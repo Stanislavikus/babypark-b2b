@@ -9,4 +9,15 @@ enum SyncLogType: string
     case Stocks = 'stocks';
     case Contractors = 'contractors';
     case Statuses = 'statuses';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::Products => 'Товари',
+            self::Prices => 'Ціни',
+            self::Stocks => 'Залишки',
+            self::Contractors => 'Контрагенти',
+            self::Statuses => 'Статуси замовлень',
+        };
+    }
 }
