@@ -182,3 +182,29 @@ Create config/onec.php for 1C connection settings.
 
 Start by creating all migrations, then models with relationships,
 then Filament resources, then Livewire cabinet pages, then services.
+
+## Cursor Cloud specific instructions
+
+The VM ships **Laravel 11** (skeleton from `laravel/laravel`) with **PHP 8.3**, **Composer** (`~/.local/bin/composer`), **MySQL 8**, **Redis**, and **Node 22**. Add `export PATH="$HOME/.local/bin:$PATH"` to your shell before `composer` (or use the full path).
+
+### Services
+
+| Service | Start (if needed) | Notes |
+|---------|-------------------|--------|
+| MySQL 8 | `sudo service mysql start` | DB `babypark_b2b`, user `babypark` / `babypark_dev` (see `.env`) |
+| Redis | `sudo service redis-server start` | Required only when `.env` uses Redis drivers |
+| Laravel HTTP | `php artisan serve --host=0.0.0.0 --port=8000` | Use a **tmux** session for long-running dev server |
+
+CLI `mysql -u root` may fail with socket permission errors; use `sudo mysql` for admin. Laravel connects via TCP (`DB_HOST=127.0.0.1`), which avoids that issue.
+
+### Commands (from repo root)
+
+See `composer.json` and `package.json` scripts. Typical workflow:
+
+- **Dependencies:** `composer install`, `npm install`, `npm run build` (or `npm run dev` while developing assets)
+- **DB:** `php artisan migrate` (and `--seed` once seeders exist)
+- **Tests:** `php artisan test`
+- **Lint:** `vendor/bin/pint` (add `--test` for CI-style check)
+- **Filament admin (future):** `/admin` after Filament is installed
+
+The B2B domain (contractors, catalog, 1C sync, Filament resources) is **not implemented yet**—only the Laravel base app and default welcome page. Implement per the sections above.
