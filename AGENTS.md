@@ -185,26 +185,132 @@ then Filament resources, then Livewire cabinet pages, then services.
 
 ## Cursor Cloud specific instructions
 
-The VM ships **Laravel 11** (skeleton from `laravel/laravel`) with **PHP 8.3**, **Composer** (`~/.local/bin/composer`), **MySQL 8**, **Redis**, and **Node 22**. Add `export PATH="$HOME/.local/bin:$PATH"` to your shell before `composer` (or use the full path).
+The VM ships **PHP 8.3**, **MySQL 8**, **Redis**, **Node 22**, and **Composer**. It runs as a container on an **overlayfs** root filesystem.
+
+### Environment setup
+
+**The canonical setup script is `scripts/cloud-setup.sh`.**  
+Paste its contents into the **Startup script** field at [cursor.com/onboard](https://cursor.com/onboard) → Cloud Agents → Environment Settings.  
+It handles all the issues described below automatically.
+
+---
+
+### Why the original startup script failed (root cause)
+
+The original startup script ran:
+```bash
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mysql-server redis-server
+```
+This failed with `dpkg: error processing package mysql-server-8.0 (--configure)` for **two compounding reasons**:
+
+#### Problem 1 — `policy-rc.d` blocks `invoke-rc.d stop`
+
+The container ships with `/usr/sbin/policy-rc.d` returning `exit 101` for **all** operations, including `stop`. MySQL's Debian post-install script (`mysql-server-8.0.postinst`) works like this:
+
+1. Starts a temporary `mysqld` directly to run initialization SQL — **succeeds**
+2. Calls `invoke-rc.d stop mysql` to shut that mysqld down — **blocked by `policy-rc.d`**
+3. Cannot kill the process → exits with error code 1
+4. `dpkg` marks `mysql-server-8.0` as broken → entire install fails
+
+Evidence from `/var/log/apt/term.log`:
+```
+invoke-rc.d: could not determine current runlevel
+invoke-rc.d: policy-rc.d denied execution of stop.
+mysqld will log errors to /var/log/mysql/error.log
+mysqld is running as pid 17130
+Error: Unable to shut down server with process id 17130
+dpkg: error processing package mysql-server-8.0 (--configure):
+ installed mysql-server-8.0 package post-installation script subprocess returned error exit status 1
+```
+
+**Fix:** Replace `policy-rc.d` with a version that allows `stop`/`restart` before installing MySQL:
+```bash
+sudo tee /usr/sbin/policy-rc.d > /dev/null << 'EOF'
+#!/bin/sh
+case "$1" in
+  stop|restart|force-reload) exit 0 ;;
+  *)                         exit 101 ;;
+esac
+EOF
+sudo chmod +x /usr/sbin/policy-rc.d
+sudo apt-get install -y mysql-server redis-server
+# restore deny-all after install
+echo '#!/bin/sh'$'\n''exit 101' | sudo tee /usr/sbin/policy-rc.d
+```
+
+#### Problem 2 — InnoDB cannot use `O_DIRECT` on overlayfs
+
+Even after the packages install, `sudo service mysql start` always fails because `/var/lib/mysql` is on **overlayfs**. MySQL 8 InnoDB redo logs use `O_DIRECT` / `fallocate` operations that overlayfs rejects with errno 22 (EINVAL):
+
+```
+[InnoDB] Operating system error number 22 in a file operation.
+[InnoDB] File (unknown): 'close' returned OS error 122. Cannot continue operation.
+```
+
+The dirty redo logs left by the killed post-install mysqld compound this — every restart attempt finds inconsistent log files and aborts.
+
+**Fix:** Initialize and run MySQL from `/dev/shm` (a true `tmpfs` volume, always present in Cursor Cloud containers, not affected by overlayfs restrictions):
+```bash
+sudo mkdir -p /dev/shm/mysql-data && sudo chown mysql:mysql /dev/shm/mysql-data
+sudo -u mysql mysqld --initialize-insecure --datadir=/dev/shm/mysql-data \
+    --innodb-use-native-aio=0 --innodb-flush-method=fsync 2>/dev/null
+```
+
+---
+
+### Recovering MySQL on an existing agent VM
+
+If MySQL is not running, run these commands (or re-run `bash scripts/cloud-setup.sh`):
+
+```bash
+DATADIR=/dev/shm/mysql-data
+SOCKET=/tmp/mysql.sock
+
+# Initialize (only needed once per VM lifecycle)
+sudo mkdir -p $DATADIR && sudo chown mysql:mysql $DATADIR
+sudo -u mysql mysqld --initialize-insecure --datadir=$DATADIR \
+    --innodb-use-native-aio=0 --innodb-flush-method=fsync 2>/dev/null
+
+# Start (run in tmux so it stays alive)
+tmux new-session -d -s mysql -- bash -c "
+    sudo -u mysql mysqld \
+        --datadir=$DATADIR --socket=$SOCKET --port=3306 \
+        --innodb-use-native-aio=0 --innodb-flush-method=fsync \
+        --skip-log-bin 2>&1 | tee /tmp/mysqld.log"
+sleep 10
+
+# Create DB and user
+mysql --socket=$SOCKET -u root -e "
+  CREATE DATABASE IF NOT EXISTS babypark_b2b CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  CREATE USER IF NOT EXISTS 'babypark'@'localhost' IDENTIFIED BY 'secret';
+  GRANT ALL PRIVILEGES ON babypark_b2b.* TO 'babypark'@'localhost';
+  FLUSH PRIVILEGES;"
+```
+
+`.env` must include `DB_SOCKET=/tmp/mysql.sock` — see `.env.example`.  
+**Never use** `sudo service mysql start` in this container — it always fails.
+
+---
 
 ### Services
 
-| Service | Start (if needed) | Notes |
-|---------|-------------------|--------|
-| MySQL 8 | `sudo service mysql start` | DB `babypark_b2b`, user `babypark` / `babypark_dev` (see `.env`) |
-| Redis | `sudo service redis-server start` | Required only when `.env` uses Redis drivers |
-| Laravel HTTP | `php artisan serve --host=0.0.0.0 --port=8000` | Use a **tmux** session for long-running dev server |
-
-CLI `mysql -u root` may fail with socket permission errors; use `sudo mysql` for admin. Laravel connects via TCP (`DB_HOST=127.0.0.1`), which avoids that issue.
+| Service | How to start | Status after `cloud-setup.sh` |
+|---------|--------------|-------------------------------|
+| MySQL 8 | `bash scripts/cloud-setup.sh` or recovery snippet above | ✅ Running on `/tmp/mysql.sock` |
+| Redis | `redis-server --daemonize yes` | ✅ Running on `127.0.0.1:6379` |
+| Laravel | `php artisan serve --host=0.0.0.0 --port=8000` (use tmux) | Manual |
 
 ### Commands (from repo root)
 
-See `composer.json` and `package.json` scripts. Typical workflow:
+```bash
+bash scripts/cloud-setup.sh   # Full one-shot setup (first time on a new VM)
 
-- **Dependencies:** `composer install`, `npm install`, `npm run build` (or `npm run dev` while developing assets)
-- **DB:** `php artisan migrate` (and `--seed` once seeders exist)
-- **Tests:** `php artisan test`
-- **Lint:** `vendor/bin/pint` (add `--test` for CI-style check)
-- **Filament admin (future):** `/admin` after Filament is installed
+composer install               # PHP dependencies
+php artisan migrate            # Run migrations
+php artisan db:seed            # Seed test data
+php artisan serve              # Dev server (use tmux)
+vendor/bin/pint                # Code style
+php artisan test               # Tests
+```
 
-The B2B domain (contractors, catalog, 1C sync, Filament resources) is **not implemented yet**—only the Laravel base app and default welcome page. Implement per the sections above.
+Admin panel: `http://localhost:8000/admin` — `admin@babypark.ua` / `password`

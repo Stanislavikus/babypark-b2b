@@ -21,3 +21,7 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Docker SSL certs (generated on server)
+/docker/nginx/ssl/
+
