@@ -185,106 +185,132 @@ then Filament resources, then Livewire cabinet pages, then services.
 
 ## Cursor Cloud specific instructions
 
-The VM ships **PHP 8.3**, **MySQL 8**, **Redis**, **Node 22**, and **Composer**. The environment is a container running on an **overlayfs** filesystem. This has two important implications documented below.
+The VM ships **PHP 8.3**, **MySQL 8**, **Redis**, **Node 22**, and **Composer**. It runs as a container on an **overlayfs** root filesystem.
 
-### Known Issue: MySQL startup script fails during VM provisioning
+### Environment setup
 
-**Root cause:** The MySQL `mysql-server-8.0` Debian post-install script starts a temporary `mysqld` process to initialize the root user, then tries to shut it down. In this container (no systemd, `policy-rc.d` blocks `invoke-rc.d`), the shutdown fails — the process cannot be killed via the normal service mechanism. This causes `dpkg` to report exit code 1, which fails the `apt-get install mysql-server` step in the cloud agent startup script.
+**The canonical setup script is `scripts/cloud-setup.sh`.**  
+Paste its contents into the **Startup script** field at [cursor.com/onboard](https://cursor.com/onboard) → Cloud Agents → Environment Settings.  
+It handles all the issues described below automatically.
 
-Additionally, the MySQL data directory (`/var/lib/mysql`) is on **overlayfs**. MySQL 8's InnoDB redo log uses `O_DIRECT` or `fallocate` calls that overlayfs rejects with errno 22 (EINVAL) or errno 122 (EDQUOT), making `sudo service mysql start` fail even after the packages are installed.
+---
 
-**Fixes required in the env setup script:**
+### Why the original startup script failed (root cause)
 
-1. **Add a policy-rc.d override before installing MySQL** so the post-install script does not try to start/stop MySQL via init:
-   ```bash
-   echo "exit 101" | sudo tee /usr/sbin/policy-rc.d && sudo chmod +x /usr/sbin/policy-rc.d
-   sudo DEBIAN_FRONTEND=noninteractive apt-get install -y mysql-server redis-server
-   sudo rm -f /usr/sbin/policy-rc.d
-   ```
-
-2. **Add InnoDB container-safe config** before first start:
-   ```bash
-   sudo bash -c 'cat > /etc/mysql/conf.d/container.cnf << EOF
-   [mysqld]
-   innodb_use_native_aio=0
-   innodb_flush_method=fsync
-   skip_log_bin=1
-   EOF'
-   ```
-
-3. **Start MySQL with a fresh data directory on a non-overlayfs path** (e.g. tmpfs under `/dev/shm`), because the existing `/var/lib/mysql` may have dirty InnoDB redo logs from the failed post-install run:
-   ```bash
-   sudo mkdir -p /dev/shm/mysql-data && sudo chown mysql:mysql /dev/shm/mysql-data
-   sudo -u mysql mysqld --initialize-insecure --datadir=/dev/shm/mysql-data \
-     --innodb-use-native-aio=0 --innodb-flush-method=fsync 2>/dev/null
-   # Start in background
-   sudo -u mysql mysqld --datadir=/dev/shm/mysql-data \
-     --socket=/tmp/mysql.sock --port=3306 \
-     --innodb-use-native-aio=0 --innodb-flush-method=fsync \
-     --skip-log-bin --daemonize
-   sleep 5
-   mysql -u root --socket=/tmp/mysql.sock -e \
-     "CREATE DATABASE IF NOT EXISTS babypark_b2b CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-      CREATE USER IF NOT EXISTS 'babypark'@'localhost' IDENTIFIED BY 'secret';
-      GRANT ALL PRIVILEGES ON babypark_b2b.* TO 'babypark'@'localhost';
-      FLUSH PRIVILEGES;"
-   ```
-
-4. **Install php8.3-sqlite3** as a fallback in case MySQL still fails:
-   ```bash
-   sudo apt-get install -y php8.3-sqlite3
-   ```
-
-### Working MySQL start procedure (for existing agents)
-
-If MySQL is not running (check with `mysql -u root --socket=/tmp/mysql.sock -e "SELECT 1"` or `pgrep mysqld`), run:
-
+The original startup script ran:
 ```bash
-# One-time: initialize fresh datadir (only if /dev/shm/mysql-data doesn't exist)
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq mysql-server redis-server
+```
+This failed with `dpkg: error processing package mysql-server-8.0 (--configure)` for **two compounding reasons**:
+
+#### Problem 1 — `policy-rc.d` blocks `invoke-rc.d stop`
+
+The container ships with `/usr/sbin/policy-rc.d` returning `exit 101` for **all** operations, including `stop`. MySQL's Debian post-install script (`mysql-server-8.0.postinst`) works like this:
+
+1. Starts a temporary `mysqld` directly to run initialization SQL — **succeeds**
+2. Calls `invoke-rc.d stop mysql` to shut that mysqld down — **blocked by `policy-rc.d`**
+3. Cannot kill the process → exits with error code 1
+4. `dpkg` marks `mysql-server-8.0` as broken → entire install fails
+
+Evidence from `/var/log/apt/term.log`:
+```
+invoke-rc.d: could not determine current runlevel
+invoke-rc.d: policy-rc.d denied execution of stop.
+mysqld will log errors to /var/log/mysql/error.log
+mysqld is running as pid 17130
+Error: Unable to shut down server with process id 17130
+dpkg: error processing package mysql-server-8.0 (--configure):
+ installed mysql-server-8.0 package post-installation script subprocess returned error exit status 1
+```
+
+**Fix:** Replace `policy-rc.d` with a version that allows `stop`/`restart` before installing MySQL:
+```bash
+sudo tee /usr/sbin/policy-rc.d > /dev/null << 'EOF'
+#!/bin/sh
+case "$1" in
+  stop|restart|force-reload) exit 0 ;;
+  *)                         exit 101 ;;
+esac
+EOF
+sudo chmod +x /usr/sbin/policy-rc.d
+sudo apt-get install -y mysql-server redis-server
+# restore deny-all after install
+echo '#!/bin/sh'$'\n''exit 101' | sudo tee /usr/sbin/policy-rc.d
+```
+
+#### Problem 2 — InnoDB cannot use `O_DIRECT` on overlayfs
+
+Even after the packages install, `sudo service mysql start` always fails because `/var/lib/mysql` is on **overlayfs**. MySQL 8 InnoDB redo logs use `O_DIRECT` / `fallocate` operations that overlayfs rejects with errno 22 (EINVAL):
+
+```
+[InnoDB] Operating system error number 22 in a file operation.
+[InnoDB] File (unknown): 'close' returned OS error 122. Cannot continue operation.
+```
+
+The dirty redo logs left by the killed post-install mysqld compound this — every restart attempt finds inconsistent log files and aborts.
+
+**Fix:** Initialize and run MySQL from `/dev/shm` (a true `tmpfs` volume, always present in Cursor Cloud containers, not affected by overlayfs restrictions):
+```bash
 sudo mkdir -p /dev/shm/mysql-data && sudo chown mysql:mysql /dev/shm/mysql-data
 sudo -u mysql mysqld --initialize-insecure --datadir=/dev/shm/mysql-data \
-  --innodb-use-native-aio=0 --innodb-flush-method=fsync 2>/dev/null
+    --innodb-use-native-aio=0 --innodb-flush-method=fsync 2>/dev/null
+```
 
-# Start MySQL
-sudo -u mysql mysqld --datadir=/dev/shm/mysql-data \
-  --socket=/tmp/mysql.sock --port=3306 \
-  --innodb-use-native-aio=0 --innodb-flush-method=fsync \
-  --skip-log-bin &
+---
+
+### Recovering MySQL on an existing agent VM
+
+If MySQL is not running, run these commands (or re-run `bash scripts/cloud-setup.sh`):
+
+```bash
+DATADIR=/dev/shm/mysql-data
+SOCKET=/tmp/mysql.sock
+
+# Initialize (only needed once per VM lifecycle)
+sudo mkdir -p $DATADIR && sudo chown mysql:mysql $DATADIR
+sudo -u mysql mysqld --initialize-insecure --datadir=$DATADIR \
+    --innodb-use-native-aio=0 --innodb-flush-method=fsync 2>/dev/null
+
+# Start (run in tmux so it stays alive)
+tmux new-session -d -s mysql -- bash -c "
+    sudo -u mysql mysqld \
+        --datadir=$DATADIR --socket=$SOCKET --port=3306 \
+        --innodb-use-native-aio=0 --innodb-flush-method=fsync \
+        --skip-log-bin 2>&1 | tee /tmp/mysqld.log"
 sleep 10
 
 # Create DB and user
-mysql -u root --socket=/tmp/mysql.sock -e "
+mysql --socket=$SOCKET -u root -e "
   CREATE DATABASE IF NOT EXISTS babypark_b2b CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
   CREATE USER IF NOT EXISTS 'babypark'@'localhost' IDENTIFIED BY 'secret';
   GRANT ALL PRIVILEGES ON babypark_b2b.* TO 'babypark'@'localhost';
   FLUSH PRIVILEGES;"
 ```
 
-`.env` must use `DB_SOCKET=/tmp/mysql.sock` (or `DB_HOST=127.0.0.1 DB_PORT=3306`) — see `.env.example`.
+`.env` must include `DB_SOCKET=/tmp/mysql.sock` — see `.env.example`.  
+**Never use** `sudo service mysql start` in this container — it always fails.
 
-**DO NOT use** `sudo service mysql start` — it will fail in this container.
+---
 
 ### Services
 
-| Service | How to start | Notes |
-|---------|--------------|-------|
-| MySQL 8 | See "Working MySQL start procedure" above | Use `/dev/shm/mysql-data` as datadir |
-| Redis | `redis-server --daemonize yes` | Installed, but may not be running |
-| Laravel HTTP | `php artisan serve --host=0.0.0.0 --port=8000` | Use a **tmux** session |
+| Service | How to start | Status after `cloud-setup.sh` |
+|---------|--------------|-------------------------------|
+| MySQL 8 | `bash scripts/cloud-setup.sh` or recovery snippet above | ✅ Running on `/tmp/mysql.sock` |
+| Redis | `redis-server --daemonize yes` | ✅ Running on `127.0.0.1:6379` |
+| Laravel | `php artisan serve --host=0.0.0.0 --port=8000` (use tmux) | Manual |
 
 ### Commands (from repo root)
 
 ```bash
-composer install                  # Install PHP dependencies
-npm install && npm run build      # Build frontend assets
-cp .env.example .env              # Copy env file
-php artisan key:generate          # Generate app key
-php artisan migrate               # Run migrations
-php artisan db:seed               # Seed test data
-php artisan serve                 # Start dev server (use tmux)
-vendor/bin/pint                   # Code style check/fix
-php artisan test                  # Run tests
+bash scripts/cloud-setup.sh   # Full one-shot setup (first time on a new VM)
+
+composer install               # PHP dependencies
+php artisan migrate            # Run migrations
+php artisan db:seed            # Seed test data
+php artisan serve              # Dev server (use tmux)
+vendor/bin/pint                # Code style
+php artisan test               # Tests
 ```
 
-Filament admin panel: `http://localhost:8000/admin`
-Default credentials (after seeding): `admin@babypark.ua` / `password`
+Admin panel: `http://localhost:8000/admin` — `admin@babypark.ua` / `password`
