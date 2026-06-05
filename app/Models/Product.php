@@ -38,6 +38,7 @@ class Product extends Model
         'rozetka_category_id',
         'meta_title',
         'meta_description',
+        'product_url',
         'is_active',
         'synced_at',
     ];

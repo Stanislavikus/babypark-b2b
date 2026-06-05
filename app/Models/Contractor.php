@@ -18,6 +18,7 @@ class Contractor extends Authenticatable
         'ipn',
         'manager_name',
         'manager_phone',
+        'email',
         'login',
         'password',
         'is_active',
