@@ -157,34 +157,21 @@ class ProductResource extends Resource
                             ? parse_url($state, PHP_URL_HOST) . rtrim(parse_url($state, PHP_URL_PATH) ?? '', '/')
                             : null),
 
-                    // Right: 48×48 thumbnail — click opens the shared bpOpenLightbox() JS overlay.
-                    // HtmlString bypasses Filament's sanitisation (triggered by ->html()) that
-                    // would strip event handlers; Htmlable rendering via {{ }} keeps them intact.
-                    Infolists\Components\TextEntry::make('photo_preview')
+                    // Right: 48×48 thumbnail. ImageEntry renders the label via the standard
+                    // entry-wrapper (<dt> above <dd>), matching the URL field on the left.
+                    // External URLs pass FILTER_VALIDATE_URL in getImageUrl() → returned as-is.
+                    // onclick opens the shared bpOpenLightbox() JS overlay.
+                    Infolists\Components\ImageEntry::make('photo_preview')
                         ->label('Фото товару')
-                        ->getStateUsing(function ($record) {
-                            if (! $record) {
-                                return new \Illuminate\Support\HtmlString('');
-                            }
-                            $url = self::firstImage($record);
-
-                            if ($url) {
-                                $safe  = e($url);
-                                $title = e($record->name);
-
-                                return new \Illuminate\Support\HtmlString(
-                                    '<img src="' . $safe . '"' .
-                                    ' style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;cursor:zoom-in;"' .
-                                    ' title="Натисніть для збільшення"' .
-                                    ' onclick="bpOpenLightbox(\'' . $safe . '\',\'' . $title . '\')" />'
-                                );
-                            }
-
-                            return new \Illuminate\Support\HtmlString(
-                                '<div style="width:48px;height:48px;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;display:flex;align-items:center;justify-content:center;">' .
-                                '<span style="color:#9ca3af;font-size:10px;">—</span></div>'
-                            );
-                        }),
+                        ->getStateUsing(fn ($record) => $record ? self::firstImage($record) : null)
+                        ->height('48px')
+                        ->width('48px')
+                        ->extraImgAttributes(fn ($record): array =>
+                            $record instanceof \App\Models\Product
+                                ? self::lightboxImgAttributes($record)
+                                : []
+                        )
+                        ->defaultImageUrl('data:image/svg+xml,' . rawurlencode(self::placeholderSvg(48))),
                 ])->columns(2),
             ]);
     }
