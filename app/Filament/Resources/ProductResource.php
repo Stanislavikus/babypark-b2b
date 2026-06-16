@@ -36,6 +36,13 @@ class ProductResource extends Resource
     {
         $images = $record->images;
 
+        // The Eloquent array cast normally decodes JSON automatically, but guard
+        // against cases where the raw JSON string bypasses the cast (e.g. when
+        // the model is constructed without going through the accessor pipeline).
+        if (is_string($images)) {
+            $images = json_decode($images, true);
+        }
+
         return is_array($images) && count($images) > 0 ? $images[0] : null;
     }
 
@@ -126,7 +133,19 @@ class ProductResource extends Resource
                     Infolists\Components\TextEntry::make('photo_preview')
                         ->label('Фото товару')
                         ->html()
-                        ->getStateUsing(fn (Product $record): string => self::buildPhotoInfolstHtml($record)),
+                        ->getStateUsing(function ($record) {
+                            if (! $record) {
+                                return '';
+                            }
+                            $images = is_string($record->images)
+                                ? json_decode($record->images, true)
+                                : $record->images;
+                            $url = is_array($images) && count($images) > 0 ? $images[0] : null;
+
+                            return $url
+                                ? '<img src="' . e($url) . '" style="max-width:200px;max-height:200px;border-radius:8px;border:1px solid #e5e7eb;object-fit:contain;background:#f9fafb;" />'
+                                : '<div style="width:200px;height:200px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:14px;">Зображення відсутнє</div>';
+                        }),
                 ])->columns(2),
             ]);
     }
