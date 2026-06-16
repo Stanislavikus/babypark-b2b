@@ -67,6 +67,10 @@ class ContractorResource extends Resource
                         ->label('Телефон менеджера')
                         ->tel()
                         ->maxLength(255),
+                    Forms\Components\TextInput::make('email')
+                        ->label('Email')
+                        ->email()
+                        ->maxLength(255),
                 ])->columns(2),
                 Forms\Components\Section::make('Кредит')->schema([
                     Forms\Components\TextInput::make('payment_delay_days')
@@ -95,6 +99,7 @@ class ContractorResource extends Resource
                     Infolists\Components\IconEntry::make('is_active')->label('Активний')->boolean(),
                     Infolists\Components\TextEntry::make('manager_name')->label('Менеджер'),
                     Infolists\Components\TextEntry::make('manager_phone')->label('Телефон'),
+                    Infolists\Components\TextEntry::make('email')->label('Email'),
                 ])->columns(2),
                 Infolists\Components\Section::make('Кредит')->schema([
                     Infolists\Components\TextEntry::make('credit_limit')
@@ -125,6 +130,11 @@ class ContractorResource extends Resource
                 Tables\Columns\TextColumn::make('login')
                     ->label('Логін')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('email')
+                    ->label('Email')
+                    ->searchable()
+                    ->copyable()
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('credit_limit')
                     ->label('Ліміт')
                     ->money('UAH')

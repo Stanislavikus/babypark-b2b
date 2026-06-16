@@ -38,26 +38,25 @@ class ProductResource extends Resource
                     Forms\Components\TextInput::make('brand')
                         ->label('Бренд')
                         ->disabled(),
-                ])->columns(3),
-                Forms\Components\Section::make('Контент (редагується)')->schema([
-                    Forms\Components\Textarea::make('description')
-                        ->label('Опис')
-                        ->rows(6)
+                    Forms\Components\TextInput::make('category.name')
+                        ->label('Категорія')
+                        ->disabled(),
+                ])->columns(2),
+
+                Forms\Components\Section::make('Сайт')->schema([
+                    Forms\Components\TextInput::make('product_url')
+                        ->label('URL товару на сайті')
+                        ->url()
+                        ->placeholder('https://babypark.ua/product/...')
+                        ->maxLength(2048)
+                        ->suffixAction(
+                            Forms\Components\Actions\Action::make('open_url')
+                                ->icon('heroicon-m-arrow-top-right-on-square')
+                                ->url(fn (?string $state) => $state)
+                                ->openUrlInNewTab()
+                                ->visible(fn (?string $state) => filled($state))
+                        )
                         ->columnSpanFull(),
-                    Forms\Components\TagsInput::make('images')
-                        ->label('URL зображень')
-                        ->placeholder('Додати URL')
-                        ->columnSpanFull(),
-                    Forms\Components\TextInput::make('meta_title')
-                        ->label('Meta title')
-                        ->maxLength(255),
-                    Forms\Components\Textarea::make('meta_description')
-                        ->label('Meta description')
-                        ->rows(3)
-                        ->columnSpanFull(),
-                    Forms\Components\TextInput::make('rozetka_category_id')
-                        ->label('Rozetka category ID')
-                        ->numeric(),
                 ]),
             ]);
     }
@@ -66,6 +65,27 @@ class ProductResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\ImageColumn::make('first_image')
+                    ->label('')
+                    ->state(fn (Product $record): ?string => is_array($record->images) && count($record->images) > 0
+                        ? $record->images[0]
+                        : null
+                    )
+                    ->size(48)
+                    ->defaultImageUrl(fn () => 'data:image/svg+xml,' . rawurlencode('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24"><rect width="24" height="24" rx="4" fill="#f3f4f6"/><path d="M8 8h8v8H8z" fill="#d1d5db"/><circle cx="10" cy="10.5" r="1.5" fill="#9ca3af"/><path d="m8 14 3-3 2 2 2-3 3 4H8z" fill="#9ca3af"/></svg>'))
+                    ->extraImgAttributes(['class' => 'cursor-pointer rounded'])
+                    ->action(
+                        Tables\Actions\Action::make('view_image')
+                            ->modalHeading(fn (Product $record) => $record->name)
+                            ->modalWidth('md')
+                            ->modalSubmitAction(false)
+                            ->modalCancelActionLabel('Закрити')
+                            ->modalContent(fn (Product $record) => view(
+                                'filament.product-image-modal',
+                                ['images' => is_array($record->images) ? $record->images : []]
+                            ))
+                            ->visible(fn (Product $record) => is_array($record->images) && count($record->images) > 0)
+                    ),
                 Tables\Columns\TextColumn::make('sku')
                     ->label('Артикул')
                     ->searchable()
@@ -80,6 +100,13 @@ class ProductResource extends Resource
                 Tables\Columns\TextColumn::make('brand')
                     ->label('Бренд')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('product_url')
+                    ->label('URL на сайті')
+                    ->url(fn (?string $state) => $state)
+                    ->openUrlInNewTab()
+                    ->placeholder('—')
+                    ->limit(40)
+                    ->tooltip(fn (?string $state) => $state),
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Активний')
                     ->boolean(),

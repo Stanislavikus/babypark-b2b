@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\StockResource\Pages;
+use App\Models\Category;
 use App\Models\Stock;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -32,14 +33,18 @@ class StockResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('variant.sku')
-                    ->label('Артикул')
-                    ->searchable()
-                    ->sortable(),
+                Tables\Columns\TextColumn::make('variant.product.category.name')
+                    ->label('Категорія')
+                    ->sortable()
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('variant.product.name')
                     ->label('Товар')
                     ->limit(40)
                     ->searchable(),
+                Tables\Columns\TextColumn::make('variant.sku')
+                    ->label('Артикул')
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('warehouse_name')
                     ->label('Склад')
                     ->sortable(),
@@ -60,6 +65,13 @@ class StockResource extends Resource
             ])
             ->defaultSort('warehouse_name')
             ->filters([
+                Tables\Filters\SelectFilter::make('category')
+                    ->label('Категорія')
+                    ->options(fn () => Category::orderBy('name')->pluck('name', 'id')->all())
+                    ->query(fn ($query, array $data) => $data['value']
+                        ? $query->whereHas('variant.product', fn ($q) => $q->where('category_id', $data['value']))
+                        : $query
+                    ),
                 Tables\Filters\SelectFilter::make('warehouse_name')
                     ->label('Склад')
                     ->options(fn () => Stock::query()->distinct()->pluck('warehouse_name', 'warehouse_name')->all()),
