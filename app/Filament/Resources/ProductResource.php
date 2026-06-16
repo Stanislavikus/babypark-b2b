@@ -54,7 +54,9 @@ class ProductResource extends Resource
             'class'   => 'rounded object-cover',
             'style'   => 'cursor: zoom-in;',
             'title'   => 'Натисніть для збільшення',
-            'onclick' => "bpOpenLightbox('{$safe}','{$title}')",
+            // stopPropagation + preventDefault prevent the wrapping <a> row link from
+            // navigating to the view page when clicking the thumbnail.
+            'onclick' => "event.stopPropagation();event.preventDefault();bpOpenLightbox('{$safe}','{$title}')",
         ];
     }
 
