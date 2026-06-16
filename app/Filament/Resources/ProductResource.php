@@ -128,10 +128,23 @@ class ProductResource extends Resource
                             ? parse_url($state, PHP_URL_HOST) . rtrim(parse_url($state, PHP_URL_PATH) ?? '', '/')
                             : null),
 
-                    // Right: 48×48 thumbnail. Click triggers the hidden 'view_image' page
-                    // action registered in ViewProduct::getHeaderActions() via Alpine $wire.
+                    // Right: 48×48 thumbnail. The infolist entry wrapper detects ->action() and
+                    // wraps the slot content in <button wire:click="mountInfolistAction(...)">
+                    // which is the correct Filament mechanism for infolist entry actions.
                     Infolists\Components\TextEntry::make('photo_preview')
                         ->label('Фото товару')
+                        ->key('photo_preview')
+                        ->action(
+                            Infolists\Components\Actions\Action::make('view_image')
+                                ->modalHeading(fn ($record) => $record->name)
+                                ->modalWidth(MaxWidth::Large)
+                                ->modalSubmitAction(false)
+                                ->modalCancelActionLabel('Закрити')
+                                ->modalContent(fn ($record) => view(
+                                    'filament.product-image-lightbox',
+                                    ['url' => self::firstImage($record), 'alt' => $record->name]
+                                ))
+                        )
                         ->getStateUsing(function ($record) {
                             if (! $record) {
                                 return new \Illuminate\Support\HtmlString('');
@@ -143,12 +156,9 @@ class ProductResource extends Resource
 
                             if ($url) {
                                 return new \Illuminate\Support\HtmlString(
-                                    '<div x-data style="display:inline-block;">' .
                                     '<img src="' . e($url) . '"' .
-                                    ' style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;cursor:zoom-in;"' .
-                                    ' title="Натисніть для збільшення"' .
-                                    ' x-on:click="$wire.mountAction(\'view_image\')" />' .
-                                    '</div>'
+                                    ' style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;"' .
+                                    ' title="Натисніть для збільшення" />'
                                 );
                             }
 
