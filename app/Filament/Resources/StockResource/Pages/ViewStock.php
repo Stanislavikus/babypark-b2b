@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\StockResource\Pages;
 
 use App\Filament\Resources\StockResource;
-use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewStock extends ViewRecord
@@ -12,8 +11,6 @@ class ViewStock extends ViewRecord
 
     protected function getHeaderActions(): array
     {
-        return [
-            Actions\EditAction::make(),
-        ];
+        return [];
     }
 }

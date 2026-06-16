@@ -36,6 +36,13 @@ class ProductResource extends Resource
     {
         $images = $record->images;
 
+        // The Eloquent array cast normally decodes JSON automatically, but guard
+        // against cases where the raw JSON string bypasses the cast (e.g. when
+        // the model is constructed without going through the accessor pipeline).
+        if (is_string($images)) {
+            $images = json_decode($images, true);
+        }
+
         return is_array($images) && count($images) > 0 ? $images[0] : null;
     }
 
@@ -83,12 +90,11 @@ class ProductResource extends Resource
                     Forms\Components\Group::make([
                         Forms\Components\Placeholder::make('photo_preview')
                             ->label('Фото товару')
-                            ->content(fn (Forms\Get $get, ?Product $record) => $record
-                                ? new \Illuminate\Support\HtmlString(
-                                    self::buildPhotoPreviewHtml($record)
-                                )
-                                : new \Illuminate\Support\HtmlString('<span class="text-sm text-gray-400">Зображення відсутнє</span>')
-                            ),
+                            ->content(fn (Forms\Get $get, ?Product $record) => new \Illuminate\Support\HtmlString(
+                                $record
+                                    ? self::buildPhotoPreviewHtml($record)
+                                    : self::buildPhotoPlaceholderHtml()
+                            )),
                     ]),
                 ])->columns(2),
             ]);
@@ -122,10 +128,24 @@ class ProductResource extends Resource
                             ? parse_url($state, PHP_URL_HOST) . rtrim(parse_url($state, PHP_URL_PATH) ?? '', '/')
                             : null),
 
-                    // Right: photo preview (infolist Placeholder)
-                    Infolists\Components\ViewEntry::make('photo_preview')
+                    // Right: photo preview — TextEntry->html() is the correct Filament 3
+                    // approach; ViewEntry does not exist in v3.3.x.
+                    Infolists\Components\TextEntry::make('photo_preview')
                         ->label('Фото товару')
-                        ->view('filament.product-photo-entry'),
+                        ->html()
+                        ->getStateUsing(function ($record) {
+                            if (! $record) {
+                                return '';
+                            }
+                            $images = is_string($record->images)
+                                ? json_decode($record->images, true)
+                                : $record->images;
+                            $url = is_array($images) && count($images) > 0 ? $images[0] : null;
+
+                            return $url
+                                ? '<img src="' . e($url) . '" style="max-width:200px;max-height:200px;border-radius:8px;border:1px solid #e5e7eb;object-fit:contain;background:#f9fafb;" />'
+                                : '<div style="width:200px;height:200px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:14px;">Зображення відсутнє</div>';
+                        }),
                 ])->columns(2),
             ]);
     }
@@ -245,13 +265,31 @@ class ProductResource extends Resource
 SVG;
     }
 
-    /** HTML snippet for the photo preview Placeholder in the edit form. */
+    /**
+     * HTML for the "no image" placeholder — styled to match other infolist/form fields
+     * (rounded border, muted background, consistent with Filament's field appearance).
+     */
+    public static function buildPhotoPlaceholderHtml(): string
+    {
+        return <<<HTML
+<div style="display:inline-flex; align-items:center; justify-content:center; width:200px; height:200px;
+            border-radius:8px; border:1px solid #e5e7eb; background:#f9fafb; color:#9ca3af;">
+    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14
+                 m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+    </svg>
+</div>
+HTML;
+    }
+
+    /** HTML for the photo preview Placeholder in the edit form (when image exists). */
     public static function buildPhotoPreviewHtml(Product $record): string
     {
         $url = self::firstImage($record);
 
         if (! $url) {
-            return '<span class="text-sm text-gray-400">Зображення відсутнє</span>';
+            return self::buildPhotoPlaceholderHtml();
         }
 
         $safe = e($url);
@@ -259,11 +297,43 @@ SVG;
 
         return <<<HTML
 <a href="{$safe}" target="_blank" rel="noopener" title="Відкрити у новій вкладці">
-  <img src="{$safe}" alt="{$alt}"
-       style="max-width:200px; max-height:200px; width:auto; height:auto; border-radius:6px; border:1px solid #e5e7eb; object-fit:contain; background:#f9fafb;"
-       onerror="this.outerHTML='<span class=\'text-sm text-gray-400\'>Не вдалося завантажити зображення</span>'"
-  />
+    <img src="{$safe}" alt="{$alt}"
+         style="max-width:200px; max-height:200px; width:auto; height:auto; border-radius:8px;
+                border:1px solid #e5e7eb; object-fit:contain; background:#f9fafb; display:block;"
+         onerror="this.outerHTML='<div style=\'display:inline-flex;align-items:center;justify-content:center;
+                  width:200px;height:200px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;color:#9ca3af;\'><svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'currentColor\' stroke-width=\'1\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\'/></svg></div>'"
+    />
 </a>
+HTML;
+    }
+
+    /**
+     * HTML for the photo entry inside an infolist TextEntry (->html()).
+     * Shows the image with a lightbox-style link; shows the styled placeholder when no image.
+     */
+    public static function buildPhotoInfolstHtml(Product $record): string
+    {
+        $url = self::firstImage($record);
+
+        if (! $url) {
+            return self::buildPhotoPlaceholderHtml();
+        }
+
+        $safe = e($url);
+        $alt  = e($record->name);
+
+        return <<<HTML
+<a href="{$safe}" target="_blank" rel="noopener noreferrer" title="Відкрити у новій вкладці">
+    <img src="{$safe}" alt="{$alt}"
+         style="max-width:200px; max-height:200px; width:auto; height:auto; border-radius:8px;
+                border:1px solid #e5e7eb; object-fit:contain; background:#f9fafb; display:block;
+                transition:opacity .15s;"
+         onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'"
+         onerror="this.closest('a').outerHTML='<div style=\'display:inline-flex;align-items:center;justify-content:center;
+                  width:200px;height:200px;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;color:#9ca3af;\'><svg xmlns=\'http://www.w3.org/2000/svg\' width=\'40\' height=\'40\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'currentColor\' stroke-width=\'1\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' d=\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\'/></svg></div>'"
+    />
+</a>
+<span style="display:block; margin-top:4px; font-size:11px; color:#9ca3af;">🔍 Відкрити фото</span>
 HTML;
     }
 }

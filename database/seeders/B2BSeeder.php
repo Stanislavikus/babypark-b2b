@@ -153,7 +153,7 @@ class B2BSeeder extends Seeder
                 'boxes_per_pallet' => 40,
                 'lead_time_days' => rand(1, 7),
                 'description' => 'Тестовий опис товару #'.$i.' для B2B кабінету.',
-                'images' => ['https://picsum.photos/seed/'.(100 + $i).'/600/600'],
+                'images' => ['https://picsum.photos/400/400?random='.$i],
                 'is_active' => true,
                 'synced_at' => now(),
             ]);
