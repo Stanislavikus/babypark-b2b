@@ -9,7 +9,6 @@ use Filament\Forms\Form;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
-use Filament\Support\Enums\MaxWidth;
 use Filament\Tables;
 use Filament\Tables\Table;
 
@@ -30,6 +29,34 @@ class ProductResource extends Resource
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Returns extra <img> attributes for thumbnail that opens the shared JS lightbox
+     * (bpOpenLightbox injected by AdminPanelProvider::BODY_END renderHook).
+     *
+     * @return array<string, string>
+     */
+    public static function lightboxImgAttributes(Product $record): array
+    {
+        $url = self::firstImage($record);
+
+        if (! $url) {
+            return [
+                'class' => 'rounded object-cover',
+                'style' => 'cursor: default;',
+            ];
+        }
+
+        $safe  = e($url);
+        $title = e($record->name);
+
+        return [
+            'class'   => 'rounded object-cover',
+            'style'   => 'cursor: zoom-in;',
+            'title'   => 'Натисніть для збільшення',
+            'onclick' => "bpOpenLightbox('{$safe}','{$title}')",
+        ];
+    }
 
     /** Returns the first image URL from a product's images JSON, or null. */
     public static function firstImage(Product $record): ?string
@@ -128,37 +155,26 @@ class ProductResource extends Resource
                             ? parse_url($state, PHP_URL_HOST) . rtrim(parse_url($state, PHP_URL_PATH) ?? '', '/')
                             : null),
 
-                    // Right: 48×48 thumbnail. The infolist entry wrapper detects ->action() and
-                    // wraps the slot content in <button wire:click="mountInfolistAction(...)">
-                    // which is the correct Filament mechanism for infolist entry actions.
+                    // Right: 48×48 thumbnail — click opens the shared bpOpenLightbox() JS overlay.
+                    // HtmlString bypasses Filament's sanitisation (triggered by ->html()) that
+                    // would strip event handlers; Htmlable rendering via {{ }} keeps them intact.
                     Infolists\Components\TextEntry::make('photo_preview')
                         ->label('Фото товару')
-                        ->key('photo_preview')
-                        ->action(
-                            Infolists\Components\Actions\Action::make('view_image')
-                                ->modalHeading(fn ($record) => $record->name)
-                                ->modalWidth(MaxWidth::Large)
-                                ->modalSubmitAction(false)
-                                ->modalCancelActionLabel('Закрити')
-                                ->modalContent(fn ($record) => view(
-                                    'filament.product-image-lightbox',
-                                    ['url' => self::firstImage($record), 'alt' => $record->name]
-                                ))
-                        )
                         ->getStateUsing(function ($record) {
                             if (! $record) {
                                 return new \Illuminate\Support\HtmlString('');
                             }
-                            $images = is_string($record->images)
-                                ? json_decode($record->images, true)
-                                : ($record->images ?? []);
-                            $url = is_array($images) && count($images) > 0 ? $images[0] : null;
+                            $url = self::firstImage($record);
 
                             if ($url) {
+                                $safe  = e($url);
+                                $title = e($record->name);
+
                                 return new \Illuminate\Support\HtmlString(
-                                    '<img src="' . e($url) . '"' .
-                                    ' style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;"' .
-                                    ' title="Натисніть для збільшення" />'
+                                    '<img src="' . $safe . '"' .
+                                    ' style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;cursor:zoom-in;"' .
+                                    ' title="Натисніть для збільшення"' .
+                                    ' onclick="bpOpenLightbox(\'' . $safe . '\',\'' . $title . '\')" />'
                                 );
                             }
 
@@ -179,29 +195,13 @@ class ProductResource extends Resource
     {
         return $table
             ->columns([
-                // 48×48 thumbnail — click opens lightbox (image only, max 600px)
+                // 48×48 thumbnail — click opens the shared bpOpenLightbox() JS overlay
                 Tables\Columns\ImageColumn::make('first_image')
                     ->label('')
                     ->state(fn (Product $record): ?string => self::firstImage($record))
                     ->size(48)
                     ->defaultImageUrl(fn () => 'data:image/svg+xml,' . rawurlencode(self::placeholderSvg(48)))
-                    ->extraImgAttributes([
-                        'class' => 'rounded object-cover',
-                        'style' => 'cursor: zoom-in;',
-                        'title' => 'Натисніть для збільшення',
-                    ])
-                    ->action(
-                        Tables\Actions\Action::make('view_image')
-                            ->modalHeading(fn (Product $record) => $record->name)
-                            ->modalWidth(MaxWidth::Large)
-                            ->modalSubmitAction(false)
-                            ->modalCancelActionLabel('Закрити')
-                            ->modalContent(fn (Product $record) => view(
-                                'filament.product-image-lightbox',
-                                ['url' => self::firstImage($record), 'alt' => $record->name]
-                            ))
-                            ->visible(fn (Product $record) => filled(self::firstImage($record)))
-                    ),
+                    ->extraImgAttributes(fn (Product $record): array => self::lightboxImgAttributes($record)),
 
                 Tables\Columns\TextColumn::make('sku')
                     ->label('Артикул')
