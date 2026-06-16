@@ -128,23 +128,32 @@ class ProductResource extends Resource
                             ? parse_url($state, PHP_URL_HOST) . rtrim(parse_url($state, PHP_URL_PATH) ?? '', '/')
                             : null),
 
-                    // Right: photo preview — TextEntry->html() is the correct Filament 3
-                    // approach; ViewEntry does not exist in v3.3.x.
+                    // Right: photo preview — returning HtmlString bypasses Filament's
+                    // HTML sanitizer so onclick attributes are preserved for lightbox.
                     Infolists\Components\TextEntry::make('photo_preview')
                         ->label('Фото товару')
-                        ->html()
                         ->getStateUsing(function ($record) {
                             if (! $record) {
-                                return '';
+                                return new \Illuminate\Support\HtmlString('');
                             }
                             $images = is_string($record->images)
                                 ? json_decode($record->images, true)
-                                : $record->images;
+                                : ($record->images ?? []);
                             $url = is_array($images) && count($images) > 0 ? $images[0] : null;
 
-                            return $url
-                                ? '<img src="' . e($url) . '" style="max-width:200px;max-height:200px;border-radius:8px;border:1px solid #e5e7eb;object-fit:contain;background:#f9fafb;" />'
-                                : '<div style="width:200px;height:200px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:14px;">Зображення відсутнє</div>';
+                            if ($url) {
+                                return new \Illuminate\Support\HtmlString(
+                                    '<img src="' . e($url) . '"
+                                    style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;cursor:zoom-in;"
+                                    onclick="window.open(this.src,\'_blank\')"
+                                    title="Натисніть для збільшення" />'
+                                );
+                            }
+
+                            return new \Illuminate\Support\HtmlString(
+                                '<div style="width:48px;height:48px;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;display:flex;align-items:center;justify-content:center;">
+                                <span style="color:#9ca3af;font-size:10px;">—</span></div>'
+                            );
                         }),
                 ])->columns(2),
             ]);
