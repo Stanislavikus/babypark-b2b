@@ -6,6 +6,8 @@ use App\Filament\Resources\StockResource\Pages;
 use App\Models\Category;
 use App\Models\Stock;
 use Filament\Forms\Form;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -27,6 +29,43 @@ class StockResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([]);
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                Infolists\Components\Section::make('Товар')->schema([
+                    Infolists\Components\TextEntry::make('variant.product.category.name')
+                        ->label('Категорія')
+                        ->placeholder('—'),
+                    Infolists\Components\TextEntry::make('variant.product.name')
+                        ->label('Назва товару')
+                        ->placeholder('—'),
+                    Infolists\Components\TextEntry::make('variant.sku')
+                        ->label('Артикул')
+                        ->placeholder('—'),
+                ])->columns(3),
+
+                Infolists\Components\Section::make('Залишки')->schema([
+                    Infolists\Components\TextEntry::make('warehouse_name')
+                        ->label('Склад'),
+                    Infolists\Components\TextEntry::make('quantity')
+                        ->label('Кількість'),
+                    Infolists\Components\TextEntry::make('reserved')
+                        ->label('Резерв'),
+                    Infolists\Components\TextEntry::make('expected_date')
+                        ->label('Очікується')
+                        ->date('d.m.Y')
+                        ->placeholder('—'),
+                    Infolists\Components\TextEntry::make('expected_quantity')
+                        ->label('Очікувана кількість')
+                        ->placeholder('—'),
+                    Infolists\Components\TextEntry::make('updated_at')
+                        ->label('Оновлено')
+                        ->dateTime('d.m.Y H:i'),
+                ])->columns(3),
+            ]);
     }
 
     public static function table(Table $table): Table
