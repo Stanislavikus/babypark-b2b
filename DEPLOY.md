@@ -390,7 +390,7 @@ docker compose exec app php artisan sync:from-onec --type=stocks
 
 - **Admin panel:** `https://b2b.babypark.ua/admin`
 - **Admin user:** `admin@babypark.ua` / `password` *(change immediately!)*
-- **Test contractor logins:** `dytyachyi-svit`, `malyuk-plus`, `ivanenko` (password: `password`)
+- **Test contractor logins:** `dytiachyi-svit`, `malyuk-plus`, `ivanenko` (password: `password`)
 
 ---
 
