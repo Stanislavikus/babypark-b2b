@@ -1,4 +1,7 @@
 /.phpunit.cache
+/babypark_b2b
+*.sqlite
+/database/*.sqlite
 /node_modules
 /public/build
 /public/hot

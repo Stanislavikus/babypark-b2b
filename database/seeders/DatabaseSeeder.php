@@ -10,6 +10,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             B2BSeeder::class,
+            DeliverySettingSeeder::class,
         ]);
     }
 }
