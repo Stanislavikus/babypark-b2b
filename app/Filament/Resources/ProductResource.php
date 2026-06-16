@@ -32,7 +32,7 @@ class ProductResource extends Resource
     // -------------------------------------------------------------------------
 
     /** Returns the first image URL from a product's images JSON, or null. */
-    private static function firstImage(Product $record): ?string
+    public static function firstImage(Product $record): ?string
     {
         $images = $record->images;
 
@@ -128,9 +128,8 @@ class ProductResource extends Resource
                             ? parse_url($state, PHP_URL_HOST) . rtrim(parse_url($state, PHP_URL_PATH) ?? '', '/')
                             : null),
 
-                    // Right: 48×48 thumbnail. HtmlString bypasses Filament's Str::sanitizeHtml()
-                    // (triggered by ->html()) which strips onclick — using HtmlString directly
-                    // keeps event handlers intact while still rendering unescaped in Blade.
+                    // Right: 48×48 thumbnail. Click triggers the hidden 'view_image' page
+                    // action registered in ViewProduct::getHeaderActions() via Alpine $wire.
                     Infolists\Components\TextEntry::make('photo_preview')
                         ->label('Фото товару')
                         ->getStateUsing(function ($record) {
@@ -144,16 +143,18 @@ class ProductResource extends Resource
 
                             if ($url) {
                                 return new \Illuminate\Support\HtmlString(
-                                    '<img src="' . e($url) . '"
-                                    style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;cursor:zoom-in;"
-                                    onclick="window.open(this.src,\'_blank\')"
-                                    title="Натисніть для збільшення" />'
+                                    '<div x-data style="display:inline-block;">' .
+                                    '<img src="' . e($url) . '"' .
+                                    ' style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;cursor:zoom-in;"' .
+                                    ' title="Натисніть для збільшення"' .
+                                    ' x-on:click="$wire.mountAction(\'view_image\')" />' .
+                                    '</div>'
                                 );
                             }
 
                             return new \Illuminate\Support\HtmlString(
-                                '<div style="width:48px;height:48px;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;display:flex;align-items:center;justify-content:center;">
-                                <span style="color:#9ca3af;font-size:10px;">—</span></div>'
+                                '<div style="width:48px;height:48px;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;display:flex;align-items:center;justify-content:center;">' .
+                                '<span style="color:#9ca3af;font-size:10px;">—</span></div>'
                             );
                         }),
                 ])->columns(2),
@@ -174,7 +175,11 @@ class ProductResource extends Resource
                     ->state(fn (Product $record): ?string => self::firstImage($record))
                     ->size(48)
                     ->defaultImageUrl(fn () => 'data:image/svg+xml,' . rawurlencode(self::placeholderSvg(48)))
-                    ->extraImgAttributes(['class' => 'cursor-pointer rounded object-cover'])
+                    ->extraImgAttributes([
+                        'class' => 'rounded object-cover',
+                        'style' => 'cursor: zoom-in;',
+                        'title' => 'Натисніть для збільшення',
+                    ])
                     ->action(
                         Tables\Actions\Action::make('view_image')
                             ->modalHeading(fn (Product $record) => $record->name)
