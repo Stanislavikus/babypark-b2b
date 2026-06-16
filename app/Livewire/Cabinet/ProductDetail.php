@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Cabinet;
 
-use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
@@ -13,13 +12,12 @@ class ProductDetail extends Component
 {
     public Product $product;
 
-    public ?int $lightboxIndex = null;
+    public bool $lightboxOpen = false;
 
     public function mount(Product $product): void
     {
         $contractor = Auth::guard('contractor')->user();
 
-        // Client may only see products where their price exists
         $hasPricing = $product->variants()
             ->whereHas('prices', fn ($q) => $q->where('contractor_id', $contractor->id))
             ->exists();
@@ -35,14 +33,14 @@ class ProductDetail extends Component
         ]);
     }
 
-    public function openLightbox(int $index): void
+    public function openLightbox(): void
     {
-        $this->lightboxIndex = $index;
+        $this->lightboxOpen = true;
     }
 
     public function closeLightbox(): void
     {
-        $this->lightboxIndex = null;
+        $this->lightboxOpen = false;
     }
 
     public function render()

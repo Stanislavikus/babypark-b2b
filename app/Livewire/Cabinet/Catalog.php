@@ -24,19 +24,21 @@ class Catalog extends Component
     #[Url]
     public string $brand = '';
 
-    public function updatedSearch(): void
+    /** Product ID whose photo lightbox is open; null = closed. */
+    public ?int $lightboxProductId = null;
+
+    public function updatedSearch(): void { $this->resetPage(); }
+    public function updatedCategory(): void { $this->resetPage(); }
+    public function updatedBrand(): void { $this->resetPage(); }
+
+    public function openPhotoLightbox(int $productId): void
     {
-        $this->resetPage();
+        $this->lightboxProductId = $productId;
     }
 
-    public function updatedCategory(): void
+    public function closePhotoLightbox(): void
     {
-        $this->resetPage();
-    }
-
-    public function updatedBrand(): void
-    {
-        $this->resetPage();
+        $this->lightboxProductId = null;
     }
 
     public function render()
@@ -49,15 +51,15 @@ class Catalog extends Component
             ->with([
                 'category',
                 'variants' => fn ($q) => $q->where('is_active', true),
-                'variants.prices' => fn ($q) => $q->where('contractor_id', $contractor->id),
+                'variants.prices'  => fn ($q) => $q->where('contractor_id', $contractor->id),
                 'variants.stocks',
             ]);
 
         if (filled($this->search)) {
             $query->where(fn ($q) => $q
                 ->where('name', 'like', "%{$this->search}%")
-                ->orWhere('sku', 'like', "%{$this->search}%")
-                ->orWhere('brand', 'like', "%{$this->search}%")
+                ->orWhere('sku',  'like', "%{$this->search}%")
+                ->orWhere('brand','like', "%{$this->search}%")
             );
         }
 
@@ -69,16 +71,19 @@ class Catalog extends Component
             $query->where('brand', $this->brand);
         }
 
-        $products = $query->orderBy('name')->paginate(24);
-
+        $products   = $query->orderBy('name')->paginate(24);
         $categories = Category::orderBy('name')->get();
-        $brands = Product::where('is_active', true)
+        $brands     = Product::where('is_active', true)
             ->whereNotNull('brand')
             ->whereHas('variants.prices', fn ($q) => $q->where('contractor_id', $contractor->id))
-            ->distinct()
-            ->orderBy('brand')
-            ->pluck('brand');
+            ->distinct()->orderBy('brand')->pluck('brand');
 
-        return view('livewire.cabinet.catalog', compact('products', 'categories', 'brands'));
+        // Resolve lightbox product if one is open
+        $lightboxProduct = $this->lightboxProductId
+            ? Product::find($this->lightboxProductId)
+            : null;
+
+        return view('livewire.cabinet.catalog',
+            compact('products', 'categories', 'brands', 'lightboxProduct'));
     }
 }
