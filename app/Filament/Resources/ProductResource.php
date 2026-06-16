@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductResource\Pages;
+use App\Models\Category;
 use App\Models\Product;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -11,6 +12,7 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class ProductResource extends Resource
 {
@@ -54,8 +56,6 @@ class ProductResource extends Resource
             'class'   => 'rounded object-cover',
             'style'   => 'cursor: zoom-in;',
             'title'   => 'Натисніть для збільшення',
-            // stopPropagation + preventDefault prevent the wrapping <a> row link from
-            // navigating to the view page when clicking the thumbnail.
             'onclick' => "event.stopPropagation();event.preventDefault();bpOpenLightbox('{$safe}','{$title}')",
         ];
     }
@@ -65,14 +65,61 @@ class ProductResource extends Resource
     {
         $images = $record->images;
 
-        // The Eloquent array cast normally decodes JSON automatically, but guard
-        // against cases where the raw JSON string bypasses the cast (e.g. when
-        // the model is constructed without going through the accessor pipeline).
         if (is_string($images)) {
             $images = json_decode($images, true);
         }
 
         return is_array($images) && count($images) > 0 ? $images[0] : null;
+    }
+
+    /** Compute stock status string for a product using category threshold logic. */
+    protected static function computeStockStatus(Product $record): string
+    {
+        $threshold    = $record->category?->stock_display_threshold ?? 10;
+        $totalQty     = 0;
+        $expectedDate = null;
+
+        foreach ($record->variants as $variant) {
+            foreach ($variant->stocks as $stock) {
+                $totalQty += (int) $stock->quantity;
+                if ($stock->expected_date && $expectedDate === null) {
+                    $expectedDate = $stock->expected_date;
+                }
+            }
+        }
+
+        if ($totalQty > $threshold) {
+            return 'В наявності';
+        }
+        if ($totalQty > 0) {
+            return "Залишилось {$totalQty} шт";
+        }
+        if ($expectedDate) {
+            return 'Очікується ' . $expectedDate->format('d.m');
+        }
+
+        return 'Немає в наявності';
+    }
+
+    /** Compute maximum RRP string for a product, or null when not available. */
+    protected static function computeRrp(Product $record): ?string
+    {
+        $maxRrp = null;
+
+        foreach ($record->variants as $variant) {
+            foreach ($variant->prices as $price) {
+                if (
+                    $price->recommended_retail_price !== null
+                    && ($maxRrp === null || $price->recommended_retail_price > $maxRrp)
+                ) {
+                    $maxRrp = (float) $price->recommended_retail_price;
+                }
+            }
+        }
+
+        return $maxRrp !== null
+            ? '₴ ' . number_format($maxRrp, 2, '.', ' ')
+            : null;
     }
 
     // -------------------------------------------------------------------------
@@ -99,7 +146,6 @@ class ProductResource extends Resource
                 ])->columns(2),
 
                 Forms\Components\Section::make('Сайт')->schema([
-                    // Left column: URL field
                     Forms\Components\Group::make([
                         Forms\Components\TextInput::make('product_url')
                             ->label('URL товару на сайті')
@@ -115,7 +161,6 @@ class ProductResource extends Resource
                             ),
                     ]),
 
-                    // Right column: photo preview
                     Forms\Components\Group::make([
                         Forms\Components\Placeholder::make('photo_preview')
                             ->label('Фото товару')
@@ -138,30 +183,42 @@ class ProductResource extends Resource
         return $infolist
             ->schema([
                 Infolists\Components\Section::make('Основне (з 1С)')->schema([
-                    Infolists\Components\TextEntry::make('sku')->label('Артикул'),
-                    Infolists\Components\TextEntry::make('name')->label('Назва'),
-                    Infolists\Components\TextEntry::make('brand')->label('Бренд')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('category.name')->label('Категорія')->placeholder('—'),
-                ])->columns(2),
+                    Infolists\Components\TextEntry::make('sku')
+                        ->label('Артикул'),
 
-                Infolists\Components\Section::make('Сайт')->schema([
-                    // Left: clickable URL
-                    Infolists\Components\TextEntry::make('product_url')
-                        ->label('URL товару на сайті')
-                        ->placeholder('—')
-                        ->url(fn (?string $state) => $state)
-                        ->openUrlInNewTab()
-                        ->icon('heroicon-m-arrow-top-right-on-square')
-                        ->iconColor('primary')
-                        ->formatStateUsing(fn (?string $state) => $state
-                            ? parse_url($state, PHP_URL_HOST) . rtrim(parse_url($state, PHP_URL_PATH) ?? '', '/')
-                            : null),
+                    Infolists\Components\TextEntry::make('name')
+                        ->label('Назва'),
 
-                    // Right: 48×48 thumbnail — click opens the shared bpOpenLightbox() JS overlay.
-                    // HtmlString bypasses Filament's sanitisation (triggered by ->html()) that
-                    // would strip event handlers; Htmlable rendering via {{ }} keeps them intact.
+                    Infolists\Components\TextEntry::make('brand')
+                        ->label('Бренд')
+                        ->placeholder('—'),
+
+                    // Stock status after "Бренд"
+                    Infolists\Components\TextEntry::make('stock_status')
+                        ->label('Наявність')
+                        ->getStateUsing(fn (Product $record): string => self::computeStockStatus($record))
+                        ->badge()
+                        ->color(fn (string $state): string => match (true) {
+                            $state === 'В наявності'                 => 'success',
+                            str_starts_with($state, 'Залишилось')    => 'warning',
+                            str_starts_with($state, 'Очікується')    => 'info',
+                            default                                  => 'gray',
+                        }),
+
+                    Infolists\Components\TextEntry::make('category.name')
+                        ->label('Категорія')
+                        ->placeholder('—'),
+
+                    // RRP after "Категорія"
+                    Infolists\Components\TextEntry::make('rrp')
+                        ->label('РРЦ')
+                        ->getStateUsing(fn (Product $record): ?string => self::computeRrp($record))
+                        ->placeholder('—'),
+
+                    // Photo thumbnail (full width)
                     Infolists\Components\TextEntry::make('photo_preview')
                         ->label('Фото товару')
+                        ->columnSpanFull()
                         ->getStateUsing(function ($record) {
                             if (! $record) {
                                 return new \Illuminate\Support\HtmlString('');
@@ -197,7 +254,6 @@ class ProductResource extends Resource
     {
         return $table
             ->columns([
-                // 48×48 thumbnail — click opens the shared bpOpenLightbox() JS overlay
                 Tables\Columns\ImageColumn::make('first_image')
                     ->label('')
                     ->state(fn (Product $record): ?string => self::firstImage($record))
@@ -227,73 +283,20 @@ class ProductResource extends Resource
 
                 Tables\Columns\TextColumn::make('rrp')
                     ->label('РРЦ')
-                    ->getStateUsing(function (Product $record): ?string {
-                        $maxRrp = null;
-                        foreach ($record->variants as $variant) {
-                            foreach ($variant->prices as $price) {
-                                if (
-                                    $price->recommended_retail_price !== null
-                                    && ($maxRrp === null || $price->recommended_retail_price > $maxRrp)
-                                ) {
-                                    $maxRrp = (float) $price->recommended_retail_price;
-                                }
-                            }
-                        }
-
-                        return $maxRrp !== null
-                            ? '₴ ' . number_format($maxRrp, 2, '.', ' ')
-                            : null;
-                    })
+                    ->getStateUsing(fn (Product $record): ?string => self::computeRrp($record))
                     ->placeholder('—')
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('stock_status')
                     ->label('Наявність')
-                    ->getStateUsing(function (Product $record): string {
-                        $threshold = $record->category?->stock_display_threshold ?? 10;
-                        $totalQty  = 0;
-                        $expectedDate = null;
-
-                        foreach ($record->variants as $variant) {
-                            foreach ($variant->stocks as $stock) {
-                                $totalQty += (int) $stock->quantity;
-                                if ($stock->expected_date && $expectedDate === null) {
-                                    $expectedDate = $stock->expected_date;
-                                }
-                            }
-                        }
-
-                        if ($totalQty > $threshold) {
-                            return 'В наявності';
-                        }
-                        if ($totalQty > 0) {
-                            return "Залишилось {$totalQty} шт";
-                        }
-                        if ($expectedDate) {
-                            return 'Очікується ' . $expectedDate->format('d.m');
-                        }
-
-                        return 'Немає в наявності';
-                    })
+                    ->getStateUsing(fn (Product $record): string => self::computeStockStatus($record))
                     ->badge()
                     ->color(fn (string $state): string => match (true) {
-                        $state === 'В наявності'            => 'success',
-                        str_starts_with($state, 'Залишилось') => 'warning',
-                        str_starts_with($state, 'Очікується') => 'info',
-                        default                              => 'gray',
+                        $state === 'В наявності'               => 'success',
+                        str_starts_with($state, 'Залишилось')  => 'warning',
+                        str_starts_with($state, 'Очікується')  => 'info',
+                        default                                => 'gray',
                     }),
-
-                // Clickable link column
-                Tables\Columns\TextColumn::make('product_url')
-                    ->label('URL на сайті')
-                    ->url(fn (?string $state) => $state)
-                    ->openUrlInNewTab()
-                    ->placeholder('—')
-                    ->icon('heroicon-m-arrow-top-right-on-square')
-                    ->iconColor('primary')
-                    ->limit(35)
-                    ->tooltip(fn (?string $state) => $state)
-                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Активний')
@@ -301,15 +304,127 @@ class ProductResource extends Resource
             ])
             ->defaultSort('sku')
             ->filters([
-                Tables\Filters\SelectFilter::make('category_id')
-                    ->label('Категорія')
-                    ->relationship('category', 'name'),
+                // Multi-select checkbox filter for categories
+                Tables\Filters\Filter::make('categories')
+                    ->form([
+                        Forms\Components\CheckboxList::make('category_ids')
+                            ->label('Категорії')
+                            ->options(fn (): array => Category::orderBy('name')
+                                ->pluck('name', 'id')
+                                ->toArray())
+                            ->columns(2),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        $ids = $data['category_ids'] ?? [];
+
+                        return $query->when(
+                            ! empty($ids),
+                            fn (Builder $q) => $q->whereIn('category_id', $ids)
+                        );
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $ids = $data['category_ids'] ?? [];
+                        if (empty($ids)) {
+                            return [];
+                        }
+
+                        $names = Category::whereIn('id', $ids)->orderBy('name')->pluck('name')->implode(', ');
+
+                        return ["Категорії: {$names}"];
+                    }),
+
+                // Multi-select checkbox filter for brands
+                Tables\Filters\Filter::make('brands')
+                    ->form([
+                        Forms\Components\CheckboxList::make('brand_values')
+                            ->label('Бренди')
+                            ->options(fn (): array => Product::whereNotNull('brand')
+                                ->distinct()
+                                ->orderBy('brand')
+                                ->pluck('brand', 'brand')
+                                ->toArray())
+                            ->columns(2),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        $brands = $data['brand_values'] ?? [];
+
+                        return $query->when(
+                            ! empty($brands),
+                            fn (Builder $q) => $q->whereIn('brand', $brands)
+                        );
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $brands = $data['brand_values'] ?? [];
+                        if (empty($brands)) {
+                            return [];
+                        }
+
+                        return ['Бренди: ' . implode(', ', $brands)];
+                    }),
+
+                // Sort options
+                Tables\Filters\Filter::make('sort_by')
+                    ->form([
+                        Forms\Components\Select::make('sort_option')
+                            ->label('Сортування')
+                            ->placeholder('За замовчуванням')
+                            ->options([
+                                'rrp_asc'    => 'РРЦ: від меншого до більшого',
+                                'rrp_desc'   => 'РРЦ: від більшого до меншого',
+                                'stock_first' => 'Наявність: спочатку в наявності',
+                            ]),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        $option = $data['sort_option'] ?? null;
+                        if (! $option) {
+                            return $query;
+                        }
+
+                        // Correlated subquery for max RRP across all variants of a product
+                        $rrpSubq = '(SELECT MAX(p.recommended_retail_price)'
+                            . ' FROM prices p'
+                            . ' JOIN product_variants pv ON pv.id = p.variant_id'
+                            . ' WHERE pv.product_id = products.id)';
+
+                        // Correlated subquery for total stock quantity
+                        $stockSubq = '(SELECT COALESCE(SUM(s.quantity), 0)'
+                            . ' FROM stocks s'
+                            . ' JOIN product_variants pv ON pv.id = s.variant_id'
+                            . ' WHERE pv.product_id = products.id)';
+
+                        match ($option) {
+                            // ISNULL() = 0 for non-null → non-null rows sort first; then by value asc
+                            'rrp_asc'    => $query
+                                ->orderByRaw("ISNULL({$rrpSubq}) ASC")
+                                ->orderByRaw("{$rrpSubq} ASC"),
+
+                            // NULLs still last (ISNULL ASC), then highest RRP first
+                            'rrp_desc'   => $query
+                                ->orderByRaw("ISNULL({$rrpSubq}) ASC")
+                                ->orderByRaw("{$rrpSubq} DESC"),
+
+                            // Most stock first
+                            'stock_first' => $query->orderByRaw("{$stockSubq} DESC"),
+
+                            default => null,
+                        };
+
+                        return $query;
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        return match ($data['sort_option'] ?? null) {
+                            'rrp_asc'    => ['Сортування: РРЦ ↑'],
+                            'rrp_desc'   => ['Сортування: РРЦ ↓'],
+                            'stock_first' => ['Сортування: в наявності спочатку'],
+                            default      => [],
+                        };
+                    }),
+
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Активний'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([]);
     }
@@ -363,10 +478,6 @@ class ProductResource extends Resource
 SVG;
     }
 
-    /**
-     * HTML for the "no image" placeholder — styled to match other infolist/form fields
-     * (rounded border, muted background, consistent with Filament's field appearance).
-     */
     public static function buildPhotoPlaceholderHtml(): string
     {
         return <<<HTML
@@ -406,7 +517,7 @@ HTML;
     }
 
     /**
-     * HTML for the photo entry inside an infolist TextEntry (->html()).
+     * HTML for the photo entry inside an infolist TextEntry.
      * Shows the image with a lightbox-style link; shows the styled placeholder when no image.
      */
     public static function buildPhotoInfolstHtml(Product $record): string
