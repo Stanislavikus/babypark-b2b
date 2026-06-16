@@ -213,6 +213,7 @@ class ProductResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->label('Назва')
                     ->searchable()
+                    ->sortable()
                     ->limit(50),
 
                 Tables\Columns\TextColumn::make('category.name')
@@ -221,7 +222,66 @@ class ProductResource extends Resource
 
                 Tables\Columns\TextColumn::make('brand')
                     ->label('Бренд')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('rrp')
+                    ->label('РРЦ')
+                    ->getStateUsing(function (Product $record): ?string {
+                        $maxRrp = null;
+                        foreach ($record->variants as $variant) {
+                            foreach ($variant->prices as $price) {
+                                if (
+                                    $price->recommended_retail_price !== null
+                                    && ($maxRrp === null || $price->recommended_retail_price > $maxRrp)
+                                ) {
+                                    $maxRrp = (float) $price->recommended_retail_price;
+                                }
+                            }
+                        }
+
+                        return $maxRrp !== null
+                            ? '₴ ' . number_format($maxRrp, 2, '.', ' ')
+                            : null;
+                    })
+                    ->placeholder('—')
+                    ->toggleable(),
+
+                Tables\Columns\TextColumn::make('stock_status')
+                    ->label('Наявність')
+                    ->getStateUsing(function (Product $record): string {
+                        $threshold = $record->category?->stock_display_threshold ?? 10;
+                        $totalQty  = 0;
+                        $expectedDate = null;
+
+                        foreach ($record->variants as $variant) {
+                            foreach ($variant->stocks as $stock) {
+                                $totalQty += (int) $stock->quantity;
+                                if ($stock->expected_date && $expectedDate === null) {
+                                    $expectedDate = $stock->expected_date;
+                                }
+                            }
+                        }
+
+                        if ($totalQty > $threshold) {
+                            return 'В наявності';
+                        }
+                        if ($totalQty > 0) {
+                            return "Залишилось {$totalQty} шт";
+                        }
+                        if ($expectedDate) {
+                            return 'Очікується ' . $expectedDate->format('d.m');
+                        }
+
+                        return 'Немає в наявності';
+                    })
+                    ->badge()
+                    ->color(fn (string $state): string => match (true) {
+                        $state === 'В наявності'            => 'success',
+                        str_starts_with($state, 'Залишилось') => 'warning',
+                        str_starts_with($state, 'Очікується') => 'info',
+                        default                              => 'gray',
+                    }),
 
                 // Clickable link column
                 Tables\Columns\TextColumn::make('product_url')
@@ -232,7 +292,8 @@ class ProductResource extends Resource
                     ->icon('heroicon-m-arrow-top-right-on-square')
                     ->iconColor('primary')
                     ->limit(35)
-                    ->tooltip(fn (?string $state) => $state),
+                    ->tooltip(fn (?string $state) => $state)
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Активний')
@@ -251,6 +312,16 @@ class ProductResource extends Resource
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([]);
+    }
+
+    // -------------------------------------------------------------------------
+    // Eager loading
+    // -------------------------------------------------------------------------
+
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['variants.stocks', 'variants.prices', 'category']);
     }
 
     // -------------------------------------------------------------------------
