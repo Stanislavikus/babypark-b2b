@@ -195,6 +195,12 @@ class ProductResource extends Resource
                                 : null;
                         })
                         ->placeholder('—'),
+                    // Row 4: Статус | (empty)
+                    Infolists\Components\TextEntry::make('admin_status')
+                        ->label('Статус')
+                        ->getStateUsing(fn (Product $record): string => $record->is_active ? 'Активний' : 'Неактивний')
+                        ->badge()
+                        ->color(fn (string $state): string => $state === 'Активний' ? 'success' : 'gray'),
                 ])->columns(2),
 
                 Infolists\Components\Section::make('Сайт')->schema([
@@ -364,9 +370,8 @@ class ProductResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\IconColumn::make('is_active')
-                    ->label('Активний')
-                    ->boolean()
-                    ->sortable(),
+                    ->label('Статус')
+                    ->boolean(),
             ])
             ->defaultSort('sku')
             ->recordUrl(fn (Product $record): string => static::getUrl('view', ['record' => $record]))
@@ -385,6 +390,21 @@ class ProductResource extends Resource
                         ->pluck('brand', 'brand')
                         ->toArray())
                     ->multiple(),
+                Tables\Filters\SelectFilter::make('status')
+                    ->label('Статус')
+                    ->options([
+                        'active'   => 'Тільки активні',
+                        'inactive' => 'Тільки неактивні',
+                        'all'      => 'Всі',
+                    ])
+                    ->default('active')
+                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
+                        return match ($data['value'] ?? 'active') {
+                            'active'   => $query->where('is_active', true),
+                            'inactive' => $query->where('is_active', false),
+                            default    => $query,
+                        };
+                    }),
             ])
             ->actions([])
             ->bulkActions([]);

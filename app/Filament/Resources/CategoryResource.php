@@ -32,7 +32,7 @@ class CategoryResource extends Resource
                     ->label('Назва')
                     ->disabled(),
                 Forms\Components\TextInput::make('stock_display_threshold')
-                    ->label('Поріг відображення залишку')
+                    ->label('Поріг відображення')
                     ->helperText('Якщо залишок ≤ порогу — показувати точну кількість')
                     ->required()
                     ->numeric()
@@ -53,7 +53,7 @@ class CategoryResource extends Resource
                     ->label('Батьківська')
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('stock_display_threshold')
-                    ->label('Поріг залишку')
+                    ->label('Поріг відображення')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('products_count')
                     ->label('Товарів')
