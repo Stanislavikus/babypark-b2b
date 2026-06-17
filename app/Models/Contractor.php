@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
@@ -18,6 +19,8 @@ class Contractor extends Authenticatable
         'ipn',
         'manager_name',
         'manager_phone',
+        'account_manager_id',
+        'backup_manager_id',
         'email',
         'login',
         'password',
@@ -57,5 +60,63 @@ class Contractor extends Authenticatable
     public function reservations(): HasMany
     {
         return $this->hasMany(Reservation::class);
+    }
+
+    public function accountManager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'account_manager_id');
+    }
+
+    public function backupManager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'backup_manager_id');
+    }
+
+    /**
+     * Returns ['name' => ..., 'phone' => ...] for the effective manager contact.
+     *
+     * Priority:
+     * 1. No account_manager_id set → use manager_name / manager_phone (legacy fields)
+     * 2. account_manager_id set + not on vacation → use that user's name/phone
+     * 3. account_manager on vacation + backup_manager available → use backup's name/phone
+     * 4. Fallback → manager_name / manager_phone
+     */
+    public function effectiveManager(): array
+    {
+        $fallback = [
+            'name'  => $this->manager_name,
+            'phone' => $this->manager_phone,
+        ];
+
+        if (! $this->account_manager_id) {
+            return $fallback;
+        }
+
+        $manager = $this->accountManager;
+
+        if (! $manager) {
+            return $fallback;
+        }
+
+        if (! $manager->isOnVacation()) {
+            return [
+                'name'  => $manager->name,
+                'phone' => $manager->phone,
+            ];
+        }
+
+        // Account manager is on vacation — try backup
+        if ($this->backup_manager_id) {
+            $backup = $this->backupManager;
+
+            if ($backup && ! $backup->isOnVacation()) {
+                return [
+                    'name'  => $backup->name,
+                    'phone' => $backup->phone,
+                ];
+            }
+        }
+
+        return $fallback;
     }
 }

@@ -21,6 +21,8 @@ class User extends Authenticatable implements FilamentUser
         'contractor_id',
         'name',
         'email',
+        'phone',
+        'vacation_until',
         'password',
         'role',
         'is_active',
@@ -38,7 +40,13 @@ class User extends Authenticatable implements FilamentUser
             'password' => 'hashed',
             'role' => UserRole::class,
             'is_active' => 'boolean',
+            'vacation_until' => 'date',
         ];
+    }
+
+    public function isOnVacation(): bool
+    {
+        return $this->vacation_until !== null && $this->vacation_until->isFuture();
     }
 
     public function contractor(): BelongsTo

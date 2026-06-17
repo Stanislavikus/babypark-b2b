@@ -17,18 +17,25 @@
                 <a href="{{ route('cabinet.catalog') }}" class="text-lg font-bold text-indigo-600">
                     BabyPark B2B
                 </a>
+                <a href="{{ route('cabinet.dashboard') }}"
+                   class="text-sm font-medium transition-colors hover:text-indigo-600 {{ request()->routeIs('cabinet.dashboard') ? 'text-indigo-600' : 'text-gray-700' }}">
+                    Кабінет
+                </a>
                 <a href="{{ route('cabinet.catalog') }}"
-                   class="text-sm font-medium text-gray-700 hover:text-indigo-600 {{ request()->routeIs('cabinet.catalog') ? 'text-indigo-600' : '' }}">
+                   class="text-sm font-medium transition-colors hover:text-indigo-600 {{ request()->routeIs('cabinet.catalog*') ? 'text-indigo-600' : 'text-gray-700' }}">
                     Каталог
                 </a>
             </div>
             <div class="flex items-center gap-4">
+                {{-- Cart indicator --}}
+                @livewire('cabinet.cart-indicator')
+
                 <span class="text-sm text-gray-600">
                     {{ auth('contractor')->user()->short_name ?? auth('contractor')->user()->name }}
                 </span>
                 <form method="POST" action="{{ route('cabinet.logout') }}">
                     @csrf
-                    <button type="submit" class="text-sm text-gray-500 hover:text-red-600">
+                    <button type="submit" class="text-sm text-gray-500 hover:text-red-600 transition-colors">
                         Вийти
                     </button>
                 </form>

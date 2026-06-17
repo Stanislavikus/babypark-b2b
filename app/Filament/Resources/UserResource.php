@@ -39,6 +39,15 @@ class UserResource extends Resource
                     ->required()
                     ->maxLength(255)
                     ->unique(ignoreRecord: true),
+                Forms\Components\TextInput::make('phone')
+                    ->label('Телефон')
+                    ->tel()
+                    ->nullable()
+                    ->maxLength(50),
+                Forms\Components\DatePicker::make('vacation_until')
+                    ->label('У відпустці до')
+                    ->nullable()
+                    ->displayFormat('d.m.Y'),
                 Forms\Components\Select::make('role')
                     ->label('Роль')
                     ->options(UserRole::options())
@@ -78,6 +87,15 @@ class UserResource extends Resource
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Активний')
                     ->boolean(),
+                Tables\Columns\TextColumn::make('phone')
+                    ->label('Телефон')
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('vacation_until')
+                    ->label('Відпустка до')
+                    ->date('d.m.Y')
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Створено')
                     ->dateTime('d.m.Y')
