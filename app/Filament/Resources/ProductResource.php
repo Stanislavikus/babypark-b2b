@@ -138,10 +138,63 @@ class ProductResource extends Resource
         return $infolist
             ->schema([
                 Infolists\Components\Section::make('Основне (з 1С)')->schema([
+                    // Row 1: Артикул | Назва
                     Infolists\Components\TextEntry::make('sku')->label('Артикул'),
                     Infolists\Components\TextEntry::make('name')->label('Назва'),
+                    // Row 2: Бренд | Наявність (real admin quantity, no threshold)
                     Infolists\Components\TextEntry::make('brand')->label('Бренд')->placeholder('—'),
+                    Infolists\Components\TextEntry::make('admin_stock_status')
+                        ->label('Наявність')
+                        ->getStateUsing(function (Product $record): string {
+                            $totalQty = 0;
+                            $earliestExpectedDate = null;
+
+                            foreach ($record->variants as $variant) {
+                                foreach ($variant->stocks as $stock) {
+                                    $totalQty += (int) $stock->quantity;
+                                    if ($stock->expected_date !== null && ($earliestExpectedDate === null || $stock->expected_date < $earliestExpectedDate)) {
+                                        $earliestExpectedDate = $stock->expected_date;
+                                    }
+                                }
+                            }
+
+                            if ($totalQty > 0) {
+                                return "У наявності: {$totalQty} шт";
+                            }
+                            if ($earliestExpectedDate) {
+                                return 'Очікується ' . $earliestExpectedDate->format('d.m');
+                            }
+
+                            return 'Немає в наявності';
+                        })
+                        ->badge()
+                        ->color(fn (string $state): string => match (true) {
+                            str_starts_with($state, 'У наявності') => 'success',
+                            str_starts_with($state, 'Очікується')  => 'info',
+                            default                                 => 'gray',
+                        }),
+                    // Row 3: Категорія | РРЦ
                     Infolists\Components\TextEntry::make('category.name')->label('Категорія')->placeholder('—'),
+                    Infolists\Components\TextEntry::make('admin_rrp')
+                        ->label('РРЦ')
+                        ->getStateUsing(function (Product $record): ?string {
+                            $maxRrp = null;
+                            foreach ($record->variants as $variant) {
+                                foreach ($variant->prices as $price) {
+                                    if (
+                                        $price->recommended_retail_price !== null
+                                        && ($maxRrp === null || $price->recommended_retail_price > $maxRrp)
+                                    ) {
+                                        $maxRrp = (float) $price->recommended_retail_price;
+                                    }
+                                }
+                            }
+
+                            return $maxRrp !== null
+                                ? '₴ ' . number_format($maxRrp, 2, '.', ' ')
+                                : null;
+                        })
+                        ->placeholder('—'),
                 ])->columns(2),
 
                 Infolists\Components\Section::make('Сайт')->schema([
@@ -197,13 +250,14 @@ class ProductResource extends Resource
     {
         return $table
             ->columns([
-                // 48×48 thumbnail — click opens the shared bpOpenLightbox() JS overlay
+                // 48×48 thumbnail — toggleable; click opens the shared bpOpenLightbox() JS overlay
                 Tables\Columns\ImageColumn::make('first_image')
-                    ->label('')
+                    ->label('Фото')
                     ->state(fn (Product $record): ?string => self::firstImage($record))
                     ->size(48)
                     ->defaultImageUrl(fn () => 'data:image/svg+xml,' . rawurlencode(self::placeholderSvg(48)))
-                    ->extraImgAttributes(fn (Product $record): array => self::lightboxImgAttributes($record)),
+                    ->extraImgAttributes(fn (Product $record): array => self::lightboxImgAttributes($record))
+                    ->toggleable(),
 
                 Tables\Columns\TextColumn::make('sku')
                     ->label('Артикул')
@@ -245,42 +299,56 @@ class ProductResource extends Resource
                             : null;
                     })
                     ->placeholder('—')
-                    ->toggleable(),
+                    ->toggleable()
+                    ->sortable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $direction): \Illuminate\Database\Eloquent\Builder {
+                        return $query->orderByRaw(
+                            "COALESCE(
+                                (SELECT MAX(pr.recommended_retail_price)
+                                 FROM prices pr
+                                 INNER JOIN product_variants pv ON pr.variant_id = pv.id
+                                 WHERE pv.product_id = products.id),
+                                0
+                            ) {$direction}"
+                        );
+                    }),
 
                 Tables\Columns\TextColumn::make('stock_status')
                     ->label('Наявність')
                     ->getStateUsing(function (Product $record): string {
-                        $threshold = $record->category?->stock_display_threshold ?? 10;
-                        $totalQty  = 0;
-                        $expectedDate = null;
+                        $totalQty = 0;
+                        $earliestExpectedDate = null;
 
                         foreach ($record->variants as $variant) {
                             foreach ($variant->stocks as $stock) {
                                 $totalQty += (int) $stock->quantity;
-                                if ($stock->expected_date && $expectedDate === null) {
-                                    $expectedDate = $stock->expected_date;
+                                if ($stock->expected_date !== null && ($earliestExpectedDate === null || $stock->expected_date < $earliestExpectedDate)) {
+                                    $earliestExpectedDate = $stock->expected_date;
                                 }
                             }
                         }
 
-                        if ($totalQty > $threshold) {
-                            return 'В наявності';
-                        }
                         if ($totalQty > 0) {
-                            return "Залишилось {$totalQty} шт";
+                            return "У наявності: {$totalQty} шт";
                         }
-                        if ($expectedDate) {
-                            return 'Очікується ' . $expectedDate->format('d.m');
+                        if ($earliestExpectedDate) {
+                            return 'Очікується ' . $earliestExpectedDate->format('d.m');
                         }
 
                         return 'Немає в наявності';
                     })
                     ->badge()
                     ->color(fn (string $state): string => match (true) {
-                        $state === 'В наявності'            => 'success',
-                        str_starts_with($state, 'Залишилось') => 'warning',
-                        str_starts_with($state, 'Очікується') => 'info',
-                        default                              => 'gray',
+                        str_starts_with($state, 'У наявності') => 'success',
+                        str_starts_with($state, 'Очікується')  => 'info',
+                        default                                 => 'gray',
+                    })
+                    ->sortable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $direction): \Illuminate\Database\Eloquent\Builder {
+                        return $query->orderByRaw(
+                            "(SELECT COALESCE(SUM(s.quantity), 0)
+                              FROM stocks s
+                              INNER JOIN product_variants pv ON s.variant_id = pv.id
+                              WHERE pv.product_id = products.id) {$direction}"
+                        );
                     }),
 
                 // Clickable link column
@@ -297,20 +365,28 @@ class ProductResource extends Resource
 
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Активний')
-                    ->boolean(),
+                    ->boolean()
+                    ->sortable(),
             ])
             ->defaultSort('sku')
+            ->recordUrl(fn (Product $record): string => static::getUrl('view', ['record' => $record]))
             ->filters([
                 Tables\Filters\SelectFilter::make('category_id')
-                    ->label('Категорія')
-                    ->relationship('category', 'name'),
-                Tables\Filters\TernaryFilter::make('is_active')
-                    ->label('Активний'),
+                    ->label('Категорії')
+                    ->relationship('category', 'name')
+                    ->multiple()
+                    ->preload(),
+                Tables\Filters\SelectFilter::make('brand')
+                    ->label('Бренди')
+                    ->options(fn (): array => \App\Models\Product::query()
+                        ->distinct()
+                        ->orderBy('brand')
+                        ->whereNotNull('brand')
+                        ->pluck('brand', 'brand')
+                        ->toArray())
+                    ->multiple(),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-            ])
+            ->actions([])
             ->bulkActions([]);
     }
 
@@ -333,7 +409,6 @@ class ProductResource extends Resource
         return [
             'index' => Pages\ListProducts::route('/'),
             'view'  => Pages\ViewProduct::route('/{record}'),
-            'edit'  => Pages\EditProduct::route('/{record}/edit'),
         ];
     }
 
