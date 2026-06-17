@@ -349,12 +349,31 @@ class ProductResource extends Resource
                         default                                 => 'gray',
                     })
                     ->sortable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $direction): \Illuminate\Database\Eloquent\Builder {
-                        return $query->orderByRaw(
-                            "(SELECT COALESCE(SUM(s.quantity), 0)
-                              FROM stocks s
-                              INNER JOIN product_variants pv ON s.variant_id = pv.id
-                              WHERE pv.product_id = products.id) {$direction}"
-                        );
+                        // Subquery expressions reused across ORDER BY clauses.
+                        $totalQty = "(SELECT COALESCE(SUM(s.quantity), 0)
+                                      FROM stocks s
+                                      INNER JOIN product_variants pv ON s.variant_id = pv.id
+                                      WHERE pv.product_id = products.id)";
+
+                        $minExpectedDate = "(SELECT MIN(s.expected_date)
+                                            FROM stocks s
+                                            INNER JOIN product_variants pv ON s.variant_id = pv.id
+                                            WHERE pv.product_id = products.id)";
+
+                        // Priority bucket: 0 = У наявності, 1 = Очікується, 2 = Немає в наявності.
+                        // Sorting by $direction means asc→best-first, desc→worst-first.
+                        $priorityExpr = "CASE
+                            WHEN {$totalQty} > 0 THEN 0
+                            WHEN {$minExpectedDate} IS NOT NULL THEN 1
+                            ELSE 2
+                        END";
+
+                        return $query
+                            ->orderByRaw("{$priorityExpr} {$direction}")
+                            // Within "У наявності" bucket: more stock first (fixed DESC).
+                            ->orderByRaw("{$totalQty} DESC")
+                            // Within "Очікується" bucket: soonest arrival first (fixed ASC).
+                            ->orderByRaw("{$minExpectedDate} ASC");
                     }),
 
                 // Clickable link column
@@ -371,7 +390,12 @@ class ProductResource extends Resource
 
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Статус')
-                    ->boolean(),
+                    ->boolean()
+                    ->sortable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $direction): \Illuminate\Database\Eloquent\Builder {
+                        // Secondary sort by id keeps rows stable when all visible values are identical
+                        // (e.g. when a status filter is active and every row shares the same is_active value).
+                        return $query->orderBy('is_active', $direction)->orderBy('id', $direction);
+                    }),
             ])
             ->defaultSort('sku')
             ->recordUrl(fn (Product $record): string => static::getUrl('view', ['record' => $record]))
@@ -392,14 +416,14 @@ class ProductResource extends Resource
                     ->multiple(),
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Статус')
+                    ->placeholder('Всі')
                     ->options([
                         'active'   => 'Тільки активні',
                         'inactive' => 'Тільки неактивні',
-                        'all'      => 'Всі',
                     ])
                     ->default('active')
                     ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
-                        return match ($data['value'] ?? 'active') {
+                        return match ($data['value'] ?? null) {
                             'active'   => $query->where('is_active', true),
                             'inactive' => $query->where('is_active', false),
                             default    => $query,
