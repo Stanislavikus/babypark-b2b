@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\UserRole;
 use App\Filament\Resources\ContractorResource\Pages;
 use App\Filament\Resources\ContractorResource\RelationManagers;
 use App\Models\Contractor;
+use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
@@ -61,16 +63,46 @@ class ContractorResource extends Resource
                         ->label('ІПН')
                         ->maxLength(20),
                     Forms\Components\TextInput::make('manager_name')
-                        ->label('Менеджер')
+                        ->label('Менеджер (текст)')
                         ->maxLength(255),
                     Forms\Components\TextInput::make('manager_phone')
-                        ->label('Телефон менеджера')
+                        ->label('Телефон менеджера (текст)')
                         ->tel()
                         ->maxLength(255),
                     Forms\Components\TextInput::make('email')
                         ->label('Email')
                         ->email()
                         ->maxLength(255),
+                    Forms\Components\Select::make('account_manager_id')
+                        ->label('Акаунт менеджер')
+                        ->options(
+                            User::whereIn('role', [
+                                UserRole::Manager->value,
+                                UserRole::Merchandiser->value,
+                                UserRole::Director->value,
+                            ])
+                                ->where('is_active', true)
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
+                        )
+                        ->searchable()
+                        ->nullable()
+                        ->placeholder('— не призначено —'),
+                    Forms\Components\Select::make('backup_manager_id')
+                        ->label('Резервний менеджер')
+                        ->options(
+                            User::whereIn('role', [
+                                UserRole::Manager->value,
+                                UserRole::Merchandiser->value,
+                                UserRole::Director->value,
+                            ])
+                                ->where('is_active', true)
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
+                        )
+                        ->searchable()
+                        ->nullable()
+                        ->placeholder('— не призначено —'),
                 ])->columns(2),
                 Forms\Components\Section::make('Кредит')->schema([
                     Forms\Components\TextInput::make('payment_delay_days')
@@ -97,9 +129,15 @@ class ContractorResource extends Resource
                     Infolists\Components\TextEntry::make('name')->label('Назва'),
                     Infolists\Components\TextEntry::make('login')->label('Логін'),
                     Infolists\Components\IconEntry::make('is_active')->label('Активний')->boolean(),
-                    Infolists\Components\TextEntry::make('manager_name')->label('Менеджер'),
-                    Infolists\Components\TextEntry::make('manager_phone')->label('Телефон'),
+                    Infolists\Components\TextEntry::make('manager_name')->label('Менеджер (текст)'),
+                    Infolists\Components\TextEntry::make('manager_phone')->label('Телефон (текст)'),
                     Infolists\Components\TextEntry::make('email')->label('Email'),
+                    Infolists\Components\TextEntry::make('accountManager.name')
+                        ->label('Акаунт менеджер')
+                        ->placeholder('—'),
+                    Infolists\Components\TextEntry::make('backupManager.name')
+                        ->label('Резервний менеджер')
+                        ->placeholder('—'),
                 ])->columns(2),
                 Infolists\Components\Section::make('Кредит')->schema([
                     Infolists\Components\TextEntry::make('credit_limit')
