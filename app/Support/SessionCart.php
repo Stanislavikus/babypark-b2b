@@ -30,7 +30,7 @@ class SessionCart
         } else {
             $cart[$variantId] = [
                 'variant_id' => $variantId,
-                'quantity'   => $quantity,
+                'quantity' => $quantity,
             ];
         }
 

@@ -46,8 +46,8 @@ class Dashboard extends Component
             ->get();
 
         return view('livewire.cabinet.dashboard', [
-            'contractor'   => $contractor,
-            'manager'      => $contractor->effectiveManager(),
+            'contractor' => $contractor,
+            'manager' => $contractor->effectiveManager(),
             'recentOrders' => $recentOrders,
         ]);
     }

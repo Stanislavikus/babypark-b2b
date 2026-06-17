@@ -8,7 +8,6 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Reservation;
 use App\Support\SessionCart;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -45,9 +44,20 @@ class Catalog extends Component
     /** Flash message after cart/reservation action */
     public ?string $flashMessage = null;
 
-    public function updatedSearch(): void { $this->resetPage(); }
-    public function updatedCategory(): void { $this->resetPage(); }
-    public function updatedBrand(): void { $this->resetPage(); }
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedCategory(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedBrand(): void
+    {
+        $this->resetPage();
+    }
 
     public function setViewMode(string $mode): void
     {
@@ -104,10 +114,10 @@ class Catalog extends Component
 
         Reservation::create([
             'contractor_id' => $contractor->id,
-            'variant_id'    => $variantId,
-            'quantity'      => $qty,
-            'status'        => ReservationStatus::Active,
-            'expires_at'    => now()->addHours(config('b2b.reservation_ttl_hours', 48)),
+            'variant_id' => $variantId,
+            'quantity' => $qty,
+            'status' => ReservationStatus::Active,
+            'expires_at' => now()->addHours(config('b2b.reservation_ttl_hours', 48)),
         ]);
 
         $this->flashMessage = 'Бронювання створено';
@@ -124,14 +134,14 @@ class Catalog extends Component
             ->with([
                 'category',
                 'variants' => fn ($q) => $q->where('is_active', true),
-                'variants.prices'  => fn ($q) => $q->where('contractor_id', $contractor->id),
+                'variants.prices' => fn ($q) => $q->where('contractor_id', $contractor->id),
                 'variants.stocks',
             ]);
 
         if (filled($this->search)) {
             $query->where(fn ($q) => $q
-                ->where('name',  'like', "%{$this->search}%")
-                ->orWhere('sku',   'like', "%{$this->search}%")
+                ->where('name', 'like', "%{$this->search}%")
+                ->orWhere('sku', 'like', "%{$this->search}%")
                 ->orWhere('brand', 'like', "%{$this->search}%")
             );
         }
@@ -150,14 +160,14 @@ class Catalog extends Component
         // and initialise quantity defaults.
         $productData = [];
         foreach ($products as $product) {
-            $threshold     = $product->category?->stock_display_threshold ?? 10;
+            $threshold = $product->category?->stock_display_threshold ?? 10;
             $activeVariants = $product->variants->where('is_active', true);
             $variantsWithPrice = $activeVariants->filter(fn ($v) => $v->prices->isNotEmpty());
-            $firstVariant  = $variantsWithPrice->first();
+            $firstVariant = $variantsWithPrice->first();
 
             // Aggregate stock across ALL active variants for the badge
-            $totalAvailQty  = $activeVariants->sum(fn ($v) => $v->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0)));
-            $totalExpQty    = $activeVariants->sum(fn ($v) => $v->stocks->sum('expected_quantity')) ?? 0;
+            $totalAvailQty = $activeVariants->sum(fn ($v) => $v->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0)));
+            $totalExpQty = $activeVariants->sum(fn ($v) => $v->stocks->sum('expected_quantity')) ?? 0;
             $earliestExpDate = $activeVariants
                 ->flatMap(fn ($v) => $v->stocks)
                 ->whereNotNull('expected_date')
@@ -177,12 +187,12 @@ class Catalog extends Component
 
             $maxQty = match ($badge['color']) {
                 'success', 'warning' => $variantAvailQty,
-                'info'               => $variantExpQty,
-                default              => 0,
+                'info' => $variantExpQty,
+                default => 0,
             };
 
-            $minQty  = max(1, $product->min_order_quantity);
-            $step    = max(1, $product->order_step);
+            $minQty = max(1, $product->min_order_quantity);
+            $step = max(1, $product->order_step);
 
             // Initialise the quantity input only if not yet set (preserves user input)
             if ($firstVariant && ! isset($this->quantities[$firstVariant->id])) {
@@ -192,12 +202,12 @@ class Catalog extends Component
             $price = $firstVariant?->prices->first();
 
             $productData[$product->id] = [
-                'badge'        => $badge,
+                'badge' => $badge,
                 'firstVariant' => $firstVariant,
-                'price'        => $price,
-                'maxQty'       => $maxQty,
-                'minQty'       => $minQty,
-                'step'         => $step,
+                'price' => $price,
+                'maxQty' => $maxQty,
+                'minQty' => $minQty,
+                'step' => $step,
             ];
         }
 

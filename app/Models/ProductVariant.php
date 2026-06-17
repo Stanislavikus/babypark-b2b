@@ -66,26 +66,26 @@ class ProductVariant extends Model
     ): array {
         if ($availQty > $threshold) {
             return [
-                'label'              => 'В наявності',
-                'color'              => 'success',
+                'label' => 'В наявності',
+                'color' => 'success',
                 'available_quantity' => $availQty,
             ];
         }
 
         if ($availQty > 0) {
             return [
-                'label'              => "Залишилось {$availQty} шт",
-                'color'              => 'warning',
+                'label' => "Залишилось {$availQty} шт",
+                'color' => 'warning',
                 'available_quantity' => $availQty,
             ];
         }
 
         if ($expectedDate) {
             return [
-                'label'             => 'Очікується ' . $expectedDate->format('d.m'),
-                'color'             => 'info',
+                'label' => 'Очікується '.$expectedDate->format('d.m'),
+                'color' => 'info',
                 'expected_quantity' => $expectedQty,
-                'expected_date'     => $expectedDate,
+                'expected_date' => $expectedDate,
             ];
         }
 
@@ -104,7 +104,7 @@ class ProductVariant extends Model
      */
     public function availabilityBadge(int $threshold): array
     {
-        $availQty    = $this->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0));
+        $availQty = $this->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0));
         $expectedQty = $this->stocks->sum('expected_quantity') ?? 0;
         $expectedDate = $this->stocks
             ->whereNotNull('expected_date')

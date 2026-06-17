@@ -84,7 +84,7 @@ class Contractor extends Authenticatable
     public function effectiveManager(): array
     {
         $fallback = [
-            'name'  => $this->manager_name,
+            'name' => $this->manager_name,
             'phone' => $this->manager_phone,
         ];
 
@@ -100,7 +100,7 @@ class Contractor extends Authenticatable
 
         if (! $manager->isOnVacation()) {
             return [
-                'name'  => $manager->name,
+                'name' => $manager->name,
                 'phone' => $manager->phone,
             ];
         }
@@ -111,7 +111,7 @@ class Contractor extends Authenticatable
 
             if ($backup && ! $backup->isOnVacation()) {
                 return [
-                    'name'  => $backup->name,
+                    'name' => $backup->name,
                     'phone' => $backup->phone,
                 ];
             }

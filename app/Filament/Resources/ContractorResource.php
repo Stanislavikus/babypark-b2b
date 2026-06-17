@@ -81,9 +81,9 @@ class ContractorResource extends Resource
                                 UserRole::Merchandiser->value,
                                 UserRole::Director->value,
                             ])
-                            ->where('is_active', true)
-                            ->orderBy('name')
-                            ->pluck('name', 'id')
+                                ->where('is_active', true)
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
                         )
                         ->searchable()
                         ->nullable()
@@ -96,9 +96,9 @@ class ContractorResource extends Resource
                                 UserRole::Merchandiser->value,
                                 UserRole::Director->value,
                             ])
-                            ->where('is_active', true)
-                            ->orderBy('name')
-                            ->pluck('name', 'id')
+                                ->where('is_active', true)
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
                         )
                         ->searchable()
                         ->nullable()
