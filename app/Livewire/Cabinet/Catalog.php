@@ -48,9 +48,6 @@ class Catalog extends Component
     /** Columns hidden by user toggle: 'photo', 'category', 'brand' */
     public array $hiddenColumns = [];
 
-    /** Lightbox — product id for both table and cards mode */
-    public ?int $lightboxProductId = null;
-
     /** Flash message after cart/reservation action */
     public ?string $flashMessage = null;
 
@@ -130,16 +127,6 @@ class Catalog extends Component
     {
         $current = (int) ($this->quantities[$variantId] ?? $minQty);
         $this->quantities[$variantId] = max($minQty, $current - $step);
-    }
-
-    public function openPhotoLightbox(int $productId): void
-    {
-        $this->lightboxProductId = $productId;
-    }
-
-    public function closePhotoLightbox(): void
-    {
-        $this->lightboxProductId = null;
     }
 
     /**
@@ -269,16 +256,11 @@ class Catalog extends Component
             ->whereHas('variants.prices', fn ($q) => $q->where('contractor_id', $contractor->id))
             ->distinct()->orderBy('brand')->pluck('brand');
 
-        $lightboxProduct = $this->lightboxProductId
-            ? Product::find($this->lightboxProductId)
-            : null;
-
         return view('livewire.cabinet.catalog', compact(
             'products',
             'productData',
             'categories',
-            'brands',
-            'lightboxProduct'
+            'brands'
         ));
     }
 

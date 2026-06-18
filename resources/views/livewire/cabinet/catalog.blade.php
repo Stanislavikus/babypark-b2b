@@ -11,9 +11,7 @@
             x-transition:leave-end="opacity-0 -translate-y-2"
             class="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg"
         >
-            <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
-            </svg>
+            <x-heroicon-m-check class="w-4 h-4 shrink-0" />
             {{ $flashMessage }}
         </div>
     @endif
@@ -42,20 +40,16 @@
                 class="inline-flex items-center gap-1.5 rounded-md border py-2 px-3 text-sm font-medium shadow-sm transition-colors
                        {{ ($category || $brand) ? 'border-indigo-400 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-200' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50' }}"
             >
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z"/>
-                </svg>
+                <x-heroicon-m-funnel class="w-4 h-4" />
                 Фільтри
                 @if($category || $brand)
                     <span class="inline-block w-2 h-2 rounded-full bg-indigo-500"></span>
                 @else
-                    <svg class="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
-                    </svg>
+                    <x-heroicon-m-chevron-down class="w-3 h-3 text-gray-400" />
                 @endif
             </button>
 
-            {{-- Filters panel --}}
+            {{-- Filters panel — matches admin fi-ta-filters structure --}}
             <div
                 x-show="open"
                 @click.away="open = false"
@@ -65,21 +59,22 @@
                 x-transition:leave="transition ease-in duration-75"
                 x-transition:leave-start="opacity-100 scale-100"
                 x-transition:leave-end="opacity-0 scale-95"
-                class="absolute top-full left-0 mt-1.5 z-30 w-72 rounded-xl border border-gray-200 bg-white p-4 shadow-lg"
+                class="absolute top-full left-0 mt-1.5 z-30 w-72 rounded-xl border border-gray-200 bg-white p-6 shadow-lg"
                 style="display:none;"
             >
-                <div class="mb-3 flex items-center justify-between">
-                    <span class="text-sm font-semibold text-gray-900">Фільтри</span>
+                {{-- Header row: Фільтри + Скинути — matches fi-ta-filters heading row --}}
+                <div class="mb-4 flex items-center justify-between">
+                    <h4 class="text-base font-semibold leading-6 text-gray-950">Фільтри</h4>
                     <button
                         type="button"
                         wire:click="resetFilters"
-                        class="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                        class="text-sm font-medium text-red-600 hover:text-red-500"
                     >Скинути</button>
                 </div>
 
-                <div class="space-y-3">
+                <div class="grid gap-y-4">
                     <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Категорії</label>
+                        <label class="block text-sm font-medium leading-6 text-gray-950 mb-1">Категорії</label>
                         <select
                             wire:model.live="category"
                             class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm"
@@ -92,7 +87,7 @@
                     </div>
 
                     <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Бренди</label>
+                        <label class="block text-sm font-medium leading-6 text-gray-950 mb-1">Бренди</label>
                         <select
                             wire:model.live="brand"
                             class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm"
@@ -115,13 +110,9 @@
                     type="button"
                     class="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white py-2 px-3 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
                 >
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z"/>
-                    </svg>
+                    <x-heroicon-m-view-columns class="w-4 h-4" />
                     Стовпці
-                    <svg class="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
-                    </svg>
+                    <x-heroicon-m-chevron-down class="w-3 h-3 text-gray-400" />
                 </button>
 
                 <div
@@ -136,7 +127,7 @@
                     class="absolute top-full left-0 mt-1.5 z-30 w-48 rounded-xl border border-gray-200 bg-white p-4 shadow-lg"
                     style="display:none;"
                 >
-                    <p class="mb-2 text-sm font-semibold text-gray-900">Стовпці</p>
+                    <p class="mb-2 text-sm font-semibold text-gray-950">Стовпці</p>
                     @foreach(['photo' => 'Фото', 'category' => 'Категорія', 'brand' => 'Бренд'] as $colKey => $colLabel)
                         <label class="flex cursor-pointer items-center gap-2 py-1.5 text-sm text-gray-700 hover:text-gray-900">
                             <input
@@ -160,10 +151,7 @@
                 title="Картки"
                 class="p-2 transition-colors {{ $viewMode === 'cards' ? 'bg-indigo-100 text-indigo-700' : 'bg-white text-gray-400 hover:bg-gray-50 hover:text-gray-600' }}"
             >
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                          d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/>
-                </svg>
+                <x-heroicon-m-squares-2x2 class="w-5 h-5" />
             </button>
             <button
                 wire:click="setViewMode('table')"
@@ -171,36 +159,30 @@
                 title="Таблиця"
                 class="p-2 border-l border-gray-300 transition-colors {{ $viewMode === 'table' ? 'bg-indigo-100 text-indigo-700' : 'bg-white text-gray-400 hover:bg-gray-50 hover:text-gray-600' }}"
             >
-                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round"
-                          d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h7.5c.621 0 1.125-.504 1.125-1.125m-9.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-7.5A1.125 1.125 0 0112 18.375m9.75-12.75c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125m19.5 0v1.5c0 .621-.504 1.125-1.125 1.125M2.25 5.625v1.5c0 .621.504 1.125 1.125 1.125m0 0h17.25m-17.25 0h7.5c.621 0 1.125.504 1.125 1.125M3.375 8.25c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375z"/>
-                </svg>
+                <x-heroicon-m-table-cells class="w-5 h-5" />
             </button>
         </div>
     </div>
 
     {{-- ═══════════════════════════════════
-         SORT HELPERS (PHP closures in view scope)
+         SORT HELPERS — match admin's header-cell.blade.php exactly:
+         • unsorted  → heroicon-m-chevron-down, text-gray-400 group-hover:text-gray-500
+         • sorted ASC → heroicon-m-chevron-up,   text-gray-950
+         • sorted DESC → heroicon-m-chevron-down, text-gray-950
     ════════════════════════════════════ --}}
     @php
-        $svgUp      = '<path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5"/>';
-        $svgDown    = '<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>';
-        $svgNeutral = '<path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9"/>';
-
-        $sortPath = function (string $col) use ($sortBy, $sortDir, $svgUp, $svgDown, $svgNeutral): string {
-            if ($sortBy !== $col) {
-                return $svgNeutral;
-            }
-            return $sortDir === 'asc' ? $svgUp : $svgDown;
-        };
+        $sortIconComponent = fn (string $col): string =>
+            ($sortBy === $col && $sortDir === 'asc') ? 'heroicon-m-chevron-up' : 'heroicon-m-chevron-down';
 
         $sortIconClass = fn (string $col) => $sortBy === $col
-            ? 'w-3.5 h-3.5 text-indigo-500'
-            : 'w-3.5 h-3.5 text-gray-300 group-hover:text-gray-400';
+            ? 'h-5 w-5 shrink-0 transition duration-75 text-gray-950'
+            : 'h-5 w-5 shrink-0 transition duration-75 text-gray-400 group-hover:text-gray-500';
 
-        $thBase    = 'px-3 py-3 cursor-pointer select-none group';
-        $thInner   = 'inline-flex items-center gap-1 hover:text-indigo-700 transition-colors';
-        $thInnerR  = 'inline-flex items-center justify-end gap-1 hover:text-indigo-700 transition-colors w-full';
+        // th: matches fi-ta-header-cell px-3 py-3.5; group enables group-hover on icon
+        $thBase   = 'px-3 py-3.5 cursor-pointer select-none group';
+        // inner span: matches admin's "group flex w-full items-center gap-x-1 cursor-pointer"
+        $thInner  = 'flex w-full items-center gap-x-1';
+        $thInnerR = 'flex w-full items-center justify-end gap-x-1';
 
         // Colspan for the empty-results row
         $emptyColspan = 8; // fixed: Артикул, Назва, Наявність, Ваша ціна, РРЦ, Маржа, Кількість, Замовити
@@ -213,33 +195,34 @@
          TABLE VIEW
     ════════════════════════════════════ --}}
     @if($viewMode === 'table')
-        <div wire:loading.class="opacity-50" class="transition-opacity overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
-            <table class="w-full text-sm text-left">
-                <thead class="bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wide border-b border-gray-200">
+        {{-- Outer wrapper: ring-1 ring-gray-950/5 matches fi-ta-ctn --}}
+        <div wire:loading.class="opacity-50" class="transition-opacity overflow-x-auto rounded-xl shadow-sm ring-1 ring-gray-950/5">
+            {{-- Table: divide-y divide-gray-200 matches fi-ta-table --}}
+            <table class="w-full table-auto divide-y divide-gray-200 text-start">
+                {{-- thead: bg-gray-50 matches admin; NO uppercase/tracking-wide --}}
+                <thead class="bg-gray-50">
                     <tr>
 
-                        {{-- Фото (optional) --}}
+                        {{-- Фото (optional, non-sortable) --}}
                         @if(! in_array('photo', $hiddenColumns))
-                            <th class="px-3 py-3 w-14">Фото</th>
+                            <th class="px-3 py-3.5 w-14">
+                                <span class="text-sm font-semibold text-gray-950">Фото</span>
+                            </th>
                         @endif
 
                         {{-- Артикул --}}
                         <th wire:click="sortColumn('sku')" class="{{ $thBase }}">
                             <div class="{{ $thInner }}">
-                                Артикул
-                                <svg class="{{ $sortIconClass('sku') }}" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    {!! $sortPath('sku') !!}
-                                </svg>
+                                <span class="text-sm font-semibold text-gray-950">Артикул</span>
+                                <x-dynamic-component :component="$sortIconComponent('sku')" :class="$sortIconClass('sku')" />
                             </div>
                         </th>
 
                         {{-- Назва --}}
                         <th wire:click="sortColumn('name')" class="{{ $thBase }}">
                             <div class="{{ $thInner }}">
-                                Назва
-                                <svg class="{{ $sortIconClass('name') }}" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    {!! $sortPath('name') !!}
-                                </svg>
+                                <span class="text-sm font-semibold text-gray-950">Назва</span>
+                                <x-dynamic-component :component="$sortIconComponent('name')" :class="$sortIconClass('name')" />
                             </div>
                         </th>
 
@@ -247,10 +230,8 @@
                         @if(! in_array('category', $hiddenColumns))
                             <th wire:click="sortColumn('category')" class="{{ $thBase }}">
                                 <div class="{{ $thInner }}">
-                                    Категорія
-                                    <svg class="{{ $sortIconClass('category') }}" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                        {!! $sortPath('category') !!}
-                                    </svg>
+                                    <span class="text-sm font-semibold text-gray-950">Категорія</span>
+                                    <x-dynamic-component :component="$sortIconComponent('category')" :class="$sortIconClass('category')" />
                                 </div>
                             </th>
                         @endif
@@ -259,10 +240,8 @@
                         @if(! in_array('brand', $hiddenColumns))
                             <th wire:click="sortColumn('brand')" class="{{ $thBase }}">
                                 <div class="{{ $thInner }}">
-                                    Бренд
-                                    <svg class="{{ $sortIconClass('brand') }}" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                        {!! $sortPath('brand') !!}
-                                    </svg>
+                                    <span class="text-sm font-semibold text-gray-950">Бренд</span>
+                                    <x-dynamic-component :component="$sortIconComponent('brand')" :class="$sortIconClass('brand')" />
                                 </div>
                             </th>
                         @endif
@@ -270,40 +249,34 @@
                         {{-- Наявність --}}
                         <th wire:click="sortColumn('stock')" class="{{ $thBase }} whitespace-nowrap">
                             <div class="{{ $thInner }}">
-                                Наявність
-                                <svg class="{{ $sortIconClass('stock') }}" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    {!! $sortPath('stock') !!}
-                                </svg>
+                                <span class="text-sm font-semibold text-gray-950">Наявність</span>
+                                <x-dynamic-component :component="$sortIconComponent('stock')" :class="$sortIconClass('stock')" />
                             </div>
                         </th>
 
                         {{-- Ваша ціна --}}
-                        <th wire:click="sortColumn('price')" class="{{ $thBase }} whitespace-nowrap text-right">
+                        <th wire:click="sortColumn('price')" class="{{ $thBase }} whitespace-nowrap">
                             <div class="{{ $thInnerR }}">
-                                Ваша ціна
-                                <svg class="{{ $sortIconClass('price') }}" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    {!! $sortPath('price') !!}
-                                </svg>
+                                <span class="text-sm font-semibold text-gray-950">Ваша ціна</span>
+                                <x-dynamic-component :component="$sortIconComponent('price')" :class="$sortIconClass('price')" />
                             </div>
                         </th>
 
                         {{-- РРЦ --}}
-                        <th wire:click="sortColumn('rrp')" class="{{ $thBase }} whitespace-nowrap text-right">
+                        <th wire:click="sortColumn('rrp')" class="{{ $thBase }} whitespace-nowrap">
                             <div class="{{ $thInnerR }}">
-                                РРЦ
-                                <svg class="{{ $sortIconClass('rrp') }}" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    {!! $sortPath('rrp') !!}
-                                </svg>
+                                <span class="text-sm font-semibold text-gray-950">РРЦ</span>
+                                <x-dynamic-component :component="$sortIconComponent('rrp')" :class="$sortIconClass('rrp')" />
                             </div>
                         </th>
 
                         {{-- Маржа — sort on th, format toggle on inner button --}}
-                        <th wire:click="sortColumn('margin')" class="{{ $thBase }} whitespace-nowrap text-right">
+                        <th wire:click="sortColumn('margin')" class="{{ $thBase }} whitespace-nowrap">
                             <div class="{{ $thInnerR }}">
                                 <button
                                     wire:click.stop="toggleMarginFormat"
                                     type="button"
-                                    class="inline-flex items-center gap-1 hover:text-indigo-700 transition-colors"
+                                    class="inline-flex items-center gap-1 text-sm font-semibold text-gray-950 hover:text-gray-700 transition-colors"
                                     title="Перемкнути формат маржі"
                                 >
                                     Маржа
@@ -311,17 +284,20 @@
                                         {{ $marginFormat === 'percent' ? '%' : '₴' }}
                                     </span>
                                 </button>
-                                <svg class="{{ $sortIconClass('margin') }}" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                                    {!! $sortPath('margin') !!}
-                                </svg>
+                                <x-dynamic-component :component="$sortIconComponent('margin')" :class="$sortIconClass('margin')" />
                             </div>
                         </th>
 
-                        <th class="px-3 py-3 whitespace-nowrap w-36">Кількість</th>
-                        <th class="px-3 py-3 whitespace-nowrap w-32">Замовити</th>
+                        <th class="px-3 py-3.5 whitespace-nowrap w-36">
+                            <span class="text-sm font-semibold text-gray-950">Кількість</span>
+                        </th>
+                        <th class="px-3 py-3.5 whitespace-nowrap w-32">
+                            <span class="text-sm font-semibold text-gray-950">Замовити</span>
+                        </th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100 bg-white">
+                {{-- tbody: divide-gray-200 matches fi-ta-table; whitespace-nowrap matches admin --}}
+                <tbody class="divide-y divide-gray-200 whitespace-nowrap bg-white">
                     @forelse($products as $product)
                         @php
                             $data         = $productData[$product->id];
@@ -346,16 +322,21 @@
                                 default   => 'bg-gray-100 text-gray-500',
                             };
                         @endphp
-                        <tr class="hover:bg-gray-50 transition-colors">
+                        <tr class="hover:bg-gray-50 transition-colors duration-75">
 
-                            {{-- Фото (optional) — opens lightbox --}}
+                            {{-- Фото (optional) — opens admin-style JS lightbox --}}
                             @if(! in_array('photo', $hiddenColumns))
-                                <td class="px-3 py-2">
+                                <td class="px-3 py-4">
                                     <button
                                         type="button"
-                                        wire:click="openPhotoLightbox({{ $product->id }})"
+                                        @if($photo)
+                                            onclick="event.stopPropagation();bpOpenLightbox('{{ e($photo) }}','{{ e($product->name) }}')"
+                                            style="cursor:zoom-in;"
+                                            title="Натисніть для збільшення"
+                                        @else
+                                            style="cursor:default;"
+                                        @endif
                                         class="block w-12 h-12 overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                                        title="Переглянути фото"
                                     >
                                         @if($photo)
                                             <img
@@ -377,41 +358,41 @@
                             @endif
 
                             {{-- Артикул --}}
-                            <td class="px-3 py-2 font-mono text-xs text-gray-500 whitespace-nowrap">
+                            <td class="px-3 py-4 font-mono text-xs text-gray-500 whitespace-nowrap">
                                 {{ $product->sku }}
                             </td>
 
                             {{-- Назва --}}
-                            <td class="px-3 py-2 max-w-xs">
+                            <td class="px-3 py-4 max-w-xs whitespace-normal">
                                 <a href="{{ route('cabinet.catalog.show', $product) }}"
-                                   class="font-medium text-gray-900 hover:text-indigo-700 line-clamp-2">
+                                   class="text-sm font-medium text-gray-950 hover:text-indigo-700 line-clamp-2">
                                     {{ $product->name }}
                                 </a>
                             </td>
 
                             {{-- Категорія (optional) --}}
                             @if(! in_array('category', $hiddenColumns))
-                                <td class="px-3 py-2 text-sm text-gray-500 whitespace-nowrap">
+                                <td class="px-3 py-4 text-sm text-gray-500 whitespace-nowrap">
                                     {{ $product->category?->name ?? '—' }}
                                 </td>
                             @endif
 
                             {{-- Бренд (optional) --}}
                             @if(! in_array('brand', $hiddenColumns))
-                                <td class="px-3 py-2 text-sm text-gray-500 whitespace-nowrap">
+                                <td class="px-3 py-4 text-sm text-gray-500 whitespace-nowrap">
                                     {{ $product->brand ?? '—' }}
                                 </td>
                             @endif
 
                             {{-- Наявність --}}
-                            <td class="px-3 py-2">
+                            <td class="px-3 py-4">
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ $badgeClasses }}">
                                     {{ $badge['label'] }}
                                 </span>
                             </td>
 
                             {{-- Ваша ціна --}}
-                            <td class="px-3 py-2 text-right whitespace-nowrap">
+                            <td class="px-3 py-4 text-right whitespace-nowrap">
                                 @if($price)
                                     <span class="font-semibold text-indigo-700">
                                         {{ number_format($myPrice, 2, ',', ' ') }} ₴
@@ -422,7 +403,7 @@
                             </td>
 
                             {{-- РРЦ --}}
-                            <td class="px-3 py-2 text-right whitespace-nowrap">
+                            <td class="px-3 py-4 text-right whitespace-nowrap">
                                 @if($rrp > 0)
                                     <span class="text-gray-400 line-through">
                                         {{ number_format($rrp, 2, ',', ' ') }} ₴
@@ -433,7 +414,7 @@
                             </td>
 
                             {{-- Маржа --}}
-                            <td class="px-3 py-2 text-right whitespace-nowrap">
+                            <td class="px-3 py-4 text-right whitespace-nowrap">
                                 @if($marginPct !== null)
                                     @if($marginFormat === 'percent')
                                         <span class="font-medium text-emerald-600">{{ number_format($marginPct, 1) }}%</span>
@@ -446,7 +427,7 @@
                             </td>
 
                             {{-- Кількість --}}
-                            <td class="px-3 py-2">
+                            <td class="px-3 py-4">
                                 @if($firstVariant && $maxQty > 0)
                                     <div class="flex items-center gap-1">
                                         <button type="button"
@@ -472,7 +453,7 @@
                             </td>
 
                             {{-- Замовити --}}
-                            <td class="px-3 py-2">
+                            <td class="px-3 py-4">
                                 @if($firstVariant && $maxQty > 0)
                                     @if(in_array($badge['color'], ['success', 'warning']))
                                         <button
@@ -528,15 +509,21 @@
                     };
                 @endphp
 
-                <div class="group bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
+                {{-- Card: ring-1 ring-gray-950/5 matches admin's fi-ta-ctn container style --}}
+                <div class="group bg-white rounded-xl ring-1 ring-gray-950/5 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
 
-                    {{-- Thumbnail — always clickable, opens lightbox --}}
+                    {{-- Thumbnail — opens admin-style JS lightbox --}}
                     <div class="aspect-square bg-gray-100 overflow-hidden relative">
                         <button
                             type="button"
-                            wire:click="openPhotoLightbox({{ $product->id }})"
+                            @if($photo)
+                                onclick="event.stopPropagation();bpOpenLightbox('{{ e($photo) }}','{{ e($product->name) }}')"
+                                style="cursor:zoom-in;"
+                                title="Натисніть для збільшення"
+                            @else
+                                style="cursor:default;"
+                            @endif
                             class="absolute inset-0 w-full h-full focus:outline-none"
-                            title="Переглянути фото"
                         >
                             @if($photo)
                                 <img
@@ -560,19 +547,19 @@
                     {{-- Card body --}}
                     <div class="p-3 flex flex-col flex-1">
                         <a href="{{ route('cabinet.catalog.show', $product) }}" class="flex flex-col flex-1 hover:opacity-80 transition-opacity">
-                            <p class="text-xs text-gray-400 font-mono">{{ $product->sku }}</p>
-                            <p class="text-sm font-medium text-gray-900 line-clamp-2 flex-1">{{ $product->name }}</p>
+                            <p class="text-xs text-gray-500 font-mono">{{ $product->sku }}</p>
+                            <p class="text-sm font-semibold text-gray-950 line-clamp-2 flex-1">{{ $product->name }}</p>
                             @if($product->brand)
                                 <p class="text-xs text-gray-500 mt-0.5">{{ $product->brand }}</p>
                             @endif
 
-                            {{-- Prices --}}
+                            {{-- Prices — indigo to stay consistent with table view and admin palette --}}
                             <div class="mt-2 flex items-baseline gap-2 flex-wrap">
                                 @if($rrp > 0)
                                     <span class="text-xs text-gray-400 line-through">{{ number_format($rrp, 2, ',', ' ') }} ₴</span>
                                 @endif
                                 @if($myPrice > 0)
-                                    <span class="text-base font-bold text-green-700">{{ number_format($myPrice, 2, ',', ' ') }} ₴</span>
+                                    <span class="text-base font-bold text-indigo-700">{{ number_format($myPrice, 2, ',', ' ') }} ₴</span>
                                 @endif
                             </div>
 
@@ -625,45 +612,5 @@
     @endif
 
     <div class="mt-6">{{ $products->links() }}</div>
-
-    {{-- ═══════════════════════════════════
-         PHOTO LIGHTBOX (table + cards modes)
-    ════════════════════════════════════ --}}
-    @if($lightboxProduct)
-        @php
-            $lbImages = is_array($lightboxProduct->images) ? $lightboxProduct->images : [];
-            $lbPhoto  = $lbImages[0] ?? null;
-        @endphp
-        <div
-            wire:click="closePhotoLightbox"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-            style="cursor:zoom-out;"
-        >
-            <div wire:click.stop class="relative mx-4">
-                <button
-                    wire:click="closePhotoLightbox"
-                    class="absolute -top-10 right-0 flex items-center gap-1 text-sm text-white/80 hover:text-white"
-                >
-                    Закрити
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-                @if($lbPhoto)
-                    <img
-                        src="{{ $lbPhoto }}"
-                        alt="{{ $lightboxProduct->name }}"
-                        style="max-width:600px; max-height:85vh; width:100%; height:auto; object-fit:contain; border-radius:10px;"
-                        onerror="this.style.display='none'"
-                    />
-                    <p class="mt-2 text-center text-sm text-white/80">{{ $lightboxProduct->name }}</p>
-                @else
-                    <div class="flex h-64 w-64 items-center justify-center rounded-xl bg-gray-800 text-gray-400">
-                        Зображення відсутнє
-                    </div>
-                @endif
-            </div>
-        </div>
-    @endif
 
 </div>

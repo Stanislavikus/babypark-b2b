@@ -22,12 +22,13 @@
             @endphp
 
             @if($photo)
-                {{-- Clickable photo → opens lightbox --}}
+                {{-- Clickable photo → opens admin-style JS lightbox --}}
                 <button
                     type="button"
-                    wire:click="openLightbox"
+                    onclick="event.stopPropagation();bpOpenLightbox('{{ e($photo) }}','{{ e($product->name) }}')"
+                    style="cursor:zoom-in;"
                     class="group block w-full focus:outline-none"
-                    title="Збільшити фото"
+                    title="Натисніть для збільшення"
                 >
                     <div class="relative overflow-hidden rounded-xl bg-gray-50 border border-gray-200"
                          style="max-width:400px;">
@@ -152,35 +153,5 @@
         </div>
     </div>
 
-    {{-- ════════════════════════════════════════
-         Lightbox overlay — images[0] only, max 600px
-    ═════════════════════════════════════════ --}}
-    @if($lightboxOpen)
-        @php $photo = isset($images[0]) ? $images[0] : null; @endphp
-        <div
-            wire:click="closeLightbox"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-            style="cursor:zoom-out;"
-        >
-            <div wire:click.stop class="relative mx-4">
-                <button
-                    wire:click="closeLightbox"
-                    class="absolute -top-10 right-0 text-white/80 hover:text-white flex items-center gap-1 text-sm"
-                >
-                    Закрити
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-                @if($photo)
-                    <img
-                        src="{{ $photo }}"
-                        alt="{{ $product->name }}"
-                        style="max-width:600px; max-height:85vh; width:100%; height:auto; object-fit:contain; border-radius:10px;"
-                        onerror="this.style.display='none'"
-                    />
-                @endif
-            </div>
-        </div>
-    @endif
+    {{-- Lightbox is handled by the shared #bp-photo-lb JS overlay injected in cabinet.blade.php --}}
 </div>
