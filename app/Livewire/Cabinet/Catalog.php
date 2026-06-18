@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Reservation;
 use App\Support\SessionCart;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -32,13 +33,22 @@ class Catalog extends Component
     #[Url]
     public string $viewMode = 'cards';
 
+    #[Url]
+    public string $sortBy = 'name';
+
+    #[Url]
+    public string $sortDir = 'asc';
+
     /** Margin column display format: 'percent' or 'uah' */
     public string $marginFormat = 'percent';
 
     /** Quantity inputs keyed by variant_id */
     public array $quantities = [];
 
-    /** Lightbox — only used in cards mode */
+    /** Columns hidden by user toggle: 'photo', 'category', 'brand' */
+    public array $hiddenColumns = [];
+
+    /** Lightbox — product id for both table and cards mode */
     public ?int $lightboxProductId = null;
 
     /** Flash message after cart/reservation action */
@@ -62,6 +72,47 @@ class Catalog extends Component
     public function setViewMode(string $mode): void
     {
         $this->viewMode = in_array($mode, ['cards', 'table']) ? $mode : 'cards';
+    }
+
+    public function sortColumn(string $column): void
+    {
+        $allowed = ['sku', 'name', 'category', 'brand', 'stock', 'price', 'rrp', 'margin'];
+        if (! in_array($column, $allowed)) {
+            return;
+        }
+
+        if ($this->sortBy === $column) {
+            $this->sortDir = $this->sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy = $column;
+            $this->sortDir = 'asc';
+        }
+
+        $this->resetPage();
+    }
+
+    public function resetFilters(): void
+    {
+        $this->category = '';
+        $this->brand = '';
+        $this->resetPage();
+    }
+
+    /**
+     * Toggle column visibility for optional columns: 'photo', 'category', 'brand'.
+     */
+    public function toggleColumn(string $column): void
+    {
+        $allowed = ['photo', 'category', 'brand'];
+        if (! in_array($column, $allowed)) {
+            return;
+        }
+
+        if (in_array($column, $this->hiddenColumns)) {
+            $this->hiddenColumns = array_values(array_diff($this->hiddenColumns, [$column]));
+        } else {
+            $this->hiddenColumns[] = $column;
+        }
     }
 
     public function toggleMarginFormat(): void
@@ -154,7 +205,8 @@ class Catalog extends Component
             $query->where('brand', $this->brand);
         }
 
-        $products = $query->orderBy('name')->paginate(24);
+        $query = $this->applySorting($query, $contractor);
+        $products = $query->paginate(24);
 
         // Pre-compute badge + first-variant data for each product on this page,
         // and initialise quantity defaults.
@@ -228,5 +280,57 @@ class Catalog extends Component
             'brands',
             'lightboxProduct'
         ));
+    }
+
+    private function applySorting(Builder $query, $contractor): Builder
+    {
+        $dir = in_array($this->sortDir, ['asc', 'desc']) ? $this->sortDir : 'asc';
+
+        return match ($this->sortBy) {
+            'sku' => $query->orderBy('sku', $dir),
+            'name' => $query->orderBy('name', $dir),
+            'category' => $query->orderBy(
+                Category::select('name')
+                    ->whereColumn('categories.id', 'products.category_id')
+                    ->limit(1),
+                $dir
+            ),
+            'brand' => $query->orderBy('brand', $dir),
+            'stock' => $query->orderByRaw(
+                "CASE
+                    WHEN (SELECT COALESCE(SUM(s.quantity), 0) FROM stocks s
+                          INNER JOIN product_variants pv ON s.variant_id = pv.id
+                          WHERE pv.product_id = products.id) > 0 THEN 0
+                    WHEN (SELECT MIN(s.expected_date) FROM stocks s
+                          INNER JOIN product_variants pv ON s.variant_id = pv.id
+                          WHERE pv.product_id = products.id
+                          AND s.expected_date IS NOT NULL) IS NOT NULL THEN 1
+                    ELSE 2
+                END {$dir}"
+            ),
+            'price' => $query->orderByRaw(
+                "COALESCE((SELECT p.price_with_vat FROM prices p
+                    INNER JOIN product_variants pv ON p.variant_id = pv.id
+                    WHERE pv.product_id = products.id
+                    AND p.contractor_id = ?
+                    ORDER BY pv.id LIMIT 1), 0) {$dir}",
+                [$contractor->id]
+            ),
+            'rrp' => $query->orderByRaw(
+                "COALESCE((SELECT MAX(p.recommended_retail_price) FROM prices p
+                    INNER JOIN product_variants pv ON p.variant_id = pv.id
+                    WHERE pv.product_id = products.id
+                    AND p.contractor_id = ?), 0) {$dir}",
+                [$contractor->id]
+            ),
+            'margin' => $query->orderByRaw(
+                "COALESCE((SELECT MAX(p.recommended_retail_price) - MIN(p.price_with_vat) FROM prices p
+                    INNER JOIN product_variants pv ON p.variant_id = pv.id
+                    WHERE pv.product_id = products.id
+                    AND p.contractor_id = ?), 0) {$dir}",
+                [$contractor->id]
+            ),
+            default => $query->orderBy('name', 'asc'),
+        };
     }
 }
