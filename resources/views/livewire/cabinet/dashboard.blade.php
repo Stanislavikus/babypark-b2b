@@ -39,7 +39,7 @@
                     <div class="flex justify-between text-sm">
                         <dt class="text-gray-500">Email</dt>
                         <dd class="font-medium text-gray-900">
-                            <a href="mailto:{{ $contractor->email }}" class="hover:text-indigo-600">{{ $contractor->email }}</a>
+                            <a href="mailto:{{ $contractor->email }}" class="hover:text-primary-600">{{ $contractor->email }}</a>
                         </dd>
                     </div>
                 @endif
@@ -73,7 +73,7 @@
                         <div class="flex justify-between text-sm">
                             <dt class="text-gray-500">Телефон</dt>
                             <dd class="font-medium text-gray-900">
-                                <a href="tel:{{ $manager['phone'] }}" class="hover:text-indigo-600">{{ $manager['phone'] }}</a>
+                                <a href="tel:{{ $manager['phone'] }}" class="hover:text-primary-600">{{ $manager['phone'] }}</a>
                             </dd>
                         </div>
                     @endif
@@ -148,7 +148,7 @@
                                     'new'         => 'bg-blue-100 text-blue-800',
                                     'pending'     => 'bg-yellow-100 text-yellow-800',
                                     'confirmed'   => 'bg-green-100 text-green-800',
-                                    'in_progress' => 'bg-indigo-100 text-indigo-800',
+                                    'in_progress' => 'bg-primary-100 text-primary-700',
                                     'shipped'     => 'bg-purple-100 text-purple-800',
                                     'delivered'   => 'bg-emerald-100 text-emerald-800',
                                     'cancelled'   => 'bg-red-100 text-red-800',
@@ -175,7 +175,7 @@
                                 <td class="px-4 py-3 text-right">
                                     <button
                                         wire:click="repeatOrder({{ $order->id }})"
-                                        class="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 transition-colors"
+                                        class="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700 transition-colors"
                                         title="Додати позиції цього замовлення до кошика"
                                     >
                                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">

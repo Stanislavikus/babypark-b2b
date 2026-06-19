@@ -23,18 +23,20 @@ class Catalog extends Component
     #[Url]
     public string $search = '';
 
+    /** @var list<string> */
     #[Url]
-    public string $category = '';
+    public array $selectedCategories = [];
 
+    /** @var list<string> */
     #[Url]
-    public string $brand = '';
+    public array $selectedBrands = [];
 
     /** 'cards' or 'table' */
     #[Url]
     public string $viewMode = 'cards';
 
     #[Url]
-    public string $sortBy = 'name';
+    public string $sortBy = 'sku';
 
     #[Url]
     public string $sortDir = 'asc';
@@ -48,9 +50,6 @@ class Catalog extends Component
     /** Columns hidden by user toggle: 'photo', 'category', 'brand' */
     public array $hiddenColumns = [];
 
-    /** Lightbox — product id for both table and cards mode */
-    public ?int $lightboxProductId = null;
-
     /** Flash message after cart/reservation action */
     public ?string $flashMessage = null;
 
@@ -59,12 +58,12 @@ class Catalog extends Component
         $this->resetPage();
     }
 
-    public function updatedCategory(): void
+    public function updatedSelectedCategories(): void
     {
         $this->resetPage();
     }
 
-    public function updatedBrand(): void
+    public function updatedSelectedBrands(): void
     {
         $this->resetPage();
     }
@@ -93,8 +92,20 @@ class Catalog extends Component
 
     public function resetFilters(): void
     {
-        $this->category = '';
-        $this->brand = '';
+        $this->selectedCategories = [];
+        $this->selectedBrands = [];
+        $this->resetPage();
+    }
+
+    public function removeCategoryFilter(string $categoryId): void
+    {
+        $this->selectedCategories = array_values(array_diff($this->selectedCategories, [$categoryId]));
+        $this->resetPage();
+    }
+
+    public function removeBrandFilter(string $brand): void
+    {
+        $this->selectedBrands = array_values(array_diff($this->selectedBrands, [$brand]));
         $this->resetPage();
     }
 
@@ -130,16 +141,6 @@ class Catalog extends Component
     {
         $current = (int) ($this->quantities[$variantId] ?? $minQty);
         $this->quantities[$variantId] = max($minQty, $current - $step);
-    }
-
-    public function openPhotoLightbox(int $productId): void
-    {
-        $this->lightboxProductId = $productId;
-    }
-
-    public function closePhotoLightbox(): void
-    {
-        $this->lightboxProductId = null;
     }
 
     /**
@@ -197,19 +198,17 @@ class Catalog extends Component
             );
         }
 
-        if (filled($this->category)) {
-            $query->where('category_id', $this->category);
+        if (! empty($this->selectedCategories)) {
+            $query->whereIn('category_id', $this->selectedCategories);
         }
 
-        if (filled($this->brand)) {
-            $query->where('brand', $this->brand);
+        if (! empty($this->selectedBrands)) {
+            $query->whereIn('brand', $this->selectedBrands);
         }
 
         $query = $this->applySorting($query, $contractor);
         $products = $query->paginate(24);
 
-        // Pre-compute badge + first-variant data for each product on this page,
-        // and initialise quantity defaults.
         $productData = [];
         foreach ($products as $product) {
             $threshold = $product->category?->stock_display_threshold ?? 10;
@@ -217,7 +216,10 @@ class Catalog extends Component
             $variantsWithPrice = $activeVariants->filter(fn ($v) => $v->prices->isNotEmpty());
             $firstVariant = $variantsWithPrice->first();
 
-            // Aggregate stock across ALL active variants for the badge
+            $allPrices = $variantsWithPrice->flatMap(fn ($v) => $v->prices);
+            $maxRrp = (float) ($allPrices->max('recommended_retail_price') ?? 0);
+            $maxMyPrice = (float) ($allPrices->max('price_with_vat') ?? 0);
+
             $totalAvailQty = $activeVariants->sum(fn ($v) => $v->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0)));
             $totalExpQty = $activeVariants->sum(fn ($v) => $v->stocks->sum('expected_quantity')) ?? 0;
             $earliestExpDate = $activeVariants
@@ -229,7 +231,6 @@ class Catalog extends Component
 
             $badge = ProductVariant::badgeFromQty($totalAvailQty, $totalExpQty, $earliestExpDate, $threshold);
 
-            // Counter max — first variant's own available stock (safe upper bound for ordering)
             $variantAvailQty = $firstVariant
                 ? $firstVariant->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0))
                 : 0;
@@ -246,17 +247,15 @@ class Catalog extends Component
             $minQty = max(1, $product->min_order_quantity);
             $step = max(1, $product->order_step);
 
-            // Initialise the quantity input only if not yet set (preserves user input)
             if ($firstVariant && ! isset($this->quantities[$firstVariant->id])) {
                 $this->quantities[$firstVariant->id] = $minQty;
             }
 
-            $price = $firstVariant?->prices->first();
-
             $productData[$product->id] = [
                 'badge' => $badge,
                 'firstVariant' => $firstVariant,
-                'price' => $price,
+                'maxRrp' => $maxRrp,
+                'maxMyPrice' => $maxMyPrice,
                 'maxQty' => $maxQty,
                 'minQty' => $minQty,
                 'step' => $step,
@@ -269,16 +268,11 @@ class Catalog extends Component
             ->whereHas('variants.prices', fn ($q) => $q->where('contractor_id', $contractor->id))
             ->distinct()->orderBy('brand')->pluck('brand');
 
-        $lightboxProduct = $this->lightboxProductId
-            ? Product::find($this->lightboxProductId)
-            : null;
-
         return view('livewire.cabinet.catalog', compact(
             'products',
             'productData',
             'categories',
             'brands',
-            'lightboxProduct'
         ));
     }
 
@@ -296,24 +290,12 @@ class Catalog extends Component
                 $dir
             ),
             'brand' => $query->orderBy('brand', $dir),
-            'stock' => $query->orderByRaw(
-                "CASE
-                    WHEN (SELECT COALESCE(SUM(s.quantity), 0) FROM stocks s
-                          INNER JOIN product_variants pv ON s.variant_id = pv.id
-                          WHERE pv.product_id = products.id) > 0 THEN 0
-                    WHEN (SELECT MIN(s.expected_date) FROM stocks s
-                          INNER JOIN product_variants pv ON s.variant_id = pv.id
-                          WHERE pv.product_id = products.id
-                          AND s.expected_date IS NOT NULL) IS NOT NULL THEN 1
-                    ELSE 2
-                END {$dir}"
-            ),
+            'stock' => $this->applyStockSorting($query, $dir),
             'price' => $query->orderByRaw(
-                "COALESCE((SELECT p.price_with_vat FROM prices p
+                "COALESCE((SELECT MAX(p.price_with_vat) FROM prices p
                     INNER JOIN product_variants pv ON p.variant_id = pv.id
                     WHERE pv.product_id = products.id
-                    AND p.contractor_id = ?
-                    ORDER BY pv.id LIMIT 1), 0) {$dir}",
+                    AND p.contractor_id = ?), 0) {$dir}",
                 [$contractor->id]
             ),
             'rrp' => $query->orderByRaw(
@@ -330,7 +312,32 @@ class Catalog extends Component
                     AND p.contractor_id = ?), 0) {$dir}",
                 [$contractor->id]
             ),
-            default => $query->orderBy('name', 'asc'),
+            default => $query->orderBy('sku', 'asc'),
         };
+    }
+
+    private function applyStockSorting(Builder $query, string $dir): Builder
+    {
+        $totalQty = '(SELECT COALESCE(SUM(s.quantity), 0)
+                      FROM stocks s
+                      INNER JOIN product_variants pv ON s.variant_id = pv.id
+                      WHERE pv.product_id = products.id)';
+
+        $minExpectedDate = '(SELECT MIN(s.expected_date)
+                            FROM stocks s
+                            INNER JOIN product_variants pv ON s.variant_id = pv.id
+                            WHERE pv.product_id = products.id
+                            AND s.expected_date IS NOT NULL)';
+
+        $priorityExpr = "CASE
+            WHEN {$totalQty} > 0 THEN 0
+            WHEN {$minExpectedDate} IS NOT NULL THEN 1
+            ELSE 2
+        END";
+
+        return $query
+            ->orderByRaw("{$priorityExpr} {$dir}")
+            ->orderByRaw("{$totalQty} DESC")
+            ->orderByRaw("{$minExpectedDate} ASC");
     }
 }

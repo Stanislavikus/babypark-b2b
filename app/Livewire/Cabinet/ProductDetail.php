@@ -12,8 +12,6 @@ class ProductDetail extends Component
 {
     public Product $product;
 
-    public bool $lightboxOpen = false;
-
     public function mount(Product $product): void
     {
         $contractor = Auth::guard('contractor')->user();
@@ -31,16 +29,6 @@ class ProductDetail extends Component
             'variants.stocks',
             'variants.prices' => fn ($q) => $q->where('contractor_id', $contractor->id),
         ]);
-    }
-
-    public function openLightbox(): void
-    {
-        $this->lightboxOpen = true;
-    }
-
-    public function closeLightbox(): void
-    {
-        $this->lightboxOpen = false;
     }
 
     public function render()

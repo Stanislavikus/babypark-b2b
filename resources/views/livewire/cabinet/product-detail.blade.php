@@ -1,7 +1,7 @@
 <div>
     {{-- Breadcrumb --}}
     <nav class="mb-4 flex items-center gap-2 text-sm text-gray-500">
-        <a href="{{ route('cabinet.catalog') }}" class="hover:text-indigo-600">Каталог</a>
+        <a href="{{ route('cabinet.catalog') }}" class="hover:text-primary-600">Каталог</a>
         <span>/</span>
         @if($product->category)
             <span>{{ $product->category->name }}</span>
@@ -22,38 +22,29 @@
             @endphp
 
             @if($photo)
-                {{-- Clickable photo → opens lightbox --}}
-                <button
-                    type="button"
-                    wire:click="openLightbox"
-                    class="group block w-full focus:outline-none"
-                    title="Збільшити фото"
-                >
-                    <div class="relative overflow-hidden rounded-xl bg-gray-50 border border-gray-200"
-                         style="max-width:400px;">
-                        <img
-                            src="{{ $photo }}"
-                            alt="{{ $product->name }}"
-                            style="width:100%; height:auto; max-width:400px; display:block; object-fit:contain; aspect-ratio:1/1; background:#f9fafb;"
-                            onerror="this.closest('button').style.display='none'; document.getElementById('photo-placeholder-{{ $product->id }}').style.display='flex';"
-                        />
-                        <div class="absolute inset-0 flex items-end justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span class="bg-black/50 text-white text-xs px-2 py-1 rounded-full">
-                                🔍 Збільшити
-                            </span>
-                        </div>
-                    </div>
-                </button>
+                @php
+                    $lbUrl = addslashes($photo);
+                    $lbTitle = addslashes($product->name);
+                @endphp
+                <div class="relative overflow-hidden rounded-xl border border-gray-200" style="max-width:400px;">
+                    <img
+                        src="{{ $photo }}"
+                        alt="{{ $product->name }}"
+                        style="width:100%; height:auto; max-width:400px; display:block; object-fit:contain; aspect-ratio:1/1; background:#f9fafb; cursor:zoom-in;"
+                        title="Натисніть для збільшення"
+                        onclick="event.stopPropagation();event.preventDefault();bpOpenLightbox('{{ $lbUrl }}','{{ $lbTitle }}')"
+                        onerror="this.style.display='none'; document.getElementById('photo-placeholder-{{ $product->id }}').style.display='flex';"
+                    />
+                </div>
             @endif
 
             {{-- Placeholder (shown if no photo OR image fails to load) --}}
             <div
                 id="photo-placeholder-{{ $product->id }}"
-                style="{{ $photo ? 'display:none;' : '' }} max-width:400px;"
-                class="flex items-center justify-center rounded-xl bg-gray-100 border border-gray-200 text-gray-300"
-                style="width:100%; aspect-ratio:1/1;"
+                class="flex items-center justify-center rounded-xl border border-gray-200"
+                style="{{ $photo ? 'display:none;' : '' }} width:100%; max-width:400px; aspect-ratio:1/1; background:#f3f4f6; cursor:default;"
             >
-                <svg class="w-16 h-16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                <svg class="w-16 h-16" style="color:#d1d5db;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                 </svg>
             </div>
@@ -79,7 +70,7 @@
                     href="{{ $product->product_url }}"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center gap-1.5 text-sm text-indigo-600 hover:text-indigo-800 hover:underline"
+                    class="inline-flex items-center gap-1.5 text-sm text-primary-600 hover:text-primary-700 hover:underline"
                 >
                     <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/>
@@ -110,7 +101,7 @@
                     <div class="flex items-end gap-4 flex-wrap">
                         <div>
                             <p class="text-xs text-gray-500 uppercase tracking-wide">Ваша ціна (з ПДВ)</p>
-                            <p class="text-3xl font-bold text-indigo-700">
+                            <p class="text-3xl font-bold text-primary-700">
                                 {{ number_format($price->price_with_vat, 2, ',', ' ') }} ₴
                             </p>
                         </div>
@@ -151,36 +142,4 @@
             @endforeach
         </div>
     </div>
-
-    {{-- ════════════════════════════════════════
-         Lightbox overlay — images[0] only, max 600px
-    ═════════════════════════════════════════ --}}
-    @if($lightboxOpen)
-        @php $photo = isset($images[0]) ? $images[0] : null; @endphp
-        <div
-            wire:click="closeLightbox"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-            style="cursor:zoom-out;"
-        >
-            <div wire:click.stop class="relative mx-4">
-                <button
-                    wire:click="closeLightbox"
-                    class="absolute -top-10 right-0 text-white/80 hover:text-white flex items-center gap-1 text-sm"
-                >
-                    Закрити
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-                @if($photo)
-                    <img
-                        src="{{ $photo }}"
-                        alt="{{ $product->name }}"
-                        style="max-width:600px; max-height:85vh; width:100%; height:auto; object-fit:contain; border-radius:10px;"
-                        onerror="this.style.display='none'"
-                    />
-                @endif
-            </div>
-        </div>
-    @endif
 </div>

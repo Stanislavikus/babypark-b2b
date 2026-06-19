@@ -30,24 +30,27 @@
                 type="search"
                 wire:model.live.debounce.300ms="search"
                 placeholder="Назва, артикул, бренд…"
-                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm"
+                class="block w-full rounded-md border-0 py-2 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-primary-600 sm:text-sm"
             >
         </div>
 
         {{-- Фільтри button + dropdown panel --}}
+        @php
+            $hasActiveFilters = ! empty($selectedCategories) || ! empty($selectedBrands);
+        @endphp
         <div x-data="{ open: false }" class="relative">
             <button
                 @click="open = !open"
                 type="button"
                 class="inline-flex items-center gap-1.5 rounded-md border py-2 px-3 text-sm font-medium shadow-sm transition-colors
-                       {{ ($category || $brand) ? 'border-indigo-400 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-200' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50' }}"
+                       {{ $hasActiveFilters ? 'border-primary-400 bg-primary-50 text-primary-700 ring-2 ring-primary-100' : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50' }}"
             >
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z"/>
                 </svg>
                 Фільтри
-                @if($category || $brand)
-                    <span class="inline-block w-2 h-2 rounded-full bg-indigo-500"></span>
+                @if($hasActiveFilters)
+                    <span class="inline-block w-2 h-2 rounded-full bg-primary-500"></span>
                 @else
                     <svg class="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
@@ -65,7 +68,7 @@
                 x-transition:leave="transition ease-in duration-75"
                 x-transition:leave-start="opacity-100 scale-100"
                 x-transition:leave-end="opacity-0 scale-95"
-                class="absolute top-full left-0 mt-1.5 z-30 w-72 rounded-xl border border-gray-200 bg-white p-4 shadow-lg"
+                class="absolute top-full left-0 mt-1.5 z-30 w-80 rounded-xl border border-gray-200 bg-white p-4 shadow-lg"
                 style="display:none;"
             >
                 <div class="mb-3 flex items-center justify-between">
@@ -73,35 +76,65 @@
                     <button
                         type="button"
                         wire:click="resetFilters"
-                        class="text-xs font-medium text-indigo-600 hover:text-indigo-800 hover:underline"
+                        class="text-xs font-medium text-primary-600 hover:text-primary-700 hover:underline"
                     >Скинути</button>
                 </div>
 
-                <div class="space-y-3">
+                @if($hasActiveFilters)
+                    <div class="mb-3 flex flex-wrap gap-1.5">
+                        @foreach($selectedCategories as $catId)
+                            @php $catName = $categories->firstWhere('id', (int) $catId)?->name ?? $catId; @endphp
+                            <span class="inline-flex items-center gap-1 rounded-full bg-primary-100 px-2.5 py-0.5 text-xs font-medium text-primary-700">
+                                {{ $catName }}
+                                <button type="button" wire:click="removeCategoryFilter('{{ $catId }}')" class="hover:text-primary-900">&times;</button>
+                            </span>
+                        @endforeach
+                        @foreach($selectedBrands as $brandName)
+                            <span class="inline-flex items-center gap-1 rounded-full bg-primary-100 px-2.5 py-0.5 text-xs font-medium text-primary-700">
+                                {{ $brandName }}
+                                <button type="button" wire:click="removeBrandFilter(@js($brandName))" class="hover:text-primary-900">&times;</button>
+                            </span>
+                        @endforeach
+                    </div>
+                @endif
+
+                <div class="space-y-4">
                     <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Категорії</label>
-                        <select
-                            wire:model.live="category"
-                            class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm"
-                        >
-                            <option value="">Всі категорії</option>
-                            @foreach($categories as $cat)
-                                <option value="{{ $cat->id }}">{{ $cat->name }}</option>
-                            @endforeach
-                        </select>
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">Категорії</label>
+                        <div class="max-h-40 overflow-y-auto rounded-md border border-gray-200 p-2 space-y-1">
+                            @forelse($categories as $cat)
+                                <label class="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm text-gray-700 hover:bg-primary-50">
+                                    <input
+                                        type="checkbox"
+                                        wire:model.live="selectedCategories"
+                                        value="{{ $cat->id }}"
+                                        class="rounded border-gray-300 text-primary-600 focus:ring-primary-600"
+                                    >
+                                    {{ $cat->name }}
+                                </label>
+                            @empty
+                                <p class="px-1.5 py-1 text-xs text-gray-400">Всі</p>
+                            @endforelse
+                        </div>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-medium text-gray-600 mb-1">Бренди</label>
-                        <select
-                            wire:model.live="brand"
-                            class="block w-full rounded-md border-0 py-1.5 px-3 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm"
-                        >
-                            <option value="">Всі бренди</option>
-                            @foreach($brands as $b)
-                                <option value="{{ $b }}">{{ $b }}</option>
-                            @endforeach
-                        </select>
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">Бренди</label>
+                        <div class="max-h-40 overflow-y-auto rounded-md border border-gray-200 p-2 space-y-1">
+                            @forelse($brands as $b)
+                                <label class="flex cursor-pointer items-center gap-2 rounded px-1.5 py-1 text-sm text-gray-700 hover:bg-primary-50">
+                                    <input
+                                        type="checkbox"
+                                        wire:model.live="selectedBrands"
+                                        value="{{ $b }}"
+                                        class="rounded border-gray-300 text-primary-600 focus:ring-primary-600"
+                                    >
+                                    {{ $b }}
+                                </label>
+                            @empty
+                                <p class="px-1.5 py-1 text-xs text-gray-400">Всі</p>
+                            @endforelse
+                        </div>
                     </div>
                 </div>
             </div>
@@ -143,7 +176,7 @@
                                 type="checkbox"
                                 wire:click="toggleColumn('{{ $colKey }}')"
                                 @checked(! in_array($colKey, $hiddenColumns))
-                                class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-600"
+                                class="rounded border-gray-300 text-primary-600 focus:ring-primary-600"
                             >
                             {{ $colLabel }}
                         </label>
@@ -158,7 +191,7 @@
                 wire:click="setViewMode('cards')"
                 type="button"
                 title="Картки"
-                class="p-2 transition-colors {{ $viewMode === 'cards' ? 'bg-indigo-100 text-indigo-700' : 'bg-white text-gray-400 hover:bg-gray-50 hover:text-gray-600' }}"
+                class="p-2 transition-colors {{ $viewMode === 'cards' ? 'bg-primary-100 text-primary-700' : 'bg-white text-gray-400 hover:bg-gray-50 hover:text-gray-600' }}"
             >
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -169,7 +202,7 @@
                 wire:click="setViewMode('table')"
                 type="button"
                 title="Таблиця"
-                class="p-2 border-l border-gray-300 transition-colors {{ $viewMode === 'table' ? 'bg-indigo-100 text-indigo-700' : 'bg-white text-gray-400 hover:bg-gray-50 hover:text-gray-600' }}"
+                class="p-2 border-l border-gray-300 transition-colors {{ $viewMode === 'table' ? 'bg-primary-100 text-primary-700' : 'bg-white text-gray-400 hover:bg-gray-50 hover:text-gray-600' }}"
             >
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round"
@@ -195,12 +228,12 @@
         };
 
         $sortIconClass = fn (string $col) => $sortBy === $col
-            ? 'w-3.5 h-3.5 text-indigo-500'
+            ? 'w-3.5 h-3.5 text-primary-500'
             : 'w-3.5 h-3.5 text-gray-300 group-hover:text-gray-400';
 
         $thBase    = 'px-3 py-3 cursor-pointer select-none group';
-        $thInner   = 'inline-flex items-center gap-1 hover:text-indigo-700 transition-colors';
-        $thInnerR  = 'inline-flex items-center justify-end gap-1 hover:text-indigo-700 transition-colors w-full';
+        $thInner   = 'inline-flex items-center gap-1 hover:text-primary-700 transition-colors';
+        $thInnerR  = 'inline-flex items-center justify-end gap-1 hover:text-primary-700 transition-colors w-full';
 
         // Colspan for the empty-results row
         $emptyColspan = 8; // fixed: Артикул, Назва, Наявність, Ваша ціна, РРЦ, Маржа, Кількість, Замовити
@@ -303,7 +336,7 @@
                                 <button
                                     wire:click.stop="toggleMarginFormat"
                                     type="button"
-                                    class="inline-flex items-center gap-1 hover:text-indigo-700 transition-colors"
+                                    class="inline-flex items-center gap-1 hover:text-primary-700 transition-colors"
                                     title="Перемкнути формат маржі"
                                 >
                                     Маржа
@@ -327,15 +360,14 @@
                             $data         = $productData[$product->id];
                             $badge        = $data['badge'];
                             $firstVariant = $data['firstVariant'];
-                            $price        = $data['price'];
                             $maxQty       = $data['maxQty'];
                             $minQty       = $data['minQty'];
                             $step         = $data['step'];
                             $images       = is_array($product->images) ? $product->images : [];
                             $photo        = $images[0] ?? null;
 
-                            $rrp       = (float) ($price?->recommended_retail_price ?? 0);
-                            $myPrice   = (float) ($price?->price_with_vat ?? 0);
+                            $rrp       = $data['maxRrp'];
+                            $myPrice   = $data['maxMyPrice'];
                             $marginUah = $rrp > 0 ? $rrp - $myPrice : null;
                             $marginPct = $rrp > 0 ? (($rrp - $myPrice) / $rrp * 100) : null;
 
@@ -351,28 +383,30 @@
                             {{-- Фото (optional) — opens lightbox --}}
                             @if(! in_array('photo', $hiddenColumns))
                                 <td class="px-3 py-2">
-                                    <button
-                                        type="button"
-                                        wire:click="openPhotoLightbox({{ $product->id }})"
-                                        class="block w-12 h-12 overflow-hidden rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                                        title="Переглянути фото"
-                                    >
+                                    <div class="block w-12 h-12 overflow-hidden rounded-lg">
                                         @if($photo)
+                                            @php
+                                                $lbUrl = addslashes($photo);
+                                                $lbTitle = addslashes($product->name);
+                                            @endphp
                                             <img
                                                 src="{{ $photo }}"
                                                 alt="{{ $product->name }}"
                                                 class="w-full h-full object-cover"
-                                                onerror="this.closest('button').innerHTML='<div class=\'w-full h-full bg-gray-100 flex items-center justify-center\'><svg class=\'w-6 h-6 text-gray-300\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'currentColor\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1\' d=\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\'/></svg></div>'"
+                                                style="cursor: zoom-in;"
+                                                title="Натисніть для збільшення"
+                                                onclick="event.stopPropagation();event.preventDefault();bpOpenLightbox('{{ $lbUrl }}','{{ $lbTitle }}')"
+                                                onerror="this.outerHTML='<div class=\'w-full h-full flex items-center justify-center\' style=\'background:#f3f4f6;cursor:default;\'><svg class=\'w-6 h-6\' style=\'color:#d1d5db;\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'currentColor\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1\' d=\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\'/></svg></div>'"
                                             />
                                         @else
-                                            <div class="w-full h-full bg-gray-100 flex items-center justify-center">
-                                                <svg class="w-6 h-6 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <div class="w-full h-full flex items-center justify-center" style="background:#f3f4f6;cursor:default;">
+                                                <svg class="w-6 h-6" style="color:#d1d5db;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
                                                           d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                                 </svg>
                                             </div>
                                         @endif
-                                    </button>
+                                    </div>
                                 </td>
                             @endif
 
@@ -384,7 +418,7 @@
                             {{-- Назва --}}
                             <td class="px-3 py-2 max-w-xs">
                                 <a href="{{ route('cabinet.catalog.show', $product) }}"
-                                   class="font-medium text-gray-900 hover:text-indigo-700 line-clamp-2">
+                                   class="font-medium text-gray-900 hover:text-primary-700 line-clamp-2">
                                     {{ $product->name }}
                                 </a>
                             </td>
@@ -412,8 +446,8 @@
 
                             {{-- Ваша ціна --}}
                             <td class="px-3 py-2 text-right whitespace-nowrap">
-                                @if($price)
-                                    <span class="font-semibold text-indigo-700">
+                                @if($myPrice > 0)
+                                    <span class="font-semibold text-primary-700">
                                         {{ number_format($myPrice, 2, ',', ' ') }} ₴
                                     </span>
                                 @else
@@ -459,7 +493,7 @@
                                             min="{{ $minQty }}"
                                             max="{{ $maxQty }}"
                                             step="{{ $step }}"
-                                            class="w-16 text-center text-sm border border-gray-300 rounded py-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                            class="w-16 text-center text-sm border border-gray-300 rounded py-1 focus:ring-primary-500 focus:border-primary-500"
                                         >
                                         <button type="button"
                                                 wire:click="incrementQty({{ $firstVariant->id }}, {{ $step }}, {{ $maxQty }})"
@@ -477,7 +511,7 @@
                                     @if(in_array($badge['color'], ['success', 'warning']))
                                         <button
                                             wire:click="addToCart({{ $firstVariant->id }}, {{ $minQty }})"
-                                            class="whitespace-nowrap rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition-colors"
+                                            class="whitespace-nowrap rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 transition-colors"
                                         >Купити</button>
                                     @elseif($badge['color'] === 'info')
                                         <button
@@ -510,15 +544,14 @@
                     $data         = $productData[$product->id];
                     $badge        = $data['badge'];
                     $firstVariant = $data['firstVariant'];
-                    $price        = $data['price'];
                     $maxQty       = $data['maxQty'];
                     $minQty       = $data['minQty'];
                     $step         = $data['step'];
                     $images       = is_array($product->images) ? $product->images : [];
                     $photo        = $images[0] ?? null;
 
-                    $rrp     = (float) ($price?->recommended_retail_price ?? 0);
-                    $myPrice = (float) ($price?->price_with_vat ?? 0);
+                    $rrp     = $data['maxRrp'];
+                    $myPrice = $data['maxMyPrice'];
 
                     $badgeClasses = match($badge['color']) {
                         'success' => 'bg-green-100 text-green-800',
@@ -530,31 +563,30 @@
 
                 <div class="group bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
 
-                    {{-- Thumbnail — always clickable, opens lightbox --}}
-                    <div class="aspect-square bg-gray-100 overflow-hidden relative">
-                        <button
-                            type="button"
-                            wire:click="openPhotoLightbox({{ $product->id }})"
-                            class="absolute inset-0 w-full h-full focus:outline-none"
-                            title="Переглянути фото"
-                        >
-                            @if($photo)
-                                <img
-                                    src="{{ $photo }}"
-                                    alt="{{ $product->name }}"
-                                    style="width:100%; height:100%; object-fit:cover;"
-                                    class="group-hover:scale-105 transition-transform duration-200"
-                                    onerror="this.closest('button').innerHTML='<div class=\'flex h-full w-full items-center justify-center text-gray-300\'><svg class=\'w-10 h-10\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'currentColor\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1\' d=\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\'/></svg></div>'"
-                                />
-                            @else
-                                <div class="flex h-full w-full items-center justify-center text-gray-300">
-                                    <svg class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
-                                              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                    </svg>
-                                </div>
-                            @endif
-                        </button>
+                    {{-- Thumbnail — click opens shared JS lightbox --}}
+                    <div class="aspect-square overflow-hidden relative" style="background:#f3f4f6;">
+                        @if($photo)
+                            @php
+                                $lbUrl = addslashes($photo);
+                                $lbTitle = addslashes($product->name);
+                            @endphp
+                            <img
+                                src="{{ $photo }}"
+                                alt="{{ $product->name }}"
+                                style="width:100%; height:100%; object-fit:cover; cursor:zoom-in;"
+                                title="Натисніть для збільшення"
+                                onclick="event.stopPropagation();event.preventDefault();bpOpenLightbox('{{ $lbUrl }}','{{ $lbTitle }}')"
+                                class="group-hover:scale-105 transition-transform duration-200"
+                                onerror="this.outerHTML='<div class=\'flex h-full w-full items-center justify-center\' style=\'background:#f3f4f6;cursor:default;\'><svg class=\'w-10 h-10\' style=\'color:#d1d5db;\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'currentColor\'><path stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1\' d=\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\'/></svg></div>'"
+                            />
+                        @else
+                            <div class="flex h-full w-full items-center justify-center" style="background:#f3f4f6;cursor:default;">
+                                <svg class="w-10 h-10" style="color:#d1d5db;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+                                          d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                            </div>
+                        @endif
                     </div>
 
                     {{-- Card body --}}
@@ -596,7 +628,7 @@
                                         min="{{ $minQty }}"
                                         max="{{ $maxQty }}"
                                         step="{{ $step }}"
-                                        class="w-12 text-center text-xs border border-gray-300 rounded py-0.5 focus:ring-indigo-500 focus:border-indigo-500"
+                                        class="w-12 text-center text-xs border border-gray-300 rounded py-0.5 focus:ring-primary-500 focus:border-primary-500"
                                     >
                                     <button type="button"
                                             wire:click="incrementQty({{ $firstVariant->id }}, {{ $step }}, {{ $maxQty }})"
@@ -606,7 +638,7 @@
                                 @if(in_array($badge['color'], ['success', 'warning']))
                                     <button
                                         wire:click="addToCart({{ $firstVariant->id }}, {{ $minQty }})"
-                                        class="rounded-lg bg-indigo-600 px-2 py-1 text-xs font-medium text-white hover:bg-indigo-700 transition-colors whitespace-nowrap"
+                                        class="rounded-lg bg-primary-600 px-2 py-1 text-xs font-medium text-white hover:bg-primary-700 transition-colors whitespace-nowrap"
                                     >Купити</button>
                                 @elseif($badge['color'] === 'info')
                                     <button
@@ -625,45 +657,5 @@
     @endif
 
     <div class="mt-6">{{ $products->links() }}</div>
-
-    {{-- ═══════════════════════════════════
-         PHOTO LIGHTBOX (table + cards modes)
-    ════════════════════════════════════ --}}
-    @if($lightboxProduct)
-        @php
-            $lbImages = is_array($lightboxProduct->images) ? $lightboxProduct->images : [];
-            $lbPhoto  = $lbImages[0] ?? null;
-        @endphp
-        <div
-            wire:click="closePhotoLightbox"
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-            style="cursor:zoom-out;"
-        >
-            <div wire:click.stop class="relative mx-4">
-                <button
-                    wire:click="closePhotoLightbox"
-                    class="absolute -top-10 right-0 flex items-center gap-1 text-sm text-white/80 hover:text-white"
-                >
-                    Закрити
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-                @if($lbPhoto)
-                    <img
-                        src="{{ $lbPhoto }}"
-                        alt="{{ $lightboxProduct->name }}"
-                        style="max-width:600px; max-height:85vh; width:100%; height:auto; object-fit:contain; border-radius:10px;"
-                        onerror="this.style.display='none'"
-                    />
-                    <p class="mt-2 text-center text-sm text-white/80">{{ $lightboxProduct->name }}</p>
-                @else
-                    <div class="flex h-64 w-64 items-center justify-center rounded-xl bg-gray-800 text-gray-400">
-                        Зображення відсутнє
-                    </div>
-                @endif
-            </div>
-        </div>
-    @endif
 
 </div>
