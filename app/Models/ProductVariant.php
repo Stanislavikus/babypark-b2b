@@ -46,6 +46,13 @@ class ProductVariant extends Model
         return $this->hasMany(Price::class, 'variant_id');
     }
 
+    public function priceFor(Contractor $contractor): ?float
+    {
+        $price = $this->prices->firstWhere('contractor_id', $contractor->id);
+
+        return $price?->price_with_vat !== null ? (float) $price->price_with_vat : null;
+    }
+
     /**
      * Shared badge computation from raw availability data.
      *

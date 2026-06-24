@@ -2,17 +2,19 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Cabinet\Pages\Auth\Login;
 use App\Support\Brand;
 use App\Support\ProductLightbox;
+use App\Support\SessionCart;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationItem;
 use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\View\PanelsRenderHook;
-use Filament\Widgets;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -20,15 +22,15 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
-class AdminPanelProvider extends PanelProvider
+class CabinetPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
         return $panel
-            ->default()
-            ->id('admin')
-            ->path('admin')
-            ->login()
+            ->id('cabinet')
+            ->path('cabinet')
+            ->authGuard('contractor')
+            ->login(Login::class)
             ->brandName('BabyPark B2B')
             ->colors([
                 'primary' => Brand::primaryColor(),
@@ -37,14 +39,15 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::BODY_END,
                 fn () => ProductLightbox::bodyEndHook()
             )
-            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
+            ->discoverResources(in: app_path('Filament/Cabinet/Resources'), for: 'App\\Filament\\Cabinet\\Resources')
             ->pages([
                 Pages\Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
-            ->widgets([
-                Widgets\AccountWidget::class,
+            ->navigationItems([
+                NavigationItem::make('Кошик')
+                    ->icon('heroicon-o-shopping-cart')
+                    ->sort(10)
+                    ->badge(fn (): ?string => ($count = SessionCart::count()) > 0 ? (string) $count : null),
             ])
             ->middleware([
                 EncryptCookies::class,

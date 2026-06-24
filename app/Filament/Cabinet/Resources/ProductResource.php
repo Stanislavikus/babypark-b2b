@@ -1,0 +1,545 @@
+<?php
+
+namespace App\Filament\Cabinet\Resources;
+
+use App\Enums\ReservationStatus;
+use App\Filament\Cabinet\Resources\ProductResource\Pages;
+use App\Filament\Concerns\HasProductLightbox;
+use App\Filament\Resources\ProductResource as AdminProductResource;
+use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Models\Reservation;
+use App\Support\CatalogRowData;
+use App\Support\ProductFields\ProductColumnVisibility;
+use App\Support\ProductFields\ProductPanelVisibility;
+use App\Support\SessionCart;
+use Filament\Forms;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
+use Filament\Notifications\Notification;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
+use Livewire\Livewire;
+
+class ProductResource extends Resource
+{
+    use HasProductLightbox;
+
+    protected static ?string $model = Product::class;
+
+    protected static ?string $navigationIcon = 'heroicon-o-cube';
+
+    protected static ?string $modelLabel = 'товар';
+
+    protected static ?string $pluralModelLabel = 'Товари';
+
+    protected static ?string $slug = 'products';
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        $panel = 'cabinet';
+        $visible = ProductPanelVisibility::visibleDetailFields($panel);
+        $contractor = auth('contractor')->user();
+
+        $schema = [];
+
+        if (in_array('sku', $visible, true) || in_array('brand', $visible, true)) {
+            $sectionFields = [];
+
+            if (in_array('sku', $visible, true)) {
+                $sectionFields[] = Infolists\Components\TextEntry::make('sku')->label('Артикул');
+            }
+
+            if (in_array('brand', $visible, true)) {
+                $sectionFields[] = Infolists\Components\TextEntry::make('brand')
+                    ->label('Бренд')
+                    ->placeholder('—');
+            }
+
+            $schema[] = Infolists\Components\Section::make('Основне')
+                ->schema($sectionFields)
+                ->columns(2);
+        }
+
+        if (in_array('product_url', $visible, true)) {
+            $schema[] = Infolists\Components\Section::make('Сайт')->schema([
+                Infolists\Components\TextEntry::make('product_url')
+                    ->label('URL товару на сайті')
+                    ->placeholder('—')
+                    ->url(fn (?string $state) => $state)
+                    ->openUrlInNewTab()
+                    ->icon('heroicon-m-arrow-top-right-on-square')
+                    ->iconColor('primary')
+                    ->visible(fn (Product $record): bool => filled($record->product_url)),
+            ]);
+        }
+
+        if (in_array('variants', $visible, true)) {
+            $schema[] = Infolists\Components\Section::make('Варіанти')->schema([
+                Infolists\Components\RepeatableEntry::make('active_variants')
+                    ->label('')
+                    ->getStateUsing(function (Product $record) use ($contractor) {
+                        return $record->variants
+                            ->where('is_active', true)
+                            ->filter(fn (ProductVariant $v) => $v->priceFor($contractor) !== null)
+                            ->values();
+                    })
+                    ->schema([
+                        Infolists\Components\TextEntry::make('attributes')
+                            ->label('')
+                            ->formatStateUsing(function ($state): HtmlString {
+                                $attrs = is_array($state) ? $state : [];
+                                if ($attrs === []) {
+                                    return new HtmlString('');
+                                }
+
+                                $badges = collect($attrs)->map(
+                                    fn ($val, $key) => '<span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-0.5 text-xs font-medium text-gray-600">'
+                                        .e($key).': '.e($val).'</span>'
+                                )->implode(' ');
+
+                                return new HtmlString('<div class="flex flex-wrap gap-2">'.$badges.'</div>');
+                            }),
+
+                        Infolists\Components\TextEntry::make('contractor_price')
+                            ->label('Ваша ціна (з ПДВ)')
+                            ->getStateUsing(function (ProductVariant $record) use ($contractor): ?string {
+                                $price = $record->priceFor($contractor);
+
+                                return $price !== null
+                                    ? number_format($price, 2, ',', ' ').' ₴'
+                                    : null;
+                            })
+                            ->placeholder('—'),
+
+                        Infolists\Components\TextEntry::make('rrp')
+                            ->label('Рекомендована роздрібна')
+                            ->getStateUsing(function (ProductVariant $record): ?string {
+                                $rrp = $record->prices->first()?->recommended_retail_price;
+
+                                return $rrp !== null
+                                    ? number_format((float) $rrp, 2, ',', ' ').' ₴'
+                                    : null;
+                            })
+                            ->placeholder('—')
+                            ->extraAttributes(['class' => 'line-through text-gray-400']),
+
+                        Infolists\Components\TextEntry::make('warehouse_stock')
+                            ->label('Наявність')
+                            ->getStateUsing(function (ProductVariant $record): HtmlString {
+                                $product = $record->product;
+                                $threshold = $product->category?->stock_display_threshold ?? 10;
+
+                                if ($record->stocks->isEmpty()) {
+                                    return new HtmlString('<span class="text-gray-400">Немає в наявності</span>');
+                                }
+
+                                $lines = $record->stocks->map(function ($stock) use ($threshold) {
+                                    $qty = $stock->quantity - ($stock->reserved ?? 0);
+                                    $badge = ProductVariant::badgeFromQty(
+                                        $qty,
+                                        (int) ($stock->expected_quantity ?? 0),
+                                        $stock->expected_date,
+                                        $threshold
+                                    );
+
+                                    $colorClass = match ($badge['color']) {
+                                        'success' => 'text-green-700',
+                                        'warning' => 'text-yellow-700',
+                                        'info' => 'text-blue-700',
+                                        default => 'text-gray-400',
+                                    };
+
+                                    return '<div class="flex justify-between text-sm">'
+                                        .'<span class="text-gray-600">'.e($stock->warehouse_name).'</span>'
+                                        .'<span class="font-medium '.$colorClass.'">'.e($badge['label']).'</span>'
+                                        .'</div>';
+                                })->implode('');
+
+                                return new HtmlString('<div class="space-y-1">'.$lines.'</div>');
+                            }),
+                    ])
+                    ->columns(1),
+            ]);
+        }
+
+        $schema[] = Infolists\Components\Section::make('Фото')->schema([
+            Infolists\Components\TextEntry::make('photo_preview')
+                ->label('Фото товару')
+                ->getStateUsing(function (Product $record) {
+                    $url = self::firstImage($record);
+
+                    if ($url) {
+                        $safe = e($url);
+                        $title = e($record->name);
+
+                        return new HtmlString(
+                            '<img src="'.$safe.'"'
+                            .' style="max-width:400px;width:100%;height:auto;object-fit:contain;border-radius:8px;border:1px solid #e5e7eb;cursor:zoom-in;"'
+                            .' title="Натисніть для збільшення"'
+                            .' onclick="bpOpenLightbox(\''.$safe.'\',\''.$title.'\')" />'
+                        );
+                    }
+
+                    return new HtmlString(AdminProductResource::buildPhotoPlaceholderHtml());
+                }),
+        ]);
+
+        return $infolist->schema($schema);
+    }
+
+    public static function table(Table $table): Table
+    {
+        $panel = 'cabinet';
+        $visible = ProductPanelVisibility::visibleCatalogColumns($panel);
+        $toggleable = ProductColumnVisibility::toggleableColumns($panel);
+        $columns = [];
+
+        if (in_array('photo', $visible, true)) {
+            $columns[] = Tables\Columns\ImageColumn::make('first_image')
+                ->label('Фото')
+                ->state(fn (Product $record): ?string => self::firstImage($record))
+                ->size(48)
+                ->defaultImageUrl(fn () => 'data:image/svg+xml,'.rawurlencode(AdminProductResource::placeholderSvg(48)))
+                ->extraImgAttributes(fn (Product $record): array => self::lightboxImgAttributes($record))
+                ->toggleable(in_array('photo', $toggleable));
+        }
+
+        if (in_array('sku', $visible, true)) {
+            $columns[] = Tables\Columns\TextColumn::make('sku')
+                ->label('Артикул')
+                ->searchable()
+                ->sortable();
+        }
+
+        if (in_array('name', $visible, true)) {
+            $columns[] = Tables\Columns\TextColumn::make('name')
+                ->label('Назва')
+                ->searchable()
+                ->sortable()
+                ->limit(50)
+                ->url(fn (Product $record): string => static::getUrl('view', ['record' => $record]));
+        }
+
+        if (in_array('category', $visible, true)) {
+            $columns[] = Tables\Columns\TextColumn::make('category.name')
+                ->label('Категорія')
+                ->sortable()
+                ->toggleable(in_array('category', $toggleable));
+        }
+
+        if (in_array('brand', $visible, true)) {
+            $columns[] = Tables\Columns\TextColumn::make('brand')
+                ->label('Бренд')
+                ->searchable()
+                ->sortable()
+                ->toggleable(in_array('brand', $toggleable));
+        }
+
+        if (in_array('stock', $visible, true)) {
+            $columns[] = Tables\Columns\TextColumn::make('stock_status')
+                ->label('Наявність')
+                ->getStateUsing(function (Product $record): string {
+                    $contractor = auth('contractor')->user();
+                    $data = CatalogRowData::forProduct($record, $contractor);
+
+                    return $data['badge']['label'];
+                })
+                ->badge()
+                ->color(function (Product $record): string {
+                    $contractor = auth('contractor')->user();
+                    $data = CatalogRowData::forProduct($record, $contractor);
+
+                    return match ($data['badge']['color']) {
+                        'success' => 'success',
+                        'warning' => 'warning',
+                        'info' => 'info',
+                        default => 'gray',
+                    };
+                })
+                ->sortable(query: fn (Builder $query, string $direction): Builder => self::applyStockSorting($query, $direction));
+        }
+
+        if (in_array('price', $visible, true)) {
+            $columns[] = Tables\Columns\TextColumn::make('contractor_price')
+                ->label('Ваша ціна')
+                ->getStateUsing(function (Product $record): ?string {
+                    $contractor = auth('contractor')->user();
+                    $price = $record->minPriceFor($contractor);
+
+                    return $price !== null
+                        ? '₴ '.number_format($price, 2, '.', ' ')
+                        : null;
+                })
+                ->placeholder('—')
+                ->sortable(query: function (Builder $query, string $direction): Builder {
+                    $contractorId = auth('contractor')->id();
+
+                    return $query->orderByRaw(
+                        "COALESCE((SELECT MIN(p.price_with_vat) FROM prices p
+                            INNER JOIN product_variants pv ON p.variant_id = pv.id
+                            WHERE pv.product_id = products.id
+                            AND p.contractor_id = ?), 0) {$direction}",
+                        [$contractorId]
+                    );
+                });
+        }
+
+        if (in_array('rrp', $visible, true)) {
+            $columns[] = Tables\Columns\TextColumn::make('rrp')
+                ->label('РРЦ')
+                ->getStateUsing(function (Product $record): ?string {
+                    $rrp = $record->maxRrp();
+
+                    return $rrp !== null
+                        ? '₴ '.number_format($rrp, 2, '.', ' ')
+                        : null;
+                })
+                ->placeholder('—')
+                ->toggleable(in_array('rrp', $toggleable))
+                ->sortable(query: function (Builder $query, string $direction): Builder {
+                    return $query->orderByRaw(
+                        "COALESCE(
+                            (SELECT MAX(pr.recommended_retail_price)
+                             FROM prices pr
+                             INNER JOIN product_variants pv ON pr.variant_id = pv.id
+                             WHERE pv.product_id = products.id),
+                            0
+                        ) {$direction}"
+                    );
+                });
+        }
+
+        if (in_array('margin', $visible, true)) {
+            $columns[] = Tables\Columns\TextColumn::make('margin')
+                ->label(function (): HtmlString {
+                    $livewire = Livewire::current();
+                    $format = $livewire?->marginFormat ?? 'percent';
+                    $badge = $format === 'percent' ? '%' : '₴';
+
+                    return new HtmlString(
+                        '<button type="button" wire:click="toggleMarginFormat"'
+                        .' class="inline-flex items-center gap-1 hover:text-primary-600 transition-colors"'
+                        .' title="Перемкнути формат маржі">'
+                        .'Маржа'
+                        .'<span class="text-[10px] font-bold px-1 py-0.5 rounded bg-gray-200 text-gray-600">'.$badge.'</span>'
+                        .'</button>'
+                    );
+                })
+                ->getStateUsing(function (Product $record): ?string {
+                    $contractor = auth('contractor')->user();
+                    $myPrice = $record->minPriceFor($contractor);
+                    $rrp = $record->maxRrp();
+
+                    if ($myPrice === null || $rrp === null || $rrp <= 0) {
+                        return null;
+                    }
+
+                    $marginUah = $rrp - $myPrice;
+                    $livewire = Livewire::current();
+                    $format = $livewire?->marginFormat ?? 'percent';
+
+                    return $format === 'percent'
+                        ? number_format(($marginUah / $rrp) * 100, 1).'%'
+                        : number_format($marginUah, 2, '.', ' ').' ₴';
+                })
+                ->placeholder('—')
+                ->sortable(query: function (Builder $query, string $direction): Builder {
+                    $contractorId = auth('contractor')->id();
+
+                    return $query->orderByRaw(
+                        "COALESCE((SELECT MAX(p.recommended_retail_price) - MIN(p.price_with_vat) FROM prices p
+                            INNER JOIN product_variants pv ON p.variant_id = pv.id
+                            WHERE pv.product_id = products.id
+                            AND p.contractor_id = ?), 0) {$direction}",
+                        [$contractorId]
+                    );
+                });
+        }
+
+        if (in_array('quantity', $visible, true)) {
+            $columns[] = Tables\Columns\ViewColumn::make('quantity')
+                ->label('Кількість')
+                ->view('filament.cabinet.columns.quantity');
+        }
+
+        if (in_array('order', $visible, true)) {
+            $columns[] = Tables\Columns\ViewColumn::make('order')
+                ->label('Замовити')
+                ->view('filament.cabinet.columns.order');
+        }
+
+        if (in_array('url', $visible, true)) {
+            $columns[] = Tables\Columns\TextColumn::make('product_url')
+                ->label('URL на сайті')
+                ->url(fn (?string $state) => $state)
+                ->openUrlInNewTab()
+                ->placeholder('—')
+                ->icon('heroicon-m-arrow-top-right-on-square')
+                ->iconColor('primary')
+                ->limit(35)
+                ->tooltip(fn (?string $state) => $state)
+                ->toggleable(in_array('url', $toggleable), isToggledHiddenByDefault: true);
+        }
+
+        return $table
+            ->columns($columns)
+            ->defaultSort('sku')
+            ->filters([
+                Tables\Filters\SelectFilter::make('category_id')
+                    ->label('Категорії')
+                    ->relationship('category', 'name')
+                    ->multiple()
+                    ->preload(),
+                Tables\Filters\SelectFilter::make('brand')
+                    ->label('Бренди')
+                    ->options(fn (): array => Product::query()
+                        ->where('is_active', true)
+                        ->whereHas('variants.prices', fn ($q) => $q->where('contractor_id', auth('contractor')->id()))
+                        ->distinct()
+                        ->orderBy('brand')
+                        ->whereNotNull('brand')
+                        ->pluck('brand', 'brand')
+                        ->toArray())
+                    ->multiple(),
+            ])
+            ->actions([
+                Tables\Actions\Action::make('order')
+                    ->label('Замовити')
+                    ->icon('heroicon-o-shopping-cart')
+                    ->visible(fn (Product $record): bool => self::orderActionVisible($record))
+                    ->form(fn (Product $record): array => self::orderActionForm($record))
+                    ->action(fn (Product $record, array $data) => self::handleOrderAction($record, $data)),
+            ])
+            ->bulkActions([]);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $contractorId = auth('contractor')->id();
+
+        return parent::getEloquentQuery()
+            ->where('is_active', true)
+            ->whereHas('variants.prices', fn ($q) => $q->where('contractor_id', $contractorId))
+            ->with([
+                'category',
+                'variants' => fn ($q) => $q->where('is_active', true),
+                'variants.prices' => fn ($q) => $q->where('contractor_id', $contractorId),
+                'variants.stocks',
+            ]);
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListProducts::route('/'),
+            'view' => Pages\ViewProduct::route('/{record}'),
+        ];
+    }
+
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
+
+    protected static function applyStockSorting(Builder $query, string $direction): Builder
+    {
+        $totalQty = '(SELECT COALESCE(SUM(s.quantity - COALESCE(s.reserved, 0)), 0)
+                      FROM stocks s
+                      INNER JOIN product_variants pv ON s.variant_id = pv.id
+                      WHERE pv.product_id = products.id)';
+
+        $minExpectedDate = '(SELECT MIN(s.expected_date)
+                            FROM stocks s
+                            INNER JOIN product_variants pv ON s.variant_id = pv.id
+                            WHERE pv.product_id = products.id
+                            AND s.expected_date IS NOT NULL)';
+
+        $priorityExpr = "CASE
+            WHEN {$totalQty} > 0 THEN 0
+            WHEN {$minExpectedDate} IS NOT NULL THEN 1
+            ELSE 2
+        END";
+
+        return $query
+            ->orderByRaw("{$priorityExpr} {$direction}")
+            ->orderByRaw("{$totalQty} DESC")
+            ->orderByRaw("{$minExpectedDate} ASC");
+    }
+
+    protected static function orderActionVisible(Product $record): bool
+    {
+        $contractor = auth('contractor')->user();
+        $data = CatalogRowData::forProduct($record, $contractor);
+
+        return $data['firstVariant'] !== null
+            && $data['maxQty'] > 0
+            && $data['myPrice'] !== null;
+    }
+
+    /** @return list<Forms\Components\Component> */
+    protected static function orderActionForm(Product $record): array
+    {
+        $contractor = auth('contractor')->user();
+        $data = CatalogRowData::forProduct($record, $contractor);
+
+        return [
+            Forms\Components\TextInput::make('quantity')
+                ->label('Кількість')
+                ->numeric()
+                ->required()
+                ->minValue($data['minQty'])
+                ->maxValue($data['maxQty'])
+                ->step($data['step'])
+                ->default($data['minQty']),
+        ];
+    }
+
+    protected static function handleOrderAction(Product $record, array $data): void
+    {
+        $contractor = auth('contractor')->user();
+        $rowData = CatalogRowData::forProduct($record, $contractor);
+        $variant = $rowData['firstVariant'];
+
+        if (! $variant) {
+            return;
+        }
+
+        $qty = max($rowData['minQty'], (int) ($data['quantity'] ?? $rowData['minQty']));
+
+        if (in_array($rowData['badge']['color'], ['success', 'warning'], true)) {
+            SessionCart::add($variant->id, $qty);
+
+            Notification::make()
+                ->title('Додано до кошика')
+                ->success()
+                ->send();
+        } elseif ($rowData['badge']['color'] === 'info') {
+            Reservation::create([
+                'contractor_id' => $contractor->id,
+                'variant_id' => $variant->id,
+                'quantity' => $qty,
+                'status' => ReservationStatus::Active,
+                'expires_at' => now()->addHours(config('b2b.reservation_ttl_hours', 48)),
+            ]);
+
+            Notification::make()
+                ->title('Бронювання створено')
+                ->success()
+                ->send();
+        }
+    }
+}

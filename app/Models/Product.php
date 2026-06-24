@@ -66,4 +66,22 @@ class Product extends Model
     {
         return $this->hasMany(ProductVariant::class);
     }
+
+    public function minPriceFor(Contractor $contractor): ?float
+    {
+        $price = $this->variants
+            ->flatMap(fn ($variant) => $variant->prices->where('contractor_id', $contractor->id))
+            ->min('price_with_vat');
+
+        return $price !== null ? (float) $price : null;
+    }
+
+    public function maxRrp(): ?float
+    {
+        $rrp = $this->variants
+            ->flatMap(fn ($variant) => $variant->prices)
+            ->max('recommended_retail_price');
+
+        return $rrp !== null ? (float) $rrp : null;
+    }
 }

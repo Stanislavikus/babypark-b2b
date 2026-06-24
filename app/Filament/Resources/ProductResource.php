@@ -2,8 +2,10 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
+use App\Support\ProductFields\ProductColumnVisibility;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
@@ -11,9 +13,13 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 
 class ProductResource extends Resource
 {
+    use HasProductLightbox;
+
     protected static ?string $model = Product::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-cube';
@@ -25,55 +31,6 @@ class ProductResource extends Resource
     protected static ?string $pluralModelLabel = 'Товари';
 
     protected static ?int $navigationSort = 3;
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    /**
-     * Returns extra <img> attributes for thumbnail that opens the shared JS lightbox
-     * (bpOpenLightbox injected by AdminPanelProvider::BODY_END renderHook).
-     *
-     * @return array<string, string>
-     */
-    public static function lightboxImgAttributes(Product $record): array
-    {
-        $url = self::firstImage($record);
-
-        if (! $url) {
-            return [
-                'class' => 'rounded object-cover',
-                'style' => 'cursor: default;',
-            ];
-        }
-
-        $safe  = e($url);
-        $title = e($record->name);
-
-        return [
-            'class'   => 'rounded object-cover',
-            'style'   => 'cursor: zoom-in;',
-            'title'   => 'Натисніть для збільшення',
-            // stopPropagation + preventDefault prevent the wrapping <a> row link from
-            // navigating to the view page when clicking the thumbnail.
-            'onclick' => "event.stopPropagation();event.preventDefault();bpOpenLightbox('{$safe}','{$title}')",
-        ];
-    }
-
-    /** Returns the first image URL from a product's images JSON, or null. */
-    public static function firstImage(Product $record): ?string
-    {
-        $images = $record->images;
-
-        // The Eloquent array cast normally decodes JSON automatically, but guard
-        // against cases where the raw JSON string bypasses the cast (e.g. when
-        // the model is constructed without going through the accessor pipeline).
-        if (is_string($images)) {
-            $images = json_decode($images, true);
-        }
-
-        return is_array($images) && count($images) > 0 ? $images[0] : null;
-    }
 
     // -------------------------------------------------------------------------
     // Form (edit)
@@ -119,7 +76,7 @@ class ProductResource extends Resource
                     Forms\Components\Group::make([
                         Forms\Components\Placeholder::make('photo_preview')
                             ->label('Фото товару')
-                            ->content(fn (Forms\Get $get, ?Product $record) => new \Illuminate\Support\HtmlString(
+                            ->content(fn (Forms\Get $get, ?Product $record) => new HtmlString(
                                 $record
                                     ? self::buildPhotoPreviewHtml($record)
                                     : self::buildPhotoPlaceholderHtml()
@@ -162,7 +119,7 @@ class ProductResource extends Resource
                                 return "У наявності: {$totalQty} шт";
                             }
                             if ($earliestExpectedDate) {
-                                return 'Очікується ' . $earliestExpectedDate->format('d.m');
+                                return 'Очікується '.$earliestExpectedDate->format('d.m');
                             }
 
                             return 'Немає в наявності';
@@ -170,8 +127,8 @@ class ProductResource extends Resource
                         ->badge()
                         ->color(fn (string $state): string => match (true) {
                             str_starts_with($state, 'У наявності') => 'success',
-                            str_starts_with($state, 'Очікується')  => 'info',
-                            default                                 => 'gray',
+                            str_starts_with($state, 'Очікується') => 'info',
+                            default => 'gray',
                         }),
                     // Row 3: Категорія | РРЦ
                     Infolists\Components\TextEntry::make('category.name')->label('Категорія')->placeholder('—'),
@@ -191,7 +148,7 @@ class ProductResource extends Resource
                             }
 
                             return $maxRrp !== null
-                                ? '₴ ' . number_format($maxRrp, 2, '.', ' ')
+                                ? '₴ '.number_format($maxRrp, 2, '.', ' ')
                                 : null;
                         })
                         ->placeholder('—'),
@@ -213,7 +170,7 @@ class ProductResource extends Resource
                         ->icon('heroicon-m-arrow-top-right-on-square')
                         ->iconColor('primary')
                         ->formatStateUsing(fn (?string $state) => $state
-                            ? parse_url($state, PHP_URL_HOST) . rtrim(parse_url($state, PHP_URL_PATH) ?? '', '/')
+                            ? parse_url($state, PHP_URL_HOST).rtrim(parse_url($state, PHP_URL_PATH) ?? '', '/')
                             : null),
 
                     // Right: 48×48 thumbnail — click opens the shared bpOpenLightbox() JS overlay.
@@ -223,24 +180,24 @@ class ProductResource extends Resource
                         ->label('Фото товару')
                         ->getStateUsing(function ($record) {
                             if (! $record) {
-                                return new \Illuminate\Support\HtmlString('');
+                                return new HtmlString('');
                             }
                             $url = self::firstImage($record);
 
                             if ($url) {
-                                $safe  = e($url);
+                                $safe = e($url);
                                 $title = e($record->name);
 
-                                return new \Illuminate\Support\HtmlString(
-                                    '<img src="' . $safe . '"' .
-                                    ' style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;cursor:zoom-in;"' .
-                                    ' title="Натисніть для збільшення"' .
-                                    ' onclick="bpOpenLightbox(\'' . $safe . '\',\'' . $title . '\')" />'
+                                return new HtmlString(
+                                    '<img src="'.$safe.'"'.
+                                    ' style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;cursor:zoom-in;"'.
+                                    ' title="Натисніть для збільшення"'.
+                                    ' onclick="bpOpenLightbox(\''.$safe.'\',\''.$title.'\')" />'
                                 );
                             }
 
-                            return new \Illuminate\Support\HtmlString(
-                                '<div style="width:48px;height:48px;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;display:flex;align-items:center;justify-content:center;">' .
+                            return new HtmlString(
+                                '<div style="width:48px;height:48px;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;display:flex;align-items:center;justify-content:center;">'.
                                 '<span style="color:#9ca3af;font-size:10px;">—</span></div>'
                             );
                         }),
@@ -254,6 +211,9 @@ class ProductResource extends Resource
 
     public static function table(Table $table): Table
     {
+        $panel = 'admin';
+        $toggleable = ProductColumnVisibility::toggleableColumns($panel);
+
         return $table
             ->columns([
                 // 48×48 thumbnail — toggleable; click opens the shared bpOpenLightbox() JS overlay
@@ -261,9 +221,9 @@ class ProductResource extends Resource
                     ->label('Фото')
                     ->state(fn (Product $record): ?string => self::firstImage($record))
                     ->size(48)
-                    ->defaultImageUrl(fn () => 'data:image/svg+xml,' . rawurlencode(self::placeholderSvg(48)))
+                    ->defaultImageUrl(fn () => 'data:image/svg+xml,'.rawurlencode(self::placeholderSvg(48)))
                     ->extraImgAttributes(fn (Product $record): array => self::lightboxImgAttributes($record))
-                    ->toggleable(),
+                    ->toggleable(in_array('photo', $toggleable)),
 
                 Tables\Columns\TextColumn::make('sku')
                     ->label('Артикул')
@@ -278,12 +238,14 @@ class ProductResource extends Resource
 
                 Tables\Columns\TextColumn::make('category.name')
                     ->label('Категорія')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(in_array('category', $toggleable)),
 
                 Tables\Columns\TextColumn::make('brand')
                     ->label('Бренд')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(in_array('brand', $toggleable)),
 
                 Tables\Columns\TextColumn::make('rrp')
                     ->label('РРЦ')
@@ -301,12 +263,12 @@ class ProductResource extends Resource
                         }
 
                         return $maxRrp !== null
-                            ? '₴ ' . number_format($maxRrp, 2, '.', ' ')
+                            ? '₴ '.number_format($maxRrp, 2, '.', ' ')
                             : null;
                     })
                     ->placeholder('—')
-                    ->toggleable()
-                    ->sortable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $direction): \Illuminate\Database\Eloquent\Builder {
+                    ->toggleable(in_array('rrp', $toggleable))
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderByRaw(
                             "COALESCE(
                                 (SELECT MAX(pr.recommended_retail_price)
@@ -337,7 +299,7 @@ class ProductResource extends Resource
                             return "У наявності: {$totalQty} шт";
                         }
                         if ($earliestExpectedDate) {
-                            return 'Очікується ' . $earliestExpectedDate->format('d.m');
+                            return 'Очікується '.$earliestExpectedDate->format('d.m');
                         }
 
                         return 'Немає в наявності';
@@ -345,20 +307,20 @@ class ProductResource extends Resource
                     ->badge()
                     ->color(fn (string $state): string => match (true) {
                         str_starts_with($state, 'У наявності') => 'success',
-                        str_starts_with($state, 'Очікується')  => 'info',
-                        default                                 => 'gray',
+                        str_starts_with($state, 'Очікується') => 'info',
+                        default => 'gray',
                     })
-                    ->sortable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $direction): \Illuminate\Database\Eloquent\Builder {
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
                         // Subquery expressions reused across ORDER BY clauses.
-                        $totalQty = "(SELECT COALESCE(SUM(s.quantity), 0)
+                        $totalQty = '(SELECT COALESCE(SUM(s.quantity), 0)
                                       FROM stocks s
                                       INNER JOIN product_variants pv ON s.variant_id = pv.id
-                                      WHERE pv.product_id = products.id)";
+                                      WHERE pv.product_id = products.id)';
 
-                        $minExpectedDate = "(SELECT MIN(s.expected_date)
+                        $minExpectedDate = '(SELECT MIN(s.expected_date)
                                             FROM stocks s
                                             INNER JOIN product_variants pv ON s.variant_id = pv.id
-                                            WHERE pv.product_id = products.id)";
+                                            WHERE pv.product_id = products.id)';
 
                         // Priority bucket: 0 = У наявності, 1 = Очікується, 2 = Немає в наявності.
                         // Sorting by $direction means asc→best-first, desc→worst-first.
@@ -386,12 +348,12 @@ class ProductResource extends Resource
                     ->iconColor('primary')
                     ->limit(35)
                     ->tooltip(fn (?string $state) => $state)
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(in_array('url', $toggleable), isToggledHiddenByDefault: true),
 
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Статус')
                     ->boolean()
-                    ->sortable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $direction): \Illuminate\Database\Eloquent\Builder {
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
                         // Secondary sort by id keeps rows stable when all visible values are identical
                         // (e.g. when a status filter is active and every row shares the same is_active value).
                         return $query->orderBy('is_active', $direction)->orderBy('id', $direction);
@@ -407,7 +369,7 @@ class ProductResource extends Resource
                     ->preload(),
                 Tables\Filters\SelectFilter::make('brand')
                     ->label('Бренди')
-                    ->options(fn (): array => \App\Models\Product::query()
+                    ->options(fn (): array => Product::query()
                         ->distinct()
                         ->orderBy('brand')
                         ->whereNotNull('brand')
@@ -418,15 +380,15 @@ class ProductResource extends Resource
                     ->label('Статус')
                     ->placeholder('Всі')
                     ->options([
-                        'active'   => 'Тільки активні',
+                        'active' => 'Тільки активні',
                         'inactive' => 'Тільки неактивні',
                     ])
                     ->default('active')
-                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
+                    ->query(function (Builder $query, array $data): Builder {
                         return match ($data['value'] ?? null) {
-                            'active'   => $query->where('is_active', true),
+                            'active' => $query->where('is_active', true),
                             'inactive' => $query->where('is_active', false),
-                            default    => $query,
+                            default => $query,
                         };
                     }),
             ])
@@ -438,7 +400,7 @@ class ProductResource extends Resource
     // Eager loading
     // -------------------------------------------------------------------------
 
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
             ->with(['variants.stocks', 'variants.prices', 'category']);
@@ -452,7 +414,7 @@ class ProductResource extends Resource
     {
         return [
             'index' => Pages\ListProducts::route('/'),
-            'view'  => Pages\ViewProduct::route('/{record}'),
+            'view' => Pages\ViewProduct::route('/{record}'),
         ];
     }
 
@@ -488,7 +450,7 @@ SVG;
      */
     public static function buildPhotoPlaceholderHtml(): string
     {
-        return <<<HTML
+        return <<<'HTML'
 <div style="display:inline-flex; align-items:center; justify-content:center; width:200px; height:200px;
             border-radius:8px; border:1px solid #e5e7eb; background:#f9fafb; color:#9ca3af;">
     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
@@ -510,7 +472,7 @@ HTML;
         }
 
         $safe = e($url);
-        $alt  = e($record->name);
+        $alt = e($record->name);
 
         return <<<HTML
 <a href="{$safe}" target="_blank" rel="noopener" title="Відкрити у новій вкладці">
@@ -537,7 +499,7 @@ HTML;
         }
 
         $safe = e($url);
-        $alt  = e($record->name);
+        $alt = e($record->name);
 
         return <<<HTML
 <a href="{$safe}" target="_blank" rel="noopener noreferrer" title="Відкрити у новій вкладці">
