@@ -2,21 +2,16 @@
 
 namespace App\Filament\Cabinet\Resources;
 
-use App\Enums\ReservationStatus;
 use App\Filament\Cabinet\Resources\ProductResource\Pages;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource as AdminProductResource;
 use App\Models\Product;
 use App\Models\ProductVariant;
-use App\Models\Reservation;
 use App\Support\CatalogRowData;
 use App\Support\ProductFields\ProductColumnVisibility;
 use App\Support\ProductFields\ProductPanelVisibility;
-use App\Support\SessionCart;
-use Filament\Forms;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -88,6 +83,10 @@ class ProductResource extends Resource
                             ->values();
                     })
                     ->schema([
+                        Infolists\Components\TextEntry::make('barcode_ean')
+                            ->label('EAN')
+                            ->placeholder('—'),
+
                         Infolists\Components\TextEntry::make('attributes')
                             ->label('')
                             ->formatStateUsing(function ($state): HtmlString {
@@ -213,6 +212,15 @@ class ProductResource extends Resource
                 ->label('Артикул')
                 ->searchable()
                 ->sortable();
+        }
+
+        if (in_array('barcode_ean', $visible, true)) {
+            $columns[] = Tables\Columns\TextColumn::make('barcode_ean')
+                ->label('EAN')
+                ->searchable()
+                ->sortable()
+                ->placeholder('—')
+                ->toggleable(in_array('barcode_ean', $toggleable), isToggledHiddenByDefault: true);
         }
 
         if (in_array('name', $visible, true)) {
@@ -406,14 +414,6 @@ class ProductResource extends Resource
                         ->toArray())
                     ->multiple(),
             ])
-            ->actions([
-                Tables\Actions\Action::make('order')
-                    ->label('Замовити')
-                    ->icon('heroicon-o-shopping-cart')
-                    ->visible(fn (Product $record): bool => self::orderActionVisible($record))
-                    ->form(fn (Product $record): array => self::orderActionForm($record))
-                    ->action(fn (Product $record, array $data) => self::handleOrderAction($record, $data)),
-            ])
             ->bulkActions([]);
     }
 
@@ -478,68 +478,5 @@ class ProductResource extends Resource
             ->orderByRaw("{$priorityExpr} {$direction}")
             ->orderByRaw("{$totalQty} DESC")
             ->orderByRaw("{$minExpectedDate} ASC");
-    }
-
-    protected static function orderActionVisible(Product $record): bool
-    {
-        $contractor = auth('contractor')->user();
-        $data = CatalogRowData::forProduct($record, $contractor);
-
-        return $data['firstVariant'] !== null
-            && $data['maxQty'] > 0
-            && $data['myPrice'] !== null;
-    }
-
-    /** @return list<Forms\Components\Component> */
-    protected static function orderActionForm(Product $record): array
-    {
-        $contractor = auth('contractor')->user();
-        $data = CatalogRowData::forProduct($record, $contractor);
-
-        return [
-            Forms\Components\TextInput::make('quantity')
-                ->label('Кількість')
-                ->numeric()
-                ->required()
-                ->minValue($data['minQty'])
-                ->maxValue($data['maxQty'])
-                ->step($data['step'])
-                ->default($data['minQty']),
-        ];
-    }
-
-    protected static function handleOrderAction(Product $record, array $data): void
-    {
-        $contractor = auth('contractor')->user();
-        $rowData = CatalogRowData::forProduct($record, $contractor);
-        $variant = $rowData['firstVariant'];
-
-        if (! $variant) {
-            return;
-        }
-
-        $qty = max($rowData['minQty'], (int) ($data['quantity'] ?? $rowData['minQty']));
-
-        if (in_array($rowData['badge']['color'], ['success', 'warning'], true)) {
-            SessionCart::add($variant->id, $qty);
-
-            Notification::make()
-                ->title('Додано до кошика')
-                ->success()
-                ->send();
-        } elseif ($rowData['badge']['color'] === 'info') {
-            Reservation::create([
-                'contractor_id' => $contractor->id,
-                'variant_id' => $variant->id,
-                'quantity' => $qty,
-                'status' => ReservationStatus::Active,
-                'expires_at' => now()->addHours(config('b2b.reservation_ttl_hours', 48)),
-            ]);
-
-            Notification::make()
-                ->title('Бронювання створено')
-                ->success()
-                ->send();
-        }
     }
 }

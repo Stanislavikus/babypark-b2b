@@ -16,6 +16,7 @@ class CatalogRowData
      *     firstVariant: ?ProductVariant,
      *     maxQty: int,
      *     minQty: int,
+     *     defaultQty: int,
      *     step: int,
      *     myPrice: ?float,
      *     rrp: ?float,
@@ -56,14 +57,37 @@ class CatalogRowData
             default => 0,
         };
 
+        $minQty = max(1, $product->min_order_quantity);
+        $realQtyForDefault = match ($badge['color']) {
+            'success', 'warning' => $variantAvailQty,
+            'info' => $variantExpQty,
+            default => 0,
+        };
+
         return [
             'badge' => $badge,
             'firstVariant' => $firstVariant,
             'maxQty' => $maxQty,
-            'minQty' => max(1, $product->min_order_quantity),
+            'minQty' => $minQty,
+            'defaultQty' => self::defaultDisplayQty($realQtyForDefault, $threshold, $minQty, $maxQty),
             'step' => max(1, $product->order_step),
             'myPrice' => $product->minPriceFor($contractor),
             'rrp' => $product->maxRrp(),
         ];
+    }
+
+    /**
+     * Starting quantity for the stepper — mirrors the stock badge threshold rule.
+     * Ceiling (max) stays at real available stock; only the initial display is capped.
+     */
+    public static function defaultDisplayQty(int $realQty, int $threshold, int $minQty, int $maxQty): int
+    {
+        if ($maxQty <= 0) {
+            return $minQty;
+        }
+
+        $base = $realQty > $threshold ? $threshold : $realQty;
+
+        return max($minQty, min($maxQty, $base));
     }
 }

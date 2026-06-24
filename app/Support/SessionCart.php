@@ -2,7 +2,10 @@
 
 namespace App\Support;
 
+use App\Models\Contractor;
 use App\Models\Order;
+use App\Models\Price;
+use App\Models\ProductVariant;
 
 /**
  * Session-based cart for the B2B cabinet.
@@ -57,6 +60,69 @@ class SessionCart
     public static function totalQuantity(): int
     {
         return array_sum(array_column(self::all(), 'quantity'));
+    }
+
+    /**
+     * Cart lines with contractor-specific prices for display.
+     *
+     * @return list<array{
+     *     variant_id: int,
+     *     name: string,
+     *     sku: string,
+     *     quantity: int,
+     *     price_with_vat: float,
+     *     line_total: float,
+     * }>
+     */
+    public static function linesForContractor(Contractor $contractor): array
+    {
+        $cart = self::all();
+
+        if ($cart === []) {
+            return [];
+        }
+
+        $variantIds = array_keys($cart);
+
+        $variants = ProductVariant::query()
+            ->with('product')
+            ->whereIn('id', $variantIds)
+            ->get()
+            ->keyBy('id');
+
+        $prices = Price::query()
+            ->where('contractor_id', $contractor->id)
+            ->whereIn('variant_id', $variantIds)
+            ->get()
+            ->keyBy('variant_id');
+
+        $lines = [];
+
+        foreach ($cart as $item) {
+            $variant = $variants->get($item['variant_id']);
+
+            if (! $variant) {
+                continue;
+            }
+
+            $price = (float) ($prices->get($variant->id)?->price_with_vat ?? 0);
+
+            $lines[] = [
+                'variant_id' => $variant->id,
+                'name' => $variant->product->name,
+                'sku' => $variant->sku,
+                'quantity' => $item['quantity'],
+                'price_with_vat' => $price,
+                'line_total' => $price * $item['quantity'],
+            ];
+        }
+
+        return $lines;
+    }
+
+    public static function totalWithVat(Contractor $contractor): float
+    {
+        return array_sum(array_column(self::linesForContractor($contractor), 'line_total'));
     }
 
     /** Remove a single variant line. */

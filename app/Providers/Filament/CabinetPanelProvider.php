@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Cabinet\Pages\Auth\Login;
+use App\Filament\Cabinet\Resources\ProductResource\Pages\ListProducts;
 use App\Support\Brand;
 use App\Support\ProductLightbox;
 use App\Support\SessionCart;
@@ -14,12 +15,14 @@ use Filament\Navigation\NavigationItem;
 use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\Tables\View\TablesRenderHook;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class CabinetPanelProvider extends PanelProvider
@@ -38,6 +41,11 @@ class CabinetPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn () => ProductLightbox::bodyEndHook()
+            )
+            ->renderHook(
+                TablesRenderHook::TOOLBAR_TOGGLE_COLUMN_TRIGGER_AFTER,
+                fn (): string => Blade::render('@livewire(\'cabinet.cart-toolbar\')'),
+                ListProducts::class,
             )
             ->discoverResources(in: app_path('Filament/Cabinet/Resources'), for: 'App\\Filament\\Cabinet\\Resources')
             ->pages([

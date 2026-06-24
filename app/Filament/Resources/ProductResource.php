@@ -230,6 +230,13 @@ class ProductResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                Tables\Columns\TextColumn::make('barcode_ean')
+                    ->label('EAN')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('—')
+                    ->toggleable(in_array('barcode_ean', $toggleable), isToggledHiddenByDefault: true),
+
                 Tables\Columns\TextColumn::make('name')
                     ->label('Назва')
                     ->searchable()

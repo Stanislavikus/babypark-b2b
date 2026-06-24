@@ -34,21 +34,21 @@ class ListProducts extends ListRecords
         $this->marginFormat = $this->marginFormat === 'percent' ? 'uah' : 'percent';
     }
 
-    public function incrementQty(int $variantId, int $step, int $maxQty): void
+    public function incrementQty(int $variantId, int $step, int $maxQty, int $defaultQty): void
     {
-        $current = (int) ($this->quantities[$variantId] ?? $step);
+        $current = (int) ($this->quantities[$variantId] ?? $defaultQty);
         $this->quantities[$variantId] = min($maxQty, $current + $step);
     }
 
-    public function decrementQty(int $variantId, int $step, int $minQty): void
+    public function decrementQty(int $variantId, int $step, int $minQty, int $defaultQty): void
     {
-        $current = (int) ($this->quantities[$variantId] ?? $minQty);
+        $current = (int) ($this->quantities[$variantId] ?? $defaultQty);
         $this->quantities[$variantId] = max($minQty, $current - $step);
     }
 
-    public function addToCart(int $variantId, int $minQty): void
+    public function addToCart(int $variantId, int $minQty, int $defaultQty): void
     {
-        $qty = max($minQty, (int) ($this->quantities[$variantId] ?? $minQty));
+        $qty = max($minQty, (int) ($this->quantities[$variantId] ?? $defaultQty));
         SessionCart::add($variantId, $qty);
 
         Notification::make()
@@ -59,10 +59,10 @@ class ListProducts extends ListRecords
         $this->dispatch('cart-updated');
     }
 
-    public function reserve(int $variantId, int $minQty): void
+    public function reserve(int $variantId, int $minQty, int $defaultQty): void
     {
         $contractor = auth('contractor')->user();
-        $qty = max($minQty, (int) ($this->quantities[$variantId] ?? $minQty));
+        $qty = max($minQty, (int) ($this->quantities[$variantId] ?? $defaultQty));
 
         Reservation::create([
             'contractor_id' => $contractor->id,
@@ -97,7 +97,7 @@ class ListProducts extends ListRecords
         foreach ($paginator->items() as $product) {
             $data = CatalogRowData::forProduct($product, $contractor);
             if ($data['firstVariant'] && ! isset($this->quantities[$data['firstVariant']->id])) {
-                $this->quantities[$data['firstVariant']->id] = $data['minQty'];
+                $this->quantities[$data['firstVariant']->id] = $data['defaultQty'];
             }
         }
 
