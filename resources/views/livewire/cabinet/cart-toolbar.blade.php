@@ -1,16 +1,12 @@
 <div class="inline-flex items-center">
     <div
         x-data="{ open: false }"
-        class="relative inline-flex items-center gap-2"
+        class="relative inline-flex items-center gap-2.5"
     >
-        <span class="text-sm font-semibold tabular-nums text-gray-900">
-            ₴&nbsp;{{ number_format($total, 2, ',', ' ') }}
-        </span>
-
         <button
             type="button"
             @click="open = !open"
-            class="relative inline-flex items-center rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600"
+            class="relative inline-flex items-center rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-primary-400"
             title="Кошик"
         >
             <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -25,6 +21,10 @@
             @endif
         </button>
 
+        <span class="text-base font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+            ₴&nbsp;{{ number_format($total, 2, ',', ' ') }}
+        </span>
+
         @if ($count > 0)
             <div
                 x-show="open"
@@ -35,26 +35,26 @@
                 x-transition:leave="transition ease-in duration-75"
                 x-transition:leave-start="opacity-100 scale-100"
                 x-transition:leave-end="opacity-0 scale-95"
-                class="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-gray-200 bg-white p-3 shadow-lg"
+                class="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-700 dark:bg-gray-900"
                 style="display: none;"
             >
-                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Кошик</p>
+                <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Кошик</p>
 
                 <ul class="max-h-60 space-y-2 overflow-y-auto">
                     @foreach ($lines as $line)
                         <li class="flex items-start justify-between gap-2 text-sm">
                             <div class="min-w-0">
-                                <p class="truncate font-medium text-gray-900">{{ $line['name'] }}</p>
-                                <p class="text-xs text-gray-500">{{ $line['sku'] }} × {{ $line['quantity'] }}</p>
+                                <p class="truncate font-medium text-gray-900 dark:text-gray-100">{{ $line['name'] }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ $line['sku'] }} × {{ $line['quantity'] }}</p>
                             </div>
-                            <span class="shrink-0 tabular-nums text-gray-700">
+                            <span class="shrink-0 tabular-nums text-gray-700 dark:text-gray-300">
                                 ₴&nbsp;{{ number_format($line['line_total'], 2, ',', ' ') }}
                             </span>
                         </li>
                     @endforeach
                 </ul>
 
-                <div class="mt-3 flex items-center justify-between border-t border-gray-100 pt-2 text-sm font-semibold text-gray-900">
+                <div class="mt-3 flex items-center justify-between border-t border-gray-100 pt-2 text-sm font-semibold text-gray-900 dark:border-gray-800 dark:text-gray-100">
                     <span>Разом</span>
                     <span class="tabular-nums">₴&nbsp;{{ number_format($total, 2, ',', ' ') }}</span>
                 </div>

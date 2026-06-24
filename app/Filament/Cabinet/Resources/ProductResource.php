@@ -368,16 +368,10 @@ class ProductResource extends Resource
                 });
         }
 
-        if (in_array('quantity', $visible, true)) {
-            $columns[] = Tables\Columns\ViewColumn::make('quantity')
-                ->label('Кількість')
-                ->view('filament.cabinet.columns.quantity');
-        }
-
         if (in_array('order', $visible, true)) {
             $columns[] = Tables\Columns\ViewColumn::make('order')
                 ->label('Замовити')
-                ->view('filament.cabinet.columns.order');
+                ->view('filament.cabinet.columns.quantity-order');
         }
 
         if (in_array('url', $visible, true)) {
@@ -396,6 +390,11 @@ class ProductResource extends Resource
         return $table
             ->columns($columns)
             ->defaultSort('sku')
+            ->toggleColumnsTriggerAction(
+                fn (Tables\Actions\Action $action) => $action
+                    ->label('Стовпці')
+                    ->tooltip('Стовпці')
+            )
             ->filters([
                 Tables\Filters\SelectFilter::make('category_id')
                     ->label('Категорії')

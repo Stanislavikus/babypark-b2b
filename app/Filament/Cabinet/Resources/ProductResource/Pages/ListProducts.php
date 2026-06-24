@@ -4,14 +4,10 @@ namespace App\Filament\Cabinet\Resources\ProductResource\Pages;
 
 use App\Enums\ReservationStatus;
 use App\Filament\Cabinet\Resources\ProductResource;
-use App\Models\Product;
 use App\Models\Reservation;
-use App\Support\CatalogRowData;
 use App\Support\SessionCart;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
-use Illuminate\Contracts\Pagination\Paginator;
-use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\On;
 
 class ListProducts extends ListRecords
@@ -34,21 +30,21 @@ class ListProducts extends ListRecords
         $this->marginFormat = $this->marginFormat === 'percent' ? 'uah' : 'percent';
     }
 
-    public function incrementQty(int $variantId, int $step, int $maxQty, int $defaultQty): void
+    public function incrementQty(int $variantId, int $step, int $maxQty): void
     {
-        $current = (int) ($this->quantities[$variantId] ?? $defaultQty);
+        $current = (int) ($this->quantities[$variantId] ?? 0);
         $this->quantities[$variantId] = min($maxQty, $current + $step);
     }
 
-    public function decrementQty(int $variantId, int $step, int $minQty, int $defaultQty): void
+    public function decrementQty(int $variantId, int $step): void
     {
-        $current = (int) ($this->quantities[$variantId] ?? $defaultQty);
-        $this->quantities[$variantId] = max($minQty, $current - $step);
+        $current = (int) ($this->quantities[$variantId] ?? 0);
+        $this->quantities[$variantId] = max(0, $current - $step);
     }
 
-    public function addToCart(int $variantId, int $minQty, int $defaultQty): void
+    public function addToCart(int $variantId, int $minQty): void
     {
-        $qty = max($minQty, (int) ($this->quantities[$variantId] ?? $defaultQty));
+        $qty = max($minQty, (int) ($this->quantities[$variantId] ?? 0));
         SessionCart::add($variantId, $qty);
 
         Notification::make()
@@ -59,10 +55,10 @@ class ListProducts extends ListRecords
         $this->dispatch('cart-updated');
     }
 
-    public function reserve(int $variantId, int $minQty, int $defaultQty): void
+    public function reserve(int $variantId, int $minQty): void
     {
         $contractor = auth('contractor')->user();
-        $qty = max($minQty, (int) ($this->quantities[$variantId] ?? $defaultQty));
+        $qty = max($minQty, (int) ($this->quantities[$variantId] ?? 0));
 
         Reservation::create([
             'contractor_id' => $contractor->id,
@@ -82,25 +78,5 @@ class ListProducts extends ListRecords
     public function refreshCartBadge(): void
     {
         // Trigger re-render for navigation badge refresh on next navigation.
-    }
-
-    /**
-     * Ensure default quantity is set when records are loaded.
-     *
-     * @param  list<Product>  $records
-     */
-    protected function paginateTableQuery(Builder $query): Paginator
-    {
-        $paginator = parent::paginateTableQuery($query);
-        $contractor = auth('contractor')->user();
-
-        foreach ($paginator->items() as $product) {
-            $data = CatalogRowData::forProduct($product, $contractor);
-            if ($data['firstVariant'] && ! isset($this->quantities[$data['firstVariant']->id])) {
-                $this->quantities[$data['firstVariant']->id] = $data['defaultQty'];
-            }
-        }
-
-        return $paginator;
     }
 }
