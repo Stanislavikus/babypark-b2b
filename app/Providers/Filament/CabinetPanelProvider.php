@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Cabinet\Pages\Auth\Login;
 use App\Filament\Cabinet\Resources\ProductResource\Pages\ListProducts;
 use App\Support\Brand;
+use App\Support\FilamentTableToolbar;
 use App\Support\ProductLightbox;
 use App\Support\SessionCart;
 use Filament\Http\Middleware\Authenticate;
@@ -41,6 +42,10 @@ class CabinetPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn () => ProductLightbox::bodyEndHook()
+            )
+            ->renderHook(
+                FilamentTableToolbar::stylesHookName(),
+                FilamentTableToolbar::stylesRenderHook()
             )
             ->renderHook(
                 TablesRenderHook::TOOLBAR_TOGGLE_COLUMN_TRIGGER_AFTER,

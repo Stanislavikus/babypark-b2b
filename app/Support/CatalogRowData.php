@@ -28,7 +28,6 @@ class CatalogRowData
         $variantsWithPrice = $activeVariants->filter(
             fn ($v) => $v->prices->where('contractor_id', $contractor->id)->isNotEmpty()
         );
-        $firstVariant = $variantsWithPrice->first();
 
         $totalAvailQty = $activeVariants->sum(
             fn ($v) => $v->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0))
@@ -43,18 +42,28 @@ class CatalogRowData
 
         $badge = ProductVariant::badgeFromQty($totalAvailQty, $totalExpQty, $earliestExpDate, $threshold);
 
-        $variantAvailQty = $firstVariant
-            ? $firstVariant->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0))
-            : 0;
-        $variantExpQty = $firstVariant
-            ? ($firstVariant->stocks->sum('expected_quantity') ?? 0)
-            : 0;
+        $firstVariant = null;
+        $maxQty = 0;
 
-        $maxQty = match ($badge['color']) {
-            'success', 'warning' => $variantAvailQty,
-            'info' => $variantExpQty,
-            default => 0,
-        };
+        foreach ($variantsWithPrice as $variant) {
+            $variantAvailQty = $variant->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0));
+            $variantExpQty = $variant->stocks->sum('expected_quantity') ?? 0;
+
+            $variantMaxQty = match ($badge['color']) {
+                'success', 'warning' => $variantAvailQty,
+                'info' => $variantExpQty,
+                default => 0,
+            };
+
+            if ($variantMaxQty > $maxQty) {
+                $maxQty = $variantMaxQty;
+                $firstVariant = $variant;
+            }
+        }
+
+        if ($firstVariant === null) {
+            $firstVariant = $variantsWithPrice->first();
+        }
 
         $minQty = max(1, $product->min_order_quantity);
 

@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Support\Brand;
+use App\Support\FilamentTableToolbar;
 use App\Support\ProductLightbox;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -36,6 +37,10 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn () => ProductLightbox::bodyEndHook()
+            )
+            ->renderHook(
+                FilamentTableToolbar::stylesHookName(),
+                FilamentTableToolbar::stylesRenderHook()
             )
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
