@@ -276,7 +276,7 @@ class ProductResource extends Resource
                 ->label('Ваша ціна')
                 ->getStateUsing(function (Product $record): ?string {
                     $contractor = auth('contractor')->user();
-                    $price = $record->minPriceFor($contractor);
+                    $price = CatalogRowData::forProduct($record, $contractor)['myPrice'];
 
                     return $price !== null
                         ? '₴ '.number_format($price, 2, '.', ' ')
@@ -339,8 +339,9 @@ class ProductResource extends Resource
                 })
                 ->getStateUsing(function (Product $record): ?string {
                     $contractor = auth('contractor')->user();
-                    $myPrice = $record->minPriceFor($contractor);
-                    $rrp = $record->maxRrp();
+                    $data = CatalogRowData::forProduct($record, $contractor);
+                    $myPrice = $data['myPrice'];
+                    $rrp = $data['rrp'];
 
                     if ($myPrice === null || $rrp === null || $rrp <= 0) {
                         return null;

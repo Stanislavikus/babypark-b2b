@@ -5,7 +5,6 @@ namespace App\Livewire\Cabinet;
 use App\Enums\ReservationStatus;
 use App\Models\Category;
 use App\Models\Product;
-use App\Models\ProductVariant;
 use App\Models\Reservation;
 use App\Support\SessionCart;
 use Illuminate\Database\Eloquent\Builder;
@@ -211,54 +210,21 @@ class Catalog extends Component
 
         $productData = [];
         foreach ($products as $product) {
-            $threshold = $product->category?->stock_display_threshold ?? 10;
-            $activeVariants = $product->variants->where('is_active', true);
-            $variantsWithPrice = $activeVariants->filter(fn ($v) => $v->prices->isNotEmpty());
-            $firstVariant = $variantsWithPrice->first();
-
-            $allPrices = $variantsWithPrice->flatMap(fn ($v) => $v->prices);
-            $maxRrp = (float) ($allPrices->max('recommended_retail_price') ?? 0);
-            $maxMyPrice = (float) ($allPrices->max('price_with_vat') ?? 0);
-
-            $totalAvailQty = $activeVariants->sum(fn ($v) => $v->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0)));
-            $totalExpQty = $activeVariants->sum(fn ($v) => $v->stocks->sum('expected_quantity')) ?? 0;
-            $earliestExpDate = $activeVariants
-                ->flatMap(fn ($v) => $v->stocks)
-                ->whereNotNull('expected_date')
-                ->sortBy('expected_date')
-                ->first()
-                ?->expected_date;
-
-            $badge = ProductVariant::badgeFromQty($totalAvailQty, $totalExpQty, $earliestExpDate, $threshold);
-
-            $variantAvailQty = $firstVariant
-                ? $firstVariant->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0))
-                : 0;
-            $variantExpQty = $firstVariant
-                ? ($firstVariant->stocks->sum('expected_quantity') ?? 0)
-                : 0;
-
-            $maxQty = match ($badge['color']) {
-                'success', 'warning' => $variantAvailQty,
-                'info' => $variantExpQty,
-                default => 0,
-            };
-
-            $minQty = max(1, $product->min_order_quantity);
-            $step = max(1, $product->order_step);
+            $data = CatalogRowData::forProduct($product, $contractor);
+            $firstVariant = $data['firstVariant'];
 
             if ($firstVariant && ! isset($this->quantities[$firstVariant->id])) {
-                $this->quantities[$firstVariant->id] = $minQty;
+                $this->quantities[$firstVariant->id] = $data['minQty'];
             }
 
             $productData[$product->id] = [
-                'badge' => $badge,
+                'badge' => $data['badge'],
                 'firstVariant' => $firstVariant,
-                'maxRrp' => $maxRrp,
-                'maxMyPrice' => $maxMyPrice,
-                'maxQty' => $maxQty,
-                'minQty' => $minQty,
-                'step' => $step,
+                'maxRrp' => (float) ($data['rrp'] ?? 0),
+                'maxMyPrice' => (float) ($data['myPrice'] ?? 0),
+                'maxQty' => $data['maxQty'],
+                'minQty' => $data['minQty'],
+                'step' => $data['step'],
             ];
         }
 
