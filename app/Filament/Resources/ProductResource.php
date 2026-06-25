@@ -15,6 +15,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
+use Livewire\Livewire;
 
 class ProductResource extends Resource
 {
@@ -53,6 +54,13 @@ class ProductResource extends Resource
                     Forms\Components\TextInput::make('category.name')
                         ->label('Категорія')
                         ->disabled(),
+                    Forms\Components\TextInput::make('cost_price')
+                        ->label('Вхідна ціна')
+                        ->numeric()
+                        ->minValue(0)
+                        ->step(0.01)
+                        ->suffix('₴')
+                        ->placeholder('—'),
                 ])->columns(2),
 
                 Forms\Components\Section::make('Сайт')->schema([
@@ -95,11 +103,14 @@ class ProductResource extends Resource
         return $infolist
             ->schema([
                 Infolists\Components\Section::make('Основне (з 1С)')->schema([
-                    // Row 1: Артикул | Назва
                     Infolists\Components\TextEntry::make('sku')->label('Артикул'),
-                    Infolists\Components\TextEntry::make('name')->label('Назва'),
-                    // Row 2: Бренд | Наявність (real admin quantity, no threshold)
+                    Infolists\Components\TextEntry::make('variant_ean')
+                        ->label('EAN')
+                        ->getStateUsing(fn (Product $record): ?string => $record->variants->first()?->barcode_ean)
+                        ->placeholder('—'),
                     Infolists\Components\TextEntry::make('brand')->label('Бренд')->placeholder('—'),
+                    Infolists\Components\TextEntry::make('name')->label('Назва'),
+                    Infolists\Components\TextEntry::make('category.name')->label('Категорія')->placeholder('—'),
                     Infolists\Components\TextEntry::make('admin_stock_status')
                         ->label('Наявність')
                         ->getStateUsing(function (Product $record): string {
@@ -130,8 +141,12 @@ class ProductResource extends Resource
                             str_starts_with($state, 'Очікується') => 'info',
                             default => 'gray',
                         }),
-                    // Row 3: Категорія | РРЦ
-                    Infolists\Components\TextEntry::make('category.name')->label('Категорія')->placeholder('—'),
+                    Infolists\Components\TextEntry::make('cost_price')
+                        ->label('Вхідна ціна')
+                        ->formatStateUsing(fn (?string $state): ?string => $state !== null
+                            ? '₴ '.number_format((float) $state, 2, '.', ' ')
+                            : null)
+                        ->placeholder('—'),
                     Infolists\Components\TextEntry::make('admin_rrp')
                         ->label('РРЦ')
                         ->getStateUsing(function (Product $record): ?string {
@@ -152,7 +167,6 @@ class ProductResource extends Resource
                                 : null;
                         })
                         ->placeholder('—'),
-                    // Row 4: Статус | (empty)
                     Infolists\Components\TextEntry::make('admin_status')
                         ->label('Статус')
                         ->getStateUsing(fn (Product $record): string => $record->is_active ? 'Активний' : 'Неактивний')
@@ -257,17 +271,7 @@ class ProductResource extends Resource
                 Tables\Columns\TextColumn::make('rrp')
                     ->label('РРЦ')
                     ->getStateUsing(function (Product $record): ?string {
-                        $maxRrp = null;
-                        foreach ($record->variants as $variant) {
-                            foreach ($variant->prices as $price) {
-                                if (
-                                    $price->recommended_retail_price !== null
-                                    && ($maxRrp === null || $price->recommended_retail_price > $maxRrp)
-                                ) {
-                                    $maxRrp = (float) $price->recommended_retail_price;
-                                }
-                            }
-                        }
+                        $maxRrp = self::maxRrpFor($record);
 
                         return $maxRrp !== null
                             ? '₴ '.number_format($maxRrp, 2, '.', ' ')
@@ -284,6 +288,70 @@ class ProductResource extends Resource
                                  WHERE pv.product_id = products.id),
                                 0
                             ) {$direction}"
+                        );
+                    }),
+
+                Tables\Columns\TextColumn::make('cost_price')
+                    ->label('Вхідна ціна')
+                    ->formatStateUsing(fn (?string $state): ?string => $state !== null
+                        ? '₴ '.number_format((float) $state, 2, '.', ' ')
+                        : null)
+                    ->placeholder('—')
+                    ->toggleable(in_array('cost_price', $toggleable), isToggledHiddenByDefault: true)
+                    ->sortable(),
+
+                Tables\Columns\TextColumn::make('margin')
+                    ->label(function (): HtmlString {
+                        $livewire = Livewire::current();
+                        $format = $livewire?->marginFormat ?? 'percent';
+                        $badge = $format === 'percent' ? '%' : '₴';
+
+                        return new HtmlString(
+                            '<button type="button" wire:click="toggleMarginFormat"'
+                            .' class="inline-flex items-center gap-1 hover:text-primary-600 transition-colors"'
+                            .' title="Перемкнути формат маржі">'
+                            .'Маржа%'
+                            .'<span class="text-[10px] font-bold px-1 py-0.5 rounded bg-gray-200 text-gray-600">'.$badge.'</span>'
+                            .'</button>'
+                        );
+                    })
+                    ->getStateUsing(function (Product $record): ?string {
+                        $rrp = self::maxRrpFor($record);
+                        $costPrice = $record->cost_price !== null ? (float) $record->cost_price : null;
+
+                        if ($costPrice === null || $rrp === null || $rrp <= 0) {
+                            return null;
+                        }
+
+                        $marginUah = $rrp - $costPrice;
+                        $livewire = Livewire::current();
+                        $format = $livewire?->marginFormat ?? 'percent';
+
+                        return $format === 'percent'
+                            ? number_format(($marginUah / $rrp) * 100, 1).'%'
+                            : number_format($marginUah, 2, '.', ' ').' ₴';
+                    })
+                    ->color(function (Product $record): ?string {
+                        $rrp = self::maxRrpFor($record);
+                        $costPrice = $record->cost_price !== null ? (float) $record->cost_price : null;
+
+                        if ($costPrice === null || $rrp === null || $rrp <= 0) {
+                            return null;
+                        }
+
+                        return ($rrp - $costPrice) < 0 ? 'danger' : null;
+                    })
+                    ->placeholder('—')
+                    ->toggleable(in_array('margin', $toggleable), isToggledHiddenByDefault: true)
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderByRaw(
+                            "COALESCE(
+                                (SELECT MAX(pr.recommended_retail_price)
+                                 FROM prices pr
+                                 INNER JOIN product_variants pv ON pr.variant_id = pv.id
+                                 WHERE pv.product_id = products.id),
+                                0
+                            ) - COALESCE(products.cost_price, 0) {$direction}"
                         );
                     }),
 
@@ -367,6 +435,11 @@ class ProductResource extends Resource
                     }),
             ])
             ->defaultSort('sku')
+            ->toggleColumnsTriggerAction(
+                fn (Tables\Actions\Action $action) => $action
+                    ->label('Стовпці')
+                    ->tooltip('Стовпці')
+            )
             ->recordUrl(fn (Product $record): string => static::getUrl('view', ['record' => $record]))
             ->filters([
                 Tables\Filters\SelectFilter::make('category_id')
@@ -422,6 +495,7 @@ class ProductResource extends Resource
         return [
             'index' => Pages\ListProducts::route('/'),
             'view' => Pages\ViewProduct::route('/{record}'),
+            'edit' => Pages\EditProduct::route('/{record}/edit'),
         ];
     }
 
@@ -438,6 +512,23 @@ class ProductResource extends Resource
     // -------------------------------------------------------------------------
     // Internal helpers
     // -------------------------------------------------------------------------
+
+    public static function maxRrpFor(Product $record): ?float
+    {
+        $maxRrp = null;
+        foreach ($record->variants as $variant) {
+            foreach ($variant->prices as $price) {
+                if (
+                    $price->recommended_retail_price !== null
+                    && ($maxRrp === null || $price->recommended_retail_price > $maxRrp)
+                ) {
+                    $maxRrp = (float) $price->recommended_retail_price;
+                }
+            }
+        }
+
+        return $maxRrp;
+    }
 
     /** SVG placeholder icon at a given pixel size. */
     public static function placeholderSvg(int $size = 48): string

@@ -7,7 +7,8 @@ class ProductColumnVisibility
     public static function toggleableColumns(string $panel): array
     {
         return match ($panel) {
-            'admin', 'cabinet' => ['photo', 'barcode_ean', 'category', 'brand', 'rrp', 'url'],
+            'admin' => ['photo', 'barcode_ean', 'category', 'brand', 'cost_price', 'rrp', 'margin', 'url'],
+            'cabinet' => ['photo', 'barcode_ean', 'category', 'brand', 'rrp', 'url'],
             default => [],
         };
     }

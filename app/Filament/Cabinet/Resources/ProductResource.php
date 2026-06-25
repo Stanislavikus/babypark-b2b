@@ -41,22 +41,84 @@ class ProductResource extends Resource
 
         $schema = [];
 
-        if (in_array('sku', $visible, true) || in_array('brand', $visible, true)) {
-            $sectionFields = [];
-
-            if (in_array('sku', $visible, true)) {
-                $sectionFields[] = Infolists\Components\TextEntry::make('sku')->label('Артикул');
-            }
-
-            if (in_array('brand', $visible, true)) {
-                $sectionFields[] = Infolists\Components\TextEntry::make('brand')
-                    ->label('Бренд')
-                    ->placeholder('—');
-            }
-
+        if (in_array('variants', $visible, true)) {
             $schema[] = Infolists\Components\Section::make('Основне')
-                ->schema($sectionFields)
-                ->columns(2);
+                ->schema([
+                    Infolists\Components\RepeatableEntry::make('active_variants')
+                        ->label('')
+                        ->getStateUsing(function (Product $record) use ($contractor) {
+                            return $record->variants
+                                ->where('is_active', true)
+                                ->filter(fn (ProductVariant $v) => $v->priceFor($contractor) !== null)
+                                ->values();
+                        })
+                        ->schema([
+                            Infolists\Components\TextEntry::make('sku')
+                                ->label('Артикул')
+                                ->getStateUsing(fn (ProductVariant $record): string => $record->product->sku),
+
+                            Infolists\Components\TextEntry::make('barcode_ean')
+                                ->label('EAN')
+                                ->placeholder('—'),
+
+                            Infolists\Components\TextEntry::make('brand')
+                                ->label('Бренд')
+                                ->getStateUsing(fn (ProductVariant $record): ?string => $record->product->brand)
+                                ->placeholder('—'),
+
+                            Infolists\Components\TextEntry::make('name')
+                                ->label('Назва')
+                                ->getStateUsing(fn (ProductVariant $record): string => $record->product->name),
+
+                            Infolists\Components\TextEntry::make('category')
+                                ->label('Категорія')
+                                ->getStateUsing(fn (ProductVariant $record): ?string => $record->product->category?->name)
+                                ->placeholder('—'),
+
+                            Infolists\Components\TextEntry::make('stock_status')
+                                ->label('Наявність')
+                                ->getStateUsing(function (ProductVariant $record): string {
+                                    $threshold = $record->product->category?->stock_display_threshold ?? 10;
+
+                                    return $record->availabilityBadge($threshold)['label'];
+                                })
+                                ->badge()
+                                ->color(function (ProductVariant $record): string {
+                                    $threshold = $record->product->category?->stock_display_threshold ?? 10;
+
+                                    return match ($record->availabilityBadge($threshold)['color']) {
+                                        'success' => 'success',
+                                        'warning' => 'warning',
+                                        'info' => 'info',
+                                        default => 'gray',
+                                    };
+                                }),
+
+                            Infolists\Components\TextEntry::make('contractor_price')
+                                ->label('Ваша ціна')
+                                ->getStateUsing(function (ProductVariant $record) use ($contractor): ?string {
+                                    $price = $record->priceFor($contractor);
+
+                                    return $price !== null
+                                        ? '₴ '.number_format($price, 2, '.', ' ')
+                                        : null;
+                                })
+                                ->placeholder('—'),
+
+                            Infolists\Components\TextEntry::make('rrp')
+                                ->label('РРЦ')
+                                ->getStateUsing(function (ProductVariant $record): ?string {
+                                    $rrp = $record->prices->first()?->recommended_retail_price;
+
+                                    return $rrp !== null
+                                        ? '₴ '.number_format((float) $rrp, 2, '.', ' ')
+                                        : null;
+                                })
+                                ->placeholder('—')
+                                ->extraAttributes(['class' => 'line-through text-gray-400']),
+                        ])
+                        ->columns(2),
+                ]);
         }
 
         if (in_array('product_url', $visible, true)) {
@@ -68,124 +130,37 @@ class ProductResource extends Resource
                     ->openUrlInNewTab()
                     ->icon('heroicon-m-arrow-top-right-on-square')
                     ->iconColor('primary')
-                    ->visible(fn (Product $record): bool => filled($record->product_url)),
-            ]);
-        }
+                    ->formatStateUsing(fn (?string $state) => $state
+                        ? parse_url($state, PHP_URL_HOST).rtrim(parse_url($state, PHP_URL_PATH) ?? '', '/')
+                        : null),
 
-        if (in_array('variants', $visible, true)) {
-            $schema[] = Infolists\Components\Section::make('Варіанти')->schema([
-                Infolists\Components\RepeatableEntry::make('active_variants')
-                    ->label('')
-                    ->getStateUsing(function (Product $record) use ($contractor) {
-                        return $record->variants
-                            ->where('is_active', true)
-                            ->filter(fn (ProductVariant $v) => $v->priceFor($contractor) !== null)
-                            ->values();
-                    })
-                    ->schema([
-                        Infolists\Components\TextEntry::make('barcode_ean')
-                            ->label('EAN')
-                            ->placeholder('—'),
+                Infolists\Components\TextEntry::make('photo_preview')
+                    ->label('Фото товару')
+                    ->getStateUsing(function (Product $record) {
+                        if (! $record) {
+                            return new HtmlString('');
+                        }
+                        $url = self::firstImage($record);
 
-                        Infolists\Components\TextEntry::make('attributes')
-                            ->label('')
-                            ->formatStateUsing(function ($state): HtmlString {
-                                $attrs = is_array($state) ? $state : [];
-                                if ($attrs === []) {
-                                    return new HtmlString('');
-                                }
+                        if ($url) {
+                            $safe = e($url);
+                            $title = e($record->name);
 
-                                $badges = collect($attrs)->map(
-                                    fn ($val, $key) => '<span class="inline-flex items-center rounded-full bg-gray-100 px-3 py-0.5 text-xs font-medium text-gray-600">'
-                                        .e($key).': '.e($val).'</span>'
-                                )->implode(' ');
-
-                                return new HtmlString('<div class="flex flex-wrap gap-2">'.$badges.'</div>');
-                            }),
-
-                        Infolists\Components\TextEntry::make('contractor_price')
-                            ->label('Ваша ціна (з ПДВ)')
-                            ->getStateUsing(function (ProductVariant $record) use ($contractor): ?string {
-                                $price = $record->priceFor($contractor);
-
-                                return $price !== null
-                                    ? number_format($price, 2, ',', ' ').' ₴'
-                                    : null;
-                            })
-                            ->placeholder('—'),
-
-                        Infolists\Components\TextEntry::make('rrp')
-                            ->label('Рекомендована роздрібна')
-                            ->getStateUsing(function (ProductVariant $record): ?string {
-                                $rrp = $record->prices->first()?->recommended_retail_price;
-
-                                return $rrp !== null
-                                    ? number_format((float) $rrp, 2, ',', ' ').' ₴'
-                                    : null;
-                            })
-                            ->placeholder('—')
-                            ->extraAttributes(['class' => 'line-through text-gray-400']),
-
-                        Infolists\Components\TextEntry::make('warehouse_stock')
-                            ->label('Наявність')
-                            ->getStateUsing(function (ProductVariant $record): HtmlString {
-                                $product = $record->product;
-                                $threshold = $product->category?->stock_display_threshold ?? 10;
-
-                                if ($record->stocks->isEmpty()) {
-                                    return new HtmlString('<span class="text-gray-400">Немає в наявності</span>');
-                                }
-
-                                $lines = $record->stocks->map(function ($stock) use ($threshold) {
-                                    $qty = $stock->quantity - ($stock->reserved ?? 0);
-                                    $badge = ProductVariant::badgeFromQty(
-                                        $qty,
-                                        (int) ($stock->expected_quantity ?? 0),
-                                        $stock->expected_date,
-                                        $threshold
-                                    );
-
-                                    $colorClass = match ($badge['color']) {
-                                        'success' => 'text-green-700',
-                                        'warning' => 'text-yellow-700',
-                                        'info' => 'text-blue-700',
-                                        default => 'text-gray-400',
-                                    };
-
-                                    return '<div class="flex justify-between text-sm">'
-                                        .'<span class="text-gray-600">'.e($stock->warehouse_name).'</span>'
-                                        .'<span class="font-medium '.$colorClass.'">'.e($badge['label']).'</span>'
-                                        .'</div>';
-                                })->implode('');
-
-                                return new HtmlString('<div class="space-y-1">'.$lines.'</div>');
-                            }),
-                    ])
-                    ->columns(1),
-            ]);
-        }
-
-        $schema[] = Infolists\Components\Section::make('Фото')->schema([
-            Infolists\Components\TextEntry::make('photo_preview')
-                ->label('Фото товару')
-                ->getStateUsing(function (Product $record) {
-                    $url = self::firstImage($record);
-
-                    if ($url) {
-                        $safe = e($url);
-                        $title = e($record->name);
+                            return new HtmlString(
+                                '<img src="'.$safe.'"'.
+                                ' style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;cursor:zoom-in;"'.
+                                ' title="Натисніть для збільшення"'.
+                                ' onclick="bpOpenLightbox(\''.$safe.'\',\''.$title.'\')" />'
+                            );
+                        }
 
                         return new HtmlString(
-                            '<img src="'.$safe.'"'
-                            .' style="max-width:400px;width:100%;height:auto;object-fit:contain;border-radius:8px;border:1px solid #e5e7eb;cursor:zoom-in;"'
-                            .' title="Натисніть для збільшення"'
-                            .' onclick="bpOpenLightbox(\''.$safe.'\',\''.$title.'\')" />'
+                            '<div style="width:48px;height:48px;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;display:flex;align-items:center;justify-content:center;">'.
+                            '<span style="color:#9ca3af;font-size:10px;">—</span></div>'
                         );
-                    }
-
-                    return new HtmlString(AdminProductResource::buildPhotoPlaceholderHtml());
-                }),
-        ]);
+                    }),
+            ])->columns(2);
+        }
 
         return $infolist->schema($schema);
     }

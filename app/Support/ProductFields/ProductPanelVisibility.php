@@ -15,7 +15,7 @@ class ProductPanelVisibility
     public static function visibleDetailFields(string $panel): array
     {
         return match ($panel) {
-            'cabinet' => ['sku', 'brand', 'product_url', 'variants'],
+            'cabinet' => ['variants', 'product_url'],
             default => [],
         };
     }
