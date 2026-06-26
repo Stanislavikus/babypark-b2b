@@ -60,7 +60,7 @@ class ProductVariant extends Model
      *   label, color (success/warning/info/danger),
      *   and optionally available_quantity, expected_quantity, expected_date.
      *
-     * The threshold only affects whether we show exact count or "В наявності";
+     * The threshold controls the ">N / =N / bare N" suffix after "У наявності:";
      * it does NOT limit the quantity counter max.
      *
      * @return array{label: string, color: string, available_quantity?: int, expected_quantity?: int, expected_date?: Carbon|null}
@@ -73,15 +73,23 @@ class ProductVariant extends Model
     ): array {
         if ($availQty > $threshold) {
             return [
-                'label' => 'В наявності',
+                'label' => "У наявності: >{$threshold} шт.",
                 'color' => 'success',
+                'available_quantity' => $availQty,
+            ];
+        }
+
+        if ($availQty === $threshold) {
+            return [
+                'label' => "У наявності: ={$threshold} шт.",
+                'color' => 'warning',
                 'available_quantity' => $availQty,
             ];
         }
 
         if ($availQty > 0) {
             return [
-                'label' => "Залишилось {$availQty} шт",
+                'label' => "У наявності: {$availQty} шт.",
                 'color' => 'warning',
                 'available_quantity' => $availQty,
             ];
