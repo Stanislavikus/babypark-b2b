@@ -5,7 +5,9 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
+use App\Support\ProductFields\AdminProductMargin;
 use App\Support\ProductFields\ProductColumnVisibility;
+use App\Support\ProductTableLink;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
@@ -167,6 +169,16 @@ class ProductResource extends Resource
                                 : null;
                         })
                         ->placeholder('—'),
+                    Infolists\Components\TextEntry::make('admin_margin')
+                        ->label(fn (): HtmlString => AdminProductMargin::toggleLabelHtml(
+                            Livewire::current()?->marginFormat ?? 'percent'
+                        ))
+                        ->getStateUsing(fn (Product $record): ?string => AdminProductMargin::formatted(
+                            $record,
+                            Livewire::current()?->marginFormat ?? 'percent'
+                        ))
+                        ->color(fn (Product $record): ?string => AdminProductMargin::isNegative($record) ? 'danger' : null)
+                        ->placeholder('—'),
                     Infolists\Components\TextEntry::make('admin_status')
                         ->label('Статус')
                         ->getStateUsing(fn (Product $record): string => $record->is_active ? 'Активний' : 'Неактивний')
@@ -301,46 +313,14 @@ class ProductResource extends Resource
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('margin')
-                    ->label(function (): HtmlString {
-                        $livewire = Livewire::current();
-                        $format = $livewire?->marginFormat ?? 'percent';
-                        $badge = $format === 'percent' ? '%' : '₴';
-
-                        return new HtmlString(
-                            '<button type="button" wire:click="toggleMarginFormat"'
-                            .' class="inline-flex items-center gap-1 hover:text-primary-600 transition-colors"'
-                            .' title="Перемкнути формат маржі">'
-                            .'Маржа%'
-                            .'<span class="text-[10px] font-bold px-1 py-0.5 rounded bg-gray-200 text-gray-600">'.$badge.'</span>'
-                            .'</button>'
-                        );
-                    })
-                    ->getStateUsing(function (Product $record): ?string {
-                        $rrp = self::maxRrpFor($record);
-                        $costPrice = $record->cost_price !== null ? (float) $record->cost_price : null;
-
-                        if ($costPrice === null || $rrp === null || $rrp <= 0) {
-                            return null;
-                        }
-
-                        $marginUah = $rrp - $costPrice;
-                        $livewire = Livewire::current();
-                        $format = $livewire?->marginFormat ?? 'percent';
-
-                        return $format === 'percent'
-                            ? number_format(($marginUah / $rrp) * 100, 1).'%'
-                            : number_format($marginUah, 2, '.', ' ').' ₴';
-                    })
-                    ->color(function (Product $record): ?string {
-                        $rrp = self::maxRrpFor($record);
-                        $costPrice = $record->cost_price !== null ? (float) $record->cost_price : null;
-
-                        if ($costPrice === null || $rrp === null || $rrp <= 0) {
-                            return null;
-                        }
-
-                        return ($rrp - $costPrice) < 0 ? 'danger' : null;
-                    })
+                    ->label(fn (): HtmlString => AdminProductMargin::toggleLabelHtml(
+                        Livewire::current()?->marginFormat ?? 'percent'
+                    ))
+                    ->getStateUsing(fn (Product $record): ?string => AdminProductMargin::formatted(
+                        $record,
+                        Livewire::current()?->marginFormat ?? 'percent'
+                    ))
+                    ->color(fn (Product $record): ?string => AdminProductMargin::isNegative($record) ? 'danger' : null)
                     ->placeholder('—')
                     ->toggleable(in_array('margin', $toggleable), isToggledHiddenByDefault: true)
                     ->sortable(query: function (Builder $query, string $direction): Builder {
@@ -416,13 +396,9 @@ class ProductResource extends Resource
                 // Clickable link column
                 Tables\Columns\TextColumn::make('product_url')
                     ->label('URL на сайті')
-                    ->url(fn (?string $state) => $state)
-                    ->openUrlInNewTab()
-                    ->placeholder('—')
-                    ->icon('heroicon-m-arrow-top-right-on-square')
-                    ->iconColor('primary')
-                    ->limit(35)
+                    ->formatStateUsing(fn (?string $state): HtmlString|string => ProductTableLink::externalUrlHtml($state))
                     ->tooltip(fn (?string $state) => $state)
+                    ->disableClick()
                     ->toggleable(in_array('url', $toggleable), isToggledHiddenByDefault: true),
 
                 Tables\Columns\IconColumn::make('is_active')

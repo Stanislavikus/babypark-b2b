@@ -8,8 +8,10 @@ use App\Filament\Resources\ProductResource as AdminProductResource;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\CatalogRowData;
+use App\Support\ProductFields\AdminProductMargin;
 use App\Support\ProductFields\ProductColumnVisibility;
 use App\Support\ProductFields\ProductPanelVisibility;
+use App\Support\ProductTableLink;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
@@ -116,6 +118,17 @@ class ProductResource extends Resource
                                 })
                                 ->placeholder('—')
                                 ->extraAttributes(['class' => 'line-through text-gray-400']),
+
+                            Infolists\Components\TextEntry::make('admin_margin')
+                                ->label(fn (): HtmlString => AdminProductMargin::toggleLabelHtml(
+                                    Livewire::current()?->marginFormat ?? 'percent'
+                                ))
+                                ->getStateUsing(fn (ProductVariant $record): ?string => AdminProductMargin::formatted(
+                                    $record->product,
+                                    Livewire::current()?->marginFormat ?? 'percent'
+                                ))
+                                ->color(fn (ProductVariant $record): ?string => AdminProductMargin::isNegative($record->product) ? 'danger' : null)
+                                ->placeholder('—'),
                         ])
                         ->columns(2),
                 ]);
@@ -347,25 +360,23 @@ class ProductResource extends Resource
         if (in_array('order', $visible, true)) {
             $columns[] = Tables\Columns\ViewColumn::make('order')
                 ->label('Замовити')
+                ->disableClick()
                 ->view('filament.cabinet.columns.quantity-order');
         }
 
         if (in_array('url', $visible, true)) {
             $columns[] = Tables\Columns\TextColumn::make('product_url')
                 ->label('URL на сайті')
-                ->url(fn (?string $state) => $state)
-                ->openUrlInNewTab()
-                ->placeholder('—')
-                ->icon('heroicon-m-arrow-top-right-on-square')
-                ->iconColor('primary')
-                ->limit(35)
+                ->formatStateUsing(fn (?string $state): HtmlString|string => ProductTableLink::externalUrlHtml($state))
                 ->tooltip(fn (?string $state) => $state)
+                ->disableClick()
                 ->toggleable(in_array('url', $toggleable), isToggledHiddenByDefault: true);
         }
 
         return $table
             ->columns($columns)
             ->defaultSort('sku')
+            ->recordUrl(fn (Product $record): string => static::getUrl('view', ['record' => $record]))
             ->toggleColumnsTriggerAction(
                 fn (Tables\Actions\Action $action) => $action
                     ->label('Стовпці')
