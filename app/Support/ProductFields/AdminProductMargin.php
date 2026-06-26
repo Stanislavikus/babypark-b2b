@@ -43,15 +43,6 @@ class AdminProductMargin
 
     public static function toggleLabelHtml(string $format = 'percent'): HtmlString
     {
-        $badge = $format === 'percent' ? '%' : '₴';
-
-        return new HtmlString(
-            '<button type="button" wire:click="toggleMarginFormat"'
-            .' class="inline-flex items-center gap-1 hover:text-primary-600 transition-colors"'
-            .' title="Перемкнути формат маржі">'
-            .'Маржа%'
-            .'<span class="text-[10px] font-bold px-1 py-0.5 rounded bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300">'.$badge.'</span>'
-            .'</button>'
-        );
+        return MarginToggle::labelHtml($format);
     }
 }

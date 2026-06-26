@@ -22,7 +22,7 @@
             <button
                 type="button"
                 wire:click.stop="decrementQty({{ $firstVariant->id }}, {{ $step }})"
-                class="flex h-7 w-7 items-center justify-center rounded border border-gray-300 text-sm font-bold leading-none text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-white/10"
+                class="flex h-7 w-7 items-center justify-center rounded border bp-muted-border bp-muted-control text-sm font-bold leading-none hover:bg-gray-100 dark:hover:bg-white/10"
             >−</button>
             <input
                 type="number"
@@ -32,12 +32,12 @@
                 min="0"
                 max="{{ $maxQty }}"
                 step="{{ $step }}"
-                class="w-16 rounded border border-gray-300 py-1 text-center text-sm focus:border-primary-500 focus:ring-primary-500 dark:border-gray-600 dark:bg-transparent {{ $qtyMuted ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100' }}"
+                class="w-16 rounded border bp-muted-border py-1 text-center text-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-transparent {{ $qtyMuted ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-gray-100' }}"
             >
             <button
                 type="button"
                 wire:click.stop="incrementQty({{ $firstVariant->id }}, {{ $step }}, {{ $maxQty }})"
-                class="flex h-7 w-7 items-center justify-center rounded border border-gray-300 text-sm font-bold leading-none text-gray-600 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-white/10"
+                class="flex h-7 w-7 items-center justify-center rounded border bp-muted-border bp-muted-control text-sm font-bold leading-none hover:bg-gray-100 dark:hover:bg-white/10"
             >+</button>
         </div>
 

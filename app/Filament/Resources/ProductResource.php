@@ -6,6 +6,7 @@ use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
 use App\Support\ProductFields\AdminProductMargin;
+use App\Support\ProductFields\MarginToggle;
 use App\Support\ProductFields\ProductColumnVisibility;
 use App\Support\ProductTableLink;
 use Filament\Forms;
@@ -170,7 +171,7 @@ class ProductResource extends Resource
                         })
                         ->placeholder('—'),
                     Infolists\Components\TextEntry::make('admin_margin')
-                        ->label(fn (): HtmlString => AdminProductMargin::toggleLabelHtml(
+                        ->label(fn (): HtmlString => MarginToggle::labelHtml(
                             Livewire::current()?->marginFormat ?? 'percent'
                         ))
                         ->getStateUsing(fn (Product $record): ?string => AdminProductMargin::formatted(
@@ -313,7 +314,7 @@ class ProductResource extends Resource
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('margin')
-                    ->label(fn (): HtmlString => AdminProductMargin::toggleLabelHtml(
+                    ->label(fn (): HtmlString => MarginToggle::labelHtml(
                         Livewire::current()?->marginFormat ?? 'percent'
                     ))
                     ->getStateUsing(fn (Product $record): ?string => AdminProductMargin::formatted(

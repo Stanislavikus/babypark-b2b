@@ -18,7 +18,7 @@ class ProductTableLink
 
         return new HtmlString(
             '<a href="'.$safe.'" target="_blank" rel="noopener noreferrer"'
-            .' class="inline-flex items-center gap-1 text-primary-600 hover:text-primary-500 hover:underline"'
+            .' class="inline-flex cursor-pointer items-center gap-1 text-primary-600 hover:text-primary-500 hover:underline dark:text-primary-400 dark:hover:text-primary-300"'
             .' onclick="event.stopPropagation();event.preventDefault();window.open(\''.$safe.'\',\'_blank\',\'noopener,noreferrer\');">'
             .$label
             .'<svg class="h-4 w-4 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">'

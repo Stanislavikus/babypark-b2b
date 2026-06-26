@@ -8,7 +8,8 @@ use App\Filament\Resources\ProductResource as AdminProductResource;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\CatalogRowData;
-use App\Support\ProductFields\AdminProductMargin;
+use App\Support\ProductFields\CabinetProductMargin;
+use App\Support\ProductFields\MarginToggle;
 use App\Support\ProductFields\ProductColumnVisibility;
 use App\Support\ProductFields\ProductPanelVisibility;
 use App\Support\ProductTableLink;
@@ -119,15 +120,20 @@ class ProductResource extends Resource
                                 ->placeholder('—')
                                 ->extraAttributes(['class' => 'line-through text-gray-400']),
 
-                            Infolists\Components\TextEntry::make('admin_margin')
-                                ->label(fn (): HtmlString => AdminProductMargin::toggleLabelHtml(
+                            Infolists\Components\TextEntry::make('contractor_margin')
+                                ->label(fn (): HtmlString => MarginToggle::labelHtml(
                                     Livewire::current()?->marginFormat ?? 'percent'
                                 ))
-                                ->getStateUsing(fn (ProductVariant $record): ?string => AdminProductMargin::formatted(
-                                    $record->product,
-                                    Livewire::current()?->marginFormat ?? 'percent'
-                                ))
-                                ->color(fn (ProductVariant $record): ?string => AdminProductMargin::isNegative($record->product) ? 'danger' : null)
+                                ->getStateUsing(function (ProductVariant $record) use ($contractor): ?string {
+                                    return CabinetProductMargin::formatted(
+                                        $record->product,
+                                        $contractor,
+                                        Livewire::current()?->marginFormat ?? 'percent'
+                                    );
+                                })
+                                ->color(function (ProductVariant $record) use ($contractor): ?string {
+                                    return CabinetProductMargin::isNegative($record->product, $contractor) ? 'danger' : null;
+                                })
                                 ->placeholder('—'),
                         ])
                         ->columns(2),
@@ -311,37 +317,22 @@ class ProductResource extends Resource
 
         if (in_array('margin', $visible, true)) {
             $columns[] = Tables\Columns\TextColumn::make('margin')
-                ->label(function (): HtmlString {
-                    $livewire = Livewire::current();
-                    $format = $livewire?->marginFormat ?? 'percent';
-                    $badge = $format === 'percent' ? '%' : '₴';
-
-                    return new HtmlString(
-                        '<button type="button" wire:click="toggleMarginFormat"'
-                        .' class="inline-flex items-center gap-1 hover:text-primary-600 transition-colors"'
-                        .' title="Перемкнути формат маржі">'
-                        .'Маржа'
-                        .'<span class="text-[10px] font-bold px-1 py-0.5 rounded bg-gray-200 text-gray-600">'.$badge.'</span>'
-                        .'</button>'
-                    );
-                })
+                ->label(fn (): HtmlString => MarginToggle::labelHtml(
+                    Livewire::current()?->marginFormat ?? 'percent'
+                ))
                 ->getStateUsing(function (Product $record): ?string {
                     $contractor = auth('contractor')->user();
-                    $data = CatalogRowData::forProduct($record, $contractor);
-                    $myPrice = $data['myPrice'];
-                    $rrp = $data['rrp'];
 
-                    if ($myPrice === null || $rrp === null || $rrp <= 0) {
-                        return null;
-                    }
+                    return CabinetProductMargin::formatted(
+                        $record,
+                        $contractor,
+                        Livewire::current()?->marginFormat ?? 'percent'
+                    );
+                })
+                ->color(function (Product $record): ?string {
+                    $contractor = auth('contractor')->user();
 
-                    $marginUah = $rrp - $myPrice;
-                    $livewire = Livewire::current();
-                    $format = $livewire?->marginFormat ?? 'percent';
-
-                    return $format === 'percent'
-                        ? number_format(($marginUah / $rrp) * 100, 1).'%'
-                        : number_format($marginUah, 2, '.', ' ').' ₴';
+                    return CabinetProductMargin::isNegative($record, $contractor) ? 'danger' : null;
                 })
                 ->placeholder('—')
                 ->sortable(query: function (Builder $query, string $direction): Builder {

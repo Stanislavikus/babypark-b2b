@@ -340,7 +340,7 @@
                                     title="Перемкнути формат маржі"
                                 >
                                     Маржа
-                                    <span class="text-[10px] font-bold px-1 py-0.5 rounded bg-gray-200 text-gray-600">
+                                    <span class="text-[10px] font-bold px-1 py-0.5 rounded bp-muted-badge">
                                         {{ $marginFormat === 'percent' ? '%' : '₴' }}
                                     </span>
                                 </button>
