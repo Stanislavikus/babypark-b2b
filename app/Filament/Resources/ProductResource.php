@@ -6,8 +6,10 @@ use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
 use App\Support\ProductFields\AdminProductMargin;
+use App\Support\ProductFields\AdminProductStockStatus;
 use App\Support\ProductFields\MarginToggle;
 use App\Support\ProductFields\ProductColumnVisibility;
+use App\Support\ProductFields\ProductImageStorage;
 use App\Support\ProductTableLink;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -45,53 +47,144 @@ class ProductResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Основне (з 1С)')->schema([
+                    // Row 1
                     Forms\Components\TextInput::make('sku')
                         ->label('Артикул')
-                        ->disabled(),
-                    Forms\Components\TextInput::make('name')
-                        ->label('Назва')
-                        ->disabled(),
+                        ->required()
+                        ->maxLength(255),
+                    Forms\Components\Placeholder::make('variant_ean_display')
+                        ->label('EAN')
+                        ->dehydrated(false)
+                        ->content(fn (?Product $record): string => $record?->variants->first()?->barcode_ean ?? '—'),
+
+                    // Row 2
                     Forms\Components\TextInput::make('brand')
                         ->label('Бренд')
-                        ->disabled(),
-                    Forms\Components\TextInput::make('category.name')
+                        ->maxLength(255),
+                    Forms\Components\TextInput::make('name')
+                        ->label('Назва')
+                        ->required()
+                        ->maxLength(255),
+
+                    // Row 3
+                    Forms\Components\Select::make('category_id')
                         ->label('Категорія')
-                        ->disabled(),
+                        ->relationship('category', 'name')
+                        ->searchable()
+                        ->preload()
+                        ->placeholder('—'),
+                    Forms\Components\Placeholder::make('admin_stock_status_display')
+                        ->label('Наявність')
+                        ->dehydrated(false)
+                        ->content(function (?Product $record): HtmlString {
+                            if (! $record) {
+                                return new HtmlString('—');
+                            }
+
+                            return new HtmlString(view('filament.forms.readonly-badge', [
+                                'label' => AdminProductStockStatus::label($record),
+                                'color' => AdminProductStockStatus::color($record),
+                            ])->render());
+                        }),
+
+                    // Row 4
                     Forms\Components\TextInput::make('cost_price')
                         ->label('Вхідна ціна')
                         ->numeric()
                         ->minValue(0)
                         ->step(0.01)
                         ->suffix('₴')
-                        ->placeholder('—'),
+                        ->placeholder('—')
+                        ->live(onBlur: true),
+                    Forms\Components\Placeholder::make('admin_rrp_display')
+                        ->label('РРЦ')
+                        ->dehydrated(false)
+                        ->content(function (?Product $record): string {
+                            if (! $record) {
+                                return '—';
+                            }
+                            $maxRrp = self::maxRrpFor($record);
+
+                            return $maxRrp !== null
+                                ? '₴ '.number_format($maxRrp, 2, '.', ' ')
+                                : '—';
+                        }),
+
+                    // Row 5
+                    Forms\Components\Placeholder::make('admin_margin_display')
+                        ->label('Маржа')
+                        ->dehydrated(false)
+                        ->content(function (Forms\Get $get, ?Product $record): HtmlString {
+                            if (! $record) {
+                                return new HtmlString('—');
+                            }
+
+                            $preview = clone $record;
+                            $preview->cost_price = $get('cost_price');
+
+                            $formatted = AdminProductMargin::formatted($preview, 'percent') ?? '—';
+                            $class = AdminProductMargin::isNegative($preview)
+                                ? 'text-danger-600 dark:text-danger-400 font-medium'
+                                : '';
+
+                            return new HtmlString('<span class="'.$class.'">'.e($formatted).'</span>');
+                        }),
+                    Forms\Components\Placeholder::make('admin_status_display')
+                        ->label('Статус')
+                        ->dehydrated(false)
+                        ->content(function (?Product $record): HtmlString {
+                            if (! $record) {
+                                return new HtmlString('—');
+                            }
+
+                            $label = $record->is_active ? 'Активний' : 'Неактивний';
+                            $color = $record->is_active ? 'success' : 'gray';
+
+                            return new HtmlString(view('filament.forms.readonly-badge', [
+                                'label' => $label,
+                                'color' => $color,
+                            ])->render());
+                        }),
                 ])->columns(2),
 
                 Forms\Components\Section::make('Сайт')->schema([
-                    // Left column: URL field
-                    Forms\Components\Group::make([
-                        Forms\Components\TextInput::make('product_url')
-                            ->label('URL товару на сайті')
-                            ->url()
-                            ->placeholder('https://babypark.ua/product/...')
-                            ->maxLength(2048)
-                            ->suffixAction(
-                                Forms\Components\Actions\Action::make('open_url')
-                                    ->icon('heroicon-m-arrow-top-right-on-square')
-                                    ->url(fn (?string $state) => $state)
-                                    ->openUrlInNewTab()
-                                    ->visible(fn (?string $state) => filled($state))
-                            ),
-                    ]),
+                    Forms\Components\TextInput::make('product_url')
+                        ->label('URL товару на сайті')
+                        ->url()
+                        ->placeholder('https://babypark.ua/product/...')
+                        ->maxLength(2048)
+                        ->suffixAction(
+                            Forms\Components\Actions\Action::make('open_url')
+                                ->icon('heroicon-m-arrow-top-right-on-square')
+                                ->url(fn (?string $state) => $state)
+                                ->openUrlInNewTab()
+                                ->visible(fn (?string $state) => filled($state))
+                        ),
 
-                    // Right column: photo preview
                     Forms\Components\Group::make([
-                        Forms\Components\Placeholder::make('photo_preview')
+                        Forms\Components\FileUpload::make('image_upload')
                             ->label('Фото товару')
-                            ->content(fn (Forms\Get $get, ?Product $record) => new HtmlString(
-                                $record
-                                    ? self::buildPhotoPreviewHtml($record)
-                                    : self::buildPhotoPlaceholderHtml()
-                            )),
+                            ->image()
+                            ->disk(fn (): string => ProductImageStorage::disk())
+                            ->directory('products')
+                            ->visibility('public')
+                            ->maxFiles(1)
+                            ->imagePreviewHeight('6rem')
+                            ->nullable()
+                            ->helperText(function (?Product $record): ?HtmlString {
+                                $url = $record ? self::firstImage($record) : null;
+
+                                if (! $url || ProductImageStorage::pathFromUrl($url) !== null) {
+                                    return null;
+                                }
+
+                                $safe = e($url);
+
+                                return new HtmlString(
+                                    '<span class="text-xs text-gray-500 dark:text-gray-400">Поточне фото (зовнішнє посилання):</span><br>'.
+                                    '<img src="'.$safe.'" alt="" class="mt-1" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;" />'
+                                );
+                            }),
                     ]),
                 ])->columns(2),
             ]);
@@ -116,34 +209,9 @@ class ProductResource extends Resource
                     Infolists\Components\TextEntry::make('category.name')->label('Категорія')->placeholder('—'),
                     Infolists\Components\TextEntry::make('admin_stock_status')
                         ->label('Наявність')
-                        ->getStateUsing(function (Product $record): string {
-                            $totalQty = 0;
-                            $earliestExpectedDate = null;
-
-                            foreach ($record->variants as $variant) {
-                                foreach ($variant->stocks as $stock) {
-                                    $totalQty += (int) $stock->quantity;
-                                    if ($stock->expected_date !== null && ($earliestExpectedDate === null || $stock->expected_date < $earliestExpectedDate)) {
-                                        $earliestExpectedDate = $stock->expected_date;
-                                    }
-                                }
-                            }
-
-                            if ($totalQty > 0) {
-                                return "У наявності: {$totalQty} шт";
-                            }
-                            if ($earliestExpectedDate) {
-                                return 'Очікується '.$earliestExpectedDate->format('d.m');
-                            }
-
-                            return 'Немає в наявності';
-                        })
+                        ->getStateUsing(fn (Product $record): string => AdminProductStockStatus::label($record))
                         ->badge()
-                        ->color(fn (string $state): string => match (true) {
-                            str_starts_with($state, 'У наявності') => 'success',
-                            str_starts_with($state, 'Очікується') => 'info',
-                            default => 'gray',
-                        }),
+                        ->color(fn (Product $record): string => AdminProductStockStatus::color($record)),
                     Infolists\Components\TextEntry::make('cost_price')
                         ->label('Вхідна ціна')
                         ->formatStateUsing(fn (?string $state): ?string => $state !== null
