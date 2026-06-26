@@ -1,4 +1,22 @@
 <style>
+    /*
+     * First-column inset — literal values from getComputedStyle(th).paddingLeft
+     * on the live products page: 12px below 640px, 24px at 640px+ (px-3 / ps-6).
+     */
+    .fi-ta {
+        --table-cell-inset: 12px;
+    }
+
+    @media (min-width: 640px) {
+        .fi-ta {
+            --table-cell-inset: 24px;
+        }
+    }
+
+    .fi-ta thead th:first-child {
+        padding-inline-start: var(--table-cell-inset) !important;
+    }
+
     /* Shared Filament table toolbar layout (admin + cabinet). */
     .fi-ta-header-toolbar-search {
         flex: 1 1 0%;
@@ -7,6 +25,8 @@
 
     .fi-ta-header-toolbar-search .fi-ta-search-field {
         width: 100%;
+        padding-inline-start: var(--table-cell-inset);
+        box-sizing: border-box;
     }
 
     .fi-ta-header-toolbar > .ms-auto {
