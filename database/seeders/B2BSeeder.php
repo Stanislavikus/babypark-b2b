@@ -301,11 +301,16 @@ class B2BSeeder extends Seeder
         $expensive = $variants->last(); // BP-00040-V2 — pricier, in stock
 
         $contractTypeId = PriceType::query()->where('code', PriceType::CODE_CONTRACT_PRICE)->value('id');
+        $listTypeId = PriceType::query()->where('code', PriceType::CODE_LIST_PRICE)->value('id');
 
         foreach ($contractors as $contractor) {
             $this->setContractPrice($cheap, $contractor->id, $contractTypeId, 800.00);
             $this->setContractPrice($expensive, $contractor->id, $contractTypeId, 1200.00);
         }
+
+        // Realistic contractor-less РРЦ above the contract price for both variants.
+        $this->setContractorlessPrice($cheap, $listTypeId, 1000.00);
+        $this->setContractorlessPrice($expensive, $listTypeId, 1400.00);
 
         // Cheaper variant: no stock anywhere, but expected to arrive.
         Stock::query()->where('variant_id', $cheap->id)->delete();
@@ -348,6 +353,22 @@ class B2BSeeder extends Seeder
                 'value' => $value,
                 'currency' => 'UAH',
                 'source' => '1c',
+            ],
+        );
+    }
+
+    private function setContractorlessPrice(ProductVariant $variant, int $priceTypeId, float $value): void
+    {
+        ProductPrice::query()->updateOrCreate(
+            [
+                'variant_id' => $variant->id,
+                'contractor_id' => null,
+                'price_type_id' => $priceTypeId,
+            ],
+            [
+                'value' => $value,
+                'currency' => 'UAH',
+                'source' => 'manual',
             ],
         );
     }
