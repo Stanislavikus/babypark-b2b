@@ -82,8 +82,10 @@
             {{-- Variants with prices --}}
             @foreach($product->variants->where('is_active', true) as $variant)
                 @php
-                    $price = $variant->prices->first();
-                    if (! $price) continue;
+                    $prices = $variantPrices[$variant->id] ?? ['contract' => null, 'list' => null];
+                    $contractPrice = $prices['contract'];
+                    $listPrice = $prices['list'];
+                    if ($contractPrice === null) continue;
                     $attrs = is_array($variant->attributes) ? $variant->attributes : [];
                 @endphp
 
@@ -102,14 +104,14 @@
                         <div>
                             <p class="text-xs text-gray-500 uppercase tracking-wide">Ваша ціна (з ПДВ)</p>
                             <p class="text-3xl font-bold text-primary-700">
-                                {{ number_format($price->price_with_vat, 2, ',', ' ') }} ₴
+                                {{ number_format((float) $contractPrice, 2, ',', ' ') }} ₴
                             </p>
                         </div>
-                        @if($price->recommended_retail_price)
+                        @if($listPrice !== null)
                             <div>
                                 <p class="text-xs text-gray-500 uppercase tracking-wide">Рекомендована роздрібна</p>
                                 <p class="text-lg font-medium text-gray-400 line-through">
-                                    {{ number_format($price->recommended_retail_price, 2, ',', ' ') }} ₴
+                                    {{ number_format((float) $listPrice, 2, ',', ' ') }} ₴
                                 </p>
                             </div>
                         @endif

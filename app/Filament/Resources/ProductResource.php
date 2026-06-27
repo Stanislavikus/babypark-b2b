@@ -3,7 +3,9 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ProductResource\Pages;
+use App\Models\PriceType;
 use App\Models\Product;
+use App\Services\PriceResolver;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists;
@@ -178,20 +180,10 @@ class ProductResource extends Resource
                     Infolists\Components\TextEntry::make('admin_rrp')
                         ->label('РРЦ')
                         ->getStateUsing(function (Product $record): ?string {
-                            $maxRrp = null;
-                            foreach ($record->variants as $variant) {
-                                foreach ($variant->prices as $price) {
-                                    if (
-                                        $price->recommended_retail_price !== null
-                                        && ($maxRrp === null || $price->recommended_retail_price > $maxRrp)
-                                    ) {
-                                        $maxRrp = (float) $price->recommended_retail_price;
-                                    }
-                                }
-                            }
+                            $maxRrp = (new PriceResolver)->maxListPriceAcrossVariants($record);
 
                             return $maxRrp !== null
-                                ? '₴ ' . number_format($maxRrp, 2, '.', ' ')
+                                ? '₴ ' . number_format((float) $maxRrp, 2, '.', ' ')
                                 : null;
                         })
                         ->placeholder('—'),
@@ -288,33 +280,28 @@ class ProductResource extends Resource
                 Tables\Columns\TextColumn::make('rrp')
                     ->label('РРЦ')
                     ->getStateUsing(function (Product $record): ?string {
-                        $maxRrp = null;
-                        foreach ($record->variants as $variant) {
-                            foreach ($variant->prices as $price) {
-                                if (
-                                    $price->recommended_retail_price !== null
-                                    && ($maxRrp === null || $price->recommended_retail_price > $maxRrp)
-                                ) {
-                                    $maxRrp = (float) $price->recommended_retail_price;
-                                }
-                            }
-                        }
+                        $maxRrp = (new PriceResolver)->maxListPriceAcrossVariants($record);
 
                         return $maxRrp !== null
-                            ? '₴ ' . number_format($maxRrp, 2, '.', ' ')
+                            ? '₴ ' . number_format((float) $maxRrp, 2, '.', ' ')
                             : null;
                     })
                     ->placeholder('—')
                     ->toggleable()
                     ->sortable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $direction): \Illuminate\Database\Eloquent\Builder {
+                        $listTypeId = PriceType::query()->where('code', PriceType::CODE_LIST_PRICE)->value('id');
+
                         return $query->orderByRaw(
                             "COALESCE(
-                                (SELECT MAX(pr.recommended_retail_price)
-                                 FROM prices pr
-                                 INNER JOIN product_variants pv ON pr.variant_id = pv.id
-                                 WHERE pv.product_id = products.id),
+                                (SELECT MAX(pp.value)
+                                 FROM product_prices pp
+                                 INNER JOIN product_variants pv ON pp.variant_id = pv.id
+                                 WHERE pv.product_id = products.id
+                                   AND pp.price_type_id = ?
+                                   AND pp.contractor_id IS NULL),
                                 0
-                            ) {$direction}"
+                            ) {$direction}",
+                            [$listTypeId]
                         );
                     }),
 
@@ -441,7 +428,7 @@ class ProductResource extends Resource
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
         return parent::getEloquentQuery()
-            ->with(['variants.stocks', 'variants.prices', 'category']);
+            ->with(['variants.stocks', 'variants.productPrices', 'category']);
     }
 
     // -------------------------------------------------------------------------

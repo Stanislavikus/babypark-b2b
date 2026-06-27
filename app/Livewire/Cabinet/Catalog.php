@@ -4,9 +4,11 @@ namespace App\Livewire\Cabinet;
 
 use App\Enums\ReservationStatus;
 use App\Models\Category;
+use App\Models\PriceType;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Reservation;
+use App\Services\PriceResolver;
 use App\Support\SessionCart;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
@@ -186,7 +188,11 @@ class Catalog extends Component
             ->with([
                 'category',
                 'variants' => fn ($q) => $q->where('is_active', true),
-                'variants.prices' => fn ($q) => $q->where('contractor_id', $contractor->id),
+                // Load this contractor's contract prices plus the contractor-less types
+                // (list_price / cost_of_goods_sold) so PriceResolver works without N+1.
+                'variants.productPrices' => fn ($q) => $q->where(
+                    fn ($w) => $w->where('contractor_id', $contractor->id)->orWhereNull('contractor_id')
+                ),
                 'variants.stocks',
             ]);
 
@@ -209,53 +215,55 @@ class Catalog extends Component
         $query = $this->applySorting($query, $contractor);
         $products = $query->paginate(24);
 
+        $resolver = new PriceResolver;
+
         $productData = [];
         foreach ($products as $product) {
             $threshold = $product->category?->stock_display_threshold ?? 10;
-            $activeVariants = $product->variants->where('is_active', true);
-            $variantsWithPrice = $activeVariants->filter(fn ($v) => $v->prices->isNotEmpty());
-            $firstVariant = $variantsWithPrice->first();
 
-            $allPrices = $variantsWithPrice->flatMap(fn ($v) => $v->prices);
-            $maxRrp = (float) ($allPrices->max('recommended_retail_price') ?? 0);
-            $maxMyPrice = (float) ($allPrices->max('price_with_vat') ?? 0);
+            // The orderable ("Замовити") target is the variant with the lowest contract
+            // price; the displayed price, stock badge and order button all derive from this
+            // SAME resolved variant, so they can never disagree (the BP-00040 bug class).
+            $orderVariant = $resolver->minContractPriceAcrossVariants($product, $contractor);
 
-            $totalAvailQty = $activeVariants->sum(fn ($v) => $v->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0)));
-            $totalExpQty = $activeVariants->sum(fn ($v) => $v->stocks->sum('expected_quantity')) ?? 0;
-            $earliestExpDate = $activeVariants
-                ->flatMap(fn ($v) => $v->stocks)
-                ->whereNotNull('expected_date')
-                ->sortBy('expected_date')
-                ->first()
-                ?->expected_date;
+            $myPriceStr = $orderVariant ? $resolver->contractPrice($orderVariant, $contractor) : null;
+            $rrpStr = $resolver->maxListPriceAcrossVariants($product);
 
-            $badge = ProductVariant::badgeFromQty($totalAvailQty, $totalExpQty, $earliestExpDate, $threshold);
-
-            $variantAvailQty = $firstVariant
-                ? $firstVariant->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0))
-                : 0;
-            $variantExpQty = $firstVariant
-                ? ($firstVariant->stocks->sum('expected_quantity') ?? 0)
-                : 0;
+            if ($orderVariant) {
+                $availQty = $orderVariant->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0));
+                $expQty = $orderVariant->stocks->sum('expected_quantity') ?? 0;
+                $expDate = $orderVariant->stocks
+                    ->whereNotNull('expected_date')
+                    ->sortBy('expected_date')
+                    ->first()
+                    ?->expected_date;
+                $badge = ProductVariant::badgeFromQty($availQty, $expQty, $expDate, $threshold);
+            } else {
+                $availQty = 0;
+                $expQty = 0;
+                $badge = ['label' => 'Немає в наявності', 'color' => 'danger'];
+            }
 
             $maxQty = match ($badge['color']) {
-                'success', 'warning' => $variantAvailQty,
-                'info' => $variantExpQty,
+                'success', 'warning' => $availQty,
+                'info' => $expQty,
                 default => 0,
             };
 
             $minQty = max(1, $product->min_order_quantity);
             $step = max(1, $product->order_step);
 
-            if ($firstVariant && ! isset($this->quantities[$firstVariant->id])) {
-                $this->quantities[$firstVariant->id] = $minQty;
+            if ($orderVariant && ! isset($this->quantities[$orderVariant->id])) {
+                $this->quantities[$orderVariant->id] = $minQty;
             }
 
             $productData[$product->id] = [
                 'badge' => $badge,
-                'firstVariant' => $firstVariant,
-                'maxRrp' => $maxRrp,
-                'maxMyPrice' => $maxMyPrice,
+                'firstVariant' => $orderVariant,
+                // Cast to float only at the display boundary; the canonical values are the
+                // resolver's decimal strings.
+                'maxRrp' => $rrpStr !== null ? (float) $rrpStr : 0.0,
+                'maxMyPrice' => $myPriceStr !== null ? (float) $myPriceStr : 0.0,
                 'maxQty' => $maxQty,
                 'minQty' => $minQty,
                 'step' => $step,
@@ -280,6 +288,21 @@ class Catalog extends Component
     {
         $dir = in_array($this->sortDir, ['asc', 'desc']) ? $this->sortDir : 'asc';
 
+        // Price-type ids are resolved in PHP and injected into the ORDER BY subqueries;
+        // DB-level sorting cannot route through PriceResolver, but it reads the same
+        // product_prices source so list order matches what the resolver displays.
+        $contractTypeId = PriceType::query()->where('code', PriceType::CODE_CONTRACT_PRICE)->value('id');
+        $listTypeId = PriceType::query()->where('code', PriceType::CODE_LIST_PRICE)->value('id');
+
+        // Cheapest contract price per product = the value shown for the orderable variant.
+        $minContract = '(SELECT MIN(pp.value) FROM product_prices pp
+            INNER JOIN product_variants pv ON pp.variant_id = pv.id
+            WHERE pv.product_id = products.id AND pp.price_type_id = ? AND pp.contractor_id = ?)';
+
+        $maxList = '(SELECT MAX(pp.value) FROM product_prices pp
+            INNER JOIN product_variants pv ON pp.variant_id = pv.id
+            WHERE pv.product_id = products.id AND pp.price_type_id = ? AND pp.contractor_id IS NULL)';
+
         return match ($this->sortBy) {
             'sku' => $query->orderBy('sku', $dir),
             'name' => $query->orderBy('name', $dir),
@@ -292,25 +315,16 @@ class Catalog extends Component
             'brand' => $query->orderBy('brand', $dir),
             'stock' => $this->applyStockSorting($query, $dir),
             'price' => $query->orderByRaw(
-                "COALESCE((SELECT MAX(p.price_with_vat) FROM prices p
-                    INNER JOIN product_variants pv ON p.variant_id = pv.id
-                    WHERE pv.product_id = products.id
-                    AND p.contractor_id = ?), 0) {$dir}",
-                [$contractor->id]
+                "COALESCE({$minContract}, 0) {$dir}",
+                [$contractTypeId, $contractor->id]
             ),
             'rrp' => $query->orderByRaw(
-                "COALESCE((SELECT MAX(p.recommended_retail_price) FROM prices p
-                    INNER JOIN product_variants pv ON p.variant_id = pv.id
-                    WHERE pv.product_id = products.id
-                    AND p.contractor_id = ?), 0) {$dir}",
-                [$contractor->id]
+                "COALESCE({$maxList}, 0) {$dir}",
+                [$listTypeId]
             ),
             'margin' => $query->orderByRaw(
-                "COALESCE((SELECT MAX(p.recommended_retail_price) - MIN(p.price_with_vat) FROM prices p
-                    INNER JOIN product_variants pv ON p.variant_id = pv.id
-                    WHERE pv.product_id = products.id
-                    AND p.contractor_id = ?), 0) {$dir}",
-                [$contractor->id]
+                "COALESCE({$maxList} - {$minContract}, 0) {$dir}",
+                [$listTypeId, $contractTypeId, $contractor->id]
             ),
             default => $query->orderBy('sku', 'asc'),
         };
