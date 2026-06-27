@@ -164,6 +164,7 @@ Create app/Services/OneCService.php:
 5. Reservation is a signal to manager — does NOT deduct stock in MVP
 6. Use Ukrainian language for all UI labels
 7. Use UAH as default currency
+8. **Data field registry:** any task that adds or changes a database column must also update `docs/data-fields.md` in the same pull request (see live schema via `php artisan model:show`, not migration files)
 
 ## SEEDING
 
