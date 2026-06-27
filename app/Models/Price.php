@@ -15,9 +15,7 @@ class Price extends Model
         'contractor_id',
         'variant_id',
         'price',
-        'price_with_vat',
         'vat_rate',
-        'recommended_retail_price',
         'min_quantity',
         'currency',
     ];
@@ -26,9 +24,7 @@ class Price extends Model
     {
         return [
             'price' => 'decimal:2',
-            'price_with_vat' => 'decimal:2',
             'vat_rate' => 'decimal:2',
-            'recommended_retail_price' => 'decimal:2',
             'min_quantity' => 'integer',
             'updated_at' => 'datetime',
         ];
