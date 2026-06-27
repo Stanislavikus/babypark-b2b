@@ -46,6 +46,11 @@ class ProductVariant extends Model
         return $this->hasMany(Price::class, 'variant_id');
     }
 
+    public function productPrices(): HasMany
+    {
+        return $this->hasMany(ProductPrice::class, 'variant_id');
+    }
+
     /**
      * Shared badge computation from raw availability data.
      *
