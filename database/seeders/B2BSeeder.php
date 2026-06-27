@@ -12,7 +12,9 @@ use App\Models\Contractor;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Price;
+use App\Models\PriceType;
 use App\Models\Product;
+use App\Models\ProductPrice;
 use App\Models\ProductVariant;
 use App\Models\Reservation;
 use App\Models\Stock;
@@ -49,6 +51,7 @@ class B2BSeeder extends Seeder
         $variants = $this->seedProductsAndVariants($categories);
         $this->seedPrices($contractors, $variants);
         $this->seedStocks($variants);
+        $this->seedBp00040Scenario($contractors);
         $this->seedOrders($contractors, $variants, $admin);
         $this->seedReservations($contractors, $variants);
         $this->seedSyncLogs();
@@ -192,22 +195,55 @@ class B2BSeeder extends Seeder
      */
     private function seedPrices($contractors, $variants): void
     {
-        foreach ($contractors as $contractor) {
-            foreach ($variants as $index => $variant) {
-                $base = 50 + ($index % 40) * 12.5 + ($contractor->id * 3);
-                $vatRate = 20;
-                $price = round($base, 2);
+        $types = PriceType::query()->pluck('id', 'code');
+        $vatRate = 20;
+
+        foreach ($variants as $index => $variant) {
+            // Contractor-independent base used for the contractor-less types (РРЦ, cost).
+            $base = 50 + ($index % 40) * 12.5;
+            $baseWithVat = round($base * (1 + $vatRate / 100), 2);
+
+            // list_price (РРЦ) — one contractor-less row per variant.
+            ProductPrice::query()->create([
+                'variant_id' => $variant->id,
+                'contractor_id' => null,
+                'price_type_id' => $types[PriceType::CODE_LIST_PRICE],
+                'value' => round($baseWithVat * 1.35, 2),
+                'currency' => 'UAH',
+                'source' => 'manual',
+            ]);
+
+            // cost_of_goods_sold (Вхідна ціна) — one contractor-less row per variant.
+            ProductPrice::query()->create([
+                'variant_id' => $variant->id,
+                'contractor_id' => null,
+                'price_type_id' => $types[PriceType::CODE_COST_OF_GOODS_SOLD],
+                'value' => round($base * 0.7, 2),
+                'currency' => 'UAH',
+                'source' => 'manual',
+            ]);
+
+            // Per-contractor net price (prices table) + contract_price (product_prices).
+            foreach ($contractors as $contractor) {
+                $price = round($base + $contractor->id * 3, 2);
                 $priceWithVat = round($price * (1 + $vatRate / 100), 2);
 
                 Price::query()->create([
                     'contractor_id' => $contractor->id,
                     'variant_id' => $variant->id,
                     'price' => $price,
-                    'price_with_vat' => $priceWithVat,
                     'vat_rate' => $vatRate,
-                    'recommended_retail_price' => round($priceWithVat * 1.35, 2),
                     'min_quantity' => 1,
                     'currency' => 'UAH',
+                ]);
+
+                ProductPrice::query()->create([
+                    'variant_id' => $variant->id,
+                    'contractor_id' => $contractor->id,
+                    'price_type_id' => $types[PriceType::CODE_CONTRACT_PRICE],
+                    'value' => $priceWithVat,
+                    'currency' => 'UAH',
+                    'source' => '1c',
                 ]);
             }
         }
@@ -237,6 +273,83 @@ class B2BSeeder extends Seeder
                 ]);
             }
         }
+    }
+
+    /**
+     * Deterministic BP-00040 regression scenario:
+     *   - cheaper variant (V1) with NO stock (expected later)
+     *   - more expensive variant (V2) actually in stock
+     *
+     * This is the case where "catalog price" and "orderable variant" historically
+     * disagreed; the automated test and manual re-check both rely on it existing.
+     *
+     * @param  Collection<int, Contractor>  $contractors
+     */
+    private function seedBp00040Scenario($contractors): void
+    {
+        $product = Product::query()->where('sku', 'BP-00040')->first();
+        if (! $product) {
+            return;
+        }
+
+        $variants = $product->variants()->orderBy('sku')->get();
+        if ($variants->count() < 2) {
+            return;
+        }
+
+        $cheap = $variants->first();   // BP-00040-V1 — cheaper, out of stock
+        $expensive = $variants->last(); // BP-00040-V2 — pricier, in stock
+
+        $contractTypeId = PriceType::query()->where('code', PriceType::CODE_CONTRACT_PRICE)->value('id');
+
+        foreach ($contractors as $contractor) {
+            $this->setContractPrice($cheap, $contractor->id, $contractTypeId, 800.00);
+            $this->setContractPrice($expensive, $contractor->id, $contractTypeId, 1200.00);
+        }
+
+        // Cheaper variant: no stock anywhere, but expected to arrive.
+        Stock::query()->where('variant_id', $cheap->id)->delete();
+        foreach (self::WAREHOUSES as $warehouse) {
+            Stock::query()->create([
+                'variant_id' => $cheap->id,
+                'warehouse_name' => $warehouse,
+                'quantity' => 0,
+                'reserved' => 0,
+                'expected_date' => now()->addDays(10)->toDateString(),
+                'expected_quantity' => 50,
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Pricier variant: comfortably in stock.
+        Stock::query()->where('variant_id', $expensive->id)->delete();
+        foreach (self::WAREHOUSES as $warehouse) {
+            Stock::query()->create([
+                'variant_id' => $expensive->id,
+                'warehouse_name' => $warehouse,
+                'quantity' => 250,
+                'reserved' => 0,
+                'expected_date' => null,
+                'expected_quantity' => null,
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    private function setContractPrice(ProductVariant $variant, int $contractorId, int $contractTypeId, float $value): void
+    {
+        ProductPrice::query()->updateOrCreate(
+            [
+                'variant_id' => $variant->id,
+                'contractor_id' => $contractorId,
+                'price_type_id' => $contractTypeId,
+            ],
+            [
+                'value' => $value,
+                'currency' => 'UAH',
+                'source' => '1c',
+            ],
+        );
     }
 
     /**
@@ -284,7 +397,10 @@ class B2BSeeder extends Seeder
                     ->first();
 
                 $qty = rand(1, 10);
-                $lineTotal = $price->price_with_vat * $qty;
+                // price_with_vat snapshot is derived from the net price + VAT rate; the
+                // with-VAT contract price itself now lives in product_prices.
+                $priceWithVat = round($price->price * (1 + $price->vat_rate / 100), 2);
+                $lineTotal = $priceWithVat * $qty;
                 $total += $price->price * $qty;
                 $totalWithVat += $lineTotal;
 
@@ -296,7 +412,7 @@ class B2BSeeder extends Seeder
                     'attributes' => $variant->attributes,
                     'quantity' => $qty,
                     'price' => $price->price,
-                    'price_with_vat' => $price->price_with_vat,
+                    'price_with_vat' => $priceWithVat,
                     'total' => $lineTotal,
                 ]);
             }
