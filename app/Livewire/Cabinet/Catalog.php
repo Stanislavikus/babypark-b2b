@@ -6,6 +6,7 @@ use App\Enums\ReservationStatus;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\Reservation;
+use App\Support\CatalogRowData;
 use App\Support\SessionCart;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
