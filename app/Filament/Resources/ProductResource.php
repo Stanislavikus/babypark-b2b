@@ -429,9 +429,9 @@ class ProductResource extends Resource
                         };
                     }),
             ])
-          ->actions([
+            ->actions([
                 Tables\Actions\ViewAction::make()
-                    ->hidden()
+                    ->extraAttributes(['class' => 'bp-admin-row-view-action-hidden'])
                     ->slideOver()
                     ->extraModalFooterActions(fn (Product $record) => [
                         Tables\Actions\Action::make('open_full_page_footer')
