@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Product;
+use Carbon\Carbon;
 
 /**
  * Small display/filter presenter for admin availability classification.
@@ -100,7 +101,7 @@ class AdminAvailabilityPresenter
      * Compute net quantity and earliest expected date for a product.
      * Subtracts stocks.reserved from stocks.quantity.
      *
-     * @return array{0: int, 1: \Carbon\Carbon|null}
+     * @return array{0: int, 1: Carbon|null}
      */
     private static function computeNetQtyAndDate(Product $product): array
     {
