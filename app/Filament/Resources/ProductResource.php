@@ -217,7 +217,7 @@ class ProductResource extends Resource
 
         return $table
             ->columns([
-                // --- Default visible columns (7 total) ---
+                // Column order matches /cabinet catalog reference (admin-only cols: Ціна after Наявність, Статус last).
 
                 // 1. Фото: thumbnail — click opens shared bpOpenLightbox(); does NOT trigger row action
                 Tables\Columns\ImageColumn::make('first_image')
@@ -228,33 +228,41 @@ class ProductResource extends Resource
                     ->extraImgAttributes(fn (Product $record): array => self::lightboxImgAttributes($record))
                     ->toggleable(in_array('photo', $toggleable)),
 
-                // 2. Назва
+                // 2. Артикул
+                Tables\Columns\TextColumn::make('sku')
+                    ->label('Артикул')
+                    ->searchable()
+                    ->sortable(),
+
+                // 3. EAN — optional / hidden by default
+                Tables\Columns\TextColumn::make('barcode_ean')
+                    ->label('EAN')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('—')
+                    ->toggleable(in_array('barcode_ean', $toggleable), isToggledHiddenByDefault: true),
+
+                // 4. Назва
                 Tables\Columns\TextColumn::make('name')
                     ->label('Назва')
                     ->searchable()
                     ->sortable()
                     ->limit(50),
 
-                // 3. Артикул
-                Tables\Columns\TextColumn::make('sku')
-                    ->label('Артикул')
-                    ->searchable()
-                    ->sortable(),
+                // 5. Категорія — optional / hidden by default
+                Tables\Columns\TextColumn::make('category.name')
+                    ->label('Категорія')
+                    ->sortable()
+                    ->toggleable(in_array('category', $toggleable), isToggledHiddenByDefault: true),
 
-                // 4. Бренд — default visible; user may toggle it off
+                // 6. Бренд — default visible; user may toggle it off
                 Tables\Columns\TextColumn::make('brand')
                     ->label('Бренд')
                     ->searchable()
                     ->sortable()
                     ->toggleable(in_array('brand', $toggleable)),
 
-                // 5. Ціна — placeholder until admin/base sale price model is resolved (Follow-up 3)
-                Tables\Columns\TextColumn::make('admin_sale_price')
-                    ->label('Ціна')
-                    ->getStateUsing(fn (Product $record): ?string => null)
-                    ->placeholder('—'),
-
-                // 6. Наявність — uses net qty (quantity − reserved); consistent with filter and infolist
+                // 7. Наявність — uses net qty (quantity − reserved); consistent with filter and infolist
                 Tables\Columns\TextColumn::make('stock_status')
                     ->label('Наявність')
                     ->getStateUsing(fn (Product $record): string => AdminAvailabilityPresenter::adminLabel($record))
@@ -277,28 +285,17 @@ class ProductResource extends Resource
                             ->orderByRaw("{$minExpectedDate} ASC");
                     }),
 
-                // 7. Статус
-                Tables\Columns\IconColumn::make('is_active')
-                    ->label('Статус')
-                    ->boolean()
-                    ->sortable(query: function (Builder $query, string $direction): Builder {
-                        return $query->orderBy('is_active', $direction)->orderBy('id', $direction);
-                    }),
-
-                // --- Optional / hidden by default columns ---
-
-                Tables\Columns\TextColumn::make('barcode_ean')
-                    ->label('EAN')
-                    ->searchable()
-                    ->sortable()
+                // 8. Вхідна ціна — optional / hidden by default
+                Tables\Columns\TextColumn::make('cost_price')
+                    ->label('Вхідна ціна')
+                    ->formatStateUsing(fn (?string $state): ?string => $state !== null
+                        ? '₴ '.number_format((float) $state, 2, '.', ' ')
+                        : null)
                     ->placeholder('—')
-                    ->toggleable(in_array('barcode_ean', $toggleable), isToggledHiddenByDefault: true),
+                    ->toggleable(in_array('cost_price', $toggleable), isToggledHiddenByDefault: true)
+                    ->sortable(),
 
-                Tables\Columns\TextColumn::make('category.name')
-                    ->label('Категорія')
-                    ->sortable()
-                    ->toggleable(in_array('category', $toggleable), isToggledHiddenByDefault: true),
-
+                // 9. РРЦ — optional / hidden by default
                 Tables\Columns\TextColumn::make('rrp')
                     ->label('РРЦ')
                     ->getStateUsing(function (Product $record): ?string {
@@ -322,15 +319,7 @@ class ProductResource extends Resource
                         );
                     }),
 
-                Tables\Columns\TextColumn::make('cost_price')
-                    ->label('Вхідна ціна')
-                    ->formatStateUsing(fn (?string $state): ?string => $state !== null
-                        ? '₴ '.number_format((float) $state, 2, '.', ' ')
-                        : null)
-                    ->placeholder('—')
-                    ->toggleable(in_array('cost_price', $toggleable), isToggledHiddenByDefault: true)
-                    ->sortable(),
-
+                // 10. Рентабельність — optional / hidden by default
                 Tables\Columns\TextColumn::make('margin')
                     ->label(fn (): HtmlString => MarginToggle::labelHtml(
                         Livewire::current()?->marginFormat ?? 'percent'
@@ -354,7 +343,21 @@ class ProductResource extends Resource
                         );
                     }),
 
-                // Clickable external link column
+                // 11. Ціна — admin-only default visible; placeholder until admin/base sale price model is resolved (Follow-up 3)
+                Tables\Columns\TextColumn::make('admin_sale_price')
+                    ->label('Ціна')
+                    ->getStateUsing(fn (Product $record): ?string => null)
+                    ->placeholder('—'),
+
+                // 12. Статус — admin-only default visible (last of the 7 default-visible columns)
+                Tables\Columns\IconColumn::make('is_active')
+                    ->label('Статус')
+                    ->boolean()
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderBy('is_active', $direction)->orderBy('id', $direction);
+                    }),
+
+                // 13. URL на сайті — optional / hidden by default
                 Tables\Columns\TextColumn::make('product_url')
                     ->label('URL на сайті')
                     ->formatStateUsing(fn (?string $state): HtmlString|string => ProductTableLink::externalUrlHtml($state))
