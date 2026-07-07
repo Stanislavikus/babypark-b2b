@@ -429,7 +429,7 @@ class ProductResource extends Resource
                         };
                     }),
             ])
-            ->actions([
+          ->actions([
                 Tables\Actions\ViewAction::make()
                     ->hidden()
                     ->slideOver()
