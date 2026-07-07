@@ -78,7 +78,11 @@ class AdminAvailabilityPresenter
      */
     public static function netQtySql(): string
     {
-        return '(SELECT COALESCE(SUM(MAX(s.quantity - COALESCE(s.reserved, 0), 0)), 0)
+        return '(SELECT COALESCE(SUM(
+                    CASE WHEN (s.quantity - COALESCE(s.reserved, 0)) > 0
+                         THEN (s.quantity - COALESCE(s.reserved, 0))
+                         ELSE 0 END
+                ), 0)
                  FROM stocks s
                  INNER JOIN product_variants pv ON s.variant_id = pv.id
                  WHERE pv.product_id = products.id)';

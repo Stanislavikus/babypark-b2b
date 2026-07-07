@@ -14,12 +14,6 @@ class AdminAvailabilityPresenterTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected function defineEnvironment($app): void
-    {
-        $app['config']->set('database.default', 'sqlite');
-        $app['config']->set('database.connections.sqlite.database', ':memory:');
-    }
-
     /**
      * @param  array<int, array{warehouse_name?: string, quantity: int, reserved?: int, expected_date?: string|null}>  $stockRows
      */
@@ -111,7 +105,7 @@ class AdminAvailabilityPresenterTest extends TestCase
         // Row 1: qty=10, reserved=15 → per-row net = 0
         // Row 2: qty=5,  reserved=0  → per-row net = 5
         // PHP path: max(0,-5) + max(0,5) = 5 → У наявності
-        // SQL path (fixed): SUM(MAX(-5,0), MAX(5,0)) = 5 → У наявності
+        // SQL path (fixed): SUM(CASE WHEN net > 0 THEN net ELSE 0 END) = 5 → У наявності
         $product = $this->createProductWithStocks([
             ['warehouse_name' => 'WH-A', 'quantity' => 10, 'reserved' => 15],
             ['warehouse_name' => 'WH-B', 'quantity' => 5, 'reserved' => 0],
