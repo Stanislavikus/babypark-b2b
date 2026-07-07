@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
+use App\Support\AdminAvailabilityPresenter;
 use App\Support\ProductFields\AdminProductMargin;
 use App\Support\ProductFields\MarginToggle;
 use App\Support\ProductFields\ProductColumnVisibility;
@@ -98,7 +99,7 @@ class ProductResource extends Resource
     }
 
     // -------------------------------------------------------------------------
-    // Infolist (view)
+    // Infolist (view) — used both on the dedicated view page and in the slideOver
     // -------------------------------------------------------------------------
 
     public static function infolist(Infolist $infolist): Infolist
@@ -116,34 +117,9 @@ class ProductResource extends Resource
                     Infolists\Components\TextEntry::make('category.name')->label('Категорія')->placeholder('—'),
                     Infolists\Components\TextEntry::make('admin_stock_status')
                         ->label('Наявність')
-                        ->getStateUsing(function (Product $record): string {
-                            $totalQty = 0;
-                            $earliestExpectedDate = null;
-
-                            foreach ($record->variants as $variant) {
-                                foreach ($variant->stocks as $stock) {
-                                    $totalQty += (int) $stock->quantity;
-                                    if ($stock->expected_date !== null && ($earliestExpectedDate === null || $stock->expected_date < $earliestExpectedDate)) {
-                                        $earliestExpectedDate = $stock->expected_date;
-                                    }
-                                }
-                            }
-
-                            if ($totalQty > 0) {
-                                return "У наявності: {$totalQty} шт";
-                            }
-                            if ($earliestExpectedDate) {
-                                return 'Очікується '.$earliestExpectedDate->format('d.m');
-                            }
-
-                            return 'Немає в наявності';
-                        })
+                        ->getStateUsing(fn (Product $record): string => AdminAvailabilityPresenter::adminLabel($record))
                         ->badge()
-                        ->color(fn (string $state): string => match (true) {
-                            str_starts_with($state, 'У наявності') => 'success',
-                            str_starts_with($state, 'Очікується') => 'info',
-                            default => 'gray',
-                        }),
+                        ->color(fn (string $state): string => AdminAvailabilityPresenter::badgeColor($state)),
                     Infolists\Components\TextEntry::make('cost_price')
                         ->label('Вхідна ціна')
                         ->formatStateUsing(fn (?string $state): ?string => $state !== null
@@ -201,8 +177,6 @@ class ProductResource extends Resource
                             : null),
 
                     // Right: 48×48 thumbnail — click opens the shared bpOpenLightbox() JS overlay.
-                    // HtmlString bypasses Filament's sanitisation (triggered by ->html()) that
-                    // would strip event handlers; Htmlable rendering via {{ }} keeps them intact.
                     Infolists\Components\TextEntry::make('photo_preview')
                         ->label('Фото товару')
                         ->getStateUsing(function ($record) {
@@ -243,7 +217,9 @@ class ProductResource extends Resource
 
         return $table
             ->columns([
-                // 48×48 thumbnail — toggleable; click opens the shared bpOpenLightbox() JS overlay
+                // --- Default visible columns (7 total) ---
+
+                // 1. Фото: thumbnail — click opens shared bpOpenLightbox(); does NOT trigger row action
                 Tables\Columns\ImageColumn::make('first_image')
                     ->label('Фото')
                     ->state(fn (Product $record): ?string => self::firstImage($record))
@@ -252,10 +228,64 @@ class ProductResource extends Resource
                     ->extraImgAttributes(fn (Product $record): array => self::lightboxImgAttributes($record))
                     ->toggleable(in_array('photo', $toggleable)),
 
+                // 2. Назва
+                Tables\Columns\TextColumn::make('name')
+                    ->label('Назва')
+                    ->searchable()
+                    ->sortable()
+                    ->limit(50),
+
+                // 3. Артикул
                 Tables\Columns\TextColumn::make('sku')
                     ->label('Артикул')
                     ->searchable()
                     ->sortable(),
+
+                // 4. Бренд — default visible; user may toggle it off
+                Tables\Columns\TextColumn::make('brand')
+                    ->label('Бренд')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(in_array('brand', $toggleable)),
+
+                // 5. Ціна — placeholder until admin/base sale price model is resolved (Follow-up 3)
+                Tables\Columns\TextColumn::make('admin_sale_price')
+                    ->label('Ціна')
+                    ->getStateUsing(fn (Product $record): ?string => null)
+                    ->placeholder('—'),
+
+                // 6. Наявність — uses net qty (quantity − reserved); consistent with filter and infolist
+                Tables\Columns\TextColumn::make('stock_status')
+                    ->label('Наявність')
+                    ->getStateUsing(fn (Product $record): string => AdminAvailabilityPresenter::adminLabel($record))
+                    ->badge()
+                    ->color(fn (string $state): string => AdminAvailabilityPresenter::badgeColor($state))
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        $netQty = AdminAvailabilityPresenter::netQtySql();
+                        $minExpectedDate = AdminAvailabilityPresenter::earliestExpectedDateSql();
+
+                        // Priority bucket: 0 = У наявності, 1 = Очікується, 2 = Немає в наявності.
+                        $priorityExpr = "CASE
+                            WHEN {$netQty} > 0 THEN 0
+                            WHEN {$minExpectedDate} IS NOT NULL THEN 1
+                            ELSE 2
+                        END";
+
+                        return $query
+                            ->orderByRaw("{$priorityExpr} {$direction}")
+                            ->orderByRaw("{$netQty} DESC")
+                            ->orderByRaw("{$minExpectedDate} ASC");
+                    }),
+
+                // 7. Статус
+                Tables\Columns\IconColumn::make('is_active')
+                    ->label('Статус')
+                    ->boolean()
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderBy('is_active', $direction)->orderBy('id', $direction);
+                    }),
+
+                // --- Optional / hidden by default columns ---
 
                 Tables\Columns\TextColumn::make('barcode_ean')
                     ->label('EAN')
@@ -264,22 +294,10 @@ class ProductResource extends Resource
                     ->placeholder('—')
                     ->toggleable(in_array('barcode_ean', $toggleable), isToggledHiddenByDefault: true),
 
-                Tables\Columns\TextColumn::make('name')
-                    ->label('Назва')
-                    ->searchable()
-                    ->sortable()
-                    ->limit(50),
-
                 Tables\Columns\TextColumn::make('category.name')
                     ->label('Категорія')
                     ->sortable()
-                    ->toggleable(in_array('category', $toggleable)),
-
-                Tables\Columns\TextColumn::make('brand')
-                    ->label('Бренд')
-                    ->searchable()
-                    ->sortable()
-                    ->toggleable(in_array('brand', $toggleable)),
+                    ->toggleable(in_array('category', $toggleable), isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('rrp')
                     ->label('РРЦ')
@@ -291,7 +309,7 @@ class ProductResource extends Resource
                             : null;
                     })
                     ->placeholder('—')
-                    ->toggleable(in_array('rrp', $toggleable))
+                    ->toggleable(in_array('rrp', $toggleable), isToggledHiddenByDefault: true)
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderByRaw(
                             "COALESCE(
@@ -336,80 +354,13 @@ class ProductResource extends Resource
                         );
                     }),
 
-                Tables\Columns\TextColumn::make('stock_status')
-                    ->label('Наявність')
-                    ->getStateUsing(function (Product $record): string {
-                        $totalQty = 0;
-                        $earliestExpectedDate = null;
-
-                        foreach ($record->variants as $variant) {
-                            foreach ($variant->stocks as $stock) {
-                                $totalQty += (int) $stock->quantity;
-                                if ($stock->expected_date !== null && ($earliestExpectedDate === null || $stock->expected_date < $earliestExpectedDate)) {
-                                    $earliestExpectedDate = $stock->expected_date;
-                                }
-                            }
-                        }
-
-                        if ($totalQty > 0) {
-                            return "У наявності: {$totalQty} шт";
-                        }
-                        if ($earliestExpectedDate) {
-                            return 'Очікується '.$earliestExpectedDate->format('d.m');
-                        }
-
-                        return 'Немає в наявності';
-                    })
-                    ->badge()
-                    ->color(fn (string $state): string => match (true) {
-                        str_starts_with($state, 'У наявності') => 'success',
-                        str_starts_with($state, 'Очікується') => 'info',
-                        default => 'gray',
-                    })
-                    ->sortable(query: function (Builder $query, string $direction): Builder {
-                        // Subquery expressions reused across ORDER BY clauses.
-                        $totalQty = '(SELECT COALESCE(SUM(s.quantity), 0)
-                                      FROM stocks s
-                                      INNER JOIN product_variants pv ON s.variant_id = pv.id
-                                      WHERE pv.product_id = products.id)';
-
-                        $minExpectedDate = '(SELECT MIN(s.expected_date)
-                                            FROM stocks s
-                                            INNER JOIN product_variants pv ON s.variant_id = pv.id
-                                            WHERE pv.product_id = products.id)';
-
-                        // Priority bucket: 0 = У наявності, 1 = Очікується, 2 = Немає в наявності.
-                        // Sorting by $direction means asc→best-first, desc→worst-first.
-                        $priorityExpr = "CASE
-                            WHEN {$totalQty} > 0 THEN 0
-                            WHEN {$minExpectedDate} IS NOT NULL THEN 1
-                            ELSE 2
-                        END";
-
-                        return $query
-                            ->orderByRaw("{$priorityExpr} {$direction}")
-                            // Within "У наявності" bucket: more stock first (fixed DESC).
-                            ->orderByRaw("{$totalQty} DESC")
-                            // Within "Очікується" bucket: soonest arrival first (fixed ASC).
-                            ->orderByRaw("{$minExpectedDate} ASC");
-                    }),
-
-                // Clickable link column
+                // Clickable external link column
                 Tables\Columns\TextColumn::make('product_url')
                     ->label('URL на сайті')
                     ->formatStateUsing(fn (?string $state): HtmlString|string => ProductTableLink::externalUrlHtml($state))
                     ->tooltip(fn (?string $state) => $state)
                     ->disableClick()
                     ->toggleable(in_array('url', $toggleable), isToggledHiddenByDefault: true),
-
-                Tables\Columns\IconColumn::make('is_active')
-                    ->label('Статус')
-                    ->boolean()
-                    ->sortable(query: function (Builder $query, string $direction): Builder {
-                        // Secondary sort by id keeps rows stable when all visible values are identical
-                        // (e.g. when a status filter is active and every row shares the same is_active value).
-                        return $query->orderBy('is_active', $direction)->orderBy('id', $direction);
-                    }),
             ])
             ->defaultSort('sku')
             ->toggleColumnsTriggerAction(
@@ -417,13 +368,16 @@ class ProductResource extends Resource
                     ->label('Стовпці')
                     ->tooltip('Стовпці')
             )
-            ->recordUrl(fn (Product $record): string => static::getUrl('view', ['record' => $record]))
+            // Neutral row click opens the ViewAction slideOver instead of navigating to full page.
+            ->recordUrl(null)
+            ->recordAction('view')
             ->filters([
                 Tables\Filters\SelectFilter::make('category_id')
                     ->label('Категорії')
                     ->relationship('category', 'name')
                     ->multiple()
                     ->preload(),
+
                 Tables\Filters\SelectFilter::make('brand')
                     ->label('Бренди')
                     ->options(fn (): array => Product::query()
@@ -433,6 +387,7 @@ class ProductResource extends Resource
                         ->pluck('brand', 'brand')
                         ->toArray())
                     ->multiple(),
+
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Статус')
                     ->placeholder('Всі')
@@ -448,8 +403,44 @@ class ProductResource extends Resource
                             default => $query,
                         };
                     }),
+
+                // Availability filter — uses same net-qty calculation as the column and infolist.
+                // Status buckets: У наявності / Очікується / Немає в наявності.
+                // NOTE: Follow-up 1 — migrate to AvailabilityResolver when implemented.
+                Tables\Filters\SelectFilter::make('availability')
+                    ->label('Наявність')
+                    ->placeholder('Всі')
+                    ->options([
+                        'in_stock' => AdminAvailabilityPresenter::BUCKET_IN_STOCK,
+                        'expected' => AdminAvailabilityPresenter::BUCKET_EXPECTED,
+                        'out_of_stock' => AdminAvailabilityPresenter::BUCKET_OUT_OF_STOCK,
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        $netQty = AdminAvailabilityPresenter::netQtySql();
+                        $expectedDate = AdminAvailabilityPresenter::earliestExpectedDateSql();
+
+                        return match ($data['value'] ?? null) {
+                            'in_stock' => $query->whereRaw("{$netQty} > 0"),
+                            'expected' => $query->whereRaw("{$netQty} = 0")
+                                ->whereRaw("{$expectedDate} IS NOT NULL"),
+                            'out_of_stock' => $query->whereRaw("{$netQty} = 0")
+                                ->whereRaw("{$expectedDate} IS NULL"),
+                            default => $query,
+                        };
+                    }),
             ])
-            ->actions([])
+            ->actions([
+                // Row click (recordAction('view')) and the eye icon both open this slideOver.
+                // The infolist() schema above is resolved automatically by Filament's ViewAction.
+                Tables\Actions\ViewAction::make()
+                    ->slideOver(),
+
+                // Secondary action — opens the dedicated product page for deeper editing.
+                Tables\Actions\Action::make('open_full_page')
+                    ->label('Відкрити повну картку')
+                    ->icon('heroicon-m-arrow-top-right-on-square')
+                    ->url(fn (Product $record): string => static::getUrl('view', ['record' => $record])),
+            ])
             ->bulkActions([]);
     }
 
@@ -520,8 +511,7 @@ SVG;
     }
 
     /**
-     * HTML for the "no image" placeholder — styled to match other infolist/form fields
-     * (rounded border, muted background, consistent with Filament's field appearance).
+     * HTML for the "no image" placeholder — styled to match other infolist/form fields.
      */
     public static function buildPhotoPlaceholderHtml(): string
     {
