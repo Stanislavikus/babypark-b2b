@@ -421,9 +421,9 @@ class ProductResource extends Resource
 
                         return match ($data['value'] ?? null) {
                             'in_stock' => $query->whereRaw("{$netQty} > 0"),
-                            'expected' => $query->whereRaw("{$netQty} = 0")
+                            'expected' => $query->whereRaw("{$netQty} <= 0")
                                 ->whereRaw("{$expectedDate} IS NOT NULL"),
-                            'out_of_stock' => $query->whereRaw("{$netQty} = 0")
+                            'out_of_stock' => $query->whereRaw("{$netQty} <= 0")
                                 ->whereRaw("{$expectedDate} IS NULL"),
                             default => $query,
                         };
