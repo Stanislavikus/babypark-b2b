@@ -42,4 +42,15 @@
     .bp-cart-toolbar {
         display: contents;
     }
+
+    /* Product list: hide ViewAction icon visually; row click uses recordAction('view'). */
+    .bp-admin-row-view-action-hidden {
+        display: none !important;
+    }
+
+    .fi-ta-actions-cell:has(.bp-admin-row-view-action-hidden) > .whitespace-nowrap {
+        padding: 0;
+        width: 0;
+        overflow: hidden;
+    }
 </style>
