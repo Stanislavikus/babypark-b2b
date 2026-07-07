@@ -429,11 +429,9 @@ class ProductResource extends Resource
                         };
                     }),
             ])
-            ->actions([])
-            ->emptyStateActions([
-                // Registered as flatActions['view'] for recordAction('view') → slideOver.
-                // Not in ->actions() so no actions column; hidden() would disable mountTableAction().
+            ->actions([
                 Tables\Actions\ViewAction::make()
+                    ->hidden()
                     ->slideOver()
                     ->extraModalFooterActions(fn (Product $record) => [
                         Tables\Actions\Action::make('open_full_page_footer')
