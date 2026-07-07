@@ -429,10 +429,10 @@ class ProductResource extends Resource
                         };
                     }),
             ])
-            ->actions([
-                // Row click (recordAction('view')) and the eye icon both open this slideOver.
-                // The infolist() schema above is resolved automatically by Filament's ViewAction.
-                // "Відкрити повну картку" appears in the slide-over footer for deeper editing.
+            ->actions([])
+            ->emptyStateActions([
+                // Registered as flatActions['view'] for recordAction('view') → slideOver.
+                // Not in ->actions() so no actions column; hidden() would disable mountTableAction().
                 Tables\Actions\ViewAction::make()
                     ->slideOver()
                     ->extraModalFooterActions(fn (Product $record) => [
