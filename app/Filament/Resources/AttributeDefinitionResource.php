@@ -67,21 +67,25 @@ class AttributeDefinitionResource extends Resource
                 Tables\Columns\TextColumn::make('data_type')
                     ->label('Тип')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => $state?->label() ?? (string) $state),
+                    ->formatStateUsing(fn ($state) => $state?->label() ?? (string) $state)
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('value_level')
                     ->label('Рівень')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => $state?->label() ?? (string) $state),
+                    ->formatStateUsing(fn ($state) => $state?->label() ?? (string) $state)
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('attribute_group')
                     ->label('Група')
-                    ->formatStateUsing(fn (?string $state): string => config('attribute_dictionary.groups.'.$state, $state ?? '—')),
+                    ->formatStateUsing(fn (?string $state): string => config('attribute_dictionary.groups.'.$state, $state ?? '—'))
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('scope')
                     ->label('Джерело')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => $state?->label() ?? (string) $state),
+                    ->formatStateUsing(fn ($state) => $state?->label() ?? (string) $state)
+                    ->sortable(),
 
                 Tables\Columns\IconColumn::make('visibility_settings.admin')
                     ->label('Показувати в адмінці')
@@ -97,7 +101,8 @@ class AttributeDefinitionResource extends Resource
                     ->label('Статус')
                     ->badge()
                     ->color(fn ($state) => $state === AttributeStatus::Active ? 'success' : 'gray')
-                    ->formatStateUsing(fn ($state) => $state?->label() ?? (string) $state),
+                    ->formatStateUsing(fn ($state) => $state?->label() ?? (string) $state)
+                    ->sortable(),
             ])
             ->defaultSort('sort_order')
             ->filters([
