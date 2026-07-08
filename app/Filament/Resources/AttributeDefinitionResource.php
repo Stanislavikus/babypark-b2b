@@ -11,6 +11,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class AttributeDefinitionResource extends Resource
 {
@@ -90,12 +91,18 @@ class AttributeDefinitionResource extends Resource
                 Tables\Columns\IconColumn::make('visibility_settings.admin')
                     ->label('Показувати в адмінці')
                     ->boolean()
-                    ->state(fn (AttributeDefinition $record): bool => (bool) ($record->visibility_settings['admin'] ?? false)),
+                    ->state(fn (AttributeDefinition $record): bool => (bool) ($record->visibility_settings['admin'] ?? false))
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderByRaw("JSON_EXTRACT(visibility_settings, '$.admin') {$direction}");
+                    }),
 
                 Tables\Columns\IconColumn::make('visibility_settings.b2b')
                     ->label('Показувати в B2B')
                     ->boolean()
-                    ->state(fn (AttributeDefinition $record): bool => (bool) ($record->visibility_settings['b2b'] ?? false)),
+                    ->state(fn (AttributeDefinition $record): bool => (bool) ($record->visibility_settings['b2b'] ?? false))
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderByRaw("JSON_EXTRACT(visibility_settings, '$.b2b') {$direction}");
+                    }),
 
                 Tables\Columns\TextColumn::make('status')
                     ->label('Статус')
