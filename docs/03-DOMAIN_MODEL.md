@@ -639,6 +639,10 @@ To power the Anti-Duplication Wizard and prevent users or sloppy import spreadsh
 
 - alias_name (String): Normalized string token (e.g., колор, цвет, colour).
 
+- source (String, nullable): Import/connector origin of this alias (e.g. "1c",
+  "google_sheets"), for future Connector Foundation (GAP-006) disambiguation.
+  Null means manually registered / source-agnostic — do not store "manual" as a literal value.
+
 - Validation Rule: Before the system creates a new custom attribute, the Anti-Duplication Wizard checks the input name against existing code entries, localized_labels, and workspace_import_aliases. If a match is found, the system blocks creation and suggests mapping to the existing field instead.
 
 ### Computed Fields Operational Boundary

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Workspace\BelongsToWorkspace;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,9 +11,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProductVariant extends Model
 {
+    use BelongsToWorkspace;
     use HasFactory;
 
     protected $fillable = [
+        'workspace_id',
         'product_id',
         'onec_guid',
         'sku',
@@ -34,6 +37,11 @@ class ProductVariant extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function workspace(): BelongsTo
+    {
+        return $this->belongsTo(Workspace::class);
     }
 
     public function stocks(): HasMany
