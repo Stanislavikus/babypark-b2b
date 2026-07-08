@@ -576,38 +576,39 @@ To balance high performance with infinite extensibility, the platform utilizes a
 
 - **Dynamic Fields:** Extensible, tenant-specific properties (e.g., color, material, or custom vendor attributes) are stored in Entity-Attribute-Value (EAV) structures.
 
-- **The Registry Rule:** The Attribute Dictionary tracks all available fields. Every registered attribute must define its storage_type (column or dynamic) to prevent structural duplication and instruct data-access services where to read or write the data payload.
+- **The Registry Rule:** The Attribute Dictionary tracks all available fields. Every registered
+  attribute must define its storage_type (**column, relation, or dynamic**) to prevent structural
+  duplication and instruct data-access services where to read or write the data payload.
+  `computed` is a `data_type` value only (see Computed Fields Operational Boundary) and is never
+  a valid `storage_type`.
 
 ### Core Entity: AttributeDefinition
 
 
 Defines the schema, validation rules, and behavior profiles for a product field.
 
-- id (UUID): Primary key, system-wide unique identifier.
-
-- workspace_id (UUID): Tenant isolation key. Nullable only for platform-wide system attributes.
-
-- code (String/Slug): The **immutable internal code** (e.g., brand_name, basic_color). Once created, this code cannot be mutated by the user, serving as the permanent key for API Integrations, Smart Import matchers, and code-level logic.
-
-- data_type (Enum): text, number, boolean, select (single choice), multi_select, json, computed.
-
-- scope (Enum):
-
-- system: Non-deletable core fields injected by the platform.
-
-- platform_library: Standard pre-defined industry attributes adoptable by workspaces.
-
-- workspace_custom: Custom fields explicitly created by the merchant's workspace.
-
-- value_level (Enum): product (shared content level), variant (SKU-specific level), both.
-
-- is_localizable (Boolean): Flag controlling multi-language behavior.
-
-- is_multi_value (Boolean): Allows a single field instance to hold arrays of choices.
-
-- status (Enum): active, archived.
-
-- localized_labels (**JSONB**): Dynamic map containing UI display titles across languages (e.g., {"en": "Color", "uk": "Колір", "de": "Farbe"}).
+- id (UUID)
+- workspace_id (UUID, nullable for system/platform-wide definitions)
+- code (String/Slug, immutable)
+- data_type (Enum): text, long_text, number, decimal, money, boolean, date, select, multi_select,
+  image, url, computed
+- scope (Enum): system, platform_library, workspace_custom
+- value_level (Enum): product, variant, both
+- storage_type (Enum): column, relation, dynamic
+- storage_path (String, nullable): e.g. `product_variants.barcode_ean`; null for dynamic fields
+- attribute_group (String, stable snake_case code: basic_information, identifiers, pricing,
+  availability, images_media, descriptions, characteristics, b2b, seo, logistics, internal);
+  UI labels for groups are translated via Laravel lang/config files, not stored per-definition
+- is_required (Boolean)
+- is_filterable (Boolean)
+- is_sortable (Boolean)
+- visibility_settings (JSONB): e.g. {"admin": true, "b2b": false, "channels": {}}
+- validation_rules (JSONB, nullable)
+- is_localizable (Boolean)
+- is_multi_value (Boolean)
+- status (Enum): active, archived
+- sort_order (Integer)
+- localized_labels (JSONB)
 
 ### Strict Architectural Rules for Localization and Values
 
@@ -616,9 +617,10 @@ Defines the schema, validation rules, and behavior profiles for a product field.
 
 - **Separated Value Tables:** Dynamic values are strictly isolated based on their hierarchy:
 
-- product_attribute_values: Contains (id, product_id, attribute_definition_id, value_text, value_num, value_jsonb).
-
-- variant_attribute_values: Contains (id, variant_id, attribute_definition_id, value_text, value_num, value_jsonb).
+- product_attribute_values: Contains (id, workspace_id, product_id, attribute_definition_id,
+  value_text, value_num, value_jsonb).
+- variant_attribute_values: Contains (id, workspace_id, variant_id, attribute_definition_id,
+  value_text, value_num, value_jsonb).
 
 - Write Routing: If is_localizable is true, strings are formatted as language dictionaries and committed to value_jsonb. If false, data goes to value_text or value_num based on the configuration.
 
@@ -2092,6 +2094,126 @@ The platform uses separate isolated tables:
 - `variant_attribute_values` for variant-level dynamic fields.
 
 A unified polymorphic attribute value table is strictly forbidden by the Storage Split Mandate in `04-ARCHITECTURE_PRINCIPLES.md`.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
+### Attribute storage model
+
+**Resolved.**
+
+The platform uses a hybrid attribute storage model:
+
+- System/core operational fields (product_name, brand, category, sku, gtin, status, cost_price,
+  etc.) remain column-backed or relation-backed on `products` / `product_variants`, for indexing,
+  sorting and FK integrity.
+- Dynamic/custom/tenant-specific fields are stored in `product_attribute_values` /
+  `variant_attribute_values`.
+- Every field, regardless of storage location, is registered in `attribute_definitions`, which
+  tracks its `storage_type` (`column | relation | dynamic`) and, for column/relation fields, its
+  `storage_path`.
+- `computed` is a `data_type`, never a `storage_type`; computed attributes have no physical
+  persistence (see Computed Fields Operational Boundary), and in MVP are limited to
+  system-defined read-only fields — merchants cannot create custom computed fields.
+- Dynamic value tables store only `value_text`, `value_num`, `value_jsonb`. Boolean values use
+  `value_num` (0/1) with an explicit convention; date values use `value_text` in ISO-8601 or
+  `value_jsonb`. Adding dedicated `value_boolean` / `value_date` columns requires a separate,
+  explicit documentation-level decision.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
+### Workspace_id minimum rollout scope for Product Fields Foundation
+
+**Resolved.**
+
+The combined Workspace Foundation Lite + Product Fields Foundation implementation task must add
+`workspace_id` to, at minimum:
+
+- `products`
+- `product_variants`
+- `categories`
+- `attribute_definitions`
+- `product_attribute_values`
+- `variant_attribute_values`
+- `workspace_import_aliases`
+
+Migration order: create `workspaces` → create default Babypark workspace → add nullable
+`workspace_id` to `products` / `product_variants` / `categories` → backfill existing rows to the
+default workspace → make `workspace_id` not-nullable where safe → create the new Product Fields
+tables with `workspace_id` present from their first migration.
+
+Tables not listed above (`orders`, `contractors`, `prices`, `stocks`, `reservations`,
+`sync_logs`) remain explicitly out of scope for this task and stay tracked under GAP-004 as
+separate backlog items. This task must not silently skip them nor silently include them.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
+### System Attribute seed scope for Product Fields Foundation
+
+**Resolved.**
+
+The initial `attribute_definitions` seed for Product Fields Foundation (Phase 1) registers only
+System Attributes whose storage is verified stable on `develop` today and whose storage path
+does not contradict the documented value level.
+
+Product-level Phase 1 seed:
+
+- `internal_product_id` — storage_path: `products.id`, data_type: number. Note: 02 describes
+  this attribute as a UUID; the current implementation uses a Laravel auto-increment integer
+  primary key, not a UUID. This mismatch is documented here and does not block Phase 1; it may
+  be revisited separately.
+- `product_name` — storage_path: `products.name`
+- `brand` — storage_path: `products.brand`
+- `category` — storage_type: relation, storage_path: `products.category_id`
+- `description` — storage_path: `products.description`
+- `status` — storage_path: `products.is_active`; interim convention:
+  `is_active=true → active`, `is_active=false → archived`; `draft` is not distinguishable until
+  a real product lifecycle status field exists.
+- `product_url` — storage_path: `products.product_url` (added via a dedicated migration after
+  the base `products` table was created; verified present on `develop`).
+
+Variant-level Phase 1 seed:
+
+- `sku` — storage_path: `product_variants.sku`; canonical. The duplicate `products.sku` column
+  is legacy and is not used as a storage path; tracked as backlog technical debt.
+- `gtin` — storage_path: `product_variants.barcode_ean`; canonical. The duplicate
+  `products.barcode_ean` column is legacy and is not used as a storage path; tracked as backlog
+  technical debt.
+
+Explicitly excluded from Phase 1 seed, with no placeholder record created:
+
+- `price`, `sale_price`, `cost_price` — deferred to Pricing MVP Foundation (GAP-001). `price`
+  and `cost_price` are jointly required by the `margin_percentage` computed field and must be
+  resolved together, at the correct value_level, once PriceResolver-backed storage exists.
+  `cost_price` currently physically exists only on `products` (added via a dedicated later
+  migration), while 02 classifies it as Variant-Level — this mismatch is intentionally not
+  resolved by registering it prematurely.
+- `availability` — deferred to Availability Foundation (GAP-002).
+- `image` — deferred. Current `products.images` (JSON) is product-level legacy storage; 02
+  classifies `image` as Variant-Level. Registering it now would lock in a value-level mismatch.
+  Deferred until product/variant media storage is explicitly resolved.
+- `unit` — deferred. Current `products.unit` is product-level; 02 classifies `unit` as
+  Variant-Level. Same class of mismatch as `image`; deferred until explicitly resolved.
+- `condition` — deferred. No physical storage column exists for `condition` anywhere in the
+  current schema (verified: absent from both `products` and `product_variants`).
+
+Existing `products` columns not covered above (`onec_guid`, `barcode_box`,
+`min_order_quantity`, `order_step`, `package_quantity`, `package_type`, `units_per_box`,
+`boxes_per_pallet`, `lead_time_days`, `weight_netto`, `weight_brutto`, `volume_m3`, `depth_mm`,
+`width_mm`, `height_mm`, `synced_at`) are intentionally out of scope for Phase 1 and are
+registered in a later Phase 2 pass — this is an explicit, documented scope boundary, not an
+oversight.
+
+`rozetka_category_id`, `meta_title`, `meta_description` on `products` are channel-specific
+fields that violate the Channel Mappings Protection rule in `02-ATTRIBUTE_DICTIONARY.md`. They
+are NOT registered as System Attributes here. See `GAP-007` in `IMPLEMENTATION_GAPS.md`.
+
+The pre-existing `product_variants.attributes` JSON column (cast as `array` on the
+`ProductVariant` model) is a legacy ad-hoc dynamic-attribute mechanism. The Product Fields
+Foundation implementation task must first inspect which keys actually occur in production data
+and produce a migration plan. Actual migration of this data into `variant_attribute_values` is
+included in the same implementation task only if the discovered keys are simple and safely
+mappable; otherwise it becomes a separate, explicitly scoped follow-up task. This documentation
+patch does not perform any data migration itself.
 
 This decision is closed and must not be reopened without a documentation-level decision.
 
