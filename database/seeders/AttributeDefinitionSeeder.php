@@ -1,0 +1,289 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Enums\AttributeDataType;
+use App\Enums\AttributeScope;
+use App\Enums\AttributeStatus;
+use App\Enums\AttributeStorageType;
+use App\Enums\AttributeValueLevel;
+use App\Models\AttributeDefinition;
+use Illuminate\Database\Seeder;
+
+class AttributeDefinitionSeeder extends Seeder
+{
+    public function run(): void
+    {
+        $definitions = array_merge(
+            $this->systemAttributes(),
+            $this->platformLibraryAttributes(),
+        );
+
+        foreach ($definitions as $definition) {
+            AttributeDefinition::withoutWorkspaceScope()->updateOrCreate(
+                [
+                    'code' => $definition['code'],
+                    'workspace_id' => $definition['workspace_id'] ?? null,
+                ],
+                $definition,
+            );
+        }
+    }
+
+    /**
+     * Convention: for select-type dynamic attributes, variant_attribute_values.value_text
+     * stores the stable option code (e.g. "blue", "m"), never the display label. Labels are
+     * resolved from validation_rules.options[].labels at render time.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function systemAttributes(): array
+    {
+        $visibility = fn (bool $admin, bool $b2b): array => [
+            'admin' => $admin,
+            'b2b' => $b2b,
+            'channels' => [],
+        ];
+
+        return [
+            [
+                'code' => 'internal_product_id',
+                'workspace_id' => null,
+                'scope' => AttributeScope::System,
+                'value_level' => AttributeValueLevel::Product,
+                'data_type' => AttributeDataType::Number,
+                'storage_type' => AttributeStorageType::Column,
+                'storage_path' => 'products.id',
+                'attribute_group' => 'internal',
+                'is_localizable' => false,
+                'is_multi_value' => false,
+                'is_required' => false,
+                'is_filterable' => true,
+                'is_sortable' => true,
+                'status' => AttributeStatus::Active,
+                'sort_order' => 10,
+                'visibility_settings' => $visibility(true, false),
+                'localized_labels' => ['uk' => 'Внутрішній ID товару'],
+                'validation_rules' => null,
+            ],
+            [
+                'code' => 'product_name',
+                'workspace_id' => null,
+                'scope' => AttributeScope::System,
+                'value_level' => AttributeValueLevel::Product,
+                'data_type' => AttributeDataType::Text,
+                'storage_type' => AttributeStorageType::Column,
+                'storage_path' => 'products.name',
+                'attribute_group' => 'basic_information',
+                'is_localizable' => false,
+                'is_multi_value' => false,
+                'is_required' => false,
+                'is_filterable' => true,
+                'is_sortable' => true,
+                'status' => AttributeStatus::Active,
+                'sort_order' => 20,
+                'visibility_settings' => $visibility(true, true),
+                'localized_labels' => ['uk' => 'Назва товару'],
+                'validation_rules' => null,
+            ],
+            [
+                'code' => 'brand',
+                'workspace_id' => null,
+                'scope' => AttributeScope::System,
+                'value_level' => AttributeValueLevel::Product,
+                'data_type' => AttributeDataType::Text,
+                'storage_type' => AttributeStorageType::Column,
+                'storage_path' => 'products.brand',
+                'attribute_group' => 'basic_information',
+                'is_localizable' => false,
+                'is_multi_value' => false,
+                'is_required' => false,
+                'is_filterable' => true,
+                'is_sortable' => true,
+                'status' => AttributeStatus::Active,
+                'sort_order' => 30,
+                'visibility_settings' => $visibility(true, true),
+                'localized_labels' => ['uk' => 'Бренд'],
+                'validation_rules' => null,
+            ],
+            [
+                'code' => 'category',
+                'workspace_id' => null,
+                'scope' => AttributeScope::System,
+                'value_level' => AttributeValueLevel::Product,
+                'data_type' => AttributeDataType::Text,
+                'storage_type' => AttributeStorageType::Relation,
+                'storage_path' => 'products.category_id',
+                'attribute_group' => 'basic_information',
+                'is_localizable' => false,
+                'is_multi_value' => false,
+                'is_required' => false,
+                'is_filterable' => true,
+                'is_sortable' => true,
+                'status' => AttributeStatus::Active,
+                'sort_order' => 40,
+                'visibility_settings' => $visibility(true, true),
+                'localized_labels' => ['uk' => 'Категорія'],
+                'validation_rules' => null,
+            ],
+            [
+                'code' => 'description',
+                'workspace_id' => null,
+                'scope' => AttributeScope::System,
+                'value_level' => AttributeValueLevel::Product,
+                'data_type' => AttributeDataType::LongText,
+                'storage_type' => AttributeStorageType::Column,
+                'storage_path' => 'products.description',
+                'attribute_group' => 'descriptions',
+                'is_localizable' => false,
+                'is_multi_value' => false,
+                'is_required' => false,
+                'is_filterable' => true,
+                'is_sortable' => true,
+                'status' => AttributeStatus::Active,
+                'sort_order' => 50,
+                'visibility_settings' => $visibility(true, true),
+                'localized_labels' => ['uk' => 'Опис'],
+                'validation_rules' => null,
+            ],
+            [
+                'code' => 'status',
+                'workspace_id' => null,
+                'scope' => AttributeScope::System,
+                'value_level' => AttributeValueLevel::Product,
+                'data_type' => AttributeDataType::Boolean,
+                'storage_type' => AttributeStorageType::Column,
+                'storage_path' => 'products.is_active',
+                'attribute_group' => 'basic_information',
+                'is_localizable' => false,
+                'is_multi_value' => false,
+                'is_required' => false,
+                'is_filterable' => true,
+                'is_sortable' => true,
+                'status' => AttributeStatus::Active,
+                'sort_order' => 60,
+                'visibility_settings' => $visibility(true, false),
+                'localized_labels' => ['uk' => 'Статус'],
+                'validation_rules' => null,
+            ],
+            [
+                'code' => 'product_url',
+                'workspace_id' => null,
+                'scope' => AttributeScope::System,
+                'value_level' => AttributeValueLevel::Product,
+                'data_type' => AttributeDataType::Url,
+                'storage_type' => AttributeStorageType::Column,
+                'storage_path' => 'products.product_url',
+                'attribute_group' => 'seo',
+                'is_localizable' => false,
+                'is_multi_value' => false,
+                'is_required' => false,
+                'is_filterable' => true,
+                'is_sortable' => true,
+                'status' => AttributeStatus::Active,
+                'sort_order' => 70,
+                'visibility_settings' => $visibility(true, false),
+                'localized_labels' => ['uk' => 'URL товару'],
+                'validation_rules' => null,
+            ],
+            [
+                'code' => 'sku',
+                'workspace_id' => null,
+                'scope' => AttributeScope::System,
+                'value_level' => AttributeValueLevel::Variant,
+                'data_type' => AttributeDataType::Text,
+                'storage_type' => AttributeStorageType::Column,
+                'storage_path' => 'product_variants.sku',
+                'attribute_group' => 'identifiers',
+                'is_localizable' => false,
+                'is_multi_value' => false,
+                'is_required' => false,
+                'is_filterable' => true,
+                'is_sortable' => true,
+                'status' => AttributeStatus::Active,
+                'sort_order' => 80,
+                'visibility_settings' => $visibility(true, true),
+                'localized_labels' => ['uk' => 'SKU'],
+                'validation_rules' => null,
+            ],
+            [
+                'code' => 'gtin',
+                'workspace_id' => null,
+                'scope' => AttributeScope::System,
+                'value_level' => AttributeValueLevel::Variant,
+                'data_type' => AttributeDataType::Text,
+                'storage_type' => AttributeStorageType::Column,
+                'storage_path' => 'product_variants.barcode_ean',
+                'attribute_group' => 'identifiers',
+                'is_localizable' => false,
+                'is_multi_value' => false,
+                'is_required' => false,
+                'is_filterable' => true,
+                'is_sortable' => true,
+                'status' => AttributeStatus::Active,
+                'sort_order' => 90,
+                'visibility_settings' => $visibility(true, true),
+                'localized_labels' => ['uk' => 'GTIN'],
+                'validation_rules' => null,
+            ],
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function platformLibraryAttributes(): array
+    {
+        return [
+            [
+                'code' => 'color',
+                'workspace_id' => null,
+                'scope' => AttributeScope::PlatformLibrary,
+                'value_level' => AttributeValueLevel::Variant,
+                'data_type' => AttributeDataType::Select,
+                'storage_type' => AttributeStorageType::Dynamic,
+                'storage_path' => null,
+                'attribute_group' => 'characteristics',
+                'is_localizable' => false,
+                'is_multi_value' => false,
+                'is_required' => false,
+                'is_filterable' => true,
+                'is_sortable' => false,
+                'status' => AttributeStatus::Active,
+                'sort_order' => 100,
+                'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+                'localized_labels' => ['uk' => 'Колір'],
+                'validation_rules' => [
+                    'options' => [
+                        ['code' => 'blue', 'labels' => ['uk' => 'Синій']],
+                        ['code' => 'pink', 'labels' => ['uk' => 'Рожевий']],
+                    ],
+                ],
+            ],
+            [
+                'code' => 'size',
+                'workspace_id' => null,
+                'scope' => AttributeScope::PlatformLibrary,
+                'value_level' => AttributeValueLevel::Variant,
+                'data_type' => AttributeDataType::Select,
+                'storage_type' => AttributeStorageType::Dynamic,
+                'storage_path' => null,
+                'attribute_group' => 'characteristics',
+                'is_localizable' => false,
+                'is_multi_value' => false,
+                'is_required' => false,
+                'is_filterable' => true,
+                'is_sortable' => false,
+                'status' => AttributeStatus::Active,
+                'sort_order' => 110,
+                'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+                'localized_labels' => ['uk' => 'Розмір'],
+                'validation_rules' => [
+                    'options' => [
+                        ['code' => 'm', 'labels' => ['uk' => 'M']],
+                    ],
+                ],
+            ],
+        ];
+    }
+}
