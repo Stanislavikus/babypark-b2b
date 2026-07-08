@@ -247,9 +247,20 @@ Code values must be web-safe, API-friendly, and completely decoupled from any ch
 ### Attribute Data Types
 
 
-- **MVP Supported**: text, long text, number, decimal, money, boolean, date, select, multi-select, image, URL. 
+- **MVP Supported**: text, long text, number, decimal, money, boolean, date, select,
+  multi-select, image, URL, computed (system-defined read-only fields only — merchants cannot
+  create custom computed fields in MVP).
 
-- **Future Extension**: file, relation, JSON, measurement, rich text, computed value. 
+- **Future Extension**: file, JSON, measurement, rich text.
+
+Note: `relation`-backed fields (e.g. `category`) are represented through
+`storage_type = relation` in `attribute_definitions`, not through a `data_type` value. `relation`
+is not a `data_type`.
+
+Note: `value_jsonb` in the dynamic value tables (see 03-DOMAIN_MODEL.md) is a storage column for
+structured/internal/localized/multi-value payloads. It does not mean merchant-created JSON
+attribute fields are supported in MVP. Adding `json` as a user-facing `data_type` requires a
+separate documentation-level decision.
 
 ### Localization Architectural Rules
 
@@ -404,9 +415,8 @@ They are defined within the dictionary schema as metadata records with a data_ty
 
 The following architectural decisions must be finalized before implementation, keeping the system ready for future scales:
 
-- **Attribute storage model:**
-
-- **Direction:** A hybrid model is preferred. Use stable database columns for core system identity and operational performance fields (Product and Variant tables), plus dedicated dynamic attribute-value tables for extensible, custom product data. The exact relational schema belongs in 03-DOMAIN_MODEL.md.
+- **Attribute storage model:** Status: Resolved. See `03-DOMAIN_MODEL.md → Domain Decisions →
+  Attribute storage model`. This item is no longer open; it must not be re-litigated here.
 
 - **Translation storage:**
 

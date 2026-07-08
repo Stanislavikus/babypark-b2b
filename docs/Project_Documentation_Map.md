@@ -261,6 +261,27 @@ This file guides database design, Laravel models, service boundaries and domain 
 
 ---
 
+## IMPLEMENTATION_GAPS.md
+
+Records known, verified gaps between approved project documentation (00–07) and the actual
+state of the codebase on `develop`.
+
+This document describes:
+
+- GAP-001 through GAP-007 — documented mismatches where architectural decisions are
+  **Resolved** in docs but code has not yet caught up;
+- rules for linking temporary workarounds to their GAP entry;
+- explicit scope boundaries for Product Fields Foundation, Pricing, Availability,
+  Workspace isolation, and Connector work.
+
+Entries here are NOT open product questions. A gap must not be re-litigated as if it were
+an open design question.
+
+This file must be read before starting any Foundation implementation task (Product Fields,
+Pricing, Availability, Workspace, Connector).
+
+---
+
 ## 04-ARCHITECTURE_PRINCIPLES.md
 
 Defines the technical and architectural rules of the platform.
