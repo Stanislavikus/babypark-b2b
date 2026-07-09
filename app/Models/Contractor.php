@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Workspace\BelongsToWorkspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,9 +10,11 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 
 class Contractor extends Authenticatable
 {
+    use BelongsToWorkspace;
     use HasFactory;
 
     protected $fillable = [
+        'workspace_id',
         'onec_guid',
         'name',
         'short_name',
@@ -28,6 +31,7 @@ class Contractor extends Authenticatable
         'payment_delay_days',
         'credit_limit',
         'current_debt',
+        'default_price_list_id',
         'synced_at',
     ];
 
@@ -55,6 +59,16 @@ class Contractor extends Authenticatable
     public function prices(): HasMany
     {
         return $this->hasMany(Price::class);
+    }
+
+    public function workspace(): BelongsTo
+    {
+        return $this->belongsTo(Workspace::class);
+    }
+
+    public function defaultPriceList(): BelongsTo
+    {
+        return $this->belongsTo(PriceList::class, 'default_price_list_id');
     }
 
     public function reservations(): HasMany

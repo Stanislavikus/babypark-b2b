@@ -2400,6 +2400,75 @@ manual per-customer row configuration:
 
 This decision is closed and must not be reopened without a documentation-level decision.
 
+### Reference price fields on ProductVariant
+
+**Resolved.**
+
+`recommended_retail_price` (РРЦ) and a cached base price are variant-level reference data, not
+per-price-list or per-customer data — a manufacturer's suggested retail price does not logically
+vary by which customer is asking. `ProductVariant` gains:
+
+- `recommended_retail_price_cache` (Decimal, nullable): reference/informational price shown to
+  customers for context. Never treated as the resolved sale price.
+- `base_price_cache` (Decimal, nullable): the final fallback tier of the documented
+  `PriceResolver` priority, used only when no `PriceListItem` matches for either the customer's
+  assigned list or the workspace default list.
+
+`PriceListItem` does not carry `recommended_retail_price`. If a future need arises for RRP to
+vary by price list, that is a separate, explicit documentation-level decision.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
+### VAT handling in PriceListItem
+
+**Resolved.**
+
+`PriceListItem.price` is a net/base price, VAT-exclusive. `PriceListItem.vat_rate` (Decimal,
+nullable — null means "use `config('pricing.default_vat_rate')`") is added to the documented
+schema. Gross/VAT-inclusive price is always a computed display value
+(`price * (1 + vat_rate/100)`), never a stored column. `PriceResolver`'s output (`ResolvedPrice`)
+includes `regular_net_price`, `sale_price` (nullable), `effective_net_price`, `vat_rate`,
+`gross_price`, `currency`, and `source`. `effective_net_price` is the actual net price used for
+charge/display calculations: `PriceListItem.sale_price` overrides `PriceListItem.price` when
+present; otherwise the regular tier price is used.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
+### Effective MVP priority order (steps 3, 5, 6 of the documented 6-level priority)
+
+**Resolved.**
+
+Because `CustomerGroup` and `PricingRule` are deferred (see GAP-010), Pricing MVP Foundation
+implements a 3-step subset of the documented 6-level `PriceResolver` priority:
+
+1. Contractor's assigned `PriceList` (via `Contractor.default_price_list_id`) → matching
+   `PriceListItem` (highest `quantity_min` ≤ requested quantity, respecting `valid_from`/
+   `valid_until`/`status`).
+2. Workspace default `PriceList` (`is_default = true`) → matching `PriceListItem` tier.
+3. `ProductVariant.base_price_cache` fallback.
+
+Steps 1, 2, 4 (customer-specific `PricingRule`, `CustomerGroup` rule, `CustomerGroup`-assigned
+list) activate later without requiring `PriceResolver`'s structure to change.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
+### Exactly one default PriceList per workspace
+
+**Resolved.**
+
+Exactly one `PriceList` per workspace may have `is_default = true`. This must be enforced at the
+database level, not left to application discipline — the same category of bug that caused two
+production incidents in Availability Foundation (MySQL-specific NULL/uniqueness and ENUM
+ordering behavior not caught by SQLite-based tests). A plain `unique(workspace_id, is_default)`
+index does not work in MySQL, since it would also limit `is_default = false` rows to one per
+workspace. The implementation must use a MySQL-safe technique (e.g. a generated column that
+only takes a real value when `is_default` is true, indexed uniquely) — this is an implementation
+detail for Cursor to get right and test against MySQL specifically, not something to leave
+ungoverned. `PriceResolver` must throw a clear domain exception if it finds zero or more than
+one active default list for a workspace, rather than silently picking one.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
 ### InventoryReservation status vocabulary
 
 **Resolved.**

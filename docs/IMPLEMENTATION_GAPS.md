@@ -337,3 +337,31 @@ onboarded, or when explicitly prioritized in product planning.
 "pre-order" should concretely mean for Babypark's catalog.
 
 **Status:** Open, low urgency.
+
+---
+
+## GAP-010 — CustomerGroup / PricingRule not implemented
+
+**Approved docs:**
+- `03-DOMAIN_MODEL.md`, "CustomerGroup" and "PricingRule" sections (descriptive, not yet
+  formally Resolved): customer groups may connect to a price list, discount rule, visibility
+  rules, and access mode; `PricingRule` represents a pricing adjustment layered on top of a
+  resolved `PriceListItem` tier.
+
+**Current code:**
+- `Contractor` has no group/segment concept at all. Pricing MVP Foundation implements direct
+  `Contractor.default_price_list_id` assignment only — many contractors can share one
+  `PriceList`, which covers simple grouping-by-price, but there is no entity for bundling
+  additional segment-level rules (catalog visibility, payment terms) together.
+
+**Impact:**
+- A merchant whose B2B customers need more than shared pricing cannot yet configure that as a
+  single reusable "profile."
+
+**Decision:**
+- Do not build ad-hoc segment logic anywhere as a stopgap. Design `CustomerGroup` as its own
+  entity that composes with the existing `PriceList` assignment, when actually needed.
+
+**Next task:** Not scheduled.
+
+**Status:** Open, low urgency.

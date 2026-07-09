@@ -22,6 +22,7 @@ class Product extends Model
         'name',
         'category_id',
         'brand',
+        /** @deprecated Task 3C-2 — use variant-level cost_price; kept for legacy admin call sites */
         'cost_price',
         'unit',
         'min_order_quantity',

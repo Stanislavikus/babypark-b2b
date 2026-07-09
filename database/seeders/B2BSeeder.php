@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use App\Enums\OrderStatus;
+use App\Enums\PriceListItemStatus;
+use App\Enums\PriceListStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\SyncLogStatus;
 use App\Enums\SyncLogType;
@@ -13,6 +15,8 @@ use App\Models\InventoryLocation;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Price;
+use App\Models\PriceList;
+use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Reservation;
@@ -146,6 +150,7 @@ class B2BSeeder extends Seeder
                 'name' => 'Товар BabyPark #'.$i,
                 'category_id' => $category->id,
                 'brand' => $brands[($i - 1) % count($brands)],
+                'cost_price' => round(25 + ($i % 20) * 3.5, 2),
                 'unit' => 'шт',
                 'min_order_quantity' => $i % 5 === 0 ? 2 : 1,
                 'order_step' => 1,
@@ -167,6 +172,7 @@ class B2BSeeder extends Seeder
                 'barcode_ean' => $product->barcode_ean,
                 'attributes' => $i % 3 === 0 ? ['Колір' => 'Синій', 'Розмір' => 'M'] : null,
                 'is_active' => true,
+                'cost_price' => $product->cost_price,
                 'synced_at' => now(),
             ]);
 
@@ -178,6 +184,7 @@ class B2BSeeder extends Seeder
                     'barcode_ean' => sprintf('482%010d', 50000 + $i),
                     'attributes' => ['Колір' => 'Рожевий'],
                     'is_active' => true,
+                    'cost_price' => $product->cost_price,
                     'synced_at' => now(),
                 ]);
             }
@@ -194,12 +201,38 @@ class B2BSeeder extends Seeder
      */
     private function seedPrices($contractors, $variants): void
     {
+        $workspaceId = app(WorkspaceContext::class)->id();
+
+        PriceList::withoutWorkspaceScope()->firstOrCreate(
+            [
+                'workspace_id' => $workspaceId,
+                'is_default' => true,
+            ],
+            [
+                'name' => 'Workspace Default',
+                'currency' => 'UAH',
+                'priority' => 0,
+                'status' => PriceListStatus::Active,
+            ],
+        );
+
         foreach ($contractors as $contractor) {
+            $priceList = PriceList::query()->create([
+                'name' => 'Legacy — '.$contractor->name,
+                'currency' => 'UAH',
+                'is_default' => false,
+                'priority' => 0,
+                'status' => PriceListStatus::Active,
+            ]);
+
+            $contractor->update(['default_price_list_id' => $priceList->id]);
+
             foreach ($variants as $index => $variant) {
                 $base = 50 + ($index % 40) * 12.5 + ($contractor->id * 3);
                 $vatRate = 20;
                 $price = round($base, 2);
                 $priceWithVat = round($price * (1 + $vatRate / 100), 2);
+                $rrp = round((50 + ($index % 40) * 12.5) * 1.2 * 1.35, 2);
 
                 Price::query()->create([
                     'contractor_id' => $contractor->id,
@@ -207,11 +240,31 @@ class B2BSeeder extends Seeder
                     'price' => $price,
                     'price_with_vat' => $priceWithVat,
                     'vat_rate' => $vatRate,
-                    'recommended_retail_price' => round($priceWithVat * 1.35, 2),
+                    'recommended_retail_price' => $rrp,
                     'min_quantity' => 1,
                     'currency' => 'UAH',
                 ]);
+
+                PriceListItem::query()->create([
+                    'price_list_id' => $priceList->id,
+                    'product_variant_id' => $variant->id,
+                    'quantity_min' => 1,
+                    'price' => $price,
+                    'sale_price' => null,
+                    'vat_rate' => $vatRate,
+                    'status' => PriceListItemStatus::Active,
+                ]);
             }
+        }
+
+        foreach ($variants as $index => $variant) {
+            $demoNet = round(50 + ($index % 40) * 12.5, 2);
+            $demoGross = round($demoNet * 1.2, 2);
+
+            $variant->update([
+                'recommended_retail_price_cache' => round($demoGross * 1.35, 2),
+                'base_price_cache' => null,
+            ]);
         }
     }
 

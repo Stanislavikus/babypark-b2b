@@ -26,6 +26,9 @@ class ProductVariant extends Model
         'is_active',
         'available_quantity_cache',
         'availability_status',
+        'cost_price',
+        'recommended_retail_price_cache',
+        'base_price_cache',
         'synced_at',
     ];
 
@@ -36,6 +39,9 @@ class ProductVariant extends Model
             'is_active' => 'boolean',
             'available_quantity_cache' => 'integer',
             'availability_status' => AvailabilityStatus::class,
+            'cost_price' => 'decimal:2',
+            'recommended_retail_price_cache' => 'decimal:2',
+            'base_price_cache' => 'decimal:2',
             'synced_at' => 'datetime',
         ];
     }
@@ -58,6 +64,11 @@ class ProductVariant extends Model
     public function prices(): HasMany
     {
         return $this->hasMany(Price::class, 'variant_id');
+    }
+
+    public function priceListItems(): HasMany
+    {
+        return $this->hasMany(PriceListItem::class);
     }
 
     public function priceFor(Contractor $contractor): ?float
