@@ -11,6 +11,7 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class StockResource extends Resource
 {
@@ -87,7 +88,17 @@ class StockResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('inventoryLocation.name')
                     ->label('Локація')
-                    ->sortable(),
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query
+                            ->join(
+                                'inventory_locations',
+                                'stocks.inventory_location_id',
+                                '=',
+                                'inventory_locations.id'
+                            )
+                            ->orderBy('inventory_locations.name', $direction)
+                            ->select('stocks.*');
+                    }),
                 Tables\Columns\TextColumn::make('quantity')
                     ->label('Кількість')
                     ->sortable(),
@@ -103,7 +114,7 @@ class StockResource extends Resource
                     ->dateTime('d.m.Y H:i')
                     ->sortable(),
             ])
-            ->defaultSort('inventoryLocation.name')
+            ->defaultSort('inventoryLocation.name', 'asc')
             ->filters([
                 Tables\Filters\SelectFilter::make('category')
                     ->label('Категорія')

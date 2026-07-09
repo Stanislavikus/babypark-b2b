@@ -17,8 +17,13 @@ class ReservationCreator
         private readonly AvailabilityResolver $availabilityResolver,
     ) {}
 
-    public function create(ProductVariant $variant, int $quantity, ?Order $order = null, ?Contractor $contractor = null): Reservation
-    {
+    public function create(
+        ProductVariant $variant,
+        int $quantity,
+        ?Order $order = null,
+        ?Contractor $contractor = null,
+        ?int $ttlMinutes = null,
+    ): Reservation {
         if ($quantity <= 0) {
             throw new InvalidReservationQuantityException('Reservation quantity must be greater than zero.');
         }
@@ -29,7 +34,9 @@ class ReservationCreator
             throw new InvalidReservationQuantityException('A contractor is required to create a reservation.');
         }
 
-        return DB::transaction(function () use ($variant, $quantity, $order, $contractorId): Reservation {
+        $ttlMinutes = $ttlMinutes ?? (int) config('availability.reservation_ttl_minutes', 15);
+
+        return DB::transaction(function () use ($variant, $quantity, $order, $contractorId, $ttlMinutes): Reservation {
             $lockedVariant = ProductVariant::query()
                 ->whereKey($variant->id)
                 ->lockForUpdate()
@@ -57,7 +64,7 @@ class ReservationCreator
                 'variant_id' => $lockedVariant->id,
                 'quantity' => $quantity,
                 'status' => ReservationStatus::Pending,
-                'expires_at' => now()->addMinutes((int) config('availability.reservation_ttl_minutes', 15)),
+                'expires_at' => now()->addMinutes($ttlMinutes),
             ]);
         }, 3);
     }

@@ -16,6 +16,9 @@ class ProductDetail extends Component
     /** @var array<int, array<int, array{location_name: string, status_label: string, status_class: string}>> */
     public array $variantStockDisplay = [];
 
+    /** @var array<int, int> */
+    public array $variantNetAvailability = [];
+
     public function mount(Product $product): void
     {
         $contractor = Auth::guard('contractor')->user();
@@ -75,11 +78,7 @@ class ProductDetail extends Component
             }
 
             $this->variantStockDisplay[$variant->id] = $rows;
-        }
-
-        // Ensure resolver is used for variant-level net availability even when no per-location rows.
-        foreach ($this->product->variants->where('is_active', true) as $variant) {
-            $resolver->netAvailable($variant);
+            $this->variantNetAvailability[$variant->id] = $resolver->netAvailable($variant);
         }
     }
 

@@ -115,6 +115,14 @@
                         @endif
                     </div>
 
+                    {{-- Net availability (variant-level, accounts for pending reservations) --}}
+                    @if(isset($variantNetAvailability[$variant->id]))
+                        <p class="mt-3 text-sm text-gray-700">
+                            <span class="text-gray-500">Загальна наявність:</span>
+                            <span class="font-medium">{{ $variantNetAvailability[$variant->id] }} шт</span>
+                        </p>
+                    @endif
+
                     {{-- Stock per location --}}
                     @if(isset($variantStockDisplay[$variant->id]) && count($variantStockDisplay[$variant->id]) > 0)
                         <div class="mt-3 space-y-1.5">

@@ -166,7 +166,12 @@ class Catalog extends Component
 
         $variant = ProductVariant::query()->findOrFail($variantId);
 
-        app(ReservationCreator::class)->create($variant, $qty, contractor: $contractor);
+        app(ReservationCreator::class)->create(
+            $variant,
+            $qty,
+            contractor: $contractor,
+            ttlMinutes: config('b2b.reservation_ttl_hours', 48) * 60,
+        );
 
         $this->flashMessage = 'Бронювання створено';
         $this->dispatch('flash', message: $this->flashMessage);

@@ -58,6 +58,26 @@ class AvailabilityServicesTest extends TestCase
         ]);
     }
 
+    public function test_reservation_creator_honors_ttl_override(): void
+    {
+        config(['availability.reservation_ttl_minutes' => 15]);
+
+        $variant = $this->createVariantWithCache(50);
+        $before = now();
+
+        $reservation = app(ReservationCreator::class)->create(
+            $variant,
+            2,
+            contractor: $this->createContractor(),
+            ttlMinutes: 120,
+        );
+
+        $this->assertTrue($reservation->expires_at->between(
+            $before->copy()->addMinutes(118),
+            $before->copy()->addMinutes(122),
+        ));
+    }
+
     public function test_reservation_creator_sets_expires_at(): void
     {
         config(['availability.reservation_ttl_minutes' => 20]);
