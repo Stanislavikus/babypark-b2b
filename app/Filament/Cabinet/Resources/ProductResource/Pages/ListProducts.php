@@ -2,9 +2,9 @@
 
 namespace App\Filament\Cabinet\Resources\ProductResource\Pages;
 
-use App\Enums\ReservationStatus;
 use App\Filament\Cabinet\Resources\ProductResource;
-use App\Models\Reservation;
+use App\Models\ProductVariant;
+use App\Services\Availability\ReservationCreator;
 use App\Support\SessionCart;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
@@ -60,13 +60,9 @@ class ListProducts extends ListRecords
         $contractor = auth('contractor')->user();
         $qty = max($minQty, (int) ($this->quantities[$variantId] ?? 0));
 
-        Reservation::create([
-            'contractor_id' => $contractor->id,
-            'variant_id' => $variantId,
-            'quantity' => $qty,
-            'status' => ReservationStatus::Active,
-            'expires_at' => now()->addHours(config('b2b.reservation_ttl_hours', 48)),
-        ]);
+        $variant = ProductVariant::query()->findOrFail($variantId);
+
+        app(ReservationCreator::class)->create($variant, $qty, contractor: $contractor);
 
         Notification::make()
             ->title('Бронювання створено')

@@ -3,13 +3,19 @@
 namespace App\Models;
 
 use App\Enums\ReservationStatus;
+use App\Support\Workspace\BelongsToWorkspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Reservation extends Model
 {
+    use BelongsToWorkspace;
+
     protected $fillable = [
+        'workspace_id',
         'contractor_id',
+        'order_id',
+        'order_item_id',
         'variant_id',
         'quantity',
         'status',
@@ -25,9 +31,24 @@ class Reservation extends Model
         ];
     }
 
+    public function workspace(): BelongsTo
+    {
+        return $this->belongsTo(Workspace::class);
+    }
+
     public function contractor(): BelongsTo
     {
         return $this->belongsTo(Contractor::class);
+    }
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
+    }
+
+    public function orderItem(): BelongsTo
+    {
+        return $this->belongsTo(OrderItem::class);
     }
 
     public function variant(): BelongsTo

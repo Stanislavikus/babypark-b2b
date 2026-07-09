@@ -5,8 +5,8 @@ namespace App\Filament\Cabinet\Resources;
 use App\Filament\Cabinet\Resources\ProductResource\Pages;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource as AdminProductResource;
-use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Services\Availability\AvailabilityResolver;
 use App\Support\CatalogRowData;
 use App\Support\ProductFields\CabinetProductMargin;
 use App\Support\ProductFields\MarginToggle;
@@ -434,10 +434,7 @@ class ProductResource extends Resource
 
     protected static function applyStockSorting(Builder $query, string $direction): Builder
     {
-        $totalQty = '(SELECT COALESCE(SUM(s.quantity - COALESCE(s.reserved, 0)), 0)
-                      FROM stocks s
-                      INNER JOIN product_variants pv ON s.variant_id = pv.id
-                      WHERE pv.product_id = products.id)';
+        $totalQty = AvailabilityResolver::netQtySqlForProduct('products.id');
 
         $minExpectedDate = '(SELECT MIN(s.expected_date)
                             FROM stocks s

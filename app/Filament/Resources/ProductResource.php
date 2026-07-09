@@ -254,7 +254,7 @@ class ProductResource extends Resource
                     ->getStateUsing(fn (Product $record): ?string => null)
                     ->placeholder('—'),
 
-                // 6. Наявність — uses net qty (quantity − reserved); consistent with filter and infolist
+                // 6. Наявність — uses AvailabilityResolver net qty; consistent with filter and infolist
                 Tables\Columns\TextColumn::make('stock_status')
                     ->label('Наявність')
                     ->getStateUsing(fn (Product $record): string => AdminAvailabilityPresenter::adminLabel($record))

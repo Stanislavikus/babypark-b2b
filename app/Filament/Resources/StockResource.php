@@ -48,12 +48,13 @@ class StockResource extends Resource
                 ])->columns(3),
 
                 Infolists\Components\Section::make('Залишки')->schema([
-                    Infolists\Components\TextEntry::make('warehouse_name')
-                        ->label('Склад'),
+                    Infolists\Components\TextEntry::make('inventoryLocation.name')
+                        ->label('Локація'),
                     Infolists\Components\TextEntry::make('quantity')
                         ->label('Кількість'),
-                    Infolists\Components\TextEntry::make('reserved')
-                        ->label('Резерв'),
+                    Infolists\Components\TextEntry::make('variant.available_quantity_cache')
+                        ->label('Доступно (варіант)')
+                        ->placeholder('—'),
                     Infolists\Components\TextEntry::make('expected_date')
                         ->label('Очікується')
                         ->date('d.m.Y')
@@ -84,14 +85,14 @@ class StockResource extends Resource
                     ->label('Артикул')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('warehouse_name')
-                    ->label('Склад')
+                Tables\Columns\TextColumn::make('inventoryLocation.name')
+                    ->label('Локація')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('quantity')
                     ->label('Кількість')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('reserved')
-                    ->label('Резерв')
+                Tables\Columns\TextColumn::make('variant.available_quantity_cache')
+                    ->label('Доступно (варіант)')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('expected_date')
                     ->label('Очікується')
@@ -102,7 +103,7 @@ class StockResource extends Resource
                     ->dateTime('d.m.Y H:i')
                     ->sortable(),
             ])
-            ->defaultSort('warehouse_name')
+            ->defaultSort('inventoryLocation.name')
             ->filters([
                 Tables\Filters\SelectFilter::make('category')
                     ->label('Категорія')
@@ -111,9 +112,9 @@ class StockResource extends Resource
                         ? $query->whereHas('variant.product', fn ($q) => $q->where('category_id', $data['value']))
                         : $query
                     ),
-                Tables\Filters\SelectFilter::make('warehouse_name')
-                    ->label('Склад')
-                    ->options(fn () => Stock::query()->distinct()->pluck('warehouse_name', 'warehouse_name')->all()),
+                Tables\Filters\SelectFilter::make('inventory_location_id')
+                    ->label('Локація')
+                    ->relationship('inventoryLocation', 'name'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),

@@ -9,6 +9,7 @@ use App\Enums\SyncLogType;
 use App\Enums\UserRole;
 use App\Models\Category;
 use App\Models\Contractor;
+use App\Models\InventoryLocation;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Price;
@@ -18,6 +19,7 @@ use App\Models\Reservation;
 use App\Models\Stock;
 use App\Models\SyncLog;
 use App\Models\User;
+use App\Support\Workspace\WorkspaceContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -218,24 +220,50 @@ class B2BSeeder extends Seeder
      */
     private function seedStocks($variants): void
     {
+        $workspaceId = app(WorkspaceContext::class)->id();
+        $locations = [];
+
+        foreach (self::WAREHOUSES as $warehouse) {
+            $locations[$warehouse] = InventoryLocation::withoutWorkspaceScope()->firstOrCreate(
+                [
+                    'workspace_id' => $workspaceId,
+                    'name' => $warehouse,
+                ],
+                [
+                    'type' => 'warehouse',
+                    'is_default' => $warehouse === self::WAREHOUSES[0],
+                    'is_active' => true,
+                ],
+            );
+        }
+
         foreach ($variants as $index => $variant) {
-            foreach (self::WAREHOUSES as $w => $warehouse) {
+            $totalQty = 0;
+
+            foreach (self::WAREHOUSES as $warehouse) {
                 $qty = match (true) {
                     $index % 7 === 0 => 0,
                     $index % 5 === 0 => rand(1, 8),
                     default => rand(20, 500),
                 };
 
+                $totalQty += $qty;
+
                 Stock::query()->create([
+                    'workspace_id' => $workspaceId,
                     'variant_id' => $variant->id,
-                    'warehouse_name' => $warehouse,
+                    'inventory_location_id' => $locations[$warehouse]->id,
                     'quantity' => $qty,
-                    'reserved' => $qty > 0 ? rand(0, min(5, $qty)) : 0,
                     'expected_date' => $qty === 0 ? now()->addDays(rand(3, 21))->toDateString() : null,
                     'expected_quantity' => $qty === 0 ? rand(10, 100) : null,
                     'updated_at' => now(),
                 ]);
             }
+
+            $variant->update([
+                'available_quantity_cache' => $totalQty,
+                'availability_status' => $totalQty > 0 ? 'in_stock' : 'out_of_stock',
+            ]);
         }
     }
 
@@ -314,12 +342,15 @@ class B2BSeeder extends Seeder
      */
     private function seedReservations($contractors, $variants): void
     {
+        $workspaceId = app(WorkspaceContext::class)->id();
+
         foreach ($contractors as $contractor) {
             Reservation::query()->create([
+                'workspace_id' => $workspaceId,
                 'contractor_id' => $contractor->id,
                 'variant_id' => $variants->random()->id,
                 'quantity' => rand(5, 50),
-                'status' => ReservationStatus::Active,
+                'status' => ReservationStatus::Pending,
                 'expires_at' => now()->addDays(3),
             ]);
         }

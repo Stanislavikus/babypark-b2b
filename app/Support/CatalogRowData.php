@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Contractor;
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Services\Availability\AvailabilityResolver;
 use Carbon\Carbon;
 
 class CatalogRowData
@@ -114,7 +115,7 @@ class CatalogRowData
 
     private static function variantAvailQty(ProductVariant $variant): int
     {
-        return (int) $variant->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0));
+        return app(AvailabilityResolver::class)->netAvailable($variant);
     }
 
     private static function variantExpectedQty(ProductVariant $variant): int

@@ -689,7 +689,7 @@ Defines the concrete price matrix rules. Volume tier support is a core architect
 
 - price_list_id (UUID): Parent price list relationship.
 
-- product_variant_id (UUID): Link to the concrete sellable SKU unit.
+- product_variant_id (bigint, matching the existing product_variants primary key): Link to the concrete sellable SKU unit.
 
 - quantity_min (Integer): The minimum quantity threshold required to unlock this price point. Defaults to 1 for standard single-item pricing.
 
@@ -763,7 +763,7 @@ The transaction ledger tracking all raw inventory updates.
 
 - workspace_id (UUID): Tenant isolation key.
 
-- product_variant_id (UUID): Target variant link.
+- product_variant_id (bigint, matching the existing product_variants primary key): Target variant link.
 
 - source_type (Enum): manual_adjustment, bulk_import, connector_sync, order_allocation.
 
@@ -784,11 +784,11 @@ To guarantee an accurate storefront availability snapshot and protect checkout f
 
 - workspace_id (UUID): Tenant scope.
 
-- order_id (UUID, Nullable): Present if the reservation is bound to a pending order undergoing processing.
+- order_id (bigint, Nullable, matching the existing orders primary key): Present if the reservation is bound to a pending order undergoing processing.
 
-- order_item_id (UUID, Nullable): Link to the precise item row.
+- order_item_id (bigint, Nullable, matching the existing order_items primary key): Link to the precise item row.
 
-- product_variant_id (UUID): The reserved item link.
+- product_variant_id (bigint, matching the existing product_variants primary key): The reserved item link.
 
 - quantity (Integer): Number of units locked by this reservation.
 
@@ -1185,7 +1185,7 @@ Orders serve as permanent legal and operational documents within the ecosystem. 
 
 The parent document tracking fulfillment progress.
 
-- id (UUID): Primary key.
+- id (bigint): Primary key (Laravel auto-increment, matching the existing orders table).
 
 - workspace_id (UUID): Tenant isolation key.
 
@@ -1262,7 +1262,7 @@ The platform enforces a strict separation between operational fulfillment tracki
 
 Represents individual product entries bound to an order.
 
-- id, order_id, product_id, product_variant_id (UUID).
+- id, order_id, product_id, product_variant_id (bigint, matching the existing orders/products/product_variants primary keys).
 
 - quantity (Integer): Total requested units.
 
@@ -2397,6 +2397,95 @@ manual per-customer row configuration:
   counts, resolver output, and representative before/after examples are verified and explicitly
   reported — the same safe-migration discipline already used for the legacy
   `product_variants.attributes` migration in Product Fields Foundation.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
+### InventoryReservation status vocabulary
+
+**Resolved.**
+
+Canonical reservation statuses are:
+
+- `pending` — active soft reservation / temporary hold, counted against net availability while
+  not expired.
+- `confirmed` — reservation was converted into a permanent stock deduction.
+- `cancelled` — reservation was explicitly released because the order/cart/manual process was
+  cancelled.
+- `expired` — reservation was released automatically after TTL.
+
+`pending`, not `active`, is the canonical name for an active soft hold — this document's earlier
+use of "active" (and the pre-existing `ReservationStatus::Active` enum case in code) is renamed
+to `pending` as part of this task, not kept as a parallel synonym.
+
+Availability calculations count only:
+`status = pending AND (expires_at IS NULL OR expires_at > now())`.
+
+`cancelled` and `expired` are distinct end states: `cancelled` means explicit release,
+`expired` means TTL-based automatic release. Both existed informally in code before this
+decision; `cancelled` is retained as a genuinely distinct, useful state, not merged into
+`expired`.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
+### Location-ready inventory foundation
+
+**Resolved.**
+
+Full WMS, warehouse routing, location-specific checkout allocation, and merchant-facing
+multi-location management remain excluded from MVP (per the existing "Multi-warehouse and
+multi-location stock are excluded from MVP" decision elsewhere in this document).
+
+However, Availability Foundation introduces an internal `inventory_locations` entity — not a
+narrower "Warehouse" entity — so that future showroom, retail-store, and pickup-point scenarios
+don't require a second migration later. This follows the same pattern as established commerce
+platforms (e.g. Shopify's "Location" concept: "any physical place where you sell products,
+fulfill orders, or stock inventory" — deliberately not limited to warehouses).
+
+In MVP:
+
+- `stocks` are linked to `inventory_locations` via `inventory_location_id`, replacing the
+  previous free-text `warehouse_name` column.
+- Existing `stocks.warehouse_name` values are migrated into `inventory_locations.name` records
+  (one location row per distinct existing name).
+- `available_quantity_cache` on `ProductVariant` remains a variant-level aggregate across all
+  locations — `AvailabilityResolver` returns aggregate variant availability, not per-location
+  availability.
+- `InventoryReservation` (the `reservations` table) remains variant-level and does not allocate
+  a specific location.
+- `InventoryRecord` may store `inventory_location_id` (nullable) and `location_name_snapshot`
+  (nullable, historical label as it was named at the time of the event — not a live lookup) for
+  audit purposes, in addition to the fields already documented (`source_type`,
+  `source_reference_id`, `quantity_change`, `resulting_quantity`, `reason`).
+- Merchant-facing UI must not expose WMS terminology, location-routing logic, or any new
+  location-selection screens.
+- Pickup-point selection, per-location checkout allocation, per-location reservation, and
+  location-aware delivery rules are explicitly future, separate work — not part of this task.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
+### Existing integer primary keys for ProductVariant / Order references
+
+**Resolved.**
+
+Although earlier domain-model field descriptions used UUID language generically for
+`product_variant_id`, `order_id`, and `order_item_id` (in the `PriceListItem`,
+`InventoryReservation`, and Orders Context sections), the current application schema on
+`develop` uses Laravel default bigint auto-increment IDs for `product_variants.id`, `orders.id`,
+and `order_items.id`.
+
+Availability Foundation (and any future Pricing Foundation work referencing the same columns)
+therefore uses bigint foreign keys for:
+- `inventory_records.product_variant_id`
+- `reservations.variant_id`
+- `reservations.order_id`
+- `reservations.order_item_id`
+
+Only `workspace_id` and `inventory_location_id` are UUID foreign keys in this and future
+Availability/Pricing work.
+
+This is an implementation-alignment decision, not permission to convert existing core
+`ProductVariant`/`Order`/`OrderItem` IDs to UUID — a future global UUID migration, if ever
+needed, would be its own explicit, separate architecture decision.
 
 This decision is closed and must not be reopened without a documentation-level decision.
 

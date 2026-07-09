@@ -2,10 +2,9 @@
 
 namespace App\Livewire\Cabinet;
 
-use App\Enums\ReservationStatus;
-use App\Models\Category;
 use App\Models\Product;
-use App\Models\Reservation;
+use App\Models\ProductVariant;
+use App\Services\Availability\ReservationCreator;
 use App\Support\CatalogRowData;
 use App\Support\SessionCart;
 use Illuminate\Database\Eloquent\Builder;
@@ -164,13 +163,9 @@ class Catalog extends Component
         $contractor = Auth::guard('contractor')->user();
         $qty = max($minQty, (int) ($this->quantities[$variantId] ?? $minQty));
 
-        Reservation::create([
-            'contractor_id' => $contractor->id,
-            'variant_id' => $variantId,
-            'quantity' => $qty,
-            'status' => ReservationStatus::Active,
-            'expires_at' => now()->addHours(config('b2b.reservation_ttl_hours', 48)),
-        ]);
+        $variant = ProductVariant::query()->findOrFail($variantId);
+
+        app(ReservationCreator::class)->create($variant, $qty, contractor: $contractor);
 
         $this->flashMessage = 'Бронювання створено';
         $this->dispatch('flash', message: $this->flashMessage);

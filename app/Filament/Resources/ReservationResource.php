@@ -5,6 +5,8 @@ namespace App\Filament\Resources;
 use App\Enums\ReservationStatus;
 use App\Filament\Resources\ReservationResource\Pages;
 use App\Models\Reservation;
+use App\Services\Availability\ReservationConfirmer;
+use App\Services\Availability\ReservationReleaser;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -86,15 +88,15 @@ class ReservationResource extends Resource
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
                     ->requiresConfirmation()
-                    ->visible(fn (Reservation $record): bool => $record->status === ReservationStatus::Active)
-                    ->action(fn (Reservation $record) => $record->update(['status' => ReservationStatus::Confirmed])),
+                    ->visible(fn (Reservation $record): bool => $record->status === ReservationStatus::Pending)
+                    ->action(fn (Reservation $record) => app(ReservationConfirmer::class)->confirm($record)),
                 Tables\Actions\Action::make('cancel')
                     ->label('Скасувати')
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->visible(fn (Reservation $record): bool => in_array($record->status, [ReservationStatus::Active, ReservationStatus::Confirmed], true))
-                    ->action(fn (Reservation $record) => $record->update(['status' => ReservationStatus::Cancelled])),
+                    ->visible(fn (Reservation $record): bool => $record->status === ReservationStatus::Pending)
+                    ->action(fn (Reservation $record) => app(ReservationReleaser::class)->release($record, 'cancelled')),
             ])
             ->bulkActions([]);
     }
@@ -113,6 +115,11 @@ class ReservationResource extends Resource
     }
 
     public static function canEdit($record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($record): bool
     {
         return false;
     }

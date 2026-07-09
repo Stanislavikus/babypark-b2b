@@ -115,25 +115,13 @@
                         @endif
                     </div>
 
-                    {{-- Stock per warehouse --}}
-                    @if($variant->stocks->count() > 0)
+                    {{-- Stock per location --}}
+                    @if(isset($variantStockDisplay[$variant->id]) && count($variantStockDisplay[$variant->id]) > 0)
                         <div class="mt-3 space-y-1.5">
-                            @foreach($variant->stocks as $stock)
-                                @php
-                                    $threshold = $product->category?->stock_display_threshold ?? 10;
-                                    $qty = $stock->quantity - ($stock->reserved ?? 0);
-                                @endphp
+                            @foreach($variantStockDisplay[$variant->id] as $stockRow)
                                 <div class="flex items-center justify-between text-sm">
-                                    <span class="text-gray-600">{{ $stock->warehouse_name }}</span>
-                                    @if($qty > $threshold)
-                                        <span class="font-medium text-green-700">В наявності</span>
-                                    @elseif($qty > 0)
-                                        <span class="font-medium text-yellow-700">Залишилось {{ $qty }} шт</span>
-                                    @elseif($stock->expected_date)
-                                        <span class="text-blue-700">Очікується {{ $stock->expected_date->format('d.m') }}</span>
-                                    @else
-                                        <span class="text-gray-400">Немає в наявності</span>
-                                    @endif
+                                    <span class="text-gray-600">{{ $stockRow['location_name'] }}</span>
+                                    <span class="{{ $stockRow['status_class'] }}">{{ $stockRow['status_label'] }}</span>
                                 </div>
                             @endforeach
                         </div>

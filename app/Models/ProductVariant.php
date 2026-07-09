@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\AvailabilityStatus;
+use App\Services\Availability\AvailabilityResolver;
 use App\Support\Workspace\BelongsToWorkspace;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,6 +24,8 @@ class ProductVariant extends Model
         'barcode_ean',
         'attributes',
         'is_active',
+        'available_quantity_cache',
+        'availability_status',
         'synced_at',
     ];
 
@@ -30,6 +34,8 @@ class ProductVariant extends Model
         return [
             'attributes' => 'array',
             'is_active' => 'boolean',
+            'available_quantity_cache' => 'integer',
+            'availability_status' => AvailabilityStatus::class,
             'synced_at' => 'datetime',
         ];
     }
@@ -118,16 +124,21 @@ class ProductVariant extends Model
         ];
     }
 
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class, 'variant_id');
+    }
+
     /**
-     * Compute availability badge for this variant (aggregate across all its warehouses).
+     * Compute availability badge for this variant (aggregate across all locations).
      *
-     * Requires $this->stocks to be loaded.
+     * Requires $this->stocks to be loaded for expected-date display.
      *
      * @return array{label: string, color: string, available_quantity?: int, expected_quantity?: int, expected_date?: Carbon|null}
      */
     public function availabilityBadge(int $threshold): array
     {
-        $availQty = $this->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0));
+        $availQty = app(AvailabilityResolver::class)->netAvailable($this);
         $expectedQty = $this->stocks->sum('expected_quantity') ?? 0;
         $expectedDate = $this->stocks
             ->whereNotNull('expected_date')

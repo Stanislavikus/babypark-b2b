@@ -3,6 +3,7 @@
 namespace App\Livewire\Cabinet;
 
 use App\Models\Product;
+use App\Services\Availability\AvailabilityResolver;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -11,6 +12,9 @@ use Livewire\Component;
 class ProductDetail extends Component
 {
     public Product $product;
+
+    /** @var array<int, array<int, array{location_name: string, status_label: string, status_class: string}>> */
+    public array $variantStockDisplay = [];
 
     public function mount(Product $product): void
     {
@@ -26,9 +30,57 @@ class ProductDetail extends Component
 
         $this->product = $product->load([
             'category',
-            'variants.stocks',
+            'variants.stocks.inventoryLocation',
             'variants.prices' => fn ($q) => $q->where('contractor_id', $contractor->id),
         ]);
+
+        $threshold = $product->category?->stock_display_threshold ?? 10;
+        $resolver = app(AvailabilityResolver::class);
+
+        foreach ($this->product->variants->where('is_active', true) as $variant) {
+            if ($variant->prices->isEmpty()) {
+                continue;
+            }
+
+            $rows = [];
+
+            foreach ($variant->stocks as $stock) {
+                $qty = (int) $stock->quantity;
+
+                if ($qty > $threshold) {
+                    $rows[] = [
+                        'location_name' => $stock->inventoryLocation?->name ?? '—',
+                        'status_label' => 'В наявності',
+                        'status_class' => 'font-medium text-green-700',
+                    ];
+                } elseif ($qty > 0) {
+                    $rows[] = [
+                        'location_name' => $stock->inventoryLocation?->name ?? '—',
+                        'status_label' => "Залишилось {$qty} шт",
+                        'status_class' => 'font-medium text-yellow-700',
+                    ];
+                } elseif ($stock->expected_date) {
+                    $rows[] = [
+                        'location_name' => $stock->inventoryLocation?->name ?? '—',
+                        'status_label' => 'Очікується '.$stock->expected_date->format('d.m'),
+                        'status_class' => 'text-blue-700',
+                    ];
+                } else {
+                    $rows[] = [
+                        'location_name' => $stock->inventoryLocation?->name ?? '—',
+                        'status_label' => 'Немає в наявності',
+                        'status_class' => 'text-gray-400',
+                    ];
+                }
+            }
+
+            $this->variantStockDisplay[$variant->id] = $rows;
+        }
+
+        // Ensure resolver is used for variant-level net availability even when no per-location rows.
+        foreach ($this->product->variants->where('is_active', true) as $variant) {
+            $resolver->netAvailable($variant);
+        }
     }
 
     public function render()

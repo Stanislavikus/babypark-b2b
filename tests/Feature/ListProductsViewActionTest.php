@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Enums\UserRole;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
+use App\Models\InventoryLocation;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Stock;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -31,7 +33,10 @@ class ListProductsViewActionTest extends TestCase
             'is_active' => true,
         ]);
 
+        $workspace = Workspace::query()->where('is_default', true)->sole();
+
         $product = Product::query()->create([
+            'workspace_id' => $workspace->id,
             'onec_guid' => Str::uuid()->toString(),
             'sku' => 'SKU-TEST-001',
             'name' => 'Test Product For View Action',
@@ -39,17 +44,29 @@ class ListProductsViewActionTest extends TestCase
         ]);
 
         $variant = ProductVariant::query()->create([
+            'workspace_id' => $workspace->id,
             'product_id' => $product->id,
             'onec_guid' => Str::uuid()->toString(),
             'sku' => 'VAR-TEST-001',
             'is_active' => true,
+            'available_quantity_cache' => 10,
+            'availability_status' => 'in_stock',
+        ]);
+
+        $location = InventoryLocation::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'name' => 'WH-TEST',
+            'type' => 'warehouse',
+            'is_default' => true,
+            'is_active' => true,
         ]);
 
         Stock::query()->create([
+            'workspace_id' => $workspace->id,
             'variant_id' => $variant->id,
-            'warehouse_name' => 'WH-TEST',
+            'inventory_location_id' => $location->id,
             'quantity' => 10,
-            'reserved' => 0,
+            'updated_at' => now(),
         ]);
 
         return [
