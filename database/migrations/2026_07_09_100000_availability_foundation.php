@@ -84,6 +84,10 @@ return new class extends Migration
         $this->makeColumnNotNull('stocks', 'inventory_location_id', 'CHAR(36)');
 
         Schema::table('stocks', function (Blueprint $table) {
+            $table->index('variant_id');
+        });
+
+        Schema::table('stocks', function (Blueprint $table) {
             $table->dropUnique(['variant_id', 'warehouse_name']);
             $table->dropColumn('warehouse_name');
             $table->unique(['workspace_id', 'variant_id', 'inventory_location_id']);
@@ -189,6 +193,10 @@ return new class extends Migration
         });
 
         Schema::table('stocks', function (Blueprint $table) {
+            $table->index('workspace_id');
+        });
+
+        Schema::table('stocks', function (Blueprint $table) {
             $table->dropUnique(['workspace_id', 'variant_id', 'inventory_location_id']);
             $table->string('warehouse_name')->nullable();
             // Non-restorative: original reserved values cannot be recovered.
@@ -210,6 +218,7 @@ return new class extends Migration
             $table->dropForeign(['inventory_location_id']);
             $table->dropColumn('inventory_location_id');
             $table->unique(['variant_id', 'warehouse_name']);
+            $table->dropIndex(['variant_id']);
         });
 
         Schema::dropIfExists('inventory_locations');
