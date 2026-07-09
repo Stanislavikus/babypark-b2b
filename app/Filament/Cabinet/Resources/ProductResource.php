@@ -5,6 +5,7 @@ namespace App\Filament\Cabinet\Resources;
 use App\Filament\Cabinet\Resources\ProductResource\Pages;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource as AdminProductResource;
+use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\Availability\AvailabilityResolver;
 use App\Support\CatalogRowData;
