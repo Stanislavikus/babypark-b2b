@@ -2288,6 +2288,118 @@ TTL, reservation engine and stock-locking terminology must never appear in merch
 
 This decision is closed and must not be reopened without a documentation-level decision.
 
+### Reservation and stock-mutation write atomicity
+
+**Resolved.**
+
+Any operation that reads current stock/availability in order to decide whether a reservation
+can be created, and then writes that reservation, must do so as a single atomic unit:
+
+- Wrapped in `DB::transaction()`.
+- The relevant `ProductVariant` / stock row must be locked with `lockForUpdate()` for the
+  duration of the check-then-write.
+- Deadlock retry must be used (Laravel's built-in `DB::transaction($closure, $attempts)`
+  parameter), not a hand-rolled retry loop.
+- When more than one row must be locked in the same transaction (e.g. variant + an existing
+  reservation row), rows must be locked in a single, consistent order (e.g. always by primary
+  key ascending) to avoid deadlocks between concurrent transactions locking the same rows in
+  different orders.
+
+This responsibility is split cleanly between two kinds of components:
+
+- **Resolvers are read-only display/query services.** `AvailabilityResolver` and
+  `PriceResolver` never mutate state. Their normal public read methods are safe for catalogue,
+  admin, and storefront display, but their result must **not** be used as the final authority
+  for a write operation (e.g. "resolver said 3 available, so create the reservation") unless the
+  writer service has already opened the transaction and acquired the required row locks first.
+- **Writers own the lock and the write-safe calculation.** A dedicated `ReservationCreator`
+  (and, symmetrically, `ReservationConfirmer` / `ReservationReleaser`) is the only code path
+  allowed to create, confirm, or expire a reservation. Each of these performs its own final
+  availability check *inside* the same transaction that holds the row lock and writes the
+  reservation — it does not trust a value read earlier by `AvailabilityResolver` outside that
+  transaction.
+- **No controller, Livewire component, or Filament action may mutate stock or reservation
+  quantities directly.** All such mutations go through the writer services above.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
+### Availability Foundation — mapping existing code to the documented model
+
+**Resolved.**
+
+`app/Models/Stock.php` and `app/Models/Reservation.php` already exist on `develop` and are
+close to, but not identical to, the entities documented above. Availability Foundation
+(implementation task) evolves them rather than replacing them from scratch:
+
+- `Stock` (`variant_id`, `warehouse_name`, `quantity`, `reserved`, `expected_date`,
+  `expected_quantity`) becomes the source that populates `available_quantity_cache` on
+  `ProductVariant`. `expected_date` / `expected_quantity` are kept as-is — they already serve
+  the "очікується поставка" (incoming stock) need identified separately, and map directly to
+  merchant-facing delivery-date display without needing any new field.
+- `Reservation` (`contractor_id`, `variant_id`, `quantity`, `status`, `expires_at`) is already
+  structurally equivalent to the documented `InventoryReservation` — including the TTL field.
+  It requires, at minimum: `workspace_id` (per the same rollout pattern used in Product Fields
+  Foundation), and `order_id` / `order_item_id` (nullable) to link a reservation to the order it
+  protects, per the documented `InventoryReservation` shape. The existing table/model name
+  (`Reservation`, not `InventoryReservation`) may be kept as-is; this document's use of
+  "InventoryReservation" refers to the concept, not a mandated class/table rename.
+- **`Stock.reserved` must not remain a second, independent source of reservation truth once
+  `InventoryReservation` (i.e. the evolved `Reservation` model) is active.** Availability
+  Foundation must either deprecate `Stock.reserved`, treat it as a derived/cache field
+  maintained only by the reservation writer services (never updated independently elsewhere),
+  or explicitly migrate away from it. Net availability must never subtract both
+  `Stock.reserved` and active `InventoryReservation` rows in the same calculation — that would
+  double-count reserved quantity and under-report real availability.
+- `InventoryRecord` (the append-only stock movement ledger) does not exist yet and must be
+  created new in Availability Foundation — there is no existing model to evolve for this one.
+- `AvailabilityResolver` does not exist as a formal service class yet and must be created new,
+  implementing the documented net-availability formula.
+- `AdminAvailabilityPresenter` may remain as an admin/UI presentation adapter — it does not need
+  to be deleted. It must no longer calculate availability directly from
+  `stocks.quantity - stocks.reserved` itself; instead it delegates the actual net-availability
+  calculation to `AvailabilityResolver`, then formats the result into merchant-facing
+  labels/badges. This keeps the working badge-rendering UI code while ensuring there is exactly
+  one place where the real calculation happens.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
+### Pricing Foundation — mapping existing code to the documented model
+
+**Resolved.**
+
+`app/Models/Price.php` already exists on `develop` and already carries meaningful pricing logic
+(`contractor_id`, `variant_id`, `price`, `price_with_vat`, `vat_rate`,
+`recommended_retail_price`, `min_quantity`, `currency`) — this is not a from-scratch build.
+However, unlike the Availability mapping above, `Price` must **not** simply be renamed into
+`PriceListItem` and kept contractor-bound as the primary architecture. The documented model
+requires an intermediate `PriceList` grouping so that pricing scales to new customers without
+manual per-customer row configuration:
+
+- Existing `Price` rows migrate into `PriceListItem` rows that belong to a customer-specific or
+  workspace-default `PriceList` — the `PriceList` / assignment layer is the primary structure
+  going forward, not a compatibility shim bolted onto direct `contractor_id` pricing.
+- `min_quantity` on the existing `Price` model maps directly onto `PriceListItem.quantity_min` —
+  this existing field is not wasted, it becomes the tier threshold field.
+- `recommended_retail_price` (РРЦ) is an informational/reference price shown to the customer for
+  context (e.g. to help them see their own resale potential). It is never treated as the
+  resolved sale price, and it is never derived from or mixed into `PriceResolver`'s output. This
+  follows the general commerce principle that a recommended/reference price and an actual
+  transactional price are different concepts serving different purposes, and must not share a
+  calculation path.
+- `PriceResolver` priority order remains exactly as already Resolved elsewhere in this document
+  (customer-specific rule → customer group rule → assigned price list → default workspace price
+  list → cached variant fallback) — this patch does not change that order, only clarifies how
+  existing data maps onto it.
+- No promotions, cart-level rules, multi-year contracts, or channel-stacked pricing are in MVP
+  scope for Pricing Foundation. `PriceListItem.sale_price` (already documented) covers simple
+  time-boxed promotional pricing; nothing more elaborate is needed yet.
+- Existing `Price` data must not be deleted or dropped during Pricing Foundation until migration
+  counts, resolver output, and representative before/after examples are verified and explicitly
+  reported — the same safe-migration discipline already used for the legacy
+  `product_variants.attributes` migration in Product Fields Foundation.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
 ### B2B storefront MVP depth
 
 **Resolved.**
