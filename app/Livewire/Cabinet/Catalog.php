@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Cabinet;
 
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\Availability\ReservationCreator;
