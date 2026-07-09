@@ -100,7 +100,12 @@ in any migration.
 
 **Next task:** Availability Foundation (see proposed task order below).
 
-**Status:** Open (partially mitigated — see `AdminAvailabilityPresenter`).
+**Status:** Closed in code. Implemented via Availability Foundation and follow-up fixes
+(PRs #39, #40, #41, #42 — schema, `AvailabilityResolver`,
+`ReservationCreator`/`Confirmer`/`Releaser`, `inventory_records` ledger, scheduler registration,
+MySQL-safe migration recovery, and UI delegation away from direct `stocks.reserved`
+calculations). Two intentionally deferred product items remain open separately — see GAP-008
+and GAP-009.
 
 ---
 
@@ -270,3 +275,65 @@ forward.
 proper channel-mapping layer and deprecates the raw columns.
 
 **Status:** Open, low priority (no active Rozetka export in the current pilot scope).
+
+---
+
+## GAP-008 — Per-location pickup/checkout allocation not implemented
+
+**Approved docs:**
+- `03-DOMAIN_MODEL.md`, "Location-ready inventory foundation" (**Resolved**, added by
+  Availability Foundation): `inventory_locations` exists as a foundation entity, but explicitly
+  states "Pickup-point selection, per-location checkout allocation, per-location reservation,
+  and location-aware delivery rules are explicitly future, separate work."
+
+**Current code:**
+- `inventory_locations` exists and `stocks` are linked to it, but `AvailabilityResolver` and
+  `InventoryReservation` both operate at the variant level only, aggregated across all
+  locations. There is no UI anywhere (admin or B2B cabinet) for a customer to choose a specific
+  pickup location, and no reservation ever allocates against a specific location.
+
+**Impact:**
+- A merchant with a showroom and a separate warehouse (or multiple physical locations) cannot
+  yet offer "choose your pickup point" to B2B customers, even though the underlying data model
+  is already location-aware. This is a real, deliberately deferred product feature, not a bug.
+
+**Decision:**
+- Do not build ad-hoc per-location logic anywhere as a stopgap. When this is prioritized, it
+  needs its own domain design pass (per-location availability formula, checkout UI, staff
+  fulfillment workflow, delivery-setting interaction) — not a quick patch on top of the current
+  variant-level resolver.
+
+**Next task:** Not scheduled. Revisit when a merchant with multiple pickup-capable locations is
+onboarded, or when explicitly prioritized in product planning.
+
+**Status:** Open, low urgency (foundation exists, feature does not).
+
+---
+
+## GAP-009 — `low_stock` / `pre_order` availability thresholds not defined
+
+**Approved docs:**
+- `03-DOMAIN_MODEL.md`, "Operational Inventory Cache": `availability_status` is documented as
+  an enum with four values — `in_stock`, `low_stock`, `out_of_stock`, `pre_order`.
+
+**Current code:**
+- `product_variants.availability_status` (added by Availability Foundation) is only ever
+  backfilled/set to `in_stock` or `out_of_stock` — a simple `available_quantity_cache > 0` check.
+  `low_stock` and `pre_order` are valid enum values that no code path ever assigns, by explicit
+  decision during Availability Foundation, to avoid inventing an un-approved business threshold
+  (e.g. "what quantity counts as running low?") or pre-order policy.
+
+**Impact:**
+- The UI cannot yet show a "Закінчується" ("running low") badge or support pre-order workflows,
+  even though the enum already has room for both. This is intentional, not an oversight — the
+  actual threshold/policy is a business decision that hasn't been made yet.
+
+**Decision:**
+- Do not invent a `low_stock` threshold or `pre_order` policy in code without an explicit
+  documentation-level decision first (e.g. "low_stock = quantity below N" or "below N% of a
+  typical restock level," and whatever `pre_order` should mean operationally for this business).
+
+**Next task:** Not scheduled. Revisit when the business defines what "running low" and
+"pre-order" should concretely mean for Babypark's catalog.
+
+**Status:** Open, low urgency.
