@@ -5,6 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * Legacy per-contractor price rows from the pre–PriceList migration era.
+ *
+ * Read-only compatibility model — active runtime pricing, display, cart, and order
+ * paths must use PriceResolver / PriceListItem instead.
+ */
 class Price extends Model
 {
     public const CREATED_AT = null;

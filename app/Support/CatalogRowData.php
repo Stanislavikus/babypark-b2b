@@ -6,6 +6,8 @@ use App\Models\Contractor;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\Availability\AvailabilityResolver;
+use App\Services\Pricing\ProductPricingSummary;
+use App\Support\Pricing\VariantPriceDisplay;
 use Carbon\Carbon;
 
 class CatalogRowData
@@ -23,31 +25,34 @@ class CatalogRowData
      *     minQty: int,
      *     step: int,
      *     myPrice: ?float,
+     *     myPriceDisplay: ?VariantPriceDisplay,
      *     rrp: ?float,
      * }
      */
     public static function forProduct(Product $product, Contractor $contractor): array
     {
+        $summary = app(ProductPricingSummary::class);
         $threshold = $product->category?->stock_display_threshold ?? 10;
         $activeVariants = $product->variants->where('is_active', true);
         $variantsWithPrice = $activeVariants->filter(
-            fn (ProductVariant $v) => $v->prices->where('contractor_id', $contractor->id)->isNotEmpty()
+            fn (ProductVariant $v) => $summary->variantHasResolvablePrice($v, $contractor)
         );
 
         $minQty = max(1, $product->min_order_quantity);
         $step = max(1, $product->order_step);
-        $rrp = $product->maxRrp();
+        $rrp = $summary->maxRrp($product);
 
-        // Step 1: in-stock priced variants — lowest price wins.
+        // Step 1: in-stock priced variants — lowest gross price wins.
         $inStockVariants = $variantsWithPrice->filter(
             fn (ProductVariant $v) => self::variantAvailQty($v) > 0
         );
 
         if ($inStockVariants->isNotEmpty()) {
             $firstVariant = $inStockVariants
-                ->sortBy(fn (ProductVariant $v) => $v->priceFor($contractor))
+                ->sortBy(fn (ProductVariant $v) => $summary->tryResolveVariantDisplay($v, $contractor)?->grossPrice ?? PHP_FLOAT_MAX)
                 ->first();
 
+            $priceDisplay = $summary->tryResolveVariantDisplay($firstVariant, $contractor);
             $availQty = self::variantAvailQty($firstVariant);
             $badge = ProductVariant::badgeFromQty(
                 $availQty,
@@ -62,7 +67,8 @@ class CatalogRowData
                 'maxQty' => $availQty,
                 'minQty' => $minQty,
                 'step' => $step,
-                'myPrice' => $firstVariant->priceFor($contractor),
+                'myPrice' => $priceDisplay?->grossPrice,
+                'myPriceDisplay' => $priceDisplay,
                 'rrp' => $rrp,
             ];
         }
@@ -78,6 +84,7 @@ class CatalogRowData
                 ->sortBy(fn (ProductVariant $v) => self::variantEarliestExpectedDate($v))
                 ->first();
 
+            $priceDisplay = $summary->tryResolveVariantDisplay($firstVariant, $contractor);
             $expectedQty = self::variantExpectedQty($firstVariant);
             $expectedDate = self::variantEarliestExpectedDate($firstVariant);
             $badge = ProductVariant::badgeFromQty(0, $expectedQty, $expectedDate, $threshold);
@@ -88,7 +95,8 @@ class CatalogRowData
                 'maxQty' => $expectedQty,
                 'minQty' => $minQty,
                 'step' => $step,
-                'myPrice' => $firstVariant->priceFor($contractor),
+                'myPrice' => $priceDisplay?->grossPrice,
+                'myPriceDisplay' => $priceDisplay,
                 'rrp' => $rrp,
             ];
         }
@@ -108,7 +116,8 @@ class CatalogRowData
             'maxQty' => 0,
             'minQty' => $minQty,
             'step' => $step,
-            'myPrice' => $product->minPriceFor($contractor),
+            'myPrice' => $summary->minGrossPriceForContractor($product, $contractor),
+            'myPriceDisplay' => null,
             'rrp' => $rrp,
         ];
     }

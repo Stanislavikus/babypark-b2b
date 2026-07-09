@@ -5,6 +5,8 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
+use App\Services\Pricing\PricingSqlExpressions;
+use App\Services\Pricing\ProductPricingSummary;
 use App\Support\AdminAvailabilityPresenter;
 use App\Support\ProductFields\AdminProductMargin;
 use App\Support\ProductFields\MarginToggle;
@@ -58,13 +60,11 @@ class ProductResource extends Resource
                     Forms\Components\TextInput::make('category.name')
                         ->label('Категорія')
                         ->disabled(),
-                    Forms\Components\TextInput::make('cost_price')
+                    Forms\Components\Placeholder::make('cost_price_summary')
                         ->label('Вхідна ціна')
-                        ->numeric()
-                        ->minValue(0)
-                        ->step(0.01)
-                        ->suffix('₴')
-                        ->placeholder('—'),
+                        ->content(fn (?Product $record): string => $record
+                            ? (app(ProductPricingSummary::class)->formatCostPrice($record) ?? '—')
+                            : '—'),
                 ])->columns(2),
 
                 Forms\Components\Section::make('Сайт')->schema([
@@ -120,31 +120,13 @@ class ProductResource extends Resource
                         ->getStateUsing(fn (Product $record): string => AdminAvailabilityPresenter::adminLabel($record))
                         ->badge()
                         ->color(fn (string $state): string => AdminAvailabilityPresenter::badgeColor($state)),
-                    Infolists\Components\TextEntry::make('cost_price')
+                    Infolists\Components\TextEntry::make('cost_price_summary')
                         ->label('Вхідна ціна')
-                        ->formatStateUsing(fn (?string $state): ?string => $state !== null
-                            ? '₴ '.number_format((float) $state, 2, '.', ' ')
-                            : null)
+                        ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatCostPrice($record))
                         ->placeholder('—'),
                     Infolists\Components\TextEntry::make('admin_rrp')
                         ->label('РРЦ')
-                        ->getStateUsing(function (Product $record): ?string {
-                            $maxRrp = null;
-                            foreach ($record->variants as $variant) {
-                                foreach ($variant->prices as $price) {
-                                    if (
-                                        $price->recommended_retail_price !== null
-                                        && ($maxRrp === null || $price->recommended_retail_price > $maxRrp)
-                                    ) {
-                                        $maxRrp = (float) $price->recommended_retail_price;
-                                    }
-                                }
-                            }
-
-                            return $maxRrp !== null
-                                ? '₴ '.number_format($maxRrp, 2, '.', ' ')
-                                : null;
-                        })
+                        ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatRrp($record))
                         ->placeholder('—'),
                     Infolists\Components\TextEntry::make('admin_margin')
                         ->label(fn (): HtmlString => MarginToggle::labelHtml(
@@ -251,7 +233,7 @@ class ProductResource extends Resource
                 // 5. Ціна — placeholder until admin/base sale price model is resolved (Follow-up 3)
                 Tables\Columns\TextColumn::make('admin_sale_price')
                     ->label('Ціна')
-                    ->getStateUsing(fn (Product $record): ?string => null)
+                    ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatDefaultSalePrice($record))
                     ->placeholder('—'),
 
                 // 6. Наявність — uses AvailabilityResolver net qty; consistent with filter and infolist
@@ -301,35 +283,29 @@ class ProductResource extends Resource
 
                 Tables\Columns\TextColumn::make('rrp')
                     ->label('РРЦ')
-                    ->getStateUsing(function (Product $record): ?string {
-                        $maxRrp = self::maxRrpFor($record);
-
-                        return $maxRrp !== null
-                            ? '₴ '.number_format($maxRrp, 2, '.', ' ')
-                            : null;
-                    })
+                    ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatRrp($record))
                     ->placeholder('—')
                     ->toggleable(in_array('rrp', $toggleable), isToggledHiddenByDefault: true)
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderByRaw(
-                            "COALESCE(
-                                (SELECT MAX(pr.recommended_retail_price)
-                                 FROM prices pr
-                                 INNER JOIN product_variants pv ON pr.variant_id = pv.id
-                                 WHERE pv.product_id = products.id),
-                                0
-                            ) {$direction}"
+                            'COALESCE('.PricingSqlExpressions::maxRrpSqlForProduct('products.id').", 0) {$direction}"
                         );
                     }),
 
-                Tables\Columns\TextColumn::make('cost_price')
+                Tables\Columns\TextColumn::make('cost_price_summary')
                     ->label('Вхідна ціна')
-                    ->formatStateUsing(fn (?string $state): ?string => $state !== null
-                        ? '₴ '.number_format((float) $state, 2, '.', ' ')
-                        : null)
+                    ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatCostPrice($record))
                     ->placeholder('—')
                     ->toggleable(in_array('cost_price', $toggleable), isToggledHiddenByDefault: true)
-                    ->sortable(),
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderByRaw(
+                            "(SELECT MIN(pv.cost_price)
+                              FROM product_variants pv
+                              WHERE pv.product_id = products.id
+                              AND pv.is_active = 1
+                              AND pv.cost_price IS NOT NULL) {$direction}"
+                        );
+                    }),
 
                 Tables\Columns\TextColumn::make('margin')
                     ->label(fn (): HtmlString => MarginToggle::labelHtml(
@@ -344,13 +320,7 @@ class ProductResource extends Resource
                     ->toggleable(in_array('margin', $toggleable), isToggledHiddenByDefault: true)
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderByRaw(
-                            "COALESCE(
-                                (SELECT MAX(pr.recommended_retail_price)
-                                 FROM prices pr
-                                 INNER JOIN product_variants pv ON pr.variant_id = pv.id
-                                 WHERE pv.product_id = products.id),
-                                0
-                            ) - COALESCE(products.cost_price, 0) {$direction}"
+                            PricingSqlExpressions::adminMarginSortSql('products.id')." {$direction}"
                         );
                     }),
 
@@ -451,7 +421,7 @@ class ProductResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['variants.stocks', 'variants.prices', 'category']);
+            ->with(['variants.stocks', 'category']);
     }
 
     // -------------------------------------------------------------------------
@@ -480,23 +450,6 @@ class ProductResource extends Resource
     // -------------------------------------------------------------------------
     // Internal helpers
     // -------------------------------------------------------------------------
-
-    public static function maxRrpFor(Product $record): ?float
-    {
-        $maxRrp = null;
-        foreach ($record->variants as $variant) {
-            foreach ($variant->prices as $price) {
-                if (
-                    $price->recommended_retail_price !== null
-                    && ($maxRrp === null || $price->recommended_retail_price > $maxRrp)
-                ) {
-                    $maxRrp = (float) $price->recommended_retail_price;
-                }
-            }
-        }
-
-        return $maxRrp;
-    }
 
     /** SVG placeholder icon at a given pixel size. */
     public static function placeholderSvg(int $size = 48): string

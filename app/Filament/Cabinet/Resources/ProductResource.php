@@ -8,7 +8,10 @@ use App\Filament\Resources\ProductResource as AdminProductResource;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\Availability\AvailabilityResolver;
+use App\Services\Pricing\PricingSqlExpressions;
+use App\Services\Pricing\ProductPricingSummary;
 use App\Support\CatalogRowData;
+use App\Support\Pricing\ContractorPricingScope;
 use App\Support\ProductFields\CabinetProductMargin;
 use App\Support\ProductFields\MarginToggle;
 use App\Support\ProductFields\ProductColumnVisibility;
@@ -42,6 +45,7 @@ class ProductResource extends Resource
         $panel = 'cabinet';
         $visible = ProductPanelVisibility::visibleDetailFields($panel);
         $contractor = auth('contractor')->user();
+        $summary = app(ProductPricingSummary::class);
 
         $schema = [];
 
@@ -50,10 +54,10 @@ class ProductResource extends Resource
                 ->schema([
                     Infolists\Components\RepeatableEntry::make('active_variants')
                         ->label('')
-                        ->getStateUsing(function (Product $record) use ($contractor) {
+                        ->getStateUsing(function (Product $record) use ($contractor, $summary) {
                             return $record->variants
                                 ->where('is_active', true)
-                                ->filter(fn (ProductVariant $v) => $v->priceFor($contractor) !== null)
+                                ->filter(fn (ProductVariant $v) => $summary->variantHasResolvablePrice($v, $contractor))
                                 ->values();
                         })
                         ->schema([
@@ -100,19 +104,17 @@ class ProductResource extends Resource
 
                             Infolists\Components\TextEntry::make('contractor_price')
                                 ->label('Ваша ціна')
-                                ->getStateUsing(function (ProductVariant $record) use ($contractor): ?string {
-                                    $price = $record->priceFor($contractor);
+                                ->getStateUsing(function (ProductVariant $record) use ($contractor, $summary): ?string {
+                                    $display = $summary->tryResolveVariantDisplay($record, $contractor);
 
-                                    return $price !== null
-                                        ? '₴ '.number_format($price, 2, '.', ' ')
-                                        : null;
+                                    return $display?->formattedGross();
                                 })
                                 ->placeholder('—'),
 
                             Infolists\Components\TextEntry::make('rrp')
                                 ->label('РРЦ')
                                 ->getStateUsing(function (ProductVariant $record): ?string {
-                                    $rrp = $record->prices->first()?->recommended_retail_price;
+                                    $rrp = $record->recommended_retail_price_cache;
 
                                     return $rrp !== null
                                         ? '₴ '.number_format((float) $rrp, 2, '.', ' ')
@@ -279,14 +281,15 @@ class ProductResource extends Resource
                 })
                 ->placeholder('—')
                 ->sortable(query: function (Builder $query, string $direction): Builder {
-                    $contractorId = auth('contractor')->id();
+                    $contractor = auth('contractor')->user();
+                    $priceListId = ContractorPricingScope::priceListIdFor($contractor);
+
+                    if ($priceListId === null) {
+                        return $query->orderBy('sku', $direction);
+                    }
 
                     return $query->orderByRaw(
-                        "COALESCE((SELECT MIN(p.price_with_vat) FROM prices p
-                            INNER JOIN product_variants pv ON p.variant_id = pv.id
-                            WHERE pv.product_id = products.id
-                            AND p.contractor_id = ?), 0) {$direction}",
-                        [$contractorId]
+                        'COALESCE('.PricingSqlExpressions::minGrossPriceSqlForProduct('products.id', $priceListId).", 0) {$direction}"
                     );
                 });
         }
@@ -295,23 +298,15 @@ class ProductResource extends Resource
             $columns[] = Tables\Columns\TextColumn::make('rrp')
                 ->label('РРЦ')
                 ->getStateUsing(function (Product $record): ?string {
-                    $rrp = $record->maxRrp();
+                    $summary = app(ProductPricingSummary::class);
 
-                    return $rrp !== null
-                        ? '₴ '.number_format($rrp, 2, '.', ' ')
-                        : null;
+                    return $summary->formatRrp($record);
                 })
                 ->placeholder('—')
                 ->toggleable(in_array('rrp', $toggleable))
                 ->sortable(query: function (Builder $query, string $direction): Builder {
                     return $query->orderByRaw(
-                        "COALESCE(
-                            (SELECT MAX(pr.recommended_retail_price)
-                             FROM prices pr
-                             INNER JOIN product_variants pv ON pr.variant_id = pv.id
-                             WHERE pv.product_id = products.id),
-                            0
-                        ) {$direction}"
+                        'COALESCE('.PricingSqlExpressions::maxRrpSqlForProduct('products.id').", 0) {$direction}"
                     );
                 });
         }
@@ -337,14 +332,15 @@ class ProductResource extends Resource
                 })
                 ->placeholder('—')
                 ->sortable(query: function (Builder $query, string $direction): Builder {
-                    $contractorId = auth('contractor')->id();
+                    $contractor = auth('contractor')->user();
+                    $priceListId = ContractorPricingScope::priceListIdFor($contractor);
+
+                    if ($priceListId === null) {
+                        return $query->orderBy('sku', $direction);
+                    }
 
                     return $query->orderByRaw(
-                        "COALESCE((SELECT MAX(p.recommended_retail_price) - MIN(p.price_with_vat) FROM prices p
-                            INNER JOIN product_variants pv ON p.variant_id = pv.id
-                            WHERE pv.product_id = products.id
-                            AND p.contractor_id = ?), 0) {$direction}",
-                        [$contractorId]
+                        PricingSqlExpressions::contractorMarginSortSql('products.id', $priceListId)." {$direction}"
                     );
                 });
         }
@@ -382,9 +378,10 @@ class ProductResource extends Resource
                     ->preload(),
                 Tables\Filters\SelectFilter::make('brand')
                     ->label('Бренди')
-                    ->options(fn (): array => Product::query()
-                        ->where('is_active', true)
-                        ->whereHas('variants.prices', fn ($q) => $q->where('contractor_id', auth('contractor')->id()))
+                    ->options(fn (): array => ContractorPricingScope::applyProductScope(
+                        Product::query()->where('is_active', true),
+                        auth('contractor')->user(),
+                    )
                         ->distinct()
                         ->orderBy('brand')
                         ->whereNotNull('brand')
@@ -397,17 +394,12 @@ class ProductResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $contractorId = auth('contractor')->id();
+        $contractor = auth('contractor')->user();
 
-        return parent::getEloquentQuery()
-            ->where('is_active', true)
-            ->whereHas('variants.prices', fn ($q) => $q->where('contractor_id', $contractorId))
-            ->with([
-                'category',
-                'variants' => fn ($q) => $q->where('is_active', true),
-                'variants.prices' => fn ($q) => $q->where('contractor_id', $contractorId),
-                'variants.stocks',
-            ]);
+        return ContractorPricingScope::applyProductScope(
+            parent::getEloquentQuery()->where('is_active', true),
+            $contractor,
+        )->with(ContractorPricingScope::eagerLoadForContractor($contractor));
     }
 
     public static function getPages(): array
