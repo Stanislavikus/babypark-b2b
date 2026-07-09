@@ -29,7 +29,11 @@
                                 <p class="text-xs text-gray-500 dark:text-gray-400">{{ $line['sku'] }} × {{ $line['quantity'] }}</p>
                             </div>
                             <span class="shrink-0 tabular-nums text-gray-700 dark:text-gray-300">
-                                ₴&nbsp;{{ number_format($line['line_total'], 2, ',', ' ') }}
+                                @if ($line['price_available'])
+                                    ₴&nbsp;{{ number_format($line['line_total'], 2, ',', ' ') }}
+                                @else
+                                    <span class="text-amber-600">Ціна не задана</span>
+                                @endif
                             </span>
                         </li>
                     @endforeach

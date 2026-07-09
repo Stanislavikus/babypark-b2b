@@ -4,6 +4,8 @@ namespace App\Livewire\Cabinet;
 
 use App\Models\Product;
 use App\Services\Availability\AvailabilityResolver;
+use App\Services\Pricing\ProductPricingSummary;
+use App\Support\Pricing\VariantPriceDisplay;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -19,13 +21,18 @@ class ProductDetail extends Component
     /** @var array<int, int> */
     public array $variantNetAvailability = [];
 
+    /** @var array<int, VariantPriceDisplay> */
+    public array $variantPriceDisplay = [];
+
     public function mount(Product $product): void
     {
         $contractor = Auth::guard('contractor')->user();
+        $summary = app(ProductPricingSummary::class);
 
         $hasPricing = $product->variants()
-            ->whereHas('prices', fn ($q) => $q->where('contractor_id', $contractor->id))
-            ->exists();
+            ->where('is_active', true)
+            ->get()
+            ->contains(fn ($variant) => $summary->variantHasResolvablePrice($variant, $contractor));
 
         if (! $hasPricing) {
             abort(404);
@@ -34,16 +41,19 @@ class ProductDetail extends Component
         $this->product = $product->load([
             'category',
             'variants.stocks.inventoryLocation',
-            'variants.prices' => fn ($q) => $q->where('contractor_id', $contractor->id),
         ]);
 
         $threshold = $product->category?->stock_display_threshold ?? 10;
         $resolver = app(AvailabilityResolver::class);
 
         foreach ($this->product->variants->where('is_active', true) as $variant) {
-            if ($variant->prices->isEmpty()) {
+            $priceDisplay = $summary->tryResolveVariantDisplay($variant, $contractor);
+
+            if ($priceDisplay === null) {
                 continue;
             }
+
+            $this->variantPriceDisplay[$variant->id] = $priceDisplay;
 
             $rows = [];
 

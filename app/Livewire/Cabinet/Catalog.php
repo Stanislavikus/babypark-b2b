@@ -6,7 +6,9 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\Availability\ReservationCreator;
+use App\Services\Pricing\PricingSqlExpressions;
 use App\Support\CatalogRowData;
+use App\Support\Pricing\ContractorPricingScope;
 use App\Support\SessionCart;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
@@ -181,15 +183,10 @@ class Catalog extends Component
     {
         $contractor = Auth::guard('contractor')->user();
 
-        $query = Product::query()
-            ->where('is_active', true)
-            ->whereHas('variants.prices', fn ($q) => $q->where('contractor_id', $contractor->id))
-            ->with([
-                'category',
-                'variants' => fn ($q) => $q->where('is_active', true),
-                'variants.prices' => fn ($q) => $q->where('contractor_id', $contractor->id),
-                'variants.stocks',
-            ]);
+        $query = ContractorPricingScope::applyProductScope(
+            Product::query()->where('is_active', true),
+            $contractor,
+        )->with(ContractorPricingScope::eagerLoadForContractor($contractor));
 
         if (filled($this->search)) {
             $query->where(fn ($q) => $q
@@ -231,10 +228,10 @@ class Catalog extends Component
         }
 
         $categories = Category::orderBy('name')->get();
-        $brands = Product::where('is_active', true)
-            ->whereNotNull('brand')
-            ->whereHas('variants.prices', fn ($q) => $q->where('contractor_id', $contractor->id))
-            ->distinct()->orderBy('brand')->pluck('brand');
+        $brands = ContractorPricingScope::applyProductScope(
+            Product::query()->where('is_active', true)->whereNotNull('brand'),
+            $contractor,
+        )->distinct()->orderBy('brand')->pluck('brand');
 
         return view('livewire.cabinet.catalog', compact(
             'products',
@@ -247,6 +244,7 @@ class Catalog extends Component
     private function applySorting(Builder $query, $contractor): Builder
     {
         $dir = in_array($this->sortDir, ['asc', 'desc']) ? $this->sortDir : 'asc';
+        $priceListId = ContractorPricingScope::priceListIdFor($contractor);
 
         return match ($this->sortBy) {
             'sku' => $query->orderBy('sku', $dir),
@@ -259,27 +257,19 @@ class Catalog extends Component
             ),
             'brand' => $query->orderBy('brand', $dir),
             'stock' => $this->applyStockSorting($query, $dir),
-            'price' => $query->orderByRaw(
-                "COALESCE((SELECT MAX(p.price_with_vat) FROM prices p
-                    INNER JOIN product_variants pv ON p.variant_id = pv.id
-                    WHERE pv.product_id = products.id
-                    AND p.contractor_id = ?), 0) {$dir}",
-                [$contractor->id]
-            ),
+            'price' => $priceListId
+                ? $query->orderByRaw(
+                    'COALESCE('.PricingSqlExpressions::maxGrossPriceSqlForProduct('products.id', $priceListId).", 0) {$dir}"
+                )
+                : $query->orderBy('sku', $dir),
             'rrp' => $query->orderByRaw(
-                "COALESCE((SELECT MAX(p.recommended_retail_price) FROM prices p
-                    INNER JOIN product_variants pv ON p.variant_id = pv.id
-                    WHERE pv.product_id = products.id
-                    AND p.contractor_id = ?), 0) {$dir}",
-                [$contractor->id]
+                'COALESCE('.PricingSqlExpressions::maxRrpSqlForProduct('products.id').", 0) {$dir}"
             ),
-            'margin' => $query->orderByRaw(
-                "COALESCE((SELECT MAX(p.recommended_retail_price) - MIN(p.price_with_vat) FROM prices p
-                    INNER JOIN product_variants pv ON p.variant_id = pv.id
-                    WHERE pv.product_id = products.id
-                    AND p.contractor_id = ?), 0) {$dir}",
-                [$contractor->id]
-            ),
+            'margin' => $priceListId
+                ? $query->orderByRaw(
+                    PricingSqlExpressions::contractorMarginSortSql('products.id', $priceListId)." {$dir}"
+                )
+                : $query->orderBy('sku', $dir),
             default => $query->orderBy('sku', 'asc'),
         };
     }

@@ -22,8 +22,6 @@ class Product extends Model
         'name',
         'category_id',
         'brand',
-        /** @deprecated Task 3C-2 — use variant-level cost_price; kept for legacy admin call sites */
-        'cost_price',
         'unit',
         'min_order_quantity',
         'order_step',
@@ -56,7 +54,6 @@ class Product extends Model
             'synced_at' => 'datetime',
             'min_order_quantity' => 'integer',
             'order_step' => 'integer',
-            'cost_price' => 'decimal:2',
             'weight_netto' => 'decimal:3',
             'weight_brutto' => 'decimal:3',
             'volume_m3' => 'decimal:6',
@@ -76,23 +73,5 @@ class Product extends Model
     public function variants(): HasMany
     {
         return $this->hasMany(ProductVariant::class);
-    }
-
-    public function minPriceFor(Contractor $contractor): ?float
-    {
-        $price = $this->variants
-            ->flatMap(fn ($variant) => $variant->prices->where('contractor_id', $contractor->id))
-            ->min('price_with_vat');
-
-        return $price !== null ? (float) $price : null;
-    }
-
-    public function maxRrp(): ?float
-    {
-        $rrp = $this->variants
-            ->flatMap(fn ($variant) => $variant->prices)
-            ->max('recommended_retail_price');
-
-        return $rrp !== null ? (float) $rrp : null;
     }
 }

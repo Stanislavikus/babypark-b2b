@@ -2,10 +2,11 @@
 
 namespace App\Support;
 
+use App\Exceptions\Pricing\PriceNotAvailableException;
 use App\Models\Contractor;
 use App\Models\Order;
-use App\Models\Price;
 use App\Models\ProductVariant;
+use App\Services\Pricing\PriceResolver;
 
 /**
  * Session-based cart for the B2B cabinet.
@@ -63,18 +64,46 @@ class SessionCart
     }
 
     /**
-     * Cart lines with contractor-specific prices for display.
+     * Cart lines with contractor-specific resolved prices for display.
      *
      * @return list<array{
      *     variant_id: int,
      *     name: string,
      *     sku: string,
      *     quantity: int,
-     *     price_with_vat: float,
-     *     line_total: float,
+     *     price_available: bool,
+     *     gross_price: ?float,
+     *     regular_net_price: ?float,
+     *     sale_price: ?float,
+     *     line_total: ?float,
+     *     price_label: string,
      * }>
      */
     public static function linesForContractor(Contractor $contractor): array
+    {
+        return array_map(
+            fn (array $line) => self::publicLineFromResolved($line),
+            self::resolvedLinesForContractor($contractor),
+        );
+    }
+
+    /**
+     * Resolved cart lines used by display and order creation.
+     *
+     * @return list<array{
+     *     variant_id: int,
+     *     variant: ProductVariant,
+     *     name: string,
+     *     sku: string,
+     *     quantity: int,
+     *     price_available: bool,
+     *     gross_price: ?float,
+     *     regular_net_price: ?float,
+     *     sale_price: ?float,
+     *     line_total: ?float,
+     * }>
+     */
+    public static function resolvedLinesForContractor(Contractor $contractor): array
     {
         $cart = self::all();
 
@@ -83,18 +112,13 @@ class SessionCart
         }
 
         $variantIds = array_keys($cart);
+        $resolver = app(PriceResolver::class);
 
         $variants = ProductVariant::query()
             ->with('product')
             ->whereIn('id', $variantIds)
             ->get()
             ->keyBy('id');
-
-        $prices = Price::query()
-            ->where('contractor_id', $contractor->id)
-            ->whereIn('variant_id', $variantIds)
-            ->get()
-            ->keyBy('variant_id');
 
         $lines = [];
 
@@ -105,15 +129,34 @@ class SessionCart
                 continue;
             }
 
-            $price = (float) ($prices->get($variant->id)?->price_with_vat ?? 0);
+            $quantity = $item['quantity'];
+            $priceAvailable = true;
+            $grossPrice = null;
+            $regularNetPrice = null;
+            $salePrice = null;
+            $lineTotal = null;
+
+            try {
+                $resolved = $resolver->resolveForContractor($variant, $contractor, $quantity);
+                $grossPrice = $resolved->grossPrice;
+                $regularNetPrice = $resolved->regularNetPrice;
+                $salePrice = $resolved->salePrice;
+                $lineTotal = round($grossPrice * $quantity, 2);
+            } catch (PriceNotAvailableException) {
+                $priceAvailable = false;
+            }
 
             $lines[] = [
                 'variant_id' => $variant->id,
+                'variant' => $variant,
                 'name' => $variant->product->name,
                 'sku' => $variant->sku,
-                'quantity' => $item['quantity'],
-                'price_with_vat' => $price,
-                'line_total' => $price * $item['quantity'],
+                'quantity' => $quantity,
+                'price_available' => $priceAvailable,
+                'gross_price' => $grossPrice,
+                'regular_net_price' => $regularNetPrice,
+                'sale_price' => $salePrice,
+                'line_total' => $lineTotal,
             ];
         }
 
@@ -122,7 +165,23 @@ class SessionCart
 
     public static function totalWithVat(Contractor $contractor): float
     {
-        return array_sum(array_column(self::linesForContractor($contractor), 'line_total'));
+        return array_sum(
+            array_map(
+                fn (array $line) => $line['line_total'] ?? 0.0,
+                self::resolvedLinesForContractor($contractor),
+            )
+        );
+    }
+
+    public static function hasUnavailablePrices(Contractor $contractor): bool
+    {
+        foreach (self::resolvedLinesForContractor($contractor) as $line) {
+            if (! $line['price_available']) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Remove a single variant line. */
@@ -150,5 +209,48 @@ class SessionCart
         foreach ($order->items as $item) {
             self::add($item->variant_id, $item->quantity);
         }
+    }
+
+    /**
+     * @param  array{
+     *     variant_id: int,
+     *     name: string,
+     *     sku: string,
+     *     quantity: int,
+     *     price_available: bool,
+     *     gross_price: ?float,
+     *     regular_net_price: ?float,
+     *     sale_price: ?float,
+     *     line_total: ?float,
+     * }  $line
+     * @return array{
+     *     variant_id: int,
+     *     name: string,
+     *     sku: string,
+     *     quantity: int,
+     *     price_available: bool,
+     *     gross_price: ?float,
+     *     regular_net_price: ?float,
+     *     sale_price: ?float,
+     *     line_total: ?float,
+     *     price_label: string,
+     * }
+     */
+    private static function publicLineFromResolved(array $line): array
+    {
+        return [
+            'variant_id' => $line['variant_id'],
+            'name' => $line['name'],
+            'sku' => $line['sku'],
+            'quantity' => $line['quantity'],
+            'price_available' => $line['price_available'],
+            'gross_price' => $line['gross_price'],
+            'regular_net_price' => $line['regular_net_price'],
+            'sale_price' => $line['sale_price'],
+            'line_total' => $line['line_total'],
+            'price_label' => $line['price_available']
+                ? '₴ '.number_format((float) $line['gross_price'], 2, ',', ' ')
+                : 'Ціна не задана',
+        ];
     }
 }

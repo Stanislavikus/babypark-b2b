@@ -14,7 +14,6 @@ use App\Models\Contractor;
 use App\Models\InventoryLocation;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\Price;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\Product;
@@ -23,6 +22,7 @@ use App\Models\Reservation;
 use App\Models\Stock;
 use App\Models\SyncLog;
 use App\Models\User;
+use App\Services\Pricing\PriceResolver;
 use App\Support\Workspace\WorkspaceContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
@@ -143,6 +143,7 @@ class B2BSeeder extends Seeder
 
         for ($i = 1; $i <= 50; $i++) {
             $category = $categories->random();
+            $costPrice = round(25 + ($i % 20) * 3.5, 2);
             $product = Product::query()->create([
                 'onec_guid' => (string) Str::uuid(),
                 'sku' => sprintf('BP-%05d', $i),
@@ -150,7 +151,6 @@ class B2BSeeder extends Seeder
                 'name' => 'Товар BabyPark #'.$i,
                 'category_id' => $category->id,
                 'brand' => $brands[($i - 1) % count($brands)],
-                'cost_price' => round(25 + ($i % 20) * 3.5, 2),
                 'unit' => 'шт',
                 'min_order_quantity' => $i % 5 === 0 ? 2 : 1,
                 'order_step' => 1,
@@ -172,7 +172,7 @@ class B2BSeeder extends Seeder
                 'barcode_ean' => $product->barcode_ean,
                 'attributes' => $i % 3 === 0 ? ['Колір' => 'Синій', 'Розмір' => 'M'] : null,
                 'is_active' => true,
-                'cost_price' => $product->cost_price,
+                'cost_price' => $costPrice,
                 'synced_at' => now(),
             ]);
 
@@ -184,7 +184,7 @@ class B2BSeeder extends Seeder
                     'barcode_ean' => sprintf('482%010d', 50000 + $i),
                     'attributes' => ['Колір' => 'Рожевий'],
                     'is_active' => true,
-                    'cost_price' => $product->cost_price,
+                    'cost_price' => $costPrice,
                     'synced_at' => now(),
                 ]);
             }
@@ -233,17 +233,6 @@ class B2BSeeder extends Seeder
                 $price = round($base, 2);
                 $priceWithVat = round($price * (1 + $vatRate / 100), 2);
                 $rrp = round((50 + ($index % 40) * 12.5) * 1.2 * 1.35, 2);
-
-                Price::query()->create([
-                    'contractor_id' => $contractor->id,
-                    'variant_id' => $variant->id,
-                    'price' => $price,
-                    'price_with_vat' => $priceWithVat,
-                    'vat_rate' => $vatRate,
-                    'recommended_retail_price' => $rrp,
-                    'min_quantity' => 1,
-                    'currency' => 'UAH',
-                ]);
 
                 PriceListItem::query()->create([
                     'price_list_id' => $priceList->id,
@@ -359,14 +348,10 @@ class B2BSeeder extends Seeder
             ]);
 
             foreach ($orderVariants as $variant) {
-                $price = Price::query()
-                    ->where('contractor_id', $contractor->id)
-                    ->where('variant_id', $variant->id)
-                    ->first();
-
                 $qty = rand(1, 10);
-                $lineTotal = $price->price_with_vat * $qty;
-                $total += $price->price * $qty;
+                $resolved = app(PriceResolver::class)->resolveForContractor($variant, $contractor, $qty);
+                $lineTotal = round($resolved->grossPrice * $qty, 2);
+                $total += round($resolved->effectiveNetPrice * $qty, 2);
                 $totalWithVat += $lineTotal;
 
                 OrderItem::query()->create([
@@ -376,8 +361,8 @@ class B2BSeeder extends Seeder
                     'name' => $variant->product->name,
                     'attributes' => $variant->attributes,
                     'quantity' => $qty,
-                    'price' => $price->price,
-                    'price_with_vat' => $price->price_with_vat,
+                    'price' => $resolved->effectiveNetPrice,
+                    'price_with_vat' => $resolved->grossPrice,
                     'total' => $lineTotal,
                 ]);
             }
