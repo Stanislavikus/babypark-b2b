@@ -410,9 +410,12 @@ by itself decide the business threshold, which remains open per this gap.
 **Next task:** Product classification structure implementation (schema task, separate from the
 Phase 2 field backlog in GAP-013).
 
-**Status:** Open. `Merchant Type`/`Tags` are ready to implement now (no open architectural
-questions remaining for that part). Standard Category remains deferred/tracked alongside
-GAP-006 — this GAP is not "closed" by implementing only the ready part.
+**Status:** Partially closed in code. Implemented: `products.merchant_type` (nullable string column),
+its column-backed `AttributeDefinition`, `tags` table, `product_tag` pivot with `workspace_id`
+consistency enforcement (Eloquent `ProductTag` pivot guard + MySQL composite foreign keys),
+`Tag` model, and `Product`/`Tag` `belongsToMany` relations. Standard Category remains explicitly
+deferred/tracked alongside GAP-006 — this GAP is not fully closed until that future concept is
+built.
 
 ---
 
@@ -457,12 +460,13 @@ GAP-006 — this GAP is not "closed" by implementing only the ready part.
 **Current code:**
 - Phase 1 fields (name, brand, category, description, status, url, sku, gtin, price, RRP,
   cost_price, availability, color, size) are registered and working (Tasks 1-2, 3B, 3C).
-- Not yet registered as `AttributeDefinition` records: product weight, tax class (deferred, see
-  Decision below), shipping-required flag, inventory backorder policy (see GAP-009's related
-  finding above), image alt text, "Технічні характеристики" and "Інструкція" (long-text,
-  platform_library — see Decision below for readiness-vs-draft framing). Tags is tracked
-  separately under GAP-011 (classification structure), not here, since it needs its own schema
-  (a many-to-many table), not just an `AttributeDefinition` row.
+- Phase 2 field registrations implemented (Task 5): `weight_netto`, `weight_brutto`, `volume_m3`,
+  `shipping_required`, `backorder_policy`, `technical_characteristics`, `instructions` — all
+  registered as `AttributeDefinition` records via `AttributeDefinitionSeeder`.
+- Not yet registered: tax class (deferred, see Decision below), gift card flag (deferred).
+  `image_alt_text` remains deferred to future Media entities (`MediaAsset`/`ProductMedia`/`VariantMedia`
+  — alt text is a per-image property, not a product/variant-level attribute). Tags is tracked
+  separately under GAP-011 (classification structure), not here.
 
 **Impact:**
 - These are ordinary Phase 2 registrations — no architectural blocker, unlike the Category/Type/
@@ -483,4 +487,10 @@ GAP-006 — this GAP is not "closed" by implementing only the ready part.
 **Next task:** Product Fields Phase 2 implementation (schema/seed task, separate from the
 Merchant Category/Standard Category/Merchant Type/Tags structural task in GAP-011).
 
-**Status:** Open, ready to implement (no open architectural questions remaining).
+**Status:** Partially closed in code. Phase 2 `AttributeDefinition` registrations are
+implemented for `weight_netto`, `weight_brutto`, `volume_m3`, `shipping_required`,
+`backorder_policy`, `technical_characteristics`, and `instructions`. Tax class and gift card flag
+remain explicitly deferred (unchanged). `image_alt_text` remains deferred to future Media entities
+(unchanged). `backorder_policy` registration does not change `AvailabilityResolver` behavior and
+does not close GAP-009. Publication-readiness enforcement for `technical_characteristics` and
+`instructions` remains the future responsibility of `B2BPublicationChecker` (not yet built).

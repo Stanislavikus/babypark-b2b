@@ -6,6 +6,7 @@ use App\Support\Workspace\BelongsToWorkspace;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
@@ -22,6 +23,7 @@ class Product extends Model
         'name',
         'category_id',
         'brand',
+        'merchant_type',
         'unit',
         'min_order_quantity',
         'order_step',
@@ -73,5 +75,13 @@ class Product extends Model
     public function variants(): HasMany
     {
         return $this->hasMany(ProductVariant::class);
+    }
+
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class)
+            ->using(ProductTag::class)
+            ->withPivot('workspace_id')
+            ->withPivotValue('workspace_id', $this->workspace_id);
     }
 }
