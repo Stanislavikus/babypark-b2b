@@ -529,7 +529,7 @@ A category may contain:
 
 - status.
 
-The platform should not introduce global taxonomy in MVP.
+The platform should not introduce global taxonomy in MVP. See **Product classification model** below for how this relates to the separate, not-yet-built Standard Category concept.
 
 Global taxonomy, marketplace taxonomy mapping and channel-specific category mapping should be handled later in connector/channel mapping layers.
 
@@ -1079,7 +1079,7 @@ The storefront should support category navigation.
 
 For MVP, categories are workspace-owned.
 
-The platform should not require a global taxonomy for storefront navigation.
+The platform should not require a global taxonomy for storefront navigation. See **Product classification model** below for how this relates to the separate, not-yet-built Standard Category concept.
 
 Marketplace taxonomy mapping should remain part of connector/channel mapping, not the core B2B storefront.
 
@@ -2597,6 +2597,60 @@ These capabilities belong to B2BChannel settings and storefront presentation rul
 They must not create a separate product database or turn the platform into a CMS or website builder.
 
 This decision is closed and must not be changed without a documentation-level decision.
+
+### Product classification model — Merchant Category / Standard Category / Merchant Type / Tags
+
+**Resolved.**
+
+**Naming note, checked against this document's existing content:** this document already has a
+`### Product Type` section describing `ProductType` as an internal template controlling which
+fields are shown/recommended/required for a product's structure (hidden in MVP, default "Basic
+Product"). **The new concept introduced here is deliberately named `Merchant Type`, not
+`Type`, to avoid colliding with that existing, unrelated concept.** `Merchant Type` does not
+control fields, variants, required attributes, readiness rules, or attribute suggestions —
+that remains `ProductType`'s role, unchanged by this patch.
+
+Based on how Shopify's Standard Product Taxonomy, Google's Product Taxonomy, Magento's
+Attribute Sets, and commercetools' Product Types all converge on the same pattern, product
+classification eventually involves **four** distinct, independently-purposed concepts — not a
+replacement of what already exists, but an addition alongside it:
+
+- **Merchant/Catalogue Category** (`categories`, already exists, unchanged): the existing
+  workspace-owned navigation tree. Per the already-Resolved "Category" and "B2B storefront
+  category" decisions elsewhere in this document, this remains workspace-owned, and the
+  platform continues to not require a global taxonomy for storefront navigation in MVP. **This
+  patch does not change that decision.**
+- **Standard Category** (new concept, not yet implemented, not required for MVP): a
+  standardized taxonomy node (Google Product Taxonomy / Shopify's open-source Standard Product
+  Taxonomy — both freely available, ~10,000 categories), used for *readiness/export/attribute-
+  suggestion* purposes only — not storefront navigation. This is what unlocks category-specific
+  attribute suggestions and near-zero-effort mapping to Google Shopping / Meta / Bing / Pinterest
+  exports later. Per the existing "no global taxonomy in MVP" decision, this is **not built now**
+  — it is tracked as a future concept (see GAP-011) that will eventually sit *alongside*
+  Merchant/Catalogue Category, not replace it, and will most naturally live in the
+  connector/channel-mapping layer already anticipated for marketplace taxonomy mapping (GAP-006),
+  not as a change to the core `categories` table.
+- **Merchant Type** (new, free-form, optional — inspired by Shopify's custom "product type"
+  field, distinct from this document's existing `ProductType` template concept as explained
+  above): an unstructured internal label a merchant can set for their own organization, with no
+  taxonomy backing and no attribute-unlocking behavior. Suggested future storage name:
+  `products.merchant_type` or `products.custom_type` — deliberately not a generic `type` column,
+  to keep it unambiguous in code as well as in docs.
+- **Tags** (new, free-form, optional, multiple per product): the loosest layer, for filtering/
+  collections on top of Merchant/Catalogue Category — never a substitute for it.
+
+**When Standard Category is eventually built** (not now), it becomes mandatory for product
+readiness/channel-export/publishing flows specifically — not for draft-product existence, and
+not a replacement for Merchant/Catalogue Category's storefront-navigation role.
+
+This is a planning decision, not yet implemented — see **GAP-011** for the `Merchant Type`/`Tags`
+schema task (ready to implement now) and the Standard Category concept (tracked, deferred,
+connects to GAP-006's connector/channel-mapping layer when built).
+
+This decision is closed and must not be reopened without a documentation-level decision. It
+does not reopen, override, or contradict the existing "Categories are workspace-owned" / "no
+global taxonomy in MVP" decisions, nor the existing `ProductType` template concept — it adds
+new, separate concepts alongside them.
 
 ### Payment implementation timing
 

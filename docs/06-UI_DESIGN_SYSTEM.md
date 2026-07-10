@@ -734,6 +734,27 @@ If there are no images, show a neutral placeholder without click behavior.
 
 No-image placeholder: a muted gray square with a simple product icon. Do not use text, brand marks, initials or broken-image icons as the placeholder.
 
+### Product image size and format convention
+
+**Resolved.**
+
+Compiled from cross-referencing Shopify/Amazon/major platform image guidelines:
+- Original upload/storage: up to 2048×2048px (source for all derived sizes).
+- Thumbnail (tables, cart): ~150-300px.
+- Catalog/card view: ~600-800px.
+- Zoom/lightbox: ~1600-2048px.
+- Delivery format: `.webp` where the browser supports it, JPEG fallback otherwise. Alt text is
+  mandatory on every product image (accessibility + SEO).
+
+**Scope note:** this convention applies to the platform's own product UI/storefront delivery
+only. Connector/export jobs (e.g. sending images to a marketplace or Google Shopping feed) may
+need to transform images to channel-specific requirements later (different platforms have their
+own size/format rules) — that is a separate connector/channel-mapping concern (GAP-006), not
+something this convention dictates. Do not treat `.webp` delivery as a marketplace-export
+requirement.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
 ## Row Action Zones
 
 Rows may contain multiple independent action zones.
