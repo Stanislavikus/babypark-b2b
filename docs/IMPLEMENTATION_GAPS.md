@@ -41,27 +41,27 @@ in any migration.
   ProductPrice`, and cached variant prices are explicitly part of MVP scope, not
   future scope.
 
-**Current code:**
-- `app/Models/Price.php` — a flat model where `contractor_id` is a **mandatory**
-  (non-nullable) foreign key. Every price row belongs to exactly one contractor.
-  There is no `PriceList`, no `PriceListItem`, no `is_default` concept, and no
-  cached base price field on `ProductVariant`.
-- No `PriceResolver` class exists anywhere in `app/`.
+**Current code (historical — see Status below for resolution):**
+- `app/Models/Price.php` was a flat model where `contractor_id` was a mandatory foreign key,
+  with no `PriceList`, no `PriceListItem`, no `is_default` concept, and no cached base price on
+  `ProductVariant`. The legacy `prices` table and `Price` model are retained, read-only, for
+  historical/compatibility reasons (not deleted).
 
-**Impact:**
-- There is no way to answer "what is this product's price" without already knowing
-  which contractor is asking. The admin product table has no source for a neutral
-  `Ціна` column.
+**Impact (historical):**
+- There was no way to answer "what is this product's price" without already knowing which
+  contractor was asking, and the admin product table had no source for a neutral `Ціна` column.
 
-**Decision:**
-- Do not rename `РРЦ` (recommended_retail_price) into `Ціна` — they are different
-  concepts.
-- Do not invent UI-only price-resolution logic to fake a base price.
-- Interim state: admin `Ціна` column renders `—` until this gap is closed.
+**Decision (still applies):**
+- `РРЦ` (recommended_retail_price_cache) and resolved sale price remain distinct concepts — do
+  not conflate them.
 
-**Next task:** Pricing MVP Foundation (see proposed task order below).
-
-**Status:** Open.
+**Status:** Closed in code. Implemented via Pricing MVP Foundation (PR #44 — schema,
+`PriceList`/`PriceListItem`, `PriceResolver`, MySQL-safe default-list constraint, safe legacy
+data migration; PR #45 — replacement of all legacy pricing call sites, `products.cost_price`
+finally dropped in favor of variant-level `cost_price`, order-creation price snapshot
+integration via `OrderCreator`). The admin `Ціна`/РРЦ/margin columns are now populated from
+`PriceResolver`/`ProductPricingSummary` rather than rendering `—`. `CustomerGroup`/`PricingRule`
+remain deferred — see GAP-010.
 
 ---
 
