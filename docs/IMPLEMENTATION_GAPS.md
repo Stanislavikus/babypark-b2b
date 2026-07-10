@@ -336,6 +336,12 @@ onboarded, or when explicitly prioritized in product planning.
 **Next task:** Not scheduled. Revisit when the business defines what "running low" and
 "pre-order" should concretely mean for Babypark's catalog.
 
+**Related finding (does not close this gap):** Shopify's `Variant Inventory Policy`
+(`deny`/`continue` — whether a variant can still be ordered at zero stock) is the standard
+mechanism that would populate `availability_status = pre_order`. This clarifies *how* pre-order
+would work mechanically once a business decision is made on *when* to allow it — it does not
+by itself decide the business threshold, which remains open per this gap.
+
 **Status:** Open, low urgency.
 
 ---
@@ -365,3 +371,116 @@ onboarded, or when explicitly prioritized in product planning.
 **Next task:** Not scheduled.
 
 **Status:** Open, low urgency.
+
+---
+
+## GAP-011 — Product classification structure: `Merchant Type`/`Tags` schema, and tracking of a future Standard Category concept
+
+**Approved docs:**
+- `03-DOMAIN_MODEL.md`, "Product classification model — Merchant Category / Standard Category /
+  Merchant Type / Tags" (Patch 1 above, Resolved): four distinct concepts. Merchant/Catalogue
+  `Category` (existing `categories` table) is unchanged. This document's existing `ProductType`
+  template concept (internal field/variant structure control, hidden in MVP) is also unchanged
+  and unrelated to the new `Merchant Type` concept. `Merchant Type` and `Tags` do not exist as
+  schema yet and are ready to implement. Standard Category (standardized public taxonomy) is a
+  tracked future concept, deliberately not built now, consistent with the existing "no global
+  taxonomy in MVP" decision.
+
+**Current code:**
+- `categories` table/relationship already exists and is used for storefront navigation — no
+  change needed here. No `Merchant Type` (free-form label) or `Tags` (free-form, multi-value)
+  field exists anywhere on `Product`. No Standard Category / public taxonomy integration exists
+  (correctly — it isn't meant to yet).
+
+**Impact:**
+- Products cannot yet be given the free internal organizational label (`Merchant Type`) or
+  filtering tags (`Tags`) the classification model calls for. Merchant/Catalogue `Category`
+  alone is already functional and not blocked by this gap. Standard Category's absence has no
+  MVP impact — it becomes relevant once channel/marketplace export (GAP-006) is actually built.
+
+**Decision:**
+- Implement `Merchant Type` (nullable string, e.g. `products.merchant_type` — not a generic
+  `type` column, to stay unambiguous relative to the existing `ProductType` concept) and `Tags`
+  (separate table, many-to-many with `Product`) as their own small schema task now — this does
+  not require re-touching `Category` (stays workspace-owned) or `ProductType` (stays hidden,
+  unrelated).
+- Standard Category is explicitly **not** part of this task's scope — revisit only alongside
+  GAP-006 (connector/channel-mapping infrastructure), not as a core catalog change.
+
+**Next task:** Product classification structure implementation (schema task, separate from the
+Phase 2 field backlog in GAP-013).
+
+**Status:** Open. `Merchant Type`/`Tags` are ready to implement now (no open architectural
+questions remaining for that part). Standard Category remains deferred/tracked alongside
+GAP-006 — this GAP is not "closed" by implementing only the ready part.
+
+---
+
+## GAP-012 — Multi-currency pricing not implemented
+
+**Approved docs:**
+- `03-DOMAIN_MODEL.md`, Pricing Foundation blocks: `price_lists.currency` field exists in the
+  schema (Task 3C-1), defaulting to `'UAH'`, but no conversion/exchange-rate/multi-currency
+  display logic was built — deliberately deferred at the time.
+
+**Current code:**
+- `PriceList.currency` is a UAH-only select in the admin UI (Task 3D-1); `PriceResolver` assumes
+  a single currency throughout.
+
+**Impact:**
+- This SaaS is intended to be sellable beyond a single Ukrainian pilot merchant. A merchant
+  selling in EUR/USD/other currencies cannot be onboarded without this. Given the realistic
+  commercial ambition (a global-capable product, not a Ukraine-only tool), this must not be
+  silently forgotten — it is tracked here explicitly so it surfaces again when the first
+  non-UAH merchant scenario becomes real, rather than being rediscovered under time pressure.
+
+**Decision:**
+- Do not build ad-hoc currency conversion as a side effect of some other task. When a real
+  multi-currency need appears, it needs its own domain design pass (exchange rate source,
+  rounding rules, display format per locale, whether `PriceListItem` needs per-currency rows or
+  a conversion layer).
+
+**Next task:** Not scheduled. Revisit when the first non-UAH merchant scenario is real.
+
+**Status:** Open, tracked (not urgent, but must not be dropped from this document).
+
+---
+
+## GAP-013 — Product Fields Phase 2: remaining standard fields not yet registered
+
+**Approved docs:**
+- `02-ATTRIBUTE_DICTIONARY.md`'s Phase 1 seed scope explicitly deferred a Phase 2 list.
+- Cross-referenced against Shopify's real product CSV template and Magento's product
+  attribute/CSV documentation (compiled reference, not reproduced verbatim per copyright — see
+  the comparison table already shared with the project owner).
+
+**Current code:**
+- Phase 1 fields (name, brand, category, description, status, url, sku, gtin, price, RRP,
+  cost_price, availability, color, size) are registered and working (Tasks 1-2, 3B, 3C).
+- Not yet registered as `AttributeDefinition` records: product weight, tax class (deferred, see
+  Decision below), shipping-required flag, inventory backorder policy (see GAP-009's related
+  finding above), image alt text, "Технічні характеристики" and "Інструкція" (long-text,
+  platform_library — see Decision below for readiness-vs-draft framing). Tags is tracked
+  separately under GAP-011 (classification structure), not here, since it needs its own schema
+  (a many-to-many table), not just an `AttributeDefinition` row.
+
+**Impact:**
+- These are ordinary Phase 2 registrations — no architectural blocker, unlike the Category/Type/
+  Tags model (GAP-011) which needs its own schema work first.
+
+**Decision:**
+- Register these via the normal `AttributeDefinition` seeding mechanism already established
+  (Task 1/2), grouped into existing `attribute_group` codes where they fit
+  (`characteristics`, `logistics`, `images_media`, `b2b`) — no new mechanism needed.
+- "Технічні характеристики" and "Інструкція" are **mandatory for B2B-ready/customer-facing
+  publication readiness, not necessarily required at initial draft creation** — consistent with
+  progressive product onboarding (start with a name, enrich later). Do not treat them as
+  skippable nice-to-haves when a product is being prepared for publishing, but also do not make
+  them a hard database-level requirement that blocks creating a draft product row.
+- Tax class and Gift Card flag remain explicitly deferred (not registered now) per product
+  owner decision — revisit only if a real need appears.
+
+**Next task:** Product Fields Phase 2 implementation (schema/seed task, separate from the
+Merchant Category/Standard Category/Merchant Type/Tags structural task in GAP-011).
+
+**Status:** Open, ready to implement (no open architectural questions remaining).
