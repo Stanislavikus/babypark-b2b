@@ -20,10 +20,16 @@ class PriceResolver
         $this->assertPositiveQuantity($quantity);
 
         if ($contractor->default_price_list_id !== null) {
-            $item = $this->matchingListItem($contractor->default_price_list_id, $variant->id, $quantity);
+            $assignedList = PriceList::withoutWorkspaceScope()
+                ->where('id', $contractor->default_price_list_id)
+                ->first();
 
-            if ($item !== null) {
-                return $this->resolvedFromItem($item, 'contractor_price_list');
+            if ($assignedList !== null && $assignedList->status === PriceListStatus::Active) {
+                $item = $this->matchingListItem($assignedList->id, $variant->id, $quantity);
+
+                if ($item !== null) {
+                    return $this->resolvedFromItem($item, 'contractor_price_list');
+                }
             }
         }
 

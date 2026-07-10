@@ -19,6 +19,27 @@ class PriceResolverTest extends TestCase
     use CreatesPricingFixtures;
     use RefreshDatabase;
 
+    public function test_resolve_for_contractor_falls_back_when_assigned_price_list_is_inactive(): void
+    {
+        $contractor = $this->createContractor();
+        $variant = $this->createVariant();
+        $inactiveList = $this->createPriceList(status: PriceListStatus::Inactive);
+        $contractor->update(['default_price_list_id' => $inactiveList->id]);
+        $this->createPriceListItem($inactiveList, $variant, 100.00, 1, null, 20);
+
+        $defaultList = PriceList::withoutWorkspaceScope()
+            ->where('workspace_id', $variant->workspace_id)
+            ->where('is_default', true)
+            ->first();
+
+        $this->createPriceListItem($defaultList, $variant, 55.50);
+
+        $resolved = app(PriceResolver::class)->resolveForContractor($variant, $contractor, 1);
+
+        $this->assertSame(55.5, $resolved->effectiveNetPrice);
+        $this->assertSame('workspace_default_price_list', $resolved->source);
+    }
+
     public function test_resolve_for_contractor_uses_assigned_price_list(): void
     {
         $contractor = $this->createContractor();
