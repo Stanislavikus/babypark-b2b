@@ -2,9 +2,13 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\TagBulkOperation;
+use App\Exceptions\Catalog\InvalidTagBulkSelectionException;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource\Pages;
+use App\Filament\Resources\ProductResource\Support\TagBulkUi;
 use App\Models\Product;
+use App\Models\Tag;
 use App\Services\Catalog\TagManager;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Services\Pricing\ProductPricingSummary;
@@ -13,14 +17,19 @@ use App\Support\ProductFields\AdminProductMargin;
 use App\Support\ProductFields\MarginToggle;
 use App\Support\ProductFields\ProductColumnVisibility;
 use App\Support\ProductTableLink;
+use App\Support\Workspace\WorkspaceContext;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Support\Exceptions\Halt;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
 use Livewire\Livewire;
 use LogicException;
@@ -125,7 +134,7 @@ class ProductResource extends Resource
                     Forms\Components\Group::make([
                         Forms\Components\Placeholder::make('photo_preview')
                             ->label('Фото товару')
-                            ->content(fn (Forms\Get $get, ?Product $record) => new HtmlString(
+                            ->content(fn (Get $get, ?Product $record) => new HtmlString(
                                 $record
                                     ? self::buildPhotoPreviewHtml($record)
                                     : self::buildPhotoPlaceholderHtml()
@@ -488,7 +497,26 @@ class ProductResource extends Resource
                             ->url(static::getUrl('view', ['record' => $record])),
                     ]),
             ])
-            ->bulkActions([]);
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    self::makeTagBulkAction(
+                        operation: TagBulkOperation::Add,
+                        name: 'add_tags',
+                        label: 'Додати теги',
+                        icon: 'heroicon-o-plus-circle',
+                        successTitle: 'Теги додано',
+                        failureTitle: 'Не вдалося додати теги',
+                    ),
+                    self::makeTagBulkAction(
+                        operation: TagBulkOperation::Remove,
+                        name: 'remove_tags',
+                        label: 'Видалити теги',
+                        icon: 'heroicon-o-minus-circle',
+                        successTitle: 'Теги видалено',
+                        failureTitle: 'Не вдалося видалити теги',
+                    ),
+                ]),
+            ]);
     }
 
     // -------------------------------------------------------------------------
@@ -522,6 +550,97 @@ class ProductResource extends Resource
     public static function canDelete($record): bool
     {
         return false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Bulk tag actions
+    // -------------------------------------------------------------------------
+
+    private static function makeTagBulkAction(
+        TagBulkOperation $operation,
+        string $name,
+        string $label,
+        string $icon,
+        string $successTitle,
+        string $failureTitle,
+    ): Tables\Actions\BulkAction {
+        return Tables\Actions\BulkAction::make($name)
+            ->label($label)
+            ->icon($icon)
+            ->form([
+                Forms\Components\Select::make('tag_ids')
+                    ->label('Теги')
+                    ->multiple()
+                    ->required()
+                    ->options(fn (): array => Tag::withoutWorkspaceScope()
+                        ->where('workspace_id', app(WorkspaceContext::class)->id())
+                        ->orderBy('name')
+                        ->pluck('name', 'id')
+                        ->all())
+                    ->searchable()
+                    ->preload()
+                    ->live(),
+                Forms\Components\Placeholder::make('bulk_preview')
+                    ->label('Попередній перегляд')
+                    ->content(function (Get $get, Pages\ListProducts $livewire) use ($operation): string {
+                        $tagIds = $get('tag_ids') ?? [];
+
+                        if ($tagIds === []) {
+                            return 'Оберіть теги для попереднього перегляду.';
+                        }
+
+                        $productIds = $livewire->getSelectedTableRecords()->modelKeys();
+
+                        if ($productIds === []) {
+                            return 'Оберіть товари для попереднього перегляду.';
+                        }
+
+                        try {
+                            $metrics = TagBulkUi::assignmentService()->preview(
+                                app(WorkspaceContext::class)->id(),
+                                $productIds,
+                                $tagIds,
+                                $operation,
+                            );
+
+                            return TagBulkUi::formatPreviewText($metrics);
+                        } catch (InvalidTagBulkSelectionException $exception) {
+                            return $exception->getMessage();
+                        }
+                    })
+                    ->visible(fn (Get $get): bool => filled($get('tag_ids'))),
+            ])
+            ->action(function (Collection $records, array $data, Pages\ListProducts $livewire) use ($operation, $successTitle, $failureTitle): void {
+                $workspaceId = app(WorkspaceContext::class)->id();
+                $productIds = $livewire->getSelectedTableRecords()->modelKeys();
+                $tagIds = $data['tag_ids'] ?? [];
+
+                try {
+                    $metrics = TagBulkUi::assignmentService()->apply(
+                        $workspaceId,
+                        $productIds,
+                        $tagIds,
+                        $operation,
+                    );
+                } catch (InvalidTagBulkSelectionException $exception) {
+                    Notification::make()
+                        ->danger()
+                        ->title($failureTitle)
+                        ->body($exception->getMessage())
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                Notification::make()
+                    ->success()
+                    ->title($successTitle)
+                    ->body(TagBulkUi::formatResultNotification($metrics))
+                    ->send();
+
+                $livewire->deselectAllTableRecords();
+            })
+            ->deselectRecordsAfterCompletion(false);
     }
 
     // -------------------------------------------------------------------------
