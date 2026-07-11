@@ -388,15 +388,22 @@ by itself decide the business threshold, which remains open per this gap.
 
 **Current code:**
 - `categories` table/relationship already exists and is used for storefront navigation — no
-  change needed here. No `Merchant Type` (free-form label) or `Tags` (free-form, multi-value)
-  field exists anywhere on `Product`. No Standard Category / public taxonomy integration exists
-  (correctly — it isn't meant to yet).
+  change needed here. Schema for `Merchant Type` and `Tags` is implemented (Task 5).
+- **Implemented (Task 6A):** `TagResource` (standalone admin CRUD with guarded delete);
+  `Merchant Type` and `Tags` in a dedicated `"Класифікація"` section on `ProductResource`
+  form and infolist; internal admin table columns (`merchant_type`, `tags.name`) and filters;
+  eager loading of `tags` on the product list query; `TagManager` for shared validation across
+  standalone and inline tag creation; atomic locked delete guard preventing silent cascade when
+  a tag is still attached to products.
+- **Still deferred:** Standard Category (tracked alongside GAP-006, unchanged); B2B/cabinet
+  exposure of `merchant_type` or `Tags` (not decided, not built); bulk tag operations
+  (Task 6B, explicitly planned separately).
 
 **Impact:**
-- Products cannot yet be given the free internal organizational label (`Merchant Type`) or
-  filtering tags (`Tags`) the classification model calls for. Merchant/Catalogue `Category`
-  alone is already functional and not blocked by this gap. Standard Category's absence has no
-  MVP impact — it becomes relevant once channel/marketplace export (GAP-006) is actually built.
+- Managers can now assign the free internal organizational label (`Merchant Type`) and
+  filtering tags (`Tags`) on products in the admin panel. Merchant/Catalogue `Category`
+  alone was already functional and is unchanged. Standard Category's absence has no MVP impact
+  — it becomes relevant once channel/marketplace export (GAP-006) is actually built.
 
 **Decision:**
 - Implement `Merchant Type` (nullable string, e.g. `products.merchant_type` — not a generic
@@ -413,9 +420,12 @@ Phase 2 field backlog in GAP-013).
 **Status:** Partially closed in code. Implemented: `products.merchant_type` (nullable string column),
 its column-backed `AttributeDefinition`, `tags` table, `product_tag` pivot with `workspace_id`
 consistency enforcement (Eloquent `ProductTag` pivot guard + MySQL composite foreign keys),
-`Tag` model, and `Product`/`Tag` `belongsToMany` relations. Standard Category remains explicitly
-deferred/tracked alongside GAP-006 — this GAP is not fully closed until that future concept is
-built.
+`Tag` model, and `Product`/`Tag` `belongsToMany` relations; admin UI for assigning
+`Merchant Type` and `Tags` to products (`ProductResource` `"Класифікація"` section, table columns,
+filters, eager loading); standalone `TagResource` with guarded delete via `TagManager`.
+Standard Category remains explicitly deferred/tracked alongside GAP-006 — this GAP is not fully
+closed until that future concept is built. B2B/cabinet exposure and bulk tag operations remain
+open (Task 6B).
 
 ---
 

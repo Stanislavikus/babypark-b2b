@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource\Pages;
 use App\Models\Product;
+use App\Services\Catalog\TagManager;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Services\Pricing\ProductPricingSummary;
 use App\Support\AdminAvailabilityPresenter;
@@ -22,6 +23,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Livewire\Livewire;
+use LogicException;
 
 class ProductResource extends Resource
 {
@@ -65,6 +67,41 @@ class ProductResource extends Resource
                         ->content(fn (?Product $record): string => $record
                             ? (app(ProductPricingSummary::class)->formatCostPrice($record) ?? '—')
                             : '—'),
+                ])->columns(2),
+
+                Forms\Components\Section::make('Класифікація')->schema([
+                    Forms\Components\TextInput::make('merchant_type')
+                        ->label('Внутрішній тип товару')
+                        ->maxLength(255)
+                        ->datalist(fn (): array => Product::query()
+                            ->distinct()
+                            ->orderBy('merchant_type')
+                            ->whereNotNull('merchant_type')
+                            ->where('merchant_type', '!=', '')
+                            ->pluck('merchant_type')
+                            ->all())
+                        ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? trim($state) : null),
+                    Forms\Components\Select::make('tags')
+                        ->label('Теги')
+                        ->multiple()
+                        ->relationship(titleAttribute: 'name')
+                        ->createOptionForm([
+                            Forms\Components\TextInput::make('name')
+                                ->label('Назва')
+                                ->required()
+                                ->maxLength(255),
+                        ])
+                        ->createOptionUsing(function (array $data, ?Product $record): string {
+                            if ($record === null) {
+                                throw new LogicException('A persisted Product is required for inline tag creation.');
+                            }
+
+                            return app(TagManager::class)
+                                ->create($record->workspace_id, $data['name'])
+                                ->getKey();
+                        })
+                        ->preload()
+                        ->searchable(),
                 ])->columns(2),
 
                 Forms\Components\Section::make('Сайт')->schema([
@@ -143,6 +180,16 @@ class ProductResource extends Resource
                         ->getStateUsing(fn (Product $record): string => $record->is_active ? 'Активний' : 'Неактивний')
                         ->badge()
                         ->color(fn (string $state): string => $state === 'Активний' ? 'success' : 'gray'),
+                ])->columns(2),
+
+                Infolists\Components\Section::make('Класифікація')->schema([
+                    Infolists\Components\TextEntry::make('merchant_type')
+                        ->label('Внутрішній тип товару')
+                        ->placeholder('—'),
+                    Infolists\Components\TextEntry::make('tags.name')
+                        ->label('Теги')
+                        ->badge()
+                        ->placeholder('—'),
                 ])->columns(2),
 
                 Infolists\Components\Section::make('Сайт')->schema([
@@ -331,6 +378,18 @@ class ProductResource extends Resource
                     ->tooltip(fn (?string $state) => $state)
                     ->disableClick()
                     ->toggleable(in_array('url', $toggleable), isToggledHiddenByDefault: true),
+
+                Tables\Columns\TextColumn::make('merchant_type')
+                    ->label('Внутрішній тип товару')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('—')
+                    ->toggleable(in_array('merchant_type', $toggleable), isToggledHiddenByDefault: true),
+
+                Tables\Columns\TextColumn::make('tags.name')
+                    ->label('Теги')
+                    ->placeholder('—')
+                    ->toggleable(in_array('tags', $toggleable), isToggledHiddenByDefault: true),
             ])
             ->defaultSort('sku')
             ->toggleColumnsTriggerAction(
@@ -398,6 +457,24 @@ class ProductResource extends Resource
                             default => $query,
                         };
                     }),
+
+                Tables\Filters\SelectFilter::make('tags')
+                    ->label('Теги')
+                    ->relationship('tags', 'name')
+                    ->multiple()
+                    ->searchable()
+                    ->preload(),
+
+                Tables\Filters\SelectFilter::make('merchant_type')
+                    ->label('Внутрішній тип товару')
+                    ->options(fn (): array => Product::query()
+                        ->distinct()
+                        ->orderBy('merchant_type')
+                        ->whereNotNull('merchant_type')
+                        ->where('merchant_type', '!=', '')
+                        ->pluck('merchant_type', 'merchant_type')
+                        ->toArray())
+                    ->multiple(),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make()
@@ -421,7 +498,7 @@ class ProductResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['variants.stocks', 'category']);
+            ->with(['variants.stocks', 'category', 'tags']);
     }
 
     // -------------------------------------------------------------------------

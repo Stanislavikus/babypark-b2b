@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\Workspace\BelongsToWorkspace;
+use App\Support\Workspace\WorkspaceContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -82,6 +83,11 @@ class Product extends Model
         return $this->belongsToMany(Tag::class)
             ->using(ProductTag::class)
             ->withPivot('workspace_id')
-            ->withPivotValue('workspace_id', $this->workspace_id);
+            ->withPivotValue('workspace_id', $this->relationWorkspaceId());
+    }
+
+    private function relationWorkspaceId(): string
+    {
+        return (string) ($this->getAttribute('workspace_id') ?? app(WorkspaceContext::class)->id());
     }
 }
