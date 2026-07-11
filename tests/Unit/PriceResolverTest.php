@@ -53,6 +53,10 @@ class PriceResolverTest extends TestCase
         $this->assertSame(100.0, $resolved->effectiveNetPrice);
         $this->assertSame(120.0, $resolved->grossPrice);
         $this->assertSame('contractor_price_list', $resolved->source);
+        $this->assertSame($list->id, $resolved->sourcePriceListId);
+        $this->assertNotNull($resolved->sourcePriceListItemId);
+        $this->assertSame(120.0, $resolved->regularGrossPrice);
+        $this->assertFalse($resolved->isOnSale);
     }
 
     public function test_sale_price_overrides_regular_net_price(): void
@@ -69,6 +73,8 @@ class PriceResolverTest extends TestCase
         $this->assertSame(80.0, $resolved->salePrice);
         $this->assertSame(80.0, $resolved->effectiveNetPrice);
         $this->assertSame(96.0, $resolved->grossPrice);
+        $this->assertTrue($resolved->isOnSale);
+        $this->assertSame(120.0, $resolved->regularGrossPrice);
     }
 
     public function test_resolve_default_falls_back_to_workspace_default_list(): void
@@ -95,6 +101,9 @@ class PriceResolverTest extends TestCase
 
         $this->assertSame(42.0, $resolved->effectiveNetPrice);
         $this->assertSame('base_price_cache', $resolved->source);
+        $this->assertNull($resolved->sourcePriceListId);
+        $this->assertNull($resolved->sourcePriceListItemId);
+        $this->assertFalse($resolved->isOnSale);
     }
 
     public function test_rejects_non_positive_quantity(): void

@@ -12,6 +12,10 @@ readonly class ResolvedPrice
         public float $grossPrice,
         public string $currency,
         public string $source,
+        public ?string $sourcePriceListId,
+        public ?string $sourcePriceListItemId,
+        public float $regularGrossPrice,
+        public bool $isOnSale,
     ) {}
 
     public static function fromListItem(
@@ -20,10 +24,14 @@ readonly class ResolvedPrice
         ?float $vatRate,
         string $currency,
         string $source,
+        string $sourcePriceListId,
+        string $sourcePriceListItemId,
     ): self {
         $resolvedVatRate = $vatRate ?? (float) config('pricing.default_vat_rate', 20);
         $effectiveNetPrice = $salePrice ?? $regularNetPrice;
         $grossPrice = round($effectiveNetPrice * (1 + $resolvedVatRate / 100), 2);
+        $regularGrossPrice = round($regularNetPrice * (1 + $resolvedVatRate / 100), 2);
+        $isOnSale = $salePrice !== null && $salePrice < $regularNetPrice;
 
         return new self(
             regularNetPrice: $regularNetPrice,
@@ -33,6 +41,10 @@ readonly class ResolvedPrice
             grossPrice: $grossPrice,
             currency: $currency,
             source: $source,
+            sourcePriceListId: $sourcePriceListId,
+            sourcePriceListItemId: $sourcePriceListItemId,
+            regularGrossPrice: $regularGrossPrice,
+            isOnSale: $isOnSale,
         );
     }
 
@@ -42,6 +54,7 @@ readonly class ResolvedPrice
     ): self {
         $vatRate = (float) config('pricing.default_vat_rate', 20);
         $grossPrice = round($baseNetPrice * (1 + $vatRate / 100), 2);
+        $regularGrossPrice = $grossPrice;
 
         return new self(
             regularNetPrice: $baseNetPrice,
@@ -51,6 +64,10 @@ readonly class ResolvedPrice
             grossPrice: $grossPrice,
             currency: $currency,
             source: 'base_price_cache',
+            sourcePriceListId: null,
+            sourcePriceListItemId: null,
+            regularGrossPrice: $regularGrossPrice,
+            isOnSale: false,
         );
     }
 }

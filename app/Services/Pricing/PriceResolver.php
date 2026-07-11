@@ -120,6 +120,8 @@ class PriceResolver
             vatRate: $item->vat_rate !== null ? (float) $item->vat_rate : null,
             currency: $currency,
             source: $source,
+            sourcePriceListId: $item->price_list_id,
+            sourcePriceListItemId: $item->id,
         );
     }
 

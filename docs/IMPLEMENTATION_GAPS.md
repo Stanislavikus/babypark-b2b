@@ -494,3 +494,38 @@ remain explicitly deferred (unchanged). `image_alt_text` remains deferred to fut
 (unchanged). `backorder_policy` registration does not change `AvailabilityResolver` behavior and
 does not close GAP-009. Publication-readiness enforcement for `technical_characteristics` and
 `instructions` remains the future responsibility of `B2BPublicationChecker` (not yet built).
+
+---
+
+## GAP-014 — `sale_price >= regular price` data-integrity gap on non-Filament write paths
+
+**Approved docs:**
+- `03-DOMAIN_MODEL.md`, VAT handling in `PriceListItem` (**Resolved**): `effective_net_price`
+  is the actual net price used for charge/display calculations — `PriceListItem.sale_price`
+  overrides `PriceListItem.price` when present; otherwise the regular tier price is used.
+
+**Current code:**
+- `ResolvedPrice::fromListItem()` uses any non-null `sale_price` as `effectiveNetPrice`,
+  regardless of whether it is lower than the regular `price`. Filament's admin form prevents
+  entering `sale_price >= price` via `->lt('price')`, but non-Filament write paths (e.g. a
+  future import/connector) can still persist such values.
+- Task 3D-2B adds `isOnSale` metadata (`salePrice < regularNetPrice`) that correctly reports
+  `false` for this data-error case, but does **not** change `effectiveNetPrice`/`grossPrice`
+  algorithm behavior — that remains a separate pricing-integrity concern.
+
+**Impact:**
+- A `sale_price` that is not actually lower than the regular price could still be charged as the
+  effective price, while provenance metadata would correctly show the item is not "on sale."
+  Future admin tooling that shows struck-through regular vs effective prices must not assume
+  `isOnSale` and `effectiveNetPrice` are always consistent until this gap is closed.
+
+**Decision:**
+- Do not silently alter `PriceResolver`'s effective-price selection in metadata-only work.
+- When a real non-Filament write path exists (import/connector), add validation or normalization
+  there, and/or teach `PriceResolver` to ignore non-discount `sale_price` values — as an explicit
+  pricing-integrity task, not as a side effect of provenance metadata.
+
+**Next task:** Pricing integrity pass — scheduled when import/connector write paths for
+`PriceListItem` are built, or when product requirements demand stricter sale-price enforcement.
+
+**Status:** Open, tracked.

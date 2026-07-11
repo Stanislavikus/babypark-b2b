@@ -14,6 +14,10 @@ readonly class VariantPriceDisplay
         public ?float $recommendedRetailPrice,
         public string $currency,
         public string $source,
+        public ?string $sourcePriceListId,
+        public ?string $sourcePriceListItemId,
+        public float $regularGrossPrice,
+        public bool $isOnSale,
     ) {}
 
     public static function fromResolved(ResolvedPrice $resolved, ?float $recommendedRetailPrice = null): self
@@ -26,6 +30,10 @@ readonly class VariantPriceDisplay
             recommendedRetailPrice: $recommendedRetailPrice,
             currency: $resolved->currency,
             source: $resolved->source,
+            sourcePriceListId: $resolved->sourcePriceListId,
+            sourcePriceListItemId: $resolved->sourcePriceListItemId,
+            regularGrossPrice: $resolved->regularGrossPrice,
+            isOnSale: $resolved->isOnSale,
         );
     }
 
@@ -39,6 +47,10 @@ readonly class VariantPriceDisplay
             recommendedRetailPrice: null,
             currency: (string) config('pricing.default_currency', 'UAH'),
             source: 'unavailable',
+            sourcePriceListId: null,
+            sourcePriceListItemId: null,
+            regularGrossPrice: 0.0,
+            isOnSale: false,
         );
     }
 
