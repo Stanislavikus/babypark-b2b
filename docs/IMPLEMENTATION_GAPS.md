@@ -396,8 +396,16 @@ by itself decide the business threshold, which remains open per this gap.
   standalone and inline tag creation; atomic locked delete guard preventing silent cascade when
   a tag is still attached to products.
 - **Still deferred:** Standard Category (tracked alongside GAP-006, unchanged); B2B/cabinet
-  exposure of `merchant_type` or `Tags` (not decided, not built); bulk tag operations
-  (Task 6B, explicitly planned separately).
+  exposure of `merchant_type` or `Tags` (not decided, not built).
+
+**Implemented (as of Task 6B):**
+- Bulk "Додати теги" and "Видалити теги" operations, with preview/apply metrics distinguishing
+  products from links.
+- Selected-rows and all-matching-filter support for bulk tag operations.
+
+**Still deferred:**
+- Standard Category (tracked alongside GAP-006, unchanged).
+- B2B/cabinet exposure of Merchant Type/Tags (not decided, not built).
 
 **Impact:**
 - Managers can now assign the free internal organizational label (`Merchant Type`) and
@@ -422,10 +430,10 @@ its column-backed `AttributeDefinition`, `tags` table, `product_tag` pivot with 
 consistency enforcement (Eloquent `ProductTag` pivot guard + MySQL composite foreign keys),
 `Tag` model, and `Product`/`Tag` `belongsToMany` relations; admin UI for assigning
 `Merchant Type` and `Tags` to products (`ProductResource` `"Класифікація"` section, table columns,
-filters, eager loading); standalone `TagResource` with guarded delete via `TagManager`.
+filters, eager loading); standalone `TagResource` with guarded delete via `TagManager`;
+bulk add/remove tag operations with preview/apply metrics (`TagBulkAssignmentService`).
 Standard Category remains explicitly deferred/tracked alongside GAP-006 — this GAP is not fully
-closed until that future concept is built. B2B/cabinet exposure and bulk tag operations remain
-open (Task 6B).
+closed until that future concept is built. B2B/cabinet exposure remains open.
 
 ---
 
@@ -539,3 +547,30 @@ does not close GAP-009. Publication-readiness enforcement for `technical_charact
 `PriceListItem` are built, or when product requirements demand stricter sale-price enforcement.
 
 **Status:** Open, tracked.
+
+---
+
+## GAP-015 — Bulk tag operations have no undo/operation history
+
+**Approved docs:** Task 6B implements bulk add/remove tag operations with an accurate
+pre-application preview (per-product and per-link counts), which substantially reduces the risk
+of an unintended bulk change — but this is prevention, not recovery.
+
+**Current code:** No activity-log/audit package exists in this project (confirmed absent from
+`composer.json`). Bulk tag operations have no way to be reversed after the fact beyond a manual,
+mirror-image bulk operation performed by hand.
+
+**Impact:** A genuine "undo my last bulk tag operation" capability requires storing the exact
+pivot delta per operation (which specific product-tag links were actually added/removed, not
+just the operation's inputs), an operation identifier, a retention policy, and a restore UI —
+this is real, additional scope, not a simple flag to add later.
+
+**Decision:** Do not build a partial/fake undo (e.g. "just re-run the opposite operation" is not
+equivalent to a true undo, since it would also affect any links that existed before the original
+operation for unrelated reasons). When this is prioritized, design it as its own feature — likely
+alongside introducing a proper activity-log foundation for the platform generally, not just for
+tags.
+
+**Next task:** Not scheduled.
+
+**Status:** Open, low urgency (mitigated in practice by the accurate preview from Task 6B).
