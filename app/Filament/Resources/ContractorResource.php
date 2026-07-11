@@ -3,17 +3,27 @@
 namespace App\Filament\Resources;
 
 use App\Enums\UserRole;
+use App\Exceptions\Pricing\InvalidContractorBatchException;
+use App\Exceptions\Pricing\InvalidPriceListAssignmentException;
 use App\Filament\Resources\ContractorResource\Pages;
 use App\Filament\Resources\ContractorResource\RelationManagers;
+use App\Filament\Resources\ContractorResource\Support\ContractorPriceListUi;
 use App\Models\Contractor;
+use App\Models\PriceList;
 use App\Models\User;
+use App\Services\Pricing\ContractorPriceListAssignmentDisplayState;
+use App\Support\Workspace\WorkspaceContext;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Support\Exceptions\Halt;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection;
 
 class ContractorResource extends Resource
 {
@@ -118,6 +128,80 @@ class ContractorResource extends Resource
                         ->numeric()
                         ->prefix('₴'),
                 ])->columns(3),
+                Forms\Components\Section::make('Ціни')->schema([
+                    Forms\Components\Select::make('default_price_list_id')
+                        ->label('Прайс-лист')
+                        ->options(fn (Contractor $record): array => ContractorPriceListUi::assignmentService()
+                            ->selectableOptions($record->workspace_id))
+                        ->getOptionLabelUsing(function (?string $value, Contractor $record): ?string {
+                            if ($value === null || $value === '') {
+                                return 'За замовчуванням (використовується основний прайс-лист компанії)';
+                            }
+
+                            $previewRecord = clone $record;
+                            $previewRecord->default_price_list_id = $value;
+                            $display = ContractorPriceListUi::resolveDisplay($previewRecord);
+
+                            return $display->historicalSelectLabel()
+                                ?? PriceList::withoutWorkspaceScope()->find($value)?->name;
+                        })
+                        ->placeholder('За замовчуванням (використовується основний прайс-лист компанії)')
+                        ->native(false)
+                        ->searchable()
+                        ->live()
+                        ->helperText(fn (Get $get, Contractor $record): string => ContractorPriceListUi::resolveDisplay($record)
+                            ->formHelperText($get('default_price_list_id')))
+                        ->rules([
+                            fn (Contractor $record): \Closure => function (string $attribute, mixed $value, \Closure $fail) use ($record): void {
+                                $originalTargetId = $record->getOriginal('default_price_list_id');
+                                $submittedTargetId = $value === '' ? null : $value;
+
+                                if ($submittedTargetId === $originalTargetId) {
+                                    return;
+                                }
+
+                                try {
+                                    ContractorPriceListUi::assignmentService()
+                                        ->validateTarget($record->workspace_id, $submittedTargetId);
+                                } catch (InvalidPriceListAssignmentException $exception) {
+                                    $fail($exception->getMessage());
+                                }
+                            },
+                        ]),
+                    Forms\Components\Placeholder::make('price_list_warning')
+                        ->label('')
+                        ->content(function (Get $get, Contractor $record): ?string {
+                            $selected = $get('default_price_list_id');
+
+                            if ($selected === null || $selected === '') {
+                                return null;
+                            }
+
+                            $previewRecord = clone $record;
+                            $previewRecord->default_price_list_id = $selected;
+
+                            return ContractorPriceListUi::resolveDisplay($previewRecord)->formWarning();
+                        })
+                        ->visible(function (Get $get, Contractor $record): bool {
+                            $selected = $get('default_price_list_id');
+
+                            if ($selected === null || $selected === '') {
+                                return false;
+                            }
+
+                            $previewRecord = clone $record;
+                            $previewRecord->default_price_list_id = $selected;
+
+                            return in_array(
+                                ContractorPriceListUi::resolveDisplay($previewRecord)->state,
+                                [
+                                    ContractorPriceListAssignmentDisplayState::InactiveHistorical,
+                                    ContractorPriceListAssignmentDisplayState::RedundantDirect,
+                                ],
+                                true,
+                            );
+                        }),
+                ]),
             ]);
     }
 
@@ -154,12 +238,23 @@ class ContractorResource extends Resource
                         ->state(fn (Contractor $record): float => max(0, (float) $record->credit_limit - (float) $record->current_debt))
                         ->money('UAH'),
                 ])->columns(2),
+                Infolists\Components\Section::make('Ціни')->schema([
+                    Infolists\Components\TextEntry::make('price_list_assignment')
+                        ->label('Прайс-лист')
+                        ->state(fn (Contractor $record): string => ContractorPriceListUi::resolveDisplay($record)->infolistLabel()),
+                    Infolists\Components\TextEntry::make('price_list_assignment_description')
+                        ->label('')
+                        ->state(fn (Contractor $record): ?string => ContractorPriceListUi::resolveDisplay($record)->infolistDescription())
+                        ->placeholder('—')
+                        ->color('gray'),
+                ]),
             ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with('defaultPriceList'))
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->label('Назва')
@@ -185,6 +280,15 @@ class ContractorResource extends Resource
                     ->label('Відстрочка')
                     ->suffix(' дн.')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('default_price_list_id')
+                    ->label('Прайс-лист')
+                    ->state(fn (Contractor $record): string => ContractorPriceListUi::resolveDisplay($record)->tableLabel())
+                    ->description(fn (Contractor $record): ?string => ContractorPriceListUi::resolveDisplay($record)->tableDescription())
+                    ->color(fn (Contractor $record): string => match (ContractorPriceListUi::resolveDisplay($record)->state) {
+                        ContractorPriceListAssignmentDisplayState::InactiveHistorical,
+                        ContractorPriceListAssignmentDisplayState::RedundantDirect => 'warning',
+                        default => 'gray',
+                    }),
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Активний')
                     ->boolean(),
@@ -202,7 +306,77 @@ class ContractorResource extends Resource
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
             ])
-            ->bulkActions([]);
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\BulkAction::make('assign_price_list')
+                        ->label('Призначити прайс-лист')
+                        ->icon('heroicon-o-currency-dollar')
+                        ->form([
+                            Forms\Components\Select::make('target_price_list_id')
+                                ->label('Прайс-лист')
+                                ->options(fn (): array => ContractorPriceListUi::assignmentService()
+                                    ->bulkSelectableOptions(app(WorkspaceContext::class)->id()))
+                                ->required()
+                                ->native(false)
+                                ->searchable()
+                                ->live(),
+                            Forms\Components\Placeholder::make('assignment_preview')
+                                ->label('Попередній перегляд')
+                                ->content(function (Get $get, Pages\ListContractors $livewire): string {
+                                    $sentinel = $get('target_price_list_id');
+
+                                    if (blank($sentinel)) {
+                                        return 'Оберіть прайс-лист для попереднього перегляду.';
+                                    }
+
+                                    $workspaceId = app(WorkspaceContext::class)->id();
+                                    $service = ContractorPriceListUi::assignmentService();
+                                    $targetId = $service->resolveTargetFromSentinel($sentinel);
+                                    $contractorIds = $livewire->selectedTableRecords;
+
+                                    if ($contractorIds === []) {
+                                        return '—';
+                                    }
+
+                                    try {
+                                        $preview = $service->preview($workspaceId, $contractorIds, $targetId);
+
+                                        return ContractorPriceListUi::formatPreviewText($preview, $targetId);
+                                    } catch (InvalidPriceListAssignmentException|InvalidContractorBatchException $exception) {
+                                        return $exception->getMessage();
+                                    }
+                                })
+                                ->visible(fn (Get $get): bool => filled($get('target_price_list_id'))),
+                        ])
+                        ->action(function (Collection $records, array $data, Pages\ListContractors $livewire): void {
+                            $workspaceId = app(WorkspaceContext::class)->id();
+                            $service = ContractorPriceListUi::assignmentService();
+                            $targetId = $service->resolveTargetFromSentinel($data['target_price_list_id'] ?? null);
+                            $contractorIds = $records->pluck('id')->all();
+
+                            try {
+                                $result = $service->apply($workspaceId, $contractorIds, $targetId);
+                            } catch (InvalidPriceListAssignmentException|InvalidContractorBatchException $exception) {
+                                Notification::make()
+                                    ->danger()
+                                    ->title('Не вдалося призначити прайс-лист')
+                                    ->body($exception->getMessage())
+                                    ->send();
+
+                                throw new Halt;
+                            }
+
+                            Notification::make()
+                                ->success()
+                                ->title('Прайс-лист призначено')
+                                ->body(ContractorPriceListUi::formatResultNotification($result, $targetId))
+                                ->send();
+
+                            $livewire->deselectAllTableRecords();
+                        })
+                        ->deselectRecordsAfterCompletion(false),
+                ]),
+            ]);
     }
 
     public static function getRelations(): array
