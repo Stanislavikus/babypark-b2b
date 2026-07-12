@@ -3,7 +3,7 @@
 namespace Tests\Feature;
 
 use App\Livewire\Cabinet\Catalog;
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Reservation;
@@ -18,11 +18,11 @@ class CatalogReserveTest extends TestCase
     use CreatesAvailabilityFixtures;
     use RefreshDatabase;
 
-    private function createContractor(): Contractor
+    private function createCustomer(): Customer
     {
-        return Contractor::query()->create([
+        return Customer::query()->create([
             'onec_guid' => (string) Str::uuid(),
-            'name' => 'Catalog Contractor',
+            'name' => 'Catalog Customer',
             'short_name' => 'CC',
             'login' => 'catalog-'.Str::random(6),
             'password' => 'password',
@@ -37,7 +37,7 @@ class CatalogReserveTest extends TestCase
             'availability.reservation_ttl_minutes' => 15,
         ]);
 
-        $contractor = $this->createContractor();
+        $customer = $this->createCustomer();
 
         $product = Product::create([
             'workspace_id' => $this->defaultWorkspace()->id,
@@ -59,7 +59,7 @@ class CatalogReserveTest extends TestCase
 
         $before = now();
 
-        Livewire::actingAs($contractor, 'contractor')
+        Livewire::actingAs($customer, 'customer')
             ->test(Catalog::class)
             ->call('reserve', $variant->id, 1);
 

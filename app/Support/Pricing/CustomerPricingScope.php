@@ -3,31 +3,31 @@
 namespace App\Support\Pricing;
 
 use App\Enums\PriceListStatus;
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\PriceList;
 use Illuminate\Database\Eloquent\Builder;
 
-class ContractorPricingScope
+class CustomerPricingScope
 {
-    public static function priceListIdFor(Contractor $contractor): ?string
+    public static function priceListIdFor(Customer $customer): ?string
     {
-        if ($contractor->default_price_list_id !== null) {
-            return $contractor->default_price_list_id;
+        if ($customer->default_price_list_id !== null) {
+            return $customer->default_price_list_id;
         }
 
         return PriceList::withoutWorkspaceScope()
-            ->where('workspace_id', $contractor->workspace_id)
+            ->where('workspace_id', $customer->workspace_id)
             ->where('is_default', true)
             ->where('status', PriceListStatus::Active)
             ->value('id');
     }
 
     /**
-     * Products with at least one active variant that has a resolvable price for the contractor.
+     * Products with at least one active variant that has a resolvable price for the customer.
      */
-    public static function applyProductScope(Builder $query, Contractor $contractor): Builder
+    public static function applyProductScope(Builder $query, Customer $customer): Builder
     {
-        $priceListId = self::priceListIdFor($contractor);
+        $priceListId = self::priceListIdFor($customer);
 
         return $query->whereHas('variants', function (Builder $variantQuery) use ($priceListId): void {
             $variantQuery
@@ -53,7 +53,7 @@ class ContractorPricingScope
         });
     }
 
-    public static function eagerLoadForContractor(Contractor $contractor): array
+    public static function eagerLoadForCustomer(Customer $customer): array
     {
         return [
             'category',

@@ -3,29 +3,29 @@
 namespace Tests\Unit;
 
 use App\Enums\PriceListStatus;
-use App\Exceptions\Pricing\InvalidContractorBatchException;
+use App\Exceptions\Pricing\InvalidCustomerBatchException;
 use App\Exceptions\Pricing\InvalidPriceListAssignmentException;
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\PriceList;
 use App\Models\Workspace;
-use App\Services\Pricing\ContractorPriceListAssignmentService;
+use App\Services\Pricing\CustomerPriceListAssignmentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\Concerns\CreatesPricingFixtures;
 use Tests\TestCase;
 
-class ContractorPriceListAssignmentServiceTest extends TestCase
+class CustomerPriceListAssignmentServiceTest extends TestCase
 {
     use CreatesPricingFixtures;
     use RefreshDatabase;
 
-    private ContractorPriceListAssignmentService $service;
+    private CustomerPriceListAssignmentService $service;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->service = app(ContractorPriceListAssignmentService::class);
+        $this->service = app(CustomerPriceListAssignmentService::class);
     }
 
     public function test_validate_target_rejects_missing_inactive_and_workspace_default(): void
@@ -89,16 +89,16 @@ class ContractorPriceListAssignmentServiceTest extends TestCase
         $target = $this->createPriceList($workspace, isDefault: false);
         $other = $this->createPriceList($workspace, isDefault: false);
 
-        $unchanged = $this->createContractor($workspace);
+        $unchanged = $this->createCustomer($workspace);
         $unchanged->update(['default_price_list_id' => $target->id]);
 
-        $replace = $this->createContractor($workspace);
+        $replace = $this->createCustomer($workspace);
         $replace->update(['default_price_list_id' => $other->id]);
 
-        $clear = $this->createContractor($workspace);
+        $clear = $this->createCustomer($workspace);
         $clear->update(['default_price_list_id' => $other->id]);
 
-        $alreadyDefault = $this->createContractor($workspace);
+        $alreadyDefault = $this->createCustomer($workspace);
         $alreadyDefault->update(['default_price_list_id' => null]);
 
         $preview = $this->service->preview(
@@ -126,20 +126,20 @@ class ContractorPriceListAssignmentServiceTest extends TestCase
         $this->assertSame(0, $assignPreview->clearedCount);
     }
 
-    public function test_preview_throws_for_missing_or_cross_workspace_contractor(): void
+    public function test_preview_throws_for_missing_or_cross_workspace_customer(): void
     {
         $workspace = $this->defaultWorkspace();
         $target = $this->createPriceList($workspace, isDefault: false);
-        $contractor = $this->createContractor($workspace);
+        $customer = $this->createCustomer($workspace);
 
         $otherWorkspace = Workspace::query()->create([
             'name' => 'Foreign',
             'is_default' => false,
         ]);
-        $foreignContractor = Contractor::withoutWorkspaceScope()->create([
+        $foreignCustomer = Customer::withoutWorkspaceScope()->create([
             'workspace_id' => $otherWorkspace->id,
             'onec_guid' => (string) Str::uuid(),
-            'name' => 'Foreign Contractor',
+            'name' => 'Foreign Customer',
             'login' => 'foreign-'.Str::random(6),
             'password' => 'password',
             'is_active' => true,
@@ -147,19 +147,19 @@ class ContractorPriceListAssignmentServiceTest extends TestCase
 
         try {
             $this->service->preview($workspace->id, [999999], $target->id);
-            $this->fail('Expected missing contractor exception.');
-        } catch (InvalidContractorBatchException $exception) {
-            $this->assertSame(InvalidContractorBatchException::REASON_NOT_FOUND, $exception->reason);
+            $this->fail('Expected missing customer exception.');
+        } catch (InvalidCustomerBatchException $exception) {
+            $this->assertSame(InvalidCustomerBatchException::REASON_NOT_FOUND, $exception->reason);
         }
 
         try {
-            $this->service->preview($workspace->id, [$foreignContractor->id], $target->id);
-            $this->fail('Expected cross-workspace contractor exception.');
-        } catch (InvalidContractorBatchException $exception) {
-            $this->assertSame(InvalidContractorBatchException::REASON_CROSS_WORKSPACE, $exception->reason);
+            $this->service->preview($workspace->id, [$foreignCustomer->id], $target->id);
+            $this->fail('Expected cross-workspace customer exception.');
+        } catch (InvalidCustomerBatchException $exception) {
+            $this->assertSame(InvalidCustomerBatchException::REASON_CROSS_WORKSPACE, $exception->reason);
         }
 
-        $this->assertSame($contractor->id, $contractor->fresh()->id);
+        $this->assertSame($customer->id, $customer->fresh()->id);
     }
 
     public function test_apply_updates_only_changed_records_in_transaction(): void
@@ -168,10 +168,10 @@ class ContractorPriceListAssignmentServiceTest extends TestCase
         $target = $this->createPriceList($workspace, isDefault: false);
         $other = $this->createPriceList($workspace, isDefault: false);
 
-        $unchanged = $this->createContractor($workspace);
+        $unchanged = $this->createCustomer($workspace);
         $unchanged->update(['default_price_list_id' => $target->id]);
 
-        $replace = $this->createContractor($workspace);
+        $replace = $this->createCustomer($workspace);
         $replace->update(['default_price_list_id' => $other->id]);
 
         $result = $this->service->apply(

@@ -33,9 +33,9 @@ class OrderResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Замовлення')->schema([
-                    Forms\Components\Select::make('contractor_id')
-                        ->label('Контрагент')
-                        ->relationship('contractor', 'name')
+                    Forms\Components\Select::make('customer_id')
+                        ->label('Клієнт')
+                        ->relationship('customer', 'name')
                         ->disabled(),
                     Forms\Components\TextInput::make('onec_number')
                         ->label('№ 1С')
@@ -70,8 +70,8 @@ class OrderResource extends Resource
                 Tables\Columns\TextColumn::make('id')
                     ->label('#')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('contractor.name')
-                    ->label('Контрагент')
+                Tables\Columns\TextColumn::make('customer.name')
+                    ->label('Клієнт')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
@@ -95,9 +95,9 @@ class OrderResource extends Resource
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Статус')
                     ->options(OrderStatus::options()),
-                Tables\Filters\SelectFilter::make('contractor_id')
-                    ->label('Контрагент')
-                    ->relationship('contractor', 'name')
+                Tables\Filters\SelectFilter::make('customer_id')
+                    ->label('Клієнт')
+                    ->relationship('customer', 'name')
                     ->searchable()
                     ->preload(),
                 Filter::make('created_at')

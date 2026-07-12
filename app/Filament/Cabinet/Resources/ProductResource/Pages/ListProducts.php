@@ -57,12 +57,12 @@ class ListProducts extends ListRecords
 
     public function reserve(int $variantId, int $minQty): void
     {
-        $contractor = auth('contractor')->user();
+        $customer = auth('customer')->user();
         $qty = max($minQty, (int) ($this->quantities[$variantId] ?? 0));
 
         $variant = ProductVariant::query()->findOrFail($variantId);
 
-        app(ReservationCreator::class)->create($variant, $qty, contractor: $contractor);
+        app(ReservationCreator::class)->create($variant, $qty, customer: $customer);
 
         Notification::make()
             ->title('Бронювання створено')

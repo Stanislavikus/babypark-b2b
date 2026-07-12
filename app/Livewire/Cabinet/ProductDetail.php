@@ -26,13 +26,13 @@ class ProductDetail extends Component
 
     public function mount(Product $product): void
     {
-        $contractor = Auth::guard('contractor')->user();
+        $customer = Auth::guard('customer')->user();
         $summary = app(ProductPricingSummary::class);
 
         $hasPricing = $product->variants()
             ->where('is_active', true)
             ->get()
-            ->contains(fn ($variant) => $summary->variantHasResolvablePrice($variant, $contractor));
+            ->contains(fn ($variant) => $summary->variantHasResolvablePrice($variant, $customer));
 
         if (! $hasPricing) {
             abort(404);
@@ -47,7 +47,7 @@ class ProductDetail extends Component
         $resolver = app(AvailabilityResolver::class);
 
         foreach ($this->product->variants->where('is_active', true) as $variant) {
-            $priceDisplay = $summary->tryResolveVariantDisplay($variant, $contractor);
+            $priceDisplay = $summary->tryResolveVariantDisplay($variant, $customer);
 
             if ($priceDisplay === null) {
                 continue;
@@ -95,7 +95,7 @@ class ProductDetail extends Component
     public function render()
     {
         return view('livewire.cabinet.product-detail', [
-            'contractor' => Auth::guard('contractor')->user(),
+            'customer' => Auth::guard('customer')->user(),
         ]);
     }
 }

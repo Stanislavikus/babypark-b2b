@@ -7,7 +7,7 @@ use App\Enums\PriceListStatus;
 use App\Exceptions\Pricing\InvalidPriceQuantityException;
 use App\Exceptions\Pricing\PriceListConfigurationException;
 use App\Exceptions\Pricing\PriceNotAvailableException;
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\ProductVariant;
@@ -15,20 +15,20 @@ use Illuminate\Support\Carbon;
 
 class PriceResolver
 {
-    public function resolveForContractor(ProductVariant $variant, Contractor $contractor, int $quantity): ResolvedPrice
+    public function resolveForCustomer(ProductVariant $variant, Customer $customer, int $quantity): ResolvedPrice
     {
         $this->assertPositiveQuantity($quantity);
 
-        if ($contractor->default_price_list_id !== null) {
+        if ($customer->default_price_list_id !== null) {
             $assignedList = PriceList::withoutWorkspaceScope()
-                ->where('id', $contractor->default_price_list_id)
+                ->where('id', $customer->default_price_list_id)
                 ->first();
 
             if ($assignedList !== null && $assignedList->status === PriceListStatus::Active) {
                 $item = $this->matchingListItem($assignedList->id, $variant->id, $quantity);
 
                 if ($item !== null) {
-                    return $this->resolvedFromItem($item, 'contractor_price_list');
+                    return $this->resolvedFromItem($item, 'customer_price_list');
                 }
             }
         }

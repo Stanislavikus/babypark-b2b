@@ -52,9 +52,9 @@ class UserResource extends Resource
                     ->label('Роль')
                     ->options(UserRole::options())
                     ->required(),
-                Forms\Components\Select::make('contractor_id')
-                    ->label('Контрагент')
-                    ->relationship('contractor', 'name')
+                Forms\Components\Select::make('customer_id')
+                    ->label('Клієнт')
+                    ->relationship('customer', 'name')
                     ->searchable()
                     ->nullable(),
                 Forms\Components\TextInput::make('password')

@@ -18,7 +18,7 @@ class User extends Authenticatable implements FilamentUser
     use HasFactory, HasRoles, Notifiable;
 
     protected $fillable = [
-        'contractor_id',
+        'customer_id',
         'name',
         'email',
         'phone',
@@ -49,9 +49,9 @@ class User extends Authenticatable implements FilamentUser
         return $this->vacation_until !== null && $this->vacation_until->isFuture();
     }
 
-    public function contractor(): BelongsTo
+    public function customer(): BelongsTo
     {
-        return $this->belongsTo(Contractor::class);
+        return $this->belongsTo(Customer::class);
     }
 
     public function canAccessPanel(Panel $panel): bool

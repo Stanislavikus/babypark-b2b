@@ -6,7 +6,7 @@ use App\Enums\ReservationStatus;
 use App\Exceptions\Availability\InsufficientAvailabilityException;
 use App\Exceptions\Availability\InvalidReservationQuantityException;
 use App\Exceptions\Availability\InvalidReservationTransitionException;
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\InventoryRecord;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -25,11 +25,11 @@ class AvailabilityServicesTest extends TestCase
     use CreatesAvailabilityFixtures;
     use RefreshDatabase;
 
-    private function createContractor(): Contractor
+    private function createCustomer(): Customer
     {
-        return Contractor::query()->create([
+        return Customer::query()->create([
             'onec_guid' => (string) Str::uuid(),
-            'name' => 'Test Contractor',
+            'name' => 'Test Customer',
             'short_name' => 'TC',
             'login' => 'svc-'.Str::random(6),
             'password' => 'password',
@@ -68,7 +68,7 @@ class AvailabilityServicesTest extends TestCase
         $reservation = app(ReservationCreator::class)->create(
             $variant,
             2,
-            contractor: $this->createContractor(),
+            customer: $this->createCustomer(),
             ttlMinutes: 120,
         );
 
@@ -86,7 +86,7 @@ class AvailabilityServicesTest extends TestCase
         $before = now();
         $after = now();
 
-        $reservation = app(ReservationCreator::class)->create($variant, 3, contractor: $this->createContractor());
+        $reservation = app(ReservationCreator::class)->create($variant, 3, customer: $this->createCustomer());
 
         $this->assertNotNull($reservation->expires_at);
         $this->assertTrue($reservation->expires_at->between($before->copy()->addMinutes(19), $after->copy()->addMinutes(21)));
@@ -108,7 +108,7 @@ class AvailabilityServicesTest extends TestCase
 
         Reservation::create([
             'workspace_id' => $variant->workspace_id,
-            'contractor_id' => $this->createContractor()->id,
+            'customer_id' => $this->createCustomer()->id,
             'variant_id' => $variant->id,
             'quantity' => 2,
             'status' => ReservationStatus::Pending,
@@ -117,7 +117,7 @@ class AvailabilityServicesTest extends TestCase
 
         $this->expectException(InsufficientAvailabilityException::class);
 
-        app(ReservationCreator::class)->create($variant, 1, contractor: $this->createContractor());
+        app(ReservationCreator::class)->create($variant, 1, customer: $this->createCustomer());
     }
 
     public function test_reservation_confirmer_is_idempotent(): void
@@ -126,7 +126,7 @@ class AvailabilityServicesTest extends TestCase
 
         $reservation = Reservation::create([
             'workspace_id' => $variant->workspace_id,
-            'contractor_id' => $this->createContractor()->id,
+            'customer_id' => $this->createCustomer()->id,
             'variant_id' => $variant->id,
             'quantity' => 4,
             'status' => ReservationStatus::Pending,
@@ -149,7 +149,7 @@ class AvailabilityServicesTest extends TestCase
 
         $reservation = Reservation::create([
             'workspace_id' => $variant->workspace_id,
-            'contractor_id' => $this->createContractor()->id,
+            'customer_id' => $this->createCustomer()->id,
             'variant_id' => $variant->id,
             'quantity' => 2,
             'status' => ReservationStatus::Expired,
@@ -167,7 +167,7 @@ class AvailabilityServicesTest extends TestCase
 
         $reservation = Reservation::create([
             'workspace_id' => $variant->workspace_id,
-            'contractor_id' => $this->createContractor()->id,
+            'customer_id' => $this->createCustomer()->id,
             'variant_id' => $variant->id,
             'quantity' => 2,
             'status' => ReservationStatus::Pending,
@@ -188,7 +188,7 @@ class AvailabilityServicesTest extends TestCase
 
         $reservation = Reservation::create([
             'workspace_id' => $variant->workspace_id,
-            'contractor_id' => $this->createContractor()->id,
+            'customer_id' => $this->createCustomer()->id,
             'variant_id' => $variant->id,
             'quantity' => 2,
             'status' => ReservationStatus::Confirmed,
@@ -206,7 +206,7 @@ class AvailabilityServicesTest extends TestCase
 
         $reservation = Reservation::create([
             'workspace_id' => $variant->workspace_id,
-            'contractor_id' => $this->createContractor()->id,
+            'customer_id' => $this->createCustomer()->id,
             'variant_id' => $variant->id,
             'quantity' => 3,
             'status' => ReservationStatus::Pending,

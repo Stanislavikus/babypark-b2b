@@ -18,16 +18,16 @@ class OrderPricingSnapshotTest extends TestCase
 
     public function test_placed_order_snapshots_resolved_price_immune_to_later_price_list_changes(): void
     {
-        $contractor = $this->createContractor();
+        $customer = $this->createCustomer();
         $variant = $this->createVariant();
         $list = $this->createPriceList();
-        $contractor->update(['default_price_list_id' => $list->id]);
+        $customer->update(['default_price_list_id' => $list->id]);
 
         $item = $this->createPriceListItem($list, $variant, 100.00, 1, null, 20);
 
         SessionCart::add($variant->id, 2);
 
-        $order = app(OrderCreator::class)->createFromCart($contractor);
+        $order = app(OrderCreator::class)->createFromCart($customer);
 
         $this->assertCount(1, $order->items);
         $this->assertSame(120.0, (float) $order->items->first()->price_with_vat);
@@ -42,7 +42,7 @@ class OrderPricingSnapshotTest extends TestCase
 
     public function test_order_creation_refuses_lines_without_resolved_price(): void
     {
-        $contractor = $this->createContractor();
+        $customer = $this->createCustomer();
         $variant = $this->createVariant();
 
         SessionCart::add($variant->id, 1);
@@ -50,7 +50,7 @@ class OrderPricingSnapshotTest extends TestCase
         $this->expectException(OrderMissingPriceException::class);
 
         try {
-            app(OrderCreator::class)->createFromCart($contractor);
+            app(OrderCreator::class)->createFromCart($customer);
         } finally {
             $this->assertSame(0, Order::query()->count());
             $this->assertSame(0, OrderItem::query()->count());
@@ -59,12 +59,12 @@ class OrderPricingSnapshotTest extends TestCase
 
     public function test_session_cart_does_not_assign_zero_price_when_unavailable(): void
     {
-        $contractor = $this->createContractor();
+        $customer = $this->createCustomer();
         $variant = $this->createVariant();
 
         SessionCart::add($variant->id, 1);
 
-        $lines = SessionCart::linesForContractor($contractor);
+        $lines = SessionCart::linesForCustomer($customer);
 
         $this->assertCount(1, $lines);
         $this->assertFalse($lines[0]['price_available']);
@@ -75,15 +75,15 @@ class OrderPricingSnapshotTest extends TestCase
 
     public function test_session_cart_preserves_regular_and_sale_price_fields(): void
     {
-        $contractor = $this->createContractor();
+        $customer = $this->createCustomer();
         $variant = $this->createVariant();
         $list = $this->createPriceList();
-        $contractor->update(['default_price_list_id' => $list->id]);
+        $customer->update(['default_price_list_id' => $list->id]);
         $this->createPriceListItem($list, $variant, 100.00, 1, 80.00, 20);
 
         SessionCart::add($variant->id, 1);
 
-        $lines = SessionCart::linesForContractor($contractor);
+        $lines = SessionCart::linesForCustomer($customer);
 
         $this->assertTrue($lines[0]['price_available']);
         $this->assertSame(100.0, $lines[0]['regular_net_price']);

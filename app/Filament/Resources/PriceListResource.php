@@ -96,9 +96,9 @@ class PriceListResource extends Resource
                     ->label('Кількість позицій')
                     ->counts('items')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('contractors_count')
+                Tables\Columns\TextColumn::make('customers_count')
                     ->label('Кількість клієнтів')
-                    ->counts('contractors')
+                    ->counts('customers')
                     ->sortable(),
             ])
             ->defaultSort('name')

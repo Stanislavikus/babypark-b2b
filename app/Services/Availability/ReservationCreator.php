@@ -5,7 +5,7 @@ namespace App\Services\Availability;
 use App\Enums\ReservationStatus;
 use App\Exceptions\Availability\InsufficientAvailabilityException;
 use App\Exceptions\Availability\InvalidReservationQuantityException;
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\Order;
 use App\Models\ProductVariant;
 use App\Models\Reservation;
@@ -21,22 +21,22 @@ class ReservationCreator
         ProductVariant $variant,
         int $quantity,
         ?Order $order = null,
-        ?Contractor $contractor = null,
+        ?Customer $customer = null,
         ?int $ttlMinutes = null,
     ): Reservation {
         if ($quantity <= 0) {
             throw new InvalidReservationQuantityException('Reservation quantity must be greater than zero.');
         }
 
-        $contractorId = $order?->contractor_id ?? $contractor?->id;
+        $customerId = $order?->customer_id ?? $customer?->id;
 
-        if ($contractorId === null) {
-            throw new InvalidReservationQuantityException('A contractor is required to create a reservation.');
+        if ($customerId === null) {
+            throw new InvalidReservationQuantityException('A customer is required to create a reservation.');
         }
 
         $ttlMinutes = $ttlMinutes ?? (int) config('availability.reservation_ttl_minutes', 15);
 
-        return DB::transaction(function () use ($variant, $quantity, $order, $contractorId, $ttlMinutes): Reservation {
+        return DB::transaction(function () use ($variant, $quantity, $order, $customerId, $ttlMinutes): Reservation {
             $lockedVariant = ProductVariant::query()
                 ->whereKey($variant->id)
                 ->lockForUpdate()
@@ -59,7 +59,7 @@ class ReservationCreator
 
             return Reservation::query()->create([
                 'workspace_id' => $lockedVariant->workspace_id,
-                'contractor_id' => $contractorId,
+                'customer_id' => $customerId,
                 'order_id' => $order?->id,
                 'variant_id' => $lockedVariant->id,
                 'quantity' => $quantity,

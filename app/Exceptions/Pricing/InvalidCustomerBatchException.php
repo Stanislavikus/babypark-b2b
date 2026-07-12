@@ -4,7 +4,7 @@ namespace App\Exceptions\Pricing;
 
 use RuntimeException;
 
-class InvalidContractorBatchException extends RuntimeException
+class InvalidCustomerBatchException extends RuntimeException
 {
     public const REASON_NOT_FOUND = 'not_found';
 
@@ -17,19 +17,19 @@ class InvalidContractorBatchException extends RuntimeException
         parent::__construct($message);
     }
 
-    public static function notFound(string|int $contractorId): self
+    public static function notFound(string|int $customerId): self
     {
         return new self(
             self::REASON_NOT_FOUND,
-            "Контрагента з ідентифікатором {$contractorId} не знайдено.",
+            "Клієнта з ідентифікатором {$customerId} не знайдено.",
         );
     }
 
-    public static function crossWorkspace(string|int $contractorId): self
+    public static function crossWorkspace(string|int $customerId): self
     {
         return new self(
             self::REASON_CROSS_WORKSPACE,
-            "Контрагент {$contractorId} належить іншому робочому простору.",
+            "Клієнт {$customerId} належить іншому робочому простору.",
         );
     }
 }

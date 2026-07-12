@@ -3,12 +3,12 @@
 namespace App\Filament\Resources\OrderResource\Pages;
 
 use App\Filament\Resources\OrderResource;
-use App\Models\Contractor;
 use Filament\Actions;
 use Filament\Actions\Action;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Support\Enums\FontWeight;
 use Filament\Support\Enums\MaxWidth;
 
 class ViewOrder extends ViewRecord
@@ -18,21 +18,21 @@ class ViewOrder extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('contractor_info')
-                ->label('Контрагент')
+            Action::make('customer_info')
+                ->label('Клієнт')
                 ->icon('heroicon-o-building-office-2')
                 ->color('info')
-                ->modalHeading(fn () => $this->record->contractor?->name ?? 'Контрагент')
+                ->modalHeading(fn () => $this->record->customer?->name ?? 'Клієнт')
                 ->modalWidth(MaxWidth::Medium)
                 ->modalSubmitAction(false)
                 ->modalCancelActionLabel('Закрити')
                 ->infolist(
                     fn (Infolist $infolist) => $infolist
-                        ->record($this->record->contractor)
+                        ->record($this->record->customer)
                         ->schema([
                             TextEntry::make('name')
                                 ->label('Назва')
-                                ->weight(\Filament\Support\Enums\FontWeight::Bold),
+                                ->weight(FontWeight::Bold),
                             TextEntry::make('manager_name')
                                 ->label('Менеджер')
                                 ->placeholder('—'),

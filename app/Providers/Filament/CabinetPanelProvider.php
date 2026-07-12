@@ -33,7 +33,7 @@ class CabinetPanelProvider extends PanelProvider
         return $panel
             ->id('cabinet')
             ->path('cabinet')
-            ->authGuard('contractor')
+            ->authGuard('customer')
             ->login(Login::class)
             ->brandName('BabyPark B2B')
             ->colors([

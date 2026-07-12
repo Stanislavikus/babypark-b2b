@@ -2,15 +2,15 @@
 
 namespace App\Support\ProductFields;
 
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Support\CatalogRowData;
 
 class CabinetProductMargin
 {
-    public static function marginUah(Product $product, Contractor $contractor): ?float
+    public static function marginUah(Product $product, Customer $customer): ?float
     {
-        $data = CatalogRowData::forProduct($product, $contractor);
+        $data = CatalogRowData::forProduct($product, $customer);
         $myPrice = $data['myPrice'];
         $rrp = $data['rrp'];
 
@@ -21,9 +21,9 @@ class CabinetProductMargin
         return $rrp - $myPrice;
     }
 
-    public static function formatted(Product $product, Contractor $contractor, string $format = 'percent'): ?string
+    public static function formatted(Product $product, Customer $customer, string $format = 'percent'): ?string
     {
-        $data = CatalogRowData::forProduct($product, $contractor);
+        $data = CatalogRowData::forProduct($product, $customer);
         $myPrice = $data['myPrice'];
         $rrp = $data['rrp'];
 
@@ -38,9 +38,9 @@ class CabinetProductMargin
             : number_format($marginUah, 2, '.', ' ').' ₴';
     }
 
-    public static function isNegative(Product $product, Contractor $contractor): bool
+    public static function isNegative(Product $product, Customer $customer): bool
     {
-        $marginUah = self::marginUah($product, $contractor);
+        $marginUah = self::marginUah($product, $customer);
 
         return $marginUah !== null && $marginUah < 0;
     }

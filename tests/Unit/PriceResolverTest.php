@@ -19,12 +19,12 @@ class PriceResolverTest extends TestCase
     use CreatesPricingFixtures;
     use RefreshDatabase;
 
-    public function test_resolve_for_contractor_falls_back_when_assigned_price_list_is_inactive(): void
+    public function test_resolve_for_customer_falls_back_when_assigned_price_list_is_inactive(): void
     {
-        $contractor = $this->createContractor();
+        $customer = $this->createCustomer();
         $variant = $this->createVariant();
         $inactiveList = $this->createPriceList(status: PriceListStatus::Inactive);
-        $contractor->update(['default_price_list_id' => $inactiveList->id]);
+        $customer->update(['default_price_list_id' => $inactiveList->id]);
         $this->createPriceListItem($inactiveList, $variant, 100.00, 1, null, 20);
 
         $defaultList = PriceList::withoutWorkspaceScope()
@@ -34,25 +34,25 @@ class PriceResolverTest extends TestCase
 
         $this->createPriceListItem($defaultList, $variant, 55.50);
 
-        $resolved = app(PriceResolver::class)->resolveForContractor($variant, $contractor, 1);
+        $resolved = app(PriceResolver::class)->resolveForCustomer($variant, $customer, 1);
 
         $this->assertSame(55.5, $resolved->effectiveNetPrice);
         $this->assertSame('workspace_default_price_list', $resolved->source);
     }
 
-    public function test_resolve_for_contractor_uses_assigned_price_list(): void
+    public function test_resolve_for_customer_uses_assigned_price_list(): void
     {
-        $contractor = $this->createContractor();
+        $customer = $this->createCustomer();
         $variant = $this->createVariant();
         $list = $this->createPriceList();
-        $contractor->update(['default_price_list_id' => $list->id]);
+        $customer->update(['default_price_list_id' => $list->id]);
         $this->createPriceListItem($list, $variant, 100.00, 1, null, 20);
 
-        $resolved = app(PriceResolver::class)->resolveForContractor($variant, $contractor, 1);
+        $resolved = app(PriceResolver::class)->resolveForCustomer($variant, $customer, 1);
 
         $this->assertSame(100.0, $resolved->effectiveNetPrice);
         $this->assertSame(120.0, $resolved->grossPrice);
-        $this->assertSame('contractor_price_list', $resolved->source);
+        $this->assertSame('customer_price_list', $resolved->source);
         $this->assertSame($list->id, $resolved->sourcePriceListId);
         $this->assertNotNull($resolved->sourcePriceListItemId);
         $this->assertSame(120.0, $resolved->regularGrossPrice);
@@ -61,13 +61,13 @@ class PriceResolverTest extends TestCase
 
     public function test_sale_price_overrides_regular_net_price(): void
     {
-        $contractor = $this->createContractor();
+        $customer = $this->createCustomer();
         $variant = $this->createVariant();
         $list = $this->createPriceList();
-        $contractor->update(['default_price_list_id' => $list->id]);
+        $customer->update(['default_price_list_id' => $list->id]);
         $this->createPriceListItem($list, $variant, 100.00, 1, 80.00, 20);
 
-        $resolved = app(PriceResolver::class)->resolveForContractor($variant, $contractor, 1);
+        $resolved = app(PriceResolver::class)->resolveForCustomer($variant, $customer, 1);
 
         $this->assertSame(100.0, $resolved->regularNetPrice);
         $this->assertSame(80.0, $resolved->salePrice);
@@ -108,11 +108,11 @@ class PriceResolverTest extends TestCase
 
     public function test_rejects_non_positive_quantity(): void
     {
-        $contractor = $this->createContractor();
+        $customer = $this->createCustomer();
         $variant = $this->createVariant();
 
         $this->expectException(InvalidPriceQuantityException::class);
-        app(PriceResolver::class)->resolveForContractor($variant, $contractor, 0);
+        app(PriceResolver::class)->resolveForCustomer($variant, $customer, 0);
     }
 
     public function test_throws_when_no_price_available(): void
@@ -146,16 +146,16 @@ class PriceResolverTest extends TestCase
 
     public function test_tier_matching_selects_highest_quantity_min_not_exceeding_requested_quantity(): void
     {
-        $contractor = $this->createContractor();
+        $customer = $this->createCustomer();
         $variant = $this->createVariant();
         $list = $this->createPriceList();
-        $contractor->update(['default_price_list_id' => $list->id]);
+        $customer->update(['default_price_list_id' => $list->id]);
 
         $this->createPriceListItem($list, $variant, 100.00, 1);
         $this->createPriceListItem($list, $variant, 90.00, 10);
         $this->createPriceListItem($list, $variant, 80.00, 50);
 
-        $resolved = app(PriceResolver::class)->resolveForContractor($variant, $contractor, 15);
+        $resolved = app(PriceResolver::class)->resolveForCustomer($variant, $customer, 15);
 
         $this->assertSame(90.0, $resolved->effectiveNetPrice);
     }

@@ -11,7 +11,7 @@ use App\Services\Availability\AvailabilityResolver;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Services\Pricing\ProductPricingSummary;
 use App\Support\CatalogRowData;
-use App\Support\Pricing\ContractorPricingScope;
+use App\Support\Pricing\CustomerPricingScope;
 use App\Support\ProductFields\CabinetProductMargin;
 use App\Support\ProductFields\MarginToggle;
 use App\Support\ProductFields\ProductColumnVisibility;
@@ -44,7 +44,7 @@ class ProductResource extends Resource
     {
         $panel = 'cabinet';
         $visible = ProductPanelVisibility::visibleDetailFields($panel);
-        $contractor = auth('contractor')->user();
+        $customer = auth('customer')->user();
         $summary = app(ProductPricingSummary::class);
 
         $schema = [];
@@ -54,10 +54,10 @@ class ProductResource extends Resource
                 ->schema([
                     Infolists\Components\RepeatableEntry::make('active_variants')
                         ->label('')
-                        ->getStateUsing(function (Product $record) use ($contractor, $summary) {
+                        ->getStateUsing(function (Product $record) use ($customer, $summary) {
                             return $record->variants
                                 ->where('is_active', true)
-                                ->filter(fn (ProductVariant $v) => $summary->variantHasResolvablePrice($v, $contractor))
+                                ->filter(fn (ProductVariant $v) => $summary->variantHasResolvablePrice($v, $customer))
                                 ->values();
                         })
                         ->schema([
@@ -102,10 +102,10 @@ class ProductResource extends Resource
                                     };
                                 }),
 
-                            Infolists\Components\TextEntry::make('contractor_price')
+                            Infolists\Components\TextEntry::make('customer_price')
                                 ->label('Ваша ціна')
-                                ->getStateUsing(function (ProductVariant $record) use ($contractor, $summary): ?string {
-                                    $display = $summary->tryResolveVariantDisplay($record, $contractor);
+                                ->getStateUsing(function (ProductVariant $record) use ($customer, $summary): ?string {
+                                    $display = $summary->tryResolveVariantDisplay($record, $customer);
 
                                     return $display?->formattedGross();
                                 })
@@ -123,19 +123,19 @@ class ProductResource extends Resource
                                 ->placeholder('—')
                                 ->extraAttributes(['class' => 'line-through text-gray-400']),
 
-                            Infolists\Components\TextEntry::make('contractor_margin')
+                            Infolists\Components\TextEntry::make('customer_margin')
                                 ->label(fn (): HtmlString => MarginToggle::labelHtml(
                                     Livewire::current()?->marginFormat ?? 'percent'
                                 ))
-                                ->getStateUsing(function (ProductVariant $record) use ($contractor): ?string {
+                                ->getStateUsing(function (ProductVariant $record) use ($customer): ?string {
                                     return CabinetProductMargin::formatted(
                                         $record->product,
-                                        $contractor,
+                                        $customer,
                                         Livewire::current()?->marginFormat ?? 'percent'
                                     );
                                 })
-                                ->color(function (ProductVariant $record) use ($contractor): ?string {
-                                    return CabinetProductMargin::isNegative($record->product, $contractor) ? 'danger' : null;
+                                ->color(function (ProductVariant $record) use ($customer): ?string {
+                                    return CabinetProductMargin::isNegative($record->product, $customer) ? 'danger' : null;
                                 })
                                 ->placeholder('—'),
                         ])
@@ -248,15 +248,15 @@ class ProductResource extends Resource
             $columns[] = Tables\Columns\TextColumn::make('stock_status')
                 ->label('Наявність')
                 ->getStateUsing(function (Product $record): string {
-                    $contractor = auth('contractor')->user();
-                    $data = CatalogRowData::forProduct($record, $contractor);
+                    $customer = auth('customer')->user();
+                    $data = CatalogRowData::forProduct($record, $customer);
 
                     return $data['badge']['label'];
                 })
                 ->badge()
                 ->color(function (Product $record): string {
-                    $contractor = auth('contractor')->user();
-                    $data = CatalogRowData::forProduct($record, $contractor);
+                    $customer = auth('customer')->user();
+                    $data = CatalogRowData::forProduct($record, $customer);
 
                     return match ($data['badge']['color']) {
                         'success' => 'success',
@@ -269,11 +269,11 @@ class ProductResource extends Resource
         }
 
         if (in_array('price', $visible, true)) {
-            $columns[] = Tables\Columns\TextColumn::make('contractor_price')
+            $columns[] = Tables\Columns\TextColumn::make('customer_price')
                 ->label('Ваша ціна')
                 ->getStateUsing(function (Product $record): ?string {
-                    $contractor = auth('contractor')->user();
-                    $price = CatalogRowData::forProduct($record, $contractor)['myPrice'];
+                    $customer = auth('customer')->user();
+                    $price = CatalogRowData::forProduct($record, $customer)['myPrice'];
 
                     return $price !== null
                         ? '₴ '.number_format($price, 2, '.', ' ')
@@ -281,8 +281,8 @@ class ProductResource extends Resource
                 })
                 ->placeholder('—')
                 ->sortable(query: function (Builder $query, string $direction): Builder {
-                    $contractor = auth('contractor')->user();
-                    $priceListId = ContractorPricingScope::priceListIdFor($contractor);
+                    $customer = auth('customer')->user();
+                    $priceListId = CustomerPricingScope::priceListIdFor($customer);
 
                     if ($priceListId === null) {
                         return $query->orderBy('sku', $direction);
@@ -317,30 +317,30 @@ class ProductResource extends Resource
                     Livewire::current()?->marginFormat ?? 'percent'
                 ))
                 ->getStateUsing(function (Product $record): ?string {
-                    $contractor = auth('contractor')->user();
+                    $customer = auth('customer')->user();
 
                     return CabinetProductMargin::formatted(
                         $record,
-                        $contractor,
+                        $customer,
                         Livewire::current()?->marginFormat ?? 'percent'
                     );
                 })
                 ->color(function (Product $record): ?string {
-                    $contractor = auth('contractor')->user();
+                    $customer = auth('customer')->user();
 
-                    return CabinetProductMargin::isNegative($record, $contractor) ? 'danger' : null;
+                    return CabinetProductMargin::isNegative($record, $customer) ? 'danger' : null;
                 })
                 ->placeholder('—')
                 ->sortable(query: function (Builder $query, string $direction): Builder {
-                    $contractor = auth('contractor')->user();
-                    $priceListId = ContractorPricingScope::priceListIdFor($contractor);
+                    $customer = auth('customer')->user();
+                    $priceListId = CustomerPricingScope::priceListIdFor($customer);
 
                     if ($priceListId === null) {
                         return $query->orderBy('sku', $direction);
                     }
 
                     return $query->orderByRaw(
-                        PricingSqlExpressions::contractorMarginSortSql('products.id', $priceListId)." {$direction}"
+                        PricingSqlExpressions::customerMarginSortSql('products.id', $priceListId)." {$direction}"
                     );
                 });
         }
@@ -378,9 +378,9 @@ class ProductResource extends Resource
                     ->preload(),
                 Tables\Filters\SelectFilter::make('brand')
                     ->label('Бренди')
-                    ->options(fn (): array => ContractorPricingScope::applyProductScope(
+                    ->options(fn (): array => CustomerPricingScope::applyProductScope(
                         Product::query()->where('is_active', true),
-                        auth('contractor')->user(),
+                        auth('customer')->user(),
                     )
                         ->distinct()
                         ->orderBy('brand')
@@ -394,12 +394,12 @@ class ProductResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $contractor = auth('contractor')->user();
+        $customer = auth('customer')->user();
 
-        return ContractorPricingScope::applyProductScope(
+        return CustomerPricingScope::applyProductScope(
             parent::getEloquentQuery()->where('is_active', true),
-            $contractor,
-        )->with(ContractorPricingScope::eagerLoadForContractor($contractor));
+            $customer,
+        )->with(CustomerPricingScope::eagerLoadForCustomer($customer));
     }
 
     public static function getPages(): array

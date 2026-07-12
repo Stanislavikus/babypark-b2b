@@ -10,7 +10,7 @@ use App\Enums\SyncLogStatus;
 use App\Enums\SyncLogType;
 use App\Enums\UserRole;
 use App\Models\Category;
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\InventoryLocation;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -50,20 +50,20 @@ class B2BSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        $contractors = $this->seedContractors();
+        $customers = $this->seedCustomers();
         $categories = $this->seedCategories();
         $variants = $this->seedProductsAndVariants($categories);
-        $this->seedPrices($contractors, $variants);
+        $this->seedPrices($customers, $variants);
         $this->seedStocks($variants);
-        $this->seedOrders($contractors, $variants, $admin);
-        $this->seedReservations($contractors, $variants);
+        $this->seedOrders($customers, $variants, $admin);
+        $this->seedReservations($customers, $variants);
         $this->seedSyncLogs();
     }
 
     /**
-     * @return Collection<int, Contractor>
+     * @return Collection<int, Customer>
      */
-    private function seedContractors()
+    private function seedCustomers()
     {
         $data = [
             [
@@ -93,7 +93,7 @@ class B2BSeeder extends Seeder
         ];
 
         return collect($data)->map(function (array $row, int $index) {
-            return Contractor::query()->create([
+            return Customer::query()->create([
                 'onec_guid' => (string) Str::uuid(),
                 'name' => $row['name'],
                 'short_name' => $row['short_name'],
@@ -196,10 +196,10 @@ class B2BSeeder extends Seeder
     }
 
     /**
-     * @param  Collection<int, Contractor>  $contractors
+     * @param  Collection<int, Customer>  $customers
      * @param  Collection<int, ProductVariant>  $variants
      */
-    private function seedPrices($contractors, $variants): void
+    private function seedPrices($customers, $variants): void
     {
         $workspaceId = app(WorkspaceContext::class)->id();
 
@@ -216,19 +216,19 @@ class B2BSeeder extends Seeder
             ],
         );
 
-        foreach ($contractors as $contractor) {
+        foreach ($customers as $customer) {
             $priceList = PriceList::query()->create([
-                'name' => 'Legacy — '.$contractor->name,
+                'name' => 'Legacy — '.$customer->name,
                 'currency' => 'UAH',
                 'is_default' => false,
                 'priority' => 0,
                 'status' => PriceListStatus::Active,
             ]);
 
-            $contractor->update(['default_price_list_id' => $priceList->id]);
+            $customer->update(['default_price_list_id' => $priceList->id]);
 
             foreach ($variants as $index => $variant) {
-                $base = 50 + ($index % 40) * 12.5 + ($contractor->id * 3);
+                $base = 50 + ($index % 40) * 12.5 + ($customer->id * 3);
                 $vatRate = 20;
                 $price = round($base, 2);
                 $priceWithVat = round($price * (1 + $vatRate / 100), 2);
@@ -310,10 +310,10 @@ class B2BSeeder extends Seeder
     }
 
     /**
-     * @param  Collection<int, Contractor>  $contractors
+     * @param  Collection<int, Customer>  $customers
      * @param  Collection<int, ProductVariant>  $variants
      */
-    private function seedOrders($contractors, $variants, User $admin): void
+    private function seedOrders($customers, $variants, User $admin): void
     {
         $statuses = [
             OrderStatus::New,
@@ -329,13 +329,13 @@ class B2BSeeder extends Seeder
         ];
 
         foreach ($statuses as $i => $status) {
-            $contractor = $contractors[$i % $contractors->count()];
+            $customer = $customers[$i % $customers->count()];
             $orderVariants = $variants->random(min(4, $variants->count()));
             $total = 0;
             $totalWithVat = 0;
 
             $order = Order::query()->create([
-                'contractor_id' => $contractor->id,
+                'customer_id' => $customer->id,
                 'user_id' => $admin->id,
                 'onec_number' => $status === OrderStatus::New ? null : '1C-'.(1000 + $i),
                 'status' => $status,
@@ -349,7 +349,7 @@ class B2BSeeder extends Seeder
 
             foreach ($orderVariants as $variant) {
                 $qty = rand(1, 10);
-                $resolved = app(PriceResolver::class)->resolveForContractor($variant, $contractor, $qty);
+                $resolved = app(PriceResolver::class)->resolveForCustomer($variant, $customer, $qty);
                 $lineTotal = round($resolved->grossPrice * $qty, 2);
                 $total += round($resolved->effectiveNetPrice * $qty, 2);
                 $totalWithVat += $lineTotal;
@@ -375,17 +375,17 @@ class B2BSeeder extends Seeder
     }
 
     /**
-     * @param  Collection<int, Contractor>  $contractors
+     * @param  Collection<int, Customer>  $customers
      * @param  Collection<int, ProductVariant>  $variants
      */
-    private function seedReservations($contractors, $variants): void
+    private function seedReservations($customers, $variants): void
     {
         $workspaceId = app(WorkspaceContext::class)->id();
 
-        foreach ($contractors as $contractor) {
+        foreach ($customers as $customer) {
             Reservation::query()->create([
                 'workspace_id' => $workspaceId,
-                'contractor_id' => $contractor->id,
+                'customer_id' => $customer->id,
                 'variant_id' => $variants->random()->id,
                 'quantity' => rand(5, 50),
                 'status' => ReservationStatus::Pending,

@@ -14,7 +14,7 @@ class ResolvedPriceTest extends TestCase
             salePrice: 80.0,
             vatRate: 20.0,
             currency: 'UAH',
-            source: 'contractor_price_list',
+            source: 'customer_price_list',
             sourcePriceListId: 'list-uuid',
             sourcePriceListItemId: 'item-uuid',
         );
@@ -33,7 +33,7 @@ class ResolvedPriceTest extends TestCase
             salePrice: 100.0,
             vatRate: 20.0,
             currency: 'UAH',
-            source: 'contractor_price_list',
+            source: 'customer_price_list',
             sourcePriceListId: 'list-uuid',
             sourcePriceListItemId: 'item-uuid',
         );
@@ -50,7 +50,7 @@ class ResolvedPriceTest extends TestCase
             salePrice: 110.0,
             vatRate: 20.0,
             currency: 'UAH',
-            source: 'contractor_price_list',
+            source: 'customer_price_list',
             sourcePriceListId: 'list-uuid',
             sourcePriceListItemId: 'item-uuid',
         );

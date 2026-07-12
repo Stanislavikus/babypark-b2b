@@ -2,6 +2,12 @@
 
 namespace Tests\Unit;
 
+use App\Models\Category;
+use App\Models\Customer;
+use App\Models\PriceList;
+use App\Models\PriceListItem;
+use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\Workspace;
 use App\Support\Workspace\WorkspaceContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -41,12 +47,12 @@ class WorkspaceContextTest extends TestCase
     public function test_default_throws_when_multiple_default_workspaces_exist(): void
     {
         Schema::disableForeignKeyConstraints();
-        \App\Models\PriceListItem::withoutWorkspaceScope()->delete();
-        \App\Models\PriceList::withoutWorkspaceScope()->delete();
-        \App\Models\Contractor::withoutWorkspaceScope()->delete();
-        \App\Models\ProductVariant::withoutWorkspaceScope()->delete();
-        \App\Models\Product::withoutWorkspaceScope()->delete();
-        \App\Models\Category::withoutWorkspaceScope()->delete();
+        PriceListItem::withoutWorkspaceScope()->delete();
+        PriceList::withoutWorkspaceScope()->delete();
+        Customer::withoutWorkspaceScope()->delete();
+        ProductVariant::withoutWorkspaceScope()->delete();
+        Product::withoutWorkspaceScope()->delete();
+        Category::withoutWorkspaceScope()->delete();
         Workspace::query()->delete();
         Schema::enableForeignKeyConstraints();
 
