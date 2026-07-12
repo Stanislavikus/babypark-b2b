@@ -11,6 +11,25 @@ The Attribute Dictionary is the controlled system for defining product fields. I
 
 The platform must allow powerful product data management while keeping the user experience simple enough for a non-technical business owner. The internal architecture may be enterprise-grade. The user experience must remain simple, familiar and understandable without training. 
 
+> **Relationship to Field Foundation (see `03-DOMAIN_MODEL.md`):** the
+> underlying registry described in this document (`AttributeDefinition` in this
+> document's original text) has been generalized to a cross-object mechanism —
+> `FieldDefinition` + `FieldBinding` — so the same governance also covers
+> `Customer` fields, not just Product/Variant. This document remains the
+> canonical description of the **Product Fields** user experience (System
+> Attributes, Platform Library, Workspace Custom, the anti-duplication wizard,
+> smart import). Where this document says `AttributeDefinition`, read
+> `FieldDefinition`; where it describes "Product-Level" / "Variant-Level" /
+> "Both" assignment (see "Assignment Level Rules" below), read this as
+> shorthand for a `FieldBinding` with `object_type: product` or
+> `object_type: product_variant` — **"Both" now means two separate
+> `FieldBinding` rows on the same `FieldDefinition`, not a single `both`
+> value** (that enum value is removed — see `03-DOMAIN_MODEL.md`, "Field
+> Foundation (cross-object fields)"). This document is not rewritten
+> entity-by-entity for that generalization since its subject is specifically
+> the Product Fields experience; `03-DOMAIN_MODEL.md` is the source of truth
+> for the underlying cross-object schema.
+
 ### Naming
 
 
@@ -51,12 +70,15 @@ The platform has three levels of product fields. Additionally, every attribute m
 
 ### Assignment Level Rules
 
+> **Superseded storage mechanism, same product-facing meaning** — see the
+> note under Purpose above. "Both" below no longer maps to a single stored
+> enum value; it is implemented as two separate `FieldBinding` rows.
 
-- **Product-Level**: The value is global and shared across all variations of the product (e.g., Brand, Description, Category Tree Node).
+- **Product-Level**: The value is global and shared across all variations of the product (e.g., Brand, Description, Category Tree Node). Implemented as a `FieldBinding` with `object_type: product`.
 
-- **Variant-Level**: The value is specific to each distinct variation/SKU (e.g., Size, Color, Price, Stock).
+- **Variant-Level**: The value is specific to each distinct variation/SKU (e.g., Size, Color, Price, Stock). Implemented as a `FieldBinding` with `object_type: product_variant`.
 
-- **Both**: The attribute can be defined at the Product level as a default value, but overridden at the Variant level if needed.
+- **Both**: The attribute can be defined at the Product level as a default value, but overridden at the Variant level if needed. Implemented as **two** `FieldBinding` rows on the same `FieldDefinition` — one with `object_type: product`, one with `object_type: product_variant` — not a single "both" value.
 
 ### Level 1: System Attributes
 
@@ -212,28 +234,43 @@ Readiness evaluation must not act as a permanent visual alert or noise on the de
 
 ### Attribute Structure Definition
 
+> **Superseded shape — see note under Purpose above.** The flat "one record
+> has all these columns" schema below is the pre-Field-Foundation shape. The
+> same metadata now splits across two entities (`03-DOMAIN_MODEL.md`, "Field
+> Dictionary Context" is the canonical source):
 
-Each attribute record in the dictionary contains the following schema data:
+Conceptually, this metadata is now distributed as:
 
-- internal_code (e.g., cost_price, material) 
-
-- assignment_level (product, variant, both)
-
+**`FieldDefinition`** (entity-agnostic — what the field means):
+- internal_code (e.g., cost_price, material) — renamed `code`
 - ui_label & localized_labels
-
 - data_type
+- attribute_level (system, library, custom) — renamed `scope`
+- is_localizable (boolean)
+- is_multi_value (boolean)
+- status (draft, active, deprecated, archived) — *(canonical `FieldDefinition.status` in
+  `03-DOMAIN_MODEL.md` is currently `active, archived` only; `draft`/`deprecated`
+  are not yet part of the implemented enum — treat `03-DOMAIN_MODEL.md` as the
+  source of truth if these lists ever diverge further)*
 
-- attribute_level (system, library, custom) 
+**`FieldBinding`** (one row per entity type this field applies to — what it's
+attached to and how it's stored):
+- object_type (product, product_variant, customer, ...) — replaces
+  `assignment_level (product, variant, both)`; "both" is two `FieldBinding`
+  rows, not one value
+- storage_type / storage_path
+- field_group — renamed `attribute_group`
+- is_required / is_filterable / is_sortable
+- visibility_settings (admin card, admin table, B2B storefront, exports)
+- sort_order
 
-- attribute_group
-
-- import_aliases (stored as database array/json, not hardcoded in code) 
-
-- is_localizable (boolean) 
-
-- visibility_settings (admin card, admin table, B2B storefront, exports) 
-
-- status (draft, active, deprecated, archived) 
+**`workspace_import_aliases`** (separate table, not a JSON/array column on
+the definition):
+- Previously described here as `import_aliases (stored as database array/json,
+  not hardcoded in code)`. This is superseded — aliases live in the
+  tenant-isolated `workspace_import_aliases` table (see "Anti-Duplication and
+  Smart Import Layer" in `03-DOMAIN_MODEL.md`), scoped per `field_binding_id`,
+  not as an array column on the definition record itself.
 
 ### Attribute Code Specifications
 
@@ -254,8 +291,9 @@ Code values must be web-safe, API-friendly, and completely decoupled from any ch
 - **Future Extension**: file, JSON, measurement, rich text.
 
 Note: `relation`-backed fields (e.g. `category`) are represented through
-`storage_type = relation` in `attribute_definitions`, not through a `data_type` value. `relation`
-is not a `data_type`.
+`storage_type = relation` on a `FieldBinding` (`field_bindings` table — see
+`03-DOMAIN_MODEL.md`, "Field Foundation"; previously `attribute_definitions`),
+not through a `data_type` value. `relation` is not a `data_type`.
 
 Note: `value_jsonb` in the dynamic value tables (see 03-DOMAIN_MODEL.md) is a storage column for
 structured/internal/localized/multi-value payloads. It does not mean merchant-created JSON
@@ -332,7 +370,7 @@ When a file is uploaded, the matching engine runs down the priority chain. If au
 
 - **Manual User Mapping: **If confidence is low, the user must manually select the appropriate attribute from a searchable dropdown of the current Workspace Dictionary.
 
-- **Automated Memory: **Once a user manually maps an unknown header or confirms a fuzzy suggestion, the platform automatically saves this exact raw string into the import_aliases array for that specific attribute within that workspace's context. Future imports of the same file structure will map automatically.
+- **Automated Memory: **Once a user manually maps an unknown header or confirms a fuzzy suggestion, the platform automatically saves this exact raw string as a new row in `workspace_import_aliases`, scoped to the resolved `field_binding_id` and this workspace (not an array column on the field definition — see "Attribute Structure Definition" above). Future imports of the same file structure will map automatically.
 
 ### Workspace-Specific Aliases
 

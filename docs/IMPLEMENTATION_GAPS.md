@@ -20,10 +20,17 @@ Rules for using this document:
 - No Babypark-specific hardcoding is permitted as a "solution" to any gap (per
   `04-ARCHITECTURE_PRINCIPLES.md`, Configuration Over Custom Code mandate).
 
-Verified against `develop` as of this writing: `app/Models/` contains only
-`Category, Contractor, DeliverySetting, Order, OrderItem, Price, Product,
-ProductVariant, Reservation, Stock, SyncLog, User`. No `workspace_id` column exists
-in any migration.
+Verified against `develop` as of this Documentation Truth Reset pass:
+`app/Models/` contains `AttributeDefinition, Category, Contractor,
+DeliverySetting, InventoryLocation, InventoryRecord, Order, OrderItem, Price,
+PriceList, PriceListItem, Product, ProductAttributeValue, ProductTag,
+ProductVariant, Reservation, Stock, SyncLog, Tag, User, VariantAttributeValue,
+Workspace, WorkspaceImportAlias` (22 models — this list previously said "only
+12 models, no `AttributeDefinition`", which was stale; superseded here).
+`workspace_id` appears in 9 migrations and via `BelongsToWorkspace`/
+`BelongsToWorkspaceOrGlobal` on 14 models — see GAP-004 for the caveat that
+this is a sampling check, not a full audit. `AttributeDefinition` and related
+entities still use pre-Field-Foundation naming — see GAP-016.
 
 ---
 
@@ -98,7 +105,9 @@ remain deferred — see GAP-010.
 - Do not build a second, different availability calculation anywhere else in the
   meantime.
 
-**Next task:** Availability Foundation (see proposed task order below).
+**Next task:** None — closed. (Note: this entry previously referenced "proposed
+task order below", a section that does not exist in this document — removed as
+part of this Documentation Truth Reset pass.)
 
 **Status:** Closed in code. Implemented via Availability Foundation and follow-up fixes
 (PRs #39, #40, #41, #42 — schema, `AvailabilityResolver`,
@@ -111,7 +120,9 @@ and GAP-009.
 
 ## GAP-003 — Attribute Dictionary not implemented
 
-**Approved docs:**
+**Approved docs at the time of the original GAP — now superseded in
+naming/shape by GAP-016 (Field Foundation); kept verbatim below for
+historical record, not as a description of current approved docs:**
 - `03-DOMAIN_MODEL.md`, Attribute value storage (**Resolved**): the platform must
   use separate `product_attribute_values` and `variant_attribute_values` tables.
   "A unified polymorphic attribute value table is strictly forbidden."
@@ -121,32 +132,43 @@ and GAP-009.
   Attribute Library (Level 2), each with Product-Level / Variant-Level /
   Both assignment rules.
 
-**Current code:**
-- No `AttributeDefinition`, `ProductAttributeValue`, or `VariantAttributeValue`
-  model or table exists.
-- Core fields (`brand`, `category_id`, `sku`, `barcode_ean`, `cost_price`, etc.)
-  are plain columns directly on the `products` / `product_variants` tables.
-- No dynamic/custom attribute mechanism exists at all — a workspace cannot add a
-  custom product field today.
+**Current code (re-verified against `develop`):**
+- `AttributeDefinition`, `ProductAttributeValue`, and `VariantAttributeValue`
+  models and tables all exist, with `workspace_id`, foreign keys, and unique
+  constraints. `AttributeDefinitionResource` exists in Filament
+  (`canCreate(): false`; `canDelete()` only for `workspace_custom` scope).
+- System Attributes remain first-class typed columns on `products` /
+  `product_variants` (e.g. `brand`, `sku`, `cost_price`); only Platform Attribute
+  Library / workspace-custom fields use `product_attribute_values` /
+  `variant_attribute_values`, per the "Attribute storage model" Domain Decision.
+- A workspace **can** add a custom product field today via this mechanism.
 
 **Impact:**
-- Import mapping, connector work, and any future custom/extensible field cannot be
-  built correctly without this foundation — there is nowhere to map an unknown
-  spreadsheet column to.
-- **Open question, now Resolved via the "System Attribute seed scope" and
-  "Attribute storage model" Domain Decisions added to `03-DOMAIN_MODEL.md`** (see
-  the docs patch that introduced this note): System Attributes remain first-class
-  typed columns; only Platform Attribute Library / workspace-custom fields use
-  `product_attribute_values` / `variant_attribute_values`.
+- The original impact (no foundation for import mapping / connector work) no
+  longer applies for the Product/Variant domain.
+- This GAP's original scope was explicitly Product/Variant-only (see
+  "Approved docs" above). Extending the same governance to `Customer` fields is
+  **new scope**, not a reopening of this GAP — see the "Field Foundation
+  (cross-object fields)" Domain Decision in `03-DOMAIN_MODEL.md` (that Domain
+  Decision, not a separate ADR file, is the canonical record — no separate ADR
+  document is checked into `docs/`).
 
 **Decision:**
 - Do not build a one-off custom-field mechanism anywhere as a stopgap.
 - Do not let any connector/import work hardcode column-to-field mapping outside
   a proper `FieldMapping` mechanism once it exists.
+- Do not treat this GAP's closure as covering `Customer`/other future entities —
+  that is tracked separately (see `03-DOMAIN_MODEL.md`, "Field Foundation").
 
-**Next task:** Product Fields Foundation (see proposed task order below).
+**Next task:** None for the original Product/Variant scope. Cross-object
+extension is tracked as its own Field Foundation migration (GAP-016), sequenced
+after the Contractor → Customer terminology migration (GAP-017) and before
+GAP-006. **Not** blocked by GAP-004's full coverage audit — that audit is a
+separate prerequisite for onboarding a second workspace only, not for this
+migration (see "Field Foundation", Workspace isolation note, in
+`03-DOMAIN_MODEL.md`).
 
-**Status:** Open.
+**Status:** Closed for original (Product/Variant) scope.
 
 ---
 
@@ -161,30 +183,33 @@ and GAP-009.
   a critical, non-negotiable requirement — cross-tenant data leaks are a critical
   system failure.
 
-**Current code:**
-- Verified: zero occurrences of `workspace_id` in any model or migration across
-  the entire codebase.
-- The application is currently single-tenant in practice (Babypark only), despite
-  being architected on paper as multi-tenant SaaS.
+**Current code (re-verified against `develop`):**
+- `workspace_id` now appears in 9 migrations; `BelongsToWorkspace` /
+  `BelongsToWorkspaceOrGlobal` traits are applied to 14 models, including
+  `Product`, `AttributeDefinition`, `Contractor`, `PriceList`, `Category`.
+- This check was a **sampling audit**, not a full inventory of every
+  workspace-owned table, model, background job, and raw query in the codebase.
 
 **Impact:**
-- Onboarding a second paying workspace today would require retrofitting
-  `workspace_id` onto every existing table and every query — exactly the
-  "rebuild instead of extend" scenario `00-WHY.md` explicitly wants the platform
-  to avoid for its own customers.
+- Broad workspace isolation is demonstrably implemented, contrary to the
+  previous "zero occurrences" note. However, the previous note's caution about
+  not onboarding a second workspace before full verification still applies —
+  a sampling audit finding isolation everywhere it looked is not the same as
+  proof of no gaps anywhere.
 
 **Decision:**
-- Do not onboard a second workspace before this gap is closed.
-- Any new table created for Product Fields / Pricing / Availability Foundation
-  work (GAP-001/002/003) must include `workspace_id` from its first migration,
-  even while Babypark remains the only workspace — retrofitting it twice would be
-  worse than including it now.
+- Do not onboard a second workspace before a full audit (not sampling) is
+  completed: every workspace-owned table, every Eloquent query path, every
+  background job, plus a cross-workspace-leakage test suite.
+- Any new table created for Field Foundation / Connector Foundation work must
+  include `workspace_id` from its first migration.
 
-**Next task:** Workspace Isolation Foundation — should be sequenced together with
-GAP-001/002/003 schema work, not as a separate later pass, precisely because new
-tables must be born with `workspace_id` already present.
+**Next task:** Full workspace-isolation coverage audit (inventory + tests), not
+a rewrite — the mechanism already exists broadly, this is a verification task.
 
-**Status:** Open.
+**Status:** Partially closed — broad workspace isolation implemented; full
+table/model/query/job coverage audit still required before onboarding a second
+workspace. Do not mark this Closed on the basis of a sampling check.
 
 ---
 
@@ -238,18 +263,28 @@ yet), but should be scheduled before any payment gateway integration work starts
 **Impact:**
 - The 1C sync and Google Sheets export the pilot actually needs to be useful (per
   the user's own stated requirement) cannot be built correctly without
-  `FieldMapping`, and `FieldMapping` itself depends on GAP-003 (Attribute
-  Dictionary) being resolved first — this gap is blocked on GAP-003.
+  `FieldMapping`.
+- **Updated dependency:** GAP-003 (Attribute Dictionary) is closed for its
+  original Product/Variant scope and no longer blocks this gap by itself.
+  `FieldMapping` must instead point at `field_binding_id` (not
+  `attribute_definition_id`/`AttributeDefinition` directly), per the "Field
+  Foundation (cross-object fields)" Domain Decision in `03-DOMAIN_MODEL.md`.
+  This gap is now blocked on that Field Foundation migration, not on GAP-003.
 
 **Decision:**
 - Do not build a one-off, hardcoded 1C-to-database field mapping as a shortcut —
   this is explicitly the "Babypark-specific hardcoded logic" that
   `04-ARCHITECTURE_PRINCIPLES.md` Mandate 9 forbids.
+- Do not resume Connector Foundation work until the Field Foundation migration
+  (FieldDefinition / FieldBinding split, `field_binding_id` on aliases) lands —
+  building `FieldMapping` against the current `AttributeDefinition` shape would
+  require rework immediately after.
 
-**Next task:** Connector Foundation — sequenced after GAP-003 (Attribute
-Dictionary), since FieldMapping needs AttributeDefinition to map onto.
+**Next task:** Connector Foundation — sequenced after GAP-017 (Contractor →
+Customer terminology migration) and GAP-016 (Field Foundation migration), per
+the approved phased plan.
 
-**Status:** Open, blocked on GAP-003.
+**Status:** Open, blocked on GAP-016 (Field Foundation migration), not GAP-003.
 
 ---
 
@@ -574,3 +609,85 @@ tags.
 **Next task:** Not scheduled.
 
 **Status:** Open, low urgency (mitigated in practice by the accurate preview from Task 6B).
+
+---
+
+## GAP-016 — Field Foundation code migration not yet done
+
+**Approved docs:**
+- `03-DOMAIN_MODEL.md`, "Field Dictionary Context" and "Field Foundation
+  (cross-object fields)" Domain Decision (**Resolved**): the canonical entity
+  names are `FieldDefinition`, `FieldBinding`, `product_field_values`,
+  `variant_field_values`, `customer_field_values`, and
+  `workspace_import_aliases.field_binding_id`.
+
+**Current code:**
+- The codebase still uses the pre-Field-Foundation names:
+  `AttributeDefinition`, `ProductAttributeValue`, `VariantAttributeValue`,
+  `product_attribute_values`, `variant_attribute_values`,
+  `workspace_import_aliases.attribute_definition_id`. No `FieldBinding` model,
+  no `customer_field_values` table exist yet. `value_level`
+  (`product`/`variant`/`both`) is still a live enum in code
+  (`AttributeValueLevel`).
+
+**Impact:**
+- Do not read `03-DOMAIN_MODEL.md`'s Field Foundation naming as a description
+  of current code — it is the target. Any Cursor task that touches this area
+  must check actual current code (this GAP), not assume the renamed entities
+  already exist.
+- `GAP-006` (Connector Foundation) is blocked on this migration landing first.
+
+**Decision:**
+- Do not build any new feature (e.g. Customer Fields UI, Connector Foundation)
+  against the old `AttributeDefinition`/`value_level` shape — it would need
+  immediate rework once this migration lands.
+- This is a schema + model + Filament resource + service rename/restructure,
+  not a pure find-and-replace — see "Field Dictionary Context" for the full
+  target shape, including the new `FieldBinding` entity and the
+  one-binding-per-object_type rule replacing `value_level`.
+
+**Next task:** Field Foundation migration — sequenced after GAP-017
+(Contractor → Customer) and before GAP-006 (Connector Foundation) resumes.
+
+**Status:** Open, not started.
+
+---
+
+## GAP-017 — Contractor → Customer terminology/auth migration not yet done
+
+**Approved docs:**
+- `03-DOMAIN_MODEL.md`, Customers Context (**Resolved**): `Customer`/`Клієнти`
+  is the only acceptable user-facing and domain term; `contractor` may appear
+  only inside a connector adapter that itself uses that external term (e.g.
+  the 1C connector).
+
+**Current code:**
+- The codebase still names the model, table, Filament resource, pages, and
+  related services/tests after `Contractor`, not `Customer`
+  (`app/Models/Contractor.php`, `ContractorResource`, `ListContractors`,
+  `ContractorPriceListAssignmentService`, etc. — 45 files reference
+  `Contractor` as of this writing).
+- `config/auth.php` defines a `contractor` guard and `contractors` provider;
+  `routes/web.php` uses `guest:contractor` and `Auth::guard('contractor')`;
+  `ContractorAuthenticated` middleware exists. These are part of the B2B
+  cabinet's live authentication path, not just naming — renaming the model
+  without updating these would break `/cabinet` login silently.
+
+**Impact:**
+- Every new task in this area currently has to reconcile `Customer` in docs/UI
+  with `Contractor` in code, which is a standing source of confusion for both
+  developers and AI-assisted sessions.
+
+**Decision:**
+- Pre-launch, one-time terminology migration, not a permanent compatibility
+  alias — SaaS is not yet launched, so there is no external integration
+  depending on the old names today.
+- Must be its own self-contained migration task (model, table, FK, Filament
+  resource + pages, services, exceptions, tests, `config/auth.php`
+  guard/provider, routes, middleware) — not folded into the Field Foundation
+  migration (GAP-016), and not left as a side effect of some other task.
+
+**Next task:** Contractor → Customer terminology/auth migration — sequenced
+before GAP-016 (Field Foundation), per the approved phased plan.
+
+**Status:** Open, not started.

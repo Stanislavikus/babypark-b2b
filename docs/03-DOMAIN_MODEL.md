@@ -562,30 +562,48 @@ The first version may support:
 
 Media handling should not become a full DAM system in MVP.
 
-## Attribute Dictionary Context
+## Field Dictionary Context
 
+> **Renamed from "Attribute Dictionary Context".** This section describes the
+> canonical, target architecture — entity-agnostic from the start (Product,
+> Variant, and Customer share this registry; see "Field Foundation
+> (cross-object fields)" in Domain Decisions for the rationale of this
+> generalization and for what it replaces). As of this writing, the
+> **codebase still uses the pre-generalization names** (`AttributeDefinition`,
+> `product_attribute_values`, `variant_attribute_values`) — that code migration
+> is tracked separately; see `IMPLEMENTATION_GAPS.md`, GAP-016. Do not read this
+> section as a description of current code; it is the target this and future
+> Cursor tasks must build toward.
 
-The Attribute Dictionary manages field metadata definitions, distinct from the storage of actual values. It acts as the structural registry for both core system fields and custom vendor properties, enforcing data integrity before any product updates reach the database.
+The Field Dictionary manages field metadata definitions, distinct from the storage of actual values. It acts as the structural registry for both core system fields and custom vendor properties, enforcing data integrity before any product, customer, or (future) other-entity updates reach the database.
 
-### Hybrid Attribute Storage Implementation
+### Hybrid Field Storage Implementation
 
 
 To balance high performance with infinite extensibility, the platform utilizes a hybrid storage engine:
 
-- **Column-Backed Fields:** Core operational and transaction-critical metrics (product_name, sku, gtin, status, cached prices, and quantities) are kept as standard database columns for indexing, rapid sorting, and foreign key integrity.
+- **Column-Backed Fields:** Core operational and transaction-critical fields (product_name, sku, gtin, status, cached prices and quantities on Product/Variant; name, tax_number, credit_limit on Customer) are kept as standard database columns for indexing, rapid sorting, and foreign key integrity.
 
-- **Dynamic Fields:** Extensible, tenant-specific properties (e.g., color, material, or custom vendor attributes) are stored in Entity-Attribute-Value (EAV) structures.
+- **Relation-Backed Fields:** Fields that are really a reference to another entity (e.g. Customer's `default_price_list`) are Eloquent relations, not scalar columns or dynamic values.
 
-- **The Registry Rule:** The Attribute Dictionary tracks all available fields. Every registered
-  attribute must define its storage_type (**column, relation, or dynamic**) to prevent structural
-  duplication and instruct data-access services where to read or write the data payload.
-  `computed` is a `data_type` value only (see Computed Fields Operational Boundary) and is never
-  a valid `storage_type`.
+- **Dynamic Fields:** Extensible, tenant-specific properties (e.g., color, material on Product; a custom segment field on Customer) are stored in Entity-Attribute-Value (EAV) structures, one typed table per bound entity — never a single shared polymorphic table (see Domain Decisions, "Attribute value storage").
 
-### Core Entity: AttributeDefinition
+- **The Registry Rule:** The Field Dictionary tracks all available fields via two
+  cooperating entities — `FieldDefinition` (what the field means) and
+  `FieldBinding` (what entity it's attached to and how it's physically stored).
+  Every `FieldBinding` must define its `storage_type` (**column, relation, or
+  dynamic**) to prevent structural duplication and instruct data-access
+  services where to read or write the data payload. `computed` is a `data_type`
+  value only (see Computed Fields Operational Boundary) and is never a valid
+  `storage_type`.
 
+### Core Entity: FieldDefinition
 
-Defines the schema, validation rules, and behavior profiles for a product field.
+*(renamed from `AttributeDefinition`; table renamed from `attribute_definitions` to `field_definitions`)*
+
+Defines the semantic meaning, data type, and governance level of a field —
+**entity-agnostic**. Does not know which entity (Product, Variant, Customer,
+...) it is attached to, or how it is stored — that is `FieldBinding`'s job.
 
 - id (UUID)
 - workspace_id (UUID, nullable for system/platform-wide definitions)
@@ -593,34 +611,93 @@ Defines the schema, validation rules, and behavior profiles for a product field.
 - data_type (Enum): text, long_text, number, decimal, money, boolean, date, select, multi_select,
   image, url, computed
 - scope (Enum): system, platform_library, workspace_custom
-- value_level (Enum): product, variant, both
-- storage_type (Enum): column, relation, dynamic
-- storage_path (String, nullable): e.g. `product_variants.barcode_ean`; null for dynamic fields
-- attribute_group (String, stable snake_case code: basic_information, identifiers, pricing,
-  availability, images_media, descriptions, characteristics, b2b, seo, logistics, internal);
-  UI labels for groups are translated via Laravel lang/config files, not stored per-definition
-- is_required (Boolean)
-- is_filterable (Boolean)
-- is_sortable (Boolean)
-- visibility_settings (JSONB): e.g. {"admin": true, "b2b": false, "channels": {}}
+- localized_labels (JSONB)
+- description (Text, nullable)
 - validation_rules (JSONB, nullable)
 - is_localizable (Boolean)
 - is_multi_value (Boolean)
 - status (Enum): active, archived
+
+### Core Entity: FieldBinding
+
+*(new entity; table `field_bindings`)*
+
+Defines what entity a `FieldDefinition` applies to, and how its value is
+physically stored for that entity. **One binding = exactly one `object_type`.**
+A field that applies to both Product and ProductVariant (e.g. a field that can
+be set at product level and overridden per variant) is represented as **two
+separate `FieldBinding` rows** on the same `FieldDefinition` — there is no
+`both` value and no null/undefined level for entities (like Customer) that
+have no variant-equivalent concept. This replaces the previous
+`AttributeDefinition.value_level` enum (`product | variant | both`), which is
+removed, not carried forward.
+
+- id (UUID)
+- workspace_id (UUID, nullable for system/platform-wide bindings — mirrors
+  `FieldDefinition.workspace_id` nullability rule)
+- field_definition_id (UUID, FK → field_definitions)
+- object_type (Enum): product, product_variant, customer *(future: order, supplier, ...
+  added only when a real feature needs them — see UI direction in Domain Decisions)*
+- storage_type (Enum): column, relation, dynamic
+- storage_path (String, nullable): e.g. `product_variants.barcode_ean`,
+  `customers.credit_limit`, `Customer.defaultPriceList` (relation accessor);
+  null only for `storage_type: dynamic`
+- field_group (String, stable snake_case code: basic_information, identifiers, pricing,
+  availability, images_media, descriptions, characteristics, b2b, seo, logistics, internal);
+  UI labels for groups are translated via Laravel lang/config files, not stored per-binding
+- is_required (Boolean)
+- is_filterable (Boolean)
+- is_sortable (Boolean)
+- visibility_settings (JSONB): e.g. {"admin": true, "b2b": false, "channels": {}}
 - sort_order (Integer)
-- localized_labels (JSONB)
+- status (Enum): active, archived — allows deprecating a binding independently
+  of its `FieldDefinition` (e.g. a field stays defined but is unbound from a
+  retired entity type)
+
+**Constraint:** a `FieldBinding` may only be referenced by rows in the value
+table matching its `object_type`, and only when `storage_type = dynamic` (see
+below). This is an application-level invariant (enforced in the write path),
+not expressible as a single database constraint across separate value tables.
 
 ### Strict Architectural Rules for Localization and Values
 
 
-- **JSONB Storage Mandate:** If an AttributeDefinition has is_localizable = true, the application and database must store its values strictly within a **JSONB structure** inside the dynamic value tables or column entries. Flat string overwrites are prohibited.
+- **JSONB Storage Mandate:** If a `FieldDefinition` has is_localizable = true, the application and database must store its values strictly within a **JSONB structure** inside the dynamic value tables or column entries. Flat string overwrites are prohibited.
 
-- **Separated Value Tables:** Dynamic values are strictly isolated based on their hierarchy:
+- **Separated Value Tables — one per bound entity type, never polymorphic:**
 
-- product_attribute_values: Contains (id, workspace_id, product_id, attribute_definition_id,
-  value_text, value_num, value_jsonb).
-- variant_attribute_values: Contains (id, workspace_id, variant_id, attribute_definition_id,
-  value_text, value_num, value_jsonb).
+  - `product_field_values` *(renamed from `product_attribute_values`)*:
+    `id`, `workspace_id`, `product_id` (FK → products), `field_binding_id`
+    (FK → field_bindings, **not** `field_definition_id` — see rationale below),
+    `value_text`, `value_num`, `value_jsonb`.
+    Unique index: (`workspace_id`, `product_id`, `field_binding_id`).
+  - `variant_field_values` *(renamed from `variant_attribute_values`)*:
+    `id`, `workspace_id`, `variant_id` (FK → product_variants), `field_binding_id`,
+    `value_text`, `value_num`, `value_jsonb`.
+    Unique index: (`workspace_id`, `variant_id`, `field_binding_id`).
+  - `customer_field_values` *(new)*:
+    `id`, `workspace_id`, `customer_id` (FK → customers), `field_binding_id`,
+    `value_text`, `value_num`, `value_jsonb`.
+    Unique index: (`workspace_id`, `customer_id`, `field_binding_id`).
+
+  **Why `field_binding_id`, not `field_definition_id`:** a raw value row must
+  unambiguously resolve to one `object_type` and one `storage_type`. Referencing
+  `field_definition_id` directly would allow (in theory) a `customer_field_values`
+  row to reference a binding whose `object_type` is `product` — referencing
+  `field_binding_id` and enforcing the object_type match at the write-path
+  level closes that hole. This does not reopen the "no polymorphic value
+  table" decision — each value table still serves exactly one entity type; it
+  only changes which column the FK points to.
+
+- **Multi-value fields** (`is_multi_value = true` on `FieldDefinition`) store
+  their value as a JSON array inside `value_jsonb` on the single value row for
+  that binding — not as multiple rows. This is the existing convention,
+  unchanged by this renaming.
+
+- **Only `storage_type: dynamic` bindings may have value rows.** A `FieldBinding`
+  with `storage_type: column` or `relation` must never have a corresponding
+  row in any `*_field_values` table — its value lives at `storage_path` on the
+  entity itself. Write-path code must validate this before insert.
 
 - Write Routing: If is_localizable is true, strings are formatted as language dictionaries and committed to value_jsonb. If false, data goes to value_text or value_num based on the configuration.
 
@@ -635,7 +712,11 @@ To power the Anti-Duplication Wizard and prevent users or sloppy import spreadsh
 
 - workspace_id (UUID): Binds the alias scope to a specific tenant.
 
-- attribute_definition_id (UUID): Foreign key mapping back to the true immutable system or custom definition.
+- field_binding_id (UUID) *(renamed from `attribute_definition_id`)*: Foreign
+  key to the specific `FieldBinding` this alias resolves to — not just the
+  `FieldDefinition` — because the same raw external column name (e.g. "Назва")
+  is ambiguous between Product and Customer at the definition level, and is
+  only unambiguous once resolved to a specific entity binding.
 
 - alias_name (String): Normalized string token (e.g., колор, цвет, colour).
 
@@ -643,16 +724,17 @@ To power the Anti-Duplication Wizard and prevent users or sloppy import spreadsh
   "google_sheets"), for future Connector Foundation (GAP-006) disambiguation.
   Null means manually registered / source-agnostic — do not store "manual" as a literal value.
 
-- Validation Rule: Before the system creates a new custom attribute, the Anti-Duplication Wizard checks the input name against existing code entries, localized_labels, and workspace_import_aliases. If a match is found, the system blocks creation and suggests mapping to the existing field instead.
+- Validation Rule: Before the system creates a new custom field, the Anti-Duplication Wizard checks the input name against existing code entries, localized_labels, and workspace_import_aliases (scoped to the relevant object_type). If a match is found, the system blocks creation and suggests mapping to the existing field instead.
 
 ### Computed Fields Operational Boundary
 
 
-Attributes registered with data_type = 'computed' (such as margin_percentage or b2b_readiness_status) represent derived calculations.
+Fields registered with data_type = 'computed' (such as margin_percentage or b2b_readiness_status) represent derived calculations.
 
-- **No Physical Persistence Rule:** The platform is strictly forbidden from allocating physical rows or strings within the product_attribute_values or variant_attribute_values tables for computed types.
+- **No Physical Persistence Rule:** The platform is strictly forbidden from allocating physical rows or strings within `product_field_values`, `variant_field_values`, or `customer_field_values` for computed types.
 
 - **Runtime Execution:** These properties must be calculated dynamically on-the-fly inside the application layer (Runtime Services) or handled via native database virtual columns (Virtual Generated Columns / Read Views). This eliminates data staleness when base prices or stock variables change.
+
 
 ## Pricing Context
 
@@ -823,6 +905,16 @@ The platform should not use Contractor as the main user-facing term.
 The term contractor may appear only in connectors where external systems use it.
 
 For example, a 1C connector may map an external contractor to the platform Customer.
+
+**Pending code migration (tracked, not yet done):** as of this writing, the
+codebase still names the model, table, Filament resource, auth guard/provider,
+and related services/tests after `Contractor`, not `Customer`. This is a
+pre-launch, one-time terminology migration (`Contractor` → `Customer`,
+including `config/auth.php`'s `contractor` guard / `contractors` provider and
+all `Auth::guard('contractor')` / `guest:contractor` usages) — sequenced before
+the Field Foundation migration described later in this document. The word
+`contractor` remains acceptable only inside the 1C connector adapter itself
+(e.g. `OneCContractorDto`), per this section's existing rule.
 
 ### Customer
 
@@ -1831,9 +1923,11 @@ Product owns product identity.
 
 Variant owns sellable SKU-level data.
 
-Attribute Definition owns field meaning.
+Field Definition owns field meaning *(renamed from "Attribute Definition"; see Field Foundation)*.
 
-ProductAttributeValue and VariantAttributeValue own dynamic field values according to product-level or variant-level assignment.
+Field Binding owns what entity a field is attached to and how it is stored *(new — see Field Foundation)*.
+
+ProductFieldValue, VariantFieldValue, and CustomerFieldValue own dynamic field values, each scoped to its own entity type via FieldBinding *(renamed from ProductAttributeValue/VariantAttributeValue; CustomerFieldValue is new)*.
 
 Price List owns pricing context.
 
@@ -1874,9 +1968,11 @@ The MVP domain model should include:
 
 - Category tree inside workspace;
 
-- AttributeDefinition;
+- FieldDefinition / FieldBinding *(renamed from AttributeDefinition; see Field
+  Dictionary Context above)*;
 
-- ProductAttributeValue / VariantAttributeValue;
+- ProductFieldValue / VariantFieldValue *(renamed from ProductAttributeValue /
+  VariantAttributeValue)* / CustomerFieldValue *(new — cross-object scope)*;
 
 - MediaAsset / primary image;
 
@@ -1989,15 +2085,19 @@ Catalogue:
 
 - variant_media
 
-Attributes:
+Fields *(renamed from "Attributes")*:
 
-- attribute_definitions
+- field_definitions *(renamed from attribute_definitions)*
+
+- field_bindings *(new)*
 
 - workspace_import_aliases
 
-- product_attribute_values
+- product_field_values *(renamed from product_attribute_values)*
 
-- variant_attribute_values
+- variant_field_values *(renamed from variant_attribute_values)*
+
+- customer_field_values *(new)*
 
 Pricing:
 
@@ -2090,32 +2190,34 @@ This decision is closed and must not be reopened without a documentation-level d
 
 ### Attribute value storage
 
-**Resolved.**
+**Resolved — superseded in naming only, see note.**
 
-The platform uses separate isolated tables:
+The platform uses separate isolated tables per bound entity type — this
+constraint itself is **not reopened**:
 
-- `product_attribute_values` for product-level dynamic fields;
-- `variant_attribute_values` for variant-level dynamic fields.
+- `product_field_values` *(renamed from `product_attribute_values`)* for product-level dynamic fields;
+- `variant_field_values` *(renamed from `variant_attribute_values`)* for variant-level dynamic fields;
+- `customer_field_values` *(new)* for customer-level dynamic fields.
 
-A unified polymorphic attribute value table is strictly forbidden by the Storage Split Mandate in `04-ARCHITECTURE_PRINCIPLES.md`.
+A unified polymorphic value table across entity types is strictly forbidden by the Storage Split Mandate in `04-ARCHITECTURE_PRINCIPLES.md`. This section is retained to preserve the historical decision and its rationale; for full current field/table definitions, see "Field Dictionary Context" above and "Field Foundation (cross-object fields)" below.
 
 This decision is closed and must not be reopened without a documentation-level decision.
 
 ### Attribute storage model
 
-**Resolved.**
+**Resolved — superseded in naming only, see note.**
 
-The platform uses a hybrid attribute storage model:
+The platform uses a hybrid field storage model:
 
 - System/core operational fields (product_name, brand, category, sku, gtin, status, cost_price,
-  etc.) remain column-backed or relation-backed on `products` / `product_variants`, for indexing,
-  sorting and FK integrity.
-- Dynamic/custom/tenant-specific fields are stored in `product_attribute_values` /
-  `variant_attribute_values`.
-- Every field, regardless of storage location, is registered in `attribute_definitions`, which
-  tracks its `storage_type` (`column | relation | dynamic`) and, for column/relation fields, its
-  `storage_path`.
-- `computed` is a `data_type`, never a `storage_type`; computed attributes have no physical
+  etc. on Product/Variant; name, tax_number, credit_limit on Customer) remain column-backed or
+  relation-backed, for indexing, sorting and FK integrity.
+- Dynamic/custom/tenant-specific fields are stored in `product_field_values` /
+  `variant_field_values` / `customer_field_values`.
+- Every field, regardless of storage location, is registered in `field_definitions` with one or
+  more `field_bindings`, each tracking its own `storage_type` (`column | relation | dynamic`) and,
+  for column/relation bindings, its `storage_path`.
+- `computed` is a `data_type`, never a `storage_type`; computed fields have no physical
   persistence (see Computed Fields Operational Boundary), and in MVP are limited to
   system-defined read-only fields — merchants cannot create custom computed fields.
 - Dynamic value tables store only `value_text`, `value_num`, `value_jsonb`. Boolean values use
@@ -2123,11 +2225,17 @@ The platform uses a hybrid attribute storage model:
   `value_jsonb`. Adding dedicated `value_boolean` / `value_date` columns requires a separate,
   explicit documentation-level decision.
 
+This section's substance is unchanged from the original decision; only entity names and table
+names are updated to match "Field Foundation (cross-object fields)" below, which is the
+canonical source for the full rationale (Option C vs A/B) and for cross-object rules not
+present in the original Product/Variant-only version of this decision.
+
 This decision is closed and must not be reopened without a documentation-level decision.
 
 ### Workspace_id minimum rollout scope for Product Fields Foundation
 
-**Resolved.**
+**Resolved.** *(Table names below updated to Field Foundation naming; the
+historical migration order and rationale are unchanged.)*
 
 The combined Workspace Foundation Lite + Product Fields Foundation implementation task must add
 `workspace_id` to, at minimum:
@@ -2135,17 +2243,21 @@ The combined Workspace Foundation Lite + Product Fields Foundation implementatio
 - `products`
 - `product_variants`
 - `categories`
-- `attribute_definitions`
-- `product_attribute_values`
-- `variant_attribute_values`
+- `field_definitions` *(renamed from `attribute_definitions`)*
+- `product_field_values` *(renamed from `product_attribute_values`)*
+- `variant_field_values` *(renamed from `variant_attribute_values`)*
 - `workspace_import_aliases`
+
+Any new tables created by the Field Foundation migration (`field_bindings`,
+`customer_field_values`) must include `workspace_id` from their first
+migration, per this same rule — not as an afterthought.
 
 Migration order: create `workspaces` → create default Babypark workspace → add nullable
 `workspace_id` to `products` / `product_variants` / `categories` → backfill existing rows to the
 default workspace → make `workspace_id` not-nullable where safe → create the new Product Fields
 tables with `workspace_id` present from their first migration.
 
-Tables not listed above (`orders`, `contractors`, `prices`, `stocks`, `reservations`,
+Tables not listed above (`orders`, `contractors`/`customers`, `prices`, `stocks`, `reservations`,
 `sync_logs`) remain explicitly out of scope for this task and stay tracked under GAP-004 as
 separate backlog items. This task must not silently skip them nor silently include them.
 
@@ -2153,11 +2265,13 @@ This decision is closed and must not be reopened without a documentation-level d
 
 ### System Attribute seed scope for Product Fields Foundation
 
-**Resolved.**
+**Resolved.** *(Table/entity names below updated to Field Foundation naming;
+the historical seed decisions — which system field maps to which column — are
+unchanged.)*
 
-The initial `attribute_definitions` seed for Product Fields Foundation (Phase 1) registers only
+The initial `field_definitions` seed for Product Fields Foundation (Phase 1) registers only
 System Attributes whose storage is verified stable on `develop` today and whose storage path
-does not contradict the documented value level.
+does not contradict the documented object_type/binding.
 
 Product-level Phase 1 seed:
 
@@ -2187,18 +2301,25 @@ Explicitly excluded from Phase 1 seed, with no placeholder record created:
 
 - `price`, `sale_price`, `cost_price` — deferred to Pricing MVP Foundation (GAP-001). `price`
   and `cost_price` are jointly required by the `margin_percentage` computed field and must be
-  resolved together, at the correct value_level, once PriceResolver-backed storage exists.
+  resolved together, with the correct `FieldBinding.object_type` (product vs variant), once
+  PriceResolver-backed storage exists.
   `cost_price` currently physically exists only on `products` (added via a dedicated later
-  migration), while 02 classifies it as Variant-Level — this mismatch is intentionally not
-  resolved by registering it prematurely.
+  migration), while 02 classifies it as belonging to the `product_variant` object type — this
+  mismatch is intentionally not resolved by registering it prematurely.
 - `availability` — deferred to Availability Foundation (GAP-002).
 - `image` — deferred. Current `products.images` (JSON) is product-level legacy storage; 02
-  classifies `image` as Variant-Level. Registering it now would lock in a value-level mismatch.
-  Deferred until product/variant media storage is explicitly resolved.
-- `unit` — deferred. Current `products.unit` is product-level; 02 classifies `unit` as
-  Variant-Level. Same class of mismatch as `image`; deferred until explicitly resolved.
+  classifies `image` as belonging to the `product_variant` object type. Registering it now would
+  lock in an object_type mismatch. Deferred until product/variant media storage is explicitly
+  resolved.
+- `unit` — deferred. Current `products.unit` is product-level; 02 classifies `unit` as belonging
+  to the `product_variant` object type. Same class of mismatch as `image`; deferred until
+  explicitly resolved.
 - `condition` — deferred. No physical storage column exists for `condition` anywhere in the
   current schema (verified: absent from both `products` and `product_variants`).
+
+*(Note: "02 classifies X as belonging to the `product_variant` object type" reflects the
+Field Foundation renaming of 02-ATTRIBUTE_DICTIONARY.md's former "Variant-Level" terminology —
+see that document's Assignment Level Rules section.)*
 
 Existing `products` columns not covered above (`onec_guid`, `barcode_box`,
 `min_order_quantity`, `order_step`, `package_quantity`, `package_type`, `units_per_box`,
@@ -2214,7 +2335,7 @@ are NOT registered as System Attributes here. See `GAP-007` in `IMPLEMENTATION_G
 The pre-existing `product_variants.attributes` JSON column (cast as `array` on the
 `ProductVariant` model) is a legacy ad-hoc dynamic-attribute mechanism. The Product Fields
 Foundation implementation task must first inspect which keys actually occur in production data
-and produce a migration plan. Actual migration of this data into `variant_attribute_values` is
+and produce a migration plan. Actual migration of this data into `variant_field_values` is
 included in the same implementation task only if the discovered keys are simple and safely
 mappable; otherwise it becomes a separate, explicitly scoped follow-up task. This documentation
 patch does not perform any data migration itself.
@@ -2676,6 +2797,112 @@ Hardcoded controller-level status changes triggered by payment events are strict
 
 This decision is closed and must not be reopened without a documentation-level decision.
 
+### Field Foundation (cross-object fields)
+
+**Resolved.**
+
+The Attribute Dictionary described in `02-ATTRIBUTE_DICTIONARY.md` and the previous
+`AttributeDefinition` / `ProductAttributeValue` / `VariantAttributeValue` model were
+built for the Product/Variant domain only (see GAP-003, closed for that original
+scope). Extending the same governance to `Customer` (and, in the future, other
+entities such as Order or Supplier) requires a cross-object foundation. This is
+new scope, not a reopening of the "Attribute storage model" decision above.
+
+**Chosen architecture — Option C (shared field registry, separate typed value
+storage), rejecting both Option A (generalize `AttributeDefinition` via an
+`entity_type` column) and Option B (a fully separate, parallel
+`CustomerAttributeDefinition` mechanism).**
+
+For the full, current field lists of `FieldDefinition`, `FieldBinding`, and the
+three `*_field_values` tables — including `workspace_id` placement, the
+"one binding = one object_type" rule replacing `value_level`, and the exact
+value-table structure — see **"Field Dictionary Context"** earlier in this
+document. This section does not repeat those definitions; it records the
+decision rationale, what was rejected and why, and the sequencing.
+
+**Why not A:** a single `AttributeDefinition.value_level` enum (`product` /
+`variant` / `both`) has no natural value for `customer` bindings (no
+variant-equivalent concept exists) — it would force either an unnatural enum
+extension or an ignored/null field on every Customer-scoped definition.
+
+**Why not B:** a fully separate `CustomerAttributeDefinition` mechanism
+duplicates the anti-duplication wizard, import alias engine, and validation
+logic. At the first additional entity (Order, Supplier), this becomes N
+near-identical, independently-drifting mechanisms instead of one shared
+registry.
+
+**Evidence used, honestly scoped:**
+- Shopify's `MetafieldDefinition.ownerType` confirms **object-scoped field
+  definitions** as a real, shipped pattern — but Shopify itself uses one
+  definition entity with an owner-type field, not a separate
+  `FieldDefinition`/`FieldBinding` table split. The two-table split is this
+  platform's own architectural choice (for value-table type-safety in
+  Postgres/Laravel), not a literal copy of Shopify's implementation.
+- HubSpot's Properties UI (one page, object selector) and Data Sync field
+  mappings (`direction`, "Always use X" conflict rule) confirm the general
+  shape of `FieldMapping.direction`/`authority` below — but HubSpot's public
+  documentation does **not** confirm a persistent, record+field-level
+  `FieldSyncOverride`. That entity is this platform's own design choice for a
+  manual-first SaaS (users create records by hand before connecting an ERP),
+  not an externally-validated pattern.
+
+**Sync ownership is explicitly out of scope for the field registry itself** —
+`FieldDefinition`/`FieldBinding` must never know about 1C, Odoo, CSV, or any
+other external system, per Mandate 7 (Connector Independence). Synchronization
+concerns are modeled as separate future entities, sequenced with Connector
+Foundation (GAP-006). There is no separate "Sync Policy" entity — direction and
+conflict authority live directly on `FieldMapping`, below:
+
+- `FieldMapping` — external field ↔ internal `field_binding_id`, with
+  `direction` (`external_to_saas` / `saas_to_external` / `bidirectional`) and
+  `authority` (`external_system` / `saas` / `manual_review`).
+- `ExternalRecordLink` — external record id ↔ internal Product/Customer/
+  PriceList id, used for safe upsert instead of fuzzy/name-based matching.
+- `FieldSyncOverride` — a per-record, per-field manual exception so a user who
+  created records manually before connecting an ERP is never silently
+  overwritten.
+
+**UI direction (Resolved as part of the same decision):** a single settings
+area, not one sidebar item per entity type:
+
+```
+Налаштування → Поля → [ Товари ] [ Клієнти ]
+```
+
+New tabs (Orders, Suppliers, ...) are added only when a real feature for that
+entity type exists — not preemptively. Connector-specific field mapping lives
+in a separate area (`Інтеграції → <integration> → Зіставлення полів`) and must
+not be merged into the field registry UI. The `scope` column's UI label changes
+from "Джерело" to **"Походження поля"** (values: "Системне" / "З бібліотеки" /
+"Власне поле") so it does not collide with the future, distinct concept of
+sync source (Вручну / Odoo / 1С / CSV / Google Sheets / API).
+
+**Sequencing (Resolved):**
+
+1. Contractor → Customer terminology/auth migration (model, table, FK, Filament
+   resource, `config/auth.php` guard/provider, routes, services, tests — see
+   Customers Context above and GAP-017).
+2. Field Foundation migration itself (`FieldDefinition`/`FieldBinding`, three
+   value tables, `workspace_import_aliases.field_binding_id` — see GAP-016).
+3. Customer Fields UI (`Налаштування → Поля → [Клієнти]`).
+4. Connector Foundation (GAP-006) — `FieldMapping` built against
+   `field_binding_id` from the start, not against the old
+   `attribute_definition_id` shape.
+
+**Workspace isolation note:** the full workspace-isolation coverage audit
+tracked under GAP-004 is a **separate task and does not block** steps 1–4
+above. It is a prerequisite only for onboarding a second workspace, not for
+this migration. However, every new table created in step 2 (`field_definitions`,
+`field_bindings`, `customer_field_values`) must still include `workspace_id`
+from its first migration and be covered by a cross-workspace-leakage test for
+that specific new table — that is a normal part of building the table
+correctly, not the same thing as the full GAP-004 audit.
+
+This decision is closed and must not be reopened without a documentation-level decision. It
+does not reopen, and is not blocked by, the "Attribute storage model" / "unified
+polymorphic table forbidden" decision above — it extends the same discipline
+to a new entity.
+
 ### Connector scope
 
 
@@ -2689,7 +2916,11 @@ Likely candidates:
 
 - ERP / 1C for Babypark pilot.
 
-Connector work must use FieldMapping and Attribute Dictionary from the beginning.
+Connector work must use `FieldMapping` and the Field Foundation registry
+(`FieldDefinition` / `FieldBinding`) from the beginning — see "Field Foundation
+(cross-object fields)" above and GAP-006. `FieldMapping` must reference
+`field_binding_id`, not a bare field code, since the same external column name
+can be ambiguous across entity types (e.g. Product vs Customer).
 
 ### Billing scope
 
