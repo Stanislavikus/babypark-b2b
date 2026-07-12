@@ -13,12 +13,13 @@ return new class extends Migration
             return;
         }
 
-        $this->dropContractorsDefaultPriceListForeignKey();
+        $this->dropDefaultPriceListForeignKey('contractors');
         $this->dropChildForeignKeys('contractor_id');
         $this->renameChildColumns('contractor_id', 'customer_id');
         Schema::rename('contractors', 'customers');
+        $this->renameSelfConstraints('customers', 'contractors', 'customers');
         $this->restoreChildForeignKeys('customer_id', 'customers');
-        $this->restoreContractorsDefaultPriceListForeignKey('customers');
+        $this->restoreDefaultPriceListForeignKey('customers');
         $this->migrateSyncLogType(toCustomers: true);
     }
 
@@ -28,58 +29,58 @@ return new class extends Migration
             return;
         }
 
-        $this->dropContractorsDefaultPriceListForeignKey('customers');
+        $this->dropDefaultPriceListForeignKey('customers');
         $this->dropChildForeignKeys('customer_id');
         $this->renameChildColumns('customer_id', 'contractor_id');
         Schema::rename('customers', 'contractors');
+        $this->renameSelfConstraints('contractors', 'customers', 'contractors');
         $this->restoreChildForeignKeys('contractor_id', 'contractors');
-        $this->restoreContractorsDefaultPriceListForeignKey('contractors');
+        $this->restoreDefaultPriceListForeignKey('contractors');
         $this->migrateSyncLogType(toCustomers: false);
     }
 
-    private function dropContractorsDefaultPriceListForeignKey(string $table = 'contractors'): void
+    private function constraintNameForDefaultPriceList(string $table): string
+    {
+        return $table === 'customers'
+            ? 'customers_workspace_default_price_list_fk'
+            : 'contractors_workspace_default_price_list_fk';
+    }
+
+    private function dropDefaultPriceListForeignKey(string $table): void
     {
         if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'default_price_list_id')) {
             return;
         }
 
         if (DB::getDriverName() === 'mysql') {
-            try {
-                Schema::table($table, function (Blueprint $blueprint) {
-                    $blueprint->dropForeign('contractors_workspace_default_price_list_fk');
-                });
-            } catch (Throwable) {
-                // FK may already be absent.
-            }
-        } else {
-            try {
-                Schema::table($table, function (Blueprint $blueprint) {
-                    $blueprint->dropForeign(['default_price_list_id']);
-                });
-            } catch (Throwable) {
-                // FK may already be absent.
-            }
+            $this->dropForeignIfExists($table, $this->constraintNameForDefaultPriceList($table));
+        } elseif ($this->sqliteForeignKeyExistsOnColumns($table, ['default_price_list_id'])) {
+            Schema::table($table, function (Blueprint $blueprint) {
+                $blueprint->dropForeign(['default_price_list_id']);
+            });
         }
     }
 
-    private function restoreContractorsDefaultPriceListForeignKey(string $table): void
+    private function restoreDefaultPriceListForeignKey(string $table): void
     {
         if (! Schema::hasTable($table) || ! Schema::hasColumn($table, 'default_price_list_id')) {
             return;
         }
 
         if (DB::getDriverName() === 'mysql') {
-            Schema::table($table, function (Blueprint $blueprint) use ($table) {
-                $constraint = $table === 'customers'
-                    ? 'customers_workspace_default_price_list_fk'
-                    : 'contractors_workspace_default_price_list_fk';
+            $constraint = $this->constraintNameForDefaultPriceList($table);
 
+            if ($this->foreignKeyExists($table, $constraint)) {
+                return;
+            }
+
+            Schema::table($table, function (Blueprint $blueprint) use ($constraint) {
                 $blueprint->foreign(
                     ['workspace_id', 'default_price_list_id'],
                     $constraint
                 )->references(['workspace_id', 'id'])->on('price_lists')->restrictOnDelete();
             });
-        } else {
+        } elseif (! $this->sqliteForeignKeyExistsOnColumns($table, ['default_price_list_id'])) {
             Schema::table($table, function (Blueprint $blueprint) {
                 $blueprint->foreign('default_price_list_id')
                     ->references('id')
@@ -89,6 +90,37 @@ return new class extends Migration
         }
     }
 
+    private function renameSelfConstraints(string $table, string $fromPrefix, string $toPrefix): void
+    {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
+        $this->renameIndexIfExists($table, "{$fromPrefix}_login_unique", "{$toPrefix}_login_unique");
+        $this->renameIndexIfExists($table, "{$fromPrefix}_onec_guid_unique", "{$toPrefix}_onec_guid_unique");
+
+        $this->dropForeignIfExists($table, "{$fromPrefix}_account_manager_id_foreign");
+        $this->dropForeignIfExists($table, "{$fromPrefix}_backup_manager_id_foreign");
+        $this->dropForeignIfExists($table, "{$fromPrefix}_workspace_id_foreign");
+
+        Schema::table($table, function (Blueprint $blueprint) use ($table, $toPrefix) {
+            if (! $this->foreignKeyExists($table, "{$toPrefix}_account_manager_id_foreign")) {
+                $blueprint->foreign('account_manager_id', "{$toPrefix}_account_manager_id_foreign")
+                    ->references('id')->on('users')->nullOnDelete();
+            }
+
+            if (! $this->foreignKeyExists($table, "{$toPrefix}_backup_manager_id_foreign")) {
+                $blueprint->foreign('backup_manager_id', "{$toPrefix}_backup_manager_id_foreign")
+                    ->references('id')->on('users')->nullOnDelete();
+            }
+
+            if (! $this->foreignKeyExists($table, "{$toPrefix}_workspace_id_foreign")) {
+                $blueprint->foreign('workspace_id', "{$toPrefix}_workspace_id_foreign")
+                    ->references('id')->on('workspaces');
+            }
+        });
+    }
+
     private function dropChildForeignKeys(string $column): void
     {
         foreach (array_keys($this->childForeignKeyDefinitions()) as $table) {
@@ -96,21 +128,21 @@ return new class extends Migration
                 continue;
             }
 
-            Schema::table($table, function (Blueprint $blueprint) use ($table, $column) {
-                try {
-                    $blueprint->dropForeign([$column]);
-                } catch (Throwable) {
-                    // Already dropped or unnamed on SQLite.
-                }
+            if (DB::getDriverName() === 'mysql') {
+                $this->dropForeignIfExists($table, "{$table}_{$column}_foreign");
 
                 if ($table === 'prices') {
-                    try {
-                        $blueprint->dropUnique([$column, 'variant_id']);
-                    } catch (Throwable) {
-                        // Unique index may already be absent.
-                    }
+                    $this->dropUniqueIfExists($table, "{$table}_{$column}_variant_id_unique");
                 }
-            });
+            } elseif ($this->sqliteForeignKeyExistsOnColumns($table, [$column])) {
+                Schema::table($table, function (Blueprint $blueprint) use ($column, $table) {
+                    $blueprint->dropForeign([$column]);
+
+                    if ($table === 'prices') {
+                        $blueprint->dropUnique([$column, 'variant_id']);
+                    }
+                });
+            }
         }
     }
 
@@ -134,6 +166,14 @@ return new class extends Migration
                 continue;
             }
 
+            if (DB::getDriverName() === 'mysql') {
+                $foreignName = "{$table}_{$column}_foreign";
+
+                if ($this->foreignKeyExists($table, $foreignName)) {
+                    continue;
+                }
+            }
+
             Schema::table($table, function (Blueprint $blueprint) use ($table, $column, $parentTable, $onDelete) {
                 $foreign = $blueprint->foreign($column)->references('id')->on($parentTable);
 
@@ -144,7 +184,11 @@ return new class extends Migration
                 }
 
                 if ($table === 'prices') {
-                    $blueprint->unique([$column, 'variant_id']);
+                    $uniqueName = "{$table}_{$column}_variant_id_unique";
+
+                    if (DB::getDriverName() !== 'mysql' || ! $this->uniqueIndexExists($table, $uniqueName)) {
+                        $blueprint->unique([$column, 'variant_id']);
+                    }
                 }
             });
         }
@@ -161,6 +205,105 @@ return new class extends Migration
             'prices' => 'cascade',
             'reservations' => 'cascade',
         ];
+    }
+
+    private function dropForeignIfExists(string $table, string $constraint): void
+    {
+        if (DB::getDriverName() !== 'mysql' || ! $this->foreignKeyExists($table, $constraint)) {
+            return;
+        }
+
+        Schema::table($table, function (Blueprint $blueprint) use ($constraint) {
+            $blueprint->dropForeign($constraint);
+        });
+    }
+
+    private function dropUniqueIfExists(string $table, string $indexName): void
+    {
+        if (DB::getDriverName() !== 'mysql' || ! $this->uniqueIndexExists($table, $indexName)) {
+            return;
+        }
+
+        Schema::table($table, function (Blueprint $blueprint) use ($indexName) {
+            $blueprint->dropIndex($indexName);
+        });
+    }
+
+    private function renameIndexIfExists(string $table, string $from, string $to): void
+    {
+        if (DB::getDriverName() !== 'mysql' || ! $this->indexExists($table, $from)) {
+            return;
+        }
+
+        Schema::table($table, function (Blueprint $blueprint) use ($from, $to) {
+            $blueprint->renameIndex($from, $to);
+        });
+    }
+
+    private function foreignKeyExists(string $table, string $constraint): bool
+    {
+        if (DB::getDriverName() !== 'mysql') {
+            return false;
+        }
+
+        return DB::table('information_schema.TABLE_CONSTRAINTS')
+            ->where('TABLE_SCHEMA', DB::getDatabaseName())
+            ->where('TABLE_NAME', $table)
+            ->where('CONSTRAINT_NAME', $constraint)
+            ->where('CONSTRAINT_TYPE', 'FOREIGN KEY')
+            ->exists();
+    }
+
+    private function uniqueIndexExists(string $table, string $indexName): bool
+    {
+        return $this->indexExists($table, $indexName)
+            && DB::table('information_schema.STATISTICS')
+                ->where('TABLE_SCHEMA', DB::getDatabaseName())
+                ->where('TABLE_NAME', $table)
+                ->where('INDEX_NAME', $indexName)
+                ->where('NON_UNIQUE', 0)
+                ->exists();
+    }
+
+    private function indexExists(string $table, string $indexName): bool
+    {
+        if (DB::getDriverName() !== 'mysql') {
+            return false;
+        }
+
+        return DB::table('information_schema.STATISTICS')
+            ->where('TABLE_SCHEMA', DB::getDatabaseName())
+            ->where('TABLE_NAME', $table)
+            ->where('INDEX_NAME', $indexName)
+            ->exists();
+    }
+
+    /**
+     * @param  list<string>  $columns
+     */
+    private function sqliteForeignKeyExistsOnColumns(string $table, array $columns): bool
+    {
+        if (DB::getDriverName() !== 'sqlite') {
+            return false;
+        }
+
+        $foreignKeys = DB::select('PRAGMA foreign_key_list('.$table.')');
+        $targetColumns = collect($columns)->sort()->values()->all();
+
+        foreach ($foreignKeys as $foreignKey) {
+            $fkColumns = collect($foreignKeys)
+                ->where('id', $foreignKey->id)
+                ->pluck('from')
+                ->sort()
+                ->values()
+                ->all();
+
+            if ($fkColumns === $targetColumns) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function migrateSyncLogType(bool $toCustomers): void

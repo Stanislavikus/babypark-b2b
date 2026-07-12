@@ -22,6 +22,11 @@ class CustomerRenameMigrationTest extends TestCase
     {
         Artisan::call('migrate:fresh');
 
+        if (DB::getDriverName() === 'mysql') {
+            $this->assertCustomersTableSchema();
+            $this->assertSchemaContainsNoContractorArtifacts();
+        }
+
         $workspaceId = DB::table('workspaces')->where('is_default', true)->value('id');
 
         $password = 'legacy-secret';
@@ -54,6 +59,11 @@ class CustomerRenameMigrationTest extends TestCase
             DB::table('contractors')->count(),
             'down() must preserve row count when renaming customers back to contractors'
         );
+
+        if (DB::getDriverName() === 'mysql') {
+            $this->assertContractorsTableSchema();
+            $this->assertSchemaContainsNoCustomerConstraintArtifacts();
+        }
 
         $legacyId = DB::table('contractors')->insertGetId([
             'workspace_id' => $workspaceId,
@@ -118,6 +128,11 @@ class CustomerRenameMigrationTest extends TestCase
             'up() must preserve contractor row count after rename'
         );
 
+        if (DB::getDriverName() === 'mysql') {
+            $this->assertCustomersTableSchema();
+            $this->assertSchemaContainsNoContractorArtifacts();
+        }
+
         $migrated = DB::table('customers')->where('id', $legacyId)->first();
 
         $this->assertNotNull($migrated);
@@ -142,5 +157,165 @@ class CustomerRenameMigrationTest extends TestCase
         Artisan::call('migrate:fresh');
 
         parent::tearDown();
+    }
+
+    private function assertCustomersTableSchema(): void
+    {
+        $this->assertNamedForeignKeyCount('customers', 'customers_workspace_default_price_list_fk', 1);
+        $this->assertNamedForeignKeyCount('customers', 'customers_account_manager_id_foreign', 1);
+        $this->assertNamedForeignKeyCount('customers', 'customers_backup_manager_id_foreign', 1);
+        $this->assertNamedForeignKeyCount('customers', 'customers_workspace_id_foreign', 1);
+        $this->assertNamedUniqueIndexCount('customers', 'customers_login_unique', 1);
+        $this->assertNamedUniqueIndexCount('customers', 'customers_onec_guid_unique', 1);
+        $this->assertForeignKeyCountOnColumn('customers', 'account_manager_id', 1);
+        $this->assertForeignKeyCountOnColumn('customers', 'backup_manager_id', 1);
+        $this->assertForeignKeyCountOnColumn('customers', 'workspace_id', 1);
+        $this->assertCompoundForeignKeyCount('customers', ['workspace_id', 'default_price_list_id'], 1);
+    }
+
+    private function assertContractorsTableSchema(): void
+    {
+        $this->assertNamedForeignKeyCount('contractors', 'contractors_workspace_default_price_list_fk', 1);
+        $this->assertNamedForeignKeyCount('contractors', 'contractors_account_manager_id_foreign', 1);
+        $this->assertNamedForeignKeyCount('contractors', 'contractors_backup_manager_id_foreign', 1);
+        $this->assertNamedForeignKeyCount('contractors', 'contractors_workspace_id_foreign', 1);
+        $this->assertNamedUniqueIndexCount('contractors', 'contractors_login_unique', 1);
+        $this->assertNamedUniqueIndexCount('contractors', 'contractors_onec_guid_unique', 1);
+        $this->assertForeignKeyCountOnColumn('contractors', 'account_manager_id', 1);
+        $this->assertForeignKeyCountOnColumn('contractors', 'backup_manager_id', 1);
+        $this->assertForeignKeyCountOnColumn('contractors', 'workspace_id', 1);
+        $this->assertCompoundForeignKeyCount('contractors', ['workspace_id', 'default_price_list_id'], 1);
+    }
+
+    private function assertSchemaContainsNoContractorArtifacts(): void
+    {
+        $schema = DB::getDatabaseName();
+
+        $this->assertEmpty(
+            DB::select(
+                'SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME LIKE ?',
+                [$schema, '%contractor%']
+            ),
+            'information_schema.TABLES must not contain contractor'
+        );
+
+        $this->assertEmpty(
+            DB::select(
+                'SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND COLUMN_NAME LIKE ?',
+                [$schema, '%contractor%']
+            ),
+            'information_schema.COLUMNS must not contain contractor'
+        );
+
+        $this->assertEmpty(
+            DB::select(
+                'SELECT TABLE_NAME, CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = ? AND CONSTRAINT_NAME LIKE ?',
+                [$schema, '%contractor%']
+            ),
+            'information_schema.TABLE_CONSTRAINTS must not contain contractor'
+        );
+
+        $this->assertEmpty(
+            DB::select(
+                'SELECT TABLE_NAME, INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND INDEX_NAME LIKE ?',
+                [$schema, '%contractor%']
+            ),
+            'information_schema.STATISTICS must not contain contractor'
+        );
+    }
+
+    private function assertSchemaContainsNoCustomerConstraintArtifacts(): void
+    {
+        $schema = DB::getDatabaseName();
+
+        $this->assertEmpty(
+            DB::select(
+                'SELECT TABLE_NAME, CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = ? AND CONSTRAINT_NAME LIKE ?',
+                [$schema, 'customers_%']
+            ),
+            'information_schema.TABLE_CONSTRAINTS must not contain customers_ after down()'
+        );
+
+        $this->assertEmpty(
+            DB::select(
+                'SELECT TABLE_NAME, INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND INDEX_NAME LIKE ?',
+                [$schema, 'customers_%']
+            ),
+            'information_schema.STATISTICS must not contain customers_ after down()'
+        );
+    }
+
+    private function assertNamedForeignKeyCount(string $table, string $constraintName, int $expected): void
+    {
+        $count = DB::table('information_schema.TABLE_CONSTRAINTS')
+            ->where('TABLE_SCHEMA', DB::getDatabaseName())
+            ->where('TABLE_NAME', $table)
+            ->where('CONSTRAINT_NAME', $constraintName)
+            ->where('CONSTRAINT_TYPE', 'FOREIGN KEY')
+            ->count();
+
+        $this->assertSame($expected, $count, "Expected {$expected} FK named {$constraintName} on {$table}");
+    }
+
+    private function assertNamedUniqueIndexCount(string $table, string $indexName, int $expected): void
+    {
+        $count = DB::table('information_schema.STATISTICS')
+            ->where('TABLE_SCHEMA', DB::getDatabaseName())
+            ->where('TABLE_NAME', $table)
+            ->where('INDEX_NAME', $indexName)
+            ->where('NON_UNIQUE', 0)
+            ->distinct('INDEX_NAME')
+            ->count('INDEX_NAME');
+
+        $this->assertSame($expected, $count, "Expected {$expected} unique index named {$indexName} on {$table}");
+    }
+
+    private function assertForeignKeyCountOnColumn(string $table, string $column, int $expected): void
+    {
+        $count = DB::table('information_schema.KEY_COLUMN_USAGE')
+            ->where('TABLE_SCHEMA', DB::getDatabaseName())
+            ->where('TABLE_NAME', $table)
+            ->where('COLUMN_NAME', $column)
+            ->whereNotNull('REFERENCED_TABLE_NAME')
+            ->distinct('CONSTRAINT_NAME')
+            ->count('CONSTRAINT_NAME');
+
+        $this->assertSame($expected, $count, "Expected {$expected} FK on {$table}.{$column}");
+    }
+
+    /**
+     * @param  list<string>  $columns
+     */
+    private function assertCompoundForeignKeyCount(string $table, array $columns, int $expected): void
+    {
+        $schema = DB::getDatabaseName();
+
+        $constraints = DB::table('information_schema.KEY_COLUMN_USAGE')
+            ->where('TABLE_SCHEMA', $schema)
+            ->where('TABLE_NAME', $table)
+            ->whereIn('COLUMN_NAME', $columns)
+            ->whereNotNull('REFERENCED_TABLE_NAME')
+            ->pluck('CONSTRAINT_NAME')
+            ->unique()
+            ->values();
+
+        $matching = $constraints->filter(function (string $constraint) use ($schema, $table, $columns) {
+            $constraintColumns = DB::table('information_schema.KEY_COLUMN_USAGE')
+                ->where('TABLE_SCHEMA', $schema)
+                ->where('TABLE_NAME', $table)
+                ->where('CONSTRAINT_NAME', $constraint)
+                ->orderBy('ORDINAL_POSITION')
+                ->pluck('COLUMN_NAME')
+                ->values()
+                ->all();
+
+            return $constraintColumns === $columns;
+        });
+
+        $this->assertSame(
+            $expected,
+            $matching->count(),
+            'Expected '.$expected.' compound FK on '.implode('+', $columns).' for '.$table
+        );
     }
 }
