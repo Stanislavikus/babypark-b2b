@@ -906,16 +906,6 @@ The term contractor may appear only in connectors where external systems use it.
 
 For example, a 1C connector may map an external contractor to the platform Customer.
 
-**Pending code migration (tracked, not yet done):** as of this writing, the
-codebase still names the model, table, Filament resource, auth guard/provider,
-and related services/tests after `Contractor`, not `Customer`. This is a
-pre-launch, one-time terminology migration (`Contractor` → `Customer`,
-including `config/auth.php`'s `contractor` guard / `contractors` provider and
-all `Auth::guard('contractor')` / `guest:contractor` usages) — sequenced before
-the Field Foundation migration described later in this document. The word
-`contractor` remains acceptable only inside the 1C connector adapter itself
-(e.g. `OneCContractorDto`), per this section's existing rule.
-
 ### Customer
 
 
