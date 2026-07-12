@@ -1,15 +1,15 @@
 <?php
 
-namespace App\Filament\Resources\ContractorResource\Support;
+namespace App\Filament\Resources\CustomerResource\Support;
 
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\PriceList;
 use App\Services\Pricing\AssignmentPreview;
 use App\Services\Pricing\AssignmentResult;
-use App\Services\Pricing\ContractorPriceListAssignmentDisplay;
-use App\Services\Pricing\ContractorPriceListAssignmentService;
+use App\Services\Pricing\CustomerPriceListAssignmentDisplay;
+use App\Services\Pricing\CustomerPriceListAssignmentService;
 
-class ContractorPriceListUi
+class CustomerPriceListUi
 {
     public static function formatPreviewText(AssignmentPreview $preview, ?string $targetPriceListId): string
     {
@@ -51,13 +51,13 @@ class ContractorPriceListUi
         );
     }
 
-    public static function resolveDisplay(Contractor $contractor): ContractorPriceListAssignmentDisplay
+    public static function resolveDisplay(Customer $customer): CustomerPriceListAssignmentDisplay
     {
-        return ContractorPriceListAssignmentDisplay::resolve($contractor);
+        return CustomerPriceListAssignmentDisplay::resolve($customer);
     }
 
-    public static function assignmentService(): ContractorPriceListAssignmentService
+    public static function assignmentService(): CustomerPriceListAssignmentService
     {
-        return app(ContractorPriceListAssignmentService::class);
+        return app(CustomerPriceListAssignmentService::class);
     }
 }

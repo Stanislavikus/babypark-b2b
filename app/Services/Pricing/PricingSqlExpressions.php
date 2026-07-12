@@ -44,7 +44,7 @@ class PricingSqlExpressions
     }
 
     /**
-     * Minimum gross contractor price across active variants (price list item tier qty=1, else base cache).
+     * Minimum gross customer price across active variants (price list item tier qty=1, else base cache).
      */
     public static function minGrossPriceSqlForProduct(string $productIdColumn, string $priceListId): string
     {
@@ -74,7 +74,7 @@ class PricingSqlExpressions
     }
 
     /**
-     * Maximum gross contractor price across active variants.
+     * Maximum gross customer price across active variants.
      */
     public static function maxGrossPriceSqlForProduct(string $productIdColumn, string $priceListId): string
     {
@@ -121,9 +121,9 @@ class PricingSqlExpressions
     }
 
     /**
-     * Contractor margin sort: max RRP cache minus min gross contractor price.
+     * Customer margin sort: max RRP cache minus min gross customer price.
      */
-    public static function contractorMarginSortSql(string $productIdColumn, string $priceListId): string
+    public static function customerMarginSortSql(string $productIdColumn, string $priceListId): string
     {
         $maxRrp = self::maxRrpSqlForProduct($productIdColumn);
         $minGross = self::minGrossPriceSqlForProduct($productIdColumn, $priceListId);

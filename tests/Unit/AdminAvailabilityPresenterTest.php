@@ -3,7 +3,7 @@
 namespace Tests\Unit;
 
 use App\Enums\ReservationStatus;
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Reservation;
@@ -39,11 +39,11 @@ class AdminAvailabilityPresenterTest extends TestCase
         return AdminAvailabilityPresenter::BUCKET_OUT_OF_STOCK;
     }
 
-    private function createContractor(): Contractor
+    private function createCustomer(): Customer
     {
-        return Contractor::query()->create([
+        return Customer::query()->create([
             'onec_guid' => (string) Str::uuid(),
-            'name' => 'Test Contractor',
+            'name' => 'Test Customer',
             'short_name' => 'TC',
             'login' => 'test-'.Str::random(6),
             'password' => 'password',
@@ -72,7 +72,7 @@ class AdminAvailabilityPresenterTest extends TestCase
 
         Reservation::create([
             'workspace_id' => $variant->workspace_id,
-            'contractor_id' => $this->createContractor()->id,
+            'customer_id' => $this->createCustomer()->id,
             'variant_id' => $variant->id,
             'quantity' => 10,
             'status' => ReservationStatus::Pending,
@@ -120,7 +120,7 @@ class AdminAvailabilityPresenterTest extends TestCase
             if ($config['reserve'] > 0) {
                 Reservation::create([
                     'workspace_id' => $workspace->id,
-                    'contractor_id' => $this->createContractor()->id,
+                    'customer_id' => $this->createCustomer()->id,
                     'variant_id' => $variant->id,
                     'quantity' => $config['reserve'],
                     'status' => ReservationStatus::Pending,

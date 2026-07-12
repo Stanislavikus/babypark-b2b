@@ -20,17 +20,16 @@ Rules for using this document:
 - No Babypark-specific hardcoding is permitted as a "solution" to any gap (per
   `04-ARCHITECTURE_PRINCIPLES.md`, Configuration Over Custom Code mandate).
 
-Verified against `develop` as of this Documentation Truth Reset pass:
-`app/Models/` contains `AttributeDefinition, Category, Contractor,
+Verified against `develop` as of the GAP-017 migration (PR pending):
+`app/Models/` contains `AttributeDefinition, Category, Customer,
 DeliverySetting, InventoryLocation, InventoryRecord, Order, OrderItem, Price,
 PriceList, PriceListItem, Product, ProductAttributeValue, ProductTag,
 ProductVariant, Reservation, Stock, SyncLog, Tag, User, VariantAttributeValue,
-Workspace, WorkspaceImportAlias` (22 models — this list previously said "only
-12 models, no `AttributeDefinition`", which was stale; superseded here).
-`workspace_id` appears in 9 migrations and via `BelongsToWorkspace`/
-`BelongsToWorkspaceOrGlobal` on 14 models — see GAP-004 for the caveat that
-this is a sampling check, not a full audit. `AttributeDefinition` and related
-entities still use pre-Field-Foundation naming — see GAP-016.
+Workspace, WorkspaceImportAlias` (22 models). `workspace_id` appears in 9
+migrations and via `BelongsToWorkspace`/`BelongsToWorkspaceOrGlobal` on 14
+models — see GAP-004 for the caveat that this is a sampling check, not a full
+audit. `AttributeDefinition` and related entities still use pre-Field-Foundation
+naming — see GAP-016.
 
 ---
 
@@ -186,7 +185,7 @@ migration (see "Field Foundation", Workspace isolation note, in
 **Current code (re-verified against `develop`):**
 - `workspace_id` now appears in 9 migrations; `BelongsToWorkspace` /
   `BelongsToWorkspaceOrGlobal` traits are applied to 14 models, including
-  `Product`, `AttributeDefinition`, `Contractor`, `PriceList`, `Category`.
+  `Product`, `AttributeDefinition`, `Customer`, `PriceList`, `Category`.
 - This check was a **sampling audit**, not a full inventory of every
   workspace-owned table, model, background job, and raw query in the codebase.
 
@@ -646,10 +645,10 @@ tags.
   target shape, including the new `FieldBinding` entity and the
   one-binding-per-object_type rule replacing `value_level`.
 
-**Next task:** Field Foundation migration — sequenced after GAP-017
-(Contractor → Customer) and before GAP-006 (Connector Foundation) resumes.
+**Next task:** Field Foundation migration — GAP-017 prerequisite blocker removed;
+sequenced before GAP-006 (Connector Foundation) resumes.
 
-**Status:** Open, not started.
+**Status:** Open, not started — unblocked by GAP-017 closure.
 
 ---
 
@@ -661,7 +660,7 @@ tags.
   only inside a connector adapter that itself uses that external term (e.g.
   the 1C connector).
 
-**Current code:**
+**Current code (historical — state before this migration landed):**
 - The codebase still names the model, table, Filament resource, pages, and
   related services/tests after `Contractor`, not `Customer`
   (`app/Models/Contractor.php`, `ContractorResource`, `ListContractors`,
@@ -687,7 +686,7 @@ tags.
   guard/provider, routes, middleware) — not folded into the Field Foundation
   migration (GAP-016), and not left as a side effect of some other task.
 
-**Next task:** Contractor → Customer terminology/auth migration — sequenced
-before GAP-016 (Field Foundation), per the approved phased plan.
+**Next task:** None — closed. GAP-016 (Field Foundation migration) is now
+unblocked as the next sequenced task.
 
-**Status:** Open, not started.
+**Status:** Closed in code.

@@ -8,7 +8,7 @@ use App\Models\ProductVariant;
 use App\Services\Availability\ReservationCreator;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Support\CatalogRowData;
-use App\Support\Pricing\ContractorPricingScope;
+use App\Support\Pricing\CustomerPricingScope;
 use App\Support\SessionCart;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
@@ -163,7 +163,7 @@ class Catalog extends Component
      */
     public function reserve(int $variantId, int $minQty): void
     {
-        $contractor = Auth::guard('contractor')->user();
+        $customer = Auth::guard('customer')->user();
         $qty = max($minQty, (int) ($this->quantities[$variantId] ?? $minQty));
 
         $variant = ProductVariant::query()->findOrFail($variantId);
@@ -171,7 +171,7 @@ class Catalog extends Component
         app(ReservationCreator::class)->create(
             $variant,
             $qty,
-            contractor: $contractor,
+            customer: $customer,
             ttlMinutes: config('b2b.reservation_ttl_hours', 48) * 60,
         );
 
@@ -181,12 +181,12 @@ class Catalog extends Component
 
     public function render()
     {
-        $contractor = Auth::guard('contractor')->user();
+        $customer = Auth::guard('customer')->user();
 
-        $query = ContractorPricingScope::applyProductScope(
+        $query = CustomerPricingScope::applyProductScope(
             Product::query()->where('is_active', true),
-            $contractor,
-        )->with(ContractorPricingScope::eagerLoadForContractor($contractor));
+            $customer,
+        )->with(CustomerPricingScope::eagerLoadForCustomer($customer));
 
         if (filled($this->search)) {
             $query->where(fn ($q) => $q
@@ -204,12 +204,12 @@ class Catalog extends Component
             $query->whereIn('brand', $this->selectedBrands);
         }
 
-        $query = $this->applySorting($query, $contractor);
+        $query = $this->applySorting($query, $customer);
         $products = $query->paginate(24);
 
         $productData = [];
         foreach ($products as $product) {
-            $data = CatalogRowData::forProduct($product, $contractor);
+            $data = CatalogRowData::forProduct($product, $customer);
             $firstVariant = $data['firstVariant'];
 
             if ($firstVariant && ! isset($this->quantities[$firstVariant->id])) {
@@ -228,9 +228,9 @@ class Catalog extends Component
         }
 
         $categories = Category::orderBy('name')->get();
-        $brands = ContractorPricingScope::applyProductScope(
+        $brands = CustomerPricingScope::applyProductScope(
             Product::query()->where('is_active', true)->whereNotNull('brand'),
-            $contractor,
+            $customer,
         )->distinct()->orderBy('brand')->pluck('brand');
 
         return view('livewire.cabinet.catalog', compact(
@@ -241,10 +241,10 @@ class Catalog extends Component
         ));
     }
 
-    private function applySorting(Builder $query, $contractor): Builder
+    private function applySorting(Builder $query, $customer): Builder
     {
         $dir = in_array($this->sortDir, ['asc', 'desc']) ? $this->sortDir : 'asc';
-        $priceListId = ContractorPricingScope::priceListIdFor($contractor);
+        $priceListId = CustomerPricingScope::priceListIdFor($customer);
 
         return match ($this->sortBy) {
             'sku' => $query->orderBy('sku', $dir),
@@ -267,7 +267,7 @@ class Catalog extends Component
             ),
             'margin' => $priceListId
                 ? $query->orderByRaw(
-                    PricingSqlExpressions::contractorMarginSortSql('products.id', $priceListId)." {$dir}"
+                    PricingSqlExpressions::customerMarginSortSql('products.id', $priceListId)." {$dir}"
                 )
                 : $query->orderBy('sku', $dir),
             default => $query->orderBy('sku', 'asc'),

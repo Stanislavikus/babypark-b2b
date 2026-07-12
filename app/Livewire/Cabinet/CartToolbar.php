@@ -21,13 +21,13 @@ class CartToolbar extends Component
 
     public function render()
     {
-        $contractor = auth('contractor')->user();
-        $lines = SessionCart::linesForContractor($contractor);
+        $customer = auth('customer')->user();
+        $lines = SessionCart::linesForCustomer($customer);
 
         return view('livewire.cabinet.cart-toolbar', [
             'lines' => $lines,
             'count' => count($lines),
-            'total' => SessionCart::totalWithVat($contractor),
+            'total' => SessionCart::totalWithVat($customer),
         ]);
     }
 }

@@ -31,9 +31,9 @@ class ReservationResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Select::make('contractor_id')
-                    ->label('Контрагент')
-                    ->relationship('contractor', 'name')
+                Forms\Components\Select::make('customer_id')
+                    ->label('Клієнт')
+                    ->relationship('customer', 'name')
                     ->disabled(),
                 Forms\Components\Select::make('variant_id')
                     ->label('Варіант')
@@ -56,8 +56,8 @@ class ReservationResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('contractor.name')
-                    ->label('Контрагент')
+                Tables\Columns\TextColumn::make('customer.name')
+                    ->label('Клієнт')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('variant.sku')

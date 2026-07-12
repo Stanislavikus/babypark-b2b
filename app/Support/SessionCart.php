@@ -3,7 +3,7 @@
 namespace App\Support;
 
 use App\Exceptions\Pricing\PriceNotAvailableException;
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\Order;
 use App\Models\ProductVariant;
 use App\Services\Pricing\PriceResolver;
@@ -64,7 +64,7 @@ class SessionCart
     }
 
     /**
-     * Cart lines with contractor-specific resolved prices for display.
+     * Cart lines with customer-specific resolved prices for display.
      *
      * @return list<array{
      *     variant_id: int,
@@ -79,11 +79,11 @@ class SessionCart
      *     price_label: string,
      * }>
      */
-    public static function linesForContractor(Contractor $contractor): array
+    public static function linesForCustomer(Customer $customer): array
     {
         return array_map(
             fn (array $line) => self::publicLineFromResolved($line),
-            self::resolvedLinesForContractor($contractor),
+            self::resolvedLinesForCustomer($customer),
         );
     }
 
@@ -103,7 +103,7 @@ class SessionCart
      *     line_total: ?float,
      * }>
      */
-    public static function resolvedLinesForContractor(Contractor $contractor): array
+    public static function resolvedLinesForCustomer(Customer $customer): array
     {
         $cart = self::all();
 
@@ -137,7 +137,7 @@ class SessionCart
             $lineTotal = null;
 
             try {
-                $resolved = $resolver->resolveForContractor($variant, $contractor, $quantity);
+                $resolved = $resolver->resolveForCustomer($variant, $customer, $quantity);
                 $grossPrice = $resolved->grossPrice;
                 $regularNetPrice = $resolved->regularNetPrice;
                 $salePrice = $resolved->salePrice;
@@ -163,19 +163,19 @@ class SessionCart
         return $lines;
     }
 
-    public static function totalWithVat(Contractor $contractor): float
+    public static function totalWithVat(Customer $customer): float
     {
         return array_sum(
             array_map(
                 fn (array $line) => $line['line_total'] ?? 0.0,
-                self::resolvedLinesForContractor($contractor),
+                self::resolvedLinesForCustomer($customer),
             )
         );
     }
 
-    public static function hasUnavailablePrices(Contractor $contractor): bool
+    public static function hasUnavailablePrices(Customer $customer): bool
     {
-        foreach (self::resolvedLinesForContractor($contractor) as $line) {
+        foreach (self::resolvedLinesForCustomer($customer) as $line) {
             if (! $line['price_available']) {
                 return true;
             }

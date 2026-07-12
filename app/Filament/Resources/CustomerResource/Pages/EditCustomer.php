@@ -1,18 +1,18 @@
 <?php
 
-namespace App\Filament\Resources\ContractorResource\Pages;
+namespace App\Filament\Resources\CustomerResource\Pages;
 
 use App\Exceptions\Pricing\InvalidPriceListAssignmentException;
-use App\Filament\Resources\ContractorResource;
+use App\Filament\Resources\CustomerResource;
 use App\Models\PriceList;
-use App\Services\Pricing\ContractorPriceListAssignmentService;
+use App\Services\Pricing\CustomerPriceListAssignmentService;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Validation\ValidationException;
 
-class EditContractor extends EditRecord
+class EditCustomer extends EditRecord
 {
-    protected static string $resource = ContractorResource::class;
+    protected static string $resource = CustomerResource::class;
 
     protected function getHeaderActions(): array
     {
@@ -46,7 +46,7 @@ class EditContractor extends EditRecord
 
         if ($submittedTargetId !== $originalTargetId) {
             try {
-                app(ContractorPriceListAssignmentService::class)
+                app(CustomerPriceListAssignmentService::class)
                     ->validateTarget($record->workspace_id, $submittedTargetId);
             } catch (InvalidPriceListAssignmentException $exception) {
                 throw ValidationException::withMessages([

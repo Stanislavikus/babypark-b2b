@@ -18,10 +18,10 @@ class PriceProvenancePresenter
 
         $source = $price->source;
 
-        if (in_array($source, ['contractor_price_list', 'workspace_default_price_list'], true)) {
+        if (in_array($source, ['customer_price_list', 'workspace_default_price_list'], true)) {
             $this->assertListBasedSource($price, $sourcePriceList);
 
-            $label = $source === 'contractor_price_list'
+            $label = $source === 'customer_price_list'
                 ? "Індивідуальний прайс-лист «{$sourcePriceList->name}»"
                 : 'Основний прайс-лист компанії';
         } elseif ($source === 'base_price_cache') {

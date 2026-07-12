@@ -42,8 +42,8 @@ class PriceList extends Model
         return $this->hasMany(PriceListItem::class);
     }
 
-    public function contractors(): HasMany
+    public function customers(): HasMany
     {
-        return $this->hasMany(Contractor::class, 'default_price_list_id');
+        return $this->hasMany(Customer::class, 'default_price_list_id');
     }
 }

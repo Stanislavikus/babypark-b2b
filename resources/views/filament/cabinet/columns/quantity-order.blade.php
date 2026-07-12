@@ -2,8 +2,8 @@
     use App\Support\CatalogRowData;
     use Livewire\Livewire;
 
-    $contractor = auth('contractor')->user();
-    $data = CatalogRowData::forProduct($getRecord(), $contractor);
+    $customer = auth('customer')->user();
+    $data = CatalogRowData::forProduct($getRecord(), $customer);
     $firstVariant = $data['firstVariant'];
     $maxQty = $data['maxQty'];
     $minQty = $data['minQty'];

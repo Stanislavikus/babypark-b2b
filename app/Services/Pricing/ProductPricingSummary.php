@@ -3,7 +3,7 @@
 namespace App\Services\Pricing;
 
 use App\Exceptions\Pricing\PriceNotAvailableException;
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\Pricing\VariantPriceDisplay;
@@ -80,11 +80,11 @@ class ProductPricingSummary
 
     public function resolveVariantDisplay(
         ProductVariant $variant,
-        Contractor $contractor,
+        Customer $customer,
         int $quantity = 1,
     ): VariantPriceDisplay {
         try {
-            $resolved = $this->priceResolver->resolveForContractor($variant, $contractor, $quantity);
+            $resolved = $this->priceResolver->resolveForCustomer($variant, $customer, $quantity);
             $rrp = $variant->recommended_retail_price_cache !== null
                 ? (float) $variant->recommended_retail_price_cache
                 : null;
@@ -97,46 +97,46 @@ class ProductPricingSummary
 
     public function tryResolveVariantDisplay(
         ProductVariant $variant,
-        Contractor $contractor,
+        Customer $customer,
         int $quantity = 1,
     ): ?VariantPriceDisplay {
-        $display = $this->resolveVariantDisplay($variant, $contractor, $quantity);
+        $display = $this->resolveVariantDisplay($variant, $customer, $quantity);
 
         return $display->available ? $display : null;
     }
 
-    public function minGrossPriceForContractor(Product $product, Contractor $contractor): ?float
+    public function minGrossPriceForCustomer(Product $product, Customer $customer): ?float
     {
         $prices = $product->variants
             ->where('is_active', true)
-            ->map(fn (ProductVariant $variant) => $this->tryResolveVariantDisplay($variant, $contractor)?->grossPrice)
+            ->map(fn (ProductVariant $variant) => $this->tryResolveVariantDisplay($variant, $customer)?->grossPrice)
             ->filter()
             ->values();
 
         return $prices->isEmpty() ? null : $prices->min();
     }
 
-    public function formatContractorGrossPrice(Product $product, Contractor $contractor): ?string
+    public function formatCustomerGrossPrice(Product $product, Customer $customer): ?string
     {
         $prices = $product->variants
             ->where('is_active', true)
-            ->map(fn (ProductVariant $variant) => $this->tryResolveVariantDisplay($variant, $contractor)?->grossPrice)
+            ->map(fn (ProductVariant $variant) => $this->tryResolveVariantDisplay($variant, $customer)?->grossPrice)
             ->filter()
             ->values();
 
         return self::formatMoneyRange($prices);
     }
 
-    public function variantHasResolvablePrice(ProductVariant $variant, Contractor $contractor, int $quantity = 1): bool
+    public function variantHasResolvablePrice(ProductVariant $variant, Customer $customer, int $quantity = 1): bool
     {
-        return $this->tryResolveVariantDisplay($variant, $contractor, $quantity) !== null;
+        return $this->tryResolveVariantDisplay($variant, $customer, $quantity) !== null;
     }
 
-    public function productHasResolvablePrice(Product $product, Contractor $contractor): bool
+    public function productHasResolvablePrice(Product $product, Customer $customer): bool
     {
         return $product->variants
             ->where('is_active', true)
-            ->contains(fn (ProductVariant $variant) => $this->variantHasResolvablePrice($variant, $contractor));
+            ->contains(fn (ProductVariant $variant) => $this->variantHasResolvablePrice($variant, $customer));
     }
 
     public function resolveDefaultDisplay(ProductVariant $variant, int $quantity = 1): VariantPriceDisplay

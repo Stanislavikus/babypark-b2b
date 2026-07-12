@@ -13,7 +13,7 @@ class Reservation extends Model
 
     protected $fillable = [
         'workspace_id',
-        'contractor_id',
+        'customer_id',
         'order_id',
         'order_item_id',
         'variant_id',
@@ -36,9 +36,9 @@ class Reservation extends Model
         return $this->belongsTo(Workspace::class);
     }
 
-    public function contractor(): BelongsTo
+    public function customer(): BelongsTo
     {
-        return $this->belongsTo(Contractor::class);
+        return $this->belongsTo(Customer::class);
     }
 
     public function order(): BelongsTo

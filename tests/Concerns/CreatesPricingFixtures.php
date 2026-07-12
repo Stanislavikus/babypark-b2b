@@ -4,7 +4,7 @@ namespace Tests\Concerns;
 
 use App\Enums\PriceListItemStatus;
 use App\Enums\PriceListStatus;
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\Product;
@@ -19,14 +19,14 @@ trait CreatesPricingFixtures
         return Workspace::query()->where('is_default', true)->sole();
     }
 
-    protected function createContractor(?Workspace $workspace = null): Contractor
+    protected function createCustomer(?Workspace $workspace = null): Customer
     {
         $workspace ??= $this->defaultWorkspace();
 
-        return Contractor::withoutWorkspaceScope()->create([
+        return Customer::withoutWorkspaceScope()->create([
             'workspace_id' => $workspace->id,
             'onec_guid' => (string) Str::uuid(),
-            'name' => 'Pricing Contractor '.Str::random(4),
+            'name' => 'Pricing Customer '.Str::random(4),
             'short_name' => 'PC',
             'login' => 'pricing-'.Str::random(8),
             'password' => 'password',

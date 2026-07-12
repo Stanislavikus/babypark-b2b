@@ -7,18 +7,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\Response;
 
-class ContractorAuthenticated
+class CustomerAuthenticated
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! Auth::guard('contractor')->check()) {
+        if (! Auth::guard('customer')->check()) {
             return redirect()->route('cabinet.login');
         }
 
-        $contractor = Auth::guard('contractor')->user();
+        $customer = Auth::guard('customer')->user();
 
-        if (! $contractor->is_active) {
-            Auth::guard('contractor')->logout();
+        if (! $customer->is_active) {
+            Auth::guard('customer')->logout();
 
             return redirect()->route('cabinet.login')
                 ->withErrors(['login' => 'Ваш акаунт деактивовано.']);

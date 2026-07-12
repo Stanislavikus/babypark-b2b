@@ -4,20 +4,20 @@ namespace Tests\Feature;
 
 use App\Enums\PriceListStatus;
 use App\Enums\UserRole;
-use App\Filament\Resources\ContractorResource\Pages\EditContractor;
-use App\Filament\Resources\ContractorResource\Pages\ListContractors;
-use App\Filament\Resources\ContractorResource\Pages\ViewContractor;
+use App\Filament\Resources\CustomerResource\Pages\EditCustomer;
+use App\Filament\Resources\CustomerResource\Pages\ListCustomers;
+use App\Filament\Resources\CustomerResource\Pages\ViewCustomer;
 use App\Models\PriceList;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Pricing\ContractorPriceListAssignmentService;
+use App\Services\Pricing\CustomerPriceListAssignmentService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\Concerns\CreatesPricingFixtures;
 use Tests\TestCase;
 
-class ContractorPriceListAssignmentTest extends TestCase
+class CustomerPriceListAssignmentTest extends TestCase
 {
     use CreatesPricingFixtures;
     use RefreshDatabase;
@@ -45,21 +45,21 @@ class ContractorPriceListAssignmentTest extends TestCase
 
     public function test_single_assignment_persists_active_price_list(): void
     {
-        $contractor = $this->createContractor($this->workspace);
+        $customer = $this->createCustomer($this->workspace);
         $optList = $this->createPriceList($this->workspace, isDefault: false);
 
         Livewire::actingAs($this->admin)
-            ->test(EditContractor::class, ['record' => $contractor->getRouteKey()])
+            ->test(EditCustomer::class, ['record' => $customer->getRouteKey()])
             ->fillForm(['default_price_list_id' => $optList->id])
             ->call('save')
             ->assertHasNoFormErrors();
 
-        $this->assertSame($optList->id, $contractor->fresh()->default_price_list_id);
+        $this->assertSame($optList->id, $customer->fresh()->default_price_list_id);
     }
 
     public function test_single_assignment_rejects_invalid_targets_when_changing(): void
     {
-        $contractor = $this->createContractor($this->workspace);
+        $customer = $this->createCustomer($this->workspace);
         $defaultList = PriceList::withoutWorkspaceScope()
             ->where('workspace_id', $this->workspace->id)
             ->where('is_default', true)
@@ -80,19 +80,19 @@ class ContractorPriceListAssignmentTest extends TestCase
         ]);
 
         Livewire::actingAs($this->admin)
-            ->test(EditContractor::class, ['record' => $contractor->getRouteKey()])
+            ->test(EditCustomer::class, ['record' => $customer->getRouteKey()])
             ->set('data.default_price_list_id', $defaultList->id)
             ->call('save')
             ->assertHasFormErrors(['default_price_list_id']);
 
         Livewire::actingAs($this->admin)
-            ->test(EditContractor::class, ['record' => $contractor->getRouteKey()])
+            ->test(EditCustomer::class, ['record' => $customer->getRouteKey()])
             ->set('data.default_price_list_id', $inactive->id)
             ->call('save')
             ->assertHasFormErrors(['default_price_list_id']);
 
         Livewire::actingAs($this->admin)
-            ->test(EditContractor::class, ['record' => $contractor->getRouteKey()])
+            ->test(EditCustomer::class, ['record' => $customer->getRouteKey()])
             ->set('data.default_price_list_id', $foreignList->id)
             ->call('save')
             ->assertHasFormErrors(['default_price_list_id']);
@@ -106,11 +106,11 @@ class ContractorPriceListAssignmentTest extends TestCase
             ->firstOrFail();
         $inactive = $this->createPriceList($this->workspace, status: PriceListStatus::Inactive);
 
-        $inactiveContractor = $this->createContractor($this->workspace);
-        $inactiveContractor->update(['default_price_list_id' => $inactive->id]);
+        $inactiveCustomer = $this->createCustomer($this->workspace);
+        $inactiveCustomer->update(['default_price_list_id' => $inactive->id]);
 
         Livewire::actingAs($this->admin)
-            ->test(EditContractor::class, ['record' => $inactiveContractor->getRouteKey()])
+            ->test(EditCustomer::class, ['record' => $inactiveCustomer->getRouteKey()])
             ->fillForm([
                 'email' => 'inactive-historical@example.com',
                 'default_price_list_id' => $inactive->id,
@@ -118,14 +118,14 @@ class ContractorPriceListAssignmentTest extends TestCase
             ->call('save')
             ->assertHasNoFormErrors();
 
-        $this->assertSame($inactive->id, $inactiveContractor->fresh()->default_price_list_id);
-        $this->assertSame('inactive-historical@example.com', $inactiveContractor->fresh()->email);
+        $this->assertSame($inactive->id, $inactiveCustomer->fresh()->default_price_list_id);
+        $this->assertSame('inactive-historical@example.com', $inactiveCustomer->fresh()->email);
 
-        $redundantContractor = $this->createContractor($this->workspace);
-        $redundantContractor->update(['default_price_list_id' => $defaultList->id]);
+        $redundantCustomer = $this->createCustomer($this->workspace);
+        $redundantCustomer->update(['default_price_list_id' => $defaultList->id]);
 
         Livewire::actingAs($this->admin)
-            ->test(EditContractor::class, ['record' => $redundantContractor->getRouteKey()])
+            ->test(EditCustomer::class, ['record' => $redundantCustomer->getRouteKey()])
             ->fillForm([
                 'email' => 'redundant@example.com',
                 'default_price_list_id' => $defaultList->id,
@@ -133,23 +133,23 @@ class ContractorPriceListAssignmentTest extends TestCase
             ->call('save')
             ->assertHasNoFormErrors();
 
-        $this->assertSame($defaultList->id, $redundantContractor->fresh()->default_price_list_id);
-        $this->assertSame('redundant@example.com', $redundantContractor->fresh()->email);
+        $this->assertSame($defaultList->id, $redundantCustomer->fresh()->default_price_list_id);
+        $this->assertSame('redundant@example.com', $redundantCustomer->fresh()->email);
     }
 
     public function test_null_assignment_displays_inherited_default_across_surfaces(): void
     {
-        $contractor = $this->createContractor($this->workspace);
-        $contractor->update(['default_price_list_id' => null, 'name' => 'Inherited Default Contractor']);
+        $customer = $this->createCustomer($this->workspace);
+        $customer->update(['default_price_list_id' => null, 'name' => 'Inherited Default Customer']);
 
         Livewire::actingAs($this->admin)
-            ->test(ViewContractor::class, ['record' => $contractor->getRouteKey()])
+            ->test(ViewCustomer::class, ['record' => $customer->getRouteKey()])
             ->assertSee('Основний прайс компанії')
             ->assertSee('Індивідуальний прайс-лист не призначено');
 
         Livewire::actingAs($this->admin)
-            ->test(ListContractors::class)
-            ->assertSee('Inherited Default Contractor')
+            ->test(ListCustomers::class)
+            ->assertSee('Inherited Default Customer')
             ->assertSee('Основний прайс компанії');
     }
 
@@ -169,44 +169,44 @@ class ContractorPriceListAssignmentTest extends TestCase
             'status' => PriceListStatus::Inactive,
         ]);
 
-        $inactiveContractor = $this->createContractor($this->workspace);
-        $inactiveContractor->update([
+        $inactiveCustomer = $this->createCustomer($this->workspace);
+        $inactiveCustomer->update([
             'default_price_list_id' => $inactive->id,
-            'name' => 'Inactive Assignment Contractor',
+            'name' => 'Inactive Assignment Customer',
         ]);
 
-        $redundantContractor = $this->createContractor($this->workspace);
-        $redundantContractor->update([
+        $redundantCustomer = $this->createCustomer($this->workspace);
+        $redundantCustomer->update([
             'default_price_list_id' => $defaultList->id,
-            'name' => 'Redundant Assignment Contractor',
+            'name' => 'Redundant Assignment Customer',
         ]);
 
         Livewire::actingAs($this->admin)
-            ->test(ViewContractor::class, ['record' => $inactiveContractor->getRouteKey()])
+            ->test(ViewCustomer::class, ['record' => $inactiveCustomer->getRouteKey()])
             ->assertSee('Опт-2')
             ->assertSee('неактивний')
             ->assertSee('Фактично використовується основний прайс-лист компанії');
 
         Livewire::actingAs($this->admin)
-            ->test(ViewContractor::class, ['record' => $redundantContractor->getRouteKey()])
+            ->test(ViewCustomer::class, ['record' => $redundantCustomer->getRouteKey()])
             ->assertSee('основний прайс-лист компанії')
             ->assertSee('Рекомендується використовувати «За замовчуванням»');
 
         Livewire::actingAs($this->admin)
-            ->test(ListContractors::class)
-            ->assertSee('Inactive Assignment Contractor')
+            ->test(ListCustomers::class)
+            ->assertSee('Inactive Assignment Customer')
             ->assertSee('Опт-2')
             ->assertSee('Неактивний')
-            ->assertSee('Redundant Assignment Contractor')
+            ->assertSee('Redundant Assignment Customer')
             ->assertSee('рекомендується «За замовчуванням»');
 
         Livewire::actingAs($this->admin)
-            ->test(EditContractor::class, ['record' => $inactiveContractor->getRouteKey()])
+            ->test(EditCustomer::class, ['record' => $inactiveCustomer->getRouteKey()])
             ->assertSee('неактивний')
             ->assertSee('Фактично використовується основний прайс-лист компанії');
 
         Livewire::actingAs($this->admin)
-            ->test(EditContractor::class, ['record' => $redundantContractor->getRouteKey()])
+            ->test(EditCustomer::class, ['record' => $redundantCustomer->getRouteKey()])
             ->assertSee('основний прайс-лист компанії')
             ->assertSee('Рекомендується обрати «За замовчуванням»');
     }
@@ -223,12 +223,12 @@ class ContractorPriceListAssignmentTest extends TestCase
         ]);
         $other = $this->createPriceList($this->workspace, isDefault: false);
 
-        $first = $this->createContractor($this->workspace);
-        $second = $this->createContractor($this->workspace);
+        $first = $this->createCustomer($this->workspace);
+        $second = $this->createCustomer($this->workspace);
         $second->update(['default_price_list_id' => $other->id]);
 
         $component = Livewire::actingAs($this->admin)
-            ->test(ListContractors::class)
+            ->test(ListCustomers::class)
             ->mountTableBulkAction('assign_price_list', [$first, $second])
             ->setTableBulkActionData([
                 'target_price_list_id' => $target->id,
@@ -240,10 +240,10 @@ class ContractorPriceListAssignmentTest extends TestCase
         $this->assertSame($target->id, $second->fresh()->default_price_list_id);
 
         Livewire::actingAs($this->admin)
-            ->test(ListContractors::class)
+            ->test(ListCustomers::class)
             ->mountTableBulkAction('assign_price_list', [$first, $second])
             ->setTableBulkActionData([
-                'target_price_list_id' => ContractorPriceListAssignmentService::WORKSPACE_DEFAULT_SENTINEL,
+                'target_price_list_id' => CustomerPriceListAssignmentService::WORKSPACE_DEFAULT_SENTINEL,
             ])
             ->callMountedTableBulkAction()
             ->assertNotified();
@@ -252,7 +252,7 @@ class ContractorPriceListAssignmentTest extends TestCase
         $this->assertNull($second->fresh()->default_price_list_id);
     }
 
-    public function test_bulk_select_all_matching_filter_updates_only_matching_contractors(): void
+    public function test_bulk_select_all_matching_filter_updates_only_matching_customers(): void
     {
         $target = PriceList::withoutWorkspaceScope()->create([
             'workspace_id' => $this->workspace->id,
@@ -263,30 +263,30 @@ class ContractorPriceListAssignmentTest extends TestCase
             'status' => PriceListStatus::Active,
         ]);
 
-        $activeContractors = collect();
+        $activeCustomers = collect();
         for ($i = 0; $i < 12; $i++) {
-            $contractor = $this->createContractor($this->workspace);
-            $contractor->update([
-                'name' => "Active Filter Contractor {$i}",
+            $customer = $this->createCustomer($this->workspace);
+            $customer->update([
+                'name' => "Active Filter Customer {$i}",
                 'is_active' => true,
             ]);
-            $activeContractors->push($contractor);
+            $activeCustomers->push($customer);
         }
 
-        $inactiveOnPage = $this->createContractor($this->workspace);
+        $inactiveOnPage = $this->createCustomer($this->workspace);
         $inactiveOnPage->update([
-            'name' => 'Inactive On Page Contractor',
+            'name' => 'Inactive On Page Customer',
             'is_active' => false,
         ]);
 
-        $inactiveOffPage = $this->createContractor($this->workspace);
+        $inactiveOffPage = $this->createCustomer($this->workspace);
         $inactiveOffPage->update([
-            'name' => 'Inactive Off Page Contractor',
+            'name' => 'Inactive Off Page Customer',
             'is_active' => false,
         ]);
 
         $component = Livewire::actingAs($this->admin)
-            ->test(ListContractors::class)
+            ->test(ListCustomers::class)
             ->set('tableFilters', [
                 'is_active' => [
                     'value' => true,
@@ -301,15 +301,15 @@ class ContractorPriceListAssignmentTest extends TestCase
         $this->assertNotContains((string) $inactiveOffPage->id, $keys);
 
         $component
-            ->mountTableBulkAction('assign_price_list', $activeContractors->all())
+            ->mountTableBulkAction('assign_price_list', $activeCustomers->all())
             ->setTableBulkActionData([
                 'target_price_list_id' => $target->id,
             ])
             ->callMountedTableBulkAction()
             ->assertNotified();
 
-        foreach ($activeContractors as $contractor) {
-            $this->assertSame($target->id, $contractor->fresh()->default_price_list_id);
+        foreach ($activeCustomers as $customer) {
+            $this->assertSame($target->id, $customer->fresh()->default_price_list_id);
         }
 
         $this->assertNull($inactiveOnPage->fresh()->default_price_list_id);

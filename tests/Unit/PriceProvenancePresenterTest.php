@@ -29,7 +29,7 @@ class PriceProvenancePresenterTest extends TestCase
         $this->assertNull($this->presenter->present(VariantPriceDisplay::unavailable()));
     }
 
-    public function test_present_contractor_price_list_with_complete_presentation(): void
+    public function test_present_customer_price_list_with_complete_presentation(): void
     {
         $list = $this->createPriceList();
         $resolved = ResolvedPrice::fromListItem(
@@ -37,7 +37,7 @@ class PriceProvenancePresenterTest extends TestCase
             salePrice: 80.0,
             vatRate: 20.0,
             currency: 'UAH',
-            source: 'contractor_price_list',
+            source: 'customer_price_list',
             sourcePriceListId: $list->id,
             sourcePriceListItemId: 'item-uuid',
         );
@@ -45,7 +45,7 @@ class PriceProvenancePresenterTest extends TestCase
         $presentation = $this->presenter->present($resolved, $list);
 
         $this->assertSame("Індивідуальний прайс-лист «{$list->name}»", $presentation->label);
-        $this->assertSame('contractor_price_list', $presentation->source);
+        $this->assertSame('customer_price_list', $presentation->source);
         $this->assertTrue($presentation->isOnSale);
         $this->assertSame(120.0, $presentation->regularGrossPrice);
         $this->assertSame(96.0, $presentation->effectiveGrossPrice);
@@ -106,7 +106,7 @@ class PriceProvenancePresenterTest extends TestCase
             salePrice: null,
             vatRate: 20.0,
             currency: 'UAH',
-            source: 'contractor_price_list',
+            source: 'customer_price_list',
             sourcePriceListId: $list->id,
             sourcePriceListItemId: 'item-uuid',
         );
@@ -127,7 +127,7 @@ class PriceProvenancePresenterTest extends TestCase
             salePrice: 110.0,
             vatRate: 20.0,
             currency: 'UAH',
-            source: 'contractor_price_list',
+            source: 'customer_price_list',
             sourcePriceListId: $list->id,
             sourcePriceListItemId: 'item-uuid',
         );
@@ -223,7 +223,7 @@ class PriceProvenancePresenterTest extends TestCase
     }
 
     private function makeResolvedPrice(
-        string $source = 'contractor_price_list',
+        string $source = 'customer_price_list',
         ?string $sourcePriceListId = 'list-uuid',
         ?string $sourcePriceListItemId = 'item-uuid',
     ): ResolvedPrice {

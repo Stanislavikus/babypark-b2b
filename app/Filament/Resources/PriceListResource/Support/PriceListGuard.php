@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\PriceListResource\Support;
 
 use App\Enums\PriceListStatus;
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\PriceList;
 use Illuminate\Support\Collection;
 
@@ -22,13 +22,13 @@ class PriceListGuard
             ];
         }
 
-        $contractors = self::assignedContractors($record);
+        $customers = self::assignedCustomers($record);
 
-        if ($contractors->isNotEmpty()) {
+        if ($customers->isNotEmpty()) {
             return [
                 'allowed' => false,
                 'title' => 'Неможливо видалити прайс-лист',
-                'body' => 'Цей список призначено клієнтам: '.$contractors->pluck('name')->join(', ').'.',
+                'body' => 'Цей список призначено клієнтам: '.$customers->pluck('name')->join(', ').'.',
             ];
         }
 
@@ -52,13 +52,13 @@ class PriceListGuard
             ];
         }
 
-        $contractors = self::assignedContractors($record);
+        $customers = self::assignedCustomers($record);
 
-        if ($contractors->isNotEmpty()) {
+        if ($customers->isNotEmpty()) {
             return [
                 'allowed' => false,
                 'title' => 'Неможливо деактивувати прайс-лист',
-                'body' => 'Цей список призначено клієнтам: '.$contractors->pluck('name')->join(', ').'.',
+                'body' => 'Цей список призначено клієнтам: '.$customers->pluck('name')->join(', ').'.',
             ];
         }
 
@@ -87,11 +87,11 @@ class PriceListGuard
     }
 
     /**
-     * @return Collection<int, Contractor>
+     * @return Collection<int, Customer>
      */
-    public static function assignedContractors(PriceList $record): Collection
+    public static function assignedCustomers(PriceList $record): Collection
     {
-        return $record->contractors()
+        return $record->customers()()
             ->orderBy('name')
             ->get(['id', 'name']);
     }

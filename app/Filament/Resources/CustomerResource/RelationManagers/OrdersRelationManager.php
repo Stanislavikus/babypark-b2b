@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\ContractorResource\RelationManagers;
+namespace App\Filament\Resources\CustomerResource\RelationManagers;
 
 use App\Enums\OrderStatus;
 use App\Filament\Resources\OrderResource;

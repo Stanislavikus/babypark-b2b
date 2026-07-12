@@ -5,7 +5,7 @@ namespace App\Services\Orders;
 use App\Enums\OrderStatus;
 use App\Exceptions\Orders\EmptyCartException;
 use App\Exceptions\Orders\OrderMissingPriceException;
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
@@ -25,7 +25,7 @@ class OrderCreator
      * @throws EmptyCartException
      * @throws OrderMissingPriceException
      */
-    public function createFromCart(Contractor $contractor, ?User $user = null, ?string $comment = null): Order
+    public function createFromCart(Customer $customer, ?User $user = null, ?string $comment = null): Order
     {
         $cart = SessionCart::all();
 
@@ -33,7 +33,7 @@ class OrderCreator
             throw new EmptyCartException('Cannot place an order from an empty cart.');
         }
 
-        $lines = SessionCart::resolvedLinesForContractor($contractor);
+        $lines = SessionCart::resolvedLinesForCustomer($customer);
 
         foreach ($lines as $line) {
             if (! $line['price_available']) {
@@ -43,13 +43,13 @@ class OrderCreator
             }
         }
 
-        return DB::transaction(function () use ($contractor, $user, $comment, $lines): Order {
+        return DB::transaction(function () use ($customer, $user, $comment, $lines): Order {
             $totalNet = 0.0;
             $totalGross = 0.0;
             $currency = (string) config('pricing.default_currency', 'UAH');
 
             $order = Order::query()->create([
-                'contractor_id' => $contractor->id,
+                'customer_id' => $customer->id,
                 'user_id' => $user?->id,
                 'status' => OrderStatus::New,
                 'total' => 0,
@@ -61,7 +61,7 @@ class OrderCreator
             foreach ($lines as $line) {
                 $variant = $line['variant'];
                 $quantity = $line['quantity'];
-                $resolved = $this->priceResolver->resolveForContractor($variant, $contractor, $quantity);
+                $resolved = $this->priceResolver->resolveForCustomer($variant, $customer, $quantity);
                 $currency = $resolved->currency;
 
                 $lineTotalGross = round($resolved->grossPrice * $quantity, 2);

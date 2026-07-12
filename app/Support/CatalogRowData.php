@@ -2,7 +2,7 @@
 
 namespace App\Support;
 
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\Availability\AvailabilityResolver;
@@ -29,13 +29,13 @@ class CatalogRowData
      *     rrp: ?float,
      * }
      */
-    public static function forProduct(Product $product, Contractor $contractor): array
+    public static function forProduct(Product $product, Customer $customer): array
     {
         $summary = app(ProductPricingSummary::class);
         $threshold = $product->category?->stock_display_threshold ?? 10;
         $activeVariants = $product->variants->where('is_active', true);
         $variantsWithPrice = $activeVariants->filter(
-            fn (ProductVariant $v) => $summary->variantHasResolvablePrice($v, $contractor)
+            fn (ProductVariant $v) => $summary->variantHasResolvablePrice($v, $customer)
         );
 
         $minQty = max(1, $product->min_order_quantity);
@@ -49,10 +49,10 @@ class CatalogRowData
 
         if ($inStockVariants->isNotEmpty()) {
             $firstVariant = $inStockVariants
-                ->sortBy(fn (ProductVariant $v) => $summary->tryResolveVariantDisplay($v, $contractor)?->grossPrice ?? PHP_FLOAT_MAX)
+                ->sortBy(fn (ProductVariant $v) => $summary->tryResolveVariantDisplay($v, $customer)?->grossPrice ?? PHP_FLOAT_MAX)
                 ->first();
 
-            $priceDisplay = $summary->tryResolveVariantDisplay($firstVariant, $contractor);
+            $priceDisplay = $summary->tryResolveVariantDisplay($firstVariant, $customer);
             $availQty = self::variantAvailQty($firstVariant);
             $badge = ProductVariant::badgeFromQty(
                 $availQty,
@@ -84,7 +84,7 @@ class CatalogRowData
                 ->sortBy(fn (ProductVariant $v) => self::variantEarliestExpectedDate($v))
                 ->first();
 
-            $priceDisplay = $summary->tryResolveVariantDisplay($firstVariant, $contractor);
+            $priceDisplay = $summary->tryResolveVariantDisplay($firstVariant, $customer);
             $expectedQty = self::variantExpectedQty($firstVariant);
             $expectedDate = self::variantEarliestExpectedDate($firstVariant);
             $badge = ProductVariant::badgeFromQty(0, $expectedQty, $expectedDate, $threshold);
@@ -116,7 +116,7 @@ class CatalogRowData
             'maxQty' => 0,
             'minQty' => $minQty,
             'step' => $step,
-            'myPrice' => $summary->minGrossPriceForContractor($product, $contractor),
+            'myPrice' => $summary->minGrossPriceForCustomer($product, $customer),
             'myPriceDisplay' => null,
             'rrp' => $rrp,
         ];

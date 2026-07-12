@@ -16,7 +16,7 @@ class WorkspaceContext
      *
      * MVP simplification: always resolves to the default workspace while only one tenant exists.
      *
-     * @todo GAP-004 — resolve workspace from authenticated User (admin) or Contractor (cabinet),
+     * @todo GAP-004 — resolve workspace from authenticated User (admin) or Customer (cabinet),
      *       and from scheduled sync commands that run outside HTTP/guard context.
      */
     public function current(): Workspace

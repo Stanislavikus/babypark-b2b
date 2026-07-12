@@ -33,9 +33,9 @@ class Login extends BaseLogin
             return null;
         }
 
-        $contractor = filament()->auth()->user();
+        $customer = filament()->auth()->user();
 
-        if (! $contractor->is_active) {
+        if (! $customer->is_active) {
             filament()->auth()->logout();
 
             throw ValidationException::withMessages([

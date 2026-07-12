@@ -3,14 +3,14 @@
 namespace App\Services\Pricing;
 
 use App\Enums\PriceListStatus;
-use App\Exceptions\Pricing\InvalidContractorBatchException;
+use App\Exceptions\Pricing\InvalidCustomerBatchException;
 use App\Exceptions\Pricing\InvalidPriceListAssignmentException;
-use App\Models\Contractor;
+use App\Models\Customer;
 use App\Models\PriceList;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
-class ContractorPriceListAssignmentService
+class CustomerPriceListAssignmentService
 {
     public const WORKSPACE_DEFAULT_SENTINEL = '__workspace_default__';
 
@@ -42,37 +42,37 @@ class ContractorPriceListAssignmentService
     }
 
     /**
-     * @param  array<int|string>  $contractorIds
+     * @param  array<int|string>  $customerIds
      */
-    public function preview(string $workspaceId, array $contractorIds, ?string $targetPriceListId): AssignmentPreview
+    public function preview(string $workspaceId, array $customerIds, ?string $targetPriceListId): AssignmentPreview
     {
-        $contractors = $this->loadAndValidateContractors($workspaceId, $contractorIds);
+        $customers = $this->loadAndValidateCustomers($workspaceId, $customerIds);
 
         $this->validateTarget($workspaceId, $targetPriceListId);
 
-        return $this->buildPreview($contractors, $targetPriceListId);
+        return $this->buildPreview($customers, $targetPriceListId);
     }
 
     /**
-     * @param  array<int|string>  $contractorIds
+     * @param  array<int|string>  $customerIds
      */
-    public function apply(string $workspaceId, array $contractorIds, ?string $targetPriceListId): AssignmentResult
+    public function apply(string $workspaceId, array $customerIds, ?string $targetPriceListId): AssignmentResult
     {
-        $contractors = $this->loadAndValidateContractors($workspaceId, $contractorIds);
+        $customers = $this->loadAndValidateCustomers($workspaceId, $customerIds);
 
         $this->validateTarget($workspaceId, $targetPriceListId);
 
-        $preview = $this->buildPreview($contractors, $targetPriceListId);
+        $preview = $this->buildPreview($customers, $targetPriceListId);
 
         $updatedCount = 0;
 
-        DB::transaction(function () use ($contractors, $targetPriceListId, &$updatedCount): void {
-            foreach ($contractors as $contractor) {
-                if ($contractor->default_price_list_id === $targetPriceListId) {
+        DB::transaction(function () use ($customers, $targetPriceListId, &$updatedCount): void {
+            foreach ($customers as $customer) {
+                if ($customer->default_price_list_id === $targetPriceListId) {
                     continue;
                 }
 
-                $contractor->update(['default_price_list_id' => $targetPriceListId]);
+                $customer->update(['default_price_list_id' => $targetPriceListId]);
                 $updatedCount++;
             }
         });
@@ -142,53 +142,53 @@ class ContractorPriceListAssignmentService
     }
 
     /**
-     * @param  array<int|string>  $contractorIds
-     * @return Collection<int, Contractor>
+     * @param  array<int|string>  $customerIds
+     * @return Collection<int, Customer>
      */
-    private function loadAndValidateContractors(string $workspaceId, array $contractorIds): Collection
+    private function loadAndValidateCustomers(string $workspaceId, array $customerIds): Collection
     {
         $uniqueIds = array_values(array_unique(array_map(
             static fn ($id): string => (string) $id,
-            $contractorIds,
+            $customerIds,
         )));
 
         if ($uniqueIds === []) {
-            throw InvalidContractorBatchException::notFound('(empty)');
+            throw InvalidCustomerBatchException::notFound('(empty)');
         }
 
-        $contractors = Contractor::withoutWorkspaceScope()
+        $customers = Customer::withoutWorkspaceScope()
             ->whereIn('id', $uniqueIds)
             ->get()
-            ->keyBy(static fn (Contractor $contractor): string => (string) $contractor->id);
+            ->keyBy(static fn (Customer $customer): string => (string) $customer->id);
 
-        foreach ($uniqueIds as $contractorId) {
-            $contractor = $contractors->get($contractorId);
+        foreach ($uniqueIds as $customerId) {
+            $customer = $customers->get($customerId);
 
-            if ($contractor === null) {
-                throw InvalidContractorBatchException::notFound($contractorId);
+            if ($customer === null) {
+                throw InvalidCustomerBatchException::notFound($customerId);
             }
 
-            if ($contractor->workspace_id !== $workspaceId) {
-                throw InvalidContractorBatchException::crossWorkspace($contractorId);
+            if ($customer->workspace_id !== $workspaceId) {
+                throw InvalidCustomerBatchException::crossWorkspace($customerId);
             }
         }
 
         return collect($uniqueIds)
-            ->map(static fn (string $id): Contractor => $contractors->get($id));
+            ->map(static fn (string $id): Customer => $customers->get($id));
     }
 
     /**
-     * @param  Collection<int, Contractor>  $contractors
+     * @param  Collection<int, Customer>  $customers
      */
-    private function buildPreview(Collection $contractors, ?string $targetPriceListId): AssignmentPreview
+    private function buildPreview(Collection $customers, ?string $targetPriceListId): AssignmentPreview
     {
-        $selectedCount = $contractors->count();
+        $selectedCount = $customers->count();
         $unchangedCount = 0;
         $replacedCount = 0;
         $clearedCount = 0;
 
-        foreach ($contractors as $contractor) {
-            $current = $contractor->default_price_list_id;
+        foreach ($customers as $customer) {
+            $current = $customer->default_price_list_id;
 
             if ($current === $targetPriceListId) {
                 $unchangedCount++;
