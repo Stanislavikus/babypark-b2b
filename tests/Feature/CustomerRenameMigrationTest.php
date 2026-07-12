@@ -56,7 +56,7 @@ class CustomerRenameMigrationTest extends TestCase
 
         $customersBeforeRollback = DB::table('customers')->count();
 
-        Artisan::call('migrate:rollback', ['--step' => 1]);
+        Artisan::call('migrate:rollback', ['--step' => 2]);
 
         $this->assertTrue(Schema::hasTable('contractors'));
         $this->assertFalse(Schema::hasTable('customers'));

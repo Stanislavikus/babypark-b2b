@@ -2,17 +2,23 @@
 
 namespace App\Console\Commands;
 
-use App\Models\AttributeDefinition;
+use App\Enums\FieldObjectType;
+use App\Models\FieldBinding;
 use App\Models\ProductVariant;
-use App\Models\VariantAttributeValue;
+use App\Models\VariantFieldValue;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 
+/**
+ * Legacy one-off importer from product_variants.attributes JSON.
+ *
+ * Deletion deferred until verified on production-representative data (GAP-016 §L).
+ */
 class MigrateLegacyProductVariantAttributes extends Command
 {
     protected $signature = 'product-fields:migrate-legacy-attributes {--dry-run : Inspect data without writing}';
 
-    protected $description = 'Migrate legacy product_variants.attributes JSON into variant_attribute_values';
+    protected $description = 'Migrate legacy product_variants.attributes JSON into variant_field_values';
 
     private const ALLOWED_KEYS = ['Колір', 'Розмір'];
 
@@ -62,18 +68,18 @@ class MigrateLegacyProductVariantAttributes extends Command
             return self::FAILURE;
         }
 
-        $colorDefinition = AttributeDefinition::withoutWorkspaceScope()
-            ->where('code', 'color')
-            ->whereNull('workspace_id')
+        $colorBinding = FieldBinding::withoutWorkspaceScope()
+            ->where('object_type', FieldObjectType::ProductVariant)
+            ->whereHas('fieldDefinition', fn ($q) => $q->where('code', 'color')->whereNull('workspace_id'))
             ->first();
 
-        $sizeDefinition = AttributeDefinition::withoutWorkspaceScope()
-            ->where('code', 'size')
-            ->whereNull('workspace_id')
+        $sizeBinding = FieldBinding::withoutWorkspaceScope()
+            ->where('object_type', FieldObjectType::ProductVariant)
+            ->whereHas('fieldDefinition', fn ($q) => $q->where('code', 'size')->whereNull('workspace_id'))
             ->first();
 
-        if ($colorDefinition === null || $sizeDefinition === null) {
-            $this->error('Required attribute definitions (color, size) are missing. Run AttributeDefinitionSeeder first.');
+        if ($colorBinding === null || $sizeBinding === null) {
+            $this->error('Required field bindings (color, size) are missing. Run FieldDefinitionSeeder first.');
 
             return self::FAILURE;
         }
@@ -88,13 +94,13 @@ class MigrateLegacyProductVariantAttributes extends Command
                     continue;
                 }
 
-                [$definition, $storedValue] = match ($key) {
-                    'Колір' => [$colorDefinition, self::COLOR_VALUE_MAP[$value] ?? null],
-                    'Розмір' => [$sizeDefinition, self::SIZE_VALUE_MAP[$value] ?? null],
+                [$binding, $storedValue] = match ($key) {
+                    'Колір' => [$colorBinding, self::COLOR_VALUE_MAP[$value] ?? null],
+                    'Розмір' => [$sizeBinding, self::SIZE_VALUE_MAP[$value] ?? null],
                     default => [null, null],
                 };
 
-                if ($definition === null || $storedValue === null) {
+                if ($binding === null || $storedValue === null) {
                     continue;
                 }
 
@@ -104,7 +110,7 @@ class MigrateLegacyProductVariantAttributes extends Command
                         $variant->id,
                         $variant->sku,
                         $key,
-                        $definition->code,
+                        $binding->fieldDefinition->code,
                         $storedValue,
                     ));
                     $created++;
@@ -112,11 +118,11 @@ class MigrateLegacyProductVariantAttributes extends Command
                     continue;
                 }
 
-                VariantAttributeValue::withoutWorkspaceScope()->updateOrCreate(
+                VariantFieldValue::withoutWorkspaceScope()->updateOrCreate(
                     [
                         'workspace_id' => $variant->workspace_id,
                         'variant_id' => $variant->id,
-                        'attribute_definition_id' => $definition->id,
+                        'field_binding_id' => $binding->id,
                     ],
                     [
                         'value_text' => $storedValue,
@@ -127,13 +133,13 @@ class MigrateLegacyProductVariantAttributes extends Command
             }
         }
 
-        $totalValues = VariantAttributeValue::withoutWorkspaceScope()->count();
+        $totalValues = VariantFieldValue::withoutWorkspaceScope()->count();
 
         if ($dryRun) {
-            $this->info("Dry-run complete. Would create/update {$created} variant attribute value row(s).");
+            $this->info("Dry-run complete. Would create/update {$created} variant field value row(s).");
         } else {
             $this->info("Migration complete. Processed {$created} attribute value mapping(s).");
-            $this->info('Total variant_attribute_values rows: '.$totalValues);
+            $this->info('Total variant_field_values rows: '.$totalValues);
         }
 
         return self::SUCCESS;

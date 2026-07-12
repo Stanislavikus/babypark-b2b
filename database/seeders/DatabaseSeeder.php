@@ -10,7 +10,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             WorkspaceSeeder::class,
-            AttributeDefinitionSeeder::class,
+            FieldDefinitionSeeder::class,
             B2BSeeder::class,
             DeliverySettingSeeder::class,
         ]);

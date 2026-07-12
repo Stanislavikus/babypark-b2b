@@ -315,7 +315,21 @@ separate documentation-level decision.
 ### Attribute Groups
 
 
-For UI rendering layout, attributes are filtered into logical tabs: *Basic information*, *Identifiers*, *Pricing*, *Availability*, *Images and media*, *Descriptions*, *Characteristics*, *B2B*, *SEO*, *Logistics*, *Internal*. Groups serve visualization organization only and must not inject hidden business logic. 
+For UI rendering layout, attributes are filtered into logical tabs: *Basic information*, *Identifiers*, *Pricing*, *Availability*, *Images and media*, *Descriptions*, *Characteristics*, *B2B*, *SEO*, *Logistics*, *Internal*. Groups serve visualization organization only and must not inject hidden business logic.
+
+#### Customer `field_group` taxonomy
+
+Customer system fields reuse several Product group codes and add two Customer-only groups:
+
+| `field_group` | Purpose | Customer fields | Notes |
+|---|---|---|---|
+| `basic_information` | Core identity and status | `name`, `is_active`, `short_name` | Reused from Product taxonomy |
+| `identifiers` | Legal and external IDs | `edrpou`, `ipn`, `onec_guid` | Reused from Product taxonomy |
+| `contacts` | People and communication | `email`, `manager_name`, `manager_phone` | **Customer-only** — not used for Product fields |
+| `commercial_terms` | Financial and pricing defaults | `payment_delay_days`, `credit_limit`, `current_debt`, `default_price_list_id` | **Customer-only** — B2B cabinet hides `credit_limit` / `current_debt` |
+| `internal` | Staff-only references | `account_manager_id`, `backup_manager_id` | Reused from Product taxonomy |
+
+Product-specific groups (`pricing`, `availability`, `images_media`, `descriptions`, `characteristics`, `b2b`, `seo`, `logistics`) remain Product/Variant-only and must not be assigned to Customer bindings.
 
 ### Attribute Scope Definition
 
