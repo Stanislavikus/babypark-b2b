@@ -690,3 +690,25 @@ sequenced before GAP-006 (Connector Foundation) resumes.
 unblocked as the next sequenced task.
 
 **Status:** Closed in code.
+
+### Post-mortem: production deploy incident
+
+- **Date / commit:** deploy of PR #55 (`432b7c6`), `migrate-safe.sh` on production.
+- **Symptom:** `SQLSTATE[01000]: Warning: 1265 Data truncated for column 'type'`
+  at `migrateSyncLogType()` during the Contractor → Customer migration.
+- **Root cause:** operation order in `migrateSyncLogType()` — `UPDATE` ran before
+  `ALTER TABLE ... MODIFY COLUMN type ENUM(...)`, so MySQL strict mode rejected
+  writing `'customers'` into a column whose ENUM still allowed only the old
+  value set (`..., 'contractors', ...`).
+- **Why the test missed it:** `CustomerRenameMigrationTest` had no fixture row
+  in `sync_logs` with `type='contractors'` before rollback; production had such
+  a row.
+- **Manual recovery on production:** the confirmed 3-step
+  ALTER→UPDATE→ALTER sequence applied manually via `mysql` CLI, followed by a
+  clean `php artisan migrate` (which marked the migration `Ran`, since `up()`
+  begins with `if (! Schema::hasTable('contractors')) return;`).
+- **Fix:** correct operation order in the migration file plus a regression
+  fixture in `CustomerRenameMigrationTest` (this task).
+- **Lesson:** MySQL migration tests must cover **data** that actually exists on
+  production — including "rare" lookup tables like `sync_logs` — not only the
+  primary entities under test.

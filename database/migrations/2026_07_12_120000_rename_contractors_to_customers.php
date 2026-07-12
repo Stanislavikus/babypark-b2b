@@ -321,6 +321,12 @@ return new class extends Migration
             return;
         }
 
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement(
+                "ALTER TABLE sync_logs MODIFY COLUMN type ENUM('products', 'prices', 'stocks', '{$from}', '{$to}', 'statuses') NOT NULL"
+            );
+        }
+
         DB::table('sync_logs')->where('type', $from)->update(['type' => $to]);
 
         if (DB::getDriverName() === 'mysql') {

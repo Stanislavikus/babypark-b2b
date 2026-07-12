@@ -27,6 +27,12 @@ class CustomerRenameMigrationTest extends TestCase
             $this->assertSchemaContainsNoContractorArtifacts();
         }
 
+        $syncLogId = DB::table('sync_logs')->insertGetId([
+            'type' => 'customers',
+            'status' => 'success',
+            'started_at' => now(),
+        ]);
+
         $workspaceId = DB::table('workspaces')->where('is_default', true)->value('id');
 
         $password = 'legacy-secret';
@@ -54,6 +60,22 @@ class CustomerRenameMigrationTest extends TestCase
 
         $this->assertTrue(Schema::hasTable('contractors'));
         $this->assertFalse(Schema::hasTable('customers'));
+        $this->assertSame(
+            'contractors',
+            DB::table('sync_logs')->where('id', $syncLogId)->value('type'),
+            'down() must rename sync_logs.type from customers back to contractors'
+        );
+
+        if (DB::getDriverName() === 'mysql') {
+            $this->assertSyncLogTypeEnumContains('contractors');
+            $this->assertSyncLogTypeEnumDoesNotContain('customers');
+        }
+
+        $this->assertTrue(
+            DB::table('sync_logs')->where('id', $syncLogId)->where('type', 'contractors')->exists(),
+            'sync_logs row with type=contractors must exist before re-applying up()'
+        );
+
         $this->assertSame(
             $customersBeforeRollback,
             DB::table('contractors')->count(),
@@ -131,7 +153,15 @@ class CustomerRenameMigrationTest extends TestCase
         if (DB::getDriverName() === 'mysql') {
             $this->assertCustomersTableSchema();
             $this->assertSchemaContainsNoContractorArtifacts();
+            $this->assertSyncLogTypeEnumContains('customers');
+            $this->assertSyncLogTypeEnumDoesNotContain('contractors');
         }
+
+        $this->assertSame(
+            'customers',
+            DB::table('sync_logs')->where('id', $syncLogId)->value('type'),
+            'up() must rename sync_logs.type from contractors back to customers'
+        );
 
         $migrated = DB::table('customers')->where('id', $legacyId)->first();
 
@@ -241,6 +271,37 @@ class CustomerRenameMigrationTest extends TestCase
             ),
             'information_schema.STATISTICS must not contain customers_ after down()'
         );
+    }
+
+    private function assertSyncLogTypeEnumContains(string $value): void
+    {
+        $columnType = $this->syncLogTypeColumnType();
+
+        $this->assertStringContainsString(
+            "'{$value}'",
+            $columnType,
+            "sync_logs.type ENUM must contain '{$value}', got: {$columnType}"
+        );
+    }
+
+    private function assertSyncLogTypeEnumDoesNotContain(string $value): void
+    {
+        $columnType = $this->syncLogTypeColumnType();
+
+        $this->assertStringNotContainsString(
+            "'{$value}'",
+            $columnType,
+            "sync_logs.type ENUM must not contain '{$value}', got: {$columnType}"
+        );
+    }
+
+    private function syncLogTypeColumnType(): string
+    {
+        return (string) DB::table('information_schema.COLUMNS')
+            ->where('TABLE_SCHEMA', DB::getDatabaseName())
+            ->where('TABLE_NAME', 'sync_logs')
+            ->where('COLUMN_NAME', 'type')
+            ->value('COLUMN_TYPE');
     }
 
     private function assertNamedForeignKeyCount(string $table, string $constraintName, int $expected): void
