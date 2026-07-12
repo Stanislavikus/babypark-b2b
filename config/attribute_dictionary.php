@@ -13,5 +13,7 @@ return [
         'seo' => 'SEO',
         'logistics' => 'Логістика',
         'internal' => 'Внутрішнє',
+        'contacts' => 'Контакти',
+        'commercial_terms' => 'Комерційні умови',
     ],
 ];

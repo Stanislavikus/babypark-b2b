@@ -6,11 +6,13 @@ use App\Enums\AttributeDataType;
 use App\Enums\AttributeScope;
 use App\Enums\AttributeStatus;
 use App\Enums\AttributeStorageType;
-use App\Enums\AttributeValueLevel;
-use App\Models\AttributeDefinition;
+use App\Enums\FieldObjectType;
+use App\Models\FieldBinding;
+use App\Models\FieldDefinition;
 use Illuminate\Database\Seeder;
+use RuntimeException;
 
-class AttributeDefinitionSeeder extends Seeder
+class FieldDefinitionSeeder extends Seeder
 {
     public function run(): void
     {
@@ -19,15 +21,202 @@ class AttributeDefinitionSeeder extends Seeder
             $this->platformLibraryAttributes(),
         );
 
-        foreach ($definitions as $definition) {
-            AttributeDefinition::withoutWorkspaceScope()->updateOrCreate(
-                [
-                    'code' => $definition['code'],
-                    'workspace_id' => $definition['workspace_id'] ?? null,
-                ],
-                $definition,
-            );
+        foreach ($definitions as $seed) {
+            $definition = $this->upsertDefinition($seed);
+
+            foreach ($this->objectTypesForValueLevel($seed['value_level']) as $objectType) {
+                $this->upsertBinding($definition, $objectType, $seed);
+            }
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $seed
+     */
+    private function upsertDefinition(array $seed): FieldDefinition
+    {
+        $workspaceId = $seed['workspace_id'] ?? null;
+        $scope = $seed['scope'];
+        $code = $seed['code'];
+
+        $expected = [
+            'workspace_id' => $workspaceId,
+            'code' => $code,
+            'data_type' => $seed['data_type'],
+            'scope' => $scope,
+            'localized_labels' => $seed['localized_labels'],
+            'description' => null,
+            'validation_rules' => $seed['validation_rules'],
+            'is_localizable' => $seed['is_localizable'],
+            'is_multi_value' => $seed['is_multi_value'],
+            'status' => $seed['status'],
+        ];
+
+        $existing = FieldDefinition::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->where('scope', $scope)
+            ->where('code', $code)
+            ->first();
+
+        if ($existing !== null) {
+            $conflicts = $this->definitionConflicts($existing, $expected);
+
+            if ($conflicts !== []) {
+                throw new RuntimeException(
+                    "Field definition conflict for code '{$code}':\n- ".implode("\n- ", $conflicts)
+                );
+            }
+
+            return $existing;
+        }
+
+        return FieldDefinition::withoutWorkspaceScope()->create($expected);
+    }
+
+    /**
+     * @param  array<string, mixed>  $seed
+     */
+    private function upsertBinding(FieldDefinition $definition, FieldObjectType $objectType, array $seed): FieldBinding
+    {
+        $workspaceId = $seed['workspace_id'] ?? null;
+
+        $expected = [
+            'workspace_id' => $workspaceId,
+            'field_definition_id' => $definition->id,
+            'object_type' => $objectType,
+            'storage_type' => $seed['storage_type'],
+            'storage_path' => $seed['storage_path'],
+            'field_group' => $seed['attribute_group'],
+            'is_required' => $seed['is_required'],
+            'is_filterable' => $seed['is_filterable'],
+            'is_sortable' => $seed['is_sortable'],
+            'visibility_settings' => $seed['visibility_settings'],
+            'sort_order' => $seed['sort_order'],
+            'status' => $seed['status'],
+        ];
+
+        $existing = FieldBinding::withoutWorkspaceScope()
+            ->where('field_definition_id', $definition->id)
+            ->where('object_type', $objectType)
+            ->first();
+
+        if ($existing !== null) {
+            $conflicts = $this->bindingConflicts($existing, $expected);
+
+            if ($conflicts !== []) {
+                throw new RuntimeException(
+                    "Field binding conflict for '{$definition->code}' ({$objectType->value}):\n- ".implode("\n- ", $conflicts)
+                );
+            }
+
+            return $existing;
+        }
+
+        return FieldBinding::withoutWorkspaceScope()->create($expected);
+    }
+
+    /**
+     * @return list<FieldObjectType>
+     */
+    /**
+     * @return list<FieldObjectType>
+     */
+    private function objectTypesForValueLevel(string $valueLevel): array
+    {
+        return match ($valueLevel) {
+            'product' => [FieldObjectType::Product],
+            'variant' => [FieldObjectType::ProductVariant],
+            'both' => [FieldObjectType::Product, FieldObjectType::ProductVariant],
+            default => throw new RuntimeException("Unknown value_level '{$valueLevel}'"),
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $expected
+     * @return list<string>
+     */
+    private function definitionConflicts(FieldDefinition $existing, array $expected): array
+    {
+        $conflicts = [];
+
+        foreach (['data_type', 'scope', 'is_localizable', 'is_multi_value', 'status'] as $field) {
+            $actual = $existing->{$field};
+            $exp = $expected[$field];
+            $expValue = $exp instanceof \BackedEnum ? $exp->value : $exp;
+            $actualValue = $actual instanceof \BackedEnum ? $actual->value : $actual;
+
+            if ((string) $actualValue !== (string) $expValue) {
+                $conflicts[] = "{$field} expected ".json_encode($expValue).', got '.json_encode($actualValue);
+            }
+        }
+
+        if (! $this->valuesSemanticallyEqual($existing->localized_labels, $expected['localized_labels'])) {
+            $conflicts[] = 'localized_labels mismatch';
+        }
+
+        if (! $this->valuesSemanticallyEqual($existing->description, $expected['description'])) {
+            $conflicts[] = 'description mismatch';
+        }
+
+        if (! $this->valuesSemanticallyEqual($existing->validation_rules, $expected['validation_rules'])) {
+            $conflicts[] = 'validation_rules mismatch';
+        }
+
+        return $conflicts;
+    }
+
+    /**
+     * @param  array<string, mixed>  $expected
+     * @return list<string>
+     */
+    private function bindingConflicts(FieldBinding $existing, array $expected): array
+    {
+        $conflicts = [];
+
+        foreach ([
+            'workspace_id',
+            'storage_type',
+            'storage_path',
+            'field_group',
+            'is_required',
+            'is_filterable',
+            'is_sortable',
+            'sort_order',
+            'status',
+        ] as $field) {
+            $actual = $existing->{$field};
+            $exp = $expected[$field];
+            $expValue = $exp instanceof \BackedEnum ? $exp->value : $exp;
+            $actualValue = $actual instanceof \BackedEnum ? $actual->value : $actual;
+
+            if ((string) $actualValue !== (string) $expValue) {
+                $conflicts[] = "{$field} expected ".json_encode($expValue).', got '.json_encode($actualValue);
+            }
+        }
+
+        if (! $this->valuesSemanticallyEqual($existing->visibility_settings, $expected['visibility_settings'])) {
+            $conflicts[] = 'visibility_settings mismatch';
+        }
+
+        return $conflicts;
+    }
+
+    private function valuesSemanticallyEqual(mixed $a, mixed $b): bool
+    {
+        if (is_string($a) && $this->looksLikeJson($a)) {
+            $a = json_decode($a, true);
+        }
+
+        if (is_string($b) && $this->looksLikeJson($b)) {
+            $b = json_decode($b, true);
+        }
+
+        return $a == $b;
+    }
+
+    private function looksLikeJson(string $value): bool
+    {
+        return str_starts_with(trim($value), '{') || str_starts_with(trim($value), '[');
     }
 
     /**
@@ -50,7 +239,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'internal_product_id',
                 'workspace_id' => null,
                 'scope' => AttributeScope::System,
-                'value_level' => AttributeValueLevel::Product,
+                'value_level' => 'product',
                 'data_type' => AttributeDataType::Number,
                 'storage_type' => AttributeStorageType::Column,
                 'storage_path' => 'products.id',
@@ -70,7 +259,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'product_name',
                 'workspace_id' => null,
                 'scope' => AttributeScope::System,
-                'value_level' => AttributeValueLevel::Product,
+                'value_level' => 'product',
                 'data_type' => AttributeDataType::Text,
                 'storage_type' => AttributeStorageType::Column,
                 'storage_path' => 'products.name',
@@ -90,7 +279,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'brand',
                 'workspace_id' => null,
                 'scope' => AttributeScope::System,
-                'value_level' => AttributeValueLevel::Product,
+                'value_level' => 'product',
                 'data_type' => AttributeDataType::Text,
                 'storage_type' => AttributeStorageType::Column,
                 'storage_path' => 'products.brand',
@@ -110,7 +299,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'category',
                 'workspace_id' => null,
                 'scope' => AttributeScope::System,
-                'value_level' => AttributeValueLevel::Product,
+                'value_level' => 'product',
                 'data_type' => AttributeDataType::Text,
                 'storage_type' => AttributeStorageType::Relation,
                 'storage_path' => 'products.category_id',
@@ -130,7 +319,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'description',
                 'workspace_id' => null,
                 'scope' => AttributeScope::System,
-                'value_level' => AttributeValueLevel::Product,
+                'value_level' => 'product',
                 'data_type' => AttributeDataType::LongText,
                 'storage_type' => AttributeStorageType::Column,
                 'storage_path' => 'products.description',
@@ -150,7 +339,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'status',
                 'workspace_id' => null,
                 'scope' => AttributeScope::System,
-                'value_level' => AttributeValueLevel::Product,
+                'value_level' => 'product',
                 'data_type' => AttributeDataType::Boolean,
                 'storage_type' => AttributeStorageType::Column,
                 'storage_path' => 'products.is_active',
@@ -170,7 +359,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'product_url',
                 'workspace_id' => null,
                 'scope' => AttributeScope::System,
-                'value_level' => AttributeValueLevel::Product,
+                'value_level' => 'product',
                 'data_type' => AttributeDataType::Url,
                 'storage_type' => AttributeStorageType::Column,
                 'storage_path' => 'products.product_url',
@@ -190,7 +379,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'sku',
                 'workspace_id' => null,
                 'scope' => AttributeScope::System,
-                'value_level' => AttributeValueLevel::Variant,
+                'value_level' => 'variant',
                 'data_type' => AttributeDataType::Text,
                 'storage_type' => AttributeStorageType::Column,
                 'storage_path' => 'product_variants.sku',
@@ -210,7 +399,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'gtin',
                 'workspace_id' => null,
                 'scope' => AttributeScope::System,
-                'value_level' => AttributeValueLevel::Variant,
+                'value_level' => 'variant',
                 'data_type' => AttributeDataType::Text,
                 'storage_type' => AttributeStorageType::Column,
                 'storage_path' => 'product_variants.barcode_ean',
@@ -230,7 +419,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'merchant_type',
                 'workspace_id' => null,
                 'scope' => AttributeScope::System,
-                'value_level' => AttributeValueLevel::Product,
+                'value_level' => 'product',
                 'data_type' => AttributeDataType::Text,
                 'storage_type' => AttributeStorageType::Column,
                 'storage_path' => 'products.merchant_type',
@@ -250,7 +439,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'weight_netto',
                 'workspace_id' => null,
                 'scope' => AttributeScope::System,
-                'value_level' => AttributeValueLevel::Product,
+                'value_level' => 'product',
                 'data_type' => AttributeDataType::Decimal,
                 'storage_type' => AttributeStorageType::Column,
                 'storage_path' => 'products.weight_netto',
@@ -270,7 +459,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'weight_brutto',
                 'workspace_id' => null,
                 'scope' => AttributeScope::System,
-                'value_level' => AttributeValueLevel::Product,
+                'value_level' => 'product',
                 'data_type' => AttributeDataType::Decimal,
                 'storage_type' => AttributeStorageType::Column,
                 'storage_path' => 'products.weight_brutto',
@@ -290,7 +479,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'volume_m3',
                 'workspace_id' => null,
                 'scope' => AttributeScope::System,
-                'value_level' => AttributeValueLevel::Product,
+                'value_level' => 'product',
                 'data_type' => AttributeDataType::Decimal,
                 'storage_type' => AttributeStorageType::Column,
                 'storage_path' => 'products.volume_m3',
@@ -319,7 +508,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'color',
                 'workspace_id' => null,
                 'scope' => AttributeScope::PlatformLibrary,
-                'value_level' => AttributeValueLevel::Variant,
+                'value_level' => 'variant',
                 'data_type' => AttributeDataType::Select,
                 'storage_type' => AttributeStorageType::Dynamic,
                 'storage_path' => null,
@@ -344,7 +533,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'size',
                 'workspace_id' => null,
                 'scope' => AttributeScope::PlatformLibrary,
-                'value_level' => AttributeValueLevel::Variant,
+                'value_level' => 'variant',
                 'data_type' => AttributeDataType::Select,
                 'storage_type' => AttributeStorageType::Dynamic,
                 'storage_path' => null,
@@ -368,7 +557,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'shipping_required',
                 'workspace_id' => null,
                 'scope' => AttributeScope::PlatformLibrary,
-                'value_level' => AttributeValueLevel::Variant,
+                'value_level' => 'variant',
                 'data_type' => AttributeDataType::Boolean,
                 'storage_type' => AttributeStorageType::Dynamic,
                 'storage_path' => null,
@@ -388,7 +577,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'backorder_policy',
                 'workspace_id' => null,
                 'scope' => AttributeScope::PlatformLibrary,
-                'value_level' => AttributeValueLevel::Variant,
+                'value_level' => 'variant',
                 'data_type' => AttributeDataType::Select,
                 'storage_type' => AttributeStorageType::Dynamic,
                 'storage_path' => null,
@@ -413,7 +602,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'technical_characteristics',
                 'workspace_id' => null,
                 'scope' => AttributeScope::PlatformLibrary,
-                'value_level' => AttributeValueLevel::Product,
+                'value_level' => 'product',
                 'data_type' => AttributeDataType::LongText,
                 'storage_type' => AttributeStorageType::Dynamic,
                 'storage_path' => null,
@@ -433,7 +622,7 @@ class AttributeDefinitionSeeder extends Seeder
                 'code' => 'instructions',
                 'workspace_id' => null,
                 'scope' => AttributeScope::PlatformLibrary,
-                'value_level' => AttributeValueLevel::Product,
+                'value_level' => 'product',
                 'data_type' => AttributeDataType::LongText,
                 'storage_type' => AttributeStorageType::Dynamic,
                 'storage_path' => null,

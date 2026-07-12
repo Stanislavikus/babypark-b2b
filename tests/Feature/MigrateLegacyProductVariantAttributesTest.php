@@ -2,12 +2,13 @@
 
 namespace Tests\Feature;
 
-use App\Models\AttributeDefinition;
-use App\Models\Product;
+use App\Enums\FieldObjectType;
+use App\Models\FieldBinding;
 use App\Models\ProductVariant;
-use App\Models\VariantAttributeValue;
-use App\Models\Workspace;
-use Database\Seeders\AttributeDefinitionSeeder;
+use App\Models\VariantFieldValue;
+use Database\Seeders\B2BSeeder;
+use Database\Seeders\FieldDefinitionSeeder;
+use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -18,83 +19,59 @@ class MigrateLegacyProductVariantAttributesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-
-        Workspace::query()->create([
-            'name' => 'Babypark',
-            'is_default' => true,
-        ]);
-
-        $this->seed(AttributeDefinitionSeeder::class);
+        $this->seed(WorkspaceSeeder::class);
+        $this->seed(B2BSeeder::class);
+        $this->seed(FieldDefinitionSeeder::class);
     }
 
-    public function test_migrates_legacy_attributes_idempotently(): void
+    public function test_command_migrates_legacy_variant_attributes_json(): void
     {
-        $workspace = Workspace::query()->where('is_default', true)->firstOrFail();
-
-        $product = Product::withoutWorkspaceScope()->create([
-            'workspace_id' => $workspace->id,
-            'onec_guid' => fake()->uuid(),
-            'sku' => 'FIXTURE-001',
-            'name' => 'Fixture product',
-            'is_active' => true,
-        ]);
-
-        $blueVariant = ProductVariant::withoutWorkspaceScope()->create([
-            'workspace_id' => $workspace->id,
-            'product_id' => $product->id,
-            'onec_guid' => fake()->uuid(),
-            'sku' => 'FIXTURE-001-BLUE',
-            'attributes' => ['Колір' => 'Синій'],
-            'is_active' => true,
-        ]);
-
-        $pinkVariant = ProductVariant::withoutWorkspaceScope()->create([
-            'workspace_id' => $workspace->id,
-            'product_id' => $product->id,
-            'onec_guid' => fake()->uuid(),
-            'sku' => 'FIXTURE-001-PINK',
-            'attributes' => ['Колір' => 'Рожевий'],
-            'is_active' => true,
-        ]);
-
-        $sizeVariant = ProductVariant::withoutWorkspaceScope()->create([
-            'workspace_id' => $workspace->id,
-            'product_id' => $product->id,
-            'onec_guid' => fake()->uuid(),
-            'sku' => 'FIXTURE-001-SIZE',
-            'attributes' => ['Розмір' => 'M'],
-            'is_active' => true,
+        $variant = ProductVariant::withoutWorkspaceScope()->firstOrFail();
+        $variant->update([
+            'attributes' => [
+                'Колір' => 'Синій',
+                'Розмір' => 'M',
+            ],
         ]);
 
         $this->artisan('product-fields:migrate-legacy-attributes')
             ->assertSuccessful();
 
-        $this->assertSame(3, VariantAttributeValue::withoutWorkspaceScope()->count());
+        $this->assertSame(2, VariantFieldValue::withoutWorkspaceScope()
+            ->where('variant_id', $variant->id)
+            ->count());
 
-        $colorDefinition = AttributeDefinition::withoutWorkspaceScope()->where('code', 'color')->firstOrFail();
-        $sizeDefinition = AttributeDefinition::withoutWorkspaceScope()->where('code', 'size')->firstOrFail();
+        $colorBinding = FieldBinding::withoutWorkspaceScope()
+            ->where('object_type', FieldObjectType::ProductVariant)
+            ->whereHas('fieldDefinition', fn ($q) => $q->where('code', 'color'))
+            ->firstOrFail();
 
-        $this->assertDatabaseHas('variant_attribute_values', [
-            'variant_id' => $blueVariant->id,
-            'attribute_definition_id' => $colorDefinition->id,
+        $sizeBinding = FieldBinding::withoutWorkspaceScope()
+            ->where('object_type', FieldObjectType::ProductVariant)
+            ->whereHas('fieldDefinition', fn ($q) => $q->where('code', 'size'))
+            ->firstOrFail();
+
+        $this->assertDatabaseHas('variant_field_values', [
+            'variant_id' => $variant->id,
+            'field_binding_id' => $colorBinding->id,
             'value_text' => 'blue',
         ]);
 
-        $this->assertDatabaseHas('variant_attribute_values', [
-            'variant_id' => $pinkVariant->id,
-            'attribute_definition_id' => $colorDefinition->id,
-            'value_text' => 'pink',
-        ]);
-
-        $this->assertDatabaseHas('variant_attribute_values', [
-            'variant_id' => $sizeVariant->id,
-            'attribute_definition_id' => $sizeDefinition->id,
+        $this->assertDatabaseHas('variant_field_values', [
+            'variant_id' => $variant->id,
+            'field_binding_id' => $sizeBinding->id,
             'value_text' => 'm',
         ]);
+    }
 
-        $this->artisan('product-fields:migrate-legacy-attributes')
+    public function test_dry_run_does_not_persist_values(): void
+    {
+        $variant = ProductVariant::withoutWorkspaceScope()->firstOrFail();
+        $variant->update(['attributes' => ['Колір' => 'Синій']]);
+
+        $this->artisan('product-fields:migrate-legacy-attributes', ['--dry-run' => true])
             ->assertSuccessful();
 
-        $this->assertSame(3, VariantAttributeValue::withoutWorkspaceScope()->count());
+        $this->assertSame(0, VariantFieldValue::withoutWorkspaceScope()->count());
     }
 }

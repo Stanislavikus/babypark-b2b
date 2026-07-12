@@ -20,16 +20,15 @@ Rules for using this document:
 - No Babypark-specific hardcoding is permitted as a "solution" to any gap (per
   `04-ARCHITECTURE_PRINCIPLES.md`, Configuration Over Custom Code mandate).
 
-Verified against `develop` as of the GAP-017 migration (PR pending):
-`app/Models/` contains `AttributeDefinition, Category, Customer,
-DeliverySetting, InventoryLocation, InventoryRecord, Order, OrderItem, Price,
-PriceList, PriceListItem, Product, ProductAttributeValue, ProductTag,
-ProductVariant, Reservation, Stock, SyncLog, Tag, User, VariantAttributeValue,
-Workspace, WorkspaceImportAlias` (22 models). `workspace_id` appears in 9
+Verified against `develop` as of the GAP-016 Field Foundation migration (PR pending):
+`app/Models/` contains `Category, Customer,
+DeliverySetting, FieldBinding, FieldDefinition, InventoryLocation, InventoryRecord, Order, OrderItem, Price,
+PriceList, PriceListItem, Product, ProductFieldValue, ProductTag,
+ProductVariant, Reservation, Stock, SyncLog, Tag, User, VariantFieldValue,
+Workspace, WorkspaceImportAlias` (24 models). `workspace_id` appears in 9
 migrations and via `BelongsToWorkspace`/`BelongsToWorkspaceOrGlobal` on 14
 models — see GAP-004 for the caveat that this is a sampling check, not a full
-audit. `AttributeDefinition` and related entities still use pre-Field-Foundation
-naming — see GAP-016.
+audit. Field Foundation naming is implemented — see GAP-016 (closed).
 
 ---
 
@@ -621,13 +620,12 @@ tags.
   `workspace_import_aliases.field_binding_id`.
 
 **Current code:**
-- The codebase still uses the pre-Field-Foundation names:
-  `AttributeDefinition`, `ProductAttributeValue`, `VariantAttributeValue`,
-  `product_attribute_values`, `variant_attribute_values`,
-  `workspace_import_aliases.attribute_definition_id`. No `FieldBinding` model,
-  no `customer_field_values` table exist yet. `value_level`
-  (`product`/`variant`/`both`) is still a live enum in code
-  (`AttributeValueLevel`).
+- `FieldDefinition`, `FieldBinding`, `ProductFieldValue`, `VariantFieldValue`,
+  `CustomerFieldValue` models and tables exist. `FieldDefinitionResource` manages
+  product/variant fields. `FieldDefinitionSeeder` is idempotent. Legacy
+  `product-fields:migrate-legacy-attributes` command updated to target
+  `variant_field_values` (deletion deferred until production-representative
+  dry-run per §L).
 
 **Impact:**
 - Do not read `03-DOMAIN_MODEL.md`'s Field Foundation naming as a description
@@ -648,7 +646,7 @@ tags.
 **Next task:** Field Foundation migration — GAP-017 prerequisite blocker removed;
 sequenced before GAP-006 (Connector Foundation) resumes.
 
-**Status:** Open, not started — unblocked by GAP-017 closure.
+**Status:** Closed in code. Implemented via Field Foundation migration (`FieldDefinition`/`FieldBinding`, `product_field_values`/`variant_field_values`/`customer_field_values`, `workspace_import_aliases.field_binding_id`, idempotent `FieldDefinitionSeeder`, `FieldDefinitionResource` with product/variant query filter). GAP-006 (Connector Foundation) is unblocked.
 
 ---
 

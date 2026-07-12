@@ -6,14 +6,14 @@ use App\Support\Workspace\BelongsToWorkspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class VariantAttributeValue extends Model
+class CustomerFieldValue extends Model
 {
     use BelongsToWorkspace;
 
     protected $fillable = [
         'workspace_id',
-        'variant_id',
-        'attribute_definition_id',
+        'customer_id',
+        'field_binding_id',
         'value_text',
         'value_num',
         'value_jsonb',
@@ -27,13 +27,13 @@ class VariantAttributeValue extends Model
         ];
     }
 
-    public function variant(): BelongsTo
+    public function customer(): BelongsTo
     {
-        return $this->belongsTo(ProductVariant::class, 'variant_id');
+        return $this->belongsTo(Customer::class);
     }
 
-    public function attributeDefinition(): BelongsTo
+    public function fieldBinding(): BelongsTo
     {
-        return $this->belongsTo(AttributeDefinition::class);
+        return $this->belongsTo(FieldBinding::class);
     }
 }

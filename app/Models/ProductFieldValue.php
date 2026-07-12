@@ -3,25 +3,33 @@
 namespace App\Models;
 
 use App\Support\Workspace\BelongsToWorkspace;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class WorkspaceImportAlias extends Model
+class ProductFieldValue extends Model
 {
     use BelongsToWorkspace;
-    use HasUuids;
 
     protected $fillable = [
         'workspace_id',
+        'product_id',
         'field_binding_id',
-        'alias_name',
-        'source',
+        'value_text',
+        'value_num',
+        'value_jsonb',
     ];
 
-    public function workspace(): BelongsTo
+    protected function casts(): array
     {
-        return $this->belongsTo(Workspace::class);
+        return [
+            'value_num' => 'decimal:6',
+            'value_jsonb' => 'array',
+        ];
+    }
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
     }
 
     public function fieldBinding(): BelongsTo
