@@ -9,6 +9,7 @@ use App\Enums\FieldObjectType;
 use App\Support\Migrations\FieldFoundationCustomerSeed;
 use Database\Seeders\FieldDefinitionSeeder;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -131,6 +132,68 @@ class FieldFoundationMigrationTest extends TestCase
         $migration->up();
 
         $this->assertCount(1, DB::table('field_definitions')->where('code', 'email')->get());
+    }
+
+    public function test_incompatible_global_definition_description_fails_before_ddl(): void
+    {
+        $this->migrateThroughPreFieldFoundation();
+
+        Schema::table('attribute_definitions', function (Blueprint $table) {
+            $table->text('description')->nullable();
+        });
+
+        $emailDef = FieldFoundationCustomerSeed::definitions()['email'];
+
+        DB::table('attribute_definitions')->insert([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => null,
+            'code' => 'email',
+            'data_type' => $emailDef['data_type']->value,
+            'scope' => AttributeScope::System->value,
+            'value_level' => 'product',
+            'storage_type' => 'column',
+            'storage_path' => 'products.email',
+            'attribute_group' => 'basic_information',
+            'is_required' => false,
+            'is_filterable' => true,
+            'is_sortable' => false,
+            'visibility_settings' => json_encode(['admin' => true, 'b2b' => false, 'channels' => []]),
+            'validation_rules' => null,
+            'is_localizable' => $emailDef['is_localizable'],
+            'is_multi_value' => $emailDef['is_multi_value'],
+            'status' => $emailDef['status']->value,
+            'sort_order' => 10,
+            'localized_labels' => json_encode($emailDef['localized_labels']),
+            'description' => 'Fixture description incompatible with seed null',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $definitionCountBefore = DB::table('attribute_definitions')->count();
+
+        $migration = require database_path('migrations/2026_07_12_150000_field_foundation.php');
+
+        try {
+            $migration->up();
+            $this->fail('Expected migration to fail on incompatible email description');
+        } catch (RuntimeException $e) {
+            $this->assertStringContainsString('email', $e->getMessage());
+            $this->assertStringContainsString('description', $e->getMessage());
+        }
+
+        $this->assertFalse(Schema::hasTable('field_definitions'));
+        $this->assertTrue(Schema::hasTable('attribute_definitions'));
+        $this->assertSame($definitionCountBefore, DB::table('attribute_definitions')->count());
+
+        // Only description mismatch blocked preflight; aligning it lets migration proceed.
+        DB::table('attribute_definitions')
+            ->whereNull('workspace_id')
+            ->where('code', 'email')
+            ->update(['description' => null]);
+
+        $migration->up();
+
+        $this->assertTrue(Schema::hasTable('field_definitions'));
     }
 
     public function test_incompatible_global_definition_fails_before_ddl(): void

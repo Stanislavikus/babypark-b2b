@@ -5,8 +5,15 @@
          colors="true"
 >
     <testsuites>
-        <testsuite name="CustomerRenameMigration">
+        <!--
+            MySQL migration tests that run raw DDL must not share a PHPUnit run with
+            ordinary RefreshDatabase tests: DDL on MySQL implicitly commits any open
+            transaction and breaks isolation for every subsequent test in the same run.
+            Confirmed on CustomerRenameMigrationTest from develop (not a GAP-016 regression).
+        -->
+        <testsuite name="MySQLMigration">
             <file>tests/Feature/CustomerRenameMigrationTest.php</file>
+            <file>tests/Feature/FieldFoundationMigrationTest.php</file>
         </testsuite>
     </testsuites>
     <php>

@@ -163,6 +163,10 @@ final class FieldFoundationMigrator
             $conflicts[] = 'validation_rules mismatch';
         }
 
+        if (($row->description ?? null) !== ($expected['description'] ?? null)) {
+            $conflicts[] = 'description expected '.json_encode($expected['description'] ?? null).', got '.json_encode($row->description ?? null);
+        }
+
         return $conflicts;
     }
 
@@ -681,6 +685,7 @@ final class FieldFoundationMigrator
             'is_localizable' => $binding->is_localizable,
             'is_multi_value' => $binding->is_multi_value,
             'localized_labels' => $binding->localized_labels,
+            'description' => $binding->description,
             'validation_rules' => $binding->validation_rules,
             'status' => $binding->def_status,
         ], $expectedDef);
