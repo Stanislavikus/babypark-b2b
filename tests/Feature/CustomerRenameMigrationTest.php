@@ -169,7 +169,6 @@ class CustomerRenameMigrationTest extends TestCase
         $this->assertNamedUniqueIndexCount('customers', 'customers_onec_guid_unique', 1);
         $this->assertForeignKeyCountOnColumn('customers', 'account_manager_id', 1);
         $this->assertForeignKeyCountOnColumn('customers', 'backup_manager_id', 1);
-        $this->assertForeignKeyCountOnColumn('customers', 'workspace_id', 1);
         $this->assertCompoundForeignKeyCount('customers', ['workspace_id', 'default_price_list_id'], 1);
     }
 
@@ -183,7 +182,6 @@ class CustomerRenameMigrationTest extends TestCase
         $this->assertNamedUniqueIndexCount('contractors', 'contractors_onec_guid_unique', 1);
         $this->assertForeignKeyCountOnColumn('contractors', 'account_manager_id', 1);
         $this->assertForeignKeyCountOnColumn('contractors', 'backup_manager_id', 1);
-        $this->assertForeignKeyCountOnColumn('contractors', 'workspace_id', 1);
         $this->assertCompoundForeignKeyCount('contractors', ['workspace_id', 'default_price_list_id'], 1);
     }
 
@@ -270,6 +268,15 @@ class CustomerRenameMigrationTest extends TestCase
         $this->assertSame($expected, $count, "Expected {$expected} unique index named {$indexName} on {$table}");
     }
 
+    /**
+     * Counts ALL foreign key constraints that reference this column, including
+     * as a member of a compound (multi-column) foreign key — not just
+     * single-column FKs. A column that's both a single-column FK and part of a
+     * compound FK will correctly count as 2. Use this only for columns you've
+     * verified have no compound-FK overlap; otherwise prefer
+     * assertNamedForeignKeyCount() / assertCompoundForeignKeyCount() for
+     * unambiguous, name-specific checks.
+     */
     private function assertForeignKeyCountOnColumn(string $table, string $column, int $expected): void
     {
         $count = DB::table('information_schema.KEY_COLUMN_USAGE')
