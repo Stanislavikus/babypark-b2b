@@ -23,34 +23,15 @@ class CustomerPricingScope
     }
 
     /**
-     * Products with at least one active variant that has a resolvable price for the customer.
+     * Active products with at least one active variant (catalog eligibility only; price resolution is separate).
      */
     public static function applyProductScope(Builder $query, Customer $customer): Builder
     {
-        $priceListId = self::priceListIdFor($customer);
-
-        return $query->whereHas('variants', function (Builder $variantQuery) use ($priceListId): void {
-            $variantQuery
-                ->where('is_active', true)
-                ->where(function (Builder $priceQuery) use ($priceListId): void {
-                    if ($priceListId !== null) {
-                        $priceQuery->whereHas('priceListItems', function (Builder $itemQuery) use ($priceListId): void {
-                            $itemQuery
-                                ->where('price_list_id', $priceListId)
-                                ->where('status', 'active')
-                                ->where('quantity_min', '<=', 1)
-                                ->where(function (Builder $validQuery): void {
-                                    $validQuery->whereNull('valid_from')->orWhere('valid_from', '<=', now());
-                                })
-                                ->where(function (Builder $validQuery): void {
-                                    $validQuery->whereNull('valid_until')->orWhere('valid_until', '>=', now());
-                                });
-                        });
-                    }
-
-                    $priceQuery->orWhereNotNull('base_price_cache');
-                });
-        });
+        return $query
+            ->where('products.is_active', true)
+            ->whereHas('variants', function (Builder $variantQuery): void {
+                $variantQuery->where('is_active', true);
+            });
     }
 
     public static function eagerLoadForCustomer(Customer $customer): array
