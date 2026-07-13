@@ -82,6 +82,9 @@ trait CreatesPricingFixtures
         int $quantityMin = 1,
         ?float $salePrice = null,
         ?float $vatRate = 20,
+        PriceListItemStatus $status = PriceListItemStatus::Active,
+        ?\DateTimeInterface $validFrom = null,
+        ?\DateTimeInterface $validUntil = null,
     ): PriceListItem {
         return PriceListItem::withoutWorkspaceScope()->create([
             'workspace_id' => $priceList->workspace_id,
@@ -91,7 +94,9 @@ trait CreatesPricingFixtures
             'price' => $price,
             'sale_price' => $salePrice,
             'vat_rate' => $vatRate,
-            'status' => PriceListItemStatus::Active,
+            'status' => $status,
+            'valid_from' => $validFrom,
+            'valid_until' => $validUntil,
         ]);
     }
 }
