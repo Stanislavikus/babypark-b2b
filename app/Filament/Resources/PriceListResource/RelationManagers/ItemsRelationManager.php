@@ -148,6 +148,7 @@ class ItemsRelationManager extends RelationManager
             ->defaultSort('productVariant.product.name')
             ->headerActions([
                 Tables\Actions\CreateAction::make()
+                    ->label('Додати позицію')
                     ->mutateFormDataUsing(function (array $data): array {
                         $data['workspace_id'] = $this->getOwnerRecord()->workspace_id;
                         $data['price_list_id'] = $this->getOwnerRecord()->id;

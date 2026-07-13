@@ -13,8 +13,8 @@ use App\Services\Pricing\CustomerCatalogQuery;
 use App\Services\Pricing\PriceResolutionSnapshot;
 use App\Support\CatalogRowData;
 use App\Support\Pricing\CustomerCatalogCriteria;
-use App\Support\Workspace\WorkspaceContext;
 use Carbon\CarbonImmutable;
+use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
@@ -23,9 +23,8 @@ use Livewire\WithPagination;
 
 class PreviewAsCustomer extends Page
 {
+    use InteractsWithRecord;
     use WithPagination;
-
-    public Customer $record;
 
     protected static string $resource = CustomerResource::class;
 
@@ -71,11 +70,7 @@ class PreviewAsCustomer extends Page
 
     public function mount(int|string $record): void
     {
-        $workspaceId = app(WorkspaceContext::class)->id();
-
-        $this->record = Customer::query()
-            ->where('workspace_id', $workspaceId)
-            ->findOrFail($record);
+        $this->record = $this->resolveRecord($record);
 
         if ($this->quantity < 1) {
             $this->quantity = 1;
