@@ -71,17 +71,26 @@ class CustomerCatalogQuery
             'brand' => $query->orderBy('brand', $dir),
             'stock' => $this->applyStockSorting($query, $dir),
             'price' => $priceListId
-                ? $query->orderByRaw(
-                    'COALESCE('.PricingSqlExpressions::maxGrossPriceSqlForProduct('products.id', $priceListId).", 0) {$dir}"
-                )
+                ? (function () use ($query, $priceListId, $dir) {
+                    $priceExpr = PricingSqlExpressions::maxGrossPriceSqlForProduct('products.id', $priceListId);
+
+                    return $query->orderByRaw("CASE WHEN ({$priceExpr}) IS NULL THEN 1 ELSE 0 END ASC")
+                        ->orderByRaw("{$priceExpr} {$dir}")
+                        ->orderBy('products.id', 'asc');
+                })()
                 : $query->orderBy('sku', $dir),
             'rrp' => $query->orderByRaw(
                 'COALESCE('.PricingSqlExpressions::maxRrpSqlForProduct('products.id').", 0) {$dir}"
             ),
             'margin' => $priceListId
-                ? $query->orderByRaw(
-                    PricingSqlExpressions::customerMarginSortSql('products.id', $priceListId)." {$dir}"
-                )
+                ? (function () use ($query, $priceListId, $dir) {
+                    $marginExpr = PricingSqlExpressions::customerMarginSortSql('products.id', $priceListId);
+                    $minGrossExpr = PricingSqlExpressions::minGrossPriceSqlForProduct('products.id', $priceListId);
+
+                    return $query->orderByRaw("CASE WHEN ({$minGrossExpr}) IS NULL THEN 1 ELSE 0 END ASC")
+                        ->orderByRaw("{$marginExpr} {$dir}")
+                        ->orderBy('products.id', 'asc');
+                })()
                 : $query->orderBy('sku', $dir),
             default => $query->orderBy('sku', 'asc'),
         };
