@@ -94,7 +94,8 @@ class PriceInspectorTest extends TestCase
             ])
             ->call('resolvePrice')
             ->assertSet('resultStatus', PriceResolutionStatus::Resolved->value)
-            ->assertSet('resultSummary.price.effective_net', 100.0);
+            ->assertSet('presentation.headline', __('price_inspector.headline.resolved'))
+            ->assertSet('presentation.tone', 'success');
     }
 
     public function test_inspector_tenant_isolation_for_customer_selector(): void
@@ -238,5 +239,97 @@ class PriceInspectorTest extends TestCase
         );
         $futureOutput = $presenter->present($futureResult);
         $this->assertStringContainsString('not_yet_effective', $futureOutput);
+    }
+
+    public function test_resolved_page_shows_human_friendly_content(): void
+    {
+        $customer = $this->createCustomer($this->workspace);
+        $variant = $this->createVariant($this->workspace);
+        $list = $this->createPriceList($this->workspace);
+        $list->update(['name' => 'Оптовий Україна']);
+        $customer->update(['default_price_list_id' => $list->id]);
+        $this->createPriceListItem($list, $variant, 100.00);
+
+        $response = Livewire::actingAs($this->admin)
+            ->test(PriceInspector::class)
+            ->fillForm([
+                'customer_id' => $customer->id,
+                'variant_id' => $variant->id,
+                'quantity' => 1,
+            ])
+            ->call('resolvePrice');
+
+        $html = $response->html();
+
+        $this->assertStringContainsString(__('price_inspector.headline.resolved'), $html);
+        $this->assertStringContainsString(__('price_inspector.section.decision_path'), $html);
+        $this->assertStringContainsString('Оптовий Україна', $html);
+        $this->assertStringNotContainsString('Текстовий вивід', $html);
+        $this->assertStringNotContainsString('all_sources_exhausted', $html);
+    }
+
+    public function test_unavailable_page_shows_recommended_actions(): void
+    {
+        $customer = $this->createCustomer($this->workspace);
+        $variant = $this->createVariant($this->workspace);
+
+        $response = Livewire::actingAs($this->admin)
+            ->test(PriceInspector::class)
+            ->fillForm([
+                'customer_id' => $customer->id,
+                'variant_id' => $variant->id,
+                'quantity' => 1,
+            ])
+            ->call('resolvePrice');
+
+        $html = $response->html();
+
+        $this->assertStringContainsString(__('price_inspector.headline.unavailable'), $html);
+        $this->assertStringContainsString(__('price_inspector.section.what_to_fix'), $html);
+        $this->assertStringContainsString(__('price_inspector.action.set_base_price'), $html);
+    }
+
+    public function test_technical_details_are_inside_collapsed_details_element(): void
+    {
+        $customer = $this->createCustomer($this->workspace);
+        $variant = $this->createVariant($this->workspace);
+        $list = $this->createPriceList($this->workspace);
+        $customer->update(['default_price_list_id' => $list->id]);
+        $this->createPriceListItem($list, $variant, 100.00);
+
+        $html = Livewire::actingAs($this->admin)
+            ->test(PriceInspector::class)
+            ->fillForm([
+                'customer_id' => $customer->id,
+                'variant_id' => $variant->id,
+                'quantity' => 1,
+            ])
+            ->call('resolvePrice')
+            ->html();
+
+        $this->assertStringContainsString('<details', $html);
+        $this->assertStringNotContainsString('<details open', $html);
+        $this->assertStringContainsString(__('price_inspector.section.technical_details'), $html);
+
+        $detailsPos = strpos($html, '<details');
+        $detailsClosePos = strpos($html, '</details>', $detailsPos);
+        $mainContent = substr($html, 0, $detailsPos);
+
+        $this->assertStringNotContainsString('price_list_id', $mainContent);
+        $this->assertStringNotContainsString('all_sources_exhausted', $mainContent);
+        $this->assertStringNotContainsString('item_missing', $mainContent);
+
+        $technicalContent = substr($html, $detailsPos, $detailsClosePos - $detailsPos);
+        $this->assertStringContainsString('price_list_id', $technicalContent);
+    }
+
+    public function test_page_title_and_subheading_are_human_friendly(): void
+    {
+        $response = $this->actingAs($this->admin)
+            ->get('/admin/price-inspector');
+
+        $response->assertOk();
+        $response->assertSee('Перевірка ціни для клієнта');
+        $response->assertSee('Дізнайтеся, яку ціну отримає клієнт і чому.');
     }
 }

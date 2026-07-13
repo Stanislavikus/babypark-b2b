@@ -7,11 +7,15 @@ use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\User;
+use App\Services\Pricing\Inspection\PriceInspectorContext;
+use App\Services\Pricing\Inspection\PriceInspectorPresentation;
+use App\Services\Pricing\Inspection\PriceInspectorPresenter;
 use App\Services\Pricing\PriceResolver;
 use App\Services\Pricing\Resolution\PriceResolutionTracePresenter;
 use App\Support\Workspace\WorkspaceContext;
 use Carbon\CarbonImmutable;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -31,9 +35,9 @@ class PriceInspector extends Page implements HasForms
 
     protected static ?string $navigationGroup = 'B2B';
 
-    protected static ?string $navigationLabel = 'Інспектор цін';
+    protected static ?string $navigationLabel = 'Перевірка ціни';
 
-    protected static ?string $title = 'Інспектор цін';
+    protected static ?string $title = 'Перевірка ціни для клієнта';
 
     protected static ?int $navigationSort = 5;
 
@@ -46,7 +50,7 @@ class PriceInspector extends Page implements HasForms
     public ?string $presentedOutput = null;
 
     /** @var array<string, mixed>|null */
-    public ?array $resultSummary = null;
+    public ?array $presentation = null;
 
     public static function canAccess(): bool
     {
@@ -60,6 +64,11 @@ class PriceInspector extends Page implements HasForms
                 UserRole::Director,
                 UserRole::Programmer,
             ], true);
+    }
+
+    public function getSubheading(): ?string
+    {
+        return 'Дізнайтеся, яку ціну отримає клієнт і чому.';
     }
 
     public function mount(): void
@@ -88,6 +97,7 @@ class PriceInspector extends Page implements HasForms
     public function form(Form $form): Form
     {
         $workspaceId = app(WorkspaceContext::class)->id();
+        $timezone = config('app.timezone', 'UTC');
 
         return $form
             ->schema([
@@ -140,7 +150,11 @@ class PriceInspector extends Page implements HasForms
                     DateTimePicker::make('effective_at')
                         ->label('Дата/час дії ціни')
                         ->seconds(true)
-                        ->default(now()),
+                        ->default(now())
+                        ->helperText('Часовий пояс: '.$timezone),
+                    Placeholder::make('timezone_hint')
+                        ->label('Часовий пояс')
+                        ->content($timezone),
                 ])->columns(2),
             ])
             ->statePath('data');
@@ -170,39 +184,53 @@ class PriceInspector extends Page implements HasForms
             effectiveAt: $effectiveAt,
         );
 
+        $user = Auth::user();
+        $context = new PriceInspectorContext(
+            customer: $customer,
+            variant: $variant,
+            quantity: (int) $data['quantity'],
+            effectiveAt: $effectiveAt,
+            user: $user instanceof User ? $user : null,
+        );
+
+        $presentation = app(PriceInspectorPresenter::class)->present($result, $context);
+
         $this->resultStatus = $result->status->value;
         $this->presentedOutput = app(PriceResolutionTracePresenter::class)->present($result);
-        $this->resultSummary = [
-            'status' => $result->status->value,
-            'reason_codes' => array_map(fn ($r) => $r->value, $result->reasonCodes),
-            'price' => $result->price !== null ? [
-                'effective_net' => $result->price->effectiveNetPrice,
-                'gross' => $result->price->grossPrice,
-                'currency' => $result->price->currency,
-                'source' => $result->price->source,
-                'vat_rate' => $result->price->vatRate,
-            ] : null,
-            'failure' => $result->failure !== null ? [
-                'reason' => $result->failure->reason->value,
-                'message' => $result->failure->message,
-                'context' => $result->failure->context,
-            ] : null,
-            'trace' => array_map(fn ($step) => [
-                'source' => $step->source->value,
-                'status' => $step->status->value,
-                'reason' => $step->reason->value,
-                'price_list_id' => $step->priceListId,
-                'price_list_item_id' => $step->priceListItemId,
-                'amount' => $step->amount,
-                'currency' => $step->currency,
-                'metadata' => $step->metadata,
-            ], $result->trace->steps),
-        ];
+        $this->presentation = $this->serializePresentation($presentation);
 
         Notification::make()
             ->title('Ціну перевірено')
             ->success()
             ->send();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializePresentation(PriceInspectorPresentation $presentation): array
+    {
+        return [
+            'headline' => $presentation->headline,
+            'tone' => $presentation->tone->value,
+            'price_summary' => $presentation->priceSummary,
+            'summary' => $presentation->summary,
+            'source_steps' => array_map(fn ($step) => [
+                'source_label' => $step->sourceLabel,
+                'source_name' => $step->sourceName,
+                'outcome_label' => $step->outcomeLabel,
+                'explanation' => $step->explanation,
+                'action' => $step->action !== null ? [
+                    'label' => $step->action->label,
+                    'url' => $step->action->url,
+                ] : null,
+            ], $presentation->sourceSteps),
+            'recommended_actions' => array_map(fn ($action) => [
+                'label' => $action->label,
+                'url' => $action->url,
+            ], $presentation->recommendedActions),
+            'technical_details' => $presentation->technicalDetails,
+        ];
     }
 
     protected function getFormActions(): array
