@@ -91,7 +91,7 @@ class PriceListGuard
      */
     public static function assignedCustomers(PriceList $record): Collection
     {
-        return $record->customers()()
+        return $record->customers()
             ->orderBy('name')
             ->get(['id', 'name']);
     }
