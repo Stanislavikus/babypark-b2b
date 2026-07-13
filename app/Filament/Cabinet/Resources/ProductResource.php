@@ -249,16 +249,16 @@ class ProductResource extends Resource
                 ->label('Наявність')
                 ->getStateUsing(function (Product $record): string {
                     $customer = auth('customer')->user();
-                    $data = CatalogRowData::forProduct($record, $customer);
+                    $row = CatalogRowData::forProduct($record, $customer);
 
-                    return $data['badge']['label'];
+                    return $row->badge['label'];
                 })
                 ->badge()
                 ->color(function (Product $record): string {
                     $customer = auth('customer')->user();
-                    $data = CatalogRowData::forProduct($record, $customer);
+                    $row = CatalogRowData::forProduct($record, $customer);
 
-                    return match ($data['badge']['color']) {
+                    return match ($row->badge['color']) {
                         'success' => 'success',
                         'warning' => 'warning',
                         'info' => 'info',
@@ -273,7 +273,8 @@ class ProductResource extends Resource
                 ->label('Ваша ціна')
                 ->getStateUsing(function (Product $record): ?string {
                     $customer = auth('customer')->user();
-                    $price = CatalogRowData::forProduct($record, $customer)['myPrice'];
+                    $row = CatalogRowData::forProduct($record, $customer);
+                    $price = $row->price;
 
                     return $price !== null
                         ? '₴ '.number_format($price, 2, '.', ' ')

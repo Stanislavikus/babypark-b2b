@@ -13,6 +13,10 @@ class ViewCustomer extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('preview_as_customer')
+                ->label('Перегляд як клієнт')
+                ->icon('heroicon-o-eye')
+                ->url(fn (): string => CustomerResource::getUrl('preview', ['record' => $this->record])),
             Actions\EditAction::make(),
         ];
     }

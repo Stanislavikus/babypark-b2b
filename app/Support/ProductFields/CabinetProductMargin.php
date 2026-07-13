@@ -10,9 +10,9 @@ class CabinetProductMargin
 {
     public static function marginUah(Product $product, Customer $customer): ?float
     {
-        $data = CatalogRowData::forProduct($product, $customer);
-        $myPrice = $data['myPrice'];
-        $rrp = $data['rrp'];
+        $row = CatalogRowData::forProduct($product, $customer);
+        $myPrice = $row->price;
+        $rrp = $row->rrp;
 
         if ($myPrice === null || $rrp === null || $rrp <= 0) {
             return null;
@@ -23,9 +23,9 @@ class CabinetProductMargin
 
     public static function formatted(Product $product, Customer $customer, string $format = 'percent'): ?string
     {
-        $data = CatalogRowData::forProduct($product, $customer);
-        $myPrice = $data['myPrice'];
-        $rrp = $data['rrp'];
+        $row = CatalogRowData::forProduct($product, $customer);
+        $myPrice = $row->price;
+        $rrp = $row->rrp;
 
         if ($myPrice === null || $rrp === null || $rrp <= 0) {
             return null;

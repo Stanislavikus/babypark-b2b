@@ -3,13 +3,13 @@
     use Livewire\Livewire;
 
     $customer = auth('customer')->user();
-    $data = CatalogRowData::forProduct($getRecord(), $customer);
-    $firstVariant = $data['firstVariant'];
-    $maxQty = $data['maxQty'];
-    $minQty = $data['minQty'];
-    $step = $data['step'];
-    $badge = $data['badge'];
-    $myPrice = $data['myPrice'];
+    $row = CatalogRowData::forProduct($getRecord(), $customer);
+    $firstVariant = $row->displayedVariant;
+    $maxQty = $row->maxQty;
+    $minQty = $row->minQty;
+    $step = $row->step;
+    $badge = $row->badge;
+    $myPrice = $row->price;
 
     $livewire = Livewire::current();
     $currentQty = (int) ($livewire?->quantities[$firstVariant?->id] ?? 0);

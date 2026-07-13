@@ -2,6 +2,8 @@
 
 namespace App\Services\Pricing;
 
+use App\Enums\CatalogPriceDisplayStatus;
+use App\Exceptions\Pricing\PriceListConfigurationException;
 use App\Exceptions\Pricing\PriceNotAvailableException;
 use App\Models\Customer;
 use App\Models\Product;
@@ -82,16 +84,24 @@ class ProductPricingSummary
         ProductVariant $variant,
         Customer $customer,
         int $quantity = 1,
+        ?PriceResolutionSnapshot $snapshot = null,
     ): VariantPriceDisplay {
         try {
-            $resolved = $this->priceResolver->resolveForCustomer($variant, $customer, $quantity);
+            $resolved = $this->priceResolver->resolveForCustomer(
+                $variant,
+                $customer,
+                $quantity,
+                snapshot: $snapshot,
+            );
             $rrp = $variant->recommended_retail_price_cache !== null
                 ? (float) $variant->recommended_retail_price_cache
                 : null;
 
-            return VariantPriceDisplay::fromResolved($resolved, $rrp);
-        } catch (PriceNotAvailableException) {
+            return VariantPriceDisplay::fromResolved($resolved, $rrp, $variant);
+        } catch (PriceNotAvailableException $exception) {
             return VariantPriceDisplay::unavailable();
+        } catch (PriceListConfigurationException $exception) {
+            return VariantPriceDisplay::configurationError($exception->reason, $variant);
         }
     }
 
@@ -99,37 +109,69 @@ class ProductPricingSummary
         ProductVariant $variant,
         Customer $customer,
         int $quantity = 1,
+        ?PriceResolutionSnapshot $snapshot = null,
     ): ?VariantPriceDisplay {
-        $display = $this->resolveVariantDisplay($variant, $customer, $quantity);
+        $display = $this->resolveVariantDisplay($variant, $customer, $quantity, $snapshot);
 
         return $display->available ? $display : null;
     }
 
-    public function minGrossPriceForCustomer(Product $product, Customer $customer): ?float
+    /**
+     * @param  Collection<int, VariantPriceDisplay>  $resolvedDisplaysByVariantId
+     */
+    public function cheapestResolvedDisplay(Collection $resolvedDisplaysByVariantId): ?VariantPriceDisplay
     {
-        $prices = $product->variants
-            ->where('is_active', true)
-            ->map(fn (ProductVariant $variant) => $this->tryResolveVariantDisplay($variant, $customer)?->grossPrice)
-            ->filter()
-            ->values();
+        if ($resolvedDisplaysByVariantId->isEmpty()) {
+            return null;
+        }
 
-        return $prices->isEmpty() ? null : $prices->min();
+        $entries = $resolvedDisplaysByVariantId->all();
+        usort($entries, static function (VariantPriceDisplay $a, VariantPriceDisplay $b): int {
+            $variantIdA = $a->sourceVariant?->id ?? PHP_INT_MAX;
+            $variantIdB = $b->sourceVariant?->id ?? PHP_INT_MAX;
+
+            return ($a->grossPrice <=> $b->grossPrice) ?: ($variantIdA <=> $variantIdB);
+        });
+
+        return $entries[0] ?? null;
     }
 
-    public function formatCustomerGrossPrice(Product $product, Customer $customer): ?string
-    {
+    public function minGrossPriceForCustomer(
+        Product $product,
+        Customer $customer,
+        ?PriceResolutionSnapshot $snapshot = null,
+    ): ?VariantPriceDisplay {
+        $resolved = $product->variants
+            ->where('is_active', true)
+            ->mapWithKeys(fn (ProductVariant $variant): array => [
+                $variant->id => $this->resolveVariantDisplay($variant, $customer, 1, $snapshot),
+            ])
+            ->filter(fn (VariantPriceDisplay $display): bool => $display->status === CatalogPriceDisplayStatus::Resolved);
+
+        return $this->cheapestResolvedDisplay($resolved);
+    }
+
+    public function formatCustomerGrossPrice(
+        Product $product,
+        Customer $customer,
+        ?PriceResolutionSnapshot $snapshot = null,
+    ): ?string {
         $prices = $product->variants
             ->where('is_active', true)
-            ->map(fn (ProductVariant $variant) => $this->tryResolveVariantDisplay($variant, $customer)?->grossPrice)
+            ->map(fn (ProductVariant $variant) => $this->tryResolveVariantDisplay($variant, $customer, 1, $snapshot)?->grossPrice)
             ->filter()
             ->values();
 
         return self::formatMoneyRange($prices);
     }
 
-    public function variantHasResolvablePrice(ProductVariant $variant, Customer $customer, int $quantity = 1): bool
-    {
-        return $this->tryResolveVariantDisplay($variant, $customer, $quantity) !== null;
+    public function variantHasResolvablePrice(
+        ProductVariant $variant,
+        Customer $customer,
+        int $quantity = 1,
+        ?PriceResolutionSnapshot $snapshot = null,
+    ): bool {
+        return $this->tryResolveVariantDisplay($variant, $customer, $quantity, $snapshot) !== null;
     }
 
     public function productHasResolvablePrice(Product $product, Customer $customer): bool
@@ -139,27 +181,34 @@ class ProductPricingSummary
             ->contains(fn (ProductVariant $variant) => $this->variantHasResolvablePrice($variant, $customer));
     }
 
-    public function resolveDefaultDisplay(ProductVariant $variant, int $quantity = 1): VariantPriceDisplay
-    {
+    public function resolveDefaultDisplay(
+        ProductVariant $variant,
+        int $quantity = 1,
+        ?PriceResolutionSnapshot $snapshot = null,
+    ): VariantPriceDisplay {
         try {
-            $resolved = $this->priceResolver->resolveDefault($variant, $quantity);
+            $resolved = $this->priceResolver->resolveDefault($variant, $quantity, snapshot: $snapshot);
             $rrp = $variant->recommended_retail_price_cache !== null
                 ? (float) $variant->recommended_retail_price_cache
                 : null;
 
-            return VariantPriceDisplay::fromResolved($resolved, $rrp);
+            return VariantPriceDisplay::fromResolved($resolved, $rrp, $variant);
         } catch (PriceNotAvailableException) {
             return VariantPriceDisplay::unavailable();
+        } catch (PriceListConfigurationException $exception) {
+            return VariantPriceDisplay::configurationError($exception->reason, $variant);
         }
     }
 
-    public function formatDefaultSalePrice(Product $product): ?string
+    public function formatDefaultSalePrice(Product $product, ?PriceResolutionSnapshot $snapshot = null): ?string
     {
         $prices = $product->variants
             ->where('is_active', true)
-            ->map(fn (ProductVariant $variant) => $this->resolveDefaultDisplay($variant)->available
-                ? $this->resolveDefaultDisplay($variant)->grossPrice
-                : null)
+            ->map(function (ProductVariant $variant) use ($snapshot): ?float {
+                $display = $this->resolveDefaultDisplay($variant, 1, $snapshot);
+
+                return $display->available ? $display->grossPrice : null;
+            })
             ->filter()
             ->values();
 

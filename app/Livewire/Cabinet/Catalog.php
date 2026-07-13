@@ -2,15 +2,17 @@
 
 namespace App\Livewire\Cabinet;
 
+use App\Enums\CatalogProductDisplayState;
 use App\Models\Category;
-use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\Availability\ReservationCreator;
-use App\Services\Pricing\PricingSqlExpressions;
+use App\Services\Pricing\CustomerCatalogQuery;
+use App\Services\Pricing\PriceResolutionSnapshot;
 use App\Support\CatalogRowData;
-use App\Support\Pricing\CustomerPricingScope;
+use App\Support\Pricing\CustomerCatalogCriteria;
+use App\Support\Pricing\CustomerFacingPriceLabel;
 use App\Support\SessionCart;
-use Illuminate\Database\Eloquent\Builder;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -182,56 +184,49 @@ class Catalog extends Component
     public function render()
     {
         $customer = Auth::guard('customer')->user();
+        $snapshot = new PriceResolutionSnapshot(CarbonImmutable::now());
 
-        $query = CustomerPricingScope::applyProductScope(
-            Product::query()->where('is_active', true),
-            $customer,
-        )->with(CustomerPricingScope::eagerLoadForCustomer($customer));
+        $criteria = CustomerCatalogCriteria::fromLegacy(
+            search: $this->search,
+            categoryIds: $this->selectedCategories,
+            brandIds: $this->selectedBrands,
+            sortBy: $this->sortBy,
+            sortDir: $this->sortDir,
+        );
 
-        if (filled($this->search)) {
-            $query->where(fn ($q) => $q
-                ->where('name', 'like', "%{$this->search}%")
-                ->orWhere('sku', 'like', "%{$this->search}%")
-                ->orWhere('brand', 'like', "%{$this->search}%")
-            );
-        }
-
-        if (! empty($this->selectedCategories)) {
-            $query->whereIn('category_id', $this->selectedCategories);
-        }
-
-        if (! empty($this->selectedBrands)) {
-            $query->whereIn('brand', $this->selectedBrands);
-        }
-
-        $query = $this->applySorting($query, $customer);
-        $products = $query->paginate(24);
+        $catalogQuery = app(CustomerCatalogQuery::class);
+        $products = $catalogQuery->paginateFor($customer, $criteria);
 
         $productData = [];
         foreach ($products as $product) {
-            $data = CatalogRowData::forProduct($product, $customer);
-            $firstVariant = $data['firstVariant'];
+            $row = CatalogRowData::forProduct($product, $customer, 1, $snapshot);
+            $firstVariant = $row->displayedVariant;
 
             if ($firstVariant && ! isset($this->quantities[$firstVariant->id])) {
-                $this->quantities[$firstVariant->id] = $data['minQty'];
+                $this->quantities[$firstVariant->id] = $row->minQty;
             }
 
             $productData[$product->id] = [
-                'badge' => $data['badge'],
+                'badge' => $row->badge,
                 'firstVariant' => $firstVariant,
-                'maxRrp' => (float) ($data['rrp'] ?? 0),
-                'maxMyPrice' => (float) ($data['myPrice'] ?? 0),
-                'maxQty' => $data['maxQty'],
-                'minQty' => $data['minQty'],
-                'step' => $data['step'],
+                'maxRrp' => (float) ($row->rrp ?? 0),
+                'maxMyPrice' => (float) ($row->price ?? 0),
+                'priceLabel' => $row->myPriceDisplay !== null
+                    ? CustomerFacingPriceLabel::forDisplay($row->myPriceDisplay)
+                    : ($row->displayState === CatalogProductDisplayState::ConfigurationError
+                        ? 'Помилка конфігурації цін'
+                        : ($row->displayState === CatalogProductDisplayState::PriceUnavailable
+                            ? 'Ціна недоступна'
+                            : null)),
+                'maxQty' => $row->maxQty,
+                'minQty' => $row->minQty,
+                'step' => $row->step,
+                'displayState' => $row->displayState,
             ];
         }
 
         $categories = Category::orderBy('name')->get();
-        $brands = CustomerPricingScope::applyProductScope(
-            Product::query()->where('is_active', true)->whereNotNull('brand'),
-            $customer,
-        )->distinct()->orderBy('brand')->pluck('brand');
+        $brands = $catalogQuery->availableBrands($customer);
 
         return view('livewire.cabinet.catalog', compact(
             'products',
@@ -239,63 +234,5 @@ class Catalog extends Component
             'categories',
             'brands',
         ));
-    }
-
-    private function applySorting(Builder $query, $customer): Builder
-    {
-        $dir = in_array($this->sortDir, ['asc', 'desc']) ? $this->sortDir : 'asc';
-        $priceListId = CustomerPricingScope::priceListIdFor($customer);
-
-        return match ($this->sortBy) {
-            'sku' => $query->orderBy('sku', $dir),
-            'name' => $query->orderBy('name', $dir),
-            'category' => $query->orderBy(
-                Category::select('name')
-                    ->whereColumn('categories.id', 'products.category_id')
-                    ->limit(1),
-                $dir
-            ),
-            'brand' => $query->orderBy('brand', $dir),
-            'stock' => $this->applyStockSorting($query, $dir),
-            'price' => $priceListId
-                ? $query->orderByRaw(
-                    'COALESCE('.PricingSqlExpressions::maxGrossPriceSqlForProduct('products.id', $priceListId).", 0) {$dir}"
-                )
-                : $query->orderBy('sku', $dir),
-            'rrp' => $query->orderByRaw(
-                'COALESCE('.PricingSqlExpressions::maxRrpSqlForProduct('products.id').", 0) {$dir}"
-            ),
-            'margin' => $priceListId
-                ? $query->orderByRaw(
-                    PricingSqlExpressions::customerMarginSortSql('products.id', $priceListId)." {$dir}"
-                )
-                : $query->orderBy('sku', $dir),
-            default => $query->orderBy('sku', 'asc'),
-        };
-    }
-
-    private function applyStockSorting(Builder $query, string $dir): Builder
-    {
-        $totalQty = '(SELECT COALESCE(SUM(s.quantity), 0)
-                      FROM stocks s
-                      INNER JOIN product_variants pv ON s.variant_id = pv.id
-                      WHERE pv.product_id = products.id)';
-
-        $minExpectedDate = '(SELECT MIN(s.expected_date)
-                            FROM stocks s
-                            INNER JOIN product_variants pv ON s.variant_id = pv.id
-                            WHERE pv.product_id = products.id
-                            AND s.expected_date IS NOT NULL)';
-
-        $priorityExpr = "CASE
-            WHEN {$totalQty} > 0 THEN 0
-            WHEN {$minExpectedDate} IS NOT NULL THEN 1
-            ELSE 2
-        END";
-
-        return $query
-            ->orderByRaw("{$priorityExpr} {$dir}")
-            ->orderByRaw("{$totalQty} DESC")
-            ->orderByRaw("{$minExpectedDate} ASC");
     }
 }

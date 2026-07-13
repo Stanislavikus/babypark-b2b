@@ -61,8 +61,12 @@ final readonly class PriceResolutionResult
             ?? throw new LogicException('Failure result requires failure context.');
 
         return match ($this->status) {
-            PriceResolutionStatus::Unavailable => new PriceNotAvailableException($failure->message),
-            PriceResolutionStatus::ConfigurationError => new PriceListConfigurationException($failure->message),
+            PriceResolutionStatus::Unavailable => new PriceNotAvailableException($failure->message, $failure->context),
+            PriceResolutionStatus::ConfigurationError => new PriceListConfigurationException(
+                $failure->message,
+                $failure->reason,
+                $failure->context,
+            ),
             PriceResolutionStatus::Resolved => throw new LogicException('Resolved result has no exception.'),
         };
     }
