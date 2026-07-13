@@ -9,102 +9,187 @@
         </div>
     </form>
 
-    @if ($resultSummary !== null)
-        <x-filament::section class="mt-6" heading="Результат">
-            <div class="space-y-4">
-                <div>
-                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Статус</span>
-                    <p class="text-lg font-semibold">{{ $resultSummary['status'] }}</p>
-                </div>
+    @if ($presentation !== null)
+        @php
+            $tone = $presentation['tone'];
+            $toneClasses = match ($tone) {
+                'success' => 'border-success-300 bg-success-50 text-success-800 dark:border-success-500 dark:bg-success-500/10 dark:text-success-400',
+                'warning' => 'border-warning-300 bg-warning-50 text-warning-800 dark:border-warning-500 dark:bg-warning-500/10 dark:text-warning-400',
+                'critical' => 'border-danger-300 bg-danger-50 text-danger-800 dark:border-danger-500 dark:bg-danger-500/10 dark:text-danger-400',
+                default => 'border-gray-300 bg-gray-50 text-gray-800 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200',
+            };
+            $toneIcon = match ($tone) {
+                'success' => '✓',
+                'warning' => '⚠',
+                'critical' => '⛔',
+                default => '•',
+            };
+            $showActions = in_array($tone, ['warning', 'critical'], true);
+        @endphp
 
-                @if ($resultSummary['price'] !== null)
-                    <div class="grid gap-2 sm:grid-cols-2">
-                        <div>
-                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Нетто (ефективна)</span>
-                            <p>{{ number_format($resultSummary['price']['effective_net'], 2, ',', ' ') }} {{ $resultSummary['price']['currency'] }}</p>
-                        </div>
-                        <div>
-                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Брутто</span>
-                            <p>{{ number_format($resultSummary['price']['gross'], 2, ',', ' ') }} {{ $resultSummary['price']['currency'] }}</p>
-                        </div>
-                        <div>
-                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Джерело</span>
-                            <p>{{ $resultSummary['price']['source'] }}</p>
-                        </div>
-                        <div>
-                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">ПДВ</span>
-                            <p>{{ number_format($resultSummary['price']['vat_rate'], 2, ',', ' ') }}%</p>
-                        </div>
-                    </div>
-                @endif
-
-                @if ($resultSummary['failure'] !== null)
-                    <div class="rounded-lg border border-danger-300 bg-danger-50 p-4 dark:border-danger-500 dark:bg-danger-500/10">
-                        <p class="font-medium text-danger-700 dark:text-danger-400">
-                            {{ $resultSummary['failure']['reason'] }}
-                        </p>
-                        <p class="mt-1 text-sm">{{ $resultSummary['failure']['message'] }}</p>
-                        @if ($resultSummary['failure']['context'] !== [])
-                            <pre class="mt-2 overflow-x-auto text-xs">{{ json_encode($resultSummary['failure']['context'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+        <div class="mt-6 space-y-6">
+            {{-- Summary block --}}
+            <div class="rounded-xl border p-6 {{ $toneClasses }}">
+                <div class="flex items-start gap-3">
+                    <span class="text-2xl leading-none" aria-hidden="true">{{ $toneIcon }}</span>
+                    <div class="min-w-0 flex-1">
+                        <h2 class="text-xl font-bold">{{ $presentation['headline'] }}</h2>
+                        @if ($presentation['price_summary'] !== null)
+                            <p class="mt-2 text-3xl font-semibold">{{ $presentation['price_summary'] }}</p>
                         @endif
-                    </div>
-                @endif
-
-                <div>
-                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Коди причин</span>
-                    <p class="text-sm">{{ implode(', ', $resultSummary['reason_codes']) }}</p>
-                </div>
-
-                <div>
-                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Trace</span>
-                    <div class="mt-2 overflow-x-auto">
-                        <table class="w-full text-sm">
-                            <thead>
-                                <tr class="border-b text-left">
-                                    <th class="py-2 pr-4">#</th>
-                                    <th class="py-2 pr-4">Джерело</th>
-                                    <th class="py-2 pr-4">Статус</th>
-                                    <th class="py-2 pr-4">Причина</th>
-                                    <th class="py-2 pr-4">Сума</th>
-                                    <th class="py-2">Метадані</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @php($presenter = app(\App\Services\Pricing\Resolution\PriceResolutionTracePresenter::class))
-                                @foreach ($resultSummary['trace'] as $index => $step)
-                                    <tr class="border-b border-gray-100 dark:border-gray-800" wire:key="step-{{ $index }}">
-                                        <td class="py-2 pr-4">{{ $index + 1 }}</td>
-                                        <td class="py-2 pr-4">{{ $presenter->sourceLabel(\App\Services\Pricing\Resolution\PriceResolutionSource::from($step['source'])) }}</td>
-                                        <td class="py-2 pr-4">{{ $presenter->stepStatusLabel(\App\Services\Pricing\Resolution\PriceResolutionStepStatus::from($step['status'])) }}</td>
-                                        <td class="py-2 pr-4">{{ $presenter->reasonLabel(\App\Services\Pricing\Resolution\PriceResolutionReason::from($step['reason'])) }}</td>
-                                        <td class="py-2 pr-4">
-                                            @if ($step['amount'] !== null)
-                                                {{ number_format($step['amount'], 2, ',', ' ') }} {{ $step['currency'] }}
-                                            @else
-                                                —
-                                            @endif
-                                        </td>
-                                        <td class="py-2">
-                                            @if ($step['metadata'] !== [])
-                                                <code class="text-xs">{{ json_encode($step['metadata'], JSON_UNESCAPED_UNICODE) }}</code>
-                                            @else
-                                                —
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                        <p class="mt-2 text-base opacity-90">{{ $presentation['summary'] }}</p>
                     </div>
                 </div>
-
-                @if ($presentedOutput !== null)
-                    <div>
-                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Текстовий вивід</span>
-                        <pre class="mt-2 overflow-x-auto rounded-lg bg-gray-50 p-4 text-xs dark:bg-gray-900">{{ $presentedOutput }}</pre>
-                    </div>
-                @endif
             </div>
-        </x-filament::section>
+
+            {{-- Recommended actions --}}
+            @if ($showActions && count($presentation['recommended_actions']) > 0)
+                <x-filament::section :heading="__('price_inspector.section.what_to_fix')">
+                    <ol class="list-decimal space-y-2 pl-5">
+                        @foreach ($presentation['recommended_actions'] as $action)
+                            <li wire:key="action-{{ $loop->index }}">
+                                <a href="{{ $action['url'] }}"
+                                   class="font-medium text-primary-600 underline hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300">
+                                    {{ $action['label'] }}
+                                </a>
+                            </li>
+                        @endforeach
+                    </ol>
+                </x-filament::section>
+            @endif
+
+            {{-- Decision path --}}
+            <x-filament::section :heading="__('price_inspector.section.decision_path')">
+                <div class="space-y-4">
+                    @foreach ($presentation['source_steps'] as $index => $step)
+                        <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700"
+                             wire:key="step-{{ $index }}">
+                            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                                <div>
+                                    <span class="font-semibold">{{ $step['source_label'] }}</span>
+                                    @if ($step['source_name'] !== null)
+                                        <span class="text-gray-500 dark:text-gray-400">— {{ $step['source_name'] }}</span>
+                                    @endif
+                                </div>
+                                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                                    {{ $step['outcome_label'] }}
+                                </span>
+                            </div>
+                            <p class="mt-2 text-sm">{{ $step['explanation'] }}</p>
+                            @if ($step['action'] !== null)
+                                <div class="mt-2">
+                                    <a href="{{ $step['action']['url'] }}"
+                                       class="text-sm font-medium text-primary-600 underline hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300">
+                                        {{ $step['action']['label'] }} →
+                                    </a>
+                                </div>
+                            @endif
+                        </div>
+                    @endforeach
+                </div>
+            </x-filament::section>
+
+            {{-- Technical details (collapsed) --}}
+            <details class="rounded-lg border border-gray-200 dark:border-gray-700">
+                <summary class="cursor-pointer select-none px-4 py-3 font-medium text-gray-700 dark:text-gray-300">
+                    {{ __('price_inspector.section.technical_details') }}
+                </summary>
+                <div class="space-y-4 border-t border-gray-200 px-4 py-4 dark:border-gray-700">
+                    <div>
+                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Статус</span>
+                        <p class="font-mono text-sm">{{ $presentation['technical_details']['status'] }}</p>
+                    </div>
+
+                    <div>
+                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Коди причин</span>
+                        <p class="font-mono text-sm">{{ implode(', ', $presentation['technical_details']['reason_codes']) }}</p>
+                    </div>
+
+                    @if ($presentation['technical_details']['failure'] !== null)
+                        <div>
+                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Помилка</span>
+                            <p class="font-mono text-sm">{{ $presentation['technical_details']['failure']['reason'] }}</p>
+                            <p class="mt-1 text-sm">{{ $presentation['technical_details']['failure']['message'] }}</p>
+                            @if ($presentation['technical_details']['failure']['context'] !== [])
+                                <pre class="mt-2 overflow-x-auto rounded bg-gray-50 p-3 text-xs dark:bg-gray-900">{{ json_encode($presentation['technical_details']['failure']['context'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                            @endif
+                        </div>
+                    @endif
+
+                    @if ($presentation['technical_details']['price'] !== null)
+                        <div>
+                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Ціна (технічно)</span>
+                            <pre class="mt-1 overflow-x-auto rounded bg-gray-50 p-3 text-xs dark:bg-gray-900">{{ json_encode($presentation['technical_details']['price'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                        </div>
+                    @endif
+
+                    <div>
+                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Контекст</span>
+                        <pre class="mt-1 overflow-x-auto rounded bg-gray-50 p-3 text-xs dark:bg-gray-900">{{ json_encode($presentation['technical_details']['context'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
+                    </div>
+
+                    <div>
+                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Trace</span>
+                        <div class="mt-2 overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="border-b text-left">
+                                        <th class="py-2 pr-4">#</th>
+                                        <th class="py-2 pr-4">Джерело</th>
+                                        <th class="py-2 pr-4">Статус</th>
+                                        <th class="py-2 pr-4">Причина</th>
+                                        <th class="py-2 pr-4">price_list_id</th>
+                                        <th class="py-2 pr-4">Сума</th>
+                                        <th class="py-2">Метадані</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($presentation['technical_details']['trace'] as $traceIndex => $traceStep)
+                                        <tr class="border-b border-gray-100 dark:border-gray-800"
+                                            wire:key="trace-{{ $traceIndex }}">
+                                            <td class="py-2 pr-4">{{ $traceIndex + 1 }}</td>
+                                            <td class="py-2 pr-4 font-mono text-xs">{{ $traceStep['source'] }}</td>
+                                            <td class="py-2 pr-4 font-mono text-xs">{{ $traceStep['status'] }}</td>
+                                            <td class="py-2 pr-4 font-mono text-xs">{{ $traceStep['reason'] }}</td>
+                                            <td class="py-2 pr-4 font-mono text-xs">{{ $traceStep['price_list_id'] ?? '—' }}</td>
+                                            <td class="py-2 pr-4">
+                                                @if ($traceStep['amount'] !== null)
+                                                    {{ number_format($traceStep['amount'], 2, ',', ' ') }} {{ $traceStep['currency'] }}
+                                                @else
+                                                    —
+                                                @endif
+                                            </td>
+                                            <td class="py-2">
+                                                @if ($traceStep['metadata'] !== [])
+                                                    <code class="text-xs">{{ json_encode($traceStep['metadata'], JSON_UNESCAPED_UNICODE) }}</code>
+                                                @else
+                                                    —
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    @if ($presentedOutput !== null)
+                        <div x-data="{ copied: false }">
+                            <x-filament::button
+                                type="button"
+                                x-on:click="navigator.clipboard.writeText(@js($presentedOutput)); copied = true; setTimeout(() => copied = false, 2000)"
+                                color="gray"
+                                size="sm"
+                            >
+                                <span x-show="!copied">{{ __('price_inspector.section.copy_diagnostics') }}</span>
+                                <span x-show="copied" x-cloak>Скопійовано</span>
+                            </x-filament::button>
+                            <pre class="mt-2 overflow-x-auto rounded bg-gray-50 p-4 text-xs dark:bg-gray-900"
+                                 id="price-inspector-diagnostics">{{ $presentedOutput }}</pre>
+                        </div>
+                    @endif
+                </div>
+            </details>
+        </div>
     @endif
 </x-filament-panels::page>
