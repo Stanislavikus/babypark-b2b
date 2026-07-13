@@ -2,7 +2,9 @@
 
 namespace App\Services\Pricing;
 
+use App\Enums\CatalogPriceDisplayStatus;
 use App\Models\PriceList;
+use App\Support\Pricing\CustomerFacingPriceLabel;
 use App\Support\Pricing\VariantPriceDisplay;
 use LogicException;
 
@@ -13,6 +15,19 @@ class PriceProvenancePresenter
         ?PriceList $sourcePriceList = null,
     ): ?PriceProvenancePresentation {
         if ($price instanceof VariantPriceDisplay && ! $price->available) {
+            if ($price->status === CatalogPriceDisplayStatus::ConfigurationError) {
+                return new PriceProvenancePresentation(
+                    label: CustomerFacingPriceLabel::forDisplay($price),
+                    source: $price->source,
+                    isOnSale: false,
+                    regularGrossPrice: 0.0,
+                    effectiveGrossPrice: 0.0,
+                    currency: $price->currency,
+                    sourcePriceListId: null,
+                    sourcePriceListItemId: null,
+                );
+            }
+
             return null;
         }
 

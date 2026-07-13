@@ -5,8 +5,6 @@ namespace App\Services\Pricing;
 use App\Enums\PriceListItemStatus;
 use App\Enums\PriceListStatus;
 use App\Exceptions\Pricing\InvalidPriceQuantityException;
-use App\Exceptions\Pricing\PriceListConfigurationException;
-use App\Exceptions\Pricing\PriceNotAvailableException;
 use App\Models\Customer;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
@@ -18,32 +16,61 @@ use App\Services\Pricing\Resolution\PriceResolutionResult;
 use App\Services\Pricing\Resolution\PriceResolutionSource;
 use App\Services\Pricing\Resolution\PriceResolutionStep;
 use App\Services\Pricing\Resolution\PriceResolutionStepStatus;
+use App\Services\Pricing\Resolution\PriceResolutionTrace;
 use App\Services\Pricing\Resolution\ResolutionMode;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use InvalidArgumentException;
 
 class PriceResolver
 {
-    public function resolveForCustomer(ProductVariant $variant, Customer $customer, int $quantity): ResolvedPrice
+    private static int $standardResolutionExecutions = 0;
+
+    public static function resetStandardResolutionExecutions(): void
     {
-        return $this->resolveInternal(
-            variant: $variant,
-            customer: $customer,
-            quantity: $quantity,
-            effectiveAt: CarbonImmutable::now(),
-            mode: ResolutionMode::Standard,
-        );
+        self::$standardResolutionExecutions = 0;
     }
 
-    public function resolveDefault(ProductVariant $variant, int $quantity = 1): ResolvedPrice
+    public static function standardResolutionExecutions(): int
     {
-        return $this->resolveInternal(
-            variant: $variant,
-            customer: null,
-            quantity: $quantity,
-            effectiveAt: CarbonImmutable::now(),
-            mode: ResolutionMode::Standard,
-        );
+        return self::$standardResolutionExecutions;
+    }
+
+    public function resolveForCustomer(
+        ProductVariant $variant,
+        Customer $customer,
+        int $quantity,
+        ?CarbonImmutable $effectiveAt = null,
+        ?PriceResolutionSnapshot $snapshot = null,
+    ): ResolvedPrice {
+        if ($effectiveAt !== null && $snapshot !== null) {
+            throw new InvalidArgumentException('Cannot pass both effectiveAt and snapshot.');
+        }
+
+        $this->assertPositiveQuantity($quantity);
+
+        $at = $snapshot?->effectiveAt ?? $effectiveAt ?? CarbonImmutable::now();
+
+        return $this->resolveStandardResult($variant, $customer, $quantity, $at, $snapshot)
+            ->toResolvedPrice();
+    }
+
+    public function resolveDefault(
+        ProductVariant $variant,
+        int $quantity = 1,
+        ?CarbonImmutable $effectiveAt = null,
+        ?PriceResolutionSnapshot $snapshot = null,
+    ): ResolvedPrice {
+        if ($effectiveAt !== null && $snapshot !== null) {
+            throw new InvalidArgumentException('Cannot pass both effectiveAt and snapshot.');
+        }
+
+        $this->assertPositiveQuantity($quantity);
+
+        $at = $snapshot?->effectiveAt ?? $effectiveAt ?? CarbonImmutable::now();
+
+        return $this->resolveStandardResult($variant, null, $quantity, $at, $snapshot)
+            ->toResolvedPrice();
     }
 
     public function resolveWithTrace(
@@ -61,28 +88,86 @@ class PriceResolver
         );
     }
 
+    private function resolveStandardResult(
+        ProductVariant $variant,
+        ?Customer $customer,
+        int $quantity,
+        CarbonImmutable $effectiveAt,
+        ?PriceResolutionSnapshot $snapshot,
+    ): PriceResolutionResult {
+        $cacheKey = $snapshot !== null
+            ? $this->buildCacheKey($customer, $variant, $quantity, $effectiveAt)
+            : null;
+
+        if ($cacheKey !== null && $snapshot->has($cacheKey)) {
+            return $snapshot->get($cacheKey);
+        }
+
+        self::$standardResolutionExecutions++;
+
+        $result = $this->executeStandardResolution($variant, $customer, $quantity, $effectiveAt);
+
+        if ($cacheKey !== null) {
+            $snapshot->put($cacheKey, $result);
+        }
+
+        return $result;
+    }
+
+    private function buildCacheKey(
+        ?Customer $customer,
+        ProductVariant $variant,
+        int $quantity,
+        CarbonImmutable $effectiveAt,
+    ): string {
+        $context = $customer !== null ? 'customer' : 'no-customer';
+        $customerId = $customer?->id ?? 'no-customer';
+
+        return implode('|', [
+            $context,
+            $variant->workspace_id,
+            $customerId,
+            (string) $variant->id,
+            (string) $quantity,
+            $effectiveAt->utc()->format('Y-m-d\TH:i:s.u\Z'),
+        ]);
+    }
+
+    private function executeStandardResolution(
+        ProductVariant $variant,
+        ?Customer $customer,
+        int $quantity,
+        CarbonImmutable $effectiveAt,
+    ): PriceResolutionResult {
+        if ($customer !== null) {
+            $assignedResolved = $this->tryResolveFromCustomerPriceList($variant, $customer, $quantity, $effectiveAt);
+
+            if ($assignedResolved !== null) {
+                return PriceResolutionResult::resolved(
+                    $assignedResolved,
+                    [PriceResolutionReason::Matched],
+                    new PriceResolutionTrace([]),
+                );
+            }
+        }
+
+        return $this->resolveWorkspaceDefaultOrCacheAsResult($variant, $quantity, $effectiveAt);
+    }
+
     private function resolveInternal(
         ProductVariant $variant,
         ?Customer $customer,
         int $quantity,
         CarbonImmutable $effectiveAt,
         ResolutionMode $mode,
-    ): ResolvedPrice|PriceResolutionResult {
+    ): PriceResolutionResult {
         $this->assertPositiveQuantity($quantity);
 
         if ($mode === ResolutionMode::Diagnostic) {
             return $this->resolveDiagnostic($variant, $customer, $quantity, $effectiveAt);
         }
 
-        if ($customer !== null) {
-            $assignedResolved = $this->tryResolveFromCustomerPriceList($variant, $customer, $quantity, $effectiveAt);
-
-            if ($assignedResolved !== null) {
-                return $assignedResolved;
-            }
-        }
-
-        return $this->resolveWorkspaceDefaultOrCache($variant, $quantity, $effectiveAt);
+        return $this->executeStandardResolution($variant, $customer, $quantity, $effectiveAt);
     }
 
     private function resolveDiagnostic(
@@ -192,29 +277,96 @@ class PriceResolver
         );
     }
 
-    private function resolveWorkspaceDefaultOrCache(
+    private function resolveWorkspaceDefaultOrCacheAsResult(
         ProductVariant $variant,
         int $quantity,
         CarbonImmutable $effectiveAt,
-    ): ResolvedPrice {
-        $defaultList = $this->activeDefaultPriceListForWorkspace($variant->workspace_id);
+    ): PriceResolutionResult {
+        $configurationFailure = $this->standardWorkspaceDefaultConfigurationFailure($variant);
+
+        if ($configurationFailure !== null) {
+            return $configurationFailure;
+        }
+
+        $defaultList = PriceList::withoutWorkspaceScope()
+            ->where('workspace_id', $variant->workspace_id)
+            ->where('is_default', true)
+            ->where('status', PriceListStatus::Active)
+            ->sole();
 
         $item = $this->matchingListItem($defaultList->id, $variant->id, $quantity, $effectiveAt);
 
         if ($item !== null) {
-            return $this->resolvedFromItem($item, PriceResolutionSource::WorkspaceDefaultPriceList->value);
-        }
-
-        if ($variant->base_price_cache !== null) {
-            return ResolvedPrice::fromBasePriceCache(
-                (float) $variant->base_price_cache,
-                $defaultList->currency ?: (string) config('pricing.default_currency', 'UAH'),
+            return PriceResolutionResult::resolved(
+                $this->resolvedFromItem($item, PriceResolutionSource::WorkspaceDefaultPriceList->value),
+                [PriceResolutionReason::Matched],
+                new PriceResolutionTrace([]),
             );
         }
 
-        throw new PriceNotAvailableException(
-            "No price available for variant {$variant->id} at quantity {$quantity}."
+        if ($variant->base_price_cache !== null) {
+            $currency = $defaultList->currency ?: (string) config('pricing.default_currency', 'UAH');
+            $amount = (float) $variant->base_price_cache;
+
+            return PriceResolutionResult::resolved(
+                ResolvedPrice::fromBasePriceCache($amount, $currency),
+                [PriceResolutionReason::Matched],
+                new PriceResolutionTrace([]),
+            );
+        }
+
+        return PriceResolutionResult::unavailable(
+            reasonCodes: [PriceResolutionReason::AllSourcesExhausted],
+            trace: new PriceResolutionTrace([]),
+            failure: new PriceResolutionFailure(
+                reason: PriceResolutionReason::AllSourcesExhausted,
+                message: "No price available for variant {$variant->id} at quantity {$quantity}.",
+                context: [
+                    'variant_id' => $variant->id,
+                    'quantity' => $quantity,
+                    'workspace_id' => $variant->workspace_id,
+                ],
+            ),
         );
+    }
+
+    private function standardWorkspaceDefaultConfigurationFailure(ProductVariant $variant): ?PriceResolutionResult
+    {
+        $defaults = PriceList::withoutWorkspaceScope()
+            ->where('workspace_id', $variant->workspace_id)
+            ->where('is_default', true)
+            ->where('status', PriceListStatus::Active)
+            ->get();
+
+        if ($defaults->isEmpty()) {
+            $message = "Workspace {$variant->workspace_id} has no active default price list.";
+
+            return PriceResolutionResult::configurationError(
+                reasonCodes: [PriceResolutionReason::DefaultPriceListMisconfigured],
+                trace: new PriceResolutionTrace([]),
+                failure: new PriceResolutionFailure(
+                    reason: PriceResolutionReason::DefaultPriceListMisconfigured,
+                    message: $message,
+                    context: ['workspace_id' => $variant->workspace_id],
+                ),
+            );
+        }
+
+        if ($defaults->count() > 1) {
+            $message = "Workspace {$variant->workspace_id} has multiple active default price lists.";
+
+            return PriceResolutionResult::configurationError(
+                reasonCodes: [PriceResolutionReason::DefaultPriceListMisconfigured],
+                trace: new PriceResolutionTrace([]),
+                failure: new PriceResolutionFailure(
+                    reason: PriceResolutionReason::DefaultPriceListMisconfigured,
+                    message: $message,
+                    context: ['workspace_id' => $variant->workspace_id],
+                ),
+            );
+        }
+
+        return null;
     }
 
     private function diagnoseWorkspaceDefaultOrCache(
@@ -461,29 +613,6 @@ class PriceResolver
             'primary_reason' => PriceResolutionReason::Matched,
             'metadata' => $metadata,
         ];
-    }
-
-    private function activeDefaultPriceListForWorkspace(string $workspaceId): PriceList
-    {
-        $defaults = PriceList::withoutWorkspaceScope()
-            ->where('workspace_id', $workspaceId)
-            ->where('is_default', true)
-            ->where('status', PriceListStatus::Active)
-            ->get();
-
-        if ($defaults->isEmpty()) {
-            throw new PriceListConfigurationException(
-                "Workspace {$workspaceId} has no active default price list."
-            );
-        }
-
-        if ($defaults->count() > 1) {
-            throw new PriceListConfigurationException(
-                "Workspace {$workspaceId} has multiple active default price lists."
-            );
-        }
-
-        return $defaults->first();
     }
 
     private function matchingListItem(

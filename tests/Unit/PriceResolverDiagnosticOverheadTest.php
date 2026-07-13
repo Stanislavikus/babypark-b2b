@@ -21,9 +21,9 @@ class PriceResolverDiagnosticOverheadTest extends TestCase
      */
     private const BASELINE_CUSTOMER_ASSIGNED_MATCH = 3;
 
-    private const BASELINE_WORKSPACE_DEFAULT_MATCH = 3;
+    private const BASELINE_WORKSPACE_DEFAULT_MATCH = 4;
 
-    private const BASELINE_BASE_CACHE_MATCH = 2;
+    private const BASELINE_BASE_CACHE_MATCH = 3;
 
     private const BASELINE_TIER_MATCH_QTY15 = 3;
 

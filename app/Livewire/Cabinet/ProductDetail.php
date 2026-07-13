@@ -2,10 +2,14 @@
 
 namespace App\Livewire\Cabinet;
 
+use App\Enums\CatalogPriceDisplayStatus;
 use App\Models\Product;
 use App\Services\Availability\AvailabilityResolver;
+use App\Services\Pricing\PriceResolutionSnapshot;
 use App\Services\Pricing\ProductPricingSummary;
+use App\Support\Pricing\CustomerFacingPriceLabel;
 use App\Support\Pricing\VariantPriceDisplay;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -24,36 +28,45 @@ class ProductDetail extends Component
     /** @var array<int, VariantPriceDisplay> */
     public array $variantPriceDisplay = [];
 
+    /** @var array<int, string> */
+    public array $variantPriceLabels = [];
+
     public function mount(Product $product): void
     {
         $customer = Auth::guard('customer')->user();
         $summary = app(ProductPricingSummary::class);
-
-        $hasPricing = $product->variants()
-            ->where('is_active', true)
-            ->get()
-            ->contains(fn ($variant) => $summary->variantHasResolvablePrice($variant, $customer));
-
-        if (! $hasPricing) {
-            abort(404);
-        }
+        $snapshot = new PriceResolutionSnapshot(CarbonImmutable::now());
 
         $this->product = $product->load([
             'category',
             'variants.stocks.inventoryLocation',
         ]);
 
+        $activeVariants = $this->product->variants->where('is_active', true);
+        $displaysByVariant = $activeVariants->mapWithKeys(
+            fn ($variant) => [$variant->id => $summary->resolveVariantDisplay($variant, $customer, 1, $snapshot)]
+        );
+
+        $hasVisibleContent = $displaysByVariant->contains(
+            fn (VariantPriceDisplay $display) => $display->status !== CatalogPriceDisplayStatus::Unavailable
+        );
+
+        if (! $hasVisibleContent) {
+            abort(404);
+        }
+
         $threshold = $product->category?->stock_display_threshold ?? 10;
         $resolver = app(AvailabilityResolver::class);
 
-        foreach ($this->product->variants->where('is_active', true) as $variant) {
-            $priceDisplay = $summary->tryResolveVariantDisplay($variant, $customer);
+        foreach ($activeVariants as $variant) {
+            $priceDisplay = $displaysByVariant->get($variant->id);
 
-            if ($priceDisplay === null) {
+            if ($priceDisplay->status === CatalogPriceDisplayStatus::Unavailable) {
                 continue;
             }
 
             $this->variantPriceDisplay[$variant->id] = $priceDisplay;
+            $this->variantPriceLabels[$variant->id] = CustomerFacingPriceLabel::forDisplay($priceDisplay);
 
             $rows = [];
 

@@ -446,7 +446,11 @@
 
                             {{-- Ваша ціна --}}
                             <td class="px-3 py-2 text-right whitespace-nowrap">
-                                @if($myPrice > 0)
+                                @if(! empty($data['priceLabel']))
+                                    <span class="font-semibold {{ $myPrice > 0 ? 'text-primary-700' : 'text-gray-500 text-xs' }}">
+                                        {{ $data['priceLabel'] }}
+                                    </span>
+                                @elseif($myPrice > 0)
                                     <span class="font-semibold text-primary-700">
                                         {{ number_format($myPrice, 2, ',', ' ') }} ₴
                                     </span>
@@ -603,7 +607,9 @@
                                 @if($rrp > 0)
                                     <span class="text-xs text-gray-400 line-through">{{ number_format($rrp, 2, ',', ' ') }} ₴</span>
                                 @endif
-                                @if($myPrice > 0)
+                                @if(! empty($data['priceLabel']))
+                                    <span class="text-base font-bold {{ $myPrice > 0 ? 'text-green-700' : 'text-gray-500 text-sm' }}">{{ $data['priceLabel'] }}</span>
+                                @elseif($myPrice > 0)
                                     <span class="text-base font-bold text-green-700">{{ number_format($myPrice, 2, ',', ' ') }} ₴</span>
                                 @endif
                             </div>

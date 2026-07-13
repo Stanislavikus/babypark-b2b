@@ -305,6 +305,10 @@ class CustomerResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('preview_as_customer')
+                    ->label('Перегляд як клієнт')
+                    ->icon('heroicon-o-eye')
+                    ->url(fn (Customer $record): string => static::getUrl('preview', ['record' => $record])),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -392,6 +396,7 @@ class CustomerResource extends Resource
             'index' => Pages\ListCustomers::route('/'),
             'view' => Pages\ViewCustomer::route('/{record}'),
             'edit' => Pages\EditCustomer::route('/{record}/edit'),
+            'preview' => Pages\PreviewAsCustomer::route('/{record}/preview'),
         ];
     }
 

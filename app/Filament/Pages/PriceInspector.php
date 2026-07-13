@@ -64,10 +64,25 @@ class PriceInspector extends Page implements HasForms
 
     public function mount(): void
     {
-        $this->form->fill([
-            'quantity' => 1,
-            'effective_at' => now()->toDateTimeString(),
-        ]);
+        $prefill = [
+            'quantity' => max(1, (int) request()->query('quantity', 1)),
+            'effective_at' => request()->query('effective_at'),
+            'customer_id' => request()->query('customer_id'),
+            'variant_id' => request()->query('variant_id'),
+            'product_id' => request()->query('product_id'),
+        ];
+
+        if ($prefill['effective_at'] !== null) {
+            $prefill['effective_at'] = CarbonImmutable::parse($prefill['effective_at'])->format('Y-m-d H:i:s');
+        } else {
+            $prefill['effective_at'] = now()->toDateTimeString();
+        }
+
+        $this->form->fill($prefill);
+
+        if ($prefill['customer_id'] && $prefill['variant_id']) {
+            $this->resolvePrice();
+        }
     }
 
     public function form(Form $form): Form
@@ -124,7 +139,7 @@ class PriceInspector extends Page implements HasForms
                         ->default(1),
                     DateTimePicker::make('effective_at')
                         ->label('Дата/час дії ціни')
-                        ->seconds(false)
+                        ->seconds(true)
                         ->default(now()),
                 ])->columns(2),
             ])

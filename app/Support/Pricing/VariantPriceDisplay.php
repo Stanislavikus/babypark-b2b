@@ -2,11 +2,15 @@
 
 namespace App\Support\Pricing;
 
+use App\Enums\CatalogPriceDisplayStatus;
+use App\Models\ProductVariant;
+use App\Services\Pricing\Resolution\PriceResolutionReason;
 use App\Services\Pricing\ResolvedPrice;
 
 readonly class VariantPriceDisplay
 {
-    public function __construct(
+    private function __construct(
+        public CatalogPriceDisplayStatus $status,
         public bool $available,
         public float $grossPrice,
         public float $regularNetPrice,
@@ -18,11 +22,17 @@ readonly class VariantPriceDisplay
         public ?string $sourcePriceListItemId,
         public float $regularGrossPrice,
         public bool $isOnSale,
+        public ?PriceResolutionReason $reason,
+        public ?ProductVariant $sourceVariant,
     ) {}
 
-    public static function fromResolved(ResolvedPrice $resolved, ?float $recommendedRetailPrice = null): self
-    {
+    public static function fromResolved(
+        ResolvedPrice $resolved,
+        ?float $recommendedRetailPrice = null,
+        ?ProductVariant $sourceVariant = null,
+    ): self {
         return new self(
+            status: CatalogPriceDisplayStatus::Resolved,
             available: true,
             grossPrice: $resolved->grossPrice,
             regularNetPrice: $resolved->regularNetPrice,
@@ -34,12 +44,15 @@ readonly class VariantPriceDisplay
             sourcePriceListItemId: $resolved->sourcePriceListItemId,
             regularGrossPrice: $resolved->regularGrossPrice,
             isOnSale: $resolved->isOnSale,
+            reason: null,
+            sourceVariant: $sourceVariant,
         );
     }
 
-    public static function unavailable(): self
+    public static function unavailable(?PriceResolutionReason $reason = null): self
     {
         return new self(
+            status: CatalogPriceDisplayStatus::Unavailable,
             available: false,
             grossPrice: 0.0,
             regularNetPrice: 0.0,
@@ -51,6 +64,30 @@ readonly class VariantPriceDisplay
             sourcePriceListItemId: null,
             regularGrossPrice: 0.0,
             isOnSale: false,
+            reason: $reason ?? PriceResolutionReason::AllSourcesExhausted,
+            sourceVariant: null,
+        );
+    }
+
+    public static function configurationError(
+        PriceResolutionReason $reason,
+        ProductVariant $attemptedVariant,
+    ): self {
+        return new self(
+            status: CatalogPriceDisplayStatus::ConfigurationError,
+            available: false,
+            grossPrice: 0.0,
+            regularNetPrice: 0.0,
+            salePrice: null,
+            recommendedRetailPrice: null,
+            currency: (string) config('pricing.default_currency', 'UAH'),
+            source: 'configuration_error',
+            sourcePriceListId: null,
+            sourcePriceListItemId: null,
+            regularGrossPrice: 0.0,
+            isOnSale: false,
+            reason: $reason,
+            sourceVariant: $attemptedVariant,
         );
     }
 
