@@ -10,4 +10,5 @@ return [
     'secondary_inclusive' => ':net excl. tax · Tax :percent: :tax',
     'secondary_exclusive' => ':gross incl. tax · Tax :percent: :tax',
     'both_compact' => ':net excl. tax · :gross incl. tax',
+    'without_tax_amount' => ':amount excl. tax',
 ];
