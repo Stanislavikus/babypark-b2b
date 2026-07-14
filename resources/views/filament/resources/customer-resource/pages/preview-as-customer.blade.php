@@ -85,7 +85,7 @@
                                 {{ $row['display_state_label'] }}
                             </span>
                         </td>
-                        <td class="px-3 py-2 text-right">{{ $row['price'] !== null ? number_format($row['price'], 2, '.', ' ') : '—' }}</td>
+                        <td class="px-3 py-2 text-right">{{ $row['price_label'] ?? ($row['price'] !== null ? number_format($row['price'], 2, '.', ' ') : '—') }}</td>
                         <td class="px-3 py-2">{{ $row['currency'] ?? '—' }}</td>
                         <td class="px-3 py-2">{{ $row['price_source'] ?? '—' }}</td>
                         <td class="px-3 py-2">{{ $row['orderable'] ? 'Так' : 'Ні' }}</td>

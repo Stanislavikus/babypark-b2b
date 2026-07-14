@@ -21,23 +21,22 @@ readonly class ResolvedPrice
     public static function fromListItem(
         float $regularNetPrice,
         ?float $salePrice,
-        ?float $vatRate,
+        float $vatRate,
         string $currency,
         string $source,
         string $sourcePriceListId,
         string $sourcePriceListItemId,
     ): self {
-        $resolvedVatRate = $vatRate ?? (float) config('pricing.default_vat_rate', 20);
         $effectiveNetPrice = $salePrice ?? $regularNetPrice;
-        $grossPrice = round($effectiveNetPrice * (1 + $resolvedVatRate / 100), 2);
-        $regularGrossPrice = round($regularNetPrice * (1 + $resolvedVatRate / 100), 2);
+        $grossPrice = round($effectiveNetPrice * (1 + $vatRate / 100), 2);
+        $regularGrossPrice = round($regularNetPrice * (1 + $vatRate / 100), 2);
         $isOnSale = $salePrice !== null && $salePrice < $regularNetPrice;
 
         return new self(
             regularNetPrice: $regularNetPrice,
             salePrice: $salePrice,
             effectiveNetPrice: $effectiveNetPrice,
-            vatRate: $resolvedVatRate,
+            vatRate: $vatRate,
             grossPrice: $grossPrice,
             currency: $currency,
             source: $source,
@@ -51,8 +50,8 @@ readonly class ResolvedPrice
     public static function fromBasePriceCache(
         float $baseNetPrice,
         string $currency,
+        float $vatRate,
     ): self {
-        $vatRate = (float) config('pricing.default_vat_rate', 20);
         $grossPrice = round($baseNetPrice * (1 + $vatRate / 100), 2);
         $regularGrossPrice = $grossPrice;
 

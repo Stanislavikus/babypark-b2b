@@ -3,12 +3,14 @@
 namespace App\Services\Pricing;
 
 use App\Enums\CatalogPriceDisplayStatus;
+use App\Enums\PriceDisplayContext;
 use App\Exceptions\Pricing\PriceListConfigurationException;
 use App\Exceptions\Pricing\PriceNotAvailableException;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Support\Pricing\VariantPriceDisplay;
+use App\Support\Workspace\WorkspaceContext;
 use Illuminate\Support\Collection;
 
 class ProductPricingSummary
@@ -202,16 +204,28 @@ class ProductPricingSummary
 
     public function formatDefaultSalePrice(Product $product, ?PriceResolutionSnapshot $snapshot = null): ?string
     {
-        $prices = $product->variants
-            ->where('is_active', true)
-            ->map(function (ProductVariant $variant) use ($snapshot): ?float {
-                $display = $this->resolveDefaultDisplay($variant, 1, $snapshot);
+        $cheapestDisplay = null;
+        $cheapestGross = null;
 
-                return $display->available ? $display->grossPrice : null;
-            })
-            ->filter()
-            ->values();
+        foreach ($product->variants->where('is_active', true) as $variant) {
+            $display = $this->resolveDefaultDisplay($variant, 1, $snapshot);
 
-        return self::formatMoneyRange($prices);
+            if ($display->available && $display->resolvedPrice !== null) {
+                if ($cheapestGross === null || $display->grossPrice < $cheapestGross) {
+                    $cheapestGross = $display->grossPrice;
+                    $cheapestDisplay = $display;
+                }
+            }
+        }
+
+        if ($cheapestDisplay === null || $cheapestDisplay->resolvedPrice === null) {
+            return null;
+        }
+
+        $workspace = app(WorkspaceContext::class)->current();
+        $mode = app(PriceDisplayModeResolver::class)->resolve($workspace, PriceDisplayContext::Internal);
+        $presentation = app(PriceDisplayPresenter::class)->present($cheapestDisplay->resolvedPrice, $mode);
+
+        return $presentation->compactLabel();
     }
 }

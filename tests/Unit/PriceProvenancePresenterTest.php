@@ -81,7 +81,7 @@ class PriceProvenancePresenterTest extends TestCase
 
     public function test_present_base_price_cache_with_complete_presentation(): void
     {
-        $resolved = ResolvedPrice::fromBasePriceCache(42.0, 'UAH');
+        $resolved = ResolvedPrice::fromBasePriceCache(42.0, 'UAH', 20.0);
 
         $presentation = $this->presenter->present($resolved);
 
@@ -208,7 +208,7 @@ class PriceProvenancePresenterTest extends TestCase
     public function test_base_price_cache_throws_when_source_price_list_is_supplied(): void
     {
         $list = $this->createPriceList();
-        $price = ResolvedPrice::fromBasePriceCache(42.0, 'UAH');
+        $price = ResolvedPrice::fromBasePriceCache(42.0, 'UAH', 20.0);
 
         $this->expectException(LogicException::class);
         $this->presenter->present($price, $list);

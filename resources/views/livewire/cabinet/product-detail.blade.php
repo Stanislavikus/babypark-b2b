@@ -19,7 +19,7 @@
 
                     <div class="flex items-end gap-4 flex-wrap">
                         <div>
-                            <p class="text-xs text-gray-500 uppercase tracking-wide">Ваша ціна (з ПДВ)</p>
+                            <p class="text-xs text-gray-500 uppercase tracking-wide">Ваша ціна</p>
                             <p class="text-3xl font-bold text-primary-700">
                                 {{ $variantPriceLabels[$variant->id] ?? '—' }}
                             </p>

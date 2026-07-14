@@ -245,8 +245,8 @@ class FieldFoundationMigrationTest extends TestCase
         $workspaceB = (string) Str::uuid();
 
         DB::table('workspaces')->insert([
-            ['id' => $workspaceA, 'name' => 'Workspace A', 'is_default' => false, 'created_at' => now(), 'updated_at' => now()],
-            ['id' => $workspaceB, 'name' => 'Workspace B', 'is_default' => false, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => $workspaceA, 'name' => 'Workspace A', 'is_default' => false, 'default_vat_rate' => 20, 'default_price_display_mode' => 'tax_inclusive_primary', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => $workspaceB, 'name' => 'Workspace B', 'is_default' => false, 'default_vat_rate' => 20, 'default_price_display_mode' => 'tax_inclusive_primary', 'created_at' => now(), 'updated_at' => now()],
         ]);
 
         $definitionId = fn () => (string) Str::uuid();

@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\ProductVariant;
+use App\Models\Workspace;
 use App\Services\Pricing\Resolution\PriceResolutionDiagnosticCollector;
 use App\Services\Pricing\Resolution\PriceResolutionFailure;
 use App\Services\Pricing\Resolution\PriceResolutionReason;
@@ -25,6 +26,13 @@ use InvalidArgumentException;
 class PriceResolver
 {
     private static int $standardResolutionExecutions = 0;
+
+    /** @var array<string, Workspace> */
+    private array $workspaceCache = [];
+
+    public function __construct(
+        private readonly WorkspaceTaxDefaults $taxDefaults,
+    ) {}
 
     public static function resetStandardResolutionExecutions(): void
     {
@@ -307,9 +315,10 @@ class PriceResolver
         if ($variant->base_price_cache !== null) {
             $currency = $defaultList->currency ?: (string) config('pricing.default_currency', 'UAH');
             $amount = (float) $variant->base_price_cache;
+            $vatRate = $this->taxDefaults->resolveWorkspaceRate($this->workspaceFor($variant->workspace_id));
 
             return PriceResolutionResult::resolved(
-                ResolvedPrice::fromBasePriceCache($amount, $currency),
+                ResolvedPrice::fromBasePriceCache($amount, $currency, $vatRate),
                 [PriceResolutionReason::Matched],
                 new PriceResolutionTrace([]),
             );
@@ -409,6 +418,7 @@ class PriceResolver
         if ($variant->base_price_cache !== null) {
             $currency = $defaultList->currency ?: (string) config('pricing.default_currency', 'UAH');
             $amount = (float) $variant->base_price_cache;
+            $vatRate = $this->taxDefaults->resolveWorkspaceRate($this->workspaceFor($variant->workspace_id));
 
             $collector->addStep(new PriceResolutionStep(
                 source: PriceResolutionSource::BasePriceCache,
@@ -420,7 +430,7 @@ class PriceResolver
             $collector->addReasonCode(PriceResolutionReason::Matched);
 
             return PriceResolutionResult::resolved(
-                ResolvedPrice::fromBasePriceCache($amount, $currency),
+                ResolvedPrice::fromBasePriceCache($amount, $currency, $vatRate),
                 $collector->reasonCodes(),
                 $collector->buildTrace(),
             );
@@ -643,15 +653,23 @@ class PriceResolver
         $currency = $item->priceList?->currency
             ?: (string) config('pricing.default_currency', 'UAH');
 
+        $workspace = $this->workspaceFor($item->workspace_id);
+        $vatRate = $this->taxDefaults->resolveItemRate($item->vat_rate, $workspace);
+
         return ResolvedPrice::fromListItem(
             regularNetPrice: (float) $item->price,
             salePrice: $item->sale_price !== null ? (float) $item->sale_price : null,
-            vatRate: $item->vat_rate !== null ? (float) $item->vat_rate : null,
+            vatRate: $vatRate,
             currency: $currency,
             source: $source,
             sourcePriceListId: $item->price_list_id,
             sourcePriceListItemId: $item->id,
         );
+    }
+
+    private function workspaceFor(string $workspaceId): Workspace
+    {
+        return $this->workspaceCache[$workspaceId] ??= Workspace::query()->findOrFail($workspaceId);
     }
 
     private function assertPositiveQuantity(int $quantity): void

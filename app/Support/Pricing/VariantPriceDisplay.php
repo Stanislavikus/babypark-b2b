@@ -14,6 +14,8 @@ readonly class VariantPriceDisplay
         public bool $available,
         public float $grossPrice,
         public float $regularNetPrice,
+        public float $effectiveNetPrice,
+        public float $vatRate,
         public ?float $salePrice,
         public ?float $recommendedRetailPrice,
         public string $currency,
@@ -24,6 +26,7 @@ readonly class VariantPriceDisplay
         public bool $isOnSale,
         public ?PriceResolutionReason $reason,
         public ?ProductVariant $sourceVariant,
+        public ?ResolvedPrice $resolvedPrice,
     ) {}
 
     public static function fromResolved(
@@ -36,6 +39,8 @@ readonly class VariantPriceDisplay
             available: true,
             grossPrice: $resolved->grossPrice,
             regularNetPrice: $resolved->regularNetPrice,
+            effectiveNetPrice: $resolved->effectiveNetPrice,
+            vatRate: $resolved->vatRate,
             salePrice: $resolved->salePrice,
             recommendedRetailPrice: $recommendedRetailPrice,
             currency: $resolved->currency,
@@ -46,6 +51,7 @@ readonly class VariantPriceDisplay
             isOnSale: $resolved->isOnSale,
             reason: null,
             sourceVariant: $sourceVariant,
+            resolvedPrice: $resolved,
         );
     }
 
@@ -56,6 +62,8 @@ readonly class VariantPriceDisplay
             available: false,
             grossPrice: 0.0,
             regularNetPrice: 0.0,
+            effectiveNetPrice: 0.0,
+            vatRate: 0.0,
             salePrice: null,
             recommendedRetailPrice: null,
             currency: (string) config('pricing.default_currency', 'UAH'),
@@ -66,6 +74,7 @@ readonly class VariantPriceDisplay
             isOnSale: false,
             reason: $reason ?? PriceResolutionReason::AllSourcesExhausted,
             sourceVariant: null,
+            resolvedPrice: null,
         );
     }
 
@@ -78,6 +87,8 @@ readonly class VariantPriceDisplay
             available: false,
             grossPrice: 0.0,
             regularNetPrice: 0.0,
+            effectiveNetPrice: 0.0,
+            vatRate: 0.0,
             salePrice: null,
             recommendedRetailPrice: null,
             currency: (string) config('pricing.default_currency', 'UAH'),
@@ -88,6 +99,7 @@ readonly class VariantPriceDisplay
             isOnSale: false,
             reason: $reason,
             sourceVariant: $attemptedVariant,
+            resolvedPrice: null,
         );
     }
 

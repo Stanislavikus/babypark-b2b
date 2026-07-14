@@ -78,7 +78,7 @@ class ResolvedPriceTest extends TestCase
 
     public function test_from_base_price_cache_sets_null_provenance_and_no_sale(): void
     {
-        $resolved = ResolvedPrice::fromBasePriceCache(42.0, 'UAH');
+        $resolved = ResolvedPrice::fromBasePriceCache(42.0, 'UAH', 20.0);
 
         $this->assertSame('base_price_cache', $resolved->source);
         $this->assertNull($resolved->sourcePriceListId);

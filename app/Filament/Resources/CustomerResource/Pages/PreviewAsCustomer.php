@@ -13,6 +13,7 @@ use App\Services\Pricing\CustomerCatalogQuery;
 use App\Services\Pricing\PriceResolutionSnapshot;
 use App\Support\CatalogRowData;
 use App\Support\Pricing\CustomerCatalogCriteria;
+use App\Support\Pricing\CustomerFacingPriceLabel;
 use Carbon\CarbonImmutable;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
@@ -194,6 +195,9 @@ class PreviewAsCustomer extends Page
                 'display_state' => $projection->displayState->value,
                 'display_state_label' => $this->displayStateLabel($projection->displayState),
                 'price' => $projection->price,
+                'price_label' => $projection->myPriceDisplay !== null
+                    ? CustomerFacingPriceLabel::forDisplay($projection->myPriceDisplay)
+                    : null,
                 'currency' => $projection->currency,
                 'price_source' => $projection->priceSource,
                 'orderable' => $projection->orderable,
