@@ -259,17 +259,6 @@ yet), but should be scheduled before any payment gateway integration work starts
   `ImportJob` model exists.
 
 **Impact:**
-- The 1C sync and Google Sheets export the pilot actually needs to be useful (per
-  the user's own stated requirement) cannot be built correctly without
-  `FieldMapping`.
-- **Updated dependency:** GAP-003 (Attribute Dictionary) is closed for its
-  original Product/Variant scope and no longer blocks this gap by itself.
-  `FieldMapping` must instead point at `field_binding_id` (not
-  `attribute_definition_id`/`AttributeDefinition` directly), per the "Field
-  Foundation (cross-object fields)" Domain Decision in `03-DOMAIN_MODEL.md`.
-  This gap is now blocked on that Field Foundation migration, not on GAP-003.
-
-**Decision:**
 - Do not build a one-off, hardcoded 1C-to-database field mapping as a shortcut —
   this is explicitly the "Babypark-specific hardcoded logic" that
   `04-ARCHITECTURE_PRINCIPLES.md` Mandate 9 forbids.
@@ -277,6 +266,8 @@ yet), but should be scheduled before any payment gateway integration work starts
   (FieldDefinition / FieldBinding split, `field_binding_id` on aliases) lands —
   building `FieldMapping` against the current `AttributeDefinition` shape would
   require rework immediately after.
+- **`ImportedPriceTaxBasis`** (whether an imported row is net or gross) must be
+  captured during connector import design — see GAP-018 cross-reference.
 
 **Next task:** Connector Foundation — sequenced after GAP-017 (Contractor →
 Customer terminology migration) and GAP-016 (Field Foundation migration), per
@@ -514,10 +505,17 @@ closed until that future concept is built. B2B/cabinet exposure remains open.
 - Phase 2 field registrations implemented (Task 5): `weight_netto`, `weight_brutto`, `volume_m3`,
   `shipping_required`, `backorder_policy`, `technical_characteristics`, `instructions` — all
   registered as `AttributeDefinition` records via `AttributeDefinitionSeeder`.
-- Not yet registered: tax class (deferred, see Decision below), gift card flag (deferred).
+- Not yet registered: gift card flag (deferred).
   `image_alt_text` remains deferred to future Media entities (`MediaAsset`/`ProductMedia`/`VariantMedia`
   — alt text is a per-image property, not a product/variant-level attribute). Tags is tracked
   separately under GAP-011 (classification structure), not here.
+
+**Previous decision:** Tax class deferred until a real product need appeared.
+**Reopened:** The need is now confirmed by workspace tax defaults (this
+task), and by the anticipated product-card inheritance, bulk assignment
+and import mapping requirements that follow from it.
+**Status:** Open — near-term prerequisite for full product card and
+import UX.
 
 **Impact:**
 - These are ordinary Phase 2 registrations — no architectural blocker, unlike the Category/Type/
@@ -532,19 +530,39 @@ closed until that future concept is built. B2B/cabinet exposure remains open.
   progressive product onboarding (start with a name, enrich later). Do not treat them as
   skippable nice-to-haves when a product is being prepared for publishing, but also do not make
   them a hard database-level requirement that blocks creating a draft product row.
-- Tax class and Gift Card flag remain explicitly deferred (not registered now) per product
-  owner decision — revisit only if a real need appears.
+- Tax class remains explicitly deferred as a **registered field** (not yet in
+  `AttributeDefinition` seed) — revisit via GAP-013 reopening above. Gift card flag
+  remain explicitly deferred (not registered now) per product owner decision — revisit
+  only if a real need appears.
 
 **Next task:** Product Fields Phase 2 implementation (schema/seed task, separate from the
 Merchant Category/Standard Category/Merchant Type/Tags structural task in GAP-011).
 
 **Status:** Partially closed in code. Phase 2 `AttributeDefinition` registrations are
 implemented for `weight_netto`, `weight_brutto`, `volume_m3`, `shipping_required`,
-`backorder_policy`, `technical_characteristics`, and `instructions`. Tax class and gift card flag
-remain explicitly deferred (unchanged). `image_alt_text` remains deferred to future Media entities
-(unchanged). `backorder_policy` registration does not change `AvailabilityResolver` behavior and
-does not close GAP-009. Publication-readiness enforcement for `technical_characteristics` and
-`instructions` remains the future responsibility of `B2BPublicationChecker` (not yet built).
+`backorder_policy`, `technical_characteristics`, and `instructions`. Tax class reopened
+(see above). Gift card flag remains explicitly deferred (unchanged). `image_alt_text` remains
+deferred to future Media entities (unchanged). `backorder_policy` registration does not change
+`AvailabilityResolver` behavior and does not close GAP-009. Publication-readiness enforcement
+for `technical_characteristics` and `instructions` remains the future responsibility of
+`B2BPublicationChecker` (not yet built).
+
+---
+
+## GAP-018 — Multi-jurisdiction Tax Engine
+
+Jurisdiction за адресою клієнта; кілька податкових реєстрацій; reverse
+charge; Stripe Tax/Avalara; автоматичне оновлення міжнародних ставок.
+
+**Cross-references:**
+- `ImportedPriceTaxBasis` — доповнення до **GAP-006** (Connector Foundation):
+  1С already may send prices with or without tax; import mapping must record the
+  declared tax basis per row.
+- `ChannelPricePolicy` — доповнення до channel mapping/export work (see GAP-007
+  and future connector channel-mapping GAP): e.g. Google Merchant feed requires
+  explicit tax-inclusive vs tax-exclusive semantics per channel.
+
+**Status:** Open, tracked (not urgent) — same pattern as GAP-012.
 
 ---
 

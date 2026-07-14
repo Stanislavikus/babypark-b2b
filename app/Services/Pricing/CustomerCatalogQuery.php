@@ -6,6 +6,7 @@ use App\Enums\CatalogSort;
 use App\Models\Category;
 use App\Models\Customer;
 use App\Models\Product;
+use App\Models\Workspace;
 use App\Support\Pricing\CustomerCatalogCriteria;
 use App\Support\Pricing\CustomerPricingScope;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -58,6 +59,9 @@ class CustomerCatalogQuery
         $legacy = $sort->toLegacy();
         $dir = $legacy['sortDir'];
         $priceListId = CustomerPricingScope::priceListIdFor($customer);
+        $workspaceRate = app(WorkspaceTaxDefaults::class)->resolveWorkspaceRate(
+            $customer->workspace ?? Workspace::query()->findOrFail($customer->workspace_id)
+        );
 
         return match ($legacy['sortBy']) {
             'sku' => $query->orderBy('sku', $dir),
@@ -71,8 +75,8 @@ class CustomerCatalogQuery
             'brand' => $query->orderBy('brand', $dir),
             'stock' => $this->applyStockSorting($query, $dir),
             'price' => $priceListId
-                ? (function () use ($query, $priceListId, $dir) {
-                    $priceExpr = PricingSqlExpressions::maxGrossPriceSqlForProduct('products.id', $priceListId);
+                ? (function () use ($query, $priceListId, $dir, $workspaceRate) {
+                    $priceExpr = PricingSqlExpressions::maxGrossPriceSqlForProduct('products.id', $priceListId, $workspaceRate);
 
                     return $query->orderByRaw("CASE WHEN ({$priceExpr}) IS NULL THEN 1 ELSE 0 END ASC")
                         ->orderByRaw("{$priceExpr} {$dir}")
@@ -83,9 +87,9 @@ class CustomerCatalogQuery
                 'COALESCE('.PricingSqlExpressions::maxRrpSqlForProduct('products.id').", 0) {$dir}"
             ),
             'margin' => $priceListId
-                ? (function () use ($query, $priceListId, $dir) {
-                    $marginExpr = PricingSqlExpressions::customerMarginSortSql('products.id', $priceListId);
-                    $minGrossExpr = PricingSqlExpressions::minGrossPriceSqlForProduct('products.id', $priceListId);
+                ? (function () use ($query, $priceListId, $dir, $workspaceRate) {
+                    $marginExpr = PricingSqlExpressions::customerMarginSortSql('products.id', $priceListId, $workspaceRate);
+                    $minGrossExpr = PricingSqlExpressions::minGrossPriceSqlForProduct('products.id', $priceListId, $workspaceRate);
 
                     return $query->orderByRaw("CASE WHEN ({$minGrossExpr}) IS NULL THEN 1 ELSE 0 END ASC")
                         ->orderByRaw("{$marginExpr} {$dir}")

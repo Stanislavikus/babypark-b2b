@@ -3,6 +3,11 @@
 namespace App\Support\Pricing;
 
 use App\Enums\CatalogPriceDisplayStatus;
+use App\Enums\PriceDisplayContext;
+use App\Models\Workspace;
+use App\Services\Pricing\PriceDisplayModeResolver;
+use App\Services\Pricing\PriceDisplayPresenter;
+use App\Support\Workspace\WorkspaceContext;
 
 class CustomerFacingPriceLabel
 {
@@ -13,10 +18,10 @@ class CustomerFacingPriceLabel
         'workspace_id',
     ];
 
-    public static function forDisplay(VariantPriceDisplay $display): string
+    public static function forDisplay(VariantPriceDisplay $display, ?Workspace $workspace = null): string
     {
         return match ($display->status) {
-            CatalogPriceDisplayStatus::Resolved => self::formatResolved($display),
+            CatalogPriceDisplayStatus::Resolved => self::formatResolved($display, $workspace),
             CatalogPriceDisplayStatus::Unavailable => 'Ціна недоступна',
             CatalogPriceDisplayStatus::ConfigurationError => 'Помилка конфігурації цін',
         };
@@ -33,8 +38,16 @@ class CustomerFacingPriceLabel
         return $output;
     }
 
-    private static function formatResolved(VariantPriceDisplay $display): string
+    private static function formatResolved(VariantPriceDisplay $display, ?Workspace $workspace): string
     {
-        return $display->formattedGross();
+        if ($display->resolvedPrice === null) {
+            return $display->formattedGross();
+        }
+
+        $workspace ??= app(WorkspaceContext::class)->current();
+        $mode = app(PriceDisplayModeResolver::class)->resolve($workspace, PriceDisplayContext::CustomerFacing);
+        $presentation = app(PriceDisplayPresenter::class)->present($display->resolvedPrice, $mode);
+
+        return $presentation->compactLabel();
     }
 }

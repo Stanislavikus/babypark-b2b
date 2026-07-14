@@ -10,6 +10,7 @@ use App\Models\ProductVariant;
 use App\Services\Availability\AvailabilityResolver;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Services\Pricing\ProductPricingSummary;
+use App\Services\Pricing\WorkspaceTaxDefaults;
 use App\Support\CatalogRowData;
 use App\Support\Pricing\CustomerPricingScope;
 use App\Support\ProductFields\CabinetProductMargin;
@@ -289,8 +290,12 @@ class ProductResource extends Resource
                         return $query->orderBy('sku', $direction);
                     }
 
+                    $workspaceRate = app(WorkspaceTaxDefaults::class)->resolveWorkspaceRate(
+                        $customer->workspace ?? $customer->workspace()->firstOrFail()
+                    );
+
                     return $query->orderByRaw(
-                        'COALESCE('.PricingSqlExpressions::minGrossPriceSqlForProduct('products.id', $priceListId).", 0) {$direction}"
+                        'COALESCE('.PricingSqlExpressions::minGrossPriceSqlForProduct('products.id', $priceListId, $workspaceRate).", 0) {$direction}"
                     );
                 });
         }
@@ -340,8 +345,12 @@ class ProductResource extends Resource
                         return $query->orderBy('sku', $direction);
                     }
 
+                    $workspaceRate = app(WorkspaceTaxDefaults::class)->resolveWorkspaceRate(
+                        $customer->workspace ?? $customer->workspace()->firstOrFail()
+                    );
+
                     return $query->orderByRaw(
-                        PricingSqlExpressions::customerMarginSortSql('products.id', $priceListId)." {$direction}"
+                        PricingSqlExpressions::customerMarginSortSql('products.id', $priceListId, $workspaceRate)." {$direction}"
                     );
                 });
         }

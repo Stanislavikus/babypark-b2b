@@ -2,7 +2,10 @@
 
 namespace App\Services\Pricing\Inspection;
 
+use App\Enums\PriceDisplayContext;
 use App\Models\PriceList;
+use App\Services\Pricing\PriceDisplayModeResolver;
+use App\Services\Pricing\PriceDisplayPresenter;
 use App\Services\Pricing\Resolution\PriceResolutionReason;
 use App\Services\Pricing\Resolution\PriceResolutionResult;
 use App\Services\Pricing\Resolution\PriceResolutionSource;
@@ -90,10 +93,11 @@ final class PriceInspectorPresenter
             return null;
         }
 
-        $formatted = number_format($result->price->grossPrice, 2, ',', ' ');
-        $currency = $result->price->currency === 'UAH' ? '₴' : $result->price->currency;
+        $workspace = app(WorkspaceContext::class)->current();
+        $mode = app(PriceDisplayModeResolver::class)->resolve($workspace, PriceDisplayContext::Internal);
+        $presentation = app(PriceDisplayPresenter::class)->present($result->price, $mode);
 
-        return $formatted.' '.$currency;
+        return $presentation->fullLabel();
     }
 
     /**

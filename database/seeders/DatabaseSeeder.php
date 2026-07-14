@@ -10,6 +10,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             WorkspaceSeeder::class,
+            WorkspacePermissionSeeder::class,
             FieldDefinitionSeeder::class,
             B2BSeeder::class,
             DeliverySettingSeeder::class,

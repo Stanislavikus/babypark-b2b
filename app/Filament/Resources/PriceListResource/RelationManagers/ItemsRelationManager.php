@@ -4,6 +4,7 @@ namespace App\Filament\Resources\PriceListResource\RelationManagers;
 
 use App\Enums\PriceListItemStatus;
 use App\Models\ProductVariant;
+use App\Services\Pricing\WorkspaceTaxDefaults;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -19,9 +20,11 @@ class ItemsRelationManager extends RelationManager
 
     protected static ?string $title = 'Позиції прайс-листа';
 
+    private ?float $resolvedWorkspaceDefaultVatRate = null;
+
     public function form(Form $form): Form
     {
-        $defaultVatRate = (string) config('pricing.default_vat_rate', 20);
+        $defaultVatRate = (string) $this->workspaceDefaultVatRate();
 
         return $form
             ->schema([
@@ -60,21 +63,21 @@ class ItemsRelationManager extends RelationManager
                     ->minValue(1)
                     ->default(1),
                 Forms\Components\TextInput::make('price')
-                    ->label('Ціна')
+                    ->label('Ціна без податку')
                     ->numeric()
                     ->required()
                     ->minValue(0.01)
                     ->gt(0)
                     ->prefix('₴'),
                 Forms\Components\TextInput::make('sale_price')
-                    ->label('Акційна ціна')
+                    ->label('Акційна ціна без податку')
                     ->numeric()
                     ->nullable()
                     ->gt(0)
                     ->lt('price')
                     ->prefix('₴'),
                 Forms\Components\TextInput::make('vat_rate')
-                    ->label('ПДВ %')
+                    ->label('Ставка податку')
                     ->numeric()
                     ->nullable()
                     ->placeholder("за замовчуванням ({$defaultVatRate}%)"),
@@ -114,11 +117,11 @@ class ItemsRelationManager extends RelationManager
                     ->label('Кількість від')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('price')
-                    ->label('Ціна')
+                    ->label('Ціна без податку')
                     ->money('UAH')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('sale_price')
-                    ->label('Акційна ціна')
+                    ->label('Акційна ціна без податку')
                     ->money('UAH')
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('vat_rate')
@@ -126,7 +129,7 @@ class ItemsRelationManager extends RelationManager
                     ->formatStateUsing(
                         fn (?string $state): string => $state !== null
                             ? $state.'%'
-                            : 'за замовчуванням ('.config('pricing.default_vat_rate').'%)'
+                            : 'за замовчуванням ('.$this->workspaceDefaultVatRate().'%)'
                     ),
                 Tables\Columns\TextColumn::make('valid_from')
                     ->label('Діє з')
@@ -169,5 +172,13 @@ class ItemsRelationManager extends RelationManager
         $data['price_list_id'] = $this->getOwnerRecord()->id;
 
         return $data;
+    }
+
+    private function workspaceDefaultVatRate(): float
+    {
+        return $this->resolvedWorkspaceDefaultVatRate ??=
+            app(WorkspaceTaxDefaults::class)->resolveWorkspaceRate(
+                $this->getOwnerRecord()->workspace
+            );
     }
 }

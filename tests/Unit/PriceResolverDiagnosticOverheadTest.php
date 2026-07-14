@@ -17,9 +17,9 @@ class PriceResolverDiagnosticOverheadTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Pre-refactor SQL query baselines captured on develop (2026-07-13).
+     * SQL query baselines — +1 vs 2026-07-13 after workspace tax rate lookup in PriceResolver.
      */
-    private const BASELINE_CUSTOMER_ASSIGNED_MATCH = 3;
+    private const BASELINE_CUSTOMER_ASSIGNED_MATCH = 4;
 
     private const BASELINE_WORKSPACE_DEFAULT_MATCH = 4;
 

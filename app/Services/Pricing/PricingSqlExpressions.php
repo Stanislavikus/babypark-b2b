@@ -6,32 +6,35 @@ use Illuminate\Support\Facades\DB;
 
 class PricingSqlExpressions
 {
-    public static function defaultVatRate(): float
+    private static function rateLiteral(float $workspaceDefaultVatRate): string
     {
-        return (float) config('pricing.default_vat_rate', 20);
+        return number_format($workspaceDefaultVatRate, 2, '.', '');
     }
 
     /**
      * SQL expression for gross price from a price_list_items row alias.
      */
     public static function grossFromListItemColumns(
+        float $workspaceDefaultVatRate,
         string $priceColumn = 'pli.price',
         string $saleColumn = 'pli.sale_price',
         string $vatColumn = 'pli.vat_rate',
     ): string {
-        $defaultVat = self::defaultVatRate();
+        $defaultVat = self::rateLiteral($workspaceDefaultVatRate);
 
-        return "ROUND(COALESCE({$saleColumn}, {$priceColumn}) * (1 + COALESCE({$vatColumn}, {$defaultVat}) / 100), 2)";
+        return "ROUND(COALESCE({$saleColumn}, {$priceColumn}) * (1 + COALESCE({$vatColumn}, {$defaultVat}) / 100.0), 2)";
     }
 
     /**
      * SQL expression for gross price from variant base_price_cache.
      */
-    public static function grossFromBaseCacheColumn(string $cacheColumn = 'pv.base_price_cache'): string
-    {
-        $defaultVat = self::defaultVatRate();
+    public static function grossFromBaseCacheColumn(
+        float $workspaceDefaultVatRate,
+        string $cacheColumn = 'pv.base_price_cache',
+    ): string {
+        $defaultVat = self::rateLiteral($workspaceDefaultVatRate);
 
-        return "ROUND({$cacheColumn} * (1 + {$defaultVat} / 100), 2)";
+        return "ROUND({$cacheColumn} * (1 + {$defaultVat} / 100.0), 2)";
     }
 
     public static function maxRrpSqlForProduct(string $productIdColumn = 'products.id'): string
@@ -46,12 +49,15 @@ class PricingSqlExpressions
     /**
      * Minimum gross customer price across active variants (price list item tier qty=1, else base cache).
      */
-    public static function minGrossPriceSqlForProduct(string $productIdColumn, string $priceListId): string
-    {
+    public static function minGrossPriceSqlForProduct(
+        string $productIdColumn,
+        string $priceListId,
+        float $workspaceDefaultVatRate,
+    ): string {
         $quotedListId = DB::connection()->getPdo()->quote($priceListId);
         $now = DB::connection()->getPdo()->quote(now()->toDateTimeString());
-        $grossItem = self::grossFromListItemColumns();
-        $grossCache = self::grossFromBaseCacheColumn();
+        $grossItem = self::grossFromListItemColumns($workspaceDefaultVatRate);
+        $grossCache = self::grossFromBaseCacheColumn($workspaceDefaultVatRate);
 
         return "(SELECT MIN(
                     COALESCE(
@@ -76,12 +82,15 @@ class PricingSqlExpressions
     /**
      * Maximum gross customer price across active variants.
      */
-    public static function maxGrossPriceSqlForProduct(string $productIdColumn, string $priceListId): string
-    {
+    public static function maxGrossPriceSqlForProduct(
+        string $productIdColumn,
+        string $priceListId,
+        float $workspaceDefaultVatRate,
+    ): string {
         $quotedListId = DB::connection()->getPdo()->quote($priceListId);
         $now = DB::connection()->getPdo()->quote(now()->toDateTimeString());
-        $grossItem = self::grossFromListItemColumns();
-        $grossCache = self::grossFromBaseCacheColumn();
+        $grossItem = self::grossFromListItemColumns($workspaceDefaultVatRate);
+        $grossCache = self::grossFromBaseCacheColumn($workspaceDefaultVatRate);
 
         return "(SELECT MAX(
                     COALESCE(
@@ -123,10 +132,13 @@ class PricingSqlExpressions
     /**
      * Customer margin sort: max RRP cache minus min gross customer price.
      */
-    public static function customerMarginSortSql(string $productIdColumn, string $priceListId): string
-    {
+    public static function customerMarginSortSql(
+        string $productIdColumn,
+        string $priceListId,
+        float $workspaceDefaultVatRate,
+    ): string {
         $maxRrp = self::maxRrpSqlForProduct($productIdColumn);
-        $minGross = self::minGrossPriceSqlForProduct($productIdColumn, $priceListId);
+        $minGross = self::minGrossPriceSqlForProduct($productIdColumn, $priceListId, $workspaceDefaultVatRate);
 
         return "COALESCE({$maxRrp}, 0) - COALESCE({$minGross}, 0)";
     }
