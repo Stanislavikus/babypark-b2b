@@ -4,7 +4,7 @@
 
         <div class="mt-4">
             <x-filament::button type="submit">
-                Перевірити ціну
+                {{ __('price_inspector.form.check_price') }}
             </x-filament::button>
         </div>
     </form>
@@ -48,10 +48,10 @@
                     <ol class="list-decimal space-y-2 pl-5">
                         @foreach ($presentation['recommended_actions'] as $action)
                             <li wire:key="action-{{ $loop->index }}">
-                                <a href="{{ $action['url'] }}"
-                                   class="font-medium text-primary-600 underline hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300">
-                                    {{ $action['label'] }}
-                                </a>
+                                <x-price-inspector-nav-link
+                                    :href="$action['url']"
+                                    :label="$action['label']"
+                                />
                             </li>
                         @endforeach
                     </ol>
@@ -78,10 +78,11 @@
                             <p class="mt-2 text-sm">{{ $step['explanation'] }}</p>
                             @if ($step['action'] !== null)
                                 <div class="mt-2">
-                                    <a href="{{ $step['action']['url'] }}"
-                                       class="text-sm font-medium text-primary-600 underline hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300">
-                                        {{ $step['action']['label'] }} →
-                                    </a>
+                                    <x-price-inspector-nav-link
+                                        :href="$step['action']['url']"
+                                        :label="$step['action']['label'].' →'"
+                                        class="text-sm font-medium text-primary-600 underline hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
+                                    />
                                 </div>
                             @endif
                         </div>
@@ -96,18 +97,18 @@
                 </summary>
                 <div class="space-y-4 border-t border-gray-200 px-4 py-4 dark:border-gray-700">
                     <div>
-                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Статус</span>
+                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ __('price_inspector.technical.status') }}</span>
                         <p class="font-mono text-sm">{{ $presentation['technical_details']['status'] }}</p>
                     </div>
 
                     <div>
-                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Коди причин</span>
+                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ __('price_inspector.technical.reason_codes') }}</span>
                         <p class="font-mono text-sm">{{ implode(', ', $presentation['technical_details']['reason_codes']) }}</p>
                     </div>
 
                     @if ($presentation['technical_details']['failure'] !== null)
                         <div>
-                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Помилка</span>
+                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ __('price_inspector.technical.failure') }}</span>
                             <p class="font-mono text-sm">{{ $presentation['technical_details']['failure']['reason'] }}</p>
                             <p class="mt-1 text-sm">{{ $presentation['technical_details']['failure']['message'] }}</p>
                             @if ($presentation['technical_details']['failure']['context'] !== [])
@@ -118,29 +119,29 @@
 
                     @if ($presentation['technical_details']['price'] !== null)
                         <div>
-                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Ціна (технічно)</span>
+                            <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ __('price_inspector.technical.price') }}</span>
                             <pre class="mt-1 overflow-x-auto rounded bg-gray-50 p-3 text-xs dark:bg-gray-900">{{ json_encode($presentation['technical_details']['price'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
                         </div>
                     @endif
 
                     <div>
-                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Контекст</span>
+                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ __('price_inspector.technical.context') }}</span>
                         <pre class="mt-1 overflow-x-auto rounded bg-gray-50 p-3 text-xs dark:bg-gray-900">{{ json_encode($presentation['technical_details']['context'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) }}</pre>
                     </div>
 
                     <div>
-                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Trace</span>
+                        <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ __('price_inspector.technical.trace') }}</span>
                         <div class="mt-2 overflow-x-auto">
                             <table class="w-full text-sm">
                                 <thead>
                                     <tr class="border-b text-left">
-                                        <th class="py-2 pr-4">#</th>
-                                        <th class="py-2 pr-4">Джерело</th>
-                                        <th class="py-2 pr-4">Статус</th>
-                                        <th class="py-2 pr-4">Причина</th>
-                                        <th class="py-2 pr-4">price_list_id</th>
-                                        <th class="py-2 pr-4">Сума</th>
-                                        <th class="py-2">Метадані</th>
+                                        <th class="py-2 pr-4">{{ __('price_inspector.technical.trace_index') }}</th>
+                                        <th class="py-2 pr-4">{{ __('price_inspector.technical.trace_source') }}</th>
+                                        <th class="py-2 pr-4">{{ __('price_inspector.technical.trace_status') }}</th>
+                                        <th class="py-2 pr-4">{{ __('price_inspector.technical.trace_reason') }}</th>
+                                        <th class="py-2 pr-4">{{ __('price_inspector.technical.trace_price_list_id') }}</th>
+                                        <th class="py-2 pr-4">{{ __('price_inspector.technical.trace_amount') }}</th>
+                                        <th class="py-2">{{ __('price_inspector.technical.trace_metadata') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -182,7 +183,7 @@
                                 size="sm"
                             >
                                 <span x-show="!copied">{{ __('price_inspector.section.copy_diagnostics') }}</span>
-                                <span x-show="copied" x-cloak>Скопійовано</span>
+                                <span x-show="copied" x-cloak>{{ __('price_inspector.section.copied') }}</span>
                             </x-filament::button>
                             <pre class="mt-2 overflow-x-auto rounded bg-gray-50 p-4 text-xs dark:bg-gray-900"
                                  id="price-inspector-diagnostics">{{ $presentedOutput }}</pre>

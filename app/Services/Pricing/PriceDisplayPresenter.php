@@ -19,17 +19,34 @@ final class PriceDisplayPresenter
 
         return match ($mode) {
             PriceDisplayMode::TaxInclusivePrimary => new PriceDisplayPresentation(
-                primaryLine: "{$grossFormatted} з податком",
-                secondaryLine: "{$netFormatted} без податку · Податок {$vatPercent}: {$taxFormatted}",
+                primaryLine: __('price_display.with_tax', ['amount' => $grossFormatted]),
+                secondaryLine: __('price_display.secondary_inclusive', [
+                    'net' => $netFormatted,
+                    'percent' => $vatPercent,
+                    'tax' => $taxFormatted,
+                ]),
+                decisionPathLabel: __('price_display.with_tax', ['amount' => $grossFormatted]),
             ),
             PriceDisplayMode::TaxExclusivePrimary => new PriceDisplayPresentation(
-                primaryLine: "{$netFormatted} без податку",
-                secondaryLine: "{$grossFormatted} з податком · Податок {$vatPercent}: {$taxFormatted}",
+                primaryLine: __('price_display.without_tax', ['amount' => $netFormatted]),
+                secondaryLine: __('price_display.secondary_exclusive', [
+                    'gross' => $grossFormatted,
+                    'percent' => $vatPercent,
+                    'tax' => $taxFormatted,
+                ]),
+                decisionPathLabel: __('price_display.without_tax', ['amount' => $netFormatted]),
             ),
             PriceDisplayMode::BothEqual => new PriceDisplayPresentation(
-                primaryLine: "Без податку {$netFormatted}",
-                secondaryLine: "Податок {$vatPercent} {$taxFormatted}",
-                tertiaryLine: "З податком {$grossFormatted}",
+                primaryLine: __('price_display.without_tax_prefix', ['amount' => $netFormatted]),
+                secondaryLine: __('price_display.tax_line', [
+                    'percent' => $vatPercent,
+                    'amount' => $taxFormatted,
+                ]),
+                tertiaryLine: __('price_display.with_tax_prefix', ['amount' => $grossFormatted]),
+                decisionPathLabel: __('price_display.both_compact', [
+                    'net' => $netFormatted,
+                    'gross' => $grossFormatted,
+                ]),
             ),
         };
     }

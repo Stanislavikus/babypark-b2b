@@ -24,8 +24,12 @@ class PriceDisplayPresenterTest extends TestCase
 
         $presentation = $this->presenter->present($price, PriceDisplayMode::TaxInclusivePrimary);
 
-        $this->assertSame('108,00 ₴ з податком', $presentation->primaryLine);
-        $this->assertSame('90,00 ₴ без податку · Податок 20%: 18,00 ₴', $presentation->secondaryLine);
+        $this->assertSame(__('price_display.with_tax', ['amount' => '108,00 ₴']), $presentation->primaryLine);
+        $this->assertSame(__('price_display.secondary_inclusive', [
+            'net' => '90,00 ₴',
+            'percent' => '20%',
+            'tax' => '18,00 ₴',
+        ]), $presentation->secondaryLine);
         $this->assertNull($presentation->tertiaryLine);
     }
 
@@ -35,8 +39,12 @@ class PriceDisplayPresenterTest extends TestCase
 
         $presentation = $this->presenter->present($price, PriceDisplayMode::TaxExclusivePrimary);
 
-        $this->assertSame('90,00 ₴ без податку', $presentation->primaryLine);
-        $this->assertSame('108,00 ₴ з податком · Податок 20%: 18,00 ₴', $presentation->secondaryLine);
+        $this->assertSame(__('price_display.without_tax', ['amount' => '90,00 ₴']), $presentation->primaryLine);
+        $this->assertSame(__('price_display.secondary_exclusive', [
+            'gross' => '108,00 ₴',
+            'percent' => '20%',
+            'tax' => '18,00 ₴',
+        ]), $presentation->secondaryLine);
     }
 
     public function test_both_equal_mode(): void
@@ -45,9 +53,16 @@ class PriceDisplayPresenterTest extends TestCase
 
         $presentation = $this->presenter->present($price, PriceDisplayMode::BothEqual);
 
-        $this->assertSame('Без податку 90,00 ₴', $presentation->primaryLine);
-        $this->assertSame('Податок 20% 18,00 ₴', $presentation->secondaryLine);
-        $this->assertSame('З податком 108,00 ₴', $presentation->tertiaryLine);
+        $this->assertSame(__('price_display.without_tax_prefix', ['amount' => '90,00 ₴']), $presentation->primaryLine);
+        $this->assertSame(__('price_display.tax_line', [
+            'percent' => '20%',
+            'amount' => '18,00 ₴',
+        ]), $presentation->secondaryLine);
+        $this->assertSame(__('price_display.with_tax_prefix', ['amount' => '108,00 ₴']), $presentation->tertiaryLine);
+        $this->assertSame(__('price_display.both_compact', [
+            'net' => '90,00 ₴',
+            'gross' => '108,00 ₴',
+        ]), $presentation->decisionPathLabel);
     }
 
     private function samplePrice(): ResolvedPrice

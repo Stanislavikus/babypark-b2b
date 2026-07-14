@@ -35,9 +35,9 @@ class PriceInspector extends Page implements HasForms
 
     protected static ?string $navigationGroup = 'B2B';
 
-    protected static ?string $navigationLabel = 'Перевірка ціни';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Перевірка ціни для клієнта';
+    protected static ?string $title = null;
 
     protected static ?int $navigationSort = 5;
 
@@ -66,9 +66,19 @@ class PriceInspector extends Page implements HasForms
             ], true);
     }
 
+    public static function getNavigationLabel(): string
+    {
+        return __('price_inspector.page.navigation');
+    }
+
+    public function getTitle(): string
+    {
+        return __('price_inspector.page.title');
+    }
+
     public function getSubheading(): ?string
     {
-        return 'Дізнайтеся, яку ціну отримає клієнт і чому.';
+        return __('price_inspector.page.subheading');
     }
 
     public function mount(): void
@@ -101,9 +111,9 @@ class PriceInspector extends Page implements HasForms
 
         return $form
             ->schema([
-                Section::make('Параметри перевірки')->schema([
+                Section::make(__('price_inspector.form.parameters'))->schema([
                     Select::make('customer_id')
-                        ->label('Клієнт')
+                        ->label(__('price_inspector.form.customer'))
                         ->required()
                         ->searchable()
                         ->options(fn (): array => Customer::query()
@@ -112,7 +122,7 @@ class PriceInspector extends Page implements HasForms
                             ->pluck('name', 'id')
                             ->all()),
                     Select::make('product_id')
-                        ->label('Товар (фільтр)')
+                        ->label(__('price_inspector.form.product_filter'))
                         ->searchable()
                         ->live()
                         ->options(fn (): array => Product::query()
@@ -121,7 +131,7 @@ class PriceInspector extends Page implements HasForms
                             ->pluck('name', 'id')
                             ->all()),
                     Select::make('variant_id')
-                        ->label('Варіант')
+                        ->label(__('price_inspector.form.variant'))
                         ->required()
                         ->searchable()
                         ->options(function (Get $get) use ($workspaceId): array {
@@ -141,19 +151,19 @@ class PriceInspector extends Page implements HasForms
                                 ->all();
                         }),
                     TextInput::make('quantity')
-                        ->label('Кількість')
+                        ->label(__('price_inspector.form.quantity'))
                         ->numeric()
                         ->integer()
                         ->minValue(1)
                         ->required()
                         ->default(1),
                     DateTimePicker::make('effective_at')
-                        ->label('Дата/час дії ціни')
+                        ->label(__('price_inspector.form.effective_at'))
                         ->seconds(true)
                         ->default(now())
-                        ->helperText('Часовий пояс: '.$timezone),
+                        ->helperText(__('price_inspector.form.timezone_hint', ['timezone' => $timezone])),
                     Placeholder::make('timezone_hint')
-                        ->label('Часовий пояс')
+                        ->label(__('price_inspector.form.timezone'))
                         ->content($timezone),
                 ])->columns(2),
             ])
@@ -200,7 +210,7 @@ class PriceInspector extends Page implements HasForms
         $this->presentation = $this->serializePresentation($presentation);
 
         Notification::make()
-            ->title('Ціну перевірено')
+            ->title(__('price_inspector.form.price_checked'))
             ->success()
             ->send();
     }

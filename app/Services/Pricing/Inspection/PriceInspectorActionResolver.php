@@ -16,6 +16,13 @@ use App\Support\Workspace\WorkspaceContext;
 
 final class PriceInspectorActionResolver
 {
+    /**
+     * RelationManager table search is not bound via parent-page query string in
+     * Filament v3 (verified in PriceListDeepLinkVerificationTest). Deep links
+     * open the price list edit page only — not a focused row.
+     */
+    private const PRICE_LIST_ITEM_SEARCH_SUPPORTED = false;
+
     public function forStep(
         PriceResolutionStep $step,
         PriceInspectorContext $context,
@@ -37,10 +44,88 @@ final class PriceInspectorActionResolver
 
             PriceResolutionReason::DefaultPriceListMisconfigured => $this->openPriceListSettingsAction($context),
 
-            PriceResolutionReason::Matched,
+            PriceResolutionReason::Matched => $this->matchedAction($step, $context, $workspaceId),
+
             PriceResolutionReason::PreviousSourceResolved,
             PriceResolutionReason::AllSourcesExhausted => null,
         };
+    }
+
+    private function matchedAction(
+        PriceResolutionStep $step,
+        PriceInspectorContext $context,
+        string $workspaceId,
+    ): ?PriceInspectorAction {
+        return match ($step->source) {
+            PriceResolutionSource::CustomerPriceList,
+            PriceResolutionSource::WorkspaceDefaultPriceList => $this->matchedPriceListAction($step, $context, $workspaceId),
+            PriceResolutionSource::BasePriceCache => $this->matchedProductAction($context, $workspaceId),
+        };
+    }
+
+    private function matchedPriceListAction(
+        PriceResolutionStep $step,
+        PriceInspectorContext $context,
+        string $workspaceId,
+    ): ?PriceInspectorAction {
+        if ($step->priceListId === null) {
+            return null;
+        }
+
+        $priceList = $this->findPriceList($step->priceListId, $workspaceId);
+
+        if ($priceList === null || ! PriceListResource::canEdit($priceList)) {
+            return null;
+        }
+
+        $url = $this->buildPriceListEditUrl($priceList, $context);
+        $label = $this->priceListMatchedLabel($context);
+
+        return new PriceInspectorAction(
+            label: $label,
+            url: $url,
+            deduplicationKey: 'price_list:'.$priceList->id,
+        );
+    }
+
+    private function matchedProductAction(
+        PriceInspectorContext $context,
+        string $workspaceId,
+    ): ?PriceInspectorAction {
+        $product = $this->findProduct($context->variant->product_id, $workspaceId);
+
+        if ($product === null || ! ProductResource::canEdit($product)) {
+            return null;
+        }
+
+        return new PriceInspectorAction(
+            label: __('price_inspector.action.open_product'),
+            url: ProductResource::getUrl('edit', ['record' => $product]),
+            deduplicationKey: 'product:'.$product->id,
+        );
+    }
+
+    private function priceListMatchedLabel(PriceInspectorContext $context): string
+    {
+        if (self::PRICE_LIST_ITEM_SEARCH_SUPPORTED && filled($context->variant->sku)) {
+            return __('price_inspector.action.edit_price_list_item');
+        }
+
+        return __('price_inspector.action.open_price_list');
+    }
+
+    private function buildPriceListEditUrl(PriceList $priceList, PriceInspectorContext $context): string
+    {
+        $url = PriceListResource::getUrl('edit', ['record' => $priceList]);
+
+        if (! self::PRICE_LIST_ITEM_SEARCH_SUPPORTED || blank($context->variant->sku)) {
+            return $url;
+        }
+
+        return $url.'?'.http_build_query([
+            'activeRelationManager' => '0',
+            'itemsRelationManagerTableSearch' => $context->variant->sku,
+        ]);
     }
 
     private function priceListItemAction(
