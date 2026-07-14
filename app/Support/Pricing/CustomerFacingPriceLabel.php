@@ -22,8 +22,8 @@ class CustomerFacingPriceLabel
     {
         return match ($display->status) {
             CatalogPriceDisplayStatus::Resolved => self::formatResolved($display, $workspace),
-            CatalogPriceDisplayStatus::Unavailable => 'Ціна недоступна',
-            CatalogPriceDisplayStatus::ConfigurationError => 'Помилка конфігурації цін',
+            CatalogPriceDisplayStatus::Unavailable => __('catalog_price.unavailable'),
+            CatalogPriceDisplayStatus::ConfigurationError => __('catalog_price.configuration_error'),
         };
     }
 
@@ -31,7 +31,7 @@ class CustomerFacingPriceLabel
     {
         foreach (self::INTERNAL_PATTERNS as $pattern) {
             if (str_contains($output, $pattern)) {
-                return 'Помилка конфігурації цін';
+                return __('catalog_price.configuration_error');
             }
         }
 

@@ -28,6 +28,14 @@ final class PriceInspectorPresenter
         PriceInspectorContext $context,
     ): PriceInspectorPresentation {
         $steps = $this->buildSteps($result, $context);
+
+        if ($result->status === PriceResolutionStatus::Resolved) {
+            $steps = array_values(array_filter(
+                $steps,
+                fn (PriceInspectorSourceStep $step) => $step->stepStatus !== PriceResolutionStepStatus::NotChecked,
+            ));
+        }
+
         $recommendedActions = $this->aggregateRecommendedActions($steps);
 
         if (
@@ -97,7 +105,9 @@ final class PriceInspectorPresenter
         $mode = app(PriceDisplayModeResolver::class)->resolve($workspace, PriceDisplayContext::Internal);
         $presentation = app(PriceDisplayPresenter::class)->present($result->price, $mode);
 
-        return $presentation->fullLabel();
+        return $presentation->decisionPathLabel !== ''
+            ? $presentation->decisionPathLabel
+            : $presentation->fullLabel();
     }
 
     /**
@@ -116,6 +126,7 @@ final class PriceInspectorPresenter
                 outcomeLabel: $this->outcomeLabel($step),
                 explanation: $this->explanation($step, $context),
                 action: $this->actionResolver->forStep($step, $context),
+                stepStatus: $step->status,
             );
         }
 
@@ -136,6 +147,7 @@ final class PriceInspectorPresenter
                 outcomeLabel: $this->outcomeLabel($syntheticStep),
                 explanation: __('price_inspector.explanation.workspace_default_price_list.default_price_list_misconfigured'),
                 action: $this->actionResolver->forStep($syntheticStep, $context),
+                stepStatus: $syntheticStep->status,
             );
         }
 

@@ -74,6 +74,8 @@ return [
         'assign_price_list' => 'Призначити прайс-лист клієнту',
         'open_price_list' => 'Відкрити прайс-лист',
         'open_price_list_item' => 'Відкрити позицію прайс-листа',
+        'edit_price_list_item' => 'Редагувати цю позицію прайс-листа',
+        'open_product' => 'Відкрити товар',
         'check_quantity' => 'Перевірити ціну для :quantity шт.',
         'set_base_price' => 'Відкрити варіант і задати базову ціну',
         'open_price_list_settings' => 'Відкрити налаштування прайс-листів',
@@ -84,5 +86,43 @@ return [
         'decision_path' => 'Як система перевірила ціну',
         'technical_details' => 'Технічні дані',
         'copy_diagnostics' => 'Копіювати діагностику',
+        'copied' => 'Скопійовано',
     ],
+
+    'form' => [
+        'check_price' => 'Перевірити ціну',
+        'parameters' => 'Параметри перевірки',
+        'customer' => 'Клієнт',
+        'product_filter' => 'Товар (фільтр)',
+        'variant' => 'Варіант',
+        'quantity' => 'Кількість',
+        'effective_at' => 'Дата/час дії ціни',
+        'timezone' => 'Часовий пояс',
+        'timezone_hint' => 'Часовий пояс: :timezone',
+        'price_checked' => 'Ціну перевірено',
+    ],
+
+    'page' => [
+        'title' => 'Перевірка ціни для клієнта',
+        'subheading' => 'Дізнайтеся, яку ціну отримає клієнт і чому.',
+        'navigation' => 'Перевірка ціни',
+    ],
+
+    'technical' => [
+        'status' => 'Статус',
+        'reason_codes' => 'Коди причин',
+        'failure' => 'Помилка',
+        'price' => 'Ціна (технічно)',
+        'context' => 'Контекст',
+        'trace' => 'Trace',
+        'trace_index' => '#',
+        'trace_source' => 'Джерело',
+        'trace_status' => 'Статус',
+        'trace_reason' => 'Причина',
+        'trace_price_list_id' => 'price_list_id',
+        'trace_amount' => 'Сума',
+        'trace_metadata' => 'Метадані',
+    ],
+
+    'opens_in_new_tab' => '(відкривається в новій вкладці)',
 ];

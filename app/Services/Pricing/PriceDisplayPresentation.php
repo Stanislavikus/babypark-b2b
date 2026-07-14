@@ -8,6 +8,7 @@ readonly class PriceDisplayPresentation
         public string $primaryLine,
         public ?string $secondaryLine = null,
         public ?string $tertiaryLine = null,
+        public string $decisionPathLabel = '',
     ) {}
 
     public function compactLabel(): string

@@ -329,7 +329,7 @@ class PriceInspectorTest extends TestCase
             ->get('/admin/price-inspector');
 
         $response->assertOk();
-        $response->assertSee('Перевірка ціни для клієнта');
-        $response->assertSee('Дізнайтеся, яку ціну отримає клієнт і чому.');
+        $response->assertSee(__('price_inspector.page.title'));
+        $response->assertSee(__('price_inspector.page.subheading'));
     }
 }

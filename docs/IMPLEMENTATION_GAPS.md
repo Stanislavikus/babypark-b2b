@@ -566,6 +566,20 @@ charge; Stripe Tax/Avalara; автоматичне оновлення міжна
 
 ---
 
+## GAP-019 — Application-wide UI Localization
+
+Price Inspector fully localized (uk/ru/en) as of this task; rest of
+admin panel (Filament resources, other pages) still Ukrainian-only.
+
+Deferred: inventory of hardcoded UI strings across the rest of the
+admin panel; Filament/vendor package translations; user/workspace
+locale preference; locale-selection middleware; language switcher UI;
+translation completeness checks.
+
+**Status:** Open, tracked (not urgent) — same pattern as GAP-012/GAP-018.
+
+---
+
 ## GAP-014 — `sale_price >= regular price` data-integrity gap on non-Filament write paths
 
 **Approved docs:**
