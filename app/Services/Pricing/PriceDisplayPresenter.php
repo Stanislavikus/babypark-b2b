@@ -6,6 +6,10 @@ use App\Enums\PriceDisplayMode;
 
 final class PriceDisplayPresenter
 {
+    public function __construct(
+        private readonly MoneyFormatter $moneyFormatter,
+    ) {}
+
     public function present(ResolvedPrice $price, PriceDisplayMode $mode): PriceDisplayPresentation
     {
         $net = $price->effectiveNetPrice;
@@ -13,9 +17,9 @@ final class PriceDisplayPresenter
         $taxAmount = round($gross - $net, 2);
         $vatPercent = $this->formatPercent($price->vatRate);
 
-        $netFormatted = $this->formatMoney($net);
-        $grossFormatted = $this->formatMoney($gross);
-        $taxFormatted = $this->formatMoney($taxAmount);
+        $netFormatted = $this->formatMoney($net, $price->currency);
+        $grossFormatted = $this->formatMoney($gross, $price->currency);
+        $taxFormatted = $this->formatMoney($taxAmount, $price->currency);
 
         return match ($mode) {
             PriceDisplayMode::TaxInclusivePrimary => new PriceDisplayPresentation(
@@ -51,9 +55,9 @@ final class PriceDisplayPresenter
         };
     }
 
-    private function formatMoney(float $amount): string
+    private function formatMoney(float $amount, string $currency): string
     {
-        return number_format($amount, 2, ',', ' ').' ₴';
+        return $this->moneyFormatter->format($amount, $currency);
     }
 
     private function formatPercent(float $rate): string

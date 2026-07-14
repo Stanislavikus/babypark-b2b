@@ -4,6 +4,7 @@ namespace App\Services\Pricing\Inspection;
 
 use App\Enums\PriceDisplayContext;
 use App\Models\PriceList;
+use App\Services\Pricing\MoneyFormatter;
 use App\Services\Pricing\PriceDisplayModeResolver;
 use App\Services\Pricing\PriceDisplayPresenter;
 use App\Services\Pricing\Resolution\PriceResolutionReason;
@@ -21,6 +22,7 @@ final class PriceInspectorPresenter
     public function __construct(
         private readonly PriceResolutionTracePresenter $tracePresenter,
         private readonly PriceInspectorActionResolver $actionResolver,
+        private readonly MoneyFormatter $moneyFormatter,
     ) {}
 
     public function present(
@@ -207,10 +209,11 @@ final class PriceInspectorPresenter
     {
         $timezone = config('app.timezone', 'UTC');
         $currency = $step->currency ?? 'UAH';
-        $currencySymbol = $currency === 'UAH' ? '₴' : $currency;
 
         $amount = $step->amount !== null
-            ? number_format($step->amount, 2, ',', ' ').' '.$currencySymbol
+            ? __('price_display.without_tax_amount', [
+                'amount' => $this->moneyFormatter->format($step->amount, $currency),
+            ])
             : '—';
 
         return [

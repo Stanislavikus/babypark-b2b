@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Enums\PriceDisplayMode;
 use App\Enums\UserRole;
 use App\Models\PriceList;
 use App\Models\User;
@@ -10,10 +11,15 @@ use App\Services\Pricing\Inspection\PriceInspectorContext;
 use App\Services\Pricing\Inspection\PriceInspectorPresentation;
 use App\Services\Pricing\Inspection\PriceInspectorPresenter;
 use App\Services\Pricing\Inspection\PriceInspectorTone;
+use App\Services\Pricing\MoneyFormatter;
+use App\Services\Pricing\PriceDisplayPresenter;
 use App\Services\Pricing\PriceResolver;
 use App\Services\Pricing\Resolution\PriceResolutionStatus;
+use App\Services\Pricing\ResolvedPrice;
+use App\Support\Workspace\WorkspaceContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\DB;
 use Tests\Concerns\CreatesPricingFixtures;
 use Tests\TestCase;
@@ -348,6 +354,113 @@ class PriceInspectorPresenterTest extends TestCase
             $this->assertStringNotContainsString('item_missing', $step->explanation);
             $this->assertStringNotContainsString('quantity_below_minimum', $step->explanation);
         }
+    }
+
+    public function test_matched_step_always_shows_net_amount_for_all_display_modes(): void
+    {
+        App::setLocale('uk');
+
+        $workspace = $this->defaultWorkspace();
+        $customer = $this->createCustomer($workspace);
+        $variant = $this->createVariant($workspace);
+        $list = $this->createPriceList($workspace);
+        $customer->update(['default_price_list_id' => $list->id]);
+        $this->createPriceListItem($list, $variant, 90.0, vatRate: 20.0);
+
+        $result = $this->resolver->resolveWithTrace($variant, $customer, 1);
+        $netAmountLabel = __('price_display.without_tax_amount', [
+            'amount' => app(MoneyFormatter::class)->format(90.0, 'UAH'),
+        ]);
+        $expectedMatchedExplanation = __('price_inspector.explanation.customer_price_list.matched', [
+            'amount' => $netAmountLabel,
+        ]);
+
+        $expectedSummaries = [
+            PriceDisplayMode::TaxInclusivePrimary->value => __('price_display.with_tax', [
+                'amount' => app(MoneyFormatter::class)->format(108.0, 'UAH'),
+            ]),
+            PriceDisplayMode::TaxExclusivePrimary->value => __('price_display.without_tax', [
+                'amount' => app(MoneyFormatter::class)->format(90.0, 'UAH'),
+            ]),
+            PriceDisplayMode::BothEqual->value => __('price_display.both_compact', [
+                'net' => app(MoneyFormatter::class)->format(90.0, 'UAH'),
+                'gross' => app(MoneyFormatter::class)->format(108.0, 'UAH'),
+            ]),
+        ];
+
+        foreach (PriceDisplayMode::cases() as $mode) {
+            $workspace->update(['default_price_display_mode' => $mode]);
+            app(WorkspaceContext::class)->reset();
+
+            $presentation = $this->present($result, $customer, $variant, 1);
+            $matchedStep = collect($presentation->sourceSteps)
+                ->first(fn ($step) => $step->outcomeLabel === __('price_inspector.step_outcome.used'));
+
+            $this->assertNotNull($matchedStep, "Matched step missing for mode {$mode->value}");
+            $this->assertSame(
+                $expectedMatchedExplanation,
+                $matchedStep->explanation,
+                "Decision path should always show net for mode {$mode->value}",
+            );
+            $this->assertSame(
+                $expectedSummaries[$mode->value],
+                $presentation->priceSummary,
+                "Headline should follow display mode {$mode->value}",
+            );
+            $this->assertStringNotContainsString('20%', $matchedStep->explanation);
+            $this->assertStringNotContainsString('18,00', $matchedStep->explanation);
+        }
+    }
+
+    public function test_base_price_cache_matched_step_shows_net_amount(): void
+    {
+        App::setLocale('uk');
+
+        $customer = $this->createCustomer();
+        $variant = $this->createVariant(basePriceCache: 90.0);
+
+        $result = $this->resolver->resolveWithTrace($variant, $customer, 1);
+        $presentation = $this->present($result, $customer, $variant, 1);
+
+        $baseStep = collect($presentation->sourceSteps)
+            ->first(fn ($step) => $step->sourceLabel === __('price_inspector.source.base_price_cache')
+                && $step->outcomeLabel === __('price_inspector.step_outcome.used'));
+
+        $this->assertNotNull($baseStep);
+        $this->assertSame(
+            __('price_inspector.explanation.base_price_cache.matched', [
+                'amount' => __('price_display.without_tax_amount', [
+                    'amount' => app(MoneyFormatter::class)->format(90.0, 'UAH'),
+                ]),
+            ]),
+            $baseStep->explanation,
+        );
+    }
+
+    public function test_headline_gross_uses_resolved_price_rounding_not_raw_float_multiplication(): void
+    {
+        $price = ResolvedPrice::fromListItem(
+            regularNetPrice: 33.33,
+            salePrice: null,
+            vatRate: 20.0,
+            currency: 'UAH',
+            source: 'customer_price_list',
+            sourcePriceListId: 'list-id',
+            sourcePriceListItemId: 'item-id',
+        );
+
+        $rawFloatGross = 33.33 * 1.2;
+        $this->assertNotSame($rawFloatGross, $price->grossPrice);
+        $this->assertSame(40.0, $price->grossPrice);
+
+        $expectedGrossLabel = app(MoneyFormatter::class)->format($price->grossPrice, $price->currency);
+        $presentation = app(PriceDisplayPresenter::class)->present($price, PriceDisplayMode::TaxInclusivePrimary);
+
+        $this->assertSame(
+            __('price_display.with_tax', ['amount' => $expectedGrossLabel]),
+            $presentation->primaryLine,
+        );
+        $this->assertSame('40,00 ₴', $expectedGrossLabel);
     }
 
     /**

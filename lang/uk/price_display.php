@@ -10,4 +10,5 @@ return [
     'secondary_inclusive' => ':net без податку · Податок :percent: :tax',
     'secondary_exclusive' => ':gross з податком · Податок :percent: :tax',
     'both_compact' => ':net без податку · :gross з податком',
+    'without_tax_amount' => ':amount без податку',
 ];
