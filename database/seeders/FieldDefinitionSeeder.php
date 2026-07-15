@@ -194,9 +194,10 @@ class FieldDefinitionSeeder extends Seeder
             }
         }
 
-        if (! $this->valuesSemanticallyEqual($existing->visibility_settings, $expected['visibility_settings'])) {
-            $conflicts[] = 'visibility_settings mismatch';
-        }
+        // visibility_settings is intentionally excluded from conflict checks:
+        // it is administrator-editable state (see FieldDefinitionResource
+        // "Показувати в B2B" toggle), and existing bindings are never
+        // overwritten by this seeder — no risk of silent data loss.
 
         return $conflicts;
     }
