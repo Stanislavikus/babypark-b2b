@@ -1042,38 +1042,62 @@ MVP may implement a simpler access mode first.
 
 The model should not block future access modes or display modes.
 
-### B2B Catalogue Projection
+### B2B Catalogue Projection — Resolved
 
 
 A B2B catalogue is not a copied product table.
 
-It is a projection built from:
+It is a runtime projection built from shared workspace data. The projection never duplicates product identity — it composes eligibility, pricing, availability, and presentation over the same `Product` / `ProductVariant` models used elsewhere.
 
-- products;
+**Projection inputs and their code mapping (verified on `develop`, PR #58–66):**
 
-- variants;
+- **Products and variants** — `App\Models\Product`, `App\Models\ProductVariant`. Catalog eligibility requires `products.is_active = true` and at least one active variant. Enforced by `App\Support\Pricing\CustomerPricingScope::applyProductScope()`.
+- **Categories** — `App\Models\Category`. Used for navigation, filtering, and sort in `App\Services\Pricing\CustomerCatalogQuery`.
+- **Price list** — `App\Models\PriceList`. Assigned per customer via `Customer.default_price_list_id`; fallback to workspace default via `CustomerPricingScope::priceListIdFor()`.
+- **Pricing / tier rules** — `App\Models\PriceListItem` quantity tiers resolved by `App\Services\Pricing\PriceResolver`. VAT defaults from `App\Services\Pricing\WorkspaceTaxDefaults`. Resolver output is wrapped in `App\Services\Pricing\Resolution\PriceResolutionResult` with three statuses (`App\Services\Pricing\Resolution\PriceResolutionStatus`: Resolved, Unavailable, ConfigurationError).
+- **Availability** — net sellable stock via `App\Services\Availability\AvailabilityResolver::netAvailable()`. Stock badges use `ProductVariant::badgeFromQty()` with the category's `stock_display_threshold`.
+- **Visibility** — product list scope in `CustomerCatalogQuery` + `CustomerPricingScope::applyProductScope()`. **Decoupled from price availability** (PR #62): products without a resolvable price remain in the catalogue with `CatalogProductDisplayState::PriceUnavailable`, not hidden.
+- **Presentation** — per-row projection via `App\Support\CatalogRowData` → `App\Support\Pricing\CatalogRowProjection`, using `App\Enums\CatalogProductDisplayState` (five cases). Customer-facing price labels via `App\Enums\PriceDisplayMode`, `App\Services\Pricing\PriceDisplayModeResolver`, and `App\Services\Pricing\PriceDisplayPresenter`.
+- **Channel / storefront settings** — the `B2BChannel` entity described elsewhere in this document is **not implemented yet**. MVP cabinet (`App\Livewire\Cabinet\Catalog`) and Preview as Customer (`App\Filament\Resources\CustomerResource\Pages\PreviewAsCustomer`) use workspace-level defaults (`Workspace.default_vat_rate`, `Workspace.default_price_display_mode`) and page-level UI settings instead.
 
-- categories;
-
-- product selection rules;
-
-- customer group;
-
-- price list;
-
-- pricing rules;
-
-- availability;
-
-- visibility rules;
-
-- channel settings.
-
-The platform may use helper tables for performance.
+The platform may use helper tables or caches for performance.
 
 However, those tables must be treated as cache or configuration, not as a separate product model.
 
 The B2B channel must always use the shared product model, shared pricing model and shared availability model.
+
+**Implemented (verified via PR #58–66):**
+
+- Price resolution: `App\Services\Pricing\PriceResolver`, `App\Services\Pricing\Resolution\PriceResolutionResult` (Resolved / Unavailable / ConfigurationError).
+- Product/variant eligibility independent of price availability: `App\Support\Pricing\CustomerPricingScope::applyProductScope()`.
+- Workspace-level tax defaults: `App\Services\Pricing\WorkspaceTaxDefaults`.
+- Display mode (net/gross primary): `App\Enums\PriceDisplayMode`, `App\Services\Pricing\PriceDisplayPresenter`, `App\Services\Pricing\PriceDisplayModeResolver`.
+- Per-product display projection: `App\Support\CatalogRowData`, `App\Enums\CatalogProductDisplayState`.
+- Shared catalogue query for cabinet and admin preview: `App\Services\Pricing\CustomerCatalogQuery`.
+
+**Not yet implemented, deliberately open (does not block this decision):**
+
+- Customer group / segment-level product selection rules — GAP-010.
+- `PricingRule` overlays on top of resolved `PriceListItem` tiers — GAP-010.
+- `B2BChannel` entity and channel-specific visibility configuration — future; MVP uses workspace defaults and cabinet routes directly.
+
+This decision is closed and must not be reopened without a documentation-level decision.
+
+### Audience Resolution — Resolved
+
+
+"Audience resolution" means: given a specific `Customer`, what products appear in their catalogue and how each row is displayed. Today this is a fixed, code-enforced pipeline — not a configurable rules engine.
+
+1. **Product/variant eligibility** — `CustomerCatalogQuery::paginateFor()` starts from `CustomerPricingScope::applyProductScope()`: active products (`products.is_active = true`) with at least one active variant. Inactive products are excluded entirely (see `Tests\Unit\CustomerCatalogVisibilityTest::test_inactive_product_is_hidden`).
+2. **Optional catalogue filters** — search, category, brand, and sort from `App\Support\Pricing\CustomerCatalogCriteria` inside `CustomerCatalogQuery`. Sorting may reference price-list tiers via `App\Services\Pricing\PricingSqlExpressions` but does not hide products.
+3. **Per-product price resolution** — `CatalogRowData::forProduct()` calls `App\Services\Pricing\ProductPricingSummary::resolveVariantDisplay()` for each active variant, which delegates to `PriceResolver`. Three outcomes per variant: Resolved, Unavailable, ConfigurationError (via `PriceResolutionResult` / exceptions caught in `ProductPricingSummary`).
+4. **Display state selection** — resolved and unresolved variants map to one of five `CatalogProductDisplayState` values: `OrderableVariantSelected`, `ExpectedVariantSelected`, `InformationalPriceOnly`, `ConfigurationError`, `PriceUnavailable`. Selection priority: in-stock resolvable variant → expected-date resolvable variant → cheapest informational price → configuration error → price unavailable.
+5. **Availability overlay** — within projection, `AvailabilityResolver::netAvailable()` and stock `expected_date` / `expected_quantity` drive orderability (`orderable`, `maxQty`) and stock badges. Availability does not remove products from the catalogue list.
+6. **Price display formatting** — resolved prices are formatted through `PriceDisplayModeResolver` + `PriceDisplayPresenter` according to `Workspace.default_price_display_mode`.
+7. **Cabinet / Preview parity** — `App\Livewire\Cabinet\Catalog` and `App\Filament\Resources\CustomerResource\Pages\PreviewAsCustomer` share `CustomerCatalogQuery`, `CatalogRowData`, and the same display-state labels (see `Tests\Unit\CustomerCatalogVisibilityTest::test_cabinet_and_preview_parity_for_product_ids_and_projection`, PR #59).
+8. **No customer segmentation beyond direct price-list assignment** — there is no `CustomerGroup`, no per-segment product-selection rules, and no per-customer visibility matrix. A customer's price context comes only from `Customer.default_price_list_id` (with workspace-default fallback). Segment-level rules remain open — GAP-010.
+
+This decision is closed and must not be reopened without a documentation-level decision.
 
 ### Native B2B Storefront
 
