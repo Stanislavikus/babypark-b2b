@@ -8,6 +8,7 @@ use App\Filament\Resources\PriceListResource\RelationManagers;
 use App\Filament\Resources\PriceListResource\Support\GuardedDeletePriceListAction;
 use App\Filament\Resources\PriceListResource\Support\MakeDefaultPriceListAction;
 use App\Models\PriceList;
+use App\Support\Filament\RevalidatesOnUpdate;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -53,11 +54,13 @@ class PriceListResource extends Resource
                         ->integer()
                         ->default(0)
                         ->required(),
-                    Forms\Components\Select::make('status')
-                        ->label('Статус')
-                        ->options(PriceListStatus::options())
-                        ->default(PriceListStatus::Active->value)
-                        ->required(),
+                    RevalidatesOnUpdate::apply(
+                        Forms\Components\Select::make('status')
+                            ->label('Статус')
+                            ->options(PriceListStatus::options())
+                            ->default(PriceListStatus::Active->value)
+                            ->required(),
+                    ),
                 ])->columns(2),
             ]);
     }

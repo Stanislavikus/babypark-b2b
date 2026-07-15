@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\UserRole;
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
+use App\Support\Filament\RevalidatesOnUpdate;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -29,16 +30,20 @@ class UserResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\TextInput::make('name')
-                    ->label("Ім'я")
-                    ->required()
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('email')
-                    ->label('Email')
-                    ->email()
-                    ->required()
-                    ->maxLength(255)
-                    ->unique(ignoreRecord: true),
+                RevalidatesOnUpdate::apply(
+                    Forms\Components\TextInput::make('name')
+                        ->label("Ім'я")
+                        ->required()
+                        ->maxLength(255),
+                ),
+                RevalidatesOnUpdate::apply(
+                    Forms\Components\TextInput::make('email')
+                        ->label('Email')
+                        ->email()
+                        ->required()
+                        ->maxLength(255)
+                        ->unique(ignoreRecord: true),
+                ),
                 Forms\Components\TextInput::make('phone')
                     ->label('Телефон')
                     ->tel()
@@ -48,21 +53,25 @@ class UserResource extends Resource
                     ->label('У відпустці до')
                     ->nullable()
                     ->displayFormat('d.m.Y'),
-                Forms\Components\Select::make('role')
-                    ->label('Роль')
-                    ->options(UserRole::options())
-                    ->required(),
+                RevalidatesOnUpdate::apply(
+                    Forms\Components\Select::make('role')
+                        ->label('Роль')
+                        ->options(UserRole::options())
+                        ->required(),
+                ),
                 Forms\Components\Select::make('customer_id')
                     ->label('Клієнт')
                     ->relationship('customer', 'name')
                     ->searchable()
                     ->nullable(),
-                Forms\Components\TextInput::make('password')
-                    ->label('Пароль')
-                    ->password()
-                    ->dehydrated(fn (?string $state): bool => filled($state))
-                    ->required(fn (string $operation): bool => $operation === 'create')
-                    ->maxLength(255),
+                RevalidatesOnUpdate::apply(
+                    Forms\Components\TextInput::make('password')
+                        ->label('Пароль')
+                        ->password()
+                        ->dehydrated(fn (?string $state): bool => filled($state))
+                        ->required(fn (string $operation): bool => $operation === 'create')
+                        ->maxLength(255),
+                ),
                 Forms\Components\Toggle::make('is_active')
                     ->label('Активний')
                     ->default(true),
