@@ -5,6 +5,7 @@ namespace App\Filament\Resources\PriceListResource\RelationManagers;
 use App\Enums\PriceListItemStatus;
 use App\Models\ProductVariant;
 use App\Services\Pricing\WorkspaceTaxDefaults;
+use App\Support\Filament\RevalidatesOnUpdate;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -28,33 +29,35 @@ class ItemsRelationManager extends RelationManager
 
         return $form
             ->schema([
-                Forms\Components\Select::make('product_variant_id')
-                    ->label('Товар / варіант')
-                    ->required()
-                    ->searchable()
-                    ->preload()
-                    ->relationship(
-                        name: 'productVariant',
-                        titleAttribute: 'sku',
-                        modifyQueryUsing: fn (Builder $query) => $query
-                            ->where('workspace_id', $this->getOwnerRecord()->workspace_id)
-                            ->with('product'),
-                    )
-                    ->getOptionLabelFromRecordUsing(
-                        fn (ProductVariant $record): string => $record->product?->name.' — '.$record->sku
-                    )
-                    ->unique(
-                        ignoreRecord: true,
-                        modifyRuleUsing: function (Unique $rule, Get $get): Unique {
-                            return $rule
+                RevalidatesOnUpdate::apply(
+                    Forms\Components\Select::make('product_variant_id')
+                        ->label('Товар / варіант')
+                        ->required()
+                        ->searchable()
+                        ->preload()
+                        ->relationship(
+                            name: 'productVariant',
+                            titleAttribute: 'sku',
+                            modifyQueryUsing: fn (Builder $query) => $query
                                 ->where('workspace_id', $this->getOwnerRecord()->workspace_id)
-                                ->where('price_list_id', $this->getOwnerRecord()->id)
-                                ->where('quantity_min', (int) $get('quantity_min'));
-                        },
-                    )
-                    ->validationMessages([
-                        'unique' => 'Позиція з таким товаром і мінімальною кількістю вже існує в цьому списку.',
-                    ]),
+                                ->with('product'),
+                        )
+                        ->getOptionLabelFromRecordUsing(
+                            fn (ProductVariant $record): string => $record->product?->name.' — '.$record->sku
+                        )
+                        ->unique(
+                            ignoreRecord: true,
+                            modifyRuleUsing: function (Unique $rule, Get $get): Unique {
+                                return $rule
+                                    ->where('workspace_id', $this->getOwnerRecord()->workspace_id)
+                                    ->where('price_list_id', $this->getOwnerRecord()->id)
+                                    ->where('quantity_min', (int) $get('quantity_min'));
+                            },
+                        )
+                        ->validationMessages([
+                            'unique' => 'Позиція з таким товаром і мінімальною кількістю вже існує в цьому списку.',
+                        ]),
+                ),
                 Forms\Components\TextInput::make('quantity_min')
                     ->label('Кількість від')
                     ->numeric()

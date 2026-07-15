@@ -126,7 +126,8 @@ return [
     'prohibited_unless' => 'Поле :attribute заборонено, якщо тільки :other не знаходиться в :values.',
     'prohibits' => 'Поле :attribute забороняє присутність :other.',
     'regex' => 'Поле :attribute має хибний формат.',
-    'required' => 'Поле :attribute є обов\'язковим для заповнення.',
+    // Contract: required errors are always shown inline next to the field (or with the field key in API responses), never as a detached summary without field identity.
+    'required' => 'Заповніть це поле.',
     'required_array_keys' => 'Поле :attribute має містити записи для: :values.',
     'required_if' => 'Поле :attribute є обов\'язковим для заповнення, коли :other є рівним :value.',
     'required_if_accepted' => 'Поле :attribute є обов\'язковим, якщо прийнято :other.',

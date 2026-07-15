@@ -12,6 +12,7 @@ use App\Services\Pricing\Inspection\PriceInspectorPresentation;
 use App\Services\Pricing\Inspection\PriceInspectorPresenter;
 use App\Services\Pricing\PriceResolver;
 use App\Services\Pricing\Resolution\PriceResolutionTracePresenter;
+use App\Support\Filament\RevalidatesOnUpdate;
 use App\Support\Workspace\WorkspaceContext;
 use Carbon\CarbonImmutable;
 use Filament\Forms\Components\DateTimePicker;
@@ -112,15 +113,17 @@ class PriceInspector extends Page implements HasForms
         return $form
             ->schema([
                 Section::make(__('price_inspector.form.parameters'))->schema([
-                    Select::make('customer_id')
-                        ->label(__('price_inspector.form.customer'))
-                        ->required()
-                        ->searchable()
-                        ->options(fn (): array => Customer::query()
-                            ->where('workspace_id', $workspaceId)
-                            ->orderBy('name')
-                            ->pluck('name', 'id')
-                            ->all()),
+                    RevalidatesOnUpdate::apply(
+                        Select::make('customer_id')
+                            ->label(__('price_inspector.form.customer'))
+                            ->required()
+                            ->searchable()
+                            ->options(fn (): array => Customer::query()
+                                ->where('workspace_id', $workspaceId)
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
+                                ->all()),
+                    ),
                     Select::make('product_id')
                         ->label(__('price_inspector.form.product_filter'))
                         ->searchable()
@@ -130,33 +133,37 @@ class PriceInspector extends Page implements HasForms
                             ->orderBy('name')
                             ->pluck('name', 'id')
                             ->all()),
-                    Select::make('variant_id')
-                        ->label(__('price_inspector.form.variant'))
-                        ->required()
-                        ->searchable()
-                        ->options(function (Get $get) use ($workspaceId): array {
-                            $query = ProductVariant::query()
-                                ->where('workspace_id', $workspaceId)
-                                ->with('product')
-                                ->orderBy('sku');
+                    RevalidatesOnUpdate::apply(
+                        Select::make('variant_id')
+                            ->label(__('price_inspector.form.variant'))
+                            ->required()
+                            ->searchable()
+                            ->options(function (Get $get) use ($workspaceId): array {
+                                $query = ProductVariant::query()
+                                    ->where('workspace_id', $workspaceId)
+                                    ->with('product')
+                                    ->orderBy('sku');
 
-                            if ($productId = $get('product_id')) {
-                                $query->where('product_id', $productId);
-                            }
+                                if ($productId = $get('product_id')) {
+                                    $query->where('product_id', $productId);
+                                }
 
-                            return $query->get()
-                                ->mapWithKeys(fn (ProductVariant $variant) => [
-                                    $variant->id => $variant->sku.' — '.$variant->product->name,
-                                ])
-                                ->all();
-                        }),
-                    TextInput::make('quantity')
-                        ->label(__('price_inspector.form.quantity'))
-                        ->numeric()
-                        ->integer()
-                        ->minValue(1)
-                        ->required()
-                        ->default(1),
+                                return $query->get()
+                                    ->mapWithKeys(fn (ProductVariant $variant) => [
+                                        $variant->id => $variant->sku.' — '.$variant->product->name,
+                                    ])
+                                    ->all();
+                            }),
+                    ),
+                    RevalidatesOnUpdate::apply(
+                        TextInput::make('quantity')
+                            ->label(__('price_inspector.form.quantity'))
+                            ->numeric()
+                            ->integer()
+                            ->minValue(1)
+                            ->required()
+                            ->default(1),
+                    ),
                     DateTimePicker::make('effective_at')
                         ->label(__('price_inspector.form.effective_at'))
                         ->seconds(true)

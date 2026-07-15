@@ -1,5 +1,5 @@
 <x-filament-panels::page>
-    <form wire:submit="save">
+    <form wire:submit="save" novalidate>
         {{ $this->form }}
 
         <div class="mt-4">

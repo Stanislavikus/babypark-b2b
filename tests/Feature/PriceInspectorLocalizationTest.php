@@ -188,9 +188,9 @@ class PriceInspectorLocalizationTest extends TestCase
     public static function validationLocaleProvider(): array
     {
         return [
-            'uk' => ['uk', 'обов\'язковим'],
-            'ru' => ['ru', 'обязательно'],
-            'en' => ['en', 'required'],
+            'uk' => ['uk', 'Заповніть це поле.'],
+            'ru' => ['ru', 'Заполните это поле.'],
+            'en' => ['en', 'Please fill in this field.'],
         ];
     }
 

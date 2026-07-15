@@ -1192,6 +1192,14 @@ Is the architecture built to ensure raw credit card details or sensitive merchan
 
 Does the technical implementation completely hide software architecture jargon (such as EAV, tenant, core resolvers, state matrix, RLS, webhook secrets, or TTL reservation) away from user-facing screens, keeping the UI strictly limited to everyday business terminology?
 
+## Filament form validation standard
+
+Every Filament panel form must render with `novalidate` on the `<form>` element so browser-native constraint validation never overrides application locale and inline field errors.
+
+After a failed submit, a required-field error for a specific input must disappear once the user supplies a valid value — without resubmitting the whole form. Choose the mechanism per field (`live()` plus `validateOnly()` in `afterStateUpdated`, or an equivalent verified approach); do not apply `live()` blindly to every required `Select`.
+
+The global Laravel `validation.required` message is short and field-name-free (`Заповніть це поле.` / `Заполните это поле.` / `Please fill in this field.`). This is intentional: required errors are always shown inline next to the field or returned together with the field key (for example in API responses), never as a detached summary without field identity.
+
 # Final Principle
 
 The platform must be powerful without feeling complicated.

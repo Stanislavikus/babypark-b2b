@@ -188,6 +188,16 @@ If any of these areas are touched, the task must move to the Strict Alignment Pa
 
 ---
 
+## Filament form validation standard
+
+When changing Filament admin forms or their validation behavior:
+
+- every panel form must keep `novalidate` on the form element;
+- required-field errors must clear after the user fixes the value without a full resubmit — pick `live()` / `validateOnly()` / another verified mechanism per field, not mass `live()` on every required `Select`;
+- keep the short global `validation.required` messages (no field name in the string) because required errors are always inline or keyed by field, never shown as a detached list.
+
+---
+
 ## Strict Alignment Pathway
 
 The AI must use the Strict Alignment Pathway for any task involving:
