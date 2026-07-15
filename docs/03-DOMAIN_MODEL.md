@@ -2559,7 +2559,10 @@ This decision is closed and must not be reopened without a documentation-level d
 **Resolved.**
 
 `PriceListItem.price` is a net/base price, VAT-exclusive. `PriceListItem.vat_rate` (Decimal,
-nullable — null means "use `config('pricing.default_vat_rate')`") is added to the documented
+nullable — null means "use `Workspace.default_vat_rate`"; `config('pricing.default_vat_rate')`
+is used only to seed a new workspace's initial value via `Workspace::creating()`, never as a
+runtime fallback for resolving an individual price — see `App\Services\Pricing\WorkspaceTaxDefaults`,
+closed via PR #63) is added to the documented
 schema. Gross/VAT-inclusive price is always a computed display value
 (`price * (1 + vat_rate/100)`), never a stored column. `PriceResolver`'s output (`ResolvedPrice`)
 includes `regular_net_price`, `sale_price` (nullable), `effective_net_price`, `vat_rate`,
