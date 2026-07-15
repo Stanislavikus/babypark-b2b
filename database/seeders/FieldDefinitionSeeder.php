@@ -178,10 +178,6 @@ class FieldDefinitionSeeder extends Seeder
             'storage_type',
             'storage_path',
             'field_group',
-            'is_required',
-            'is_filterable',
-            'is_sortable',
-            'sort_order',
             'status',
         ] as $field) {
             $actual = $existing->{$field};
@@ -198,6 +194,12 @@ class FieldDefinitionSeeder extends Seeder
         // it is administrator-editable state (see FieldDefinitionResource
         // "Показувати в B2B" toggle), and existing bindings are never
         // overwritten by this seeder — no risk of silent data loss.
+
+        // is_required, is_filterable, is_sortable, sort_order are intentionally
+        // excluded from conflict checks: all four are administrator-editable
+        // via FieldDefinitionResource's binding form and are genuinely persisted
+        // (see EditFieldDefinition::handleRecordUpdate()) — existing bindings
+        // are never overwritten by this seeder, so no risk of silent data loss.
 
         return $conflicts;
     }
