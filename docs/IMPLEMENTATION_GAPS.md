@@ -547,6 +547,65 @@ deferred to future Media entities (unchanged). `backorder_policy` registration d
 for `technical_characteristics` and `instructions` remains the future responsibility of
 `B2BPublicationChecker` (not yet built).
 
+Foundation Seed Sync v5 (Branch A) added eight Platform Library fields via
+`FieldDefinitionSeeder`: `condition`, `short_description`, `material`,
+`country_of_origin`, `manufacturer`, `model`, `compatibility`, `battery_type`
+(each with a matching `FieldBinding`). See `FieldDefinitionSeederFoundationSeedV5Test`.
+
+---
+
+## GAP-020 — Canonical registry fields blocked by missing verified select options
+
+**Approved docs:**
+- Canonical Product Field Registry (CSV v7): `age_group` and `gender` are
+  registered Platform Library select fields in the registry.
+
+**Current code:**
+- Neither `age_group` nor `gender` is seeded in `FieldDefinitionSeeder`.
+- The registry CSV contains zero verified option rows for either field — seeding
+  them as empty select definitions would violate the established convention that
+  select-type fields ship with stable option codes in `validation_rules.options`.
+
+**Impact:**
+- These two fields cannot be activated via seed until verified option lists are
+  published in the canonical registry.
+
+**Decision:**
+- Do not invent placeholder option codes. Block seeding until the registry
+  documents verified options for each field.
+
+**Next task:** Update the canonical registry CSV with verified options, then
+  include both fields in the next Foundation Seed Sync batch.
+
+**Status:** Open, blocking dependency for `age_group` / `gender` seed activation.
+
+---
+
+## GAP-021 — Workspace import alias infrastructure incomplete
+
+**Approved docs:**
+- `03-DOMAIN_MODEL.md`, Field Foundation: `workspace_import_aliases` maps
+  external import column names to `field_binding_id` per workspace.
+
+**Current code:**
+- `workspace_import_aliases` table and `WorkspaceImportAlias` model exist
+  (with `field_binding_id` FK to `field_bindings`).
+- No Filament admin UI, seeder, service, or connector integration reads or
+  writes alias rows yet. Model relationships exist on `FieldDefinition` and
+  `FieldBinding` only.
+
+**Impact:**
+- Import/connector field mapping cannot use workspace-specific aliases until
+  CRUD and resolution logic are built (tracked under GAP-006).
+
+**Decision:**
+- Do not hardcode import column aliases in connector code. Wait for alias
+  management UI and resolution service alongside Connector Foundation.
+
+**Next task:** Connector Foundation (GAP-006) — alias CRUD and resolution layer.
+
+**Status:** Open, schema-only foundation present.
+
 ---
 
 ## GAP-018 — Multi-jurisdiction Tax Engine
