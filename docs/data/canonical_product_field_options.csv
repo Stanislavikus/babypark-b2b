@@ -1,0 +1,9 @@
+option_id,internal_code,option_code,en_label,uk_label,ru_label,sort_order,option_scope,applicability_id,option_source_strategy,value_domain_ref,verification_status,status,evidence_subject_key
+o001,condition,new,New,Новий,Новый,10,universal,a006,external_standard,google_merchant:condition,verified,active,option:o001
+o002,condition,used,Used,Вживаний,Б/у,20,universal,a006,external_standard,google_merchant:condition,verified,active,option:o002
+o003,condition,refurbished,Refurbished,Відновлений,Восстановленный,30,universal,a006,external_standard,google_merchant:condition,verified,active,option:o003
+o004,backorder_policy,deny,Deny,Не дозволяти,Не разрешать,10,platform_library,a015,static_registry,database/seeders/FieldDefinitionSeeder.php,verified,active,option:o004
+o005,backorder_policy,continue,Continue,Дозволяти,Разрешать,20,platform_library,a015,static_registry,database/seeders/FieldDefinitionSeeder.php,verified,active,option:o005
+o006,color,blue,Blue,Синій,Синий,10,platform_library,a013,static_registry,database/seeders/FieldDefinitionSeeder.php,verified,active,option:o006
+o007,color,pink,Pink,Рожевий,Розовый,20,platform_library,a013,static_registry,database/seeders/FieldDefinitionSeeder.php,verified,active,option:o007
+o008,size,m,M,M,M,10,platform_library,a014,static_registry,database/seeders/FieldDefinitionSeeder.php,verified,active,option:o008

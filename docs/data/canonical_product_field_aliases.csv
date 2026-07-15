@@ -1,0 +1,34 @@
+internal_code,alias,normalized_alias,locale,alias_type,scope,verification_status,evidence_subject_key
+product_name,Назва,назва,uk,import_header,global,verified,alias:product_name:uk:назва:import_header:global
+product_name,Название,название,ru,import_header,global,verified,alias:product_name:ru:название:import_header:global
+product_name,Name,name,en,import_header,global,verified,alias:product_name:en:name:import_header:global
+product_name,Title,title,en,import_header,global,verified,alias:product_name:en:title:import_header:global
+product_name,Наименование,наименование,ru,import_header,global,verified,alias:product_name:ru:наименование:import_header:global
+sku,Артикул,артикул,uk,import_header,global,verified,alias:sku:uk:артикул:import_header:global
+sku,Код,код,uk,import_header,global,verified,alias:sku:uk:код:import_header:global
+sku,SKU,sku,en,import_header,global,verified,alias:sku:en:sku:import_header:global
+sku,Code,code,en,import_header,global,verified,alias:sku:en:code:import_header:global
+sku,Item Code,item code,en,import_header,global,verified,alias:sku:en:item code:import_header:global
+gtin,EAN,ean,en,import_header,global,verified,alias:gtin:en:ean:import_header:global
+gtin,GTIN,gtin,en,import_header,global,verified,alias:gtin:en:gtin:import_header:global
+gtin,Barcode,barcode,en,import_header,global,verified,alias:gtin:en:barcode:import_header:global
+gtin,Штрихкод,штрихкод,uk,import_header,global,verified,alias:gtin:uk:штрихкод:import_header:global
+price,Цена,цена,ru,import_header,global,verified,alias:price:ru:цена:import_header:global
+price,Ціна,ціна,uk,import_header,global,verified,alias:price:uk:ціна:import_header:global
+price,Price,price,en,import_header,global,verified,alias:price:en:price:import_header:global
+price,РРЦ,ррц,ru,common_business_term,global,verified,alias:price:ru:ррц:common_business_term:global
+availability,Остаток,остаток,ru,import_header,global,verified,alias:availability:ru:остаток:import_header:global
+availability,Залишок,залишок,uk,import_header,global,verified,alias:availability:uk:залишок:import_header:global
+availability,Stock,stock,en,import_header,global,verified,alias:availability:en:stock:import_header:global
+availability,Availability,availability,en,import_header,global,verified,alias:availability:en:availability:import_header:global
+brand,Бренд,бренд,uk,localized_synonym,global,verified,alias:brand:uk:бренд:localized_synonym:global
+brand,Brand,brand,en,localized_synonym,global,verified,alias:brand:en:brand:localized_synonym:global
+color,Колір,колір,uk,localized_synonym,global,verified,alias:color:uk:колір:localized_synonym:global
+color,Цвет,цвет,ru,localized_synonym,global,verified,alias:color:ru:цвет:localized_synonym:global
+color,Color,color,en,localized_synonym,global,verified,alias:color:en:color:localized_synonym:global
+color,Колор,колор,uk,import_header,global,verified,alias:color:uk:колор:import_header:global
+mpn,MPN,mpn,en,import_header,global,verified,alias:mpn:en:mpn:import_header:global
+mpn,Артикул виробника,артикул виробника,uk,import_header,global,verified,alias:mpn:uk:артикул виробника:import_header:global
+description,Опис,опис,uk,import_header,global,verified,alias:description:uk:опис:import_header:global
+description,Описание,описание,ru,import_header,global,verified,alias:description:ru:описание:import_header:global
+gtin,gtin,gtin,en,legacy_code,global,partially_verified,alias:gtin:en:gtin:legacy_code:global
