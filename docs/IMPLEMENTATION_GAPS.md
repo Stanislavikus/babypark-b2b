@@ -742,3 +742,15 @@ unblocked as the next sequenced task.
 - **Lesson:** MySQL migration tests must cover **data** that actually exists on
   production — including "rare" lookup tables like `sync_logs` — not only the
   primary entities under test.
+
+---
+
+## Pending Minor Documentation Fixes
+
+Small, low-effort textual corrections identified during review but not
+yet applied — too small to be a GAP, too easy to forget if only
+mentioned in conversation. Each entry: what's stale, where, found in
+which PR review. Remove the entry once applied (do not leave stale
+entries after fixing).
+
+(none currently — see git history for resolved entries)
