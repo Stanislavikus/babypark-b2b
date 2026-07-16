@@ -28,3 +28,9 @@ has_energy_consumption_details,schema_org,hasEnergyConsumptionDetails,direct,not
 rozetka_category_id,rozetka,category_id,connector_only,external_taxonomy_ref,a019,undecided,undecided,partially_verified,mapping:rozetka:rozetka_category_id:category_id:a019:undecided
 age_group,google_merchant,age_group,direct,not_applicable,a029,conditionally_required,unversioned,verified,mapping:google_merchant:age_group:age_group:a029:unversioned
 gender,google_merchant,gender,direct,not_applicable,a030,conditionally_required,unversioned,verified,mapping:google_merchant:gender:gender:a030:unversioned
+sku,adobe_commerce,sku,direct,not_applicable,a031,required,2.4.9-admin-rest,verified,mapping:adobe_commerce:sku:sku:a031:2.4.9-admin-rest
+name,adobe_commerce,name,direct,not_applicable,a032,undecided,2.4.9-admin-rest,verified,mapping:adobe_commerce:name:name:a032:2.4.9-admin-rest
+description,adobe_commerce,custom_attributes[attribute_code=description].value,transformed,pack_scalar_as_custom_attribute_entry,a033,undecided,2.4.9-admin-rest,verified,mapping:adobe_commerce:description:custom_attributes[attribute_code=description].value:a033:2.4.9-admin-rest
+short_description,adobe_commerce,custom_attributes[attribute_code=short_description].value,transformed,pack_scalar_as_custom_attribute_entry,a034,undecided,2.4.9-admin-rest,verified,mapping:adobe_commerce:short_description:custom_attributes[attribute_code=short_description].value:a034:2.4.9-admin-rest
+category,adobe_commerce,extension_attributes.category_links[].category_id,transformed,category_relation_to_adobe_category_ids,a035,undecided,2.4.9-admin-rest,verified,mapping:adobe_commerce:category:extension_attributes.category_links[].category_id:a035:2.4.9-admin-rest
+status,adobe_commerce,status,transformed,is_active_boolean_to_adobe_enabled_disabled,a036,undecided,2.4.9-admin-rest,verified,mapping:adobe_commerce:status:status:a036:2.4.9-admin-rest

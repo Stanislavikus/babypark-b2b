@@ -462,6 +462,87 @@ The old codes `weight_netto` and `weight_brutto` remain only as verified
 
 - `evidence_subject_key: decision:DEC-009`
 
+### DEC-010 — Adobe Commerce public-core mapping surface
+
+Adobe Commerce exposes two distinct, non-interchangeable surfaces: the CSV
+product import/export reference and the Admin REST API `ProductInterface`.
+This decision maps against the **Admin REST API 2.4.9**
+(`channel_schema_version: 2.4.9-admin-rest`); the CSV reference is evidence
+only, not the mapping target, since its column list describes a typical
+export from a sample-data installation rather than a formal API contract.
+
+The official Adobe Commerce Admin REST API reference
+(`https://adobe-commerce.redoc.ly/2.4.9-admin/tag/products/`, version-pinned
+2.4.9-admin) confirms `sku`, `name`, `price`, `status` as top-level
+properties of the `products` resource, and confirms `custom_attributes` as
+an array of `{"attribute_code": "...", "value": "..."}` objects and
+`extension_attributes.category_links` as an array of
+`{"category_id": ..., "position": ...}` entries. `description` and
+`short_description` are stable Adobe attribute codes delivered through
+`custom_attributes`; category relations are delivered through
+`extension_attributes.category_links`.
+
+SKU's required status is directly confirmed in
+`Magento\Catalog\Model\ProductRepository::save()` (verified against the
+real file at tag 2.4.9):
+```php
+if (!$product->getSku()) {
+    throw new CouldNotSaveException(
+        __("The \"%1\" attribute value is empty. Set the attribute and try again.", "sku")
+    );
+}
+```
+
+These Registry rows record Adobe field paths and transformations only.
+Store-view and website selection remain ConnectorAccount runtime concerns
+and are not defined by this documentation-only PR.
+
+The official Adobe configurable-product tutorial represents `color` as a
+`custom_attributes` entry and explicitly requires replacing the example
+numeric option values with values from the target environment. Therefore
+Adobe color option IDs are installation-specific and no global color option
+mapping is created in this PR.
+
+No verified public-core mapping is recorded for `size` or `pattern` in this
+pass.
+
+Whether `manufacturer` ships as a guaranteed system (non-deletable)
+attribute across all Adobe Commerce 2.4.9 installations, and whether it
+would be semantically equivalent to canonical `brand`, are **not
+established** by this research pass. No mapping is created for `manufacturer`
+regardless of that open question.
+
+`price` is explicitly deferred. Per DEC-003, canonical price must be
+resolved through the Pricing Domain rather than copied from a Product
+record. A follow-up task must define Adobe product-type, website and
+price-context policy before an Adobe price mapping is recorded.
+
+`status` is mapped as `transformed`: canonical `status` is currently a
+boolean `is_active` contract (see 02-ATTRIBUTE_DICTIONARY.md), not yet the
+three-state product lifecycle described as a future direction in the same
+document. The transformation is deterministic:
+`is_active = true → status = 1` (enabled), `is_active = false → status = 2`
+(disabled), per the Adobe CSV reference's documented values (used here only
+to confirm the meaning of 1/2, not as the mapping surface).
+
+`category` is mapped as `transformed`: local category identity must be
+resolved against connector-account-specific Adobe category IDs — this is
+identity resolution, not renaming.
+
+`meta_title` and `meta_description` are deferred pending a unified SEO
+ownership, localization and Adobe store-view policy. No mappings are created
+for them in this public-core pass.
+
+`gtin`, `mpn`, `condition`, `material`, `net_weight`, `url` remain deferred
+for the same reasons recorded in the original Task 3 scope discussion
+(no confirmed stable representation, or unresolved ownership/unit
+questions — see GAP-023 for `net_weight`).
+
+Adobe Commerce category IDs referenced by `category` mappings are
+connector-account-specific external references, not global Registry data.
+
+- `evidence_subject_key: decision:DEC-010`
+
 ### DEC-002 — identifier_exists connector-only
 
 - **candidate concepts:** FieldDefinition boolean, connector transformation flag, inferred-from-empty-fields

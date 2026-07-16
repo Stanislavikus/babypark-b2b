@@ -6,3 +6,4 @@ c004,sku,core,unique_value,workspace_scope,not_applicable,a016,verified,constrai
 c005,net_weight,core,negative_allowed,false,not_applicable,a021,verified,constraint:c005
 c006,min_order_quantity,core,min_value,1,not_applicable,a022,verified,constraint:c006
 c007,mpn,channel,max_length,70,characters,a025,verified,constraint:c007
+c008,sku,channel,max_length,64,characters,a031,verified,constraint:c008
