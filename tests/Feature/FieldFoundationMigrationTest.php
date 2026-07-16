@@ -327,7 +327,7 @@ class FieldFoundationMigrationTest extends TestCase
 
     private function migrateThroughPreFieldFoundation(): void
     {
-        Artisan::call('migrate:fresh', ['--seed' => true]);
+        Artisan::call('migrate:fresh');
 
         $migration = require database_path('migrations/2026_07_12_150000_field_foundation.php');
         $migration->down();

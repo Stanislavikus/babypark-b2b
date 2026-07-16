@@ -144,9 +144,9 @@ class ProductResource extends Resource
                 ]);
         }
 
-        if (in_array('product_url', $visible, true)) {
+        if (in_array('url', $visible, true)) {
             $schema[] = Infolists\Components\Section::make('Сайт')->schema([
-                Infolists\Components\TextEntry::make('product_url')
+                Infolists\Components\TextEntry::make('url')
                     ->label('URL товару на сайті')
                     ->placeholder('—')
                     ->url(fn (?string $state) => $state)
@@ -363,7 +363,7 @@ class ProductResource extends Resource
         }
 
         if (in_array('url', $visible, true)) {
-            $columns[] = Tables\Columns\TextColumn::make('product_url')
+            $columns[] = Tables\Columns\TextColumn::make('url')
                 ->label('URL на сайті')
                 ->formatStateUsing(fn (?string $state): HtmlString|string => ProductTableLink::externalUrlHtml($state))
                 ->tooltip(fn (?string $state) => $state)

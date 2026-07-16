@@ -56,13 +56,13 @@ class CanonicalRegistryValidatorTest extends TestCase
     public function duplicated_unique_field_key_fails(): void
     {
         $this->writeValidFixture(extraFieldRows: [
-            $this->fieldRow('product_name', overrides: ['canonical_english_name' => 'Duplicate']),
+            $this->fieldRow('name', overrides: ['canonical_english_name' => 'Duplicate']),
         ]);
 
         $result = $this->validateFixture();
 
         $this->assertTrue(
-            collect($result['errors'])->contains(fn (string $e) => str_contains($e, "duplicate internal_code 'product_name'")),
+            collect($result['errors'])->contains(fn (string $e) => str_contains($e, "duplicate internal_code 'name'")),
         );
     }
 
@@ -102,7 +102,7 @@ class CanonicalRegistryValidatorTest extends TestCase
         $this->writeValidFixture(extraApplicabilityRows: [
             $this->applicabilityRow('a099', 'brand'),
         ], extraMappingRows: [
-            $this->mappingRow('product_name', 'google_merchant', 'title', 'a099'),
+            $this->mappingRow('name', 'google_merchant', 'title', 'a099'),
         ]);
 
         $result = $this->validateFixture();
@@ -227,8 +227,8 @@ class CanonicalRegistryValidatorTest extends TestCase
     public function multiple_source_rows_for_same_evidence_subject_key_are_allowed(): void
     {
         $this->writeValidFixture(extraSourceRows: [
-            $this->sourceRow('s904', 'field', 'field:product_name'),
-            $this->sourceRow('s905', 'field', 'field:product_name'),
+            $this->sourceRow('s904', 'field', 'field:name'),
+            $this->sourceRow('s905', 'field', 'field:name'),
         ]);
 
         $result = $this->validateFixture();
@@ -260,7 +260,7 @@ class CanonicalRegistryValidatorTest extends TestCase
         array $fieldOverrides = [],
         ?string $registryMarkdown = null,
     ): void {
-        $field = array_merge($this->fieldRow('product_name'), $fieldOverrides);
+        $field = array_merge($this->fieldRow('name'), $fieldOverrides);
         $fields = array_merge([
             $field,
             $this->fieldRow('condition', ['mvp_tier' => 'not_applicable', 'default_enabled' => 'not_applicable']),
@@ -273,19 +273,19 @@ class CanonicalRegistryValidatorTest extends TestCase
         ], $extraFieldRows);
 
         $applicability = [
-            $this->applicabilityRow('a002', 'product_name'),
-            $this->applicabilityRow('a003', 'product_name'),
+            $this->applicabilityRow('a002', 'name'),
+            $this->applicabilityRow('a003', 'name'),
             $this->applicabilityRow('a006', 'condition'),
         ];
         $applicability = array_merge($applicability, $extraApplicabilityRows);
 
         $mappings = [
-            $this->mappingRow('product_name', 'google_merchant', 'title', 'a002'),
+            $this->mappingRow('name', 'google_merchant', 'title', 'a002'),
         ];
         $mappings = array_merge($mappings, $extraMappingRows);
 
         $aliases = array_merge([
-            $this->aliasRow('product_name', 'Name', 'name', 'en', 'import_header', 'global', 'alias:product_name:en:name:import_header:global'),
+            $this->aliasRow('name', 'Name', 'name', 'en', 'import_header', 'global', 'alias:name:en:name:import_header:global'),
         ], $extraAliasRows);
 
         $options = [
@@ -297,13 +297,13 @@ class CanonicalRegistryValidatorTest extends TestCase
         ], $extraOptionMappingRows);
 
         $constraints = [
-            $this->constraintRow('c001', 'product_name', 'a003'),
+            $this->constraintRow('c001', 'name', 'a003'),
         ];
 
         $defaultSources = [
-            $this->sourceRow('s001', 'field', 'field:product_name'),
-            $this->sourceRow('s002', 'mapping', 'mapping:google_merchant:product_name:title:a002:unversioned'),
-            $this->sourceRow('s003', 'alias', 'alias:product_name:en:name:import_header:global'),
+            $this->sourceRow('s001', 'field', 'field:name'),
+            $this->sourceRow('s002', 'mapping', 'mapping:google_merchant:name:title:a002:unversioned'),
+            $this->sourceRow('s003', 'alias', 'alias:name:en:name:import_header:global'),
             $this->sourceRow('s004', 'option', 'option:o001'),
             $this->sourceRow('s005', 'option_mapping', 'option_mapping:om001'),
             $this->sourceRow('s006', 'constraint', 'constraint:c001'),

@@ -33,8 +33,8 @@ class Product extends Model
         'units_per_box',
         'boxes_per_pallet',
         'lead_time_days',
-        'weight_netto',
-        'weight_brutto',
+        'net_weight',
+        'gross_weight',
         'volume_m3',
         'depth_mm',
         'width_mm',
@@ -44,7 +44,7 @@ class Product extends Model
         'rozetka_category_id',
         'meta_title',
         'meta_description',
-        'product_url',
+        'url',
         'is_active',
         'synced_at',
     ];
@@ -57,8 +57,8 @@ class Product extends Model
             'synced_at' => 'datetime',
             'min_order_quantity' => 'integer',
             'order_step' => 'integer',
-            'weight_netto' => 'decimal:3',
-            'weight_brutto' => 'decimal:3',
+            'net_weight' => 'decimal:3',
+            'gross_weight' => 'decimal:3',
             'volume_m3' => 'decimal:6',
         ];
     }

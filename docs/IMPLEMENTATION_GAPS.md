@@ -502,7 +502,7 @@ closed until that future concept is built. B2B/cabinet exposure remains open.
 **Current code:**
 - Phase 1 fields (name, brand, category, description, status, url, sku, gtin, price, RRP,
   cost_price, availability, color, size) are registered and working (Tasks 1-2, 3B, 3C).
-- Phase 2 field registrations implemented (Task 5): `weight_netto`, `weight_brutto`, `volume_m3`,
+- Phase 2 field registrations implemented (Task 5): `net_weight`, `gross_weight`, `volume_m3`,
   `shipping_required`, `backorder_policy`, `technical_characteristics`, `instructions` — all
   registered as `AttributeDefinition` records via `AttributeDefinitionSeeder`.
 - Not yet registered: gift card flag (deferred).
@@ -539,7 +539,7 @@ import UX.
 Merchant Category/Standard Category/Merchant Type/Tags structural task in GAP-011).
 
 **Status:** Partially closed in code. Phase 2 `AttributeDefinition` registrations are
-implemented for `weight_netto`, `weight_brutto`, `volume_m3`, `shipping_required`,
+implemented for `net_weight`, `gross_weight`, `volume_m3`, `shipping_required`,
 `backorder_policy`, `technical_characteristics`, and `instructions`. Tax class reopened
 (see above). Gift card flag remains explicitly deferred (unchanged). `image_alt_text` remains
 deferred to future Media entities (unchanged). `backorder_policy` registration does not change
@@ -611,6 +611,43 @@ catalog data (or other pilot tenant) before seeding age_group/gender.
 
 **Status:** Open, blocking dependency for future seed of age_group/gender —
 seeding must not proceed automatically just because options now exist.
+
+---
+
+## GAP-023 — Explicit measurement value/unit storage is unresolved
+
+**Approved docs:**
+- DEC-009 defines `net_weight` and `gross_weight` as canonical physical-mass
+  concepts.
+- Canonical Registry classifies both fields with `value_shape: measurement`
+  and `unit_family: mass`.
+
+**Current code:**
+- `products.net_weight` and `products.gross_weight` store nullable decimal
+  values.
+- No explicit mass-unit column or Measurement value object exists.
+- `products.unit` represents the selling unit and must not be reused as the
+  physical mass unit.
+
+**Impact:**
+- Stored legacy values are preserved, but their physical unit is not encoded
+  explicitly beside each value.
+- Automatic Adobe Commerce, Shopify, Google Merchant, Amazon or other
+  weight mappings may be semantically incorrect without a unit and packaging
+  policy.
+
+**Decision:**
+- Naming is corrected now.
+- This PR does not introduce unit columns, conversion services or a
+  Measurement value object.
+- Weight connector mappings remain blocked until this GAP is resolved.
+
+**Next task:** Design the measurement storage contract: value/unit physical
+storage, supported unit codes, canonical conversion policy, packaging level
+and migration of existing values.
+
+**Status:** Open, blocking dependency for weight-related connector mappings.
+It does not block mappings for unrelated fields.
 
 ---
 

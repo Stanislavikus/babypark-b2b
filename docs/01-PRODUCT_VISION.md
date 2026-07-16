@@ -690,7 +690,7 @@ Import aliases are alternative column names that may appear in Excel, CSV, Googl
 
 Examples:
 
-- product_name may have aliases: Назва, Название, Наименование, Name, Title;
+- name may have aliases: Назва, Название, Наименование, Name, Title;
 
 - sku may have aliases: Артикул, Код, SKU, Code, Item Code;
 

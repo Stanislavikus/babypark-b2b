@@ -42,7 +42,7 @@ Build a B2B cabinet for wholesale buyers with:
 - package_quantity, package_type
 - units_per_box, boxes_per_pallet
 - lead_time_days
-- weight_netto, weight_brutto, volume_m3
+- net_weight, gross_weight, volume_m3
 - depth_mm, width_mm, height_mm
 - description (text), images (json)
 - rozetka_category_id, meta_title, meta_description
