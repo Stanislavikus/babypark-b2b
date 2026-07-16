@@ -582,7 +582,7 @@ The Field Dictionary manages field metadata definitions, distinct from the stora
 
 To balance high performance with infinite extensibility, the platform utilizes a hybrid storage engine:
 
-- **Column-Backed Fields:** Core operational and transaction-critical fields (product_name, sku, gtin, status, cached prices and quantities on Product/Variant; name, tax_number, credit_limit on Customer) are kept as standard database columns for indexing, rapid sorting, and foreign key integrity.
+- **Column-Backed Fields:** Core operational and transaction-critical fields (name, sku, gtin, status, cached prices and quantities on Product/Variant; name, tax_number, credit_limit on Customer) are kept as standard database columns for indexing, rapid sorting, and foreign key integrity.
 
 - **Relation-Backed Fields:** Fields that are really a reference to another entity (e.g. Customer's `default_price_list`) are Eloquent relations, not scalar columns or dynamic values.
 
@@ -2223,7 +2223,7 @@ This decision is closed and must not be reopened without a documentation-level d
 
 The platform uses a hybrid field storage model:
 
-- System/core operational fields (product_name, brand, category, sku, gtin, status, cost_price,
+- System/core operational fields (name, brand, category, sku, gtin, status, cost_price,
   etc. on Product/Variant; name, tax_number, credit_limit on Customer) remain column-backed or
   relation-backed, for indexing, sorting and FK integrity.
 - Dynamic/custom/tenant-specific fields are stored in `product_field_values` /
@@ -2293,15 +2293,15 @@ Product-level Phase 1 seed:
   this attribute as a UUID; the current implementation uses a Laravel auto-increment integer
   primary key, not a UUID. This mismatch is documented here and does not block Phase 1; it may
   be revisited separately.
-- `product_name` — storage_path: `products.name`
+- `name` — storage_path: `products.name` (shared FieldDefinition with Customer binding)
 - `brand` — storage_path: `products.brand`
 - `category` — storage_type: relation, storage_path: `products.category_id`
 - `description` — storage_path: `products.description`
 - `status` — storage_path: `products.is_active`; interim convention:
   `is_active=true → active`, `is_active=false → archived`; `draft` is not distinguishable until
   a real product lifecycle status field exists.
-- `product_url` — storage_path: `products.product_url` (added via a dedicated migration after
-  the base `products` table was created; verified present on `develop`).
+- `url` — storage_path: `products.url` (added via a dedicated migration after
+  the base `products` table was created; column renamed per DEC-008).
 
 Variant-level Phase 1 seed:
 
@@ -2337,7 +2337,7 @@ see that document's Assignment Level Rules section.)*
 
 Existing `products` columns not covered above (`onec_guid`, `barcode_box`,
 `min_order_quantity`, `order_step`, `package_quantity`, `package_type`, `units_per_box`,
-`boxes_per_pallet`, `lead_time_days`, `weight_netto`, `weight_brutto`, `volume_m3`, `depth_mm`,
+`boxes_per_pallet`, `lead_time_days`, `net_weight`, `gross_weight`, `volume_m3`, `depth_mm`,
 `width_mm`, `height_mm`, `synced_at`) are intentionally out of scope for Phase 1 and are
 registered in a later Phase 2 pass — this is an explicit, documented scope boundary, not an
 oversight.

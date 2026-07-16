@@ -94,7 +94,7 @@ The system must explicitly split system attributes by their architectural assign
 
 - internal_product_id — Internal system-generated unique product identifier (UUID). 
 
-- product_name — Base product name. 
+- name — Base product name. 
 
 - brand — Brand or manufacturer name. 
 
@@ -104,7 +104,7 @@ The system must explicitly split system attributes by their architectural assign
 
 - status — Product lifecycle status (e.g., draft, active, archived). **Crucial Rule**: This field belongs strictly to the product lifecycle and channel visibility. It has absolutely no operational relation to order_status or payment_status. 
 
-- product_url — Unique slug used for customer-facing B2B storefront routing. 
+- url — Primary absolute customer-facing product page URL. 
 
 - **Variant-Level Attributes** (Specific to each product variant):
 
@@ -191,7 +191,7 @@ The platform must clearly separate fields required for basic system operations f
 
 Only **one** field is strictly required to save a product record:
 
-- product_name
+- name
 
 If the user drops an entry with just a name, the system generates an internal product ID / internal SKU and saves it. All other metadata can be progressively enriched later. 
 
@@ -200,7 +200,7 @@ If the user drops an entry with just a name, the system generates an internal pr
 
 A product is valid for the native customer-facing B2B storefront projection when it satisfies the minimum transaction rules: 
 
-- product_name must be present. 
+- name must be present. 
 
 - price must be present. 
 
@@ -277,7 +277,7 @@ the definition):
 
 Every attribute in the dictionary must have an immutable, unique system identifier (internal_code).
 
-**Generation Rules: **System and library codes are hardcoded (e.g., product_name, brand, color). Workspace custom attributes must automatically generate an English-safe lowercase slug based on the user's initial input (e.g., user types “Длина кабеля” → system generates c_dlina_kabelya or prompts for an English fallback).
+**Generation Rules: **System and library codes are hardcoded (e.g., name, brand, color). Workspace custom attributes must automatically generate an English-safe lowercase slug based on the user's initial input (e.g., user types “Длина кабеля” → system generates c_dlina_kabelya or prompts for an English fallback).
 
 Code values must be web-safe, API-friendly, and completely decoupled from any changes made to user-facing UI labels.
 
@@ -308,14 +308,14 @@ separate documentation-level decision.
 
 **Current implemented contract (Product-Level, user-facing content):**
 
-- `product_name` — `is_localizable = false`. Stored as a scalar database column (`products.name`, `string`), not as a translation object. `storage_type: Column`, `storage_path: products.name`.
+- `name` — `is_localizable = false`. Stored as a scalar database column (`products.name`, `string`), not as a translation object. `storage_type: Column`, `storage_path: products.name`.
 - `description` — `is_localizable = false`. Stored as a scalar database column (`products.description`, `text`), not as a translation object. `storage_type: Column`, `storage_path: products.description`.
 - `short_description` — `is_localizable = true`. Stored via dynamic value storage (`storage_type: Dynamic`), not as a scalar column. User-facing localized content fields that use dynamic storage must be marked `is_localizable = true`.
 - `seo_title` / `seo_description` — no `FieldDefinition` is seeded yet; there is no current runtime contract for `is_localizable` or storage model. When these fields are added, their localizable/storage model must be decided explicitly before seed — not assumed here.
 
-**Reason (`product_name` / `description`):** Both fields are scalar database columns, not translation objects. Localized field labels (`localized_labels`) describe the attribute name in the UI; they do not mean the field value itself is localized.
+**Reason (`name` / `description`):** Both fields are scalar database columns, not translation objects. Localized field labels (`localized_labels`) describe the attribute name in the UI; they do not mean the field value itself is localized.
 
-**Future multilingual `product_name` / `description`:** Requires a separate architectural decision before implementation — storage migration, fallback locale, API/import/export contract, search/indexing behavior, channel override behavior, and migration of existing values.
+**Future multilingual `name` / `description`:** Requires a separate architectural decision before implementation — storage migration, fallback locale, API/import/export contract, search/indexing behavior, channel override behavior, and migration of existing values.
 
 Custom text attributes can also toggle `is_localizable` per field definition.
 
@@ -374,7 +374,7 @@ The ImportHeaderNormalizer service strips formatting discrepancies before compar
 
 Aliases are checked after normalization. The default seed maps common localized synonyms: 
 
-- product_name: *Назва, Название, Наименование, Name, Title*
+- name: *Назва, Название, Наименование, Name, Title*
 
 - sku: *Артикул, Код, SKU, Code, Item Code*
 
@@ -417,7 +417,7 @@ To avoid polluting the platform core with dynamic marketplace structures, channe
 
 Calculated operational states must not be dumped into the dictionary as user-editable fields. 
 
-- product_name and cost_price are manageable fields. 
+- name and cost_price are manageable fields. 
 
 - margin_percentage, stock_warning_status, and b2b_readiness_status are transient or calculated database projections and must declare their specific computing logic transparently. 
 

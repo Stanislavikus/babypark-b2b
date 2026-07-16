@@ -410,6 +410,58 @@ documentation confirms gender may be a variant-distinguishing property; the
 registry's current `binding_strategy: product` for this field is unchanged
 by this PR. See GAP-022.
 
+### DEC-008 — Generic canonical names for shared core properties
+
+The canonical Product field code `product_name` is replaced by `name`.
+Object ownership is expressed by FieldBinding rather than by repeating the
+object name inside the field code.
+
+The existing global/system `name` FieldDefinition is shared by Customer and
+Product through separate bindings:
+
+- Customer → `customers.name`
+- Product → `products.name`
+
+Google Merchant and Shopify `title` remain external channel mappings.
+`Title`, `Product Name`, and localized business names remain import aliases;
+they are not canonical internal codes.
+
+The canonical field code `product_url` is replaced by `url`. The field means
+the primary absolute customer-facing product page URL. It does not represent
+a slug, Shopify handle, Adobe Commerce url_key, or URL rewrite identifier.
+Those concepts require separate connector mappings or separate fields.
+
+The old codes `product_name` and `product_url` remain only as verified
+`legacy_code` import aliases. They must not remain active FieldDefinition
+codes, model attributes, database columns, or storage paths.
+
+- `evidence_subject_key: decision:DEC-008`
+
+### DEC-009 — International canonical terminology for physical weight
+
+The legacy field codes `weight_netto` and `weight_brutto` are replaced by
+`net_weight` and `gross_weight`.
+
+`net_weight` means the physical mass of the product itself, excluding
+packaging.
+
+`gross_weight` means the physical mass of the sellable unit including its
+immediate consumer packaging, but excluding additional transport or shipping
+packaging.
+
+The terms follow standard English and GS1 terminology. `netto` and `brutto`
+are not used in canonical English field codes.
+
+This decision does not equate `gross_weight` with channel-specific `weight`
+or `shipping_weight`. Connector mappings remain deferred until the target
+channel semantics, packaging level and measurement unit contract are
+verified.
+
+The old codes `weight_netto` and `weight_brutto` remain only as verified
+`legacy_code` import aliases.
+
+- `evidence_subject_key: decision:DEC-009`
+
 ### DEC-002 — identifier_exists connector-only
 
 - **candidate concepts:** FieldDefinition boolean, connector transformation flag, inferred-from-empty-fields
@@ -451,8 +503,8 @@ These examples satisfy all v7 invariants including semantic FK and non-empty cel
 
 ```csv
 a001,mpn,category,google:apparel:DE,google_merchant,DE,DE,apparel,google_product_taxonomy,undecided,product_variant,child,advertise,conditionally_required,undecided,open_ended,undecided,partially_verified,applicability:a001
-a002,product_name,channel,google:all_products,google_merchant,not_applicable,not_applicable,not_applicable,not_applicable,not_applicable,product,not_applicable,advertise,required,undecided,open_ended,unversioned,verified,applicability:a002
-a003,product_name,global,core:product_name,not_applicable,not_applicable,not_applicable,not_applicable,not_applicable,not_applicable,product,not_applicable,not_applicable,not_applicable,undecided,open_ended,not_applicable,partially_verified,applicability:a003
+a002,name,channel,google:all_products,google_merchant,not_applicable,not_applicable,not_applicable,not_applicable,not_applicable,product,not_applicable,advertise,required,undecided,open_ended,unversioned,verified,applicability:a002
+a003,name,global,core:name,not_applicable,not_applicable,not_applicable,not_applicable,not_applicable,not_applicable,product,not_applicable,not_applicable,not_applicable,undecided,open_ended,not_applicable,partially_verified,applicability:a003
 a025,mpn,channel,google:all_products,google_merchant,not_applicable,not_applicable,not_applicable,not_applicable,not_applicable,product_variant,not_applicable,advertise,conditionally_required,undecided,open_ended,unversioned,verified,applicability:a025
 a026,mpn,channel,schema_org:all_products,schema_org,not_applicable,not_applicable,not_applicable,not_applicable,not_applicable,product_variant,not_applicable,advertise,recommended,undecided,open_ended,unversioned,verified,applicability:a026
 ```
@@ -460,20 +512,20 @@ a026,mpn,channel,schema_org:all_products,schema_org,not_applicable,not_applicabl
 ### Constraints
 
 ```csv
-c001,product_name,core,max_length,undecided,not_applicable,a003,partially_verified,constraint:c001
-c002,product_name,channel,max_length,150,characters,a002,verified,constraint:c002
+c001,name,core,max_length,undecided,not_applicable,a003,partially_verified,constraint:c001
+c002,name,channel,max_length,150,characters,a002,verified,constraint:c002
 c007,mpn,channel,max_length,70,characters,a025,verified,constraint:c007
 ```
 
-Note: `c001` references `a003` (product_name global) — not `a001` (mpn). v7 fix for prior semantic FK error.
+Note: `c001` references `a003` (name global) — not `a001` (mpn). v7 fix for prior semantic FK error.
 
 ### Alias evidence key (duplicate text, different alias_type)
 
 Two aliases with same normalized text but different `alias_type` produce distinct keys:
 
 ```
-alias:product_name:en:name:import_header:global
-alias:product_name:en:name:common_business_term:global   ← hypothetical; not in seed
+alias:name:en:name:import_header:global
+alias:name:en:name:common_business_term:global   ← hypothetical; not in seed
 ```
 
 Current seed demonstrates `alias_type` disambiguation for `price` / `РРЦ`:
@@ -494,11 +546,11 @@ Based on `database/seeders/FieldDefinitionSeeder.php` (develop@3c3f926) and `doc
 | `gtin` | Seeded; maps to `product_variants.barcode_ean`; Google + schema.org verified |
 | `brand` | Seeded; Google conditionally required |
 | `sku` | Seeded at variant level |
-| `product_name` | Seeded; only strict required field for product creation |
+| `name` | Seeded; shared FieldDefinition with Customer binding; only strict required field for product creation |
 | `description` | Seeded |
 | `category` | Correctly modeled as `relation`, not flat text |
 | `color`, `size` | Platform library seeded with option codes |
-| `weight_netto`, `weight_brutto`, `volume_m3` | System logistics fields seeded |
+| `net_weight`, `gross_weight`, `volume_m3` | System logistics fields seeded |
 | `shipping_required`, `backorder_policy` | Platform library seeded |
 | `technical_characteristics`, `instructions` | Localizable platform library seeded |
 
@@ -518,7 +570,7 @@ Based on `database/seeders/FieldDefinitionSeeder.php` (develop@3c3f926) and `doc
 
 | Issue | Current state | Registry correction |
 |---|---|---|
-| `product_name.is_localizable` | Seeded `false`; docs say localizable for product-level content | Registry marks `false` matching **current seeder**; docs/02 conflict flagged for future DEC |
+| `name.is_localizable` | Seeded `false`; docs say localizable for product-level content | Registry marks `false` matching **current seeder**; docs/02 conflict flagged for future DEC |
 | `status` data_type | Seeded as `boolean` mapping `is_active` | Registry keeps `boolean`; enum lifecycle (draft/active/archived) deferred |
 | Legacy `products.sku` column | DB has product-level SKU; seeder binds SKU to variant | Registry follows seeder (variant); legacy column noted as migration debt |
 

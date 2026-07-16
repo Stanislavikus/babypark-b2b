@@ -116,7 +116,7 @@ class ProductResource extends Resource
                 Forms\Components\Section::make('Сайт')->schema([
                     // Left column: URL field
                     Forms\Components\Group::make([
-                        Forms\Components\TextInput::make('product_url')
+                        Forms\Components\TextInput::make('url')
                             ->label('URL товару на сайті')
                             ->url()
                             ->placeholder('https://babypark.ua/product/...')
@@ -203,7 +203,7 @@ class ProductResource extends Resource
 
                 Infolists\Components\Section::make('Сайт')->schema([
                     // Left: clickable URL
-                    Infolists\Components\TextEntry::make('product_url')
+                    Infolists\Components\TextEntry::make('url')
                         ->label('URL товару на сайті')
                         ->placeholder('—')
                         ->url(fn (?string $state) => $state)
@@ -381,7 +381,7 @@ class ProductResource extends Resource
                     }),
 
                 // Clickable external link column
-                Tables\Columns\TextColumn::make('product_url')
+                Tables\Columns\TextColumn::make('url')
                     ->label('URL на сайті')
                     ->formatStateUsing(fn (?string $state): HtmlString|string => ProductTableLink::externalUrlHtml($state))
                     ->tooltip(fn (?string $state) => $state)

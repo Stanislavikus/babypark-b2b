@@ -18,8 +18,8 @@ class FieldDefinitionSeederPhase2Test extends TestCase
 
     /** @var list<string> */
     private array $phase2Codes = [
-        'weight_netto',
-        'weight_brutto',
+        'net_weight',
+        'gross_weight',
         'volume_m3',
         'shipping_required',
         'backorder_policy',
@@ -50,12 +50,12 @@ class FieldDefinitionSeederPhase2Test extends TestCase
     {
         $this->seed(FieldDefinitionSeeder::class);
 
-        $this->assertFieldContract('weight_netto', [
+        $this->assertFieldContract('net_weight', [
             'data_type' => AttributeDataType::Decimal,
             'scope' => AttributeScope::System,
             'object_type' => FieldObjectType::Product,
             'storage_type' => AttributeStorageType::Column,
-            'storage_path' => 'products.weight_netto',
+            'storage_path' => 'products.net_weight',
             'field_group' => 'logistics',
         ]);
 

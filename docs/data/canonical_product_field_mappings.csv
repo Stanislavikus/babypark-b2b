@@ -1,6 +1,6 @@
 internal_code,channel,external_field,mapping_type,transformation,applicability_id,requirement_level,channel_schema_version,verification_status,evidence_subject_key
-product_name,google_merchant,title,direct,not_applicable,a002,required,unversioned,verified,mapping:google_merchant:product_name:title:a002:unversioned
-product_name,schema_org,name,direct,not_applicable,a003,recommended,unversioned,verified,mapping:schema_org:product_name:name:a003:unversioned
+name,google_merchant,title,direct,not_applicable,a002,required,unversioned,verified,mapping:google_merchant:name:title:a002:unversioned
+name,schema_org,name,direct,not_applicable,a003,recommended,unversioned,verified,mapping:schema_org:name:name:a003:unversioned
 brand,google_merchant,brand,direct,not_applicable,a005,conditionally_required,unversioned,verified,mapping:google_merchant:brand:brand:a005:unversioned
 brand,schema_org,brand,direct,not_applicable,a024,recommended,unversioned,verified,mapping:schema_org:brand:brand:a024:unversioned
 gtin,google_merchant,gtin,direct,not_applicable,a004,conditionally_required,unversioned,verified,mapping:google_merchant:gtin:gtin:a004:unversioned
@@ -18,8 +18,8 @@ condition,google_merchant,condition,direct,not_applicable,a006,required,unversio
 identifier_exists,google_merchant,identifier_exists,connector_only,true_only_when_identifiers_genuinely_absent,a009,conditionally_required,unversioned,partially_verified,mapping:google_merchant:identifier_exists:identifier_exists:a009:unversioned
 image,google_merchant,image_link,transformed,primary_image_url,a010,recommended,unversioned,verified,mapping:google_merchant:image:image_link:a010:unversioned
 image,schema_org,image,direct,not_applicable,a017,recommended,unversioned,verified,mapping:schema_org:image:image:a017:unversioned
-product_url,schema_org,url,transformed,absolute_storefront_url,a018,recommended,unversioned,verified,mapping:schema_org:product_url:url:a018:unversioned
-product_name,shopify,title,direct,not_applicable,a003,required,2024-10,verified,mapping:shopify:product_name:title:a003:2024-10
+url,schema_org,url,transformed,absolute_storefront_url,a018,recommended,unversioned,verified,mapping:schema_org:url:url:a018:unversioned
+name,shopify,title,direct,not_applicable,a003,required,2024-10,verified,mapping:shopify:name:title:a003:2024-10
 description,shopify,body_html,transformed,html_body,a012,optional,2024-10,verified,mapping:shopify:description:body_html:a012:2024-10
 brand,shopify,vendor,renamed,not_applicable,a024,optional,2024-10,verified,mapping:shopify:brand:vendor:a024:2024-10
 gtin,shopify,variants.barcode,transformed,variant_level_barcode,a004,optional,2024-10,verified,mapping:shopify:gtin:variants.barcode:a004:2024-10
