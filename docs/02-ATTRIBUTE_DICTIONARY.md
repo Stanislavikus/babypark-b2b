@@ -303,12 +303,23 @@ separate documentation-level decision.
 ### Localization Architectural Rules
 
 
-### Localizable vs Non-Localizable Split: 
+### Localizable vs Non-Localizable Split:
 
 
-- Fields assigned at the Product-Level that handle user-facing content (product_name, description, short_description, seo_title, seo_description) must be marked as is_localizable = true. Custom text attributes can also toggle this setting.
+**Current implemented contract (Product-Level, user-facing content):**
 
-- Operational and identity fields assigned at the Variant-Level (sku, gtin, price, sale_price, cost_price, availability) are strictly is_localizable = false.
+- `product_name` — `is_localizable = false`. Stored as a scalar database column (`products.name`, `string`), not as a translation object. `storage_type: Column`, `storage_path: products.name`.
+- `description` — `is_localizable = false`. Stored as a scalar database column (`products.description`, `text`), not as a translation object. `storage_type: Column`, `storage_path: products.description`.
+- `short_description` — `is_localizable = true`. Stored via dynamic value storage (`storage_type: Dynamic`), not as a scalar column. User-facing localized content fields that use dynamic storage must be marked `is_localizable = true`.
+- `seo_title` / `seo_description` — no `FieldDefinition` is seeded yet; there is no current runtime contract for `is_localizable` or storage model. When these fields are added, their localizable/storage model must be decided explicitly before seed — not assumed here.
+
+**Reason (`product_name` / `description`):** Both fields are scalar database columns, not translation objects. Localized field labels (`localized_labels`) describe the attribute name in the UI; they do not mean the field value itself is localized.
+
+**Future multilingual `product_name` / `description`:** Requires a separate architectural decision before implementation — storage migration, fallback locale, API/import/export contract, search/indexing behavior, channel override behavior, and migration of existing values.
+
+Custom text attributes can also toggle `is_localizable` per field definition.
+
+- Operational and identity fields assigned at the Variant-Level (sku, gtin, price, sale_price, cost_price, availability) are strictly `is_localizable = false`.
 
 **MVP UI Constraint: **The database schema must support multilingual structures from day one (e.g., via JSONB translation objects), but the MVP admin interface will only render a single primary workspace language selected during onboarding. No complex language tabs or toggles on the primary product card view for MVP. Dedicated translation tables are a future migration path only, subject to explicit architecture review before implementation.
 
