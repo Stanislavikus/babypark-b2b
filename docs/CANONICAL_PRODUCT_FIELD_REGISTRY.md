@@ -212,6 +212,120 @@ schema.org confirms semantic property existence. **Not** proof of EU legal oblig
 6. Re-verification required before connector implementation
 7. Registry is a snapshot as of each row's `verified_at`
 
+## Machine validation contract
+
+For each of the eight CSV files, this section defines the exact header
+(order matters), primary/unique key, foreign keys, allowed enum/state
+values, `evidence_subject_key` format, and file-specific invariants. The
+validator and the CSV files must conform to this contract; changing it
+requires updating this section, the validator and its tests in the same PR.
+
+Enum lists marked "declared" come from other sections of this document.
+Enum lists marked "observed (extend via DEC)" reflect the current snapshot
+and may grow via a new Canonicalization decision without being a contract
+violation. The validator performs enum/state membership checks **only** for
+columns whose full allowed set is declared in this section (see
+"Enum-validation scope for this PR" at the end). Any other column is still
+checked for header presence, emptiness/state-token rules, keys and
+FK/semantic-FK integrity, but not enum membership.
+
+### 1. canonical_product_fields.csv
+- Header (exact order): `internal_code,canonical_english_name,uk_label,ru_label,description,implementation_kind,storage_owner,field_definition_eligibility,binding_strategy,scope,field_group_or_state,data_type_or_state,value_shape,structure_schema_ref,is_localizable,value_localization_strategy,channel_value_strategy,inheritance_strategy,is_multi_value,unit_family,status,mvp_tier,default_enabled,verification_status,recommended_action,supports_admin_display,supports_b2b_display,supports_search,supports_filter,supports_table_column,evidence_subject_key`
+- Primary/unique key: `internal_code`
+- `evidence_subject_key` format: `field:<internal_code>` (must equal own `internal_code`)
+- `status` (declared, Registry governance §4): `active | proposed | deprecated`
+- `data_type_or_state` (declared, Enum extensions v7): `text | long_text | number | decimal | money | boolean | date | select | multi_select | image | url | computed | not_applicable | undecided`
+- `field_group_or_state` (declared, Enum extensions v7): `basic_information | identifiers | pricing | availability | images_media | descriptions | characteristics | b2b | seo | logistics | internal | not_applicable | undecided`
+- `binding_strategy` (observed, extend via DEC): `product | product_variant | product_and_variant_two_bindings | not_applicable`
+- `scope` (observed, extend via DEC): `system | platform_library | not_applicable`
+- `mvp_tier` (observed, extend via DEC): `A | B | C | not_applicable`; invariant: `mvp_tier=A → default_enabled=true`
+- `implementation_kind` (observed, extend via DEC): `compliance_entity | computed_projection | connector_only | core_model_property | dynamic_field | inventory_domain | media_domain | pricing_domain | product_association_domain | relation`
+- `storage_owner` (observed, extend via DEC): `Category | ConnectorMapping | FieldDefinition | MediaAsset | PriceListItem | Product | ProductAssociation | ProductVariant | calculated | not_implemented`
+- `field_definition_eligibility` (observed): `yes | no`
+- `verification_status` (observed, extend via DEC): `verified | partially_verified | needs_legal_review`
+- `recommended_action` (observed, extend via DEC): `add_to_platform_library | computed_not_editable | connector_mapping_only | covered_by_existing_domain | keep_as_is | needs_legal_review | relation_not_field`
+- `is_localizable` / `value_localization_strategy` cross-column invariant as defined in "Cross-column invariants" above.
+- **Field-specific invariant:** `has_energy_consumption_details.data_type_or_state` MUST be `not_applicable`; its structured shape is represented only by `value_shape: structured_object`. (`data_type_or_state` and `value_shape` are distinct columns — structural shape belongs to `value_shape`, never to `data_type_or_state`.)
+
+### 2. canonical_product_field_mappings.csv
+- Header: `internal_code,channel,external_field,mapping_type,transformation,applicability_id,requirement_level,channel_schema_version,verification_status,evidence_subject_key`
+- Unique key: `(internal_code, channel, external_field, channel_schema_version, applicability_id)` — the narrower 3-column combination may legitimately repeat across schema versions or applicability contexts.
+- FK: `internal_code` → fields.csv; `applicability_id` → applicability.csv
+- Semantic FK: `internal_code` of this row MUST equal `internal_code` of the referenced `applicability_id` row.
+- `channel` (declared, "Stable channel codes"): `google_merchant | shopify | adobe_commerce | bigcommerce | amazon | rozetka | schema_org`
+- `mapping_type` (observed, extend via DEC): `direct | renamed | transformed | connector_only`
+- `requirement_level` (observed, extend via DEC): `required | conditionally_required | recommended | optional | undecided`
+- `evidence_subject_key` format: `mapping:<channel>:<internal_code>:<external_field>:<applicability_id>:<channel_schema_version>`
+
+### 3. canonical_product_field_aliases.csv
+- Header: `internal_code,alias,normalized_alias,locale,alias_type,scope,verification_status,evidence_subject_key`
+- Unique key: `(internal_code, normalized_alias, locale, alias_type, scope)` — confirmed necessary: the current snapshot has two legitimate rows for `gtin/en/gtin` differing only by `alias_type` (`import_header` vs `legacy_code`); a narrower key would falsely flag this as a duplicate.
+- FK: `internal_code` → fields.csv
+- `alias_type` (observed, extend via DEC): `common_business_term | import_header | legacy_code | localized_synonym`
+- `evidence_subject_key` format: `alias:<internal_code>:<locale>:<normalized_alias>:<alias_type>:<scope>`
+
+### 4. canonical_product_field_sources.csv
+- Header: `source_id,subject_type,evidence_subject_key,source_kind,source_organization,source_title,source_url_or_state,source_ref_or_state,source_version,verified_at,evidence_locator,evidence_note`
+- Primary key: `source_id` (unique)
+- **`evidence_subject_key` is explicitly NOT unique** — multiple independent sources may confirm the same subject.
+- Invariant: `subject_type` MUST equal the prefix of `evidence_subject_key` before the first `:` (hard error on mismatch).
+- **Reverse referential integrity (hard error):** every `evidence_subject_key` in this file MUST reference an existing subject:
+  - `field:*` → `internal_code` in fields.csv
+  - `mapping:*` → a row in mappings.csv whose composite key matches
+  - `alias:*` → a row in aliases.csv whose composite key matches
+  - `option:*` → `option_id` in options.csv
+  - `option_mapping:*` → `option_mapping_id` in option_mappings.csv
+  - `constraint:*` → `constraint_id` in constraints.csv
+  - `applicability:*` → `applicability_id` in applicability.csv
+  - `decision:DEC-NNN` → a matching `### DEC-NNN` heading in `CANONICAL_PRODUCT_FIELD_REGISTRY.md`
+  An `evidence_subject_key` with a correct prefix but no matching subject (e.g. `field:brnad`, `option:o999`) is a hard error, not merely a missing-source warning.
+- `subject_type` (declared, evidence_subject_key convention): `field | mapping | alias | option | option_mapping | constraint | applicability | decision`
+- `source_kind` (observed, extend via DEC): `official_web_doc | api_schema | repository_code | repository_document`
+- `verified_at`: must be `YYYY-MM-DD`, never a state token.
+
+### 5. canonical_product_field_options.csv
+- Header: `option_id,internal_code,option_code,en_label,uk_label,ru_label,sort_order,option_scope,applicability_id,option_source_strategy,value_domain_ref,verification_status,status,evidence_subject_key`
+- Primary unique key: `option_id`
+- Secondary unique key: `(internal_code, option_code, option_scope, applicability_id)` — not just `(internal_code, option_code)`; `option_scope`/`applicability_id` distinguish a universal value from a channel/category-specific one.
+- FK: `internal_code` → fields.csv; `applicability_id` → applicability.csv
+- Semantic FK: `internal_code` of this row MUST equal `internal_code` of referenced `applicability_id` row.
+- `option_scope` (observed, extend via DEC): `universal | platform_library`
+- `option_source_strategy` (observed, extend via DEC): `external_standard | static_registry`
+- `evidence_subject_key` format: `option:<option_id>`
+
+### 6. canonical_product_field_option_mappings.csv
+- Header: `option_mapping_id,option_id,channel,external_option_value,mapping_type,applicability_id,channel_schema_version,verification_status,evidence_subject_key`
+- Unique key: `option_mapping_id`
+- FK: `option_id` → options.csv; `channel` → declared channel list; `applicability_id` → applicability.csv
+- Semantic FK (hard error): `options[option_id].internal_code` MUST equal `applicability[applicability_id].internal_code`.
+- `mapping_type` (observed, extend via DEC): `direct | renamed`
+- `evidence_subject_key` format: `option_mapping:<option_mapping_id>`
+
+### 7. canonical_product_field_constraints.csv
+- Header: `constraint_id,internal_code,constraint_context,constraint_type,constraint_value_or_state,unit_or_state,applicability_id,verification_status,evidence_subject_key`
+- Unique key: `constraint_id`
+- FK: `internal_code` → fields.csv; `applicability_id` → applicability.csv
+- Semantic FK: same rule as above.
+- `constraint_context` (observed, extend via DEC): `core | channel`
+- `constraint_type` (observed, extend via DEC): `max_length | min_value | negative_allowed | regex | unique_value`
+- `evidence_subject_key` format: `constraint:<constraint_id>`
+
+### 8. canonical_product_field_applicability.csv
+- Header: `applicability_id,internal_code,context_type,context_key,channel_or_state,market_or_state,country_or_state,product_type_or_state,category_taxonomy_or_state,category_code_or_state,entity_level,parentage_level,operation,requirement_level,effective_from,effective_to,schema_version,verification_status,evidence_subject_key`
+- Unique key: `applicability_id`
+- FK: `internal_code` → fields.csv
+- `context_type` (observed, extend via DEC): `global | channel | category`
+- `entity_level` (observed, extend via DEC): `product | product_variant`
+- `parentage_level` (observed, extend via DEC): `not_applicable | child`
+- `operation` (observed, extend via DEC): `not_applicable | advertise | publish`
+- `requirement_level` (observed, extend via DEC): `required | conditionally_required | recommended | undecided | not_applicable`
+- `evidence_subject_key` format: `applicability:<applicability_id>`
+
+### Enum-validation scope for this PR
+The validator performs enum/state membership checks only for columns whose
+full allowed set is declared above. Adding enum validation for a column not
+listed above requires extending this contract in the same PR.
+
 ## Canonicalization decisions
 
 ### DEC-001 — mpn variant binding

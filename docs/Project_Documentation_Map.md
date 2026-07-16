@@ -551,6 +551,15 @@ frontend code, Filament resource, Livewire component or Blade template.
 - 02-ATTRIBUTE_DICTIONARY.md
 - 03-DOMAIN_MODEL.md
 
+**For product-field, connector-mapping, seed or import/export decisions:**
+
+- 00-WHY.md
+- 01-PRODUCT_VISION.md
+- 02-ATTRIBUTE_DICTIONARY.md
+- 03-DOMAIN_MODEL.md
+- CANONICAL_PRODUCT_FIELD_REGISTRY.md and the related `docs/data/*.csv`
+- IMPLEMENTATION_GAPS.md — open gaps affecting the field or mapping in question
+
 **For architecture decisions:**
 
 - 00-WHY.md
@@ -565,6 +574,7 @@ frontend code, Filament resource, Livewire component or Blade template.
 - 01-PRODUCT_VISION.md
 - 02-ATTRIBUTE_DICTIONARY.md
 - 03-DOMAIN_MODEL.md
+- CANONICAL_PRODUCT_FIELD_REGISTRY.md and the related `docs/data/*.csv`
 - 04-ARCHITECTURE_PRINCIPLES.md
 - 05-AI_WORKING_AGREEMENT.md
 
