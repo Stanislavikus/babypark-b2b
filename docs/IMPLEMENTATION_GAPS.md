@@ -561,23 +561,56 @@ Foundation Seed Sync v5 (Branch A) added eight Platform Library fields via
   registered Platform Library select fields in the registry.
 
 **Current code:**
-- Neither `age_group` nor `gender` is seeded in `FieldDefinitionSeeder`.
-- The registry CSV contains zero verified option rows for either field — seeding
-  them as empty select definitions would violate the established convention that
-  select-type fields ship with stable option codes in `validation_rules.options`.
+- Canonical Registry now contains verified option sets for `age_group`
+  and `gender` under DEC-006 and DEC-007.
+- Neither field is seeded in `FieldDefinitionSeeder`.
 
 **Impact:**
-- These two fields cannot be activated via seed until verified option lists are
-  published in the canonical registry.
+- The missing-options blocker tracked by GAP-020 is resolved.
+- Seeding remains blocked by GAP-022 because product-vs-variant binding
+  is not yet resolved.
 
 **Decision:**
-- Do not invent placeholder option codes. Block seeding until the registry
-  documents verified options for each field.
+- Close the option-registry part of this gap.
+- Do not proceed to seed solely because verified options now exist.
 
-**Next task:** Update the canonical registry CSV with verified options, then
-  include both fields in the next Foundation Seed Sync batch.
+**Next task:** Resolve GAP-022, then prepare a separate seed task.
 
-**Status:** Open, blocking dependency for `age_group` / `gender` seed activation.
+**Status:** Closed as a missing-options registry gap. Future seed activation
+remains blocked by GAP-022.
+
+---
+
+## GAP-022 — age_group/gender product-vs-variant binding unresolved
+
+**Approved docs:**
+- Canonical Product Field Registry: age_group and gender registered with
+  `binding_strategy: product` (DEC-006, DEC-007).
+
+**Current code:**
+- Verified option sets for `age_group` and `gender` exist in the Canonical
+  Registry under DEC-006 and DEC-007.
+- Neither field is seeded in `FieldDefinitionSeeder`.
+- GAP-020 is closed as a missing-options registry gap; future seeding remains
+  blocked by this GAP.
+
+**Impact:**
+- Google Merchant documentation confirms both age_group and gender may be
+  variant-distinguishing properties (products varying "shoes for 0-3
+  months" vs "shoes for 1-5 years"; "mens black tennis shoes" vs "womens
+  black tennis shoes"). The registry's current product-level binding does
+  not reflect this possibility.
+
+**Decision:**
+- Not resolved by this PR. `binding_strategy` remains `product` unchanged.
+  A separate Stop-and-Amend decision must evaluate
+  `product_and_variant_two_bindings` before any seed of these fields.
+
+**Next task:** Evaluate variant-level binding need against real Babypark
+catalog data (or other pilot tenant) before seeding age_group/gender.
+
+**Status:** Open, blocking dependency for future seed of age_group/gender —
+seeding must not proceed automatically just because options now exist.
 
 ---
 

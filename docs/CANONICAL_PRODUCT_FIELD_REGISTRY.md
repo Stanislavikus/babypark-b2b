@@ -352,6 +352,64 @@ listed above requires extending this contract in the same PR.
 - **mapping/transformation consequence:** no change to Google/schema.org mapping semantics — only affects internal scope/ownership classification within this registry
 - `evidence_subject_key: decision:DEC-005`
 
+### DEC-006 — age_group canonical value model
+
+The Google Merchant five-value vocabulary (newborn, infant, toddler, kids,
+adult) is selected as the current platform normalization profile because it
+is compact, operationally required for the prioritized Google Merchant
+output, and compatible with the already-approved `select` data_type
+contract. It is not claimed to be a universal age ontology or a lossless
+representation of Shopify's Standard Product Taxonomy.
+
+Shopify's Standard Product Taxonomy defines a structurally different
+12-value `age_group` attribute (data/attributes.yml, verified 2026-07-16)
+mixing precise ranges (0_6_months, 6_12_months, 1_2_years), broad groups
+(babies, kids, teens, adults) and service values (all_ages, universal,
+other). This is deferred as a richer alternative, not adopted now.
+
+No Shopify option mappings are created in this PR. Shopify's taxonomy
+confirms the existence of similarly named values, but it does not define
+age boundaries equivalent to Google's five buckets, and its connector
+representation may use taxonomy handles or globally unique IDs
+(`gid://shopify/TaxonomyValue/...`) rather than display labels. Shopify
+mapping is deferred to the Shopify connector mapping task.
+
+A numeric suggestedMinAge/suggestedMaxAge model (confirmed as Schema.org's
+own representation) is explicitly not introduced now — that is a larger
+structural decision than GAP-020, requiring a separate Stop-and-Amend
+review of the already-approved select contract.
+
+This decision does not resolve variant-level applicability. Google
+documentation confirms age_group may be a variant-distinguishing property;
+the registry's current `binding_strategy: product` for this field is
+unchanged by this PR. See GAP-022.
+
+### DEC-007 — gender canonical value model
+
+Shopify's Standard Product Taxonomy `target_gender` attribute (female, male,
+unisex, other — data/attributes.yml, verified 2026-07-16) is adopted as the
+platform_library canonical set. It is a clean superset of Google Merchant's
+gender vocabulary (female, male, unisex — verified 2026-07-16): the first
+three values match exactly; `other` has no Google equivalent.
+
+Google option_mapping rows exist only for female, male, unisex (direct). No
+option_mapping row is created for `other` — the current
+canonical_product_field_option_mappings.csv contract supports only
+`direct | renamed` mapping_type; representing "no channel equivalent"
+requires a documented contract extension, out of scope for this PR. This
+DEC records explicitly: Google Merchant cannot receive the `other` gender
+value; automatic export is not possible for that value.
+
+No Shopify option mappings are created in this PR. Shopify is used as the
+authoritative source for the four-value canonical set, while the exact
+connector representation of taxonomy values (handle vs. globally unique ID)
+is deferred to the Shopify connector mapping task.
+
+This decision does not resolve variant-level applicability. Google
+documentation confirms gender may be a variant-distinguishing property; the
+registry's current `binding_strategy: product` for this field is unchanged
+by this PR. See GAP-022.
+
 ### DEC-002 — identifier_exists connector-only
 
 - **candidate concepts:** FieldDefinition boolean, connector transformation flag, inferred-from-empty-fields
