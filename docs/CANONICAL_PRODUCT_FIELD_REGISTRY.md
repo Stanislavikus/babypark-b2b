@@ -175,12 +175,15 @@ Forbidden as core fields: `google_title`, `shopify_title`, etc. Channel-specific
 
 Confirmed by Google Merchant Center and schema.org `Product.mpn` as a real manufacturer identifier usable alongside GTIN.
 
-**Variant binding is not pre-decided.** Google guidance: *"Typically, each variant… has its own MPN… A key exception is different sizes of apparel products, where all sizes often have the same MPN."* — resolved via `applicability.entity_level` + `category_code_or_state`, not as a global fact.
+**Current implemented contract (DEC-001 revised, DEC-005):**
 
 - `internal_code: mpn`
-- `recommended_action: add_to_system_registry` (candidate — not ready for seed/code)
-- `binding_strategy: requires_research`
-- Example applicability: `a001` (Google apparel DE, `entity_level: product_variant`, `parentage_level: child`)
+- `binding_strategy: product_variant` (fixed — not context-dependent)
+- `scope: platform_library`
+- `recommended_action: add_to_platform_library` (seeded in `FieldDefinitionSeeder`)
+- Stored via dynamic value storage (`FieldDefinition` / `VariantFieldValue`); no global uniqueness constraint on values
+- General Google mapping applicability: `a025` (`google:all_products`); general Schema.org mapping applicability: `a026` (`schema_org:all_products`)
+- Narrow apparel/DE exception scenario remains in `a001` only — not the applicability for general mappings
 
 ## identifier_exists — full formulation
 
@@ -213,14 +216,27 @@ schema.org confirms semantic property existence. **Not** proof of EU legal oblig
 
 ### DEC-001 — mpn variant binding
 
-- **candidate concepts:** product-level MPN, variant-level MPN, apparel shared MPN
-- **sources compared:** Google Merchant mpn docs, schema.org/Product.mpn
-- **semantic differences:** apparel size variants may share one MPN; other categories typically per-variant
-- **canonical code selected:** `mpn`
-- **why selected:** both independent sources agree on identifier semantics; binding is context-dependent
-- **rejected alternatives:** hard-coded variant-only binding; duplicate `manufacturer_part_number` code
-- **mapping/transformation consequence:** Google mapping direct; applicability `a001` captures category-specific conditionality
+**Revised.** Original conclusion ("binding is context-dependent") is superseded by a fixed decision below. The applicability row `a001` (entity_level: product_variant) already matched this outcome — only this DEC's written rationale needed correction.
+
+- **candidate concepts:** product-level MPN, variant-level MPN (fixed), category-dependent binding infrastructure
+- **sources compared:** Google Merchant mpn docs ("each variant typically has its own MPN... key exception: different sizes of apparel products, where all sizes often have the same MPN"), schema.org/Product.mpn; existing system convention for sku/gtin (both variant-level)
+- **semantic differences:** the apparel-size exception does not require category-dependent binding infrastructure — a shared MPN across variants can simply be entered as the same value on each variant row; no global uniqueness constraint applies
+- **canonical code selected:** `mpn`, binding_strategy = `product_variant` (fixed, not context-dependent)
+- **why selected:** matches established sku/gtin convention; avoids building category-dependent field binding infrastructure that does not exist in the platform today and has no confirmed demand
+- **rejected alternatives:** hard-coded product-level binding (would misrepresent per-unit identifier semantics); duplicate `manufacturer_part_number` code; category-dependent binding infrastructure (deferred, no confirmed demand)
+- **mapping/transformation consequence:** Google/schema.org mappings must each reference their own **general, source-specific** applicability row (no category/market/country restriction) — a general Google applicability row for the `google_merchant` mapping (`a025`), and a separate general Schema.org applicability row for the `schema_org` mapping (`a026`) — not the narrow `a001` (apparel/DE), and not each other's channel. `a001` already uses `entity_level: product_variant`, but represents **only** a narrow apparel/DE applicability scenario — it is not evidence of a global `product_variant` contract by itself. The fixed global binding decision is recorded in `canonical_product_fields.csv` and this revised DEC-001; two new, general applicability rows (one per source) are used for general mappings and channel constraints (`a001` remains only for the narrow apparel/DE exception scenario)
 - `evidence_subject_key: decision:DEC-001`
+
+### DEC-005 — mpn scope: system → platform_library
+
+- **candidate concepts:** system (core/protected concept required by internal platform operation or foundational identity model — not necessarily "mandatory non-empty value for every product"), platform_library (canonical reusable concept available to workspaces, not required by core platform operation, intended for optional activation when a real per-workspace activation mechanism exists in the future)
+- **sources compared:** Google Merchant MPN documentation (manufacturer-assigned, conditional — required only when GTIN absent and manufacturer assigned one); schema.org Product.mpn; existing system fields for comparison — `sku` (required for internal system operation regardless of standard adoption — a product/variant cannot function in this platform without one), `gtin` (extremely common in commerce but still conditional per product)
+- **semantic differences:** mpn is not needed for internal system operation — a product/variant can exist and function fully without one; this differs from `sku`, which the system itself depends on
+- **canonical code selected:** `mpn` scope = `platform_library`
+- **why selected:** mpn is canonical and widely recognized, but its absence never blocks core platform operation, matching the platform_library definition above — not a claim about existing per-workspace activation behavior, which is not yet implemented
+- **rejected alternatives:** scope = system (would misrepresent mpn as required for internal platform operation, which it is not)
+- **mapping/transformation consequence:** no change to Google/schema.org mapping semantics — only affects internal scope/ownership classification within this registry
+- `evidence_subject_key: decision:DEC-005`
 
 ### DEC-002 — identifier_exists connector-only
 
@@ -265,6 +281,8 @@ These examples satisfy all v7 invariants including semantic FK and non-empty cel
 a001,mpn,category,google:apparel:DE,google_merchant,DE,DE,apparel,google_product_taxonomy,undecided,product_variant,child,advertise,conditionally_required,undecided,open_ended,undecided,partially_verified,applicability:a001
 a002,product_name,channel,google:all_products,google_merchant,not_applicable,not_applicable,not_applicable,not_applicable,not_applicable,product,not_applicable,advertise,required,undecided,open_ended,unversioned,verified,applicability:a002
 a003,product_name,global,core:product_name,not_applicable,not_applicable,not_applicable,not_applicable,not_applicable,not_applicable,product,not_applicable,not_applicable,not_applicable,undecided,open_ended,not_applicable,partially_verified,applicability:a003
+a025,mpn,channel,google:all_products,google_merchant,not_applicable,not_applicable,not_applicable,not_applicable,not_applicable,product_variant,not_applicable,advertise,conditionally_required,undecided,open_ended,unversioned,verified,applicability:a025
+a026,mpn,channel,schema_org:all_products,schema_org,not_applicable,not_applicable,not_applicable,not_applicable,not_applicable,product_variant,not_applicable,advertise,recommended,undecided,open_ended,unversioned,verified,applicability:a026
 ```
 
 ### Constraints
@@ -272,6 +290,7 @@ a003,product_name,global,core:product_name,not_applicable,not_applicable,not_app
 ```csv
 c001,product_name,core,max_length,undecided,not_applicable,a003,partially_verified,constraint:c001
 c002,product_name,channel,max_length,150,characters,a002,verified,constraint:c002
+c007,mpn,channel,max_length,70,characters,a025,verified,constraint:c007
 ```
 
 Note: `c001` references `a003` (product_name global) — not `a001` (mpn). v7 fix for prior semantic FK error.
@@ -315,7 +334,7 @@ Based on `database/seeders/FieldDefinitionSeeder.php` (develop@3c3f926) and `doc
 
 | internal_code | recommended_action | Blocker |
 |---|---|---|
-| `mpn` | `add_to_system_registry` | Variant binding requires applicability research (`a001`) |
+| `mpn` | `add_to_platform_library` | Seeded (DEC-001 binding + DEC-005 scope) |
 | `condition` | `add_to_platform_library` | Not in seeder; Google required for ads |
 | `price`, `sale_price`, `cost_price` | `covered_by_existing_domain` | Documented in Attribute Dictionary but not in FieldDefinitionSeeder |
 | `availability` | `covered_by_existing_domain` | Inventory domain; not FieldDefinition |
@@ -350,7 +369,7 @@ Based on `database/seeders/FieldDefinitionSeeder.php` (develop@3c3f926) and `doc
 
 ## What this delivery does NOT do
 
-- Change `FieldDefinitionSeeder` or migrations
+- Change migrations (MPN seeded via existing dynamic value storage per DEC-2)
 - Implement `ImportHeaderNormalizer` service
 - Build connector runtime or EU compliance engine
 - Import full Amazon / Rozetka category trees

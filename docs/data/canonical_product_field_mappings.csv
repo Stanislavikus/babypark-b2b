@@ -5,8 +5,8 @@ brand,google_merchant,brand,direct,not_applicable,a005,conditionally_required,un
 brand,schema_org,brand,direct,not_applicable,a024,recommended,unversioned,verified,mapping:schema_org:brand:brand:a024:unversioned
 gtin,google_merchant,gtin,direct,not_applicable,a004,conditionally_required,unversioned,verified,mapping:google_merchant:gtin:gtin:a004:unversioned
 gtin,schema_org,gtin,direct,not_applicable,a004,recommended,unversioned,verified,mapping:schema_org:gtin:gtin:a004:unversioned
-mpn,google_merchant,mpn,direct,not_applicable,a001,conditionally_required,unversioned,partially_verified,mapping:google_merchant:mpn:mpn:a001:unversioned
-mpn,schema_org,mpn,direct,not_applicable,a001,recommended,unversioned,verified,mapping:schema_org:mpn:mpn:a001:unversioned
+mpn,google_merchant,mpn,direct,not_applicable,a025,conditionally_required,unversioned,verified,mapping:google_merchant:mpn:mpn:a025:unversioned
+mpn,schema_org,mpn,direct,not_applicable,a026,recommended,unversioned,verified,mapping:schema_org:mpn:mpn:a026:unversioned
 sku,google_merchant,id,renamed,variant_sku_as_offer_id,a023,required,unversioned,verified,mapping:google_merchant:sku:id:a023:unversioned
 sku,schema_org,sku,direct,not_applicable,a016,recommended,unversioned,verified,mapping:schema_org:sku:sku:a016:unversioned
 description,google_merchant,description,direct,not_applicable,a011,recommended,unversioned,verified,mapping:google_merchant:description:description:a011:unversioned

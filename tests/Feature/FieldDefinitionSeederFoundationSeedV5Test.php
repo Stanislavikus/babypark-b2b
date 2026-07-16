@@ -32,7 +32,6 @@ class FieldDefinitionSeederFoundationSeedV5Test extends TestCase
     private array $excludedCodes = [
         'age_group',
         'gender',
-        'mpn',
         'price',
         'sale_price',
         'cost_price',
