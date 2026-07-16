@@ -508,6 +508,30 @@ class FieldDefinitionSeeder extends Seeder
     {
         return [
             [
+                'code' => 'mpn',
+                'workspace_id' => null,
+                'scope' => AttributeScope::PlatformLibrary,
+                'value_level' => 'variant',
+                'data_type' => AttributeDataType::Text,
+                'storage_type' => AttributeStorageType::Dynamic,
+                'storage_path' => null,
+                'attribute_group' => 'identifiers',
+                'is_localizable' => false,
+                'is_multi_value' => false,
+                'is_required' => false,
+                'is_filterable' => true,
+                'is_sortable' => true,
+                'status' => AttributeStatus::Active,
+                'sort_order' => 95,
+                'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+                'localized_labels' => [
+                    'en' => 'Manufacturer Part Number',
+                    'uk' => 'Артикул виробника',
+                    'ru' => 'Артикул производителя',
+                ],
+                'validation_rules' => null,
+            ],
+            [
                 'code' => 'color',
                 'workspace_id' => null,
                 'scope' => AttributeScope::PlatformLibrary,
