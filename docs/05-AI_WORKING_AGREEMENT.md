@@ -772,6 +772,35 @@ The import experience should feel simple, but the mapping logic must remain cont
 
 ---
 
+## No Invisible Operator State
+
+Any state that affects an administrator's decisions, import/export
+behaviour, connector behaviour, mapping ownership of an external field, or
+that blocks a workflow, must have a visible administrative surface showing:
+status, source, last-updated date, and error (if any).
+
+Definition of Done for any such capability:
+- Where does the administrator see the current state?
+- Where is the source visible?
+- Where is the last-verified date visible?
+- Where is an error surfaced?
+- Where is change relative to the previous state visible, where versioned
+  state or change tracking is applicable? (A static CRUD reference table
+  may not yet have a meaningful history/diff view — that is acceptable.)
+- What decision can the administrator make here?
+
+Purely internal technical components (caches, internal libraries, stateless
+services) are exempt — they need tests, logs, or metrics, not necessarily an
+admin screen.
+
+If a required operator surface cannot ship in the same PR as the backend
+capability it governs, a blocking GAP must be opened with a mockup and
+acceptance criteria. No subsequent task may create, mutate, or operationally
+depend on that invisible state until the GAP is closed — unrelated backend
+work is not blocked by this rule.
+
+---
+
 ## Regional and Compliance Rules
 
 When the task targets a specific market, the AI must consider regional standards and legal/commercial requirements.

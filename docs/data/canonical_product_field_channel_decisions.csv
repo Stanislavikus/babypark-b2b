@@ -1,0 +1,9 @@
+channel_decision_id,internal_code,channel,decision_state,applicability_id_or_state,reason_ref_or_state,channel_schema_version,verification_status,evidence_subject_key
+cd001,price,adobe_commerce,deferred,all_contexts,DEC-010,2.4.9-admin-rest,verified,channel_decision:cd001
+cd002,net_weight,adobe_commerce,deferred,all_contexts,GAP-023,2.4.9-admin-rest,verified,channel_decision:cd002
+cd003,url,adobe_commerce,deferred,all_contexts,DEC-010,2.4.9-admin-rest,verified,channel_decision:cd003
+cd004,color,adobe_commerce,account_specific,all_contexts,DEC-010,2.4.9-admin-rest,verified,channel_decision:cd004
+cd005,manufacturer,adobe_commerce,account_specific,all_contexts,DEC-010,2.4.9-admin-rest,verified,channel_decision:cd005
+cd006,brand,adobe_commerce,account_specific,all_contexts,DEC-010,2.4.9-admin-rest,verified,channel_decision:cd006
+cd007,meta_title,adobe_commerce,deferred,all_contexts,DEC-010,2.4.9-admin-rest,verified,channel_decision:cd007
+cd008,meta_description,adobe_commerce,deferred,all_contexts,DEC-010,2.4.9-admin-rest,verified,channel_decision:cd008

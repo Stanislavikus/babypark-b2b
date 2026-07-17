@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             WorkspaceSeeder::class,
             WorkspacePermissionSeeder::class,
             FieldDefinitionSeeder::class,
+            ConnectorFoundationSeeder::class,
             B2BSeeder::class,
             DeliverySettingSeeder::class,
         ]);
