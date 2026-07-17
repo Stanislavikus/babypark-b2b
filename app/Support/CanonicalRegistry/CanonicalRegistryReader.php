@@ -7,10 +7,11 @@ class CanonicalRegistryReader
     /** @var array<string, list<array<string, string>>> */
     private array $datasets = [];
 
-    public function __construct(
-        private readonly string $dataPath = '',
-    ) {
-        $this->dataPath = $dataPath !== '' ? $dataPath : config('canonical_registry.data_path');
+    private readonly string $dataPath;
+
+    public function __construct(?string $dataPath = null)
+    {
+        $this->dataPath = $dataPath ?? config('canonical_registry.data_path');
     }
 
     /**
