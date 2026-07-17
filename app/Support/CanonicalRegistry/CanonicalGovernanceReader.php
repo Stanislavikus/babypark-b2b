@@ -4,17 +4,22 @@ namespace App\Support\CanonicalRegistry;
 
 class CanonicalGovernanceReader
 {
+    private readonly string $registryDocumentPath;
+
+    private readonly string $gapsDocumentPath;
+
+    private readonly CanonicalRegistryReader $registryReader;
+
     public function __construct(
-        private readonly string $registryDocumentPath = '',
-        private readonly string $gapsDocumentPath = '',
-        private readonly CanonicalRegistryReader $registryReader = new CanonicalRegistryReader,
+        ?string $registryDocumentPath = null,
+        ?string $gapsDocumentPath = null,
+        ?CanonicalRegistryReader $registryReader = null,
     ) {
-        $this->registryDocumentPath = $registryDocumentPath !== ''
-            ? $registryDocumentPath
-            : config('canonical_registry.registry_document_path');
-        $this->gapsDocumentPath = $gapsDocumentPath !== ''
-            ? $gapsDocumentPath
-            : base_path('docs/IMPLEMENTATION_GAPS.md');
+        $this->registryDocumentPath = $registryDocumentPath
+            ?? config('canonical_registry.registry_document_path');
+        $this->gapsDocumentPath = $gapsDocumentPath
+            ?? base_path('docs/IMPLEMENTATION_GAPS.md');
+        $this->registryReader = $registryReader ?? new CanonicalRegistryReader;
     }
 
     /**
