@@ -319,6 +319,7 @@ class CanonicalRegistryValidatorTest extends TestCase
         $this->writeCsv('canonical_product_field_options.csv', $this->optionHeaders(), $options);
         $this->writeCsv('canonical_product_field_option_mappings.csv', $this->optionMappingHeaders(), $optionMappings);
         $this->writeCsv('canonical_product_field_constraints.csv', $this->constraintHeaders(), $constraints);
+        $this->writeCsv('canonical_product_field_channel_decisions.csv', $this->channelDecisionHeaders(), []);
         $this->writeCsv('canonical_product_field_sources.csv', $this->sourceHeaders(), $sources);
 
         File::put(
@@ -612,6 +613,15 @@ class CanonicalRegistryValidatorTest extends TestCase
             'schema_version' => 'not_applicable',
             'verification_status' => 'verified',
             'evidence_subject_key' => 'applicability:'.$id,
+        ];
+    }
+
+    /** @return list<string> */
+    private function channelDecisionHeaders(): array
+    {
+        return [
+            'channel_decision_id', 'internal_code', 'channel', 'decision_state', 'applicability_id_or_state',
+            'reason_ref_or_state', 'channel_schema_version', 'verification_status', 'evidence_subject_key',
         ];
     }
 }

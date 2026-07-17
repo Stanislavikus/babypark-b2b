@@ -72,6 +72,13 @@ class CanonicalRegistryValidator
                 'effective_from', 'effective_to', 'schema_version', 'verification_status', 'evidence_subject_key',
             ],
         ],
+        'channel_decisions' => [
+            'filename' => 'canonical_product_field_channel_decisions.csv',
+            'headers' => [
+                'channel_decision_id', 'internal_code', 'channel', 'decision_state', 'applicability_id_or_state',
+                'reason_ref_or_state', 'channel_schema_version', 'verification_status', 'evidence_subject_key',
+            ],
+        ],
     ];
 
     private const DECLARED_ENUMS = [
@@ -87,8 +94,14 @@ class CanonicalRegistryValidator
         'mappings.channel' => [
             'google_merchant', 'shopify', 'adobe_commerce', 'bigcommerce', 'amazon', 'rozetka', 'schema_org',
         ],
+        'channel_decisions.channel' => [
+            'google_merchant', 'shopify', 'adobe_commerce', 'bigcommerce', 'amazon', 'rozetka', 'schema_org',
+        ],
+        'channel_decisions.decision_state' => [
+            'deferred', 'account_specific', 'not_applicable', 'unsupported',
+        ],
         'sources.subject_type' => [
-            'field', 'mapping', 'alias', 'option', 'option_mapping', 'constraint', 'applicability', 'decision',
+            'field', 'mapping', 'alias', 'option', 'option_mapping', 'constraint', 'applicability', 'decision', 'channel_decision',
         ],
     ];
 
@@ -111,9 +124,13 @@ class CanonicalRegistryValidator
     /** @var array<string, true> */
     private array $decisionHeadings = [];
 
+    /** @var array<string, true> */
+    private array $gapHeadings = [];
+
     public function __construct(
         private readonly string $dataPath,
         private readonly string $registryDocumentPath,
+        private readonly ?string $gapsDocumentPath = null,
     ) {}
 
     /**
@@ -126,6 +143,7 @@ class CanonicalRegistryValidator
         $this->metrics = [];
         $this->datasets = [];
         $this->decisionHeadings = $this->loadDecisionHeadings();
+        $this->gapHeadings = $this->loadGapHeadings();
 
         foreach (self::FILE_SPECS as $key => $spec) {
             $path = rtrim($this->dataPath, '/').'/'.$spec['filename'];
@@ -150,6 +168,7 @@ class CanonicalRegistryValidator
         $this->validateOptionMappings();
         $this->validateConstraints();
         $this->validateApplicability();
+        $this->validateChannelDecisions();
         $this->validateSources();
         $this->validateMissingSources();
 
@@ -249,6 +268,29 @@ class CanonicalRegistryValidator
         $headings = [];
         foreach ($matches[1] as $decisionId) {
             $headings[$decisionId] = true;
+        }
+
+        return $headings;
+    }
+
+    /** @return array<string, true> */
+    private function loadGapHeadings(): array
+    {
+        $path = $this->gapsDocumentPath ?? base_path('docs/IMPLEMENTATION_GAPS.md');
+        if (! is_file($path)) {
+            return [];
+        }
+
+        $content = file_get_contents($path);
+        if ($content === false) {
+            return [];
+        }
+
+        preg_match_all('/^## (GAP-\d+)/m', $content, $matches);
+
+        $headings = [];
+        foreach ($matches[1] as $gapId) {
+            $headings[$gapId] = true;
         }
 
         return $headings;
@@ -528,6 +570,145 @@ class CanonicalRegistryValidator
         }
     }
 
+    private function validateChannelDecisions(): void
+    {
+        if (! isset($this->datasets['channel_decisions'])) {
+            return;
+        }
+
+        $fieldCodes = $this->indexColumn('fields', 'internal_code');
+        $applicabilityById = $this->indexBy('applicability', 'applicability_id');
+        $seenIds = [];
+        $subjectsWithSources = [];
+        foreach ($this->datasets['sources'] as $sourceRow) {
+            $subjectsWithSources[$sourceRow['evidence_subject_key']] = true;
+        }
+
+        foreach ($this->datasets['channel_decisions'] as $row) {
+            $id = $row['channel_decision_id'];
+            if (isset($seenIds[$id])) {
+                $this->errors[] = "channel_decisions: duplicate channel_decision_id '{$id}'";
+            }
+            $seenIds[$id] = true;
+
+            if (! preg_match('/^cd[0-9]{3,}$/', $id)) {
+                $this->errors[] = "channel_decisions: channel_decision_id '{$id}' must match ^cd[0-9]{3,}$";
+            }
+
+            $this->checkDeclaredEnum('channel_decisions', 'channel', $row['channel'], $row);
+            $this->checkDeclaredEnum('channel_decisions', 'decision_state', $row['decision_state'], $row);
+
+            if (! isset($fieldCodes[$row['internal_code']])) {
+                $this->errors[] = "channel_decisions: unknown internal_code '{$row['internal_code']}'";
+            }
+
+            $expectedKey = 'channel_decision:'.$id;
+            if ($row['evidence_subject_key'] !== $expectedKey) {
+                $this->errors[] = "channel_decisions: evidence_subject_key for '{$id}' must be '{$expectedKey}'";
+            }
+
+            $applicabilityState = $row['applicability_id_or_state'];
+            if ($applicabilityState !== 'all_contexts' && ! isset($applicabilityById[$applicabilityState])) {
+                $this->errors[] = "channel_decisions: unknown applicability_id_or_state '{$applicabilityState}'";
+            }
+
+            if ($applicabilityState !== 'all_contexts' && isset($applicabilityById[$applicabilityState])) {
+                $applicabilityRow = $applicabilityById[$applicabilityState];
+                if ($applicabilityRow['internal_code'] !== $row['internal_code']) {
+                    $this->errors[] = "channel_decisions: semantic FK mismatch for '{$id}' — applicability internal_code does not match";
+                }
+            }
+
+            $reason = $row['reason_ref_or_state'];
+            if ($reason !== 'not_applicable' && ! isset($this->decisionHeadings[$reason]) && ! isset($this->gapHeadings[$reason])) {
+                $this->errors[] = "channel_decisions: reason_ref_or_state '{$reason}' does not resolve to DEC-NNN or GAP-NNN";
+            }
+
+            if ($row['verification_status'] === 'verified' && ! isset($subjectsWithSources[$expectedKey])) {
+                $this->errors[] = "channel_decisions: verification_status=verified requires at least one source row for '{$expectedKey}'";
+            }
+        }
+
+        $this->validateChannelDecisionSemanticKeys();
+        $this->validateMappingDecisionConflicts();
+    }
+
+    private function validateChannelDecisionSemanticKeys(): void
+    {
+        $grouped = [];
+        foreach ($this->datasets['channel_decisions'] as $row) {
+            $groupKey = implode('|', [
+                $row['internal_code'],
+                $row['channel'],
+                $row['channel_schema_version'],
+            ]);
+            $grouped[$groupKey][] = $row;
+        }
+
+        foreach ($grouped as $groupKey => $rows) {
+            $allContextsRows = array_filter($rows, fn (array $row): bool => $row['applicability_id_or_state'] === 'all_contexts');
+            if (count($allContextsRows) > 1) {
+                $this->errors[] = "channel_decisions: multiple all_contexts rows for '{$groupKey}'";
+            }
+
+            if ($allContextsRows !== [] && count($rows) > 1) {
+                $this->errors[] = "channel_decisions: all_contexts row conflicts with specific-context rows for '{$groupKey}'";
+            }
+
+            $specificApplicabilities = [];
+            foreach ($rows as $row) {
+                if ($row['applicability_id_or_state'] === 'all_contexts') {
+                    continue;
+                }
+
+                $applicabilityId = $row['applicability_id_or_state'];
+                if (isset($specificApplicabilities[$applicabilityId])) {
+                    $this->errors[] = "channel_decisions: duplicate specific applicability '{$applicabilityId}' for '{$groupKey}'";
+                }
+                $specificApplicabilities[$applicabilityId] = true;
+            }
+        }
+    }
+
+    private function validateMappingDecisionConflicts(): void
+    {
+        foreach ($this->datasets['channel_decisions'] as $decision) {
+            foreach ($this->datasets['mappings'] as $mapping) {
+                if ($mapping['internal_code'] !== $decision['internal_code']) {
+                    continue;
+                }
+
+                if ($mapping['channel'] !== $decision['channel']) {
+                    continue;
+                }
+
+                if ($mapping['channel_schema_version'] !== $decision['channel_schema_version']) {
+                    continue;
+                }
+
+                if ($decision['applicability_id_or_state'] === 'all_contexts') {
+                    $this->errors[] = sprintf(
+                        'channel_decisions: all_contexts decision %s conflicts with mapping for %s:%s:%s',
+                        $decision['channel_decision_id'],
+                        $mapping['channel'],
+                        $mapping['internal_code'],
+                        $mapping['external_field'],
+                    );
+
+                    continue;
+                }
+
+                if ($mapping['applicability_id'] === $decision['applicability_id_or_state']) {
+                    $this->errors[] = sprintf(
+                        'channel_decisions: decision %s conflicts with mapping sharing applicability %s',
+                        $decision['channel_decision_id'],
+                        $decision['applicability_id_or_state'],
+                    );
+                }
+            }
+        }
+    }
+
     private function validateSources(): void
     {
         $seenSourceIds = [];
@@ -597,6 +778,9 @@ class CanonicalRegistryValidator
         foreach ($this->datasets['applicability'] as $row) {
             $subjects[] = $row['evidence_subject_key'];
         }
+        foreach ($this->datasets['channel_decisions'] as $row) {
+            $subjects[] = $row['evidence_subject_key'];
+        }
 
         foreach (array_keys($this->decisionHeadings) as $decisionId) {
             $subjects[] = 'decision:'.$decisionId;
@@ -619,6 +803,7 @@ class CanonicalRegistryValidator
             'constraint' => isset($this->indexColumn('constraints', 'constraint_id')[$remainder]),
             'applicability' => isset($this->indexColumn('applicability', 'applicability_id')[$remainder]),
             'decision' => isset($this->decisionHeadings[$remainder]),
+            'channel_decision' => isset($this->indexColumn('channel_decisions', 'channel_decision_id')[$remainder]),
             default => false,
         };
     }

@@ -14,6 +14,7 @@ class CanonicalRegistryIntegrityTest extends TestCase
         $validator = new CanonicalRegistryValidator(
             base_path('docs/data'),
             base_path('docs/CANONICAL_PRODUCT_FIELD_REGISTRY.md'),
+            base_path('docs/IMPLEMENTATION_GAPS.md'),
         );
 
         $result = $validator->validate();
@@ -26,7 +27,7 @@ class CanonicalRegistryIntegrityTest extends TestCase
 
         $expectedMetricKeys = [
             'fields', 'mappings', 'aliases', 'sources', 'options',
-            'option_mappings', 'constraints', 'applicability',
+            'option_mappings', 'constraints', 'applicability', 'channel_decisions',
         ];
 
         foreach ($expectedMetricKeys as $key) {

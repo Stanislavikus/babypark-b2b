@@ -275,6 +275,13 @@ the approved phased plan.
 
 **Status:** Open, blocked on GAP-016 (Field Foundation migration), not GAP-003.
 
+**Task 4A note (added 2026-07-16):** Task 4A implements the first concrete
+schema for `ConnectorDefinition` and introduces `ConnectorSchemaSource`, plus
+a read-only admin surface over the existing Canonical Registry. It does not
+implement `ConnectorAccount`, credentials, live discovery, or `FieldMapping`
+runtime behaviour — those remain blocked by this GAP until Task 4B/4C.
+GAP-006 stays Open.
+
 ---
 
 ## GAP-007 — Channel-specific fields leaked into core `products` table

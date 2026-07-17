@@ -28,7 +28,7 @@ class ValidateCanonicalRegistry extends Command
         $this->newLine();
 
         $this->info('Metrics (row counts):');
-        foreach (['fields', 'mappings', 'aliases', 'sources', 'options', 'option_mappings', 'constraints', 'applicability'] as $key) {
+        foreach (['fields', 'mappings', 'aliases', 'sources', 'options', 'option_mappings', 'constraints', 'applicability', 'channel_decisions'] as $key) {
             $count = $result['metrics'][$key] ?? 0;
             $this->line(sprintf('  %-18s %d', $key.':', $count));
         }

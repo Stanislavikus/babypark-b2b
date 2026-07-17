@@ -214,7 +214,7 @@ schema.org confirms semantic property existence. **Not** proof of EU legal oblig
 
 ## Machine validation contract
 
-For each of the eight CSV files, this section defines the exact header
+For each of the nine CSV files, this section defines the exact header
 (order matters), primary/unique key, foreign keys, allowed enum/state
 values, `evidence_subject_key` format, and file-specific invariants. The
 validator and the CSV files must conform to this contract; changing it
@@ -278,8 +278,9 @@ FK/semantic-FK integrity, but not enum membership.
   - `constraint:*` → `constraint_id` in constraints.csv
   - `applicability:*` → `applicability_id` in applicability.csv
   - `decision:DEC-NNN` → a matching `### DEC-NNN` heading in `CANONICAL_PRODUCT_FIELD_REGISTRY.md`
+  - `channel_decision:cdNNN` → `channel_decision_id` in channel_decisions.csv
   An `evidence_subject_key` with a correct prefix but no matching subject (e.g. `field:brnad`, `option:o999`) is a hard error, not merely a missing-source warning.
-- `subject_type` (declared, evidence_subject_key convention): `field | mapping | alias | option | option_mapping | constraint | applicability | decision`
+- `subject_type` (declared, evidence_subject_key convention): `field | mapping | alias | option | option_mapping | constraint | applicability | decision | channel_decision`
 - `source_kind` (observed, extend via DEC): `official_web_doc | api_schema | repository_code | repository_document`
 - `verified_at`: must be `YYYY-MM-DD`, never a state token.
 
@@ -320,6 +321,27 @@ FK/semantic-FK integrity, but not enum membership.
 - `operation` (observed, extend via DEC): `not_applicable | advertise | publish`
 - `requirement_level` (observed, extend via DEC): `required | conditionally_required | recommended | undecided | not_applicable`
 - `evidence_subject_key` format: `applicability:<applicability_id>`
+
+### 9. canonical_product_field_channel_decisions.csv
+- Header (exact order): `channel_decision_id,internal_code,channel,decision_state,applicability_id_or_state,reason_ref_or_state,channel_schema_version,verification_status,evidence_subject_key`
+- Primary key: `channel_decision_id`
+- Semantic unique key: `(internal_code, channel, applicability_id_or_state, channel_schema_version)` — allows the same field/channel pair to have different decisions per product type, market, or schema version.
+- FK: `internal_code` → fields.csv; `channel` → declared channel list
+- `channel_decision_id` format: `^cd[0-9]{3,}$` (e.g. `cd001`, `cd042`)
+- `applicability_id_or_state` allowed values:
+  - `all_contexts` — the decision applies to every applicability context for this `internal_code` + `channel` + `channel_schema_version`.
+  - `<applicability_id>` — the decision applies only to that specific context; the referenced `applicability_id` must exist and must match the same `internal_code`, `channel`, and `channel_schema_version`.
+- `decision_state` (declared): `deferred | account_specific | not_applicable | unsupported` — `candidate` is explicitly NOT valid here.
+- `reason_ref_or_state`, when not `not_applicable`, must reference an existing `DEC-NNN` or `GAP-NNN` heading — hard error if it doesn't resolve.
+- `evidence_subject_key` format: `channel_decision:<channel_decision_id>`
+- **Hard structural rule (mapping/decision conflict):** a `channel_decision` row with `applicability_id_or_state: all_contexts` must not coexist with ANY `mapping` row for the same `internal_code` + `channel` + `channel_schema_version` (any applicability). A `channel_decision` row with a specific `applicability_id_or_state` must not coexist with a `mapping` row referencing that same `applicability_id`.
+- **Hard structural rule (decision/decision conflict):** an `all_contexts` channel-decision row must not coexist with ANY other `channel_decision` row for the same `internal_code` + `channel` + `channel_schema_version`.
+- `verification_status: verified` is not permitted without at least one matching source row in `canonical_product_field_sources.csv` (hard error).
+
+Extended evidence contract:
+- `canonical_product_field_sources.csv`'s declared `subject_type` enum gains `channel_decision`, with `evidence_subject_key` format `channel_decision:cdNNN`.
+- Every `channel_decision` row's `evidence_subject_key` must have source coverage in `canonical_product_field_sources.csv`. Missing coverage is a warning only while `verification_status` is not `verified`; for a `verified` row it is a hard structural error.
+- Orphan `channel_decision:*` references in `sources.csv` are a hard error.
 
 ### Enum-validation scope for this PR
 The validator performs enum/state membership checks only for columns whose

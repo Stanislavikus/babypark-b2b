@@ -1457,6 +1457,57 @@ Rules:
 
 Detailed import/mapping flows should be described in a future dedicated import-flow document. This design-system document defines only the approved UI pattern and boundaries.
 
+## Data Model & Connectors (admin section, Task 4A scope)
+
+Three screens under "Модель даних і коннектори":
+
+1. **Матриця полів** — read-only. Rows: canonical fields. Columns: up to 4
+   at a time, each identified by `(channel, channel_schema_version)`, not
+   by channel alone (see the Registry-channels-vs-ConnectorDefinitions
+   distinction in 03-DOMAIN_MODEL.md — columns are derived from Registry
+   channel values actually present in `mappings.csv`/
+   `channel_decisions.csv`, enriched by ConnectorDefinition metadata only
+   when codes match). If a channel has exactly one schema version present
+   in the Registry, it is auto-selected; if more than one exists, the
+   administrator must choose explicitly — never resolved by lexicographic
+   "latest" sorting.
+
+   Cell logic, evaluated per selected `(channel, channel_schema_version)`:
+   - no mapping and no channel_decision row for this field → **Not assessed**
+   - only mapping row(s) exist → the actual Registry `mapping_type` value
+     (`direct` / `renamed` / `transformed` / `connector_only` — shown
+     verbatim, never invented UI labels)
+   - only channel_decision row(s) exist → `deferred` / `account_specific` /
+     `unsupported` / `not_applicable`, shown verbatim
+   - mapping and channel_decision both exist, but in different,
+     non-overlapping applicability contexts → **Mixed** (this is a valid,
+     non-conflicting state; the validator only hard-fails on *overlapping*
+     contexts, per the Registry contract in section 2)
+   - a single applicability context has both a mapping and a decision row
+     → this cannot occur if the Registry validator is passing; if it is
+     ever observed in the UI, that is a data-integrity alarm, not a
+     rendering choice
+
+   Multiple applicability contexts within one cell are shown as badges or
+   a summary count, never silently collapsed into one label. Click opens a
+   drawer listing every context separately, with its own
+   mapping/applicability/transformation/sources/DEC/GAP detail. No
+   Approve/Reject actions here.
+
+2. **Платформи та джерела** — CRUD for `connector_definitions` +
+   `connector_schema_sources`. An administrator can add a platform (as
+   `draft`, promoted to `active` when ready), add multiple sources per
+   platform (each with its own `schema_scope`, `source_kind`,
+   `acquisition_mode`), edit URLs/versions, and mark verification status.
+   No "Run discovery" action here — that is Task 4B.
+
+3. **Governance** — read-only. DEC/GAP list and detail via
+   `CanonicalGovernanceReader` (strict heading contract), and evidence
+   sources from `canonical_product_field_sources.csv`.
+
+Editing/decision workflows belong to Task 4C's single-connector-focused
+Mapping Review screen, not to the Field Matrix.
+
 ## Empty States and Onboarding Rules
 
 Empty states must help the user take the next action.

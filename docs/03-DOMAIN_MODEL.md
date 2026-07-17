@@ -1614,40 +1614,113 @@ Connectors adapt external systems to the platform.
 
 The platform core must not adapt itself to each connector through hardcoded fields.
 
-### ConnectorDefinition
+### ConnectorDefinition (Resolved — physical schema)
 
+Table `connector_definitions`:
 
-A ConnectorDefinition is a global platform definition of a connector type.
+- id (UUID)
+- code (string, unique, immutable after creation)
+- name (string)
+- direction (enum: import | export | both)
+- status (enum: draft | active | deprecated)
+- notes (text, nullable)
+- created_at / updated_at
 
-Examples:
+Rules:
+- `code` is immutable once set.
+- Hard delete is forbidden once any reference exists (schema sources,
+  future ConnectorAccount rows); use `deprecated` instead.
+- `draft` definitions are not offered in production connector workflows
+  (Task 4B onward).
+- `status: active` requires at least one `connector_schema_sources` row
+  with `is_primary: true`, `schema_scope: global`, and
+  `verification_status: verified`. This prevents an administrator from
+  activating an empty platform — exactly the invisible/incomplete state
+  the initial seeder (section 2a) is meant to avoid.
 
-- Google Sheets;
+Examples of `code`: `google_merchant`, `shopify`, `adobe_commerce`,
+`bigcommerce`, `csv`, `google_sheets`, `1c`.
 
-- CSV import;
+**Registry channels are not the same set as ConnectorDefinition codes.**
+Registry mapping/channel-decision channels (e.g. `schema_org`) may have no
+runtime ConnectorDefinition at all, and some ConnectorDefinitions (e.g.
+`csv`) have no global product-field schema in the Registry. The Field
+Matrix (06-UI_DESIGN_SYSTEM.md) derives its columns from Registry channel
+values actually present in `mappings.csv`/`channel_decisions.csv`;
+ConnectorDefinition metadata only enriches a column when its `code`
+happens to match that Registry channel value. The two concepts must never
+be treated as identical.
 
-- Excel import;
+### ConnectorSchemaSource (Resolved — new entity)
 
-- 1C;
+Table `connector_schema_sources`:
 
-- Magento;
+- id (UUID)
+- connector_definition_id (FK → connector_definitions)
+- code (string, unique within the connector)
+- label (string)
+- source_kind (enum: api_schema | official_web_doc | repository_code |
+  repository_document | account_api | static_registry | manual_import)
+  — this is a compatible superset of the Registry's existing `source_kind`
+  vocabulary (`canonical_product_field_sources.csv`): it reuses the same
+  names where semantics coincide (`api_schema`, `official_web_doc`,
+  `repository_code`, `repository_document`) and adds three connector-only
+  values (`account_api`, `static_registry`, `manual_import`) that have no
+  meaning in the global field-evidence context. It is not a literally
+  identical enum, but Governance UI never needs a translation layer for
+  the four shared values.
 
-- API;
+Invariants (enforced at the application level, not by a database
+constraint that would also forbid multiple non-primary rows):
 
-- marketplace feed.
+- `code` is immutable after creation.
+- Unique: `(connector_definition_id, code)`.
+- If `source_kind: account_api`, then `schema_scope` must be `account`,
+  `acquisition_mode` must be `live_fetch`, and `endpoint_path` must not be
+  null.
+- If `schema_scope: global`, then `endpoint_path` must be null.
+- If `verification_status: verified`, then `last_verified_at` must not be
+  null.
+- `reference_url`, when present, must be a valid absolute URL.
+- At most one `is_primary: true` row per
+  `(connector_definition_id, schema_scope)`. Enforced by: an application
+  service that, within a DB transaction, locks the parent
+  `ConnectorDefinition` row and atomically unsets any previous primary in
+  the same scope before setting the new one — not by a naive unique index
+  on `(connector_definition_id, schema_scope, is_primary)`, which would
+  also forbid multiple `is_primary: false` rows. A feature test must cover
+  this transition.
+- acquisition_mode (enum: remote_static | live_fetch | bundled_file | manual)
+- schema_scope (enum: global | account)
+- reference_url (string, nullable) — for `schema_scope: global` sources
+  only, this is the documentation/schema reference URL. For
+  `schema_scope: account` sources, `reference_url` holds the URL of the
+  *official documentation describing the endpoint*, never a specific
+  client's store base URL — the actual per-store base URL belongs to
+  `ConnectorAccount` (Task 4B), not here.
+- endpoint_path (string, nullable) — e.g. `/V1/products/attributes`, only
+  meaningful when `schema_scope: account`.
+- schema_version (string, nullable)
+- is_primary (boolean) — see invariants below for the exact uniqueness rule.
+- verification_status (enum: verified | stale | broken | unverified)
+- last_verified_at (nullable timestamp)
+- notes (text, nullable)
+- sort_order (integer)
+- created_at / updated_at
 
-It may contain:
+Example — Adobe Commerce, two rows:
 
-- code;
+| label | source_kind | acquisition_mode | schema_scope | reference_url | endpoint_path | is_primary |
+|---|---|---|---|---|---|---|
+| Admin REST API reference | api_schema | remote_static | global | adobe-commerce.redoc.ly/... | null | true |
+| Live account attributes | account_api | live_fetch | account | experienceleague.adobe.com/.../products-api (docs about the endpoint) | /V1/products/attributes | true |
 
-- name;
+Both rows may be `is_primary: true` simultaneously because they have
+different `schema_scope` values (global vs account) — the uniqueness rule
+is scoped, not connector-wide.
 
-- type;
-
-- direction;
-
-- capabilities;
-
-- status.
+No credentials are stored here. Credentials belong to `ConnectorAccount`
+(Task 4B).
 
 This is global platform data.
 
@@ -1689,7 +1762,22 @@ It may contain:
 
 - source field;
 
-- target attribute definition;
+- canonical mapping target.
+
+  For Field Foundation-backed targets, the mapping references
+  `canonical_field_binding_id`, not a bare FieldDefinition reference (see
+  Field Foundation rename, GAP-016). Named "canonical", not "target",
+  because ConnectorDefinition.direction can be import, export, or both: on
+  import the canonical binding is the destination; on export it is the
+  source. "Target" would be directionally wrong for export connectors.
+
+  Domain-owned targets such as pricing, availability, media, or other
+  service-resolved concepts are NOT represented by
+  `canonical_field_binding_id` — they require a registered domain
+  target/handler whose physical FieldMapping representation is not decided
+  by this Stop-and-Amend and must be finalized before Task 4C. Task 4A does
+  not create any `field_mappings` rows, so no representation is invented
+  here.
 
 - target level;
 
