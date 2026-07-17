@@ -10,6 +10,7 @@ class FieldMatrixPresenter
 
     /**
      * @param  list<array{channel: string, channel_schema_version: string}>  $columns
+     * @param  list<array<string, string>>|null  $fields
      * @return list<array{
      *   internal_code: string,
      *   uk_label: string,
@@ -20,11 +21,11 @@ class FieldMatrixPresenter
      *   }>
      * }>
      */
-    public function buildMatrix(array $columns): array
+    public function buildMatrix(array $columns, ?array $fields = null): array
     {
         $matrix = [];
 
-        foreach ($this->reader->fields() as $field) {
+        foreach ($fields ?? $this->reader->fields() as $field) {
             $cells = [];
             foreach ($columns as $column) {
                 $key = $column['channel'].'|'.$column['channel_schema_version'];

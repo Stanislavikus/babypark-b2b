@@ -1461,8 +1461,9 @@ Detailed import/mapping flows should be described in a future dedicated import-f
 
 Three screens under "Модель даних і коннектори":
 
-1. **Матриця полів** — read-only. Rows: canonical fields. Columns: up to 4
-   at a time, each identified by `(channel, channel_schema_version)`, not
+1. **Матриця полів** — read-only. Rows: canonical fields. Columns: up to 6
+   channel/version comparison columns at a time, each identified by
+   `(channel, channel_schema_version)`, not
    by channel alone (see the Registry-channels-vs-ConnectorDefinitions
    distinction in 03-DOMAIN_MODEL.md — columns are derived from Registry
    channel values actually present in `mappings.csv`/

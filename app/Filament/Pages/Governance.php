@@ -25,13 +25,17 @@ class Governance extends Page
     /** @var list<array{id: string, type: string, title: string}> */
     public array $decisions = [];
 
-    public ?string $selectedId = null;
+    public string $activeTab = 'DEC';
+
+    public string $search = '';
+
+    public ?string $expandedCardId = null;
 
     /** @var array{id: string, type: string, title: string, body: string}|null */
-    public ?array $selectedDecision = null;
+    public ?array $expandedDecision = null;
 
     /** @var list<array<string, string>> */
-    public array $selectedSources = [];
+    public array $expandedSources = [];
 
     public static function canAccess(): bool
     {
@@ -44,17 +48,71 @@ class Governance extends Page
     {
         $reader = app(CanonicalGovernanceReader::class);
         $this->decisions = $reader->listDecisions();
-
-        if ($this->decisions !== []) {
-            $this->selectDecision($this->decisions[0]['id']);
-        }
     }
 
-    public function selectDecision(string $id): void
+    public function setActiveTab(string $tab): void
     {
-        $this->selectedId = $id;
+        if (! in_array($tab, ['DEC', 'GAP'], true)) {
+            return;
+        }
+
+        $this->activeTab = $tab;
+        $this->expandedCardId = null;
+        $this->expandedDecision = null;
+        $this->expandedSources = [];
+    }
+
+    public function toggleCard(string $id): void
+    {
+        if ($this->expandedCardId === $id) {
+            $this->expandedCardId = null;
+            $this->expandedDecision = null;
+            $this->expandedSources = [];
+
+            return;
+        }
+
+        $this->expandedCardId = $id;
         $reader = app(CanonicalGovernanceReader::class);
-        $this->selectedDecision = $reader->getDecision($id);
-        $this->selectedSources = $reader->sourcesForSubject('decision:'.$id);
+        $this->expandedDecision = $reader->getDecision($id);
+        $this->expandedSources = $reader->sourcesForSubject('decision:'.$id);
+    }
+
+    /**
+     * @return list<array{id: string, type: string, title: string}>
+     */
+    public function filteredDecisions(): array
+    {
+        $search = mb_strtolower(trim($this->search));
+
+        return collect($this->decisions)
+            ->filter(fn (array $decision): bool => $decision['type'] === $this->activeTab)
+            ->filter(function (array $decision) use ($search): bool {
+                if ($search === '') {
+                    return true;
+                }
+
+                $number = str_replace(['DEC-', 'GAP-'], '', $decision['id']);
+
+                return str_contains(mb_strtolower($decision['id']), $search)
+                    || str_contains(mb_strtolower($number), $search)
+                    || str_contains(mb_strtolower($decision['title']), $search);
+            })
+            ->values()
+            ->all();
+    }
+
+    public function decCount(): int
+    {
+        return collect($this->decisions)
+            ->where('type', 'DEC')
+            ->count();
+    }
+
+    public function gapCount(): int
+    {
+        return collect($this->decisions)
+            ->where('type', 'GAP')
+            ->count();
     }
 }
