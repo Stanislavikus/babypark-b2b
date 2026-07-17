@@ -2,17 +2,21 @@
 
 namespace App\Filament\Resources\ConnectorDefinitionResource\RelationManagers;
 
+use App\Enums\ConnectorDefinitionStatus;
 use App\Enums\ConnectorSchemaAcquisitionMode;
 use App\Enums\ConnectorSchemaScope;
 use App\Enums\ConnectorSchemaSourceKind;
 use App\Enums\ConnectorSchemaVerificationStatus;
+use App\Models\ConnectorDefinition;
 use App\Models\ConnectorSchemaSource;
-use App\Services\Connectors\ConnectorSchemaSourceService;
+use App\Services\Connectors\ConnectorDefinitionGovernanceService;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class SchemaSourcesRelationManager extends RelationManager
 {
@@ -118,30 +122,71 @@ class SchemaSourcesRelationManager extends RelationManager
             ->defaultSort('sort_order')
             ->headerActions([
                 Tables\Actions\CreateAction::make()
-                    ->mutateFormDataUsing(function (array $data): array {
-                        app(ConnectorSchemaSourceService::class)->validateInvariants($data);
+                    ->using(function (array $data, Table $table): Model {
+                        $owner = $this->resolveOwnerDefinition($table);
 
-                        return $data;
-                    })
-                    ->after(function (ConnectorSchemaSource $record, array $data): void {
-                        if (! empty($data['is_primary'])) {
-                            app(ConnectorSchemaSourceService::class)->setPrimary($record, true);
-                        }
+                        return $this->mutateSourceWithGovernance(
+                            $owner,
+                            fn () => app(ConnectorDefinitionGovernanceService::class)->createSource($owner, $data),
+                        );
                     }),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
-                    ->mutateFormDataUsing(function (array $data, ConnectorSchemaSource $record): array {
-                        app(ConnectorSchemaSourceService::class)->validateInvariants($data, $record);
+                    ->using(function (array $data, Model $record, Table $table): Model {
+                        $owner = $this->resolveOwnerDefinition($table);
 
-                        return $data;
-                    })
-                    ->after(function (ConnectorSchemaSource $record, array $data): void {
-                        if (array_key_exists('is_primary', $data)) {
-                            app(ConnectorSchemaSourceService::class)->setPrimary($record, (bool) $data['is_primary']);
-                        }
+                        return $this->mutateSourceWithGovernance(
+                            $owner,
+                            fn () => app(ConnectorDefinitionGovernanceService::class)->updateSource($record, $data),
+                        );
                     }),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\DeleteAction::make()
+                    ->using(function (Model $record, Table $table): bool {
+                        $owner = $this->resolveOwnerDefinition($table);
+
+                        $this->mutateSourceWithGovernance(
+                            $owner,
+                            function () use ($record): void {
+                                app(ConnectorDefinitionGovernanceService::class)->deleteSource($record);
+                            },
+                        );
+
+                        return true;
+                    }),
             ]);
+    }
+
+    private function resolveOwnerDefinition(Table $table): ConnectorDefinition
+    {
+        /** @var RelationManager $livewire */
+        $livewire = $table->getLivewire();
+
+        return $livewire->getOwnerRecord();
+    }
+
+    /**
+     * @template TReturn
+     *
+     * @param  callable(): TReturn  $callback
+     * @return TReturn
+     */
+    private function mutateSourceWithGovernance(ConnectorDefinition $owner, callable $callback): mixed
+    {
+        $wasActive = $owner->status === ConnectorDefinitionStatus::Active;
+
+        $result = $callback();
+
+        $owner->refresh();
+
+        if ($wasActive && $owner->status === ConnectorDefinitionStatus::Draft) {
+            Notification::make()
+                ->warning()
+                ->title('Платформу переведено в чернетку')
+                ->body('Втрачено перевірене первинне глобальне джерело схеми.')
+                ->send();
+        }
+
+        return $result;
     }
 }

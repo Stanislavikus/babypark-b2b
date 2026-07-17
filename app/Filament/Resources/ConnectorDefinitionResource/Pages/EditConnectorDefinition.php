@@ -2,11 +2,12 @@
 
 namespace App\Filament\Resources\ConnectorDefinitionResource\Pages;
 
-use App\Enums\ConnectorDefinitionStatus;
 use App\Filament\Resources\ConnectorDefinitionResource;
+use App\Models\ConnectorDefinition;
+use App\Services\Connectors\ConnectorDefinitionGovernanceService;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Database\Eloquent\Model;
 
 class EditConnectorDefinition extends EditRecord
 {
@@ -16,19 +17,17 @@ class EditConnectorDefinition extends EditRecord
     {
         return [
             Actions\DeleteAction::make()
-                ->visible(false),
+                ->using(function (ConnectorDefinition $record): bool {
+                    app(ConnectorDefinitionGovernanceService::class)
+                        ->deleteDefinitionWhenUnreferenced($record);
+
+                    return true;
+                }),
         ];
     }
 
-    protected function mutateFormDataBeforeSave(array $data): array
+    protected function handleRecordUpdate(Model $record, array $data): Model
     {
-        if (($data['status'] ?? null) === ConnectorDefinitionStatus::Active->value
-            && ! $this->record->hasVerifiedGlobalPrimarySource()) {
-            throw ValidationException::withMessages([
-                'status' => 'Активна платформа потребує перевіреного глобального первинного джерела схеми.',
-            ]);
-        }
-
-        return $data;
+        return app(ConnectorDefinitionGovernanceService::class)->updateDefinition($record, $data);
     }
 }

@@ -22,7 +22,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->foreignUuid('connector_definition_id')
                 ->constrained('connector_definitions')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
             $table->string('code');
             $table->string('label');
             $table->string('source_kind');

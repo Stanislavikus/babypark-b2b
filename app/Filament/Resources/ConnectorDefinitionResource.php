@@ -15,7 +15,6 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
 
 class ConnectorDefinitionResource extends Resource
 {
@@ -68,18 +67,7 @@ class ConnectorDefinitionResource extends Resource
                         ->label('Статус')
                         ->options(ConnectorDefinitionStatus::options())
                         ->required()
-                        ->live()
-                        ->afterStateUpdated(function (?string $state, ?ConnectorDefinition $record): void {
-                            if ($state !== ConnectorDefinitionStatus::Active->value || $record === null) {
-                                return;
-                            }
-
-                            if (! $record->hasVerifiedGlobalPrimarySource()) {
-                                throw ValidationException::withMessages([
-                                    'status' => 'Активна платформа потребує перевіреного глобального первинного джерела схеми.',
-                                ]);
-                            }
-                        }),
+                        ->visible(fn (?ConnectorDefinition $record): bool => $record !== null),
 
                     Forms\Components\Textarea::make('notes')
                         ->label('Примітки')
