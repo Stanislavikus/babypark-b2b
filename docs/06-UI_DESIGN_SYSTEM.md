@@ -526,9 +526,31 @@ Filament core підтверджує one-row toolbar baseline, але не на�
 project-level responsive extension, реалізованим публічними Filament
 Blade components і стандартним Tailwind `md` breakpoint.
 
-Content-scope switchers (наприклад, DEC/GAP) не стають row filters:
-на desktop вони можуть бути compact tabs у toolbar actions region, а на
-mobile — options у тому самому overflow panel.
+Content-scope switchers that navigate between genuinely different page
+sections or workflows may use tabs. They must not be used merely to work
+around toolbar layout.
+
+### Required Scope Filters
+
+A page-scope selector may use the standard structured-filter trigger when
+it narrows one existing list and does not navigate to a different page,
+workflow or data model.
+
+Governance document type is the approved reference:
+
+- DEC/GAP is rendered through the shared filter trigger, not through
+  tabs or a page-specific action;
+- exactly one document type is always selected;
+- the current type is shown below the toolbar using the same visual
+  language as active-filter indicators;
+- because the selector has no neutral state, its indicator is not
+  removable and the page does not show “Clear all” for this selector;
+- desktop and mobile reuse one filter-panel content instance and one
+  Livewire state value.
+
+Tabs remain appropriate when the user switches between genuinely
+different page sections or workflows. They must not be used merely to
+work around toolbar layout.
 
 ### Product Table Toolbar Specialization
 
@@ -1581,7 +1603,8 @@ Three screens under "Модель даних і коннектори":
    `acquisition_mode`), edit URLs/versions, and mark verification status.
    No "Run discovery" action here — that is Task 4B.
 
-3. **Governance** — read-only. DEC/GAP list and detail via
+3. **Governance** — read-only. DEC/GAP required document-type filter using
+   the shared Data List toolbar; list and detail via
    `CanonicalGovernanceReader` (strict heading contract), and evidence
    sources from `canonical_product_field_sources.csv`.
 

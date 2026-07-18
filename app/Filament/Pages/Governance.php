@@ -6,17 +6,18 @@ use App\Models\User;
 use App\Support\CanonicalRegistry\CanonicalGovernanceReader;
 use App\Support\Platform\PlatformAdminAuthorization;
 use Filament\Pages\Page;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
 
 class Governance extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
 
-    protected static ?string $navigationGroup = 'Модель даних і коннектори';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $navigationLabel = 'Governance';
+    protected static ?string $title = null;
 
-    protected static ?string $title = 'Governance';
+    protected static ?string $navigationGroup = null;
 
     protected static ?int $navigationSort = 3;
 
@@ -25,7 +26,7 @@ class Governance extends Page
     /** @var list<array{id: string, type: string, title: string}> */
     public array $decisions = [];
 
-    public string $activeTab = 'DEC';
+    public string $documentType = 'DEC';
 
     public string $search = '';
 
@@ -44,22 +45,44 @@ class Governance extends Page
         return $user instanceof User && PlatformAdminAuthorization::canManage($user);
     }
 
+    public static function getNavigationLabel(): string
+    {
+        return __('governance.navigation_label');
+    }
+
+    public function getTitle(): string|Htmlable
+    {
+        return __('governance.title');
+    }
+
+    public static function getNavigationGroup(): ?string
+    {
+        return __('governance.navigation_group');
+    }
+
     public function mount(): void
     {
         $reader = app(CanonicalGovernanceReader::class);
         $this->decisions = $reader->listDecisions();
     }
 
-    public function setActiveTab(string $tab): void
+    public function setDocumentType(string $type): void
     {
-        if (! in_array($tab, ['DEC', 'GAP'], true)) {
+        if (! in_array($type, ['DEC', 'GAP'], true)) {
             return;
         }
 
-        $this->activeTab = $tab;
+        $this->documentType = $type;
         $this->expandedCardId = null;
         $this->expandedDecision = null;
         $this->expandedSources = [];
+    }
+
+    public function documentTypeIndicatorLabel(): string
+    {
+        return __('governance.current_document_type', [
+            'type' => $this->documentType,
+        ]);
     }
 
     public function toggleCard(string $id): void
@@ -86,7 +109,7 @@ class Governance extends Page
         $search = mb_strtolower(trim($this->search));
 
         return collect($this->decisions)
-            ->filter(fn (array $decision): bool => $decision['type'] === $this->activeTab)
+            ->filter(fn (array $decision): bool => $decision['type'] === $this->documentType)
             ->filter(function (array $decision) use ($search): bool {
                 if ($search === '') {
                     return true;

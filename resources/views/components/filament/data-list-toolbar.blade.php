@@ -3,6 +3,7 @@
     'hasFilters' => false,
     'panelId' => null,
     'mobileContextIndicator' => null,
+    'filtersLabel' => 'Фільтри',
 ])
 
 @php
@@ -37,7 +38,7 @@
                             x-on:click="panelFocus = 'filters'; $dispatch('open-modal', { id: '{{ $panelId }}' })"
                         >
                             <span class="flex items-center gap-2">
-                                <span>Фільтри</span>
+                                <span>{{ $filtersLabel }}</span>
                                 @if ($filtersCount > 0)
                                     <x-filament::badge color="primary" size="sm">
                                         {{ $filtersCount }}
@@ -52,7 +53,7 @@
                             data-testid="data-list-filter-trigger"
                         >
                             <span class="flex items-center gap-2">
-                                <span>Фільтри</span>
+                                <span>{{ $filtersLabel }}</span>
                                 @if ($filtersCount > 0)
                                     <x-filament::badge color="primary" size="sm">
                                         {{ $filtersCount }}

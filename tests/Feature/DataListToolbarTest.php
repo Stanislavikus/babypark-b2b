@@ -322,15 +322,77 @@ class DataListToolbarTest extends TestCase
     }
 
     #[Test]
-    public function governance_keeps_dec_gap_as_tabs(): void
+    public function governance_document_type_uses_shared_filter_trigger_from_toolbar_suite(): void
     {
         Livewire::actingAs($this->platformAdmin)
             ->test(Governance::class)
-            ->assertSeeHtml('fi-tabs')
-            ->assertSee('DEC')
-            ->assertSee('GAP')
-            ->call('setActiveTab', 'GAP')
-            ->assertSet('activeTab', 'GAP');
+            ->assertSeeHtml('data-testid="data-list-filter-trigger"')
+            ->assertSeeHtml('data-toolbar-region="filters"');
+    }
+
+    #[Test]
+    public function governance_does_not_render_dec_gap_tabs_or_document_type_action_from_toolbar_suite(): void
+    {
+        $blade = File::get(resource_path('views/filament/pages/governance.blade.php'));
+
+        $this->assertStringNotContainsString('x-filament::tabs', $blade);
+        $this->assertStringNotContainsString('governance-desktop-tabs', $blade);
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(Governance::class)
+            ->assertDontSeeHtml('fi-tabs');
+    }
+
+    #[Test]
+    public function governance_required_document_type_indicator_is_visible_below_toolbar_from_toolbar_suite(): void
+    {
+        Livewire::actingAs($this->platformAdmin)
+            ->test(Governance::class)
+            ->assertSeeHtml('data-toolbar-region="active-filters"')
+            ->assertSeeHtml('data-testid="governance-document-type-indicator"');
+    }
+
+    #[Test]
+    public function governance_mobile_overflow_reuses_same_document_type_panel_from_toolbar_suite(): void
+    {
+        $blade = File::get(resource_path('views/filament/pages/governance.blade.php'));
+
+        $this->assertEquals(1, substr_count($blade, 'data-testid="governance-document-type-filter"'));
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(Governance::class)
+            ->assertSeeHtml('data-testid="data-list-mobile-overflow-trigger"')
+            ->assertSeeHtml('data-testid="governance-document-type-filter"');
+    }
+
+    #[Test]
+    public function governance_renders_shared_filter_trigger_with_required_count(): void
+    {
+        $blade = File::get(resource_path('views/filament/pages/governance.blade.php'));
+
+        $this->assertStringContainsString(':has-filters="true"', $blade);
+        $this->assertStringContainsString(':filters-count="1"', $blade);
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(Governance::class)
+            ->assertSeeHtml('data-testid="data-list-filter-trigger"');
+    }
+
+    #[Test]
+    public function field_matrix_toolbar_behavior_is_unchanged(): void
+    {
+        $blade = File::get(resource_path('views/filament/pages/field-matrix.blade.php'));
+
+        $this->assertStringContainsString(':has-filters="true"', $blade);
+        $this->assertStringContainsString('panel-id="field-matrix-toolbar-panel"', $blade);
+        $this->assertStringContainsString('data-testid="compare-channels-trigger"', $blade);
+        $this->assertEquals(1, substr_count($blade, '{{ $this->form }}'));
+        $this->assertStringNotContainsString('filters-label', $blade);
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->assertSeeHtml('data-testid="data-list-filter-trigger"')
+            ->assertSee('Фільтри');
     }
 
     #[Test]
@@ -397,70 +459,6 @@ class DataListToolbarTest extends TestCase
 
         $htmlWithComparison = $component->html();
         $this->assertEquals(1, substr_count($htmlWithComparison, 'fi-icon-btn-badge-ctn'));
-    }
-
-    #[Test]
-    public function governance_desktop_tabs_are_in_toolbar_actions_region(): void
-    {
-        $blade = File::get(resource_path('views/filament/pages/governance.blade.php'));
-
-        $this->assertStringContainsString('<x-slot name="actions">', $blade);
-        $this->assertStringContainsString('data-testid="governance-desktop-tabs"', $blade);
-        $this->assertStringNotContainsString('</x-filament.data-list-toolbar>
-
-    <x-filament::tabs>', $blade);
-
-        Livewire::actingAs($this->platformAdmin)
-            ->test(Governance::class)
-            ->assertSeeHtml('data-toolbar-region="actions"')
-            ->assertSeeHtml('data-testid="governance-desktop-tabs"');
-    }
-
-    #[Test]
-    public function governance_mobile_overflow_contains_document_type_switch(): void
-    {
-        $blade = File::get(resource_path('views/filament/pages/governance.blade.php'));
-
-        $this->assertStringContainsString('data-testid="governance-mobile-document-type"', $blade);
-        $this->assertStringContainsString('Тип документа', $blade);
-        $this->assertStringContainsString('governance-toolbar-panel', $blade);
-
-        Livewire::actingAs($this->platformAdmin)
-            ->test(Governance::class)
-            ->assertSeeHtml('data-testid="governance-mobile-document-type"')
-            ->assertSeeHtml('data-testid="data-list-mobile-overflow-trigger"');
-    }
-
-    #[Test]
-    public function governance_mobile_indicator_shows_active_dec_or_gap(): void
-    {
-        $decHtml = Livewire::actingAs($this->platformAdmin)
-            ->test(Governance::class)
-            ->assertSet('activeTab', 'DEC')
-            ->html();
-
-        $this->assertMatchesRegularExpression('/data-toolbar-region="mobile-overflow"[\s\S]*fi-icon-btn-badge-ctn[\s\S]*DEC/', $decHtml);
-
-        $gapHtml = Livewire::actingAs($this->platformAdmin)
-            ->test(Governance::class)
-            ->call('setActiveTab', 'GAP')
-            ->assertSet('activeTab', 'GAP')
-            ->html();
-
-        $this->assertMatchesRegularExpression('/data-toolbar-region="mobile-overflow"[\s\S]*fi-icon-btn-badge-ctn[\s\S]*GAP/', $gapHtml);
-    }
-
-    #[Test]
-    public function governance_does_not_render_empty_filters_trigger(): void
-    {
-        $blade = File::get(resource_path('views/filament/pages/governance.blade.php'));
-
-        $this->assertStringContainsString(':has-filters="false"', $blade);
-        $this->assertStringNotContainsString('data-testid="data-list-filter-trigger"', $blade);
-
-        Livewire::actingAs($this->platformAdmin)
-            ->test(Governance::class)
-            ->assertDontSee('Фільтри');
     }
 
     #[Test]

@@ -1,41 +1,22 @@
 <x-filament-panels::page>
   <div class="space-y-4">
     <x-filament.data-list-toolbar
-      :has-filters="false"
+      :has-filters="true"
+      :filters-count="1"
       panel-id="governance-toolbar-panel"
-      :mobile-context-indicator="$activeTab"
+      :filters-label="__('governance.filters')"
     >
       <x-slot name="search">
-        <label for="governance-search" class="sr-only">Пошук</label>
+        <label for="governance-search" class="sr-only">{{ __('governance.search_label') }}</label>
         <x-filament::input.wrapper>
           <x-filament::input
             id="governance-search"
             type="search"
-            placeholder="Пошук за номером або заголовком..."
-            aria-label="Пошук за номером або заголовком"
+            :placeholder="__('governance.search_placeholder')"
+            :aria-label="__('governance.search_label')"
             wire:model.live.debounce.300ms="search"
           />
         </x-filament::input.wrapper>
-      </x-slot>
-
-      <x-slot name="actions">
-        <x-filament::tabs data-testid="governance-desktop-tabs">
-          <x-filament::tabs.item
-            :active="$activeTab === 'DEC'"
-            :badge="(string) $this->decCount()"
-            wire:click="setActiveTab('DEC')"
-          >
-            DEC
-          </x-filament::tabs.item>
-
-          <x-filament::tabs.item
-            :active="$activeTab === 'GAP'"
-            :badge="(string) $this->gapCount()"
-            wire:click="setActiveTab('GAP')"
-          >
-            GAP
-          </x-filament::tabs.item>
-        </x-filament::tabs>
       </x-slot>
 
       <x-slot name="panel">
@@ -43,36 +24,83 @@
           class="space-y-4 p-4"
           data-testid="governance-toolbar-panel"
         >
-          <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Тип документа</h3>
+          <fieldset data-testid="governance-document-type-filter">
+            <legend class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">
+              {{ __('governance.document_type') }}
+            </legend>
 
-          <div class="space-y-2" data-testid="governance-mobile-document-type">
-            <button
-              type="button"
-              wire:click="setActiveTab('DEC')"
-              @class([
-                'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium',
-                'bg-primary-50 text-primary-700 ring-1 ring-primary-200 dark:bg-primary-500/10 dark:text-primary-400 dark:ring-primary-500/30' => $activeTab === 'DEC',
-                'bg-gray-50 text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-700' => $activeTab !== 'DEC',
-              ])
-            >
-              <span>DEC</span>
-              <x-filament::badge color="gray" size="sm">{{ $this->decCount() }}</x-filament::badge>
-            </button>
+            <div class="space-y-3">
+              <label
+                for="governance-document-type-dec"
+                data-testid="governance-document-type-dec"
+                @class([
+                  'flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2',
+                  'border-primary-300 bg-primary-50 ring-1 ring-primary-200 dark:border-primary-500/40 dark:bg-primary-500/10 dark:ring-primary-500/30' => $documentType === 'DEC',
+                  'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800' => $documentType !== 'DEC',
+                ])
+              >
+                <input
+                  id="governance-document-type-dec"
+                  type="radio"
+                  name="governance-document-type"
+                  value="DEC"
+                  class="mt-1"
+                  wire:click="setDocumentType('DEC')"
+                  @checked($documentType === 'DEC')
+                />
+                <span class="min-w-0 flex-1">
+                  <span class="block text-sm font-medium text-gray-900 dark:text-white">
+                    {{ __('governance.dec') }}
+                    <x-filament::badge color="gray" size="sm" class="ms-1">{{ $this->decCount() }}</x-filament::badge>
+                  </span>
+                  <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                    {{ __('governance.dec_description') }}
+                  </span>
+                </span>
+              </label>
 
-            <button
-              type="button"
-              wire:click="setActiveTab('GAP')"
-              @class([
-                'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium',
-                'bg-primary-50 text-primary-700 ring-1 ring-primary-200 dark:bg-primary-500/10 dark:text-primary-400 dark:ring-primary-500/30' => $activeTab === 'GAP',
-                'bg-gray-50 text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-700' => $activeTab !== 'GAP',
-              ])
-            >
-              <span>GAP</span>
-              <x-filament::badge color="gray" size="sm">{{ $this->gapCount() }}</x-filament::badge>
-            </button>
-          </div>
+              <label
+                for="governance-document-type-gap"
+                data-testid="governance-document-type-gap"
+                @class([
+                  'flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2',
+                  'border-primary-300 bg-primary-50 ring-1 ring-primary-200 dark:border-primary-500/40 dark:bg-primary-500/10 dark:ring-primary-500/30' => $documentType === 'GAP',
+                  'border-gray-200 bg-white hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800' => $documentType !== 'GAP',
+                ])
+              >
+                <input
+                  id="governance-document-type-gap"
+                  type="radio"
+                  name="governance-document-type"
+                  value="GAP"
+                  class="mt-1"
+                  wire:click="setDocumentType('GAP')"
+                  @checked($documentType === 'GAP')
+                />
+                <span class="min-w-0 flex-1">
+                  <span class="block text-sm font-medium text-gray-900 dark:text-white">
+                    {{ __('governance.gap') }}
+                    <x-filament::badge color="gray" size="sm" class="ms-1">{{ $this->gapCount() }}</x-filament::badge>
+                  </span>
+                  <span class="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">
+                    {{ __('governance.gap_description') }}
+                  </span>
+                </span>
+              </label>
+            </div>
+          </fieldset>
         </div>
+      </x-slot>
+
+      <x-slot name="activeFilters">
+        <button
+          type="button"
+          data-testid="governance-document-type-indicator"
+          x-on:click="$dispatch('open-modal', { id: 'governance-toolbar-panel' })"
+          class="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-2 py-1 text-xs text-gray-800 dark:bg-gray-800 dark:text-gray-200"
+        >
+          <span>{{ $this->documentTypeIndicatorLabel() }}</span>
+        </button>
       </x-slot>
     </x-filament.data-list-toolbar>
 
@@ -111,7 +139,7 @@
               <div class="prose prose-sm mt-4 max-w-none whitespace-pre-wrap dark:prose-invert">{{ $expandedDecision['body'] }}</div>
 
               <div class="mt-6">
-                <h4 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">Джерела доказів</h4>
+                <h4 class="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{{ __('governance.evidence_sources') }}</h4>
                 @forelse ($expandedSources as $source)
                   <div class="mb-3 rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-700">
                     <div class="font-medium">{{ $source['source_title'] }}</div>
@@ -124,14 +152,14 @@
                     <div class="mt-1 text-gray-600 dark:text-gray-300">{{ $source['evidence_note'] }}</div>
                   </div>
                 @empty
-                  <p class="text-sm text-gray-500">Немає джерел для цього рішення.</p>
+                  <p class="text-sm text-gray-500">{{ __('governance.no_evidence_sources') }}</p>
                 @endforelse
               </div>
             </div>
           @endif
         </div>
       @empty
-        <p class="text-sm text-gray-500">Немає записів для відображення.</p>
+        <p class="text-sm text-gray-500">{{ __('governance.no_results') }}</p>
       @endforelse
     </div>
   </div>

@@ -707,6 +707,10 @@ charge; Stripe Tax/Avalara; автоматичне оновлення міжна
 Price Inspector fully localized (uk/ru/en) as of this task; rest of
 admin panel (Filament resources, other pages) still Ukrainian-only.
 
+Governance navigation/title/group and page-specific controls now use
+uk/ru/en Laravel translation files and respect the current application
+locale.
+
 Deferred: inventory of hardcoded UI strings across the rest of the
 admin panel; Filament/vendor package translations; user/workspace
 locale preference; locale-selection middleware; language switcher UI;
