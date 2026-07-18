@@ -43,10 +43,10 @@ class DataListToolbarTest extends TestCase
     public function data_list_toolbar_component_resolves_and_renders(): void
     {
         $html = Blade::render(<<<'BLADE'
-            <x-filament.data-list-toolbar :filters-count="2" :has-filters="true">
+            <x-filament.data-list-toolbar :filters-count="2" :has-filters="true" panel-id="test-panel">
                 <x-slot name="search">Search slot</x-slot>
-                <x-slot name="filters">Filters slot</x-slot>
                 <x-slot name="actions">Actions slot</x-slot>
+                <x-slot name="panel">Panel slot</x-slot>
                 <x-slot name="activeFilters">Active filters slot</x-slot>
             </x-filament.data-list-toolbar>
         BLADE);
@@ -55,15 +55,90 @@ class DataListToolbarTest extends TestCase
         $this->assertStringContainsString('data-toolbar-region="filters"', $html);
         $this->assertStringContainsString('data-toolbar-region="actions"', $html);
         $this->assertStringContainsString('data-toolbar-region="active-filters"', $html);
+        $this->assertStringContainsString('data-toolbar-row="header"', $html);
         $this->assertStringContainsString('Search slot', $html);
+    }
+
+    #[Test]
+    public function data_list_toolbar_header_is_single_no_wrap_row(): void
+    {
+        $html = Blade::render(<<<'BLADE'
+            <x-filament.data-list-toolbar :has-filters="true" panel-id="test-panel">
+                <x-slot name="search">Search</x-slot>
+                <x-slot name="panel">Panel</x-slot>
+            </x-filament.data-list-toolbar>
+        BLADE);
+
+        $this->assertStringContainsString('data-toolbar-row="header"', $html);
+        $this->assertStringContainsString('flex items-center gap-2', $html);
+    }
+
+    #[Test]
+    public function data_list_toolbar_uses_md_for_toolbar_mode_switch(): void
+    {
+        $html = Blade::render(<<<'BLADE'
+            <x-filament.data-list-toolbar :has-filters="true" panel-id="test-panel">
+                <x-slot name="search">Search</x-slot>
+                <x-slot name="panel">Panel</x-slot>
+            </x-filament.data-list-toolbar>
+        BLADE);
+
+        $this->assertStringContainsString('hidden shrink-0 items-center gap-2 md:flex', $html);
+        $this->assertStringContainsString('shrink-0 md:hidden', $html);
+        $this->assertStringContainsString('data-testid="data-list-mobile-overflow-trigger"', $html);
+    }
+
+    #[Test]
+    public function data_list_toolbar_shows_desktop_controls_at_md_and_above(): void
+    {
+        $html = Blade::render(<<<'BLADE'
+            <x-filament.data-list-toolbar :has-filters="true" panel-id="test-panel">
+                <x-slot name="search">Search</x-slot>
+                <x-slot name="actions">Actions</x-slot>
+                <x-slot name="panel">Panel</x-slot>
+            </x-filament.data-list-toolbar>
+        BLADE);
+
+        $this->assertStringContainsString('hidden shrink-0 items-center gap-2 md:flex', $html);
+        $this->assertStringContainsString('data-testid="data-list-filter-trigger"', $html);
+        $this->assertStringContainsString('data-toolbar-region="actions"', $html);
+    }
+
+    #[Test]
+    public function data_list_toolbar_shows_one_mobile_overflow_below_md(): void
+    {
+        $html = Blade::render(<<<'BLADE'
+            <x-filament.data-list-toolbar :has-filters="true" panel-id="test-panel">
+                <x-slot name="search">Search</x-slot>
+                <x-slot name="panel">Panel</x-slot>
+            </x-filament.data-list-toolbar>
+        BLADE);
+
+        $this->assertEquals(1, substr_count($html, 'data-testid="data-list-mobile-overflow-trigger"'));
+        $this->assertStringContainsString('Додаткові дії', $html);
+    }
+
+    #[Test]
+    public function data_list_toolbar_header_marker_does_not_use_flex_col_or_flex_wrap(): void
+    {
+        $path = resource_path('views/components/filament/data-list-toolbar.blade.php');
+        $contents = File::get($path);
+
+        preg_match('/data-toolbar-row="header"[^>]*class="([^"]*)"/', $contents, $matches);
+        $this->assertNotEmpty($matches, 'Header row marker not found');
+        $headerClasses = $matches[1];
+
+        $this->assertStringNotContainsString('flex-col', $headerClasses);
+        $this->assertStringNotContainsString('flex-wrap', $headerClasses);
+        $this->assertStringNotContainsString('lg:flex-row', $headerClasses);
     }
 
     #[Test]
     public function data_list_toolbar_shows_filter_trigger_only_when_filters_exist(): void
     {
         $withFilters = Blade::render(<<<'BLADE'
-            <x-filament.data-list-toolbar :has-filters="true">
-                <x-slot name="filters">Filters</x-slot>
+            <x-filament.data-list-toolbar :has-filters="true" panel-id="test-panel">
+                <x-slot name="panel">Panel</x-slot>
             </x-filament.data-list-toolbar>
         BLADE);
 
@@ -77,14 +152,14 @@ class DataListToolbarTest extends TestCase
     public function data_list_toolbar_shows_active_filter_count_badge_only_when_count_is_positive(): void
     {
         $withCount = Blade::render(<<<'BLADE'
-            <x-filament.data-list-toolbar :filters-count="2" :has-filters="true">
-                <x-slot name="filters">Filters</x-slot>
+            <x-filament.data-list-toolbar :filters-count="2" :has-filters="true" panel-id="test-panel">
+                <x-slot name="panel">Panel</x-slot>
             </x-filament.data-list-toolbar>
         BLADE);
 
         $withoutCount = Blade::render(<<<'BLADE'
-            <x-filament.data-list-toolbar :filters-count="0" :has-filters="true">
-                <x-slot name="filters">Filters</x-slot>
+            <x-filament.data-list-toolbar :filters-count="0" :has-filters="true" panel-id="test-panel">
+                <x-slot name="panel">Panel</x-slot>
             </x-filament.data-list-toolbar>
         BLADE);
 
@@ -137,7 +212,7 @@ class DataListToolbarTest extends TestCase
 
         $this->assertStringContainsString('data-testid="compare-channels-trigger"', $blade);
         $this->assertStringContainsString('<x-slot name="actions">', $blade);
-        $this->assertStringContainsString('{{ $this->form }}', $blade);
+        $this->assertEquals(1, substr_count($blade, '{{ $this->form }}'));
 
         Livewire::actingAs($this->platformAdmin)
             ->test(FieldMatrix::class)
@@ -256,6 +331,123 @@ class DataListToolbarTest extends TestCase
             ->assertSee('GAP')
             ->call('setActiveTab', 'GAP')
             ->assertSet('activeTab', 'GAP');
+    }
+
+    #[Test]
+    public function field_matrix_mobile_overflow_contains_filters_and_compare_sections(): void
+    {
+        $blade = File::get(resource_path('views/filament/pages/field-matrix.blade.php'));
+
+        $this->assertStringContainsString('data-testid="field-matrix-panel-filters"', $blade);
+        $this->assertStringContainsString('data-testid="field-matrix-panel-compare"', $blade);
+        $this->assertStringContainsString('field-matrix-toolbar-panel', $blade);
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->assertSeeHtml('data-testid="field-matrix-panel-filters"')
+            ->assertSeeHtml('data-testid="field-matrix-panel-compare"')
+            ->assertSeeHtml('data-testid="data-list-mobile-overflow-trigger"');
+    }
+
+    #[Test]
+    public function field_matrix_searchable_comparison_form_is_rendered_once(): void
+    {
+        $blade = File::get(resource_path('views/filament/pages/field-matrix.blade.php'));
+
+        $this->assertEquals(1, substr_count($blade, '{{ $this->form }}'));
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->assertSee('Можна одночасно порівнювати не більше 6 варіантів каналів.');
+    }
+
+    #[Test]
+    public function field_matrix_desktop_filter_and_compare_controls_remain_separate(): void
+    {
+        $blade = File::get(resource_path('views/filament/pages/field-matrix.blade.php'));
+
+        $this->assertStringContainsString(':has-filters="true"', $blade);
+        $this->assertStringContainsString('data-testid="compare-channels-trigger"', $blade);
+        $this->assertStringContainsString("panelFocus = 'compare'", $blade);
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->assertSeeHtml('data-testid="data-list-filter-trigger"')
+            ->assertSeeHtml('data-testid="compare-channels-trigger"');
+    }
+
+    #[Test]
+    public function field_matrix_mobile_overflow_badge_counts_only_row_filters(): void
+    {
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->set('data.fieldGroup', 'seo')
+            ->set('data.bindingStrategy', 'product');
+
+        $html = $component->html();
+
+        $this->assertStringContainsString('data-testid="data-list-mobile-overflow-trigger"', $html);
+        $this->assertMatchesRegularExpression('/fi-icon-btn-badge-ctn[\s\S]*\b2\b/', $html);
+
+        $component
+            ->fillForm(['selectedColumnKeys' => [
+                $component->instance()->availableColumns[0]['channel']
+                    .'|'.$component->instance()->availableColumns[0]['channel_schema_version'],
+            ]]);
+
+        $htmlWithComparison = $component->html();
+        $this->assertEquals(1, substr_count($htmlWithComparison, 'fi-icon-btn-badge-ctn'));
+    }
+
+    #[Test]
+    public function governance_desktop_tabs_are_in_toolbar_actions_region(): void
+    {
+        $blade = File::get(resource_path('views/filament/pages/governance.blade.php'));
+
+        $this->assertStringContainsString('<x-slot name="actions">', $blade);
+        $this->assertStringContainsString('data-testid="governance-desktop-tabs"', $blade);
+        $this->assertStringNotContainsString('</x-filament.data-list-toolbar>
+
+    <x-filament::tabs>', $blade);
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(Governance::class)
+            ->assertSeeHtml('data-toolbar-region="actions"')
+            ->assertSeeHtml('data-testid="governance-desktop-tabs"');
+    }
+
+    #[Test]
+    public function governance_mobile_overflow_contains_document_type_switch(): void
+    {
+        $blade = File::get(resource_path('views/filament/pages/governance.blade.php'));
+
+        $this->assertStringContainsString('data-testid="governance-mobile-document-type"', $blade);
+        $this->assertStringContainsString('Тип документа', $blade);
+        $this->assertStringContainsString('governance-toolbar-panel', $blade);
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(Governance::class)
+            ->assertSeeHtml('data-testid="governance-mobile-document-type"')
+            ->assertSeeHtml('data-testid="data-list-mobile-overflow-trigger"');
+    }
+
+    #[Test]
+    public function governance_mobile_indicator_shows_active_dec_or_gap(): void
+    {
+        $decHtml = Livewire::actingAs($this->platformAdmin)
+            ->test(Governance::class)
+            ->assertSet('activeTab', 'DEC')
+            ->html();
+
+        $this->assertMatchesRegularExpression('/data-toolbar-region="mobile-overflow"[\s\S]*fi-icon-btn-badge-ctn[\s\S]*DEC/', $decHtml);
+
+        $gapHtml = Livewire::actingAs($this->platformAdmin)
+            ->test(Governance::class)
+            ->call('setActiveTab', 'GAP')
+            ->assertSet('activeTab', 'GAP')
+            ->html();
+
+        $this->assertMatchesRegularExpression('/data-toolbar-region="mobile-overflow"[\s\S]*fi-icon-btn-badge-ctn[\s\S]*GAP/', $gapHtml);
     }
 
     #[Test]

@@ -1,6 +1,10 @@
 <x-filament-panels::page>
   <div class="space-y-4">
-    <x-filament.data-list-toolbar :has-filters="false">
+    <x-filament.data-list-toolbar
+      :has-filters="false"
+      panel-id="governance-toolbar-panel"
+      :mobile-context-indicator="$activeTab"
+    >
       <x-slot name="search">
         <label for="governance-search" class="sr-only">Пошук</label>
         <x-filament::input.wrapper>
@@ -13,25 +17,64 @@
           />
         </x-filament::input.wrapper>
       </x-slot>
+
+      <x-slot name="actions">
+        <x-filament::tabs data-testid="governance-desktop-tabs">
+          <x-filament::tabs.item
+            :active="$activeTab === 'DEC'"
+            :badge="(string) $this->decCount()"
+            wire:click="setActiveTab('DEC')"
+          >
+            DEC
+          </x-filament::tabs.item>
+
+          <x-filament::tabs.item
+            :active="$activeTab === 'GAP'"
+            :badge="(string) $this->gapCount()"
+            wire:click="setActiveTab('GAP')"
+          >
+            GAP
+          </x-filament::tabs.item>
+        </x-filament::tabs>
+      </x-slot>
+
+      <x-slot name="panel">
+        <div
+          class="space-y-4 p-4"
+          data-testid="governance-toolbar-panel"
+        >
+          <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Тип документа</h3>
+
+          <div class="space-y-2" data-testid="governance-mobile-document-type">
+            <button
+              type="button"
+              wire:click="setActiveTab('DEC')"
+              @class([
+                'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium',
+                'bg-primary-50 text-primary-700 ring-1 ring-primary-200 dark:bg-primary-500/10 dark:text-primary-400 dark:ring-primary-500/30' => $activeTab === 'DEC',
+                'bg-gray-50 text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-700' => $activeTab !== 'DEC',
+              ])
+            >
+              <span>DEC</span>
+              <x-filament::badge color="gray" size="sm">{{ $this->decCount() }}</x-filament::badge>
+            </button>
+
+            <button
+              type="button"
+              wire:click="setActiveTab('GAP')"
+              @class([
+                'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-medium',
+                'bg-primary-50 text-primary-700 ring-1 ring-primary-200 dark:bg-primary-500/10 dark:text-primary-400 dark:ring-primary-500/30' => $activeTab === 'GAP',
+                'bg-gray-50 text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-700' => $activeTab !== 'GAP',
+              ])
+            >
+              <span>GAP</span>
+              <x-filament::badge color="gray" size="sm">{{ $this->gapCount() }}</x-filament::badge>
+            </button>
+          </div>
+        </div>
+      </x-slot>
     </x-filament.data-list-toolbar>
-
-    <x-filament::tabs>
-      <x-filament::tabs.item
-        :active="$activeTab === 'DEC'"
-        :badge="(string) $this->decCount()"
-        wire:click="setActiveTab('DEC')"
-      >
-        DEC
-      </x-filament::tabs.item>
-
-      <x-filament::tabs.item
-        :active="$activeTab === 'GAP'"
-        :badge="(string) $this->gapCount()"
-        wire:click="setActiveTab('GAP')"
-      >
-        GAP
-      </x-filament::tabs.item>
-    </x-filament::tabs>
 
     <div class="space-y-2">
       @forelse ($this->filteredDecisions() as $decision)

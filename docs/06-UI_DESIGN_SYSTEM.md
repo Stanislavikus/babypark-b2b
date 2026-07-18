@@ -498,12 +498,37 @@ technically feasible.
 Sticky toolbar/header behavior must stay compact and must not consume
 excessive vertical space, especially on mobile.
 
-### Mobile Behavior
+### Mobile Toolbar Behavior
 
-На вузьких екранах search лишається доступним; filters та secondary
-actions переносяться або згортаються в компактне доступне компонування
-відповідно до наявного простору. Семантика, active count і можливість
-очистити filters не змінюються.
+Filament Table header toolbar є базовим референсом: search, filters
+trigger, column controls і page-specific actions належать до одного
+горизонтального toolbar-рядка без `flex-wrap`.
+
+Для shared Data List toolbar використовується детермінований responsive
+контракт:
+
+- на `md` (768px) і ширше search та окремі controls показуються в одному
+  рядку;
+- нижче `md` search лишається видимим (`min-w-0 flex-1`), а всі secondary
+  controls об'єднуються в одну доступну overflow-кнопку (`shrink-0`) у
+  тому самому рядку;
+- overflow panel показує controls вертикально;
+- не розміщувати filter/action triggers окремими рядками під search;
+- у головному toolbar header-row не використовувати `flex-col`,
+  `flex-wrap` або інший breakpoint замість стандартного `md`;
+- `flex-col` усередині вертикального overflow panel і `flex-wrap` у
+  removable active-filter indicators під toolbar дозволені;
+- не використовувати runtime width detection або локальний
+  нестандартний breakpoint для toolbar mode switch.
+
+Filament core підтверджує one-row toolbar baseline, але не надає
+автоматичного hamburger-collapse. Mobile overflow є затвердженим
+project-level responsive extension, реалізованим публічними Filament
+Blade components і стандартним Tailwind `md` breakpoint.
+
+Content-scope switchers (наприклад, DEC/GAP) не стають row filters:
+на desktop вони можуть бути compact tabs у toolbar actions region, а на
+mobile — options у тому самому overflow panel.
 
 ### Product Table Toolbar Specialization
 

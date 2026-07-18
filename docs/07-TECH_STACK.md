@@ -102,6 +102,14 @@ Prefer existing shared project patterns for:
 - data list search/filter toolbar for non-Eloquent read models
   (`resources/views/components/filament/data-list-toolbar.blade.php`) —
   see "Data List Search & Filter Pattern" in `06-UI_DESIGN_SYSTEM.md`;
+- shared data-list toolbar uses a one-row `md` responsive contract:
+  desktop controls remain inline; below `md`, secondary controls move
+  into one public-Filament overflow panel. The main header row must not
+  use `flex-col`, `flex-wrap`, or a different mode-switch breakpoint.
+  Vertical overflow-panel content may use `flex-col`, and removable
+  indicator chips below the header may wrap. Do not use runtime width
+  detection, vendor table views, or duplicate Filament form containers
+  for this behavior.
 - product image thumbnail and lightbox behavior;
 - product column visibility;
 - product panel visibility;

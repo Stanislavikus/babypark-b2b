@@ -3,6 +3,7 @@
     <x-filament.data-list-toolbar
       :filters-count="$this->activeFiltersCount()"
       :has-filters="true"
+      panel-id="field-matrix-toolbar-panel"
     >
       <x-slot name="search">
         <label for="field-matrix-search" class="sr-only">Пошук полів</label>
@@ -17,84 +18,117 @@
         </x-filament::input.wrapper>
       </x-slot>
 
-      <x-slot name="filters">
-        <div class="space-y-4">
-          <div>
-            <label for="field-matrix-field-group" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
-              Група
-            </label>
-            <x-filament::input.wrapper>
-              <x-filament::input.select
-                id="field-matrix-field-group"
-                wire:model.live="data.fieldGroup"
-              >
-                <option value="">Усі групи</option>
-                @foreach ($this->fieldGroupOptions() as $value => $label)
-                  <option value="{{ $value }}">{{ $label }}</option>
-                @endforeach
-              </x-filament::input.select>
-            </x-filament::input.wrapper>
-          </div>
-
-          <div>
-            <label for="field-matrix-binding-strategy" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
-              Product / Variant / Both
-            </label>
-            <x-filament::input.wrapper>
-              <x-filament::input.select
-                id="field-matrix-binding-strategy"
-                wire:model.live="data.bindingStrategy"
-              >
-                <option value="">Усі рівні</option>
-                @foreach ($this->bindingStrategyOptions() as $value => $label)
-                  <option value="{{ $value }}">{{ $label }}</option>
-                @endforeach
-              </x-filament::input.select>
-            </x-filament::input.wrapper>
-          </div>
-
-          <div>
-            <label for="field-matrix-scope" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
-              Походження поля
-            </label>
-            <x-filament::input.wrapper>
-              <x-filament::input.select
-                id="field-matrix-scope"
-                wire:model.live="data.scope"
-              >
-                <option value="">Усі джерела</option>
-                @foreach ($this->scopeOptions() as $value => $label)
-                  <option value="{{ $value }}">{{ $label }}</option>
-                @endforeach
-              </x-filament::input.select>
-            </x-filament::input.wrapper>
-          </div>
-        </div>
+      <x-slot name="actions">
+        <x-filament::button
+          color="gray"
+          icon="heroicon-m-view-columns"
+          data-testid="compare-channels-trigger"
+          x-on:click="panelFocus = 'compare'; $dispatch('open-modal', { id: 'field-matrix-toolbar-panel' })"
+        >
+          <span class="flex items-center gap-2">
+            <span>Порівняти канали</span>
+            @if ($this->selectedComparisonColumnCount() > 0)
+              <x-filament::badge color="primary" size="sm">
+                {{ $this->selectedComparisonColumnCount() }}
+              </x-filament::badge>
+            @endif
+          </span>
+        </x-filament::button>
       </x-slot>
 
-      <x-slot name="actions">
-        <x-filament::dropdown placement="bottom-end" shift width="md">
-          <x-slot name="trigger">
-            <x-filament::button
-              color="gray"
-              icon="heroicon-m-view-columns"
-              data-testid="compare-channels-trigger"
-            >
-              <span class="flex items-center gap-2">
-                <span>Порівняти канали</span>
-                @if ($this->selectedComparisonColumnCount() > 0)
-                  <x-filament::badge color="primary" size="sm">
-                    {{ $this->selectedComparisonColumnCount() }}
-                  </x-filament::badge>
-                @endif
-              </span>
-            </x-filament::button>
-          </x-slot>
+      <x-slot name="panel">
+        <div
+          class="max-h-[70vh] space-y-6 overflow-y-auto p-4"
+          data-testid="field-matrix-toolbar-panel"
+        >
+          <div
+            x-show="panelFocus === 'filters' || panelFocus === 'all'"
+            x-cloak
+            class="space-y-4"
+            data-testid="field-matrix-panel-filters"
+          >
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Фільтри</h3>
 
-          <div class="p-4">
+            <div>
+              <label for="field-matrix-field-group" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                Група
+              </label>
+              <x-filament::input.wrapper>
+                <x-filament::input.select
+                  id="field-matrix-field-group"
+                  wire:model.live="data.fieldGroup"
+                >
+                  <option value="">Усі групи</option>
+                  @foreach ($this->fieldGroupOptions() as $value => $label)
+                    <option value="{{ $value }}">{{ $label }}</option>
+                  @endforeach
+                </x-filament::input.select>
+              </x-filament::input.wrapper>
+            </div>
+
+            <div>
+              <label for="field-matrix-binding-strategy" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                Product / Variant / Both
+              </label>
+              <x-filament::input.wrapper>
+                <x-filament::input.select
+                  id="field-matrix-binding-strategy"
+                  wire:model.live="data.bindingStrategy"
+                >
+                  <option value="">Усі рівні</option>
+                  @foreach ($this->bindingStrategyOptions() as $value => $label)
+                    <option value="{{ $value }}">{{ $label }}</option>
+                  @endforeach
+                </x-filament::input.select>
+              </x-filament::input.wrapper>
+            </div>
+
+            <div>
+              <label for="field-matrix-scope" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
+                Походження поля
+              </label>
+              <x-filament::input.wrapper>
+                <x-filament::input.select
+                  id="field-matrix-scope"
+                  wire:model.live="data.scope"
+                >
+                  <option value="">Усі джерела</option>
+                  @foreach ($this->scopeOptions() as $value => $label)
+                    <option value="{{ $value }}">{{ $label }}</option>
+                  @endforeach
+                </x-filament::input.select>
+              </x-filament::input.wrapper>
+            </div>
+
+            @if ($this->activeFiltersCount() > 0)
+              <button
+                type="button"
+                wire:click="clearAllFilters"
+                class="text-sm font-medium text-primary-600 hover:underline dark:text-primary-400"
+              >
+                Очистити все
+              </button>
+            @endif
+          </div>
+
+          <div
+            x-show="panelFocus === 'compare' || panelFocus === 'all'"
+            x-cloak
+            class="space-y-3"
+            data-testid="field-matrix-panel-compare"
+          >
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Порівняти канали</h3>
+              @if ($this->selectedComparisonColumnCount() > 0)
+                <x-filament::badge color="primary" size="sm">
+                  {{ $this->selectedComparisonColumnCount() }}
+                </x-filament::badge>
+              @endif
+            </div>
+
             {{ $this->form }}
           </div>
-        </x-filament::dropdown>
+        </div>
       </x-slot>
 
       <x-slot name="activeFilters">
