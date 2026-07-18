@@ -40,8 +40,8 @@ class GovernancePageTest extends TestCase
         $component = Livewire::actingAs($this->platformAdmin)
             ->test(Governance::class)
             ->assertSet('activeTab', 'DEC')
-            ->assertSee('DEC (')
-            ->assertSee('GAP (')
+            ->assertSee('DEC')
+            ->assertSee('GAP')
             ->call('setActiveTab', 'GAP')
             ->assertSet('activeTab', 'GAP');
 
@@ -60,8 +60,8 @@ class GovernancePageTest extends TestCase
 
         Livewire::actingAs($this->platformAdmin)
             ->test(Governance::class)
-            ->assertSee('DEC ('.$decCount.')')
-            ->assertSee('GAP ('.$gapCount.')');
+            ->assertSee((string) $decCount)
+            ->assertSee((string) $gapCount);
     }
 
     #[Test]

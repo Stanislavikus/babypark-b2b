@@ -99,6 +99,9 @@ If the exact existing path is unclear, inspect the project before creating files
 Prefer existing shared project patterns for:
 
 - product table toolbar overrides;
+- data list search/filter toolbar for non-Eloquent read models
+  (`resources/views/components/filament/data-list-toolbar.blade.php`) —
+  see "Data List Search & Filter Pattern" in `06-UI_DESIGN_SYSTEM.md`;
 - product image thumbnail and lightbox behavior;
 - product column visibility;
 - product panel visibility;

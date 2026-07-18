@@ -6,9 +6,7 @@ use App\Models\User;
 use App\Support\CanonicalRegistry\CanonicalRegistryReader;
 use App\Support\CanonicalRegistry\FieldMatrixPresenter;
 use App\Support\Platform\PlatformAdminAuthorization;
-use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
@@ -19,6 +17,8 @@ use Illuminate\Support\Facades\Auth;
 class FieldMatrix extends Page implements HasForms
 {
     use InteractsWithForms;
+
+    private const ALLOWED_FILTER_KEYS = ['fieldGroup', 'bindingStrategy', 'scope'];
 
     protected static ?string $navigationIcon = 'heroicon-o-table-cells';
 
@@ -75,44 +75,17 @@ class FieldMatrix extends Page implements HasForms
     {
         return $form
             ->schema([
-                Section::make()->schema([
-                    Select::make('selectedColumnKeys')
-                        ->label('Порівняти канали')
-                        ->multiple()
-                        ->searchable()
-                        ->maxItems(6)
-                        ->helperText('Можна одночасно порівнювати не більше 6 варіантів каналів.')
-                        ->options(fn (): array => $this->columnOptions())
-                        ->live()
-                        ->afterStateUpdated(function (mixed $state, mixed $old, Set $set): void {
-                            $this->handleSelectedColumnKeysUpdated($state, $old, $set);
-                        })
-                        ->columnSpanFull(),
-                    Select::make('fieldGroup')
-                        ->label('Група')
-                        ->options(fn (): array => $this->fieldGroupOptions())
-                        ->placeholder('Усі групи')
-                        ->live()
-                        ->afterStateUpdated(fn (): mixed => $this->refreshMatrix()),
-                    Select::make('bindingStrategy')
-                        ->label('Product / Variant / Both')
-                        ->options($this->bindingStrategyOptions())
-                        ->placeholder('Усі рівні')
-                        ->live()
-                        ->afterStateUpdated(fn (): mixed => $this->refreshMatrix()),
-                    Select::make('scope')
-                        ->label('Походження поля')
-                        ->options($this->scopeOptions())
-                        ->placeholder('Усі джерела')
-                        ->live()
-                        ->afterStateUpdated(fn (): mixed => $this->refreshMatrix()),
-                    TextInput::make('search')
-                        ->label('Пошук')
-                        ->placeholder('Назва, код...')
-                        ->live(debounce: 300)
-                        ->afterStateUpdated(fn (): mixed => $this->refreshMatrix())
-                        ->columnSpanFull(),
-                ])->columns(2),
+                Select::make('selectedColumnKeys')
+                    ->label('Порівняти канали')
+                    ->multiple()
+                    ->searchable()
+                    ->maxItems(6)
+                    ->helperText('Можна одночасно порівнювати не більше 6 варіантів каналів.')
+                    ->options(fn (): array => $this->columnOptions())
+                    ->live()
+                    ->afterStateUpdated(function (mixed $state, mixed $old, Set $set): void {
+                        $this->handleSelectedColumnKeysUpdated($state, $old, $set);
+                    }),
             ])
             ->statePath('data');
     }
@@ -125,6 +98,84 @@ class FieldMatrix extends Page implements HasForms
         );
     }
 
+    public function activeFiltersCount(): int
+    {
+        $count = 0;
+
+        foreach (self::ALLOWED_FILTER_KEYS as $key) {
+            if (filled($this->data[$key] ?? null)) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * @return list<array{key: string, label: string, value: string}>
+     */
+    public function activeFilterIndicators(): array
+    {
+        $definitions = [
+            'fieldGroup' => [
+                'label' => 'Група',
+                'options' => $this->fieldGroupOptions(),
+            ],
+            'bindingStrategy' => [
+                'label' => 'Product / Variant / Both',
+                'options' => $this->bindingStrategyOptions(),
+            ],
+            'scope' => [
+                'label' => 'Походження поля',
+                'options' => $this->scopeOptions(),
+            ],
+        ];
+
+        $indicators = [];
+
+        foreach ($definitions as $key => $definition) {
+            $value = $this->data[$key] ?? null;
+
+            if (! filled($value)) {
+                continue;
+            }
+
+            $indicators[] = [
+                'key' => $key,
+                'label' => $definition['label'],
+                'value' => $definition['options'][$value] ?? (string) $value,
+            ];
+        }
+
+        return $indicators;
+    }
+
+    public function removeFilter(string $key): void
+    {
+        if (! in_array($key, self::ALLOWED_FILTER_KEYS, true)) {
+            return;
+        }
+
+        $this->data[$key] = null;
+        $this->refreshMatrix();
+    }
+
+    public function clearAllFilters(): void
+    {
+        foreach (self::ALLOWED_FILTER_KEYS as $key) {
+            $this->data[$key] = null;
+        }
+
+        $this->refreshMatrix();
+    }
+
+    public function selectedComparisonColumnCount(): int
+    {
+        $keys = $this->data['selectedColumnKeys'] ?? [];
+
+        return is_array($keys) ? count($keys) : 0;
+    }
+
     public function updatedDataSelectedColumnKeys(mixed $value): void
     {
         if ($value === null) {
@@ -132,6 +183,26 @@ class FieldMatrix extends Page implements HasForms
             $this->resetErrorBag('data.selectedColumnKeys');
             $this->refreshMatrix();
         }
+    }
+
+    public function updatedDataSearch(): void
+    {
+        $this->refreshMatrix();
+    }
+
+    public function updatedDataFieldGroup(): void
+    {
+        $this->refreshMatrix();
+    }
+
+    public function updatedDataBindingStrategy(): void
+    {
+        $this->refreshMatrix();
+    }
+
+    public function updatedDataScope(): void
+    {
+        $this->refreshMatrix();
     }
 
     /**
@@ -251,6 +322,49 @@ class FieldMatrix extends Page implements HasForms
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function fieldGroupOptions(): array
+    {
+        $reader = app(CanonicalRegistryReader::class);
+        $groups = collect($reader->fields())
+            ->pluck('field_group_or_state')
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        return $groups->mapWithKeys(fn (string $group): array => [
+            $group => (string) config('attribute_dictionary.groups.'.$group, $group),
+        ])->all();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function bindingStrategyOptions(): array
+    {
+        return [
+            'product' => 'Product',
+            'product_variant' => 'Variant',
+            'product_and_variant_two_bindings' => 'Product + Variant',
+            'not_applicable' => 'Не застосовується',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function scopeOptions(): array
+    {
+        return [
+            'system' => 'Системне',
+            'platform_library' => 'Бібліотека',
+            'not_applicable' => 'Не застосовується',
+        ];
+    }
+
+    /**
      * @param  array{channel: string, channel_schema_version: string}  $column
      */
     private function columnKeyFor(array $column): string
@@ -296,49 +410,6 @@ class FieldMatrix extends Page implements HasForms
 
         $this->resetErrorBag($errorKey);
         $this->refreshMatrix();
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function fieldGroupOptions(): array
-    {
-        $reader = app(CanonicalRegistryReader::class);
-        $groups = collect($reader->fields())
-            ->pluck('field_group_or_state')
-            ->filter()
-            ->unique()
-            ->sort()
-            ->values();
-
-        return $groups->mapWithKeys(fn (string $group): array => [
-            $group => (string) config('attribute_dictionary.groups.'.$group, $group),
-        ])->all();
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function bindingStrategyOptions(): array
-    {
-        return [
-            'product' => 'Product',
-            'product_variant' => 'Variant',
-            'product_and_variant_two_bindings' => 'Product + Variant',
-            'not_applicable' => 'Не застосовується',
-        ];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function scopeOptions(): array
-    {
-        return [
-            'system' => 'Системне',
-            'platform_library' => 'Бібліотека',
-            'not_applicable' => 'Не застосовується',
-        ];
     }
 
     protected function getFormActions(): array

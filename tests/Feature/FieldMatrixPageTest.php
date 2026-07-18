@@ -54,7 +54,7 @@ class FieldMatrixPageTest extends TestCase
         $blade = File::get(resource_path('views/filament/pages/field-matrix.blade.php'));
 
         $this->assertStringNotContainsString('wire:model.live="selectedColumnKeys"', $blade);
-        $this->assertStringNotContainsString('<select', $blade);
+        $this->assertStringNotContainsString('multiple', $blade);
     }
 
     #[Test]
@@ -214,7 +214,7 @@ class FieldMatrixPageTest extends TestCase
     {
         $component = Livewire::actingAs($this->platformAdmin)
             ->test(FieldMatrix::class)
-            ->fillForm(['fieldGroup' => 'seo']);
+            ->set('data.fieldGroup', 'seo');
 
         $matrix = $component->instance()->matrix;
         $this->assertNotEmpty($matrix);
@@ -238,7 +238,7 @@ class FieldMatrixPageTest extends TestCase
     {
         $component = Livewire::actingAs($this->platformAdmin)
             ->test(FieldMatrix::class)
-            ->fillForm(['bindingStrategy' => 'product_variant']);
+            ->set('data.bindingStrategy', 'product_variant');
 
         $this->assertTrue(
             collect($component->instance()->filteredFields())->every(
@@ -253,7 +253,7 @@ class FieldMatrixPageTest extends TestCase
     {
         $component = Livewire::actingAs($this->platformAdmin)
             ->test(FieldMatrix::class)
-            ->fillForm(['scope' => 'platform_library']);
+            ->set('data.scope', 'platform_library');
 
         $this->assertTrue(
             collect($component->instance()->filteredFields())->every(
@@ -268,14 +268,14 @@ class FieldMatrixPageTest extends TestCase
     {
         $byCode = Livewire::actingAs($this->platformAdmin)
             ->test(FieldMatrix::class)
-            ->fillForm(['search' => 'internal_product_id']);
+            ->set('data.search', 'internal_product_id');
 
         $this->assertCount(1, $byCode->instance()->filteredFields());
         $this->assertSame('internal_product_id', $byCode->instance()->filteredFields()[0]['internal_code']);
 
         $byEnglish = Livewire::actingAs($this->platformAdmin)
             ->test(FieldMatrix::class)
-            ->fillForm(['search' => 'Product Name']);
+            ->set('data.search', 'Product Name');
 
         $this->assertTrue(
             collect($byEnglish->instance()->filteredFields())->contains(
@@ -285,7 +285,7 @@ class FieldMatrixPageTest extends TestCase
 
         $byUk = Livewire::actingAs($this->platformAdmin)
             ->test(FieldMatrix::class)
-            ->fillForm(['search' => 'Назва товару']);
+            ->set('data.search', 'Назва товару');
 
         $this->assertTrue(
             collect($byUk->instance()->filteredFields())->contains(
@@ -318,10 +318,10 @@ class FieldMatrixPageTest extends TestCase
     {
         $blade = File::get(resource_path('views/filament/pages/field-matrix.blade.php'));
 
-        $this->assertStringNotContainsString('wire:click', $blade);
         $this->assertStringNotContainsString('Approve', $blade);
         $this->assertStringNotContainsString('Reject', $blade);
         $this->assertStringNotContainsString('EditAction', $blade);
+        $this->assertStringNotContainsString('wire:submit', $blade);
     }
 
     #[Test]

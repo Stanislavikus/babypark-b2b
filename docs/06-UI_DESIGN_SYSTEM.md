@@ -448,11 +448,69 @@ Switching between `Таблиця` and `Картки` must preserve:
 
 The view switcher should be a compact segmented control or icon control with clear active state.
 
-## Product Table Toolbar Pattern
+## Data List Search & Filter Pattern
 
-Product table toolbar is a core UI pattern.
+Data list search and filter toolbar is a core UI pattern for read-only and
+mutable list screens alike.
+
+### Implementation by Data Source
+
+- **Eloquent-backed lists** use the standard `Filament\Tables\Table` toolbar
+  (search, filters, column controls) and must not reinvent a parallel toolbar
+  system.
+- **Non-Eloquent read models** (CSV arrays, Markdown governance records,
+  registry projections) use the shared presentation shell at
+  `resources/views/components/filament/data-list-toolbar.blade.php`.
+- Do **not** copy or depend on `resources/views/vendor/filament-tables/`.
+- Do **not** add data/runtime dependencies solely to support the toolbar
+  component.
+- Do **not** create a one-off local toolbar design on each page.
+
+### Universal Search and Filter Interaction
 
 Recommended layout:
+
+Left / main area:
+
+- search input (visible by default).
+
+Right / action area:
+
+- filter trigger (only when the page has structured row filters);
+- comparison / column actions where relevant;
+- view toggle, export, or overflow actions where relevant.
+
+Rules:
+
+- search remains visible; it is not hidden inside the filters dropdown;
+- the filter trigger shows an active-count badge **only when count > 0**;
+- active filters render as removable indicators with accessible remove
+  controls and a **«Очистити все»** action when at least one row filter is
+  active;
+- comparison columns / channel comparison controls stay separate from row
+  filters;
+- pages without structured row filters must not render an empty **«Фільтри»**
+  button.
+
+The toolbar should remain accessible while scrolling long lists where
+technically feasible.
+
+Sticky toolbar/header behavior must stay compact and must not consume
+excessive vertical space, especially on mobile.
+
+### Mobile Behavior
+
+На вузьких екранах search лишається доступним; filters та secondary
+actions переносяться або згортаються в компактне доступне компонування
+відповідно до наявного простору. Семантика, active count і можливість
+очистити filters не змінюються.
+
+### Product Table Toolbar Specialization
+
+Product table toolbar follows the universal contract above and adds
+product-specific rules below.
+
+Recommended product layout:
 
 Left / main area:
 
@@ -466,11 +524,7 @@ Right / action area:
 - export / overflow actions where relevant;
 - cart summary where relevant.
 
-The toolbar should remain accessible while scrolling long product lists where technically feasible.
-
-Sticky toolbar/header behavior must stay compact and must not consume excessive vertical space, especially on mobile.
-
-### Search Rules
+#### Product Search Rules
 
 Product search must be simple and broad enough for real work.
 
@@ -491,7 +545,7 @@ A warehouse or sales user should be able to scan a barcode into the search field
 
 Search must not require the user to select a search mode.
 
-### Filter Rules
+#### Product Filter Rules
 
 Filters should expose structured business dimensions.
 
@@ -507,7 +561,7 @@ Do not overload the default filter panel.
 
 Advanced filters may exist but should be secondary.
 
-### Column Visibility Rules
+#### Column Visibility Rules
 
 Tables must support approved column visibility controls.
 
@@ -529,7 +583,7 @@ Forbidden:
 - user-created technical columns that bypass the Attribute Dictionary;
 - exposing hidden technical fields directly.
 
-### Session and Preference Persistence
+#### Session and Preference Persistence
 
 Search, filters, sorting, pagination and current view mode should be preserved during the active browser session and represented in URL/query state where useful.
 
