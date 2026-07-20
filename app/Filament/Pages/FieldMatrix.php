@@ -6,12 +6,13 @@ use App\Models\User;
 use App\Support\CanonicalRegistry\CanonicalRegistryReader;
 use App\Support\CanonicalRegistry\FieldMatrixPresenter;
 use App\Support\Platform\PlatformAdminAuthorization;
-use Filament\Forms\Components\Select;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
 use Filament\Forms\Set;
 use Filament\Pages\Page;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
 
 class FieldMatrix extends Page implements HasForms
@@ -22,11 +23,11 @@ class FieldMatrix extends Page implements HasForms
 
     protected static ?string $navigationIcon = 'heroicon-o-table-cells';
 
-    protected static ?string $navigationGroup = 'Модель даних і коннектори';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $navigationLabel = 'Матриця полів';
+    protected static ?string $title = null;
 
-    protected static ?string $title = 'Матриця полів';
+    protected static ?string $navigationGroup = null;
 
     protected static ?int $navigationSort = 1;
 
@@ -45,6 +46,21 @@ class FieldMatrix extends Page implements HasForms
         $user = Auth::user();
 
         return $user instanceof User && PlatformAdminAuthorization::canManage($user);
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('field_matrix.navigation_label');
+    }
+
+    public function getTitle(): string|Htmlable
+    {
+        return __('field_matrix.title');
+    }
+
+    public static function getNavigationGroup(): ?string
+    {
+        return __('field_matrix.navigation_group');
     }
 
     public function mount(): void
@@ -66,6 +82,7 @@ class FieldMatrix extends Page implements HasForms
             'bindingStrategy' => null,
             'scope' => null,
             'search' => null,
+            'fieldSortDirection' => 'asc',
         ]);
 
         $this->refreshMatrix();
@@ -75,13 +92,11 @@ class FieldMatrix extends Page implements HasForms
     {
         return $form
             ->schema([
-                Select::make('selectedColumnKeys')
-                    ->label('Порівняти канали')
-                    ->multiple()
-                    ->searchable()
-                    ->maxItems(6)
-                    ->helperText('Можна одночасно порівнювати не більше 6 варіантів каналів.')
+                CheckboxList::make('selectedColumnKeys')
+                    ->label(__('field_matrix.compare_channels'))
+                    ->helperText(__('field_matrix.compare_channels_helper'))
                     ->options(fn (): array => $this->columnOptions())
+                    ->disableOptionWhen(fn (string $value): bool => $this->shouldDisableComparisonOption($value))
                     ->live()
                     ->afterStateUpdated(function (mixed $state, mixed $old, Set $set): void {
                         $this->handleSelectedColumnKeysUpdated($state, $old, $set);
@@ -96,6 +111,23 @@ class FieldMatrix extends Page implements HasForms
             $this->selectedColumns(),
             $this->filteredFields(),
         );
+    }
+
+    public function toggleFieldSortDirection(): void
+    {
+        $current = $this->data['fieldSortDirection'] ?? 'asc';
+        $this->data['fieldSortDirection'] = $current === 'asc' ? 'desc' : 'asc';
+        $this->refreshMatrix();
+    }
+
+    public function fieldSortDirection(): string
+    {
+        return ($this->data['fieldSortDirection'] ?? 'asc') === 'desc' ? 'desc' : 'asc';
+    }
+
+    public function fieldSortAriaValue(): string
+    {
+        return $this->fieldSortDirection() === 'asc' ? 'ascending' : 'descending';
     }
 
     public function activeFiltersCount(): int
@@ -118,15 +150,15 @@ class FieldMatrix extends Page implements HasForms
     {
         $definitions = [
             'fieldGroup' => [
-                'label' => 'Група',
+                'label' => __('field_matrix.filter_group'),
                 'options' => $this->fieldGroupOptions(),
             ],
             'bindingStrategy' => [
-                'label' => 'Product / Variant / Both',
+                'label' => __('field_matrix.filter_binding'),
                 'options' => $this->bindingStrategyOptions(),
             ],
             'scope' => [
-                'label' => 'Походження поля',
+                'label' => __('field_matrix.filter_scope'),
                 'options' => $this->scopeOptions(),
             ],
         ];
@@ -264,6 +296,17 @@ class FieldMatrix extends Page implements HasForms
         return true;
     }
 
+    public function shouldDisableComparisonOption(string $value): bool
+    {
+        $selected = $this->data['selectedColumnKeys'] ?? [];
+
+        if (! is_array($selected) || count($selected) < 6) {
+            return false;
+        }
+
+        return ! in_array($value, $selected, true);
+    }
+
     /**
      * @return list<array<string, string>>
      */
@@ -276,6 +319,7 @@ class FieldMatrix extends Page implements HasForms
         $bindingStrategy = $this->data['bindingStrategy'] ?? null;
         $scope = $this->data['scope'] ?? null;
         $search = mb_strtolower(trim((string) ($this->data['search'] ?? '')));
+        $sortDirection = $this->fieldSortDirection();
 
         $filtered = collect($fields);
 
@@ -306,13 +350,13 @@ class FieldMatrix extends Page implements HasForms
         }
 
         return $filtered
-            ->sort(function (array $a, array $b): int {
+            ->sort(function (array $a, array $b) use ($sortDirection): int {
                 $labelA = ($a['uk_label'] ?? '') !== '' ? $a['uk_label'] : ($a['canonical_english_name'] ?? '');
                 $labelB = ($b['uk_label'] ?? '') !== '' ? $b['uk_label'] : ($b['canonical_english_name'] ?? '');
 
                 $comparison = strcasecmp($labelA, $labelB);
                 if ($comparison !== 0) {
-                    return $comparison;
+                    return $sortDirection === 'desc' ? -$comparison : $comparison;
                 }
 
                 return strcasecmp($a['internal_code'] ?? '', $b['internal_code'] ?? '');
@@ -345,10 +389,10 @@ class FieldMatrix extends Page implements HasForms
     public function bindingStrategyOptions(): array
     {
         return [
-            'product' => 'Product',
-            'product_variant' => 'Variant',
-            'product_and_variant_two_bindings' => 'Product + Variant',
-            'not_applicable' => 'Не застосовується',
+            'product' => __('field_matrix.binding_product'),
+            'product_variant' => __('field_matrix.binding_variant'),
+            'product_and_variant_two_bindings' => __('field_matrix.binding_product_and_variant'),
+            'not_applicable' => __('field_matrix.not_applicable'),
         ];
     }
 
@@ -358,9 +402,9 @@ class FieldMatrix extends Page implements HasForms
     public function scopeOptions(): array
     {
         return [
-            'system' => 'Системне',
-            'platform_library' => 'Бібліотека',
-            'not_applicable' => 'Не застосовується',
+            'system' => __('field_matrix.scope_system'),
+            'platform_library' => __('field_matrix.scope_platform_library'),
+            'not_applicable' => __('field_matrix.not_applicable'),
         ];
     }
 
@@ -402,7 +446,7 @@ class FieldMatrix extends Page implements HasForms
             $set('selectedColumnKeys', is_array($old) ? $old : []);
             $this->addError(
                 $errorKey,
-                'Можна обрати не більше 6 доступних варіантів каналів без повторів.',
+                __('field_matrix.compare_channels_limit_error'),
             );
 
             return;

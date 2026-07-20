@@ -552,6 +552,37 @@ Tabs remain appropriate when the user switches between genuinely
 different page sections or workflows. They must not be used merely to
 work around toolbar layout.
 
+### Toolbar Action Labels
+
+At `md` and wider, primary or potentially ambiguous data-list toolbar
+actions use an icon plus a persistent visible text label when space is
+available. Approved examples include Filters, Compare channels, Columns,
+Export and View mode.
+
+Icon-only controls are allowed only for compact supplementary actions
+whose icon is widely understood, or where the approved responsive layout
+requires compactness. Every icon-only control must still have an
+accessible label and, on hover-capable devices, a tooltip.
+
+Below `md`, the shared Data List toolbar keeps search visible and moves
+secondary controls into the approved single overflow trigger. Inside the
+overflow panel, actions and sections use visible text labels.
+
+Do not rely on hover-only tooltips to communicate the meaning of an
+ambiguous primary toolbar action.
+
+### Choosing a Selection Control
+
+- Single choice from a compact list: Select or Radio, according to
+  available space and whether options should remain visible.
+- Small bounded multi-select whose options should be reviewed together:
+  CheckboxList.
+- Large or dynamic multi-select where showing every option is impractical:
+  searchable multi-select.
+- Do not use checkboxes for a single-choice filter.
+- Do not use a searchable tag/chip select for a small fixed multi-select
+  when an always-visible CheckboxList is clearer and more stable.
+
 ### Product Table Toolbar Specialization
 
 Product table toolbar follows the universal contract above and adds

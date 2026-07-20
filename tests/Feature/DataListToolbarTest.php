@@ -7,8 +7,8 @@ use App\Filament\Pages\FieldMatrix;
 use App\Filament\Pages\Governance;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Component;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Set;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
@@ -221,32 +221,36 @@ class DataListToolbarTest extends TestCase
     }
 
     #[Test]
-    public function field_matrix_compare_channels_keeps_searchable_filament_form_select(): void
+    public function field_matrix_compare_channels_uses_filament_checkbox_list(): void
     {
+        app()->setLocale('uk');
+
         Livewire::actingAs($this->platformAdmin)
             ->test(FieldMatrix::class)
             ->assertSuccessful()
-            ->assertSee('Порівняти канали')
-            ->assertSee('Можна одночасно порівнювати не більше 6 варіантів каналів.');
+            ->assertSee(__('field_matrix.compare_channels'))
+            ->assertSee(__('field_matrix.compare_channels_helper'));
 
         $component = Livewire::actingAs($this->platformAdmin)
             ->test(FieldMatrix::class)
             ->instance();
 
-        $select = $component->getForm('form')->getComponent(
-            fn (Component $field): bool => $field instanceof Select
+        $checkboxList = $component->getForm('form')->getComponent(
+            fn (Component $field): bool => $field instanceof CheckboxList
                 && method_exists($field, 'getName')
                 && $field->getName() === 'selectedColumnKeys'
         );
 
-        $this->assertNotNull($select);
-        $this->assertTrue($select->isSearchable());
-        $this->assertTrue($select->isMultiple());
+        $this->assertNotNull($checkboxList);
+        $this->assertFalse($checkboxList->isSearchable());
+        $this->assertFalse($checkboxList->isBulkToggleable());
     }
 
     #[Test]
     public function field_matrix_seventh_comparison_value_rolls_back_and_shows_error(): void
     {
+        app()->setLocale('uk');
+
         $component = Livewire::actingAs($this->platformAdmin)
             ->test(FieldMatrix::class);
 
@@ -271,20 +275,24 @@ class DataListToolbarTest extends TestCase
         $instance->data['selectedColumnKeys'] = $sixKeys;
 
         $form = $instance->getForm('form');
-        $select = $form->getComponent(
-            fn (Component $field): bool => $field instanceof Select
+        $checkboxList = $form->getComponent(
+            fn (Component $field): bool => $field instanceof CheckboxList
                 && method_exists($field, 'getName')
                 && $field->getName() === 'selectedColumnKeys'
         );
-        $this->assertNotNull($select);
+        $this->assertNotNull($checkboxList);
 
-        $set = new Set($select);
+        $set = new Set($checkboxList);
         $handler = (new ReflectionClass(FieldMatrix::class))->getMethod('handleSelectedColumnKeysUpdated');
         $handler->setAccessible(true);
         $handler->invoke($instance, $sevenKeys, $sixKeys, $set);
 
         $this->assertSame($sixKeys, $instance->data['selectedColumnKeys']);
         $this->assertTrue($instance->getErrorBag()->has('data.selectedColumnKeys'));
+        $this->assertSame(
+            __('field_matrix.compare_channels_limit_error'),
+            $instance->getErrorBag()->first('data.selectedColumnKeys')
+        );
     }
 
     #[Test]
@@ -381,18 +389,20 @@ class DataListToolbarTest extends TestCase
     #[Test]
     public function field_matrix_toolbar_behavior_is_unchanged(): void
     {
+        app()->setLocale('uk');
+
         $blade = File::get(resource_path('views/filament/pages/field-matrix.blade.php'));
 
         $this->assertStringContainsString(':has-filters="true"', $blade);
         $this->assertStringContainsString('panel-id="field-matrix-toolbar-panel"', $blade);
         $this->assertStringContainsString('data-testid="compare-channels-trigger"', $blade);
         $this->assertEquals(1, substr_count($blade, '{{ $this->form }}'));
-        $this->assertStringNotContainsString('filters-label', $blade);
+        $this->assertStringContainsString(':filters-label="__(\'field_matrix.filters\')"', $blade);
 
         Livewire::actingAs($this->platformAdmin)
             ->test(FieldMatrix::class)
             ->assertSeeHtml('data-testid="data-list-filter-trigger"')
-            ->assertSee('Фільтри');
+            ->assertSee(__('field_matrix.filters'));
     }
 
     #[Test]
@@ -412,15 +422,18 @@ class DataListToolbarTest extends TestCase
     }
 
     #[Test]
-    public function field_matrix_searchable_comparison_form_is_rendered_once(): void
+    public function field_matrix_comparison_checkbox_list_is_rendered_once(): void
     {
+        app()->setLocale('uk');
+
         $blade = File::get(resource_path('views/filament/pages/field-matrix.blade.php'));
 
         $this->assertEquals(1, substr_count($blade, '{{ $this->form }}'));
 
         Livewire::actingAs($this->platformAdmin)
             ->test(FieldMatrix::class)
-            ->assertSee('Можна одночасно порівнювати не більше 6 варіантів каналів.');
+            ->assertSee(__('field_matrix.compare_channels_helper'))
+            ->assertSeeHtml('fi-fo-checkbox-list');
     }
 
     #[Test]
