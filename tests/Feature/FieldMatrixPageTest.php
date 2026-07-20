@@ -7,8 +7,8 @@ use App\Filament\Pages\FieldMatrix;
 use App\Models\User;
 use App\Support\CanonicalRegistry\CanonicalRegistryReader;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\Component;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Set;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
@@ -39,13 +39,424 @@ class FieldMatrixPageTest extends TestCase
     }
 
     #[Test]
-    public function field_matrix_uses_filament_searchable_multi_select(): void
+    public function field_matrix_compare_channels_uses_filament_checkbox_list(): void
     {
+        app()->setLocale('uk');
+
         Livewire::actingAs($this->platformAdmin)
             ->test(FieldMatrix::class)
             ->assertSuccessful()
-            ->assertSee('Порівняти канали')
-            ->assertSee('Можна одночасно порівнювати не більше 6 варіантів каналів.');
+            ->assertSee(__('field_matrix.compare_channels'))
+            ->assertSee(__('field_matrix.compare_channels_helper'));
+
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->instance();
+
+        $checkboxList = $component->getForm('form')->getComponent(
+            fn (Component $field): bool => $field instanceof CheckboxList
+                && method_exists($field, 'getName')
+                && $field->getName() === 'selectedColumnKeys'
+        );
+
+        $this->assertNotNull($checkboxList);
+        $this->assertFalse($checkboxList->isSearchable());
+        $this->assertFalse($checkboxList->isBulkToggleable());
+    }
+
+    #[Test]
+    public function field_matrix_comparison_checkbox_list_is_not_searchable_for_small_option_set(): void
+    {
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->instance();
+
+        $optionCount = count($component->columnOptions());
+        $this->assertLessThanOrEqual(8, $optionCount);
+
+        $checkboxList = $component->getForm('form')->getComponent(
+            fn (Component $field): bool => $field instanceof CheckboxList
+                && method_exists($field, 'getName')
+                && $field->getName() === 'selectedColumnKeys'
+        );
+
+        $this->assertNotNull($checkboxList);
+        $this->assertFalse($checkboxList->isSearchable());
+    }
+
+    #[Test]
+    public function field_matrix_comparison_checkbox_list_is_rendered_once(): void
+    {
+        app()->setLocale('uk');
+
+        $blade = File::get(resource_path('views/filament/pages/field-matrix.blade.php'));
+
+        $this->assertEquals(1, substr_count($blade, '{{ $this->form }}'));
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->assertSee(__('field_matrix.compare_channels_helper'));
+    }
+
+    #[Test]
+    public function field_matrix_comparison_checkbox_list_does_not_render_select_chips(): void
+    {
+        $html = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->html();
+
+        $this->assertStringNotContainsString('choices__list', $html);
+        $this->assertStringNotContainsString('fi-select-input-value-label', $html);
+        $this->assertStringContainsString('fi-fo-checkbox-list', $html);
+    }
+
+    #[Test]
+    public function field_matrix_comparison_checkbox_list_does_not_enable_bulk_toggle(): void
+    {
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->instance();
+
+        $checkboxList = $component->getForm('form')->getComponent(
+            fn (Component $field): bool => $field instanceof CheckboxList
+                && method_exists($field, 'getName')
+                && $field->getName() === 'selectedColumnKeys'
+        );
+
+        $this->assertNotNull($checkboxList);
+        $this->assertFalse($checkboxList->isBulkToggleable());
+
+        $html = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->html();
+
+        $this->assertStringNotContainsString('selectAll', $html);
+    }
+
+    #[Test]
+    public function field_matrix_six_selected_values_disable_only_unchecked_options(): void
+    {
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class);
+
+        $availableColumns = collect(range(1, 8))
+            ->map(fn (int $index): array => [
+                'channel' => 'channel_'.$index,
+                'channel_schema_version' => 'v'.$index,
+            ])
+            ->all();
+
+        $sixKeys = collect($availableColumns)
+            ->take(6)
+            ->map(fn (array $column): string => $column['channel'].'|'.$column['channel_schema_version'])
+            ->all();
+
+        $instance = $component->instance();
+        $instance->availableColumns = $availableColumns;
+        $instance->data['selectedColumnKeys'] = $sixKeys;
+
+        $checkboxList = $instance->getForm('form')->getComponent(
+            fn (Component $field): bool => $field instanceof CheckboxList
+                && method_exists($field, 'getName')
+                && $field->getName() === 'selectedColumnKeys'
+        );
+        $this->assertNotNull($checkboxList);
+
+        foreach ($sixKeys as $key) {
+            $this->assertFalse(
+                $checkboxList->isOptionDisabled($key, $instance->columnOptions()[$key]),
+                "Selected option {$key} should remain enabled."
+            );
+        }
+
+        $uncheckedKey = $availableColumns[6]['channel'].'|'.$availableColumns[6]['channel_schema_version'];
+        $this->assertTrue(
+            $checkboxList->isOptionDisabled($uncheckedKey, $instance->columnOptions()[$uncheckedKey]),
+            'Unchecked option should be disabled when six are selected.'
+        );
+    }
+
+    #[Test]
+    public function field_matrix_seventh_comparison_value_rolls_back_and_shows_localized_error(): void
+    {
+        app()->setLocale('uk');
+
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class);
+
+        $availableColumns = collect(range(1, 7))
+            ->map(fn (int $index): array => [
+                'channel' => 'channel_'.$index,
+                'channel_schema_version' => 'v'.$index,
+            ])
+            ->all();
+
+        $sixKeys = collect($availableColumns)
+            ->take(6)
+            ->map(fn (array $column): string => $column['channel'].'|'.$column['channel_schema_version'])
+            ->all();
+
+        $sevenKeys = collect($availableColumns)
+            ->map(fn (array $column): string => $column['channel'].'|'.$column['channel_schema_version'])
+            ->all();
+
+        $instance = $component->instance();
+        $instance->availableColumns = $availableColumns;
+        $instance->data['selectedColumnKeys'] = $sixKeys;
+
+        $checkboxList = $instance->getForm('form')->getComponent(
+            fn (Component $field): bool => $field instanceof CheckboxList
+                && method_exists($field, 'getName')
+                && $field->getName() === 'selectedColumnKeys'
+        );
+        $this->assertNotNull($checkboxList);
+
+        $set = new Set($checkboxList);
+        $handler = (new ReflectionClass(FieldMatrix::class))->getMethod('handleSelectedColumnKeysUpdated');
+        $handler->setAccessible(true);
+        $handler->invoke($instance, $sevenKeys, $sixKeys, $set);
+
+        $this->assertSame($sixKeys, $instance->data['selectedColumnKeys']);
+        $this->assertTrue($instance->getErrorBag()->has('data.selectedColumnKeys'));
+        $this->assertSame(
+            __('field_matrix.compare_channels_limit_error'),
+            $instance->getErrorBag()->first('data.selectedColumnKeys')
+        );
+    }
+
+    #[Test]
+    public function field_matrix_duplicate_or_unknown_comparison_key_rolls_back(): void
+    {
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class);
+
+        $validKey = $component->instance()->availableColumns[0]['channel']
+            .'|'.$component->instance()->availableColumns[0]['channel_schema_version'];
+
+        $component
+            ->fillForm(['selectedColumnKeys' => [$validKey]])
+            ->fillForm(['selectedColumnKeys' => [$validKey, $validKey]])
+            ->assertHasErrors(['data.selectedColumnKeys'])
+            ->assertSet('data.selectedColumnKeys', [$validKey]);
+
+        $component
+            ->fillForm(['selectedColumnKeys' => ['unknown|missing']])
+            ->assertHasErrors(['data.selectedColumnKeys']);
+
+        $component
+            ->fillForm(['selectedColumnKeys' => [$validKey]])
+            ->assertHasNoErrors()
+            ->assertSet('data.selectedColumnKeys', [$validKey]);
+    }
+
+    #[Test]
+    public function field_matrix_null_comparison_value_normalizes_to_empty_array(): void
+    {
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->set('data.selectedColumnKeys', null)
+            ->assertHasNoErrors()
+            ->assertSet('data.selectedColumnKeys', []);
+
+        $this->assertSame([], $component->instance()->selectedColumns());
+        $this->assertNotEmpty($component->instance()->matrix);
+        $this->assertTrue(
+            collect($component->instance()->matrix)->every(
+                fn (array $row): bool => $row['cells'] === []
+            )
+        );
+    }
+
+    #[Test]
+    public function field_matrix_renders_uk_labels_when_locale_is_uk(): void
+    {
+        app()->setLocale('uk');
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->assertSee(__('field_matrix.compare_channels'))
+            ->assertSee(__('field_matrix.filter_binding'))
+            ->assertSee(__('field_matrix.binding_product'))
+            ->assertSee(__('field_matrix.binding_variant'))
+            ->assertDontSee('Product / Variant / Both')
+            ->assertDontSee('Product + Variant');
+    }
+
+    #[Test]
+    public function field_matrix_renders_ru_labels_when_locale_is_ru(): void
+    {
+        app()->setLocale('ru');
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->assertSee(__('field_matrix.compare_channels'))
+            ->assertSee(__('field_matrix.filter_binding'))
+            ->assertSee(__('field_matrix.binding_product'))
+            ->assertDontSee('Product / Variant / Both');
+    }
+
+    #[Test]
+    public function field_matrix_renders_en_labels_when_locale_is_en(): void
+    {
+        app()->setLocale('en');
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->assertSee(__('field_matrix.compare_channels'))
+            ->assertSee(__('field_matrix.filter_binding'))
+            ->assertSee('Product variant')
+            ->assertSee('Product and variant');
+    }
+
+    #[Test]
+    public function field_matrix_translation_keys_are_complete_for_all_supported_locales(): void
+    {
+        $ukKeys = array_keys(require lang_path('uk/field_matrix.php'));
+        $ruKeys = array_keys(require lang_path('ru/field_matrix.php'));
+        $enKeys = array_keys(require lang_path('en/field_matrix.php'));
+
+        sort($ukKeys);
+        sort($ruKeys);
+        sort($enKeys);
+
+        $this->assertSame($ukKeys, $ruKeys);
+        $this->assertSame($ukKeys, $enKeys);
+    }
+
+    #[Test]
+    public function field_matrix_has_no_hardcoded_product_variant_filter_labels(): void
+    {
+        $php = File::get(app_path('Filament/Pages/FieldMatrix.php'));
+        $blade = File::get(resource_path('views/filament/pages/field-matrix.blade.php'));
+
+        $this->assertStringNotContainsString('Product / Variant / Both', $php);
+        $this->assertStringNotContainsString('Product / Variant / Both', $blade);
+        $this->assertStringNotContainsString('Product + Variant', $php);
+        $this->assertStringNotContainsString('Product + Variant', $blade);
+    }
+
+    #[Test]
+    public function field_matrix_validation_error_is_localized(): void
+    {
+        app()->setLocale('ru');
+
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class);
+
+        $validKey = $component->instance()->availableColumns[0]['channel']
+            .'|'.$component->instance()->availableColumns[0]['channel_schema_version'];
+
+        $component
+            ->fillForm(['selectedColumnKeys' => [$validKey, $validKey]])
+            ->assertHasErrors(['data.selectedColumnKeys']);
+
+        $this->assertSame(
+            __('field_matrix.compare_channels_limit_error'),
+            $component->instance()->getErrorBag()->first('data.selectedColumnKeys')
+        );
+    }
+
+    #[Test]
+    public function field_matrix_defaults_to_field_sort_ascending(): void
+    {
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class);
+
+        $this->assertSame('asc', $component->instance()->fieldSortDirection());
+        $component->assertSeeHtml('aria-sort="ascending"');
+    }
+
+    #[Test]
+    public function field_matrix_field_header_toggles_to_descending(): void
+    {
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->call('toggleFieldSortDirection');
+
+        $this->assertSame('desc', $component->instance()->fieldSortDirection());
+        $component->assertSeeHtml('aria-sort="descending"');
+        $component->assertSeeHtml('data-testid="field-matrix-sort-desc"');
+    }
+
+    #[Test]
+    public function field_matrix_field_header_toggles_back_to_ascending(): void
+    {
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->call('toggleFieldSortDirection')
+            ->call('toggleFieldSortDirection');
+
+        $this->assertSame('asc', $component->instance()->fieldSortDirection());
+        $component->assertSeeHtml('aria-sort="ascending"');
+    }
+
+    #[Test]
+    public function field_matrix_sort_preserves_search_filters_and_selected_channels(): void
+    {
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class);
+
+        $selectedKeys = $component->get('data.selectedColumnKeys');
+        $component
+            ->set('data.search', 'name')
+            ->set('data.fieldGroup', 'seo')
+            ->set('data.bindingStrategy', 'product')
+            ->call('toggleFieldSortDirection');
+
+        $this->assertSame('name', $component->get('data.search'));
+        $this->assertSame('seo', $component->get('data.fieldGroup'));
+        $this->assertSame('product', $component->get('data.bindingStrategy'));
+        $this->assertSame($selectedKeys, $component->get('data.selectedColumnKeys'));
+    }
+
+    #[Test]
+    public function field_matrix_sort_uses_internal_code_as_deterministic_tie_breaker(): void
+    {
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class);
+
+        $fields = $component->instance()->filteredFields();
+        $labels = collect($fields)->map(function (array $field): string {
+            return ($field['uk_label'] ?? '') !== ''
+                ? $field['uk_label']
+                : ($field['canonical_english_name'] ?? '');
+        })->all();
+
+        $sortedAsc = $labels;
+        usort($sortedAsc, function (string $a, string $b) use ($fields): int {
+            $comparison = strcasecmp($a, $b);
+            if ($comparison !== 0) {
+                return $comparison;
+            }
+
+            $codeA = collect($fields)->first(fn (array $f): bool => (($f['uk_label'] ?? '') !== '' ? $f['uk_label'] : ($f['canonical_english_name'] ?? '')) === $a)['internal_code'] ?? '';
+            $codeB = collect($fields)->first(fn (array $f): bool => (($f['uk_label'] ?? '') !== '' ? $f['uk_label'] : ($f['canonical_english_name'] ?? '')) === $b)['internal_code'] ?? '';
+
+            return strcasecmp($codeA, $codeB);
+        });
+
+        $this->assertSame($sortedAsc, $labels);
+
+        $component->call('toggleFieldSortDirection');
+        $descFields = $component->instance()->filteredFields();
+        $descLabels = collect($descFields)->map(function (array $field): string {
+            return ($field['uk_label'] ?? '') !== ''
+                ? $field['uk_label']
+                : ($field['canonical_english_name'] ?? '');
+        })->all();
+
+        $this->assertNotSame($labels, $descLabels);
+    }
+
+    #[Test]
+    public function field_matrix_sort_header_exposes_aria_sort(): void
+    {
+        Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->assertSeeHtml('data-testid="field-matrix-sort-trigger"')
+            ->assertSeeHtml('aria-sort="ascending"')
+            ->call('toggleFieldSortDirection')
+            ->assertSeeHtml('aria-sort="descending"');
     }
 
     #[Test]
@@ -149,14 +560,13 @@ class FieldMatrixPageTest extends TestCase
         $this->assertTrue($instance->validComparisonKeys($sixKeys));
         $this->assertFalse($instance->validComparisonKeys($sevenKeys));
 
-        $form = $instance->getForm('form');
-        $select = $form->getComponent(
-            fn (Component $component): bool => $component instanceof Select
-                && method_exists($component, 'getName')
-                && $component->getName() === 'selectedColumnKeys'
+        $checkboxList = $instance->getForm('form')->getComponent(
+            fn (Component $field): bool => $field instanceof CheckboxList
+                && method_exists($field, 'getName')
+                && $field->getName() === 'selectedColumnKeys'
         );
-        $this->assertNotNull($select);
-        $set = new Set($select);
+        $this->assertNotNull($checkboxList);
+        $set = new Set($checkboxList);
 
         $handler = (new ReflectionClass(FieldMatrix::class))->getMethod('handleSelectedColumnKeysUpdated');
         $handler->setAccessible(true);
@@ -164,49 +574,6 @@ class FieldMatrixPageTest extends TestCase
 
         $this->assertSame($sixKeys, $instance->data['selectedColumnKeys']);
         $this->assertTrue($instance->getErrorBag()->has('data.selectedColumnKeys'));
-    }
-
-    #[Test]
-    public function field_matrix_rejects_unknown_or_duplicate_comparison_keys(): void
-    {
-        $component = Livewire::actingAs($this->platformAdmin)
-            ->test(FieldMatrix::class);
-
-        $validKey = $component->instance()->availableColumns[0]['channel']
-            .'|'.$component->instance()->availableColumns[0]['channel_schema_version'];
-
-        $component
-            ->fillForm(['selectedColumnKeys' => [$validKey]])
-            ->fillForm(['selectedColumnKeys' => [$validKey, $validKey]])
-            ->assertHasErrors(['data.selectedColumnKeys'])
-            ->assertSet('data.selectedColumnKeys', [$validKey]);
-
-        $component
-            ->fillForm(['selectedColumnKeys' => ['unknown|missing']])
-            ->assertHasErrors(['data.selectedColumnKeys']);
-
-        $component
-            ->fillForm(['selectedColumnKeys' => [$validKey]])
-            ->assertHasNoErrors()
-            ->assertSet('data.selectedColumnKeys', [$validKey]);
-    }
-
-    #[Test]
-    public function field_matrix_allows_clearing_all_comparison_columns(): void
-    {
-        $component = Livewire::actingAs($this->platformAdmin)
-            ->test(FieldMatrix::class)
-            ->set('data.selectedColumnKeys', null)
-            ->assertHasNoErrors()
-            ->assertSet('data.selectedColumnKeys', []);
-
-        $this->assertSame([], $component->instance()->selectedColumns());
-        $this->assertNotEmpty($component->instance()->matrix);
-        $this->assertTrue(
-            collect($component->instance()->matrix)->every(
-                fn (array $row): bool => $row['cells'] === []
-            )
-        );
     }
 
     #[Test]

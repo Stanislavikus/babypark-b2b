@@ -3,16 +3,17 @@
     <x-filament.data-list-toolbar
       :filters-count="$this->activeFiltersCount()"
       :has-filters="true"
+      :filters-label="__('field_matrix.filters')"
       panel-id="field-matrix-toolbar-panel"
     >
       <x-slot name="search">
-        <label for="field-matrix-search" class="sr-only">Пошук полів</label>
+        <label for="field-matrix-search" class="sr-only">{{ __('field_matrix.search_label') }}</label>
         <x-filament::input.wrapper>
           <x-filament::input
             id="field-matrix-search"
             type="search"
-            placeholder="Назва, код..."
-            aria-label="Пошук полів"
+            placeholder="{{ __('field_matrix.search_placeholder') }}"
+            aria-label="{{ __('field_matrix.search_label') }}"
             wire:model.live.debounce.300ms="data.search"
           />
         </x-filament::input.wrapper>
@@ -26,7 +27,7 @@
           x-on:click="panelFocus = 'compare'; $dispatch('open-modal', { id: 'field-matrix-toolbar-panel' })"
         >
           <span class="flex items-center gap-2">
-            <span>Порівняти канали</span>
+            <span>{{ __('field_matrix.compare_channels') }}</span>
             @if ($this->selectedComparisonColumnCount() > 0)
               <x-filament::badge color="primary" size="sm">
                 {{ $this->selectedComparisonColumnCount() }}
@@ -47,18 +48,18 @@
             class="space-y-4"
             data-testid="field-matrix-panel-filters"
           >
-            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Фільтри</h3>
+            <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('field_matrix.filters') }}</h3>
 
             <div>
               <label for="field-matrix-field-group" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
-                Група
+                {{ __('field_matrix.filter_group') }}
               </label>
               <x-filament::input.wrapper>
                 <x-filament::input.select
                   id="field-matrix-field-group"
                   wire:model.live="data.fieldGroup"
                 >
-                  <option value="">Усі групи</option>
+                  <option value="">{{ __('field_matrix.filter_group_all') }}</option>
                   @foreach ($this->fieldGroupOptions() as $value => $label)
                     <option value="{{ $value }}">{{ $label }}</option>
                   @endforeach
@@ -68,14 +69,14 @@
 
             <div>
               <label for="field-matrix-binding-strategy" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
-                Product / Variant / Both
+                {{ __('field_matrix.filter_binding') }}
               </label>
               <x-filament::input.wrapper>
                 <x-filament::input.select
                   id="field-matrix-binding-strategy"
                   wire:model.live="data.bindingStrategy"
                 >
-                  <option value="">Усі рівні</option>
+                  <option value="">{{ __('field_matrix.filter_binding_all') }}</option>
                   @foreach ($this->bindingStrategyOptions() as $value => $label)
                     <option value="{{ $value }}">{{ $label }}</option>
                   @endforeach
@@ -85,14 +86,14 @@
 
             <div>
               <label for="field-matrix-scope" class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-200">
-                Походження поля
+                {{ __('field_matrix.filter_scope') }}
               </label>
               <x-filament::input.wrapper>
                 <x-filament::input.select
                   id="field-matrix-scope"
                   wire:model.live="data.scope"
                 >
-                  <option value="">Усі джерела</option>
+                  <option value="">{{ __('field_matrix.filter_scope_all') }}</option>
                   @foreach ($this->scopeOptions() as $value => $label)
                     <option value="{{ $value }}">{{ $label }}</option>
                   @endforeach
@@ -106,7 +107,7 @@
                 wire:click="clearAllFilters"
                 class="text-sm font-medium text-primary-600 hover:underline dark:text-primary-400"
               >
-                Очистити все
+                {{ __('field_matrix.clear_all') }}
               </button>
             @endif
           </div>
@@ -118,7 +119,7 @@
             data-testid="field-matrix-panel-compare"
           >
             <div class="flex items-center gap-2">
-              <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Порівняти канали</h3>
+              <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('field_matrix.compare_channels') }}</h3>
               @if ($this->selectedComparisonColumnCount() > 0)
                 <x-filament::badge color="primary" size="sm">
                   {{ $this->selectedComparisonColumnCount() }}
@@ -142,7 +143,7 @@
               type="button"
               wire:click="removeFilter('{{ $indicator['key'] }}')"
               class="rounded p-0.5 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-              aria-label="Видалити фільтр {{ $indicator['label'] }}"
+              aria-label="{{ __('field_matrix.remove_filter', ['label' => $indicator['label']]) }}"
             >
               <x-filament::icon icon="heroicon-m-x-mark" class="h-4 w-4" />
             </button>
@@ -155,7 +156,7 @@
             wire:click="clearAllFilters"
             class="text-xs font-medium text-primary-600 hover:underline dark:text-primary-400"
           >
-            Очистити все
+            {{ __('field_matrix.clear_all') }}
           </button>
         @endif
       </x-slot>
@@ -179,7 +180,21 @@
         <thead class="bg-gray-50 dark:bg-gray-800">
           <tr>
             <th class="min-w-[12rem] max-w-[20rem] px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-200">
-              Поле
+              <button
+                type="button"
+                wire:click="toggleFieldSortDirection"
+                data-testid="field-matrix-sort-trigger"
+                class="inline-flex items-center gap-1 font-medium text-gray-700 hover:text-gray-900 dark:text-gray-200 dark:hover:text-white"
+                aria-sort="{{ $this->fieldSortAriaValue() }}"
+                aria-label="{{ $this->fieldSortDirection() === 'asc' ? __('field_matrix.sort_ascending') : __('field_matrix.sort_descending') }}"
+              >
+                <span>{{ __('field_matrix.field_column') }}</span>
+                @if ($this->fieldSortDirection() === 'asc')
+                  <x-filament::icon icon="heroicon-m-chevron-up" class="h-4 w-4" data-testid="field-matrix-sort-asc" />
+                @else
+                  <x-filament::icon icon="heroicon-m-chevron-down" class="h-4 w-4" data-testid="field-matrix-sort-desc" />
+                @endif
+              </button>
             </th>
             @foreach ($selectedColumns as $column)
               <th class="min-w-[10rem] max-w-[16rem] px-4 py-3 text-left font-medium text-gray-700 dark:text-gray-200">
@@ -219,7 +234,7 @@
           @empty
             <tr>
               <td colspan="{{ max($columnCount, 0) + 1 }}" class="px-4 py-6 text-center text-gray-500">
-                Немає даних реєстру.
+                {{ __('field_matrix.no_registry_data') }}
               </td>
             </tr>
           @endforelse
