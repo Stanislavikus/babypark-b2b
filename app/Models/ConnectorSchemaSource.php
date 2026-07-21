@@ -9,6 +9,7 @@ use App\Enums\ConnectorSchemaVerificationStatus;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ConnectorSchemaSource extends Model
 {
@@ -47,5 +48,20 @@ class ConnectorSchemaSource extends Model
     public function connectorDefinition(): BelongsTo
     {
         return $this->belongsTo(ConnectorDefinition::class);
+    }
+
+    public function discoveryRuns(): HasMany
+    {
+        return $this->hasMany(ConnectorDiscoveryRun::class);
+    }
+
+    public function snapshots(): HasMany
+    {
+        return $this->hasMany(ConnectorSchemaSnapshot::class);
+    }
+
+    public function diffs(): HasMany
+    {
+        return $this->hasMany(ConnectorSchemaDiff::class);
     }
 }
