@@ -148,4 +148,200 @@ class ConnectorAccountDocumentationTest extends TestCase
             );
         }
     }
+
+    #[Test]
+    public function connector_accounts_schema_is_resolved_not_candidate(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString('#### Physical schema — `connector_accounts` (Resolved)', $content);
+        $this->assertStringNotContainsString('(candidate)', $content);
+        $this->assertStringContainsString('active_name_uniqueness_key', $content);
+        $this->assertStringContainsString('**Uniqueness (Resolved):**', $content);
+    }
+
+    #[Test]
+    public function domain_model_documents_full_physical_schemas_for_diff_tables(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString('#### Physical schema — `connector_schema_diffs` (Resolved)', $content);
+        $this->assertStringContainsString('#### Physical schema — `connector_schema_diff_items` (Resolved)', $content);
+        $this->assertStringContainsString('| `is_first_snapshot` | boolean |', $content);
+        $this->assertStringContainsString('| `change_type` | enum | `added`, `removed`, `changed` |', $content);
+        $this->assertStringContainsString('| `before_snapshot_field_id` | UUID FK nullable |', $content);
+        $this->assertStringContainsString('| `after_snapshot_field_id` | UUID FK nullable |', $content);
+    }
+
+    #[Test]
+    public function retention_pruning_order_names_connector_schema_diffs(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString(
+            'Pruning order: `connector_schema_diff_items` → `connector_schema_diffs` →',
+            $content
+        );
+        $this->assertStringContainsString('eligible `connector_discovery_runs` → old `connector_connection_checks`', $content);
+    }
+
+    #[Test]
+    public function fk_matrix_documents_restrict_on_delete_for_all_fourteen_composite_edges(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString('### FK delete-behavior matrix (Resolved)', $content);
+
+        $explicitCompositeRows = [
+            'connector_discovery_runs.snapshot_id',
+            'connector_discovery_runs.previous_snapshot_id',
+            'connector_schema_snapshots.previous_snapshot_id',
+            'connector_schema_snapshots.discovery_run_id',
+            'connector_schema_snapshot_fields.snapshot_id',
+        ];
+
+        foreach ($explicitCompositeRows as $edge) {
+            $this->assertMatchesRegularExpression(
+                '/\| `'.preg_quote($edge, '/').'` \| `restrictOnDelete\(\)` \(composite\)/',
+                $content,
+                "Missing restrictOnDelete() (composite) for {$edge}"
+            );
+        }
+
+        $this->assertStringContainsString(
+            '| `connector_schema_diffs.from_snapshot_id` / `.to_snapshot_id` | `restrictOnDelete()` (composite) |',
+            $content
+        );
+        $this->assertStringContainsString(
+            '| `connector_schema_diff_items.before_snapshot_field_id` / `.after_snapshot_field_id` | `restrictOnDelete()` (composite) |',
+            $content
+        );
+        $this->assertStringContainsString(
+            '| All `connector_account_id` / `connector_schema_source_id` / `connector_definition_id` references | `restrictOnDelete()` |',
+            $content
+        );
+        $this->assertStringContainsString(
+            '| `connector_schema_diff_id` | UUID FK | Composite guard with `workspace_id` |',
+            $content
+        );
+    }
+
+    #[Test]
+    public function fk_matrix_allows_null_on_delete_for_initiated_by_user_id_only(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString(
+            '| `initiated_by_user_id` (checks, runs) | `nullOnDelete()` |',
+            $content
+        );
+    }
+
+    #[Test]
+    public function initiated_by_user_id_is_unsigned_bigint_in_checks_and_runs(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $occurrences = substr_count(
+            $content,
+            '| `initiated_by_user_id` | unsigned bigint FK nullable | Null for scheduled; matches `users.id` (bigint, not UUID) |'
+        );
+
+        $this->assertSame(2, $occurrences);
+
+        $this->assertStringContainsString(
+            '| `initiated_by_user_id` | unsigned bigint FK nullable |',
+            $content
+        );
+        $this->assertStringNotContainsString(
+            '| `initiated_by_user_id` | UUID FK nullable |',
+            $content
+        );
+    }
+
+    #[Test]
+    public function discovery_run_started_and_finished_at_are_separate_nullable_rows(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString('| `started_at` | timestamp nullable | Null while `status: queued` |', $content);
+        $this->assertStringContainsString(
+            '| `finished_at` | timestamp nullable | Set only on terminal state (`succeeded`/`failed`/`cancelled`) |',
+            $content
+        );
+        $this->assertStringNotContainsString('| `started_at` / `finished_at` | timestamps | |', $content);
+    }
+
+    #[Test]
+    public function retention_documents_producing_run_exception_and_history_indexes(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString(
+            'retained for at least as long as any snapshot that references it',
+            $content
+        );
+        $this->assertStringContainsString(
+            '- `connector_connection_checks`: `(connector_account_id, created_at)`',
+            $content
+        );
+        $this->assertStringContainsString(
+            '- `connector_discovery_runs`: `(connector_account_id, created_at)`',
+            $content
+        );
+        $this->assertStringContainsString(
+            '- `connector_schema_snapshots`: `(connector_account_id, connector_schema_source_id, created_at)`',
+            $content
+        );
+    }
+
+    #[Test]
+    public function cross_reference_consistency_invariants_are_documented_for_task_4b2(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString(
+            '### Cross-reference consistency invariants (documented now, enforced in Task 4B-2)',
+            $content
+        );
+        $this->assertStringContainsString(
+            'are **not** implemented by Task 4B-1',
+            $content
+        );
+        $this->assertStringContainsString(
+            'connector_schema_source.connector_definition_id` must equal the related',
+            $content
+        );
+        $this->assertStringContainsString(
+            'connector_schema_snapshots.discovery_run_id` must equal that run\'s own `id`',
+            $content
+        );
+        $this->assertStringContainsString(
+            'both referenced snapshots must belong to the same',
+            $content
+        );
+        $this->assertStringContainsString(
+            'before_snapshot_field_id` must belong to the',
+            $content
+        );
+        $this->assertStringContainsString(
+            'after_snapshot_field_id` must belong to the',
+            $content
+        );
+    }
+
+    #[Test]
+    public function driver_scope_is_mysql_and_sqlite_only(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString('Supported and tested in this task: MySQL, SQLite.', $content);
+        $this->assertStringContainsString('MySQL:  `VARCHAR(255) AS (...) VIRTUAL`', $content);
+        $this->assertStringContainsString('SQLite: `TEXT GENERATED ALWAYS AS (...) VIRTUAL`', $content);
+        $this->assertStringContainsString(
+            'Task 4B-1 does not introduce or claim a PostgreSQL migration contract',
+            $content
+        );
+        $this->assertStringNotContainsString('verified PostgreSQL support', $content);
+    }
 }
