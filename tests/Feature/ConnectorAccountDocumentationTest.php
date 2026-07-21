@@ -119,4 +119,33 @@ class ConnectorAccountDocumentationTest extends TestCase
         $this->assertStringContainsString('GAP-006 stays Open', $content);
         $this->assertStringContainsString('**Status:** Open', $content);
     }
+
+    #[Test]
+    public function prototype_desktop_and_mobile_screenshots_are_distinct(): void
+    {
+        $dir = base_path('docs/prototypes/task-4b0-connector-account/screenshots');
+        $pairs = [
+            ['02-settings-desktop-1440.png', '02-settings-mobile-375.png'],
+            ['03-check-error-auth-desktop-1440.png', '03-check-error-auth-mobile-375.png'],
+            ['04-discovery-desktop-1440.png', '04-discovery-mobile-375.png'],
+            ['06-history-desktop-1440.png', '06-history-mobile-375.png'],
+        ];
+
+        foreach ($pairs as [$desktop, $mobile]) {
+            $desktopPath = $dir.'/'.$desktop;
+            $mobilePath = $dir.'/'.$mobile;
+
+            $this->assertFileExists($desktopPath, "Missing desktop screenshot: {$desktop}");
+            $this->assertFileExists($mobilePath, "Missing mobile screenshot: {$mobile}");
+
+            $desktopHash = hash_file('sha256', $desktopPath);
+            $mobileHash = hash_file('sha256', $mobilePath);
+
+            $this->assertNotSame(
+                $desktopHash,
+                $mobileHash,
+                "{$desktop} and {$mobile} are byte-identical (not a real distinct capture)"
+            );
+        }
+    }
 }
