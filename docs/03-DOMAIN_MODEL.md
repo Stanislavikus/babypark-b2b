@@ -1724,30 +1724,261 @@ No credentials are stored here. Credentials belong to `ConnectorAccount`
 
 This is global platform data.
 
-### ConnectorAccount
+### ConnectorAccount (Resolved — Task 4B-0 Stop-and-Amend)
 
+> **Status marker:** `Resolved` — approved and merged via Task 4B-0 docs-only PR.
+> Application implementation proceeds in Task 4B-1 onward.
 
-A ConnectorAccount is a workspace-specific connected account or configured source.
+A `ConnectorAccount` is a **workspace-owned** connection to one external store or
+tenant. It references exactly one global `ConnectorDefinition` and holds
+account display name, auth profile, base/tenant context, non-secret settings,
+encrypted credentials, and a **current connection-health projection** updated by
+domain services after terminal connection checks and discovery runs.
 
-It may contain:
+`ConnectorAccount` does **not** contain:
 
-- workspace;
+- global platform metadata (that is `ConnectorDefinition`);
+- immutable schema history (that is snapshots/diffs — see below);
+- `FieldMapping` rows (Task 4C);
+- raw vendor response bodies by default;
+- credentials on `ConnectorDefinition`, `ConnectorSchemaSource`, or snapshots.
 
-- connector definition;
+#### Boundary vs legacy `SyncLog`
 
-- name;
+`SyncLog` remains a **legacy summary log** for existing Babypark import/export
+sync flows. It has no `workspace_id`, no `connector_account_id`, no running state,
+coarse `success|error` only, and legacy product/price/stock type enums. Task 4B
+**does not** extend or reuse `SyncLog` as a parent event table. New connector
+operational history uses the dedicated append-only entities below with explicit
+workspace ownership.
 
-- credentials;
+#### Current projection vs operational history
 
-- settings;
+**Current account overview** (`ConnectorAccount` row) answers:
 
-- status;
+- Чи підключення працює зараз?
+- Коли його востаннє перевіряли?
+- Коли востаннє успішно отримували поля?
+- Що користувач має зробити зараз?
 
-- last sync at.
+**Operational history** (`ConnectorConnectionCheck`, `ConnectorDiscoveryRun`,
+snapshots, diffs) answers:
 
-Credentials must be stored securely.
+- Коли проблема з’явилась?
+- Чи була вона тимчасовою?
+- Хто запускав перевірку?
+- Чи відновилось підключення?
+- Який snapshot створено?
 
-Connector accounts belong to a workspace.
+The list UI must read the **current projection** on `ConnectorAccount`. It must
+not recompute “last event” with an expensive history query per row. History rows
+are append-only after terminal state (`running → succeeded | failed | cancelled`).
+
+#### Physical schema — `connector_accounts` (candidate)
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID FK | Required from first migration; `BelongsToWorkspace` |
+| `connector_definition_id` | UUID FK | → `connector_definitions` |
+| `name` | string | Merchant-facing display name |
+| `auth_profile` | string | Stable code, e.g. `adobe_commerce_paas_oauth1_integration`, `adobe_commerce_saas_ims_server_to_server` |
+| `base_url` | string nullable | PaaS store origin; SSRF-validated; normalized (scheme/https, no trailing slash) |
+| `store_code` | string nullable | PaaS REST store-view segment |
+| `tenant_context` | string nullable | SaaS tenant/API path segment when not encoded in `base_url` |
+| `is_enabled` | boolean | Disabled accounts retain history but do not schedule discovery |
+| `settings` | JSON | Non-secret deployment options only |
+| `credentials` | TEXT | Laravel `encrypted:array` — never indexed or searched |
+| `connection_status` | enum | `untested`, `connected`, `attention_required`, `temporarily_unavailable`, `disabled` |
+| `last_checked_at` | timestamp nullable | |
+| `last_successful_check_at` | timestamp nullable | |
+| `last_discovery_at` | timestamp nullable | |
+| `last_successful_discovery_at` | timestamp nullable | |
+| `last_error_cause` | enum nullable | See dual-axis errors |
+| `last_error_actionability` | enum nullable | See dual-axis errors |
+| `last_error_message_key` | string nullable | Translation key, not raw vendor text |
+| `last_error_at` | timestamp nullable | |
+| `deleted_at` | timestamp nullable | Soft delete; history retained per retention policy |
+| `created_at` / `updated_at` | timestamps | |
+
+**Uniqueness (candidate):** `(workspace_id, connector_definition_id, name)` among
+non-deleted rows. Never include secrets or credential hashes in unique indexes.
+
+**Credentials storage decision:** encrypted `credentials` TEXT on the same row as
+`settings` JSON (recommended MVP). A separate `connector_account_credentials`
+1:1 table was considered for narrower SELECT exposure but rejected for MVP
+complexity — rotation and masking are handled via cast + policy + `$hidden`, with
+jobs passing `connector_account_id` only.
+
+**Adobe first adapter, generic core:** auth profile codes and adapter services are
+vendor-specific; generic tables remain free of Adobe-only columns.
+
+### ConnectorConnectionCheck (Resolved)
+
+Append-only history of connection test attempts.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID FK | |
+| `connector_account_id` | UUID FK | |
+| `trigger` | enum | `manual`, `scheduled`, `before_discovery` |
+| `initiated_by_user_id` | UUID FK nullable | Null for scheduled |
+| `status` | enum | `running`, `succeeded`, `failed` |
+| `cause_category` | enum nullable | `authentication`, `authorization`, `configuration`, `rate_limit`, `vendor_unavailable`, `network`, `schema_validation`, `data_validation`, `unknown` |
+| `actionability` | enum nullable | `user_action_required`, `automatic_retry`, `workspace_admin_required`, `support_required` |
+| `error_code` | string nullable | Internal stable code |
+| `http_status` | smallint nullable | |
+| `user_message_key` | string nullable | e.g. `connectors.errors.invalid_credentials` |
+| `safe_message_parameters` | JSON nullable | Non-secret interpolation params |
+| `technical_summary` | string nullable | Redacted, length-capped |
+| `vendor_request_id` | string nullable | Support reference when not secret |
+| `started_at` | timestamp | |
+| `finished_at` | timestamp nullable | |
+| `duration_ms` | unsigned int nullable | |
+| `created_at` | timestamp | Immutable after terminal state |
+
+**Concurrency:** at most one `running` check per account (application lock).
+**No** secrets, Authorization headers, or raw response bodies.
+
+### ConnectorDiscoveryRun (Resolved)
+
+Append-only history of schema discovery executions against one
+`connector_schema_source`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID FK | |
+| `connector_account_id` | UUID FK | |
+| `connector_schema_source_id` | UUID FK | |
+| `trigger` | enum | `manual`, `scheduled`, `after_connection_check` |
+| `initiated_by_user_id` | UUID FK nullable | |
+| `status` | enum | `queued`, `running`, `succeeded`, `failed`, `cancelled` |
+| `started_at` / `finished_at` | timestamps | |
+| `duration_ms` | unsigned int nullable | |
+| `fields_received` | unsigned int nullable | |
+| `fields_normalized` | unsigned int nullable | |
+| `added_count` / `changed_count` / `removed_count` / `unchanged_count` | unsigned int nullable | Populated when diff computed |
+| `cause_category` / `actionability` / `error_code` / `http_status` | nullable | Same vocabulary as checks |
+| `user_message_key` / `technical_summary` / `vendor_request_id` | nullable | |
+| `snapshot_id` | UUID FK nullable | Set only on full success |
+| `previous_snapshot_id` | UUID FK nullable | For diff context |
+| `created_at` | timestamp | |
+
+**Rules:**
+
+- Failed or incomplete pagination **does not** publish a canonical snapshot.
+- `partial` is not a terminal success state for snapshot publication.
+- Latest successful snapshot for account+source is resolved via indexed query,
+  not by mutating prior snapshots.
+
+### ConnectorSchemaSnapshot (Resolved)
+
+Immutable successful normalized schema capture.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID FK | |
+| `connector_account_id` | UUID FK | |
+| `connector_schema_source_id` | UUID FK | |
+| `discovery_run_id` | UUID FK | Producing run |
+| `previous_snapshot_id` | UUID FK nullable | Chain |
+| `schema_version` | string nullable | From source/account context |
+| `field_count` | unsigned int | |
+| `canonical_hash` | char(64) | Hash of ordered normalized field hashes |
+| `captured_at` | timestamp | Vendor-normalized capture instant |
+| `created_at` | timestamp | Append-only |
+
+If `canonical_hash` equals previous snapshot, a new run may still append a snapshot
+for audit, but UI labels the outcome **«Без змін»** rather than implying field churn.
+
+**Raw external payload:** not stored by default.
+
+### ConnectorSchemaSnapshotField (Resolved)
+
+Normalized field state inside one snapshot. **No** `previous_value` / `current_value`
+columns — diffs are separate entities.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID FK | |
+| `snapshot_id` | UUID FK | |
+| `external_field_key` | string | Adobe: `attribute_code` |
+| `external_label` | string nullable | |
+| `normalized_data_type` | string | Connector-neutral type code |
+| `is_required` | boolean nullable | |
+| `is_multi_value` | boolean nullable | |
+| `is_localizable` | boolean nullable | |
+| `external_scope` | string nullable | |
+| `normalized_payload` | JSON | Whitelisted metadata + options |
+| `canonical_hash` | char(64) | Per-field deterministic hash |
+| `sort_order` | unsigned int nullable | |
+| `created_at` | timestamp | |
+
+Unique: `(snapshot_id, external_field_key)`.
+
+### ConnectorSchemaDiff / ConnectorSchemaDiffItem (Resolved)
+
+`connector_schema_diffs` compares `from_snapshot_id` → `to_snapshot_id` with
+aggregate counts. **First snapshot:** UI label `Перший знімок` — baseline, not
+misleading “додано N” without explanation.
+
+`connector_schema_diff_items`: `change_type` (`added`, `removed`, `changed`),
+`external_field_key`, optional FKs to before/after snapshot fields,
+`changed_paths` JSON for scalar/option deltas. Diffs remain immutable; pruning old
+snapshots must not orphan diff summaries referenced by UI — retain latest successful
+snapshot always.
+
+### Dual-axis error classification (Resolved)
+
+**Cause:** `authentication`, `authorization`, `configuration`, `rate_limit`,
+`vendor_unavailable`, `network`, `schema_validation`, `data_validation`, `unknown`.
+
+**Actionability:** `user_action_required`, `automatic_retry`,
+`workspace_admin_required`, `support_required`.
+
+User-facing text uses `user_message_key` + safe parameters — never raw vendor
+exceptions or a single coarse `business|technical` axis.
+
+Example keys: `connectors.errors.invalid_credentials`,
+`connectors.errors.insufficient_permissions`, `connectors.errors.rate_limited`.
+
+### Task 4B vs Task 4C boundary (Resolved)
+
+| Task | Scope |
+|---|---|
+| **4B-0** (this PR) | Stop-and-Amend docs + visual contract only |
+| **4B-1** | Migrations/domain foundation for `ConnectorAccount` + history tables |
+| **4B-2** | Adobe live discovery, snapshots, diffs, operational UI |
+| **4C** | `FieldMapping` suggestions, confidence, confirmation, manual resolution |
+
+Task 4B snapshots are **input** to Task 4C. Discovery must **not** auto-create
+`FieldMapping` rows. Six Task 3 golden Adobe mappings (`sku`, `name`,
+`description`, `short_description`, `category`, `status` in
+`docs/data/canonical_product_field_mappings.csv`) are acceptance evidence only.
+
+### Retention (Resolved initial policy)
+
+| Data | Retention |
+|---|---|
+| Connection checks / failed attempts | 90 days |
+| Discovery run metadata | 12 months |
+| Successful normalized snapshots | Last 30 per account+source |
+| Latest successful snapshot | Always retained |
+| Raw vendor payload | Not stored by default |
+
+Pruning order: diff items → old snapshot fields → snapshots → runs → checks,
+never deleting a snapshot still referenced as `latest` or diff endpoint.
+
+### Workspace isolation (Resolved)
+
+Every table above includes `workspace_id` from the first migration, uses
+`BelongsToWorkspace` (or approved equivalent), composite FK guards where parent
+rows are workspace-scoped, policies on read/write, and tests for direct model,
+service, and relation cross-workspace rejection.
 
 ### FieldMapping
 

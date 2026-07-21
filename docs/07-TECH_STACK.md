@@ -152,6 +152,27 @@ If a UI task requires a new field, new persisted preference, new status, new cal
 
 ---
 
+## Connector implementation guardrails (Task 4B+)
+
+Confirmed by Task 4B-0 research — apply when implementing connector persistence:
+
+- Use Laravel HTTP client and public framework encryption APIs (`encrypted:array`
+  cast; credentials column `TEXT` or larger; not searchable).
+- Introduce a connector **adapter interface/port** per vendor deployment family;
+  no Adobe-specific columns on generic tables.
+- Queue jobs carry `connector_account_id` (and workspace context), never
+  decrypted credentials in payload.
+- Automated tests use `Http::fake()` — no live vendor calls in CI.
+- Operational UI: Filament + Livewire + Alpine + Tailwind per existing stack; no
+  new frontend framework.
+- Non-runtime visual prototypes live under `docs/prototypes/` and are not imported
+  by Laravel runtime.
+
+Do not finalize PHP class names in this document — physical design concludes in
+Task 4B-1/4B-2 implementation PRs after this Stop-and-Amend merges.
+
+---
+
 ## Task Prompt Template for Cursor
 
 Use this structure for implementation tasks:
