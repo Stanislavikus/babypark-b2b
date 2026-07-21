@@ -13,7 +13,7 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
 
-        $this->assertStringContainsString('### ConnectorAccount (Proposed — Task 4B-0 Stop-and-Amend)', $content);
+        $this->assertStringContainsString('### ConnectorAccount (Resolved — Task 4B-0 Stop-and-Amend)', $content);
         $this->assertStringContainsString('workspace-owned', $content);
         $this->assertStringContainsString('encrypted:array', $content);
         $this->assertStringContainsString('does **not** contain', $content);
@@ -24,8 +24,8 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
 
-        $this->assertStringContainsString('### ConnectorConnectionCheck (Proposed)', $content);
-        $this->assertStringContainsString('### ConnectorDiscoveryRun (Proposed)', $content);
+        $this->assertStringContainsString('### ConnectorConnectionCheck (Resolved)', $content);
+        $this->assertStringContainsString('### ConnectorDiscoveryRun (Resolved)', $content);
         $this->assertStringContainsString('append-only', $content);
     }
 
@@ -34,8 +34,8 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
 
-        $this->assertStringContainsString('### ConnectorSchemaSnapshot (Proposed)', $content);
-        $this->assertStringContainsString('### ConnectorSchemaDiff / ConnectorSchemaDiffItem (Proposed)', $content);
+        $this->assertStringContainsString('### ConnectorSchemaSnapshot (Resolved)', $content);
+        $this->assertStringContainsString('### ConnectorSchemaDiff / ConnectorSchemaDiffItem (Resolved)', $content);
         $this->assertStringContainsString('**No** `previous_value` / `current_value`', $content);
     }
 
@@ -44,7 +44,7 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
 
-        $this->assertStringContainsString('### Dual-axis error classification (Proposed)', $content);
+        $this->assertStringContainsString('### Dual-axis error classification (Resolved)', $content);
         $this->assertStringContainsString('authentication', $content);
         $this->assertStringContainsString('authorization', $content);
         $this->assertStringContainsString('user_action_required', $content);
@@ -65,7 +65,7 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
 
-        $this->assertStringContainsString('### Task 4B vs Task 4C boundary (Proposed)', $content);
+        $this->assertStringContainsString('### Task 4B vs Task 4C boundary (Resolved)', $content);
         $this->assertStringContainsString('Discovery must **not** auto-create', $content);
         $this->assertStringContainsString('Task 4C', $content);
     }

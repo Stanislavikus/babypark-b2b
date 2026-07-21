@@ -259,7 +259,7 @@ yet), but should be scheduled before any payment gateway integration work starts
   `workspace_id`, no `connector_account_id`, no running state, coarse
   `success|error`, legacy Babypark sync type enum. Task 4B **does not** extend
   `SyncLog`; new connector operational history uses dedicated workspace-owned
-  tables (see `03-DOMAIN_MODEL.md` Task 4B-0 Proposed sections).
+  tables (see `03-DOMAIN_MODEL.md` Task 4B-0 Resolved sections).
 - No `ConnectorAccount`, `FieldMapping`, connection-check/discovery/snapshot/diff
   models or migrations yet.
 

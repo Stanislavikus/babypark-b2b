@@ -1724,11 +1724,10 @@ No credentials are stored here. Credentials belong to `ConnectorAccount`
 
 This is global platform data.
 
-### ConnectorAccount (Proposed — Task 4B-0 Stop-and-Amend)
+### ConnectorAccount (Resolved — Task 4B-0 Stop-and-Amend)
 
-> **Status marker:** `Proposed` — becomes `Resolved` only when the Task 4B-0
-> docs-only PR is approved and merged. Application code remains blocked until
-> then.
+> **Status marker:** `Resolved` — approved and merged via Task 4B-0 docs-only PR.
+> Application implementation proceeds in Task 4B-1 onward.
 
 A `ConnectorAccount` is a **workspace-owned** connection to one external store or
 tenant. It references exactly one global `ConnectorDefinition` and holds
@@ -1814,7 +1813,7 @@ jobs passing `connector_account_id` only.
 **Adobe first adapter, generic core:** auth profile codes and adapter services are
 vendor-specific; generic tables remain free of Adobe-only columns.
 
-### ConnectorConnectionCheck (Proposed)
+### ConnectorConnectionCheck (Resolved)
 
 Append-only history of connection test attempts.
 
@@ -1842,7 +1841,7 @@ Append-only history of connection test attempts.
 **Concurrency:** at most one `running` check per account (application lock).
 **No** secrets, Authorization headers, or raw response bodies.
 
-### ConnectorDiscoveryRun (Proposed)
+### ConnectorDiscoveryRun (Resolved)
 
 Append-only history of schema discovery executions against one
 `connector_schema_source`.
@@ -1874,7 +1873,7 @@ Append-only history of schema discovery executions against one
 - Latest successful snapshot for account+source is resolved via indexed query,
   not by mutating prior snapshots.
 
-### ConnectorSchemaSnapshot (Proposed)
+### ConnectorSchemaSnapshot (Resolved)
 
 Immutable successful normalized schema capture.
 
@@ -1897,7 +1896,7 @@ for audit, but UI labels the outcome **«Без змін»** rather than implyin
 
 **Raw external payload:** not stored by default.
 
-### ConnectorSchemaSnapshotField (Proposed)
+### ConnectorSchemaSnapshotField (Resolved)
 
 Normalized field state inside one snapshot. **No** `previous_value` / `current_value`
 columns — diffs are separate entities.
@@ -1921,7 +1920,7 @@ columns — diffs are separate entities.
 
 Unique: `(snapshot_id, external_field_key)`.
 
-### ConnectorSchemaDiff / ConnectorSchemaDiffItem (Proposed)
+### ConnectorSchemaDiff / ConnectorSchemaDiffItem (Resolved)
 
 `connector_schema_diffs` compares `from_snapshot_id` → `to_snapshot_id` with
 aggregate counts. **First snapshot:** UI label `Перший знімок` — baseline, not
@@ -1933,7 +1932,7 @@ misleading “додано N” without explanation.
 snapshots must not orphan diff summaries referenced by UI — retain latest successful
 snapshot always.
 
-### Dual-axis error classification (Proposed)
+### Dual-axis error classification (Resolved)
 
 **Cause:** `authentication`, `authorization`, `configuration`, `rate_limit`,
 `vendor_unavailable`, `network`, `schema_validation`, `data_validation`, `unknown`.
@@ -1947,7 +1946,7 @@ exceptions or a single coarse `business|technical` axis.
 Example keys: `connectors.errors.invalid_credentials`,
 `connectors.errors.insufficient_permissions`, `connectors.errors.rate_limited`.
 
-### Task 4B vs Task 4C boundary (Proposed)
+### Task 4B vs Task 4C boundary (Resolved)
 
 | Task | Scope |
 |---|---|
@@ -1961,7 +1960,7 @@ Task 4B snapshots are **input** to Task 4C. Discovery must **not** auto-create
 `description`, `short_description`, `category`, `status` in
 `docs/data/canonical_product_field_mappings.csv`) are acceptance evidence only.
 
-### Retention (Proposed initial policy)
+### Retention (Resolved initial policy)
 
 | Data | Retention |
 |---|---|
@@ -1974,7 +1973,7 @@ Task 4B snapshots are **input** to Task 4C. Discovery must **not** auto-create
 Pruning order: diff items → old snapshot fields → snapshots → runs → checks,
 never deleting a snapshot still referenced as `latest` or diff endpoint.
 
-### Workspace isolation (Proposed)
+### Workspace isolation (Resolved)
 
 Every table above includes `workspace_id` from the first migration, uses
 `BelongsToWorkspace` (or approved equivalent), composite FK guards where parent
