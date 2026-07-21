@@ -93,7 +93,7 @@ class FieldMatrix extends Page implements HasForms
         return $form
             ->schema([
                 CheckboxList::make('selectedColumnKeys')
-                    ->label(__('field_matrix.compare_channels'))
+                    ->hiddenLabel()
                     ->helperText(__('field_matrix.compare_channels_helper'))
                     ->options(fn (): array => $this->columnOptions())
                     ->disableOptionWhen(fn (string $value): bool => $this->shouldDisableComparisonOption($value))

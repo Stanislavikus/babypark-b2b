@@ -715,4 +715,107 @@ class FieldMatrixPageTest extends TestCase
             ->assertSet('availableColumns', fn (array $columns): bool => $columns !== [])
             ->assertSet('matrix', fn (array $matrix): bool => $matrix !== []);
     }
+
+    #[Test]
+    public function field_matrix_panel_uses_select_channels_heading(): void
+    {
+        app()->setLocale('uk');
+
+        $blade = File::get(resource_path('views/filament/pages/field-matrix.blade.php'));
+
+        $this->assertStringContainsString("__('field_matrix.select_channels')", $blade);
+
+        preg_match(
+            '/data-testid="field-matrix-panel-compare"[\s\S]*?\{\{ \$this->form \}\}/',
+            $blade,
+            $compareSection
+        );
+
+        $this->assertNotEmpty($compareSection);
+        $this->assertStringContainsString("__('field_matrix.select_channels')", $compareSection[0]);
+        $this->assertStringNotContainsString("__('field_matrix.compare_channels')", $compareSection[0]);
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->assertSee(__('field_matrix.select_channels'));
+    }
+
+    #[Test]
+    public function field_matrix_compare_channels_trigger_label_is_unchanged(): void
+    {
+        app()->setLocale('uk');
+
+        Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class)
+            ->assertSee(__('field_matrix.compare_channels'))
+            ->assertSeeHtml('data-testid="compare-channels-trigger"');
+    }
+
+    #[Test]
+    public function field_matrix_translation_keys_match_across_uk_ru_en(): void
+    {
+        $uk = require lang_path('uk/field_matrix.php');
+        $ru = require lang_path('ru/field_matrix.php');
+        $en = require lang_path('en/field_matrix.php');
+
+        $this->assertArrayHasKey('select_channels', $uk);
+        $this->assertArrayHasKey('select_channels', $ru);
+        $this->assertArrayHasKey('select_channels', $en);
+        $this->assertSame('Вибрати канали', $uk['select_channels']);
+        $this->assertSame('Выбрать каналы', $ru['select_channels']);
+        $this->assertSame('Select channels', $en['select_channels']);
+
+        $ukKeys = array_keys($uk);
+        $ruKeys = array_keys($ru);
+        $enKeys = array_keys($en);
+
+        sort($ukKeys);
+        sort($ruKeys);
+        sort($enKeys);
+
+        $this->assertSame($ukKeys, $ruKeys);
+        $this->assertSame($ukKeys, $enKeys);
+    }
+
+    #[Test]
+    public function field_matrix_existing_checkbox_limit_and_sort_contracts_remain_unchanged(): void
+    {
+        $component = Livewire::actingAs($this->platformAdmin)
+            ->test(FieldMatrix::class);
+
+        $instance = $component->instance();
+
+        $checkboxList = $instance->getForm('form')->getComponent(
+            fn (Component $field): bool => $field instanceof CheckboxList
+                && method_exists($field, 'getName')
+                && $field->getName() === 'selectedColumnKeys'
+        );
+
+        $this->assertNotNull($checkboxList);
+        $this->assertFalse($checkboxList->isSearchable());
+        $this->assertFalse($checkboxList->isBulkToggleable());
+        $this->assertSame('asc', $instance->fieldSortDirection());
+
+        $availableColumns = collect(range(1, 7))
+            ->map(fn (int $index): array => [
+                'channel' => 'channel_'.$index,
+                'channel_schema_version' => 'v'.$index,
+            ])
+            ->all();
+
+        $sixKeys = collect($availableColumns)
+            ->take(6)
+            ->map(fn (array $column): string => $column['channel'].'|'.$column['channel_schema_version'])
+            ->all();
+
+        $sevenKeys = collect($availableColumns)
+            ->map(fn (array $column): string => $column['channel'].'|'.$column['channel_schema_version'])
+            ->all();
+
+        $instance->availableColumns = $availableColumns;
+        $instance->data['selectedColumnKeys'] = $sixKeys;
+
+        $this->assertTrue($instance->validComparisonKeys($sixKeys));
+        $this->assertFalse($instance->validComparisonKeys($sevenKeys));
+    }
 }

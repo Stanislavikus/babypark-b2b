@@ -15,6 +15,7 @@ return [
     'filter_scope_all' => 'All sources',
     'clear_all' => 'Clear all',
     'compare_channels' => 'Compare channels',
+    'select_channels' => 'Select channels',
     'compare_channels_helper' => 'You can compare up to 6 channel variants at once.',
     'compare_channels_limit_error' => 'You can select up to 6 available channel variants without duplicates.',
     'field_column' => 'Field',

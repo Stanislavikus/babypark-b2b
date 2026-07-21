@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\Auth;
 
 class ConnectorDefinitionResource extends Resource
 {
+    protected static bool $hasTitleCaseModelLabel = false;
+
     protected static ?string $model = ConnectorDefinition::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-server-stack';
