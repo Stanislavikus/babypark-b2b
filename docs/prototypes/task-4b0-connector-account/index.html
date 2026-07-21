@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="uk" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Task 4B-0 — Підключення (NON-RUNTIME)</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div class="brand-row">
+        <div>
+          <div class="contract-badge">Non-runtime design contract</div>
+          <h1>Підключення до зовнішніх систем</h1>
+        </div>
+        <button class="btn" id="theme-toggle" type="button">Тема: світла/темна</button>
+      </div>
+      <nav class="nav-tabs" aria-label="Екрани прототипу">
+        <button type="button" data-screen="connections" class="active">Список</button>
+        <button type="button" data-screen="settings">Налаштування</button>
+        <button type="button" data-screen="check">Перевірка</button>
+        <button type="button" data-screen="discovery">Отримання полів</button>
+        <button type="button" data-screen="diff">Зміни</button>
+        <button type="button" data-screen="history">Історія</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page">
+    <!-- Screen 1: Connections list -->
+    <section id="screen-connections" class="screen active">
+      <div class="toolbar">
+        <input class="search" type="search" placeholder="Пошук підключень…" aria-label="Пошук">
+        <div class="controls desktop-only">
+          <button class="btn" type="button">Фільтри</button>
+          <button class="btn primary" type="button" data-screen="settings">Додати підключення</button>
+        </div>
+        <button class="overflow-toggle" type="button" aria-label="Дії">⋯</button>
+      </div>
+      <div class="card">
+        <table id="connections-table">
+          <thead>
+            <tr>
+              <th>Платформа</th>
+              <th>Назва</th>
+              <th>Магазин / контекст</th>
+              <th>Статус</th>
+              <th>Остання перевірка</th>
+              <th>Останнє отримання полів</th>
+              <th>Увага</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Screen 2: Settings -->
+    <section id="screen-settings" class="screen">
+      <div class="grid-2">
+        <div class="card">
+          <h2>Налаштування підключення</h2>
+          <div class="field">
+            <label for="conn-name">Назва підключення</label>
+            <input id="conn-name" type="text" value="Babypark UA Store">
+          </div>
+          <div class="field">
+            <label for="deployment-type">Тип розгортання Adobe</label>
+            <select id="deployment-type">
+              <option value="paas">Adobe Commerce on-premises / Cloud (PaaS)</option>
+              <option value="saas">Adobe Commerce as a Cloud Service (SaaS)</option>
+            </select>
+          </div>
+          <div id="paas-fields">
+            <div class="field">
+              <label for="base-url">Адреса магазину</label>
+              <input id="base-url" type="url" value="https://shop.babypark.example" placeholder="https://your-store.example">
+            </div>
+            <div class="field">
+              <label for="store-code">Store view</label>
+              <input id="store-code" type="text" value="default">
+            </div>
+            <div class="field">
+              <label>Consumer Key</label>
+              <input type="text" value="••••••••••••ab12" readonly>
+            </div>
+            <div class="field">
+              <label>Consumer Secret</label>
+              <input type="password" placeholder="Залиште порожнім, щоб не змінювати збережене значення">
+              <p class="hint">Порожнє поле не стирає збережений секрет. Використайте «Замінити» або «Видалити».</p>
+            </div>
+            <div class="field">
+              <label>Access Token</label>
+              <input type="password" placeholder="Залиште порожнім, щоб не змінювати">
+            </div>
+            <div class="field">
+              <label>Access Token Secret</label>
+              <input type="password" placeholder="Залиште порожнім, щоб не змінювати">
+            </div>
+          </div>
+          <div id="saas-fields" class="hidden">
+            <div class="field">
+              <label>Tenant API host</label>
+              <input type="text" value="https://na1.api.commerce.adobe.com/TENANT_ID_PLACEHOLDER">
+            </div>
+            <div class="field">
+              <label>Store header</label>
+              <input type="text" value="default">
+            </div>
+            <div class="field">
+              <label>IMS Client ID</label>
+              <input type="text" value="••••••••••••cd34" readonly>
+            </div>
+            <div class="field">
+              <label>IMS Client Secret</label>
+              <input type="password" placeholder="Залиште порожнім, щоб не змінювати збережене значення">
+            </div>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.5rem">
+            <button class="btn" type="button" data-check="success">Перевірити з’єднання</button>
+            <button class="btn primary" type="button">Зберегти</button>
+            <button class="btn" type="button">Замінити секрети</button>
+            <button class="btn" type="button">Видалити секрети</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Підказки</h3>
+          <ul class="hint">
+            <li>PaaS використовує OAuth 1.0a integration credentials — не admin username/password.</li>
+            <li>SaaS використовує IMS OAuth 2.0 server-to-server зі scope <span class="mono">commerce.accs</span>.</li>
+            <li>Адреса магазину перевіряється на безпечні схеми та блокування внутрішніх мереж (SSRF).</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Screen 3: Connection check -->
+    <section id="screen-check" class="screen">
+      <p class="hint">Оберіть сценарій перевірки:</p>
+      <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1rem">
+        <button class="btn" type="button" data-check="success">Успіх</button>
+        <button class="btn" type="button" data-check="auth">401 credentials</button>
+        <button class="btn" type="button" data-check="forbidden">403 permissions</button>
+        <button class="btn" type="button" data-check="config">Невірна адреса</button>
+        <button class="btn" type="button" data-check="rate">Rate limit</button>
+        <button class="btn" type="button" data-check="outage">Timeout / 5xx</button>
+      </div>
+      <div id="check-result"></div>
+    </section>
+
+    <!-- Screen 4: Discovery -->
+    <section id="screen-discovery" class="screen">
+      <div class="field" style="max-width:320px">
+        <label for="discovery-mode">Сценарій</label>
+        <select id="discovery-mode">
+          <option value="diff">Повторне отримання (+3 / −1 / 2 зміни)</option>
+          <option value="first">Перший знімок</option>
+        </select>
+      </div>
+      <div id="discovery-summary-diff" class="kpi-row" style="margin-bottom:1rem">
+        <div class="kpi"><span class="hint">Отримано / нормалізовано</span><strong>142 / 142</strong></div>
+        <div class="kpi"><span class="hint">Додано</span><strong>3</strong></div>
+        <div class="kpi"><span class="hint">Змінено</span><strong>2</strong></div>
+        <div class="kpi"><span class="hint">Видалено</span><strong>1</strong></div>
+      </div>
+      <div id="discovery-summary-first" class="card hidden">
+        <span class="badge info">Перший знімок</span>
+        <p>Створено базовий знімок із 134 полями. Це початковий стан, а не звичайний diff «додано 134».</p>
+      </div>
+      <div class="card">
+        <p><strong>Джерело:</strong> Live account attributes · <strong>Знято:</strong> 21.07.2026 13:55</p>
+      </div>
+      <div class="toolbar">
+        <input id="discovery-search" class="search" type="search" placeholder="Пошук полів…">
+        <div class="controls desktop-only">
+          <button class="btn" id="filter-trigger" type="button">Фільтри <span class="badge muted">1</span></button>
+          <button class="btn" type="button">Сортування</button>
+        </div>
+        <button class="overflow-toggle" type="button">⋯</button>
+      </div>
+      <div class="active-filters">
+        <span class="chip">Зміна: не «Без змін» <button type="button" aria-label="Прибрати">×</button></span>
+        <button class="btn ghost" type="button">Очистити все</button>
+      </div>
+      <div class="card" style="padding:0;overflow:auto">
+        <table id="discovery-fields">
+          <thead>
+            <tr>
+              <th>Зовнішнє поле</th>
+              <th>Назва</th>
+              <th>Тип</th>
+              <th>Обов’язкове</th>
+              <th>Опції</th>
+              <th>Зміна</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Screen 5: Diff detail (also in drawer) -->
+    <section id="screen-diff" class="screen">
+      <div class="card" id="diff-detail-static">
+        <h2>description · Змінено</h2>
+        <div class="compare">
+          <div><strong>Було</strong><pre>{"is_required": false, "type": "textarea"}</pre></div>
+          <div><strong>Стало</strong><pre>{"is_required": true, "type": "textarea"}</pre></div>
+        </div>
+        <p class="hint">Змінені шляхи: <span class="mono">is_required</span></p>
+      </div>
+      <div class="card">
+        <h3>status · Видалено</h3>
+        <pre>{"external_field_key": "status", "label": "Enable Product"}</pre>
+      </div>
+    </section>
+
+    <!-- Screen 6: History -->
+    <section id="screen-history" class="screen">
+      <div class="toolbar">
+        <input class="search" type="search" placeholder="Пошук подій…">
+        <div class="controls desktop-only">
+          <button class="btn" type="button">Фільтри</button>
+        </div>
+      </div>
+      <div class="card" style="padding:0;overflow:auto">
+        <table id="history-table">
+          <thead>
+            <tr>
+              <th>Час</th>
+              <th>Подія</th>
+              <th>Статус</th>
+              <th>Причина</th>
+              <th>Дія</th>
+              <th>Ініціатор</th>
+              <th>Тривалість</th>
+              <th>Знімок</th>
+              <th>Ref</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <div class="drawer-backdrop" id="filter-backdrop"></div>
+  <aside class="drawer" id="filter-drawer" aria-label="Панель фільтрів">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0">Фільтри полів</h3>
+      <button class="btn ghost" id="filter-close" type="button">Закрити</button>
+    </div>
+    <div class="field" style="margin-top:1rem">
+      <label>Зміна</label>
+      <select>
+        <option>Будь-яка</option>
+        <option selected>Не «Без змін»</option>
+        <option>Додано</option>
+        <option>Змінено</option>
+        <option>Видалено</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Тип</label>
+      <select><option>Будь-який</option><option>text</option><option>select</option></select>
+    </div>
+    <button class="btn primary" type="button" onclick="closeDrawer()">Застосувати</button>
+  </aside>
+
+  <aside class="drawer" id="diff-drawer" aria-label="Деталі зміни">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3 style="margin:0">Деталі зміни</h3>
+      <button class="btn ghost" type="button" onclick="closeDrawer()">Закрити</button>
+    </div>
+    <div id="diff-detail"></div>
+  </aside>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1098,6 +1098,29 @@ Enterprise complexity may exist under the hood.
 
 It must not be pushed into the user’s daily workflow.
 
+## Connector operational security (reusable)
+
+These principles apply to any external-system connector, not only Adobe:
+
+- **SSRF-sensitive base URLs:** workspace users may enter external base URLs.
+  Validate scheme (HTTPS only in production), block private/link-local/metadata
+  targets, restrict redirects, apply DNS-rebinding-safe resolution, timeouts, and
+  response size limits before server-side fetch.
+- **Secrets encrypted and never logged:** credentials use Laravel `encrypted:array`
+  in TEXT columns; secrets, tokens, and Authorization headers must not appear in
+  logs, API resources, queue payloads, or exception reports.
+- **Jobs carry IDs, not decrypted credentials:** queue jobs reference
+  `connector_account_id`; decryption happens only after authorization inside the
+  worker with explicit workspace context.
+- **Immutable external-schema snapshots:** successful discovery produces append-only
+  normalized snapshots; diffs are separate entities — never store before/after on
+  snapshot field rows.
+- **Operational history ≠ legacy summary logs:** connector connection checks,
+  discovery runs, snapshots, and diffs use dedicated workspace-owned tables.
+  Legacy `SyncLog` is not extended for connector events.
+- **Connectors never dictate FieldDefinition core:** normalized external metadata
+  is stored for discovery; canonical field mapping confirmation remains Task 4C.
+
 # AI Implementation Rules and Code Generation Protocol
 
 All AI-generated implementation steps, database migrations, class structures, service plans and code blocks MUST pass the Architecture Review Checklist before implementation, staging or merging.
@@ -1191,6 +1214,17 @@ Is the architecture built to ensure raw credit card details or sensitive merchan
 ## 20. Hidden Technical Complexity
 
 Does the technical implementation completely hide software architecture jargon (such as EAV, tenant, core resolvers, state matrix, RLS, webhook secrets, or TTL reservation) away from user-facing screens, keeping the UI strictly limited to everyday business terminology?
+
+## 21. External URL and SSRF Safety
+
+When a workspace user supplies an external base URL for connector fetch or health
+checks, are scheme, host, port, redirect, DNS, timeout, and size limits enforced
+before any server-side request — blocking private networks and metadata endpoints?
+
+## 22. Connector Secret Handling
+
+Are connector credentials encrypted at rest, excluded from logs/queues/API
+serialization, and decrypted only after authorization with workspace scope?
 
 ## Filament form validation standard
 

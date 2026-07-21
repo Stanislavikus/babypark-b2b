@@ -460,6 +460,25 @@ A technically correct solution fails if it makes ordinary business operations co
 
 ---
 
+### Visual Contract Before Persistence for Complex Operational Features
+
+For a new operational workflow involving external systems, background runs,
+statuses, history, errors or diffs, domain alignment is necessary but not
+sufficient.
+
+Before migrations or production integration code, the task must include:
+
+- verified SaaS UX research;
+- fixture-backed visual states;
+- non-technical user review;
+- explicit success, empty, loading, partial and failure states;
+- visual acceptance evidence after implementation.
+
+A backend-only delivery is not acceptable when the feature's correctness must be
+understood by an ordinary business user.
+
+---
+
 ## User Interface and Terminology Rules
 
 The AI must protect approved user-facing terminology.

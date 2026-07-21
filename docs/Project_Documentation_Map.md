@@ -559,6 +559,8 @@ frontend code, Filament resource, Livewire component or Blade template.
 - 03-DOMAIN_MODEL.md
 - CANONICAL_PRODUCT_FIELD_REGISTRY.md and the related `docs/data/*.csv`
 - IMPLEMENTATION_GAPS.md — open gaps affecting the field or mapping in question
+- `docs/prototypes/task-4b0-connector-account/` — Task 4B-0 visual contract
+  (when implementing connector operational UI)
 
 **For architecture decisions:**
 

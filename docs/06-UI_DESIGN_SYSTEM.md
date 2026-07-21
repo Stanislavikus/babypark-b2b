@@ -1721,6 +1721,53 @@ Three screens under "Модель даних і коннектори":
 Editing/decision workflows belong to Task 4C's single-connector-focused
 Mapping Review screen, not to the Field Matrix.
 
+## Operational Connection Pattern (reusable)
+
+Applies to workspace-owned external connections (ERP, commerce platforms, feeds)
+— not only Adobe.
+
+### Surfaces
+
+1. **Connection list** — platform, account name, store/base context, connection
+   status, last successful check, last successful field discovery, attention
+   message, primary action. Do not show internal model names (`ConnectorAccount`,
+   auth profile codes, encrypted credentials).
+2. **Connection settings** — name, deployment type (when vendor has variants),
+   address/tenant context, store view where applicable, credential fields per
+   auth profile, masked saved secrets, explicit replace/remove semantics (blank
+   secret input does not erase saved value), **Перевірити з’єднання**, **Зберегти**.
+3. **Connection check result** — success shows duration and next action (run
+   discovery); errors use cause-specific copy with one next step. **401** →
+   replace credentials; **403** → update integration role/scopes — never a
+   generic “Connection failed” when cause is known.
+4. **Discovery overview** — run status, source, captured time, field counts,
+   diff summary, first-snapshot label, link to current snapshot.
+5. **Discovery field list** — Data List Search & Filter Pattern (search visible,
+   filters in right-side slide-over, badge semantics, mobile single overflow).
+   Hundreds of fields → list + detail drawer/page, not accordion.
+6. **Activity history** — connection checks and discovery runs with time, status,
+   cause/actionability, initiator, duration, snapshot link, safe support reference.
+
+### Current state vs history
+
+Overview/list reads **current projection** on the account row. History is a
+separate tab/section with search/filter when volume warrants it.
+
+### Error microcopy
+
+Use `user_message_key`-driven Ukrainian business language: explain situation +
+one action; no `Error:` prefix, stack traces, or raw vendor messages. Support
+may see `vendor_request_id` when safe.
+
+### States to design explicitly
+
+`Не перевірено`, `Підключено`, `Потребує уваги`, `Тимчасово недоступно`,
+`Вимкнено`; discovery: first snapshot, no-change, partial/failure after prior
+success.
+
+Fixture-backed non-runtime prototype for Task 4B-0:
+`docs/prototypes/task-4b0-connector-account/`.
+
 ## Empty States and Onboarding Rules
 
 Empty states must help the user take the next action.

@@ -254,9 +254,25 @@ yet), but should be scheduled before any payment gateway integration work starts
   `FieldMapping`, `ImportJob` are explicit MVP-scope entities.
 
 **Current code:**
-- Only `app/Models/SyncLog.php` exists — a simple log, not a connector/mapping
-  system. No `ConnectorDefinition`, `ConnectorAccount`, `FieldMapping`, or
-  `ImportJob` model exists.
+- `ConnectorDefinition` and `ConnectorSchemaSource` exist (Task 4A completed).
+- `app/Models/SyncLog.php` exists as a **legacy** global summary log — no
+  `workspace_id`, no `connector_account_id`, no running state, coarse
+  `success|error`, legacy Babypark sync type enum. Task 4B **does not** extend
+  `SyncLog`; new connector operational history uses dedicated workspace-owned
+  tables (see `03-DOMAIN_MODEL.md` Task 4B-0 Proposed sections).
+- No `ConnectorAccount`, `FieldMapping`, connection-check/discovery/snapshot/diff
+  models or migrations yet.
+
+**Task sequence (GAP-006 remains Open until implementation lands):**
+
+| Task | Scope |
+|---|---|
+| **4B-0** | Stop-and-Amend: architecture docs, visual prototype, documentation tests — no application code |
+| **4B-1** | Generic `ConnectorAccount` foundation migrations/domain |
+| **4B-2** | Adobe live discovery, snapshots, diffs, operational UI |
+| **4C** | `FieldMapping` suggestions, confidence, confirmation |
+
+Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
 
 **Impact:**
 - Do not build a one-off, hardcoded 1C-to-database field mapping as a shortcut —
@@ -281,6 +297,11 @@ a read-only admin surface over the existing Canonical Registry. It does not
 implement `ConnectorAccount`, credentials, live discovery, or `FieldMapping`
 runtime behaviour — those remain blocked by this GAP until Task 4B/4C.
 GAP-006 stays Open.
+
+**Task 4B-0 note (added 2026-07-21):** Docs-only Stop-and-Amend for
+`ConnectorAccount`, connection-check/discovery history, immutable snapshots,
+separate diffs, dual-axis errors, Adobe normalization contract, and fixture-backed
+visual prototype. No migrations/models in 4B-0 PR.
 
 **Task 4B UI handoff:**
 
