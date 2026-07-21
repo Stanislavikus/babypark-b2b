@@ -282,6 +282,23 @@ implement `ConnectorAccount`, credentials, live discovery, or `FieldMapping`
 runtime behaviour — those remain blocked by this GAP until Task 4B/4C.
 GAP-006 stays Open.
 
+**Task 4B UI handoff:**
+
+- `ConnectorDefinition` remains global platform metadata and schema-source
+  administration.
+- Workspace API credentials, store/account base URLs, connection status,
+  last sync and live account discovery belong to workspace-owned
+  `ConnectorAccount`; do not store them on `ConnectorDefinition`.
+- Task 4B must align all Eloquent list filters it materially touches with
+  `06-UI_DESIGN_SYSTEM.md`:
+  native Filament Table filters, visible desktop label, right-side
+  slide-over presentation, approved badge semantics, active indicators,
+  and mobile behavior.
+- Automatic field-match suggestions, confidence handling, persistence of
+  confirmed mappings and manual resolution for unmatched fields belong
+  to the subsequent FieldMapping workflow (Task 4C), not to
+  ConnectorDefinition metadata.
+
 ---
 
 ## GAP-007 — Channel-specific fields leaked into core `products` table

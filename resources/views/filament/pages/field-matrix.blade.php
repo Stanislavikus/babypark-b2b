@@ -119,7 +119,7 @@
             data-testid="field-matrix-panel-compare"
           >
             <div class="flex items-center gap-2">
-              <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('field_matrix.compare_channels') }}</h3>
+              <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('field_matrix.select_channels') }}</h3>
               @if ($this->selectedComparisonColumnCount() > 0)
                 <x-filament::badge color="primary" size="sm">
                   {{ $this->selectedComparisonColumnCount() }}

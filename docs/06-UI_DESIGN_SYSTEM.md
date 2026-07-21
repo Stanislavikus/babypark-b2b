@@ -579,9 +579,88 @@ ambiguous primary toolbar action.
   CheckboxList.
 - Large or dynamic multi-select where showing every option is impractical:
   searchable multi-select.
+- Boolean yes/no: Checkbox or Toggle depending on context.
 - Do not use checkboxes for a single-choice filter.
 - Do not use a searchable tag/chip select for a small fixed multi-select
   when an always-visible CheckboxList is clearer and more stable.
+
+A checkbox is not selected merely because a filter has more than two
+possible values. Checkboxes represent independent multiple selection.
+When exactly one value may be active, use Select, Radio or an approved
+segmented single-choice control.
+
+### Filter and Selection Count Semantics
+
+- The `Filters` trigger badge counts active filter dimensions, not every
+  selected value inside those dimensions.
+- A multi-select section inside the panel may show its own local count
+  of selected values.
+- A dedicated bounded-selection action such as `Compare channels` or
+  `Columns` shows the number of selected items on its own trigger.
+- Do not combine row-filter count and comparison/column count into one
+  badge.
+- A required scope filter with no neutral state counts as one active
+  dimension; its visible indicator is non-removable.
+
+Example:
+
+```text
+Фільтри [2]
+```
+
+means two active filter dimensions, not the sum of all checkbox values.
+
+```text
+Порівняти канали [4]
+```
+
+means four selected channels.
+
+### Filter Panel Presentation
+
+The project default for structured Data List filter/action panels is a
+right-side slide-over (drawer / modal side sheet), not a page-specific
+floating dropdown.
+
+This is a project-level default built from established side-sheet
+patterns and public Filament APIs. It is not presented as the only
+internationally valid filter pattern.
+
+Implementation remains data-source aware:
+
+- Eloquent-backed lists continue to use native `Filament\Tables\Table`
+  filters. When the page is migrated to this presentation, use
+  `FiltersLayout::Modal` and customize the public filter trigger action
+  with `slideOver()`.
+- Non-Eloquent read models continue to use the shared
+  `resources/views/components/filament/data-list-toolbar.blade.php`
+  slide-over panel.
+- Do not replace a native Eloquent table with the custom non-Eloquent
+  toolbar merely to obtain the same visual presentation.
+
+The slide-over preserves list context, uses the available screen height,
+avoids fragile trigger-positioned overlays, and behaves consistently on
+desktop and mobile.
+
+Avoid repeating the exact same phrase as both the toolbar trigger and
+the first section heading inside the opened panel. Use a shorter
+instructional heading or omit it only when the control remains
+unambiguously labelled and accessible.
+
+### Migration Sequencing for Existing Pages
+
+This standard applies to all current and future admin data lists, but
+existing pages are not mass-rewritten in unrelated PRs.
+
+When a page is next materially changed, its task must:
+
+1. read this section;
+2. preserve native Filament Tables for Eloquent-backed data;
+3. align trigger labels, badge semantics, selection controls, active
+   indicators and panel presentation;
+4. include visual regression evidence.
+
+A divergent existing page is not a precedent for new work.
 
 ### Product Table Toolbar Specialization
 

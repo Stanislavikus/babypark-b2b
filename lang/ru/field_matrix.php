@@ -15,6 +15,7 @@ return [
     'filter_scope_all' => 'Все источники',
     'clear_all' => 'Очистить всё',
     'compare_channels' => 'Сравнить каналы',
+    'select_channels' => 'Выбрать каналы',
     'compare_channels_helper' => 'Можно одновременно сравнивать не более 6 вариантов каналов.',
     'compare_channels_limit_error' => 'Можно выбрать не более 6 доступных вариантов каналов без повторов.',
     'field_column' => 'Поле',
