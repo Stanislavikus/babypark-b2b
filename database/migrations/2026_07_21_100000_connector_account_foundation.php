@@ -268,50 +268,99 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('connector_schema_diff_items', function (Blueprint $table) {
-            $table->dropForeign(['workspace_id', 'after_snapshot_field_id']);
-            $table->dropForeign(['workspace_id', 'before_snapshot_field_id']);
-            $table->dropForeign(['workspace_id', 'connector_schema_diff_id']);
-        });
+        $driver = Schema::getConnection()->getDriverName();
+
+        if ($driver === 'mysql') {
+            Schema::table('connector_schema_diff_items', function (Blueprint $table) {
+                $table->dropForeign('csdi_ws_after_field_fk');
+                $table->dropForeign('csdi_ws_before_field_fk');
+                $table->dropForeign('csdi_ws_diff_fk');
+            });
+        } else {
+            Schema::table('connector_schema_diff_items', function (Blueprint $table) {
+                $table->dropForeign(['workspace_id', 'after_snapshot_field_id']);
+                $table->dropForeign(['workspace_id', 'before_snapshot_field_id']);
+                $table->dropForeign(['workspace_id', 'connector_schema_diff_id']);
+            });
+        }
 
         Schema::dropIfExists('connector_schema_diff_items');
 
-        Schema::table('connector_schema_diffs', function (Blueprint $table) {
-            $table->dropForeign(['workspace_id', 'to_snapshot_id']);
-            $table->dropForeign(['workspace_id', 'from_snapshot_id']);
-            $table->dropForeign(['workspace_id', 'connector_account_id']);
-        });
+        if ($driver === 'mysql') {
+            Schema::table('connector_schema_diffs', function (Blueprint $table) {
+                $table->dropForeign('csd_ws_tosnap_fk');
+                $table->dropForeign('csd_ws_fromsnap_fk');
+                $table->dropForeign('csd_ws_account_fk');
+            });
+        } else {
+            Schema::table('connector_schema_diffs', function (Blueprint $table) {
+                $table->dropForeign(['workspace_id', 'to_snapshot_id']);
+                $table->dropForeign(['workspace_id', 'from_snapshot_id']);
+                $table->dropForeign(['workspace_id', 'connector_account_id']);
+            });
+        }
 
         Schema::dropIfExists('connector_schema_diffs');
 
-        Schema::table('connector_schema_snapshot_fields', function (Blueprint $table) {
-            $table->dropForeign(['workspace_id', 'snapshot_id']);
-        });
+        if ($driver === 'mysql') {
+            Schema::table('connector_schema_snapshot_fields', function (Blueprint $table) {
+                $table->dropForeign('cssf_ws_snapshot_fk');
+            });
+        } else {
+            Schema::table('connector_schema_snapshot_fields', function (Blueprint $table) {
+                $table->dropForeign(['workspace_id', 'snapshot_id']);
+            });
+        }
 
         Schema::dropIfExists('connector_schema_snapshot_fields');
 
-        Schema::table('connector_discovery_runs', function (Blueprint $table) {
-            $table->dropForeign(['workspace_id', 'previous_snapshot_id']);
-            $table->dropForeign(['workspace_id', 'snapshot_id']);
-        });
+        if ($driver === 'mysql') {
+            Schema::table('connector_discovery_runs', function (Blueprint $table) {
+                $table->dropForeign('cdr_ws_prevsnap_fk');
+                $table->dropForeign('cdr_ws_snapshot_fk');
+            });
 
-        Schema::table('connector_schema_snapshots', function (Blueprint $table) {
-            $table->dropForeign(['workspace_id', 'previous_snapshot_id']);
-            $table->dropForeign(['workspace_id', 'discovery_run_id']);
-            $table->dropForeign(['workspace_id', 'connector_account_id']);
-        });
+            Schema::table('connector_schema_snapshots', function (Blueprint $table) {
+                $table->dropForeign('css_ws_prevsnap_fk');
+                $table->dropForeign('css_ws_discovery_run_fk');
+                $table->dropForeign('css_ws_account_fk');
+            });
+        } else {
+            Schema::table('connector_discovery_runs', function (Blueprint $table) {
+                $table->dropForeign(['workspace_id', 'previous_snapshot_id']);
+                $table->dropForeign(['workspace_id', 'snapshot_id']);
+            });
+
+            Schema::table('connector_schema_snapshots', function (Blueprint $table) {
+                $table->dropForeign(['workspace_id', 'previous_snapshot_id']);
+                $table->dropForeign(['workspace_id', 'discovery_run_id']);
+                $table->dropForeign(['workspace_id', 'connector_account_id']);
+            });
+        }
 
         Schema::dropIfExists('connector_schema_snapshots');
 
-        Schema::table('connector_discovery_runs', function (Blueprint $table) {
-            $table->dropForeign(['workspace_id', 'connector_account_id']);
-        });
+        if ($driver === 'mysql') {
+            Schema::table('connector_discovery_runs', function (Blueprint $table) {
+                $table->dropForeign('cdr_ws_account_fk');
+            });
+        } else {
+            Schema::table('connector_discovery_runs', function (Blueprint $table) {
+                $table->dropForeign(['workspace_id', 'connector_account_id']);
+            });
+        }
 
         Schema::dropIfExists('connector_discovery_runs');
 
-        Schema::table('connector_connection_checks', function (Blueprint $table) {
-            $table->dropForeign(['workspace_id', 'connector_account_id']);
-        });
+        if ($driver === 'mysql') {
+            Schema::table('connector_connection_checks', function (Blueprint $table) {
+                $table->dropForeign('ccc_ws_account_fk');
+            });
+        } else {
+            Schema::table('connector_connection_checks', function (Blueprint $table) {
+                $table->dropForeign(['workspace_id', 'connector_account_id']);
+            });
+        }
 
         Schema::dropIfExists('connector_connection_checks');
 
