@@ -789,7 +789,7 @@ $table->timestamp('started_at')->nullable()->change();
 | Source | URL | Accessed | Fact |
 |---|---|---|---|
 | OWASP SSRF Prevention | https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html | 2026-07-22 | Validate URL, block internal ranges, DNS rebinding awareness |
-| Laravel HTTP client | https://laravel.com/docs/11.x/http-client | 2026-07-22 | Timeouts, `withOptions`, Guzzle底层 |
+| Laravel HTTP client | https://laravel.com/docs/11.x/http-client | 2026-07-22 | Timeouts, `withOptions`, Guzzle underneath |
 | Guzzle redirect | https://docs.guzzlephp.org/en/stable/request-options.html#allow-redirects | 2026-07-22 | `allow_redirects => false` |
 
 ### Recommendation
@@ -802,15 +802,64 @@ Laravel HTTP/Guzzle:
 3. Parse URL; reject userinfo, fragments; normalize hostname to lowercase punycode.
 4. Resolve DNS A/AAAA; block private/link-local/loopback/multicast/metadata
    (169.254.169.254, ::1, 10/8, 172.16/12, 192.168/16, fc00::/7, etc.).
-5. **DNS rebinding:** resolve before connect; connect to resolved IP with
-   `CURLOPT_RESOLVE` / Guzzle `force_ip_resolve` + verify cert SAN matches
-   original host — **open option requiring approval** if Laravel public API
-   insufficient; document need for isolated curl layer.
+5. **DNS rebinding:** resolve the hostname to an IP before connecting, then
+   pin the connection to that exact IP for this request using Guzzle's raw
+   `curl` option array — `['curl' => [CURLOPT_RESOLVE => ["{host}:{port}:{ip}"]]]`
+   — and verify the TLS certificate SAN still matches the original hostname.
+   **Do not use `force_ip_resolve`** for this purpose — it only selects an
+   IPv4/IPv6 address family (`CURLOPT_IPRESOLVE`) and does not pin to a
+   specific IP, so it provides no DNS-rebinding protection on its own.
+
+   **This contract requires Guzzle's cURL handler** (`CurlHandler` or
+   `CurlMultiHandler`) — the raw `curl` option array has no effect on
+   `StreamHandler`, which uses a separate `stream_context` option instead and
+   would silently ignore the `CURLOPT_RESOLVE` pinning. Guzzle can select
+   `StreamHandler` under some PHP/cURL combinations without the caller asking
+   for it. The transport factory must verify the cURL handler is actually in
+   use and **fail closed** (refuse to make the request) rather than silently
+   proceeding on `StreamHandler` without IP pinning.
+
+   **IPv6 formatting:** per libcurl's own `CURLOPT_RESOLVE` documentation,
+   IPv6 literals in resolve entries must be wrapped in square brackets, e.g.
+   `example.com:443:[2001:db8::1]` — plain `example.com:443:2001:db8::1` is
+   invalid syntax (the address's own colons collide with the entry format).
+   Build resolve entries through one tested formatter function, not by
+   string-concatenating unvalidated host/port/IP values at each call site.
+
+   If Guzzle's public API proves awkward for this per-request pinning and
+   fail-closed handler check in practice, treat that as **open option
+   requiring approval** and document the need for an isolated transport layer
+   instead.
 6. **Redirects:** disabled by default; if ever enabled, revalidate each hop.
 7. **Response:** stream with max bytes; abort over limit.
 8. **No user-provided proxy** configuration.
 
 URL validation alone is **not** sufficient (OWASP).
+
+### Exact target document and section
+
+`docs/07-TECH_STACK.md` — **SSRF-safe connector outbound transport**.
+
+### Exact proposed Markdown patch
+
+```markdown
+### SSRF-safe connector outbound transport
+
+Connector outbound HTTP must use an isolated SSRF-safe transport that:
+- allows HTTPS only in production (port 443);
+- blocks private/link-local/loopback/metadata targets after DNS resolution;
+- pins each request to the pre-validated resolved IP using Guzzle's raw
+  `curl` option array — `['curl' => [CURLOPT_RESOLVE => ["{host}:{port}:{ip}"]]]`
+  — with TLS certificate SAN verification against the original hostname;
+- requires Guzzle's cURL handler (`CurlHandler` / `CurlMultiHandler`) and
+  **fails closed** if `StreamHandler` would be used (raw `curl` options are
+  silently ignored there);
+- formats IPv6 resolve entries with bracketed literals per libcurl
+  (`example.com:443:[2001:db8::1]`) via one tested formatter function.
+
+Do **not** use `force_ip_resolve` for DNS-rebinding defense — it only sets
+`CURLOPT_IPRESOLVE` (IPv4/IPv6 family preference) and does not pin a specific IP.
+```
 
 ### Future implementation tests
 
@@ -818,6 +867,12 @@ URL validation alone is **not** sufficient (OWASP).
 - Redirect to internal URL blocked.
 - Oversized response aborted.
 - `Http::preventStrayRequests()` in tests.
+- transport fails closed when the cURL handler / ext-curl is unavailable;
+- the approved IP-pinning option reaches the actual cURL handler (not silently
+  no-op'd under StreamHandler);
+- no StreamHandler fallback is permitted for SSRF-sensitive connector calls;
+- IPv6 resolve entries are correctly bracket-formatted (test both IPv4 and
+  IPv6 pinning targets).
 
 ---
 
@@ -905,6 +960,25 @@ Connector runtime polling patch from B8 (no visual redesign).
 Add:
 - Connector profile registry (B2)
 - Adobe PaaS OAuth 1.0a signing (B5)
+- SSRF-safe connector outbound transport (B13):
+  ```markdown
+  ### SSRF-safe connector outbound transport
+
+  Connector outbound HTTP must use an isolated SSRF-safe transport that:
+  - allows HTTPS only in production (port 443);
+  - blocks private/link-local/loopback/metadata targets after DNS resolution;
+  - pins each request to the pre-validated resolved IP using Guzzle's raw
+    `curl` option array — `['curl' => [CURLOPT_RESOLVE => ["{host}:{port}:{ip}"]]]`
+    — with TLS certificate SAN verification against the original hostname;
+  - requires Guzzle's cURL handler (`CurlHandler` / `CurlMultiHandler`) and
+    **fails closed** if `StreamHandler` would be used (raw `curl` options are
+    silently ignored there);
+  - formats IPv6 resolve entries with bracketed literals per libcurl
+    (`example.com:443:[2001:db8::1]`) via one tested formatter function.
+
+  Do **not** use `force_ip_resolve` for DNS-rebinding defense — it only sets
+  `CURLOPT_IPRESOLVE` (IPv4/IPv6 family preference) and does not pin a specific IP.
+  ```
 - Queue worker production prerequisite (B9):
   ```markdown
   ### Connector queue workers (production)
