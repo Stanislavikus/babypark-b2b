@@ -747,8 +747,7 @@ It does not block mappings for unrelated fields.
 - Connector runtime production deployment (connection check, discovery, queue
   workers) should not be treated as production-ready on an unsupported
   framework release.
-- Does **not** block this Task 4B-2-0 documentation promotion or isolated
-  Task 4B-2a development and testing in the current environment.
+- Does **not** block this Task 4B-2-0 documentation promotion or isolated Task 4B-2a development and testing in the current environment.
 
 **Decision:**
 - Schedule a dedicated framework upgrade to a currently supported Laravel
@@ -758,7 +757,7 @@ It does not block mappings for unrelated fields.
 **Next task:** Plan and execute Laravel framework upgrade as a separate task.
 
 **Status:** Open — blocks connector production-readiness; does not block 4B-2-0
-docs promotion or isolated 4B-2a development.
+docs promotion or isolated Task 4B-2a development.
 
 ---
 

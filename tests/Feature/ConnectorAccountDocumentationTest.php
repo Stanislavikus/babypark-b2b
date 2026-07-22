@@ -526,8 +526,8 @@ class ConnectorAccountDocumentationTest extends TestCase
 
         $this->assertStringContainsString('### Connector adapter capabilities (proposed)', $domainModel);
         $this->assertStringContainsString('#### Credential and settings classification (proposed)', $domainModel);
-        $this->assertStringContainsString(
-            'reusing `store_code` for the `Store` header value is the preferred convention pending approval',
+        $this->assertMatchesRegularExpression(
+            '/reusing `store_code` for the `Store`\s+header value is the preferred convention pending approval/',
             $domainModel
         );
         $this->assertStringContainsString('### ConnectorAccount authorization (Resolved)', $domainModel);

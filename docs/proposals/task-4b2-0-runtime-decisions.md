@@ -1010,6 +1010,7 @@ Human approval required per decision:
 - [x] B1 — Capability ports shape
 - [x] B2 — Config-based `ConnectorProfileRegistry`
 - [x] B3 — PaaS field mapping; SaaS `store_code` reuse for `Store` header remains open, non-blocking for 4B-2a
+- [x] B4 — First production deployment family (Adobe Commerce PaaS/on-prem — fixed input from Part A; see `03-DOMAIN_MODEL.md` Connector scope (Resolved))
 - [x] B5 — signing architecture approved; concrete implementation remains Stop-and-Amend (see `07-TECH_STACK.md`)
 - [x] B6 — Authorization matrix and Spatie permissions (Merchandiser manual discovery settled)
 - [x] B7 — Connection check endpoint and error mapping table
