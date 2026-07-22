@@ -1,0 +1,96 @@
+name: MySQL tests
+
+on:
+  pull_request:
+    branches: [develop]
+
+jobs:
+  mysql-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootsecret
+          MYSQL_DATABASE: babypark_b2b_test
+          MYSQL_USER: babypark_test
+          MYSQL_PASSWORD: test-secret
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -prootsecret"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      APP_ENV: testing
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: babypark_b2b_test
+      DB_USERNAME: babypark_test
+      DB_PASSWORD: test-secret
+      DB_SOCKET: ''
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, xml, curl, sqlite3, pdo_sqlite, pdo_mysql, bcmath, intl
+          coverage: none
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Prepare application
+        run: |
+          cp .env.example .env
+          sed -i '/^DB_SOCKET=/d' .env
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
+          sed -i 's/^DB_HOST=.*/DB_HOST=127.0.0.1/' .env
+          sed -i 's/^DB_PORT=.*/DB_PORT=3306/' .env
+          sed -i 's/^DB_DATABASE=.*/DB_DATABASE=babypark_b2b_test/' .env
+          sed -i 's/^DB_USERNAME=.*/DB_USERNAME=babypark_test/' .env
+          sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=test-secret/' .env
+          php artisan key:generate --no-interaction
+          php artisan config:clear
+        env:
+          DB_SOCKET: ''
+
+      - name: Show MySQL version
+        run: mysql --host=127.0.0.1 --port=3306 -ubabypark_test -ptest-secret -e "SELECT VERSION();"
+
+      - name: ConnectorAccount documentation tests (MySQL)
+        run: php artisan test --filter=ConnectorAccountDocumentationTest
+
+      - name: ConnectorAccount foundation tests (MySQL)
+        run: php artisan test --filter=ConnectorAccountFoundationTest
+
+      - name: Customer rename migration tests (MySQL)
+        run: php artisan test --filter=CustomerRenameMigrationTest
+
+      - name: Full test suite (MySQL)
+        run: php artisan test
+
+      - name: Pint
+        run: vendor/bin/pint --test
+
+      - name: Git diff check
+        run: git diff --check

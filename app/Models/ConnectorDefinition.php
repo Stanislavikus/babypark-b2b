@@ -35,6 +35,11 @@ class ConnectorDefinition extends Model
         return $this->hasMany(ConnectorSchemaSource::class)->orderBy('sort_order');
     }
 
+    public function connectorAccounts(): HasMany
+    {
+        return $this->hasMany(ConnectorAccount::class);
+    }
+
     public function hasVerifiedGlobalPrimarySource(): bool
     {
         return $this->schemaSources()

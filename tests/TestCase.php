@@ -11,6 +11,8 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        $this->withoutVite();
+
         if (config('database.default') === 'sqlite') {
             DB::statement('PRAGMA foreign_keys = ON');
         }

@@ -7,6 +7,7 @@ use App\Enums\UserRole;
 use App\Filament\Pages\WorkspaceTaxSettings;
 use App\Filament\Resources\PriceListResource;
 use App\Filament\Resources\PriceListResource\RelationManagers\ItemsRelationManager;
+use App\Models\PriceList;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Pricing\WorkspaceTaxDefaults;
@@ -129,7 +130,10 @@ class WorkspaceTaxDefaultsFeatureTest extends TestCase
         config(['pricing.default_vat_rate' => 20]);
         $this->workspace->update(['default_vat_rate' => 19]);
 
-        $priceList = $this->createPriceList($this->workspace, isDefault: true);
+        $priceList = PriceList::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('is_default', true)
+            ->firstOrFail();
         $priceList->load('workspace');
 
         $admin = User::query()->create([

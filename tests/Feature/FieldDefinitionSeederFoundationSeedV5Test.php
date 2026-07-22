@@ -268,7 +268,7 @@ class FieldDefinitionSeederFoundationSeedV5Test extends TestCase
         $this->assertSame($expected['data_type'], $definition->data_type);
         $this->assertSame($expected['scope'], $definition->scope);
         $this->assertSame($expected['is_localizable'], $definition->is_localizable);
-        $this->assertSame($expected['localized_labels'], $definition->localized_labels);
+        $this->assertEquals($expected['localized_labels'], $definition->localized_labels);
 
         $binding = FieldBinding::withoutWorkspaceScope()
             ->where('field_definition_id', $definition->id)

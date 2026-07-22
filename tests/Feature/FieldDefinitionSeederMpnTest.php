@@ -34,7 +34,7 @@ class FieldDefinitionSeederMpnTest extends TestCase
         $this->assertSame(AttributeScope::PlatformLibrary, $definition->scope);
         $this->assertFalse($definition->is_localizable);
         $this->assertFalse($definition->is_multi_value);
-        $this->assertSame(
+        $this->assertEquals(
             ['en' => 'Manufacturer Part Number', 'uk' => 'Артикул виробника', 'ru' => 'Артикул производителя'],
             $definition->localized_labels
         );

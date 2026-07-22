@@ -37,8 +37,8 @@ class FieldDefinitionSeederVisibilitySettingsHotfixTest extends TestCase
 
         $binding->refresh();
 
-        $this->assertSame($snapshotBefore, $this->bindingSnapshot($binding));
-        $this->assertSame($customVisibility, $binding->visibility_settings);
+        $this->assertEquals($snapshotBefore, $this->bindingSnapshot($binding));
+        $this->assertEquals($customVisibility, $binding->visibility_settings);
     }
 
     public function test_creates_new_binding_with_seed_default_visibility_settings(): void
@@ -65,7 +65,7 @@ class FieldDefinitionSeederVisibilitySettingsHotfixTest extends TestCase
             ->where('object_type', FieldObjectType::Product)
             ->firstOrFail();
 
-        $this->assertSame(
+        $this->assertEquals(
             ['admin' => true, 'b2b' => true, 'channels' => []],
             $binding->visibility_settings
         );

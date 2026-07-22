@@ -1774,7 +1774,7 @@ The list UI must read the **current projection** on `ConnectorAccount`. It must
 not recompute “last event” with an expensive history query per row. History rows
 are append-only after terminal state (`running → succeeded | failed | cancelled`).
 
-#### Physical schema — `connector_accounts` (candidate)
+#### Physical schema — `connector_accounts` (Resolved)
 
 | Column | Type | Notes |
 |---|---|---|
@@ -1801,8 +1801,27 @@ are append-only after terminal state (`running → succeeded | failed | cancelle
 | `deleted_at` | timestamp nullable | Soft delete; history retained per retention policy |
 | `created_at` / `updated_at` | timestamps | |
 
-**Uniqueness (candidate):** `(workspace_id, connector_definition_id, name)` among
-non-deleted rows. Never include secrets or credential hashes in unique indexes.
+**Uniqueness (Resolved):** `(workspace_id, connector_definition_id, name)` among
+non-deleted rows.
+
+Implement this as a DB-level constraint via a driver-conditional generated column
+`active_name_uniqueness_key`, using the same technique already established by
+`FieldFoundationMigrator::addWorkspaceUniquenessKey()`:
+
+- active row (`deleted_at IS NULL`): `active_name_uniqueness_key = name`;
+- soft-deleted row: `active_name_uniqueness_key = NULL`.
+
+Unique index: `(workspace_id, connector_definition_id, active_name_uniqueness_key)`.
+
+This migration contract is verified for the two drivers used by this task:
+MySQL (production/development) and SQLite (automated tests). Both permit multiple
+`NULL` values in the generated uniqueness key, so active rows index the real `name`
+and conflict correctly while soft-deleted rows do not block reuse of the name. Application-level validation may improve UX (clearer error message
+before submit) but is not a substitute for this DB constraint. Restoring a
+soft-deleted account must fail (DB and application level) if another active account
+already occupies the same `(workspace, definition, name)` key.
+
+Never include secrets or credential hashes in unique indexes.
 
 **Credentials storage decision:** encrypted `credentials` TEXT on the same row as
 `settings` JSON (recommended MVP). A separate `connector_account_credentials`
@@ -1823,7 +1842,7 @@ Append-only history of connection test attempts.
 | `workspace_id` | UUID FK | |
 | `connector_account_id` | UUID FK | |
 | `trigger` | enum | `manual`, `scheduled`, `before_discovery` |
-| `initiated_by_user_id` | UUID FK nullable | Null for scheduled |
+| `initiated_by_user_id` | unsigned bigint FK nullable | Null for scheduled; matches `users.id` (bigint, not UUID) |
 | `status` | enum | `running`, `succeeded`, `failed` |
 | `cause_category` | enum nullable | `authentication`, `authorization`, `configuration`, `rate_limit`, `vendor_unavailable`, `network`, `schema_validation`, `data_validation`, `unknown` |
 | `actionability` | enum nullable | `user_action_required`, `automatic_retry`, `workspace_admin_required`, `support_required` |
@@ -1853,9 +1872,10 @@ Append-only history of schema discovery executions against one
 | `connector_account_id` | UUID FK | |
 | `connector_schema_source_id` | UUID FK | |
 | `trigger` | enum | `manual`, `scheduled`, `after_connection_check` |
-| `initiated_by_user_id` | UUID FK nullable | |
+| `initiated_by_user_id` | unsigned bigint FK nullable | Null for scheduled; matches `users.id` (bigint, not UUID) |
 | `status` | enum | `queued`, `running`, `succeeded`, `failed`, `cancelled` |
-| `started_at` / `finished_at` | timestamps | |
+| `started_at` | timestamp nullable | Null while `status: queued` |
+| `finished_at` | timestamp nullable | Set only on terminal state (`succeeded`/`failed`/`cancelled`) |
 | `duration_ms` | unsigned int nullable | |
 | `fields_received` | unsigned int nullable | |
 | `fields_normalized` | unsigned int nullable | |
@@ -1926,11 +1946,69 @@ Unique: `(snapshot_id, external_field_key)`.
 aggregate counts. **First snapshot:** UI label `Перший знімок` — baseline, not
 misleading “додано N” without explanation.
 
-`connector_schema_diff_items`: `change_type` (`added`, `removed`, `changed`),
-`external_field_key`, optional FKs to before/after snapshot fields,
-`changed_paths` JSON for scalar/option deltas. Diffs remain immutable; pruning old
-snapshots must not orphan diff summaries referenced by UI — retain latest successful
-snapshot always.
+#### Physical schema — `connector_schema_diffs` (Resolved)
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID FK | Required from first migration |
+| `connector_account_id` | UUID FK | Composite guard with `workspace_id` |
+| `connector_schema_source_id` | UUID FK | Same source as both endpoint snapshots |
+| `from_snapshot_id` | UUID FK nullable | Null only for a true baseline diff |
+| `to_snapshot_id` | UUID FK | Resulting snapshot; one canonical diff per snapshot |
+| `is_first_snapshot` | boolean | True exactly when `from_snapshot_id` is null |
+| `added_count` | unsigned int | |
+| `changed_count` | unsigned int | |
+| `removed_count` | unsigned int | |
+| `unchanged_count` | unsigned int | |
+| `created_at` | timestamp | Immutable, append-only; no `updated_at` |
+
+Unique: `(to_snapshot_id)` — each resulting snapshot has at most one canonical diff.
+`discovery_run_id` is intentionally **not** stored here — it is available via
+`to_snapshot.discovery_run_id`; duplicating it would create an unenforced invariant.
+
+Index: `(connector_account_id, connector_schema_source_id, created_at)` for history
+queries.
+
+Both endpoint snapshots must belong to the same workspace, account, and schema
+source represented by the diff — enforced through composite FK guards where
+possible, and application invariants where a cross-reference cannot be expressed
+portably.
+
+#### Physical schema — `connector_schema_diff_items` (Resolved)
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID FK | Required from first migration |
+| `connector_schema_diff_id` | UUID FK | Composite guard with `workspace_id` |
+| `change_type` | enum | `added`, `removed`, `changed` |
+| `external_field_key` | string | Connector field key |
+| `before_snapshot_field_id` | UUID FK nullable | Required for `removed`/`changed` |
+| `after_snapshot_field_id` | UUID FK nullable | Required for `added`/`changed` |
+| `changed_paths` | JSON nullable | JSON array; `changed` items only |
+| `created_at` | timestamp | Immutable, append-only; no `updated_at` |
+
+Unique: `(connector_schema_diff_id, external_field_key)`.
+Index: `(connector_schema_diff_id, change_type)`.
+
+**Application invariants** (documented now; enforcement and behavioral rejection
+tests belong to Task 4B-2, where the snapshot/diff computation service is introduced.
+Task 4B-1 provides columns, casts, relationships, FK integrity, and factories only,
+and must not add model observers/events that pretend to replace that future domain
+service):
+
+- `added`: `before_snapshot_field_id = null`, `after_snapshot_field_id != null`,
+  `changed_paths = null`;
+- `removed`: `before_snapshot_field_id != null`, `after_snapshot_field_id = null`,
+  `changed_paths = null`;
+- `changed`: both field FKs required, `changed_paths` is a non-empty JSON array;
+- `external_field_key` must match the referenced before/after fields;
+- referenced fields must belong to the diff's corresponding endpoint snapshots;
+- all parent references satisfy the documented composite workspace guards.
+
+Both tables follow the same append-only, immutable-after-creation discipline as
+`ConnectorConnectionCheck`/`ConnectorDiscoveryRun`/snapshots.
 
 ### Dual-axis error classification (Resolved)
 
@@ -1970,8 +2048,100 @@ Task 4B snapshots are **input** to Task 4C. Discovery must **not** auto-create
 | Latest successful snapshot | Always retained |
 | Raw vendor payload | Not stored by default |
 
-Pruning order: diff items → old snapshot fields → snapshots → runs → checks,
-never deleting a snapshot still referenced as `latest` or diff endpoint.
+Diff summaries are retained only while their endpoint snapshots are retained —
+a diff must never outlive the snapshot it describes as `latest`, and must never
+block deletion of a non-latest, non-endpoint snapshot.
+
+Pruning order: `connector_schema_diff_items` → `connector_schema_diffs` →
+old `connector_schema_snapshot_fields` → old `connector_schema_snapshots` →
+eligible `connector_discovery_runs` → old `connector_connection_checks`, never
+deleting a snapshot still referenced as `latest` or as a diff endpoint.
+
+FK delete behavior: `connector_schema_diffs.from_snapshot_id` and `.to_snapshot_id`,
+and `connector_schema_diff_items.before_snapshot_field_id` /
+`.after_snapshot_field_id`, all use `restrictOnDelete()` — the pruning service is
+responsible for deleting dependent diff/diff-item rows first, in the order above.
+This preserves referential integrity without requiring nullable endpoint FKs.
+
+### FK delete-behavior matrix (Resolved)
+
+Required because a naive `restrictOnDelete()` default on every FK would make the
+documented pruning order (old snapshots deleted before their producing/eligible
+runs, older snapshots pruned while newer ones may still chain-reference them)
+impossible at the DB level.
+
+| FK | Behavior | Why |
+|---|---|---|
+| `connector_discovery_runs.snapshot_id` | `restrictOnDelete()` (composite) | **Not** `nullOnDelete()` — MySQL requires every column in a composite FK to be nullable for `SET NULL`, and `workspace_id` is `NOT NULL`, so the constraint cannot even be created. See pruning exception below. |
+| `connector_discovery_runs.previous_snapshot_id` | `restrictOnDelete()` (composite) | Same MySQL composite-FK-with-NOT-NULL-column restriction |
+| `connector_schema_snapshots.previous_snapshot_id` | `restrictOnDelete()` (composite) | Same restriction |
+| `connector_schema_snapshots.discovery_run_id` | `restrictOnDelete()` (composite) | Producing-run link; pruning order deletes snapshots before their run becomes eligible, so this never blocks correct-order pruning |
+| `connector_schema_diffs.from_snapshot_id` / `.to_snapshot_id` | `restrictOnDelete()` (composite) | Per Зміна 3 — pruning service deletes diffs before their endpoint snapshots |
+| `connector_schema_diff_items.before_snapshot_field_id` / `.after_snapshot_field_id` | `restrictOnDelete()` (composite) | Same reasoning — items deleted before fields |
+| `connector_schema_snapshot_fields.snapshot_id` | `restrictOnDelete()` (composite) | Per pruning order, fields are deleted before their own snapshot by the pruning service, not by cascade |
+| All `connector_account_id` / `connector_schema_source_id` / `connector_definition_id` references | `restrictOnDelete()` | Consistent with `connector_schema_sources.connector_definition_id`'s existing precedent — global/parent metadata is never silently orphaned |
+| `initiated_by_user_id` (checks, runs) | `nullOnDelete()` | Single-column FK, no composite — audit-log semantics, history survives user deletion |
+
+**Pruning exception (narrow, deliberate):** snapshot/run records are immutable
+operational history, except that the three nullable archival pointer columns above
+(`connector_discovery_runs.snapshot_id`, `.previous_snapshot_id`,
+`connector_schema_snapshots.previous_snapshot_id`) may be explicitly cleared —
+`UPDATE ... SET <column> = NULL WHERE <column> = ?` — by the future pruning service
+(Task 4B-2+) immediately before deleting the snapshot they point to. MySQL
+implements MATCH SIMPLE semantics (a composite FK with any column NULL is not
+checked against the parent), so clearing only the pointer column — leaving
+`workspace_id` untouched — lets the referenced snapshot be deleted afterward under
+`restrictOnDelete()`. Task 4B-1 does not implement this pruning service; it only
+ensures the FK shape supports it correctly later.
+
+### Cross-reference consistency invariants (documented now, enforced in Task 4B-2)
+
+These are **not** database constraints and are **not** implemented by Task 4B-1 —
+they are the contract the future discovery/diff computation service (4B-2) must
+satisfy and be tested against:
+
+- For every discovery run, snapshot, and diff, the selected
+  `connector_schema_source.connector_definition_id` must equal the related
+  `connector_account.connector_definition_id`. An account for one platform must
+  never discover or diff a schema source owned by another platform definition.
+- If `connector_discovery_runs.snapshot_id` is non-null, the referenced
+  `connector_schema_snapshots.discovery_run_id` must equal that run's own `id`,
+  and both rows' `connector_account_id`/`connector_schema_source_id` must match.
+- If `connector_schema_diffs.from_snapshot_id` and `.to_snapshot_id` are both
+  non-null, both referenced snapshots must belong to the same
+  `connector_account_id` and `connector_schema_source_id` as the diff itself.
+- For `connector_schema_diff_items`, `before_snapshot_field_id` must belong to the
+  diff's `from_snapshot_id`, and `after_snapshot_field_id` must belong to the
+  diff's `to_snapshot_id` — not merely to *some* snapshot.
+
+Task 4B-1 provides the columns, relationships, and FK integrity that make these
+invariants checkable; it does not add observers/events that enforce them.
+
+The 12-month `connector_discovery_runs` retention applies only to runs not
+referenced by a retained snapshot. A producing run (`connector_schema_snapshots.discovery_run_id`)
+is retained for at least as long as any snapshot that references it — including
+the "latest successful snapshot" exception, which is always retained regardless of
+age. This is what makes "eligible discovery runs" in the pruning order unambiguous:
+eligible means both older than 12 months **and** not the producing run of any
+still-retained snapshot.
+
+Indexes (Resolved):
+- `connector_connection_checks`: `(connector_account_id, created_at)`
+- `connector_discovery_runs`: `(connector_account_id, created_at)`
+- `connector_schema_snapshots`: `(connector_account_id, connector_schema_source_id, created_at)`
+
+Supported and tested in this task: MySQL, SQLite.
+
+Generated column syntax:
+- MySQL:  `VARCHAR(255) AS (...) VIRTUAL`
+- SQLite: `TEXT GENERATED ALWAYS AS (...) VIRTUAL`
+
+`config/database.php` retains Laravel's standard `pgsql` connection template, but
+Task 4B-1 does not introduce or claim a PostgreSQL migration contract because no
+PostgreSQL environment is part of the project's current deploy/test matrix. The
+existing `FieldFoundationMigrator` branches on `mysql` versus a generic fallback;
+that fallback is verified here only for SQLite and must not be presented as verified
+PostgreSQL support.
 
 ### Workspace isolation (Resolved)
 

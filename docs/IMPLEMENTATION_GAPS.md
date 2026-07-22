@@ -754,6 +754,12 @@ admin panel; Filament/vendor package translations; user/workspace
 locale preference; locale-selection middleware; language switcher UI;
 translation completeness checks.
 
+- `ConnectorDefinitionStatus::label()`/`options()` hardcode Ukrainian
+  user-facing strings despite the application-wide localization rule
+  (`06-UI_DESIGN_SYSTEM.md`, "Internationalization and Localization Rules").
+  Do not copy this pattern into new connector enums (see Task 4B-1); migrate
+  the existing enum during a dedicated localization pass under this GAP.
+
 **Status:** Open, tracked (not urgent) — same pattern as GAP-012/GAP-018.
 
 ---

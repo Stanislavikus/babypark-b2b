@@ -2,6 +2,24 @@
 
 namespace Tests\Unit;
 
+use App\Enums\CatalogProductDisplayState;
+use App\Enums\PriceDisplayMode;
+use App\Filament\Resources\CustomerResource\Pages\PreviewAsCustomer;
+use App\Livewire\Cabinet\Catalog;
+use App\Services\Availability\AvailabilityResolver;
+use App\Services\Pricing\CustomerCatalogQuery;
+use App\Services\Pricing\PriceDisplayModeResolver;
+use App\Services\Pricing\PriceDisplayPresenter;
+use App\Services\Pricing\PriceResolver;
+use App\Services\Pricing\PricingSqlExpressions;
+use App\Services\Pricing\ProductPricingSummary;
+use App\Services\Pricing\Resolution\PriceResolutionResult;
+use App\Services\Pricing\Resolution\PriceResolutionStatus;
+use App\Services\Pricing\WorkspaceTaxDefaults;
+use App\Support\CatalogRowData;
+use App\Support\Pricing\CatalogRowProjection;
+use App\Support\Pricing\CustomerCatalogCriteria;
+use App\Support\Pricing\CustomerPricingScope;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -17,24 +35,24 @@ class DomainModelCatalogProjectionReferencesTest extends TestCase
     public static function documentedCatalogProjectionClasses(): array
     {
         return [
-            'PriceResolver' => [\App\Services\Pricing\PriceResolver::class],
-            'PriceResolutionResult' => [\App\Services\Pricing\Resolution\PriceResolutionResult::class],
-            'PriceResolutionStatus' => [\App\Services\Pricing\Resolution\PriceResolutionStatus::class],
-            'CustomerPricingScope' => [\App\Support\Pricing\CustomerPricingScope::class],
-            'WorkspaceTaxDefaults' => [\App\Services\Pricing\WorkspaceTaxDefaults::class],
-            'PriceDisplayMode' => [\App\Enums\PriceDisplayMode::class],
-            'PriceDisplayPresenter' => [\App\Services\Pricing\PriceDisplayPresenter::class],
-            'PriceDisplayModeResolver' => [\App\Services\Pricing\PriceDisplayModeResolver::class],
-            'CatalogProductDisplayState' => [\App\Enums\CatalogProductDisplayState::class],
-            'CatalogRowData' => [\App\Support\CatalogRowData::class],
-            'CatalogRowProjection' => [\App\Support\Pricing\CatalogRowProjection::class],
-            'CustomerCatalogQuery' => [\App\Services\Pricing\CustomerCatalogQuery::class],
-            'ProductPricingSummary' => [\App\Services\Pricing\ProductPricingSummary::class],
-            'AvailabilityResolver' => [\App\Services\Availability\AvailabilityResolver::class],
-            'CustomerCatalogCriteria' => [\App\Support\Pricing\CustomerCatalogCriteria::class],
-            'PricingSqlExpressions' => [\App\Services\Pricing\PricingSqlExpressions::class],
-            'Cabinet Catalog Livewire' => [\App\Livewire\Cabinet\Catalog::class],
-            'PreviewAsCustomer page' => [\App\Filament\Resources\CustomerResource\Pages\PreviewAsCustomer::class],
+            'PriceResolver' => [PriceResolver::class],
+            'PriceResolutionResult' => [PriceResolutionResult::class],
+            'PriceResolutionStatus' => [PriceResolutionStatus::class],
+            'CustomerPricingScope' => [CustomerPricingScope::class],
+            'WorkspaceTaxDefaults' => [WorkspaceTaxDefaults::class],
+            'PriceDisplayMode' => [PriceDisplayMode::class],
+            'PriceDisplayPresenter' => [PriceDisplayPresenter::class],
+            'PriceDisplayModeResolver' => [PriceDisplayModeResolver::class],
+            'CatalogProductDisplayState' => [CatalogProductDisplayState::class],
+            'CatalogRowData' => [CatalogRowData::class],
+            'CatalogRowProjection' => [CatalogRowProjection::class],
+            'CustomerCatalogQuery' => [CustomerCatalogQuery::class],
+            'ProductPricingSummary' => [ProductPricingSummary::class],
+            'AvailabilityResolver' => [AvailabilityResolver::class],
+            'CustomerCatalogCriteria' => [CustomerCatalogCriteria::class],
+            'PricingSqlExpressions' => [PricingSqlExpressions::class],
+            'Cabinet Catalog Livewire' => [Catalog::class],
+            'PreviewAsCustomer page' => [PreviewAsCustomer::class],
         ];
     }
 
