@@ -254,23 +254,32 @@ yet), but should be scheduled before any payment gateway integration work starts
   `FieldMapping`, `ImportJob` are explicit MVP-scope entities.
 
 **Current code:**
-- `ConnectorDefinition` and `ConnectorSchemaSource` exist (Task 4A completed).
-- `app/Models/SyncLog.php` exists as a **legacy** global summary log — no
-  `workspace_id`, no `connector_account_id`, no running state, coarse
-  `success|error`, legacy Babypark sync type enum. Task 4B **does not** extend
-  `SyncLog`; new connector operational history uses dedicated workspace-owned
-  tables (see `03-DOMAIN_MODEL.md` Task 4B-0 Resolved sections).
-- No `ConnectorAccount`, `FieldMapping`, connection-check/discovery/snapshot/diff
-  models or migrations yet.
+- `ConnectorDefinition` and `ConnectorSchemaSource` exist from Task 4A.
+- Task 4B-1 / PR #85 added `ConnectorAccount` plus the six
+  connection-check/discovery/snapshot/diff models and seven workspace-owned
+  tables.
+- The foundation includes 14 composite workspace FK guards, encrypted credential
+  storage, generated-column active-name uniqueness, factories, translation-keyed
+  enums, SQLite coverage, and MySQL 8 CI verification.
+- `SyncLog` remains the legacy global summary log and is not reused for connector
+  operational history.
+- Runtime adapter implementations, credential-management UI, connection-check
+  execution, discovery execution, snapshot publication, diff computation,
+  retention jobs, and operational UI are still absent.
+- `FieldMapping` remains Task 4C.
 
 **Task sequence (GAP-006 remains Open until implementation lands):**
 
 | Task | Scope |
 |---|---|
-| **4B-0** | Stop-and-Amend: architecture docs, visual prototype, documentation tests — no application code |
-| **4B-1** | Generic `ConnectorAccount` foundation migrations/domain |
-| **4B-2** | Adobe live discovery, snapshots, diffs, operational UI |
-| **4C** | `FieldMapping` suggestions, confidence, confirmation |
+| **4B-0** | Stop-and-Amend: architecture docs, six-surface visual contract, documentation tests — Done |
+| **4B-1** | Generic `ConnectorAccount` persistence/domain foundation — Done, PR #85 |
+| **4B-2-0** | Runtime Stop-and-Amend: deployment-family capabilities, adapter/auth, authorization, queue, transaction, retry and SSRF decisions — this task |
+| **4B-2a** | Connection vertical slice: PaaS adapter/auth, credentials settings service and UI, connection list, connection check/result UI, current projection |
+| **4B-2b** | Queued discovery execution, normalization, snapshot publication, and Discovery Overview UI |
+| **4B-2c** | Diff computation, discovery field list, filters, and field inspection |
+| **4B-2d** | Activity history, retention/pruning service, recovery states, and operational polish |
+| **4C** | `FieldMapping` suggestions, confidence, confirmation and manual resolution |
 
 Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
 
@@ -278,18 +287,15 @@ Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
 - Do not build a one-off, hardcoded 1C-to-database field mapping as a shortcut —
   this is explicitly the "Babypark-specific hardcoded logic" that
   `04-ARCHITECTURE_PRINCIPLES.md` Mandate 9 forbids.
-- Do not resume Connector Foundation work until the Field Foundation migration
-  (FieldDefinition / FieldBinding split, `field_binding_id` on aliases) lands —
-  building `FieldMapping` against the current `AttributeDefinition` shape would
-  require rework immediately after.
 - **`ImportedPriceTaxBasis`** (whether an imported row is net or gross) must be
   captured during connector import design — see GAP-018 cross-reference.
 
-**Next task:** Connector Foundation — sequenced after GAP-017 (Contractor →
-Customer terminology migration) and GAP-016 (Field Foundation migration), per
-the approved phased plan.
+**Next task:** Task 4B-2-0 runtime Stop-and-Amend (this cycle), then Task 4B-2a
+connection vertical slice after human approval of runtime decisions.
 
-**Status:** Open, blocked on GAP-016 (Field Foundation migration), not GAP-003.
+**Status:** Open. Unblocked — GAP-016 and GAP-017 are Closed in code, and
+Task 4B-1 is merged. Runtime connection/discovery behavior and FieldMapping remain
+unimplemented.
 
 **Task 4A note (added 2026-07-16):** Task 4A implements the first concrete
 schema for `ConnectorDefinition` and introduces `ConnectorSchemaSource`, plus
@@ -302,6 +308,16 @@ GAP-006 stays Open.
 `ConnectorAccount`, connection-check/discovery history, immutable snapshots,
 separate diffs, dual-axis errors, Adobe normalization contract, and fixture-backed
 visual prototype. No migrations/models in 4B-0 PR.
+
+**Task 4B-1 note (added 2026-07-22):** PR #85 merged seven
+workspace-owned ConnectorAccount/history/snapshot/diff tables, fourteen composite
+workspace FK guards, generated-column soft-delete uniqueness, seven Eloquent
+models, eight translation-keyed enums, and seven factories. The migration was
+verified on MySQL 8 through `.github/workflows/mysql-tests.yml`.
+No HTTP adapter, credential-management UI, connection-check execution, discovery
+execution, snapshot/diff computation, or pruning service was added.
+`ConnectorDefinitionStatus`'s pre-existing hardcoded-label debt remains tracked
+under GAP-019.
 
 **Task 4B UI handoff:**
 

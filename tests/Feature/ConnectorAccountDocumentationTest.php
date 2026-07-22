@@ -101,23 +101,122 @@ class ConnectorAccountDocumentationTest extends TestCase
     }
 
     #[Test]
-    public function implementation_gaps_documents_task_4b0_4b1_4b2_4c_sequence(): void
+    public function implementation_gaps_documents_task_4b_sequence(): void
+    {
+        $gap006 = $this->gap006Section();
+
+        $this->assertStringContainsString('**4B-0**', $gap006);
+        $this->assertStringContainsString('**4B-1**', $gap006);
+        $this->assertStringContainsString('**4B-2-0**', $gap006);
+        $this->assertStringContainsString('**4B-2a**', $gap006);
+        $this->assertStringContainsString('**4B-2b**', $gap006);
+        $this->assertStringContainsString('**4B-2c**', $gap006);
+        $this->assertStringContainsString('**4B-2d**', $gap006);
+        $this->assertStringContainsString('**4C**', $gap006);
+    }
+
+    #[Test]
+    public function implementation_gaps_task_4b2a_includes_connection_operator_surfaces(): void
+    {
+        $gap006 = $this->gap006Section();
+
+        $this->assertMatchesRegularExpression(
+            '/\*\*4B-2a\*\*.*connection list.*connection check\/result UI/s',
+            $gap006
+        );
+    }
+
+    #[Test]
+    public function implementation_gaps_task_4b2b_includes_discovery_overview_ui(): void
+    {
+        $gap006 = $this->gap006Section();
+
+        $this->assertMatchesRegularExpression(
+            '/\*\*4B-2b\*\*.*Discovery Overview UI/s',
+            $gap006
+        );
+    }
+
+    #[Test]
+    public function implementation_gaps_records_task_4b1_as_done(): void
+    {
+        $gap006 = $this->gap006Section();
+
+        $this->assertStringContainsString('**4B-1** | Generic `ConnectorAccount` persistence/domain foundation — Done, PR #85', $gap006);
+        $this->assertStringContainsString('**Task 4B-1 note (added 2026-07-22):**', $gap006);
+    }
+
+    #[Test]
+    public function implementation_gaps_gap_006_no_longer_blocked_on_gap_016(): void
+    {
+        $gap006 = $this->gap006Section();
+
+        $this->assertStringNotContainsString('blocked on GAP-016', $gap006);
+        $this->assertStringContainsString('GAP-016 and GAP-017 are Closed in code', $gap006);
+    }
+
+    #[Test]
+    public function implementation_gaps_gap_006_does_not_claim_connector_account_migrations_absent(): void
+    {
+        $gap006 = $this->gap006Section();
+
+        $this->assertStringNotContainsString('No `ConnectorAccount`', $gap006);
+        $this->assertStringNotContainsString('models or migrations yet', $gap006);
+        $this->assertStringContainsString('Task 4B-1 / PR #85 added `ConnectorAccount`', $gap006);
+    }
+
+    #[Test]
+    public function implementation_gaps_gap_006_does_not_wait_for_field_foundation(): void
+    {
+        $gap006 = $this->gap006Section();
+
+        $this->assertStringNotContainsString('Do not resume Connector Foundation work until', $gap006);
+        $this->assertStringNotContainsString('wait for Field Foundation', $gap006);
+    }
+
+    #[Test]
+    public function project_documentation_map_uses_22_item_checklist(): void
+    {
+        $content = File::get(base_path('docs/Project_Documentation_Map.md'));
+
+        $this->assertStringNotContainsString('20-item', $content);
+        $this->assertStringContainsString('22-item', $content);
+        $this->assertStringContainsString('external URL / SSRF safety', $content);
+        $this->assertStringContainsString('connector secret handling', $content);
+    }
+
+    #[Test]
+    public function domain_model_connector_scope_is_resolved_with_adobe_paas_first(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString('### Connector scope (Resolved)', $content);
+        $this->assertStringNotContainsString('The MVP should define which connector comes first', $content);
+        $this->assertStringContainsString('adobe_commerce_paas_oauth1_integration', $content);
+        $this->assertStringContainsString('Adobe Commerce PaaS/on-prem', $content);
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function gap006Section(): string
     {
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
-        $this->assertStringContainsString('**4B-0**', $content);
-        $this->assertStringContainsString('**4B-1**', $content);
-        $this->assertStringContainsString('**4B-2**', $content);
-        $this->assertStringContainsString('**4C**', $content);
+        if (! preg_match('/## GAP-006 —.*?(?=\n## GAP-007 —)/s', $content, $matches)) {
+            $this->fail('Could not locate GAP-006 section in IMPLEMENTATION_GAPS.md');
+        }
+
+        return $matches[0];
     }
 
     #[Test]
     public function implementation_gaps_keeps_gap_006_open(): void
     {
-        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+        $gap006 = $this->gap006Section();
 
-        $this->assertStringContainsString('GAP-006 stays Open', $content);
-        $this->assertStringContainsString('**Status:** Open', $content);
+        $this->assertStringContainsString('GAP-006 stays Open', File::get(base_path('docs/IMPLEMENTATION_GAPS.md')));
+        $this->assertStringContainsString('**Status:** Open. Unblocked', $gap006);
     }
 
     #[Test]

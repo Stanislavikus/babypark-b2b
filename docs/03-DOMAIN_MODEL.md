@@ -3409,18 +3409,18 @@ does not reopen, and is not blocked by, the "Attribute storage model" / "unified
 polymorphic table forbidden" decision above — it extends the same discipline
 to a new entity.
 
-### Connector scope
+### Connector scope (Resolved)
 
+Task 4B-2a's first production profile is Adobe Commerce PaaS/on-prem, using
+OAuth 1.0a integration credentials (`adobe_commerce_paas_oauth1_integration`).
+Adobe Commerce as a Cloud Service (IMS/SaaS) remains a separate, later follow-up
+until its required discovery capability and endpoint contract are verified
+(see Task 4B-2-0 runtime proposal). The generic connector core remains
+deployment-family- and vendor-extensible — this is a starting profile, not a
+hardcoded assumption elsewhere in the domain model.
 
-The MVP should define which connector comes first.
-
-Likely candidates:
-
-- Excel / CSV import;
-
-- Google Sheets;
-
-- ERP / 1C for Babypark pilot.
+Excel/CSV, Google Sheets, and ERP/1C import remain plausible *future* connector
+targets but are not scheduled ahead of Adobe.
 
 Connector work must use `FieldMapping` and the Field Foundation registry
 (`FieldDefinition` / `FieldBinding`) from the beginning — see "Field Foundation
