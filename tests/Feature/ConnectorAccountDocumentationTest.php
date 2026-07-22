@@ -513,4 +513,189 @@ class ConnectorAccountDocumentationTest extends TestCase
         );
         $this->assertStringNotContainsString('verified PostgreSQL support', $content);
     }
+
+    #[Test]
+    public function promoted_task_4b2_0_runtime_decisions_exist_in_core_docs(): void
+    {
+        $domainModel = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+        $architecture = File::get(base_path('docs/04-ARCHITECTURE_PRINCIPLES.md'));
+        $aiAgreement = File::get(base_path('docs/05-AI_WORKING_AGREEMENT.md'));
+        $uiDesign = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
+        $techStack = File::get(base_path('docs/07-TECH_STACK.md'));
+        $gaps = $this->gap006Section();
+
+        $this->assertStringContainsString('### Connector adapter capabilities (proposed)', $domainModel);
+        $this->assertStringContainsString('#### Credential and settings classification (proposed)', $domainModel);
+        $this->assertStringContainsString(
+            'reusing `store_code` for the `Store` header value is the preferred convention pending approval',
+            $domainModel
+        );
+        $this->assertStringContainsString('### ConnectorAccount authorization (Resolved)', $domainModel);
+        $this->assertStringContainsString('Merchandiser may run **manual** discovery', $domainModel);
+        $this->assertStringContainsString('### Connection-check capability and error mapping (Resolved)', $domainModel);
+        $this->assertStringContainsString('### Connection-check enqueue state (Resolved)', $domainModel);
+        $this->assertStringContainsString('add `Queued` to `ConnectorConnectionCheckStatus`', $domainModel);
+
+        $this->assertStringContainsString('**Capability-gated adapters:**', $architecture);
+        $this->assertStringContainsString('**Account-level execution lock:**', $architecture);
+
+        $this->assertStringContainsString('### Connector runtime Stop-and-Amend gate', $aiAgreement);
+        $this->assertStringContainsString('### Connector implementation test baseline (Resolved)', $aiAgreement);
+        $this->assertStringContainsString(
+            'approved B15 test matrix in `docs/proposals/task-4b2-0-runtime-decisions.md`',
+            $aiAgreement
+        );
+
+        $this->assertStringContainsString('#### Connector runtime polling (Resolved)', $uiDesign);
+
+        $connectorRuntime = $this->techStackConnectorRuntimeSection($techStack);
+        $this->assertStringContainsString('### Connector profile registry', $connectorRuntime);
+        $this->assertStringContainsString('### Adobe PaaS OAuth 1.0a signing (Resolved)', $connectorRuntime);
+        $this->assertStringContainsString('api-clients/psr7-oauth1', $connectorRuntime);
+        $this->assertStringContainsString('psr/http-message ^1.0.1', $connectorRuntime);
+        $this->assertStringContainsString('must not be promoted here as a pre-approved dependency', $connectorRuntime);
+        $this->assertStringContainsString('### Connector queue workers (production)', $connectorRuntime);
+        $this->assertStringContainsString('### Connector idempotency and overlap locking (Resolved)', $connectorRuntime);
+        $this->assertStringContainsString('MVP connector jobs do **not** implement `ShouldBeUnique`', $connectorRuntime);
+        $this->assertStringContainsString('Dispatch failure compensation', $connectorRuntime);
+        $this->assertStringContainsString('### Connector timeout and retry policy (Resolved)', $connectorRuntime);
+        $this->assertStringContainsString('### Queue timeout alignment (Resolved)', $connectorRuntime);
+        $this->assertStringContainsString('`pcntl` PHP extension', $connectorRuntime);
+        $this->assertStringContainsString('### SSRF-safe connector outbound transport', $connectorRuntime);
+        $this->assertStringContainsString('CURLOPT_RESOLVE', $connectorRuntime);
+        $this->assertStringContainsString('### Connector secret lifecycle (Resolved)', $connectorRuntime);
+        $this->assertStringContainsString('APP_PREVIOUS_KEYS', $connectorRuntime);
+
+        $this->assertStringContainsString('**Task 4B-2-0 note (added 2026-07-22):**', $gaps);
+        $this->assertStringContainsString('SaaS `Store`-header vs `store_code` reuse (B3)', $gaps);
+        $this->assertStringContainsString('Production queue-worker verification', $gaps);
+        $this->assertStringContainsString('non-blocking for 4B-2a', $gaps);
+        $this->assertStringContainsString('**GAP-024**', $gaps);
+    }
+
+    #[Test]
+    public function promoted_b7_connection_check_table_has_single_404_row(): void
+    {
+        $section = $this->domainModelConnectionCheckMappingSection();
+
+        $this->assertSame(
+            1,
+            substr_count($section, '| 404 |'),
+            'B7 table must contain exactly one 404 row'
+        );
+        $this->assertStringContainsString(
+            'connectors.errors.invalid_or_unsupported_endpoint',
+            $section
+        );
+        $this->assertStringNotContainsString('connectors.errors.unsupported_endpoint', $section);
+    }
+
+    #[Test]
+    public function b15_test_matrix_is_not_duplicated_into_core_docs(): void
+    {
+        $coreDocs = [
+            File::get(base_path('docs/03-DOMAIN_MODEL.md')),
+            File::get(base_path('docs/04-ARCHITECTURE_PRINCIPLES.md')),
+            File::get(base_path('docs/05-AI_WORKING_AGREEMENT.md')),
+            File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md')),
+            File::get(base_path('docs/07-TECH_STACK.md')),
+        ];
+
+        foreach ($coreDocs as $content) {
+            $this->assertStringNotContainsString('## B15 — Future implementation test contract', $content);
+            $this->assertStringNotContainsString('| Adapter registry | unknown/disabled profile |', $content);
+        }
+
+        $aiAgreement = File::get(base_path('docs/05-AI_WORKING_AGREEMENT.md'));
+        $this->assertStringContainsString('approved B15 test matrix', $aiAgreement);
+    }
+
+    #[Test]
+    public function proposal_file_marks_decisions_reviewed_with_fifteen_checked_boxes(): void
+    {
+        $proposal = File::get(base_path('docs/proposals/task-4b2-0-runtime-decisions.md'));
+
+        $this->assertStringContainsString(
+            'Reviewed; approved decisions promoted to core documents',
+            $proposal
+        );
+        $this->assertStringContainsString(
+            'Normative authority:** core documents only',
+            $proposal
+        );
+
+        $checklist = $this->proposalApprovalChecklistSection($proposal);
+        $this->assertSame(15, substr_count($checklist, '- [x] B'));
+        $this->assertSame(0, substr_count($checklist, '- [ ] B'));
+    }
+
+    #[Test]
+    public function gap_024_tracks_laravel_11_upgrade_for_connector_production_readiness(): void
+    {
+        $gap024 = $this->gap024Section();
+
+        $this->assertStringContainsString('**Status:** Open', $gap024);
+        $this->assertStringContainsString('2026-03-12', $gap024);
+        $this->assertStringContainsString('connector production-readiness', $gap024);
+        $this->assertStringContainsString('Does **not** block this Task 4B-2-0 documentation promotion', $gap024);
+        $this->assertStringContainsString('isolated Task 4B-2a development', $gap024);
+        $this->assertStringContainsString('Must not be bundled into PR #86', $gap024);
+        $this->assertStringContainsString('Task 4B-2a feature implementation', $gap024);
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function techStackConnectorRuntimeSection(string $content): string
+    {
+        if (! preg_match('/## Connector runtime \(Resolved — Task 4B-2-0\)\n\n(.*?)(?=\n---\n\n## Final Rule)/s', $content, $matches)) {
+            $this->fail('Could not locate connector runtime section in 07-TECH_STACK.md');
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function domainModelConnectionCheckMappingSection(): string
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        if (! preg_match(
+            '/### Connection-check capability and error mapping \(Resolved\)\n\n(.*?)(?=\n### Connection-check enqueue state)/s',
+            $content,
+            $matches
+        )) {
+            $this->fail('Could not locate B7 connection-check mapping section in 03-DOMAIN_MODEL.md');
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function proposalApprovalChecklistSection(string $content): string
+    {
+        if (! preg_match('/## Approval checklist\n\n(.*?)(?=\n## Application-code gate)/s', $content, $matches)) {
+            $this->fail('Could not locate approval checklist in proposal file');
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function gap024Section(): string
+    {
+        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        if (! preg_match('/## GAP-024 —.*?(?=\n## GAP-021 —)/s', $content, $matches)) {
+            $this->fail('Could not locate GAP-024 section in IMPLEMENTATION_GAPS.md');
+        }
+
+        return $matches[0];
+    }
 }

@@ -479,6 +479,25 @@ understood by an ordinary business user.
 
 ---
 
+### Connector runtime Stop-and-Amend gate
+
+Tasks 4B-2a–4B-2d are Strict Alignment Pathway work. Application code remains
+blocked until Task 4B-2-0 approved decisions are promoted from
+`docs/proposals/task-4b2-0-runtime-decisions.md` into core docs and merged.
+
+### Connector implementation test baseline (Resolved)
+
+Every Task 4B-2a–4B-2d specification must copy the applicable tests from the
+approved B15 test matrix in `docs/proposals/task-4b2-0-runtime-decisions.md`
+into its own "Tests required" section.
+
+This core-document rule is the normative authority for that requirement — the
+proposal file remains historical for all other purposes. Once a task
+specification has copied its applicable tests, that task specification
+becomes the direct execution contract for those tests.
+
+---
+
 ## User Interface and Terminology Rules
 
 The AI must protect approved user-facing terminology.

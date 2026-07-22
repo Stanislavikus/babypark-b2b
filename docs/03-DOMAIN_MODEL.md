@@ -2143,6 +2143,111 @@ existing `FieldFoundationMigrator` branches on `mysql` versus a generic fallback
 that fallback is verified here only for SQLite and must not be presented as verified
 PostgreSQL support.
 
+### Connector adapter capabilities (proposed)
+
+Connector runtime uses a shared adapter base plus explicit capability ports.
+Profiles declare supported capabilities in the adapter registry; unsupported
+capabilities must fail before enqueue with a stable internal error — never with a
+fallback adapter.
+
+Minimum read capabilities through Task 4B-2c:
+- `connection_check` — prove auth and permission for the next capability
+- `schema_discovery` — paginated fetch and normalization of external product-attribute metadata
+
+Write/import/export and FieldMapping are out of scope until Task 4C+.
+
+#### Credential and settings classification (proposed)
+
+Every profile field maps to exactly one storage boundary:
+1. typed `connector_accounts` column,
+2. non-secret `settings` JSON,
+3. encrypted `credentials` (`encrypted:array`),
+4. ephemeral token cache (IMS/SaaS only, later).
+
+Adobe PaaS (`adobe_commerce_paas_oauth1_integration`):
+- `base_url`, `store_code`, optional `tenant_context` → typed columns
+- OAuth consumer/access token material → `credentials`
+- other non-secret options → `settings`
+
+Adobe SaaS profile field placement remains documented in the runtime proposal
+until IMS discovery parity is confirmed; reusing `store_code` for the `Store`
+header value is the preferred convention pending approval.
+
+### ConnectorAccount authorization (Resolved)
+
+Connector operations require `ConnectorAccountPolicy` checks on every read and
+mutating action. Credential view/edit is limited to Admin, Director, and users
+with `manage_connector_accounts`.
+
+Merchandiser may run **manual** discovery for an active `ConnectorAccount` in
+their own workspace, and may view its progress, result, safe error messages,
+and discovered data. Merchandiser may **not**: view decrypted credentials;
+create, edit, remove, or replace credentials; change `base_url`, `store_code`,
+or `auth_profile`; or disable/archive a connection. Discovery dispatch goes
+through policy and an application service, never a direct Filament/Eloquent
+action; it records `initiated_by_user_id`, trigger, and a history row, and
+respects the same account-level lock/overlap/rate-limit rules as any other
+trigger. When Merchandiser needs a configuration or credential change, the UI
+shows a safe recommendation to contact Admin/Director — it does not expose the
+underlying restriction as a raw permission error.
+
+Scheduled discovery remains a system-initiated operation; configuring it
+(enabling/disabling, changing schedule) is an administrative-role action only.
+This authorization decision does not implicitly extend any other Merchandiser
+permission.
+
+Decrypted credentials must never appear in API resources, logs, events, queue
+payloads, or exception reports.
+
+### Connection-check capability and error mapping (Resolved)
+
+PaaS connection check is a single staged call:
+`GET {base_url}/rest/{store_code}/V1/products/attributes?searchCriteria[pageSize]=1` —
+this proves OAuth signature validity **and** product-attribute read permission
+in one round trip. A two-stage check (lighter probe first) is only added later
+if field testing shows the attribute-list endpoint is blocked while a lighter
+endpoint passes.
+
+| Vendor signal | HTTP | Cause | Actionability | User message key |
+|---|---|---|---|---|
+| Invalid/revoked token or consumer key | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| OAuth signature/nonce/timestamp | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_signature` |
+| Authenticated, ACL denied on attributes | 403 | `authorization` | `user_action_required` | `connectors.errors.insufficient_permissions` |
+| Invalid base URL/store/path, or unsupported endpoint on an otherwise valid host | 404 | `configuration` | `user_action_required` | `connectors.errors.invalid_or_unsupported_endpoint` |
+| Timeout | 408 / curl timeout | `network` | `automatic_retry` | `connectors.errors.timeout` |
+| Rate limited | 429 | `rate_limit` | `automatic_retry` | `connectors.errors.rate_limited` |
+| 5xx / gateway | 5xx | `vendor_unavailable` | `automatic_retry` | `connectors.errors.vendor_unavailable` |
+| JSON/schema mismatch | 200 + bad body | `schema_validation` | `support_required` | `connectors.errors.unexpected_response` |
+
+A single HTTP 404 from the connection-check URL does not, by itself, reveal
+whether the base path, store code, endpoint, Adobe module/version, or
+reverse-proxy routing is at fault — collapsing these into two differently
+named causes would invent a distinction the error mapper cannot actually make
+from one status code alone. All 404s map to one stable
+`configuration`/`user_action_required` category; safe technical detail (the
+attempted URL, safely redacted) may still be shown to help diagnosis, but the
+cause/message-key does not pretend to know which specific configuration
+field is wrong. A future probe that can genuinely disambiguate these cases
+may split this category later — that is not part of this decision.
+
+Raw vendor response bodies are never user-facing.
+
+### Connection-check enqueue state (Resolved)
+
+Task 4B-2a will add `Queued` to `ConnectorConnectionCheckStatus` and make
+`connector_connection_checks.started_at` nullable (null while `status` is
+`queued`; set when the worker begins HTTP work).
+
+Time semantics:
+- `created_at` — operator requested / enqueued
+- `started_at` — worker began external work (null while `queued`)
+- `finished_at` — terminal
+- `duration_ms` — HTTP/work duration only (`started_at` → `finished_at`), excludes queue wait
+
+This mirrors `ConnectorDiscoveryRunStatus` / `connector_discovery_runs` and is
+an approved future migration for Task 4B-2a — not applied by documentation
+promotion alone.
+
 ### Workspace isolation (Resolved)
 
 Every table above includes `workspace_id` from the first migration, uses

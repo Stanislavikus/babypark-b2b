@@ -319,6 +319,27 @@ execution, snapshot/diff computation, or pruning service was added.
 `ConnectorDefinitionStatus`'s pre-existing hardcoded-label debt remains tracked
 under GAP-019.
 
+**Task 4B-2-0 note (added 2026-07-22):** Runtime decisions for connector
+runtime Tasks 4B-2a–4B-2d were researched and approved in
+`docs/proposals/task-4b2-0-runtime-decisions.md` (B1–B15) — covering not only
+the Task 4B-2a connection vertical slice but also discovery execution,
+diff computation, retention/pruning, and operational recovery states across
+4B-2b–4B-2d. Approved patches promoted into `03-DOMAIN_MODEL.md`,
+`04-ARCHITECTURE_PRINCIPLES.md`, `05-AI_WORKING_AGREEMENT.md`,
+`06-UI_DESIGN_SYSTEM.md`, and `07-TECH_STACK.md` in this same PR. Two items
+remain explicitly open, non-blocking for 4B-2a:
+- SaaS `Store`-header vs `store_code` reuse (B3) — deferred to future SaaS work;
+- Production queue-worker verification and `deploy.sh` restart step (B9) — a
+  deployment prerequisite before connection-check/discovery go live, not a
+  blocker for building/testing 4B-2a locally or in CI (docker-compose already
+  provides a `queue` service).
+
+Connector production-readiness also depends on **GAP-024** (Laravel 11
+framework upgrade) — see that gap for scope and scheduling; it does not block
+this docs promotion or isolated 4B-2a development.
+
+Next task: Task 4B-2a (Connection vertical slice).
+
 **Task 4B UI handoff:**
 
 - `ConnectorDefinition` remains global platform metadata and schema-source
@@ -709,6 +730,35 @@ and migration of existing values.
 
 **Status:** Open, blocking dependency for weight-related connector mappings.
 It does not block mappings for unrelated fields.
+
+---
+
+## GAP-024 — Laravel 11 framework upgrade required for connector production-readiness
+
+**Approved docs:**
+- `07-TECH_STACK.md`: connector runtime, queue workers, OAuth signing, and SSRF
+  transport decisions promoted from Task 4B-2-0.
+
+**Current code:**
+- `composer.lock` pins `laravel/framework` 11.x.
+- Laravel 11 security support ended **2026-03-12** (per Laravel release policy).
+
+**Impact:**
+- Connector runtime production deployment (connection check, discovery, queue
+  workers) should not be treated as production-ready on an unsupported
+  framework release.
+- Does **not** block this Task 4B-2-0 documentation promotion or isolated
+  Task 4B-2a development and testing in the current environment.
+
+**Decision:**
+- Schedule a dedicated framework upgrade to a currently supported Laravel
+  release before connector runtime goes to production.
+- Must not be bundled into PR #86 or into Task 4B-2a feature implementation.
+
+**Next task:** Plan and execute Laravel framework upgrade as a separate task.
+
+**Status:** Open — blocks connector production-readiness; does not block 4B-2-0
+docs promotion or isolated 4B-2a development.
 
 ---
 

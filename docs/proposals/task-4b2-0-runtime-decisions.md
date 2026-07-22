@@ -1,6 +1,8 @@
 # Task 4B-2-0 Runtime Decisions — Proposal
 
-- **Status:** Draft / Non-normative
+- **Status:** Reviewed; approved decisions promoted to core documents
+- **Normative authority:** core documents only — this file is now a historical
+  record of the research, not a source of truth
 - **Created:** 2026-07-22
 - **Applies to:** proposed Task 4B-2a–4B-2d runtime implementation
 - **Source of truth:** this file is not a Resolved project document and must not
@@ -1005,20 +1007,20 @@ approved patches land in core docs.
 
 Human approval required per decision:
 
-- [ ] B1 — Capability ports shape
-- [ ] B2 — Config-based `ConnectorProfileRegistry`
-- [ ] B3 — PaaS field mapping; SaaS `store_code` reuse for `Store` header
-- [ ] B5 — `api-clients/psr7-oauth1` dependency vs isolated signer
-- [ ] B6 — Authorization matrix and Spatie permissions
-- [ ] B7 — Connection check endpoint and error mapping table
-- [ ] B8 — Sync settings service + queued check/discovery
-- [ ] B9 — Production queue worker prerequisite handling
-- [ ] B10 — Shared account-level lock; no check/discovery overlap
-- [ ] B11 — Option 1: `Queued` + nullable `started_at` for connection checks
-- [ ] B12 — Timeout/retry numeric policies
-- [ ] B13 — SSRF transport design (incl. DNS pinning approach)
-- [ ] B14 — Secret lifecycle rules
-- [ ] B15 — Test matrix acceptance
+- [x] B1 — Capability ports shape
+- [x] B2 — Config-based `ConnectorProfileRegistry`
+- [x] B3 — PaaS field mapping; SaaS `store_code` reuse for `Store` header remains open, non-blocking for 4B-2a
+- [x] B5 — signing architecture approved; concrete implementation remains Stop-and-Amend (see `07-TECH_STACK.md`)
+- [x] B6 — Authorization matrix and Spatie permissions (Merchandiser manual discovery settled)
+- [x] B7 — Connection check endpoint and error mapping table
+- [x] B8 — Sync settings service + queued check/discovery
+- [x] B9 — Production queue-worker verification remains a deployment prerequisite, non-blocking for 4B-2a local/CI development
+- [x] B10 — Shared account-level lock; no check/discovery overlap; no MVP `ShouldBeUnique`
+- [x] B11 — Option 1: `Queued` + nullable `started_at` for connection checks
+- [x] B12 — Timeout/retry numeric policies
+- [x] B13 — SSRF transport design (incl. DNS pinning via `CURLOPT_RESOLVE`)
+- [x] B14 — Secret lifecycle rules (`APP_PREVIOUS_KEYS`)
+- [x] B15 — Test matrix acceptance (normative bridge in `05-AI_WORKING_AGREEMENT.md`)
 
 ## Application-code gate
 
