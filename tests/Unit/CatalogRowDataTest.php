@@ -3,10 +3,12 @@
 namespace Tests\Unit;
 
 use App\Enums\CatalogProductDisplayState;
+use App\Models\InventoryLocation;
 use App\Models\PriceList;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Stock;
+use App\Models\Workspace;
 use App\Services\Pricing\PriceResolutionSnapshot;
 use App\Support\CatalogRowData;
 use Carbon\CarbonImmutable;
@@ -134,18 +136,8 @@ class CatalogRowDataTest extends TestCase
         $this->createPriceListItem($list, $expensive, 120.0);
         $this->createPriceListItem($list, $cheap, 100.0);
 
-        Stock::create([
-            'workspace_id' => $workspace->id,
-            'variant_id' => $expensive->id,
-            'warehouse_name' => 'Main',
-            'quantity' => 5,
-        ]);
-        Stock::create([
-            'workspace_id' => $workspace->id,
-            'variant_id' => $cheap->id,
-            'warehouse_name' => 'Main',
-            'quantity' => 5,
-        ]);
+        $this->createStock($workspace, $expensive, 5);
+        $this->createStock($workspace, $cheap, 5);
 
         $product->load(['variants.stocks', 'category']);
         $row = CatalogRowData::forProduct($product, $customer);
@@ -230,14 +222,32 @@ class CatalogRowDataTest extends TestCase
                 $this->createPriceListItem($customerList, $variant, $spec['price']);
             }
 
-            Stock::create([
-                'workspace_id' => $workspace->id,
-                'variant_id' => $variant->id,
-                'warehouse_name' => 'Main',
-                'quantity' => $spec['stock'],
-            ]);
+            $this->createStock($workspace, $variant, $spec['stock']);
         }
 
         return $product->load(['variants.stocks', 'category']);
+    }
+
+    private function createStock(Workspace $workspace, ProductVariant $variant, int $quantity): Stock
+    {
+        $location = InventoryLocation::withoutWorkspaceScope()->firstOrCreate(
+            [
+                'workspace_id' => $workspace->id,
+                'name' => 'Main',
+            ],
+            [
+                'type' => 'warehouse',
+                'is_default' => true,
+                'is_active' => true,
+            ],
+        );
+
+        return Stock::create([
+            'workspace_id' => $workspace->id,
+            'variant_id' => $variant->id,
+            'inventory_location_id' => $location->id,
+            'quantity' => $quantity,
+            'updated_at' => now(),
+        ]);
     }
 }

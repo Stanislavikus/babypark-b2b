@@ -77,12 +77,12 @@ class DeliverySettingResource extends Resource
 
                 Tables\Columns\TextColumn::make('free_from')
                     ->label('Безкоштовно від')
-                    ->formatStateUsing(fn ($state) => '₴ ' . number_format((float) $state, 0, '.', ' '))
+                    ->formatStateUsing(fn ($state) => '₴ '.number_format((float) $state, 0, '.', ' '))
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('delivery_price')
                     ->label('Вартість доставки')
-                    ->formatStateUsing(fn ($state) => '₴ ' . number_format((float) $state, 0, '.', ' '))
+                    ->formatStateUsing(fn ($state) => '₴ '.number_format((float) $state, 0, '.', ' '))
                     ->sortable(),
 
                 Tables\Columns\IconColumn::make('is_active')
@@ -113,9 +113,9 @@ class DeliverySettingResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListDeliverySettings::route('/'),
+            'index' => Pages\ListDeliverySettings::route('/'),
             'create' => Pages\CreateDeliverySetting::route('/create'),
-            'edit'   => Pages\EditDeliverySetting::route('/{record}/edit'),
+            'edit' => Pages\EditDeliverySetting::route('/{record}/edit'),
         ];
     }
 }

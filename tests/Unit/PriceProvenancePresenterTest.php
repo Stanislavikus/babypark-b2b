@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Models\PriceList;
 use App\Services\Pricing\PriceProvenancePresenter;
 use App\Services\Pricing\ResolvedPrice;
 use App\Support\Pricing\VariantPriceDisplay;
@@ -56,7 +57,10 @@ class PriceProvenancePresenterTest extends TestCase
 
     public function test_present_workspace_default_price_list_with_complete_presentation(): void
     {
-        $list = $this->createPriceList(isDefault: true);
+        $list = PriceList::withoutWorkspaceScope()
+            ->where('workspace_id', $this->defaultWorkspace()->id)
+            ->where('is_default', true)
+            ->firstOrFail();
         $resolved = ResolvedPrice::fromListItem(
             regularNetPrice: 55.5,
             salePrice: null,
