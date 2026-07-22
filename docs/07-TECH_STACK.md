@@ -208,6 +208,172 @@ Recommended implementation order:
 
 ---
 
+## Connector runtime (Resolved — Task 4B-2-0)
+
+### Connector profile registry
+
+`connector_accounts.auth_profile` resolves through `config/connectors.php` and
+`ConnectorProfileRegistry` — not through database plugins or implicit class
+guessing. Unknown or disabled profile codes fail before adapter instantiation
+with stable internal translation keys.
+
+### Adobe PaaS OAuth 1.0a signing (Resolved)
+
+OAuth1 signing is accessed only through an internal narrow port,
+`App\Support\Connectors\OAuth1\OAuth1RequestSigner` — application code never
+depends on a third-party OAuth1 library's classes directly, only on this port.
+
+The previously researched `api-clients/psr7-oauth1` package is not currently
+installable without dependency conflict: its stable release line requires
+`psr/http-message ^1.0.1`, while this project uses `psr/http-message 2.0`
+(confirmed in `composer.lock`, alongside `guzzlehttp/psr7` 2.10.4). It must
+not be added by downgrading the project's PSR-7 stack, and it must not be
+promoted here as a pre-approved dependency.
+
+Task 4B-2a must perform a Stop-and-Amend comparison between:
+1. a maintained, PSR-7-v2-compatible OAuth1 signer dependency (if one can be
+   found that actually installs cleanly against the current lockfile); and
+2. a small, isolated, project-owned signer implementing only the required
+   Adobe HMAC-SHA256 flow.
+
+Whichever is chosen stays behind `OAuth1RequestSigner` and requires
+deterministic RFC 5849 fixture tests before any live Adobe request. Tutorial
+code must not be copied into production without review.
+
+### Connector queue workers (production)
+
+Connection check and discovery require a running `queue:work` process and
+reachable lock/cache store. docker-compose includes a `queue` service for local
+full-stack; production must verify worker + deploy restart separately —
+`deploy.sh` alone does not start workers.
+
+### Connector idempotency and overlap locking (Resolved)
+
+- **Duplicate logical-operation prevention:** the authorized application
+  service acquires a short database/application lock for
+  `(workspace_id, connector_account_id, operation_kind)` and checks for an
+  existing active history row before creating a new one. If an equivalent
+  `queued` or `running` operation already exists, return its existing
+  history-row ID to the UI — do not create another row. This lock-and-check,
+  not any queue-level mechanism, is the source of logical idempotency. Only
+  after a new logical row has been committed is its job dispatched
+  (`afterCommit`).
+
+- **Queue dispatch:** MVP connector jobs do **not** implement `ShouldBeUnique`.
+  Laravel suppresses dispatch when the unique lock cannot be acquired; no job
+  is enqueued. Application code cannot treat that suppression as proof that
+  the newly-created logical operation has a corresponding queued job — and
+  this cannot be allowed to happen after a new persistent `queued` history
+  row has already been created and committed. Adding `ShouldBeUnique`
+  on top of the already-atomic logical-operation lock above does not add
+  safety; it adds a second, harder-to-observe failure mode (a stale unique
+  lock from a crashed prior attempt silently blocking dispatch of a brand
+  new, legitimately-created row).
+
+- **Dispatch failure compensation:** if dispatch after commit throws, or
+  otherwise cannot enqueue the job, the service must transition the newly
+  created row out of `queued` in a compensating transaction and expose a safe
+  retry action to the user. No history row may remain `queued` without a
+  corresponding queued or executing job.
+
+- **Concurrent execution prevention:** `WithoutOverlapping("connector-account:{id}")`
+  with `->shared()` across the connection-check and discovery job classes —
+  one account-level lock; check and discovery must not overlap for the same
+  account.
+
+- **Retry:** a new queue attempt reuses the same history row ID; the terminal
+  update uses `lockForUpdate()` on that row.
+
+- Lock driver (for the logical-operation lock and `WithoutOverlapping`):
+  `Cache::lock` on the default store (the project's `cache_locks` table
+  already supports this on the `database` driver); Redis preferred for
+  production multi-worker, not required for MVP.
+
+- `ShouldBeUnique` may be reconsidered later, but only alongside an
+  observable dispatch-failure or outbox/reconciliation contract that proves
+  its lock-suppression behavior cannot create an orphan `queued` row — not
+  as a default MVP mechanism.
+
+### Connector timeout and retry policy (Resolved)
+
+**Connection check (single GET):** connect timeout 5s; request total timeout 30s;
+job timeout 45s; max 3 queue attempts; backoff 30s/120s (no jitter on 4xx);
+retryable: timeout, 408, 429, 5xx, connection reset; non-retryable: 401, 403,
+404, schema_validation; 429 honors `Retry-After` capped at 300s and
+counts toward the attempt budget; 0 redirects; max response 256 KB; HTTP
+client itself does not retry (queue handles retry, to avoid multiplying
+attempts).
+
+**Paginated discovery:** per-page connect timeout 10s, per-page request total
+timeout 60s; job timeout 900s; max 50 pages per run; max 10,000 fields per
+run; max 2 queue attempts; backoff 60s/300s with jitter; same non-retryable
+4xx rules.
+
+**Token acquisition (IMS, later):** HTTP timeout 15s; cache TTL
+`expires_in - 60s` floor 60s; max 2 attempts.
+
+### Queue timeout alignment (Resolved)
+
+For every connector queue:
+- job `$timeout` must be shorter than the queue connection's `retry_after`;
+- worker `--timeout` must also be shorter than `retry_after`;
+- `retry_after` must exceed the longest supported connector job timeout by a
+  deliberate safety margin;
+- production workers must have the `pcntl` PHP extension installed, or
+  connector jobs must fail deployment-readiness checks (Laravel requires
+  `pcntl` to enforce job timeouts at all);
+- Task 4B-2b must not enable the 900-second discovery job while the
+  connector queue connection still uses a shorter `retry_after` — verify and,
+  if needed, raise `retry_after` for the connector queue connection before
+  enabling discovery. Task 4B-2a establishes and verifies the queue/worker
+  foundation required for connection checks; it does not implement discovery
+  execution.
+
+The exact production values must be verified against `config/queue.php` and
+the process-manager (`supervisor`/`docker-compose`) worker command — do not
+assume defaults are already aligned.
+
+### SSRF-safe connector outbound transport
+
+Connector outbound HTTP must use an isolated SSRF-safe transport that:
+- allows HTTPS only in production (port 443);
+- blocks private/link-local/loopback/metadata targets after DNS resolution;
+- pins each request to the pre-validated resolved IP using Guzzle's raw
+  `curl` option array — `['curl' => [CURLOPT_RESOLVE => ["{host}:{port}:{ip}"]]]`
+  — with TLS certificate SAN verification against the original hostname;
+- requires Guzzle's cURL handler (`CurlHandler` / `CurlMultiHandler`) and
+  **fails closed** if `StreamHandler` would be used (raw `curl` options are
+  silently ignored there);
+- formats IPv6 resolve entries with bracketed literals per libcurl
+  (`example.com:443:[2001:db8::1]`) via one tested formatter function.
+
+Do **not** use `force_ip_resolve` for DNS-rebinding defense — it only sets
+`CURLOPT_IPRESOLVE` (IPv4/IPv6 family preference) and does not pin a specific IP.
+
+### Connector secret lifecycle (Resolved)
+
+Persistent secrets live only in `connector_accounts.credentials`
+(`encrypted:array`). Non-secret identifiers/settings are never encrypted.
+Queue job payloads carry only account/check/run IDs — never decrypted
+secrets. Decrypted credentials must never appear in logs, events, exceptions,
+or serialized jobs. Secret replace/remove uses explicit semantics; a blank
+credential form field does not erase a stored secret.
+
+`APP_KEY` rotation uses Laravel's `APP_PREVIOUS_KEYS` contract:
+1. retain the former key in `APP_PREVIOUS_KEYS`;
+2. deploy the new current `APP_KEY`;
+3. verify existing connector credentials still decrypt (Laravel automatically
+   falls back through `APP_PREVIOUS_KEYS` on decrypt failure with the current
+   key — this already works without any re-save);
+4. re-save/re-encrypt all connector credentials under the current key through
+   an audited maintenance operation;
+5. verify completion before removing the former key from `APP_PREVIOUS_KEYS`.
+
+Re-save is required to retire the old key, **not** because Laravel is unable
+to decrypt legacy ciphertext while the previous key remains configured.
+
+---
+
 ## Final Rule
 
 Use the existing Laravel / Filament product. Do not build a new frontend inside it.

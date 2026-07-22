@@ -254,7 +254,6 @@ This document describes:
 **Open decisions still requiring resolution before implementation:**
 
 - Catalogue URL model (must align with 01-PRODUCT_VISION.md open decision);
-- Connector scope for MVP (which connector comes first);
 - Billing scope for MVP.
 
 This file guides database design, Laravel models, service boundaries and domain ownership.
@@ -287,7 +286,7 @@ Pricing, Availability, Workspace, Connector).
 Defines the technical and architectural rules of the platform.
 
 This document explains how the platform must be built through 11 core architectural
-mandates and a 20-item Architecture Review Checklist.
+mandates and a 22-item Architecture Review Checklist.
 
 ### 11 Core Architectural Mandates
 
@@ -347,14 +346,14 @@ Architecture Match → UI Simplicity Verification.
 
 ### Architecture Review Checklist
 
-20-item checklist covering: tenant isolation, automated scoping, authorization,
+22-item checklist covering: tenant isolation, automated scoping, authorization,
 attribute dictionary integrity, attribute storage split, JSONB localization,
 workspace_import_aliases usage, clean domain separation, variant cardinality rule,
 B2B channel projection, order/payment autonomy, WorkspaceOrderStatusMatrix
 enforcement, payment webhook routing, InventoryReservation / minimal TTL soft
 reservation, net stock calculation through AvailabilityResolver, historical order
 immutability, connector encapsulation, no hardcoded clients, payment data safety,
-hidden technical complexity.
+hidden technical complexity, external URL / SSRF safety, connector secret handling.
 
 **The checklist lives only in 04-ARCHITECTURE_PRINCIPLES.md.**
 AI agents must read it from the source file — never reconstruct from memory.
@@ -651,5 +650,5 @@ before the relevant domain area is implemented.
 |---|---|---|
 | Catalogue URL model | 01 | Must be resolved before B2B channel routing is implemented |
 | Wholesale pricing meaning | 01 | Must be resolved before PricingRule is implemented |
-| Connector scope for MVP | 03 | Must be resolved before connector development starts |
+| Connector scope for MVP | 03 | **Resolved** — Adobe Commerce PaaS/on-prem first (`03-DOMAIN_MODEL.md`, Connector scope (Resolved)) |
 | Billing scope for MVP | 03 | Deferred; simple workspace plan flags until resolved |

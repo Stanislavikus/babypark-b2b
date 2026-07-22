@@ -1120,6 +1120,10 @@ These principles apply to any external-system connector, not only Adobe:
   Legacy `SyncLog` is not extended for connector events.
 - **Connectors never dictate FieldDefinition core:** normalized external metadata
   is stored for discovery; canonical field mapping confirmation remains Task 4C.
+- **Capability-gated adapters:** registry declares supported read capabilities;
+  unsupported capabilities fail before enqueue.
+- **Account-level execution lock:** connection check and discovery for the same
+  `connector_account_id` must not overlap.
 
 # AI Implementation Rules and Code Generation Protocol
 

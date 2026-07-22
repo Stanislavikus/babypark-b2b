@@ -1768,6 +1768,13 @@ success.
 Fixture-backed non-runtime prototype for Task 4B-0:
 `docs/prototypes/task-4b0-connector-account/`.
 
+#### Connector runtime polling (Resolved)
+
+Connection check and discovery are asynchronous operator workflows. UI shows
+human states (queued/waiting, running, succeeded, failed) without queue/job
+terminology. Task 4B-2a ships connection surfaces together with check runtime;
+Task 4B-2b ships Discovery Overview together with discovery runtime.
+
 ## Empty States and Onboarding Rules
 
 Empty states must help the user take the next action.

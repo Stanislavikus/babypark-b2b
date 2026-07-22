@@ -254,23 +254,32 @@ yet), but should be scheduled before any payment gateway integration work starts
   `FieldMapping`, `ImportJob` are explicit MVP-scope entities.
 
 **Current code:**
-- `ConnectorDefinition` and `ConnectorSchemaSource` exist (Task 4A completed).
-- `app/Models/SyncLog.php` exists as a **legacy** global summary log — no
-  `workspace_id`, no `connector_account_id`, no running state, coarse
-  `success|error`, legacy Babypark sync type enum. Task 4B **does not** extend
-  `SyncLog`; new connector operational history uses dedicated workspace-owned
-  tables (see `03-DOMAIN_MODEL.md` Task 4B-0 Resolved sections).
-- No `ConnectorAccount`, `FieldMapping`, connection-check/discovery/snapshot/diff
-  models or migrations yet.
+- `ConnectorDefinition` and `ConnectorSchemaSource` exist from Task 4A.
+- Task 4B-1 / PR #85 added `ConnectorAccount` plus the six
+  connection-check/discovery/snapshot/diff models and seven workspace-owned
+  tables.
+- The foundation includes 14 composite workspace FK guards, encrypted credential
+  storage, generated-column active-name uniqueness, factories, translation-keyed
+  enums, SQLite coverage, and MySQL 8 CI verification.
+- `SyncLog` remains the legacy global summary log and is not reused for connector
+  operational history.
+- Runtime adapter implementations, credential-management UI, connection-check
+  execution, discovery execution, snapshot publication, diff computation,
+  retention jobs, and operational UI are still absent.
+- `FieldMapping` remains Task 4C.
 
 **Task sequence (GAP-006 remains Open until implementation lands):**
 
 | Task | Scope |
 |---|---|
-| **4B-0** | Stop-and-Amend: architecture docs, visual prototype, documentation tests — no application code |
-| **4B-1** | Generic `ConnectorAccount` foundation migrations/domain |
-| **4B-2** | Adobe live discovery, snapshots, diffs, operational UI |
-| **4C** | `FieldMapping` suggestions, confidence, confirmation |
+| **4B-0** | Stop-and-Amend: architecture docs, six-surface visual contract, documentation tests — Done |
+| **4B-1** | Generic `ConnectorAccount` persistence/domain foundation — Done, PR #85 |
+| **4B-2-0** | Runtime Stop-and-Amend: deployment-family capabilities, adapter/auth, authorization, queue, transaction, retry and SSRF decisions — this task |
+| **4B-2a** | Connection vertical slice: PaaS adapter/auth, credentials settings service and UI, connection list, connection check/result UI, current projection |
+| **4B-2b** | Queued discovery execution, normalization, snapshot publication, and Discovery Overview UI |
+| **4B-2c** | Diff computation, discovery field list, filters, and field inspection |
+| **4B-2d** | Activity history, retention/pruning service, recovery states, and operational polish |
+| **4C** | `FieldMapping` suggestions, confidence, confirmation and manual resolution |
 
 Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
 
@@ -278,18 +287,15 @@ Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
 - Do not build a one-off, hardcoded 1C-to-database field mapping as a shortcut —
   this is explicitly the "Babypark-specific hardcoded logic" that
   `04-ARCHITECTURE_PRINCIPLES.md` Mandate 9 forbids.
-- Do not resume Connector Foundation work until the Field Foundation migration
-  (FieldDefinition / FieldBinding split, `field_binding_id` on aliases) lands —
-  building `FieldMapping` against the current `AttributeDefinition` shape would
-  require rework immediately after.
 - **`ImportedPriceTaxBasis`** (whether an imported row is net or gross) must be
   captured during connector import design — see GAP-018 cross-reference.
 
-**Next task:** Connector Foundation — sequenced after GAP-017 (Contractor →
-Customer terminology migration) and GAP-016 (Field Foundation migration), per
-the approved phased plan.
+**Next task:** Task 4B-2-0 runtime Stop-and-Amend (this cycle), then Task 4B-2a
+connection vertical slice after human approval of runtime decisions.
 
-**Status:** Open, blocked on GAP-016 (Field Foundation migration), not GAP-003.
+**Status:** Open. Unblocked — GAP-016 and GAP-017 are Closed in code, and
+Task 4B-1 is merged. Runtime connection/discovery behavior and FieldMapping remain
+unimplemented.
 
 **Task 4A note (added 2026-07-16):** Task 4A implements the first concrete
 schema for `ConnectorDefinition` and introduces `ConnectorSchemaSource`, plus
@@ -302,6 +308,37 @@ GAP-006 stays Open.
 `ConnectorAccount`, connection-check/discovery history, immutable snapshots,
 separate diffs, dual-axis errors, Adobe normalization contract, and fixture-backed
 visual prototype. No migrations/models in 4B-0 PR.
+
+**Task 4B-1 note (added 2026-07-22):** PR #85 merged seven
+workspace-owned ConnectorAccount/history/snapshot/diff tables, fourteen composite
+workspace FK guards, generated-column soft-delete uniqueness, seven Eloquent
+models, eight translation-keyed enums, and seven factories. The migration was
+verified on MySQL 8 through `.github/workflows/mysql-tests.yml`.
+No HTTP adapter, credential-management UI, connection-check execution, discovery
+execution, snapshot/diff computation, or pruning service was added.
+`ConnectorDefinitionStatus`'s pre-existing hardcoded-label debt remains tracked
+under GAP-019.
+
+**Task 4B-2-0 note (added 2026-07-22):** Runtime decisions for connector
+runtime Tasks 4B-2a–4B-2d were researched and approved in
+`docs/proposals/task-4b2-0-runtime-decisions.md` (B1–B15) — covering not only
+the Task 4B-2a connection vertical slice but also discovery execution,
+diff computation, retention/pruning, and operational recovery states across
+4B-2b–4B-2d. Approved patches promoted into `03-DOMAIN_MODEL.md`,
+`04-ARCHITECTURE_PRINCIPLES.md`, `05-AI_WORKING_AGREEMENT.md`,
+`06-UI_DESIGN_SYSTEM.md`, and `07-TECH_STACK.md` in this same PR. Two items
+remain explicitly open, non-blocking for 4B-2a:
+- SaaS `Store`-header vs `store_code` reuse (B3) — deferred to future SaaS work;
+- Production queue-worker verification and `deploy.sh` restart step (B9) — a
+  deployment prerequisite before connection-check/discovery go live, not a
+  blocker for building/testing 4B-2a locally or in CI (docker-compose already
+  provides a `queue` service).
+
+Connector production-readiness also depends on **GAP-024** (Laravel 11
+framework upgrade) — see that gap for scope and scheduling; it does not block
+this docs promotion or isolated 4B-2a development.
+
+Next task: Task 4B-2a (Connection vertical slice).
 
 **Task 4B UI handoff:**
 
@@ -693,6 +730,34 @@ and migration of existing values.
 
 **Status:** Open, blocking dependency for weight-related connector mappings.
 It does not block mappings for unrelated fields.
+
+---
+
+## GAP-024 — Laravel 11 framework upgrade required for connector production-readiness
+
+**Approved docs:**
+- `07-TECH_STACK.md`: connector runtime, queue workers, OAuth signing, and SSRF
+  transport decisions promoted from Task 4B-2-0.
+
+**Current code:**
+- `composer.lock` pins `laravel/framework` 11.x.
+- Laravel 11 security support ended **2026-03-12** (per Laravel release policy).
+
+**Impact:**
+- Connector runtime production deployment (connection check, discovery, queue
+  workers) should not be treated as production-ready on an unsupported
+  framework release.
+- Does **not** block this Task 4B-2-0 documentation promotion or isolated Task 4B-2a development and testing in the current environment.
+
+**Decision:**
+- Schedule a dedicated framework upgrade to a currently supported Laravel
+  release before connector runtime goes to production.
+- Must not be bundled into PR #86 or into Task 4B-2a feature implementation.
+
+**Next task:** Plan and execute Laravel framework upgrade as a separate task.
+
+**Status:** Open — blocks connector production-readiness; does not block 4B-2-0
+docs promotion or isolated Task 4B-2a development.
 
 ---
 
