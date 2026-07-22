@@ -553,7 +553,10 @@ class ConnectorAccountDocumentationTest extends TestCase
         $this->assertStringContainsString('### Adobe PaaS OAuth 1.0a signing (Resolved)', $connectorRuntime);
         $this->assertStringContainsString('api-clients/psr7-oauth1', $connectorRuntime);
         $this->assertStringContainsString('psr/http-message ^1.0.1', $connectorRuntime);
-        $this->assertStringContainsString('must not be promoted here as a pre-approved dependency', $connectorRuntime);
+        $this->assertMatchesRegularExpression(
+            '/it must not be\s+promoted here as a pre-approved dependency/',
+            $connectorRuntime
+        );
         $this->assertStringContainsString('### Connector queue workers (production)', $connectorRuntime);
         $this->assertStringContainsString('### Connector idempotency and overlap locking (Resolved)', $connectorRuntime);
         $this->assertStringContainsString('MVP connector jobs do **not** implement `ShouldBeUnique`', $connectorRuntime);
