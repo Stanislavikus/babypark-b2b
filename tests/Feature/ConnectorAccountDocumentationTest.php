@@ -194,6 +194,76 @@ class ConnectorAccountDocumentationTest extends TestCase
         $this->assertStringNotContainsString('The MVP should define which connector comes first', $content);
         $this->assertStringContainsString('adobe_commerce_paas_oauth1_integration', $content);
         $this->assertStringContainsString('Adobe Commerce PaaS/on-prem', $content);
+        $this->assertStringContainsString('**Decision authority:** project-owner approval dated 2026-07-22', $content);
+    }
+
+    #[Test]
+    public function project_documentation_map_connector_scope_points_to_resolved_domain_section(): void
+    {
+        $content = File::get(base_path('docs/Project_Documentation_Map.md'));
+
+        $this->assertSame(
+            0,
+            substr_count($content, 'Connector scope for MVP (which connector comes first)'),
+            'Stale unresolved connector-scope phrasing must not appear anywhere in Project_Documentation_Map.md'
+        );
+
+        $openDecisionsBullets = $this->projectMapOpenDecisionsBulletListSection();
+
+        $this->assertStringNotContainsString(
+            'Connector scope for MVP (which connector comes first)',
+            $openDecisionsBullets,
+            'Open-decisions bullet list must not list connector scope as unresolved'
+        );
+        $this->assertStringNotContainsString(
+            'Connector scope for MVP',
+            $openDecisionsBullets,
+            'Resolved connector scope must not remain in the open-decisions bullet list'
+        );
+
+        $openDecisionsTable = $this->projectMapOpenDecisionsTableSection();
+
+        $this->assertMatchesRegularExpression(
+            '/\| Connector scope for MVP \| 03 \| \*\*Resolved\*\* — Adobe Commerce PaaS\/on-prem first \(`03-DOMAIN_MODEL\.md`, Connector scope \(Resolved\)\) \|/',
+            $openDecisionsTable,
+            'Open-decisions table must point connector scope to the Resolved section in 03-DOMAIN_MODEL.md'
+        );
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function projectMapOpenDecisionsBulletListSection(): string
+    {
+        $content = File::get(base_path('docs/Project_Documentation_Map.md'));
+
+        if (! preg_match(
+            '/\*\*Open decisions still requiring resolution before implementation:\*\*\s*\n\n(.*?)(?=\n\nThis file guides database design)/s',
+            $content,
+            $matches
+        )) {
+            $this->fail('Could not locate open-decisions bullet list in Project_Documentation_Map.md');
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function projectMapOpenDecisionsTableSection(): string
+    {
+        $content = File::get(base_path('docs/Project_Documentation_Map.md'));
+
+        if (! preg_match(
+            '/## Open Decisions Requiring Resolution Before Implementation\n\n.*?\n\n(\| Decision \| Relevant Files \| Status \|\n\|---\|---\|---\|\n(?:\|.*\|\n)+)/s',
+            $content,
+            $matches
+        )) {
+            $this->fail('Could not locate open-decisions table in Project_Documentation_Map.md');
+        }
+
+        return $matches[1];
     }
 
     /**

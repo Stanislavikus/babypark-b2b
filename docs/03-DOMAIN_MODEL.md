@@ -3422,6 +3422,11 @@ hardcoded assumption elsewhere in the domain model.
 Excel/CSV, Google Sheets, and ERP/1C import remain plausible *future* connector
 targets but are not scheduled ahead of Adobe.
 
+**Decision authority:** project-owner approval dated 2026-07-22, carried into
+the repository by this docs-only Stop-and-Amend task. Existing Adobe-oriented
+schema and prototype work are supporting technical context, not the source of
+approval by themselves.
+
 Connector work must use `FieldMapping` and the Field Foundation registry
 (`FieldDefinition` / `FieldBinding`) from the beginning — see "Field Foundation
 (cross-object fields)" above and GAP-006. `FieldMapping` must reference

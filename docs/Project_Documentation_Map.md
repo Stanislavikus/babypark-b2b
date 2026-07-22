@@ -254,8 +254,6 @@ This document describes:
 **Open decisions still requiring resolution before implementation:**
 
 - Catalogue URL model (must align with 01-PRODUCT_VISION.md open decision);
-- Connector scope for MVP — **Resolved** in `03-DOMAIN_MODEL.md` (Adobe Commerce
-  PaaS/on-prem first; see Connector scope (Resolved));
 - Billing scope for MVP.
 
 This file guides database design, Laravel models, service boundaries and domain ownership.
