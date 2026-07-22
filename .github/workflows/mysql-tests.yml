@@ -32,6 +32,7 @@ jobs:
       DB_DATABASE: babypark_b2b_test
       DB_USERNAME: babypark_test
       DB_PASSWORD: test-secret
+      DB_SOCKET: ''
 
     steps:
       - name: Checkout
@@ -61,8 +62,17 @@ jobs:
       - name: Prepare application
         run: |
           cp .env.example .env
+          sed -i '/^DB_SOCKET=/d' .env
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=mysql/' .env
+          sed -i 's/^DB_HOST=.*/DB_HOST=127.0.0.1/' .env
+          sed -i 's/^DB_PORT=.*/DB_PORT=3306/' .env
+          sed -i 's/^DB_DATABASE=.*/DB_DATABASE=babypark_b2b_test/' .env
+          sed -i 's/^DB_USERNAME=.*/DB_USERNAME=babypark_test/' .env
+          sed -i 's/^DB_PASSWORD=.*/DB_PASSWORD=test-secret/' .env
           php artisan key:generate --no-interaction
           php artisan config:clear
+        env:
+          DB_SOCKET: ''
 
       - name: Show MySQL version
         run: mysql --host=127.0.0.1 --port=3306 -ubabypark_test -ptest-secret -e "SELECT VERSION();"
