@@ -109,6 +109,68 @@ class OAuth1RequestSignerTest extends TestCase
     }
 
     #[Test]
+    public function mixed_case_form_urlencoded_content_type_produces_same_signing_as_canonical(): void
+    {
+        $credentials = $this->defaultCredentials();
+        $context = new OAuth1SigningContext('nonce', 1_700_000_000);
+        $method = 'POST';
+        $url = 'https://shop.example.com/rest/default/V1/products';
+        $body = 'field=value&field=two';
+
+        $canonical = $this->buildIntermediateValues(
+            $method,
+            $url,
+            'application/x-www-form-urlencoded',
+            $body,
+            $credentials,
+            $context,
+        );
+        $mixedCase = $this->buildIntermediateValues(
+            $method,
+            $url,
+            'Application/X-Www-Form-Urlencoded',
+            $body,
+            $credentials,
+            $context,
+        );
+
+        $this->assertSame($canonical['normalizedParameterString'], $mixedCase['normalizedParameterString']);
+        $this->assertSame($canonical['signatureBaseString'], $mixedCase['signatureBaseString']);
+        self::assertSameOAuth1Signature($canonical['signature'], $mixedCase['signature']);
+    }
+
+    #[Test]
+    public function form_urlencoded_content_type_with_charset_parameter_produces_same_signing_as_canonical(): void
+    {
+        $credentials = $this->defaultCredentials();
+        $context = new OAuth1SigningContext('nonce', 1_700_000_000);
+        $method = 'POST';
+        $url = 'https://shop.example.com/rest/default/V1/products';
+        $body = 'field=value&field=two';
+
+        $canonical = $this->buildIntermediateValues(
+            $method,
+            $url,
+            'application/x-www-form-urlencoded',
+            $body,
+            $credentials,
+            $context,
+        );
+        $withCharset = $this->buildIntermediateValues(
+            $method,
+            $url,
+            'application/x-www-form-urlencoded; charset=UTF-8',
+            $body,
+            $credentials,
+            $context,
+        );
+
+        $this->assertSame($canonical['normalizedParameterString'], $withCharset['normalizedParameterString']);
+        $this->assertSame($canonical['signatureBaseString'], $withCharset['signatureBaseString']);
+        self::assertSameOAuth1Signature($canonical['signature'], $withCharset['signature']);
+    }
+
+    #[Test]
     public function json_body_fields_are_never_included_even_when_names_overlap_with_query_parameters(): void
     {
         $credentials = $this->defaultCredentials();
