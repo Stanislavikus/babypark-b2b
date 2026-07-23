@@ -2143,7 +2143,7 @@ existing `FieldFoundationMigrator` branches on `mysql` versus a generic fallback
 that fallback is verified here only for SQLite and must not be presented as verified
 PostgreSQL support.
 
-### Connector adapter capabilities (proposed)
+### Connector adapter capabilities (Resolved)
 
 Connector runtime uses a shared adapter base plus explicit capability ports.
 Profiles declare supported capabilities in the adapter registry; unsupported
@@ -2156,7 +2156,7 @@ Minimum read capabilities through Task 4B-2c:
 
 Write/import/export and FieldMapping are out of scope until Task 4C+.
 
-#### Credential and settings classification (proposed)
+#### Credential and settings classification (Resolved)
 
 Every profile field maps to exactly one storage boundary:
 1. typed `connector_accounts` column,
