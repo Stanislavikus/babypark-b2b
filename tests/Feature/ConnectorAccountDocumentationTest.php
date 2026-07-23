@@ -515,6 +515,17 @@ class ConnectorAccountDocumentationTest extends TestCase
     }
 
     #[Test]
+    public function domain_model_connector_adapter_sections_are_resolved_not_proposed(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString('### Connector adapter capabilities (Resolved)', $content);
+        $this->assertStringContainsString('#### Credential and settings classification (Resolved)', $content);
+        $this->assertStringNotContainsString('Connector adapter capabilities (proposed)', $content);
+        $this->assertStringNotContainsString('Credential and settings classification (proposed)', $content);
+    }
+
+    #[Test]
     public function promoted_task_4b2_0_runtime_decisions_exist_in_core_docs(): void
     {
         $domainModel = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
@@ -524,8 +535,8 @@ class ConnectorAccountDocumentationTest extends TestCase
         $techStack = File::get(base_path('docs/07-TECH_STACK.md'));
         $gaps = $this->gap006Section();
 
-        $this->assertStringContainsString('### Connector adapter capabilities (proposed)', $domainModel);
-        $this->assertStringContainsString('#### Credential and settings classification (proposed)', $domainModel);
+        $this->assertStringContainsString('### Connector adapter capabilities (Resolved)', $domainModel);
+        $this->assertStringContainsString('#### Credential and settings classification (Resolved)', $domainModel);
         $this->assertMatchesRegularExpression(
             '/reusing `store_code` for the `Store`\s+header value is the preferred convention pending approval/',
             $domainModel
