@@ -3,13 +3,18 @@
 namespace Tests\Unit\Connectors;
 
 use App\Enums\ConnectorCapability;
+use App\Support\Connectors\ConnectorAccountMutationMode;
+use App\Support\Connectors\ConnectorAccountSchema;
+use App\Support\Connectors\ConnectorAccountSettingsInput;
 use App\Support\Connectors\ConnectorAdapter;
 use App\Support\Connectors\ConnectorProfileDefinition;
 use App\Support\Connectors\ConnectorProfileRegistry;
+use App\Support\Connectors\CredentialMutation;
 use App\Support\Connectors\Exceptions\ConnectorProfileNotFoundException;
 use App\Support\Connectors\Exceptions\DisabledConnectorProfileException;
 use App\Support\Connectors\Exceptions\InvalidConnectorProfileConfiguration;
 use App\Support\Connectors\Exceptions\UnsupportedConnectorCapabilityException;
+use App\Support\Connectors\ValidatedConnectorAccountState;
 use Illuminate\Contracts\Container\Container;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -51,6 +56,7 @@ class ConnectorProfileRegistryTest extends TestCase
             'disabled_profile' => [
                 'enabled' => false,
                 'adapter' => TestConnectorAdapter::class,
+                'account_schema' => TestConnectorAccountSchema::class,
                 'capabilities' => [],
             ],
         ]);
@@ -65,11 +71,10 @@ class ConnectorProfileRegistryTest extends TestCase
     public function throws_for_disabled_profile_when_requiring_capability(): void
     {
         $registry = $this->registryWithProfiles([
-            'disabled_profile' => [
+            'disabled_profile' => $this->validProfile([
                 'enabled' => false,
-                'adapter' => TestConnectorAdapter::class,
                 'capabilities' => ['connection_check'],
-            ],
+            ]),
         ]);
 
         $this->expectException(DisabledConnectorProfileException::class);
@@ -82,11 +87,7 @@ class ConnectorProfileRegistryTest extends TestCase
     public function throws_for_unsupported_capability_on_enabled_profile(): void
     {
         $registry = $this->registryWithProfiles([
-            'enabled_profile' => [
-                'enabled' => true,
-                'adapter' => TestConnectorAdapter::class,
-                'capabilities' => [],
-            ],
+            'enabled_profile' => $this->validProfile(),
         ]);
 
         $this->expectException(UnsupportedConnectorCapabilityException::class);
@@ -104,11 +105,9 @@ class ConnectorProfileRegistryTest extends TestCase
         $this->expectExceptionMessage('Connector profile [broken_profile] has unknown capability [not_a_real_capability].');
 
         $this->registryWithProfiles([
-            'broken_profile' => [
-                'enabled' => true,
-                'adapter' => TestConnectorAdapter::class,
+            'broken_profile' => $this->validProfile([
                 'capabilities' => ['not_a_real_capability'],
-            ],
+            ]),
         ]);
     }
 
@@ -121,6 +120,7 @@ class ConnectorProfileRegistryTest extends TestCase
         $this->registryWithProfiles([
             'broken_profile' => [
                 'adapter' => TestConnectorAdapter::class,
+                'account_schema' => TestConnectorAccountSchema::class,
                 'capabilities' => [],
             ],
         ]);
@@ -133,11 +133,9 @@ class ConnectorProfileRegistryTest extends TestCase
         $this->expectExceptionMessage('Connector profile [broken_profile] key [enabled] must be a boolean.');
 
         $this->registryWithProfiles([
-            'broken_profile' => [
+            'broken_profile' => $this->validProfile([
                 'enabled' => 'yes',
-                'adapter' => TestConnectorAdapter::class,
-                'capabilities' => [],
-            ],
+            ]),
         ]);
     }
 
@@ -150,6 +148,7 @@ class ConnectorProfileRegistryTest extends TestCase
         $this->registryWithProfiles([
             'broken_profile' => [
                 'enabled' => true,
+                'account_schema' => TestConnectorAccountSchema::class,
                 'capabilities' => [],
             ],
         ]);
@@ -164,11 +163,9 @@ class ConnectorProfileRegistryTest extends TestCase
         );
 
         $this->registryWithProfiles([
-            'broken_profile' => [
-                'enabled' => true,
+            'broken_profile' => $this->validProfile([
                 'adapter' => 'App\\Support\\Connectors\\MissingAdapter',
-                'capabilities' => [],
-            ],
+            ]),
         ]);
     }
 
@@ -181,11 +178,9 @@ class ConnectorProfileRegistryTest extends TestCase
         );
 
         $this->registryWithProfiles([
-            'broken_profile' => [
-                'enabled' => true,
+            'broken_profile' => $this->validProfile([
                 'adapter' => NotAConnectorAdapter::class,
-                'capabilities' => [],
-            ],
+            ]),
         ]);
     }
 
@@ -193,11 +188,7 @@ class ConnectorProfileRegistryTest extends TestCase
     public function resolves_enabled_profile_with_empty_capabilities_array(): void
     {
         $registry = $this->registryWithProfiles([
-            'empty_capabilities_profile' => [
-                'enabled' => true,
-                'adapter' => TestConnectorAdapter::class,
-                'capabilities' => [],
-            ],
+            'empty_capabilities_profile' => $this->validProfile(),
         ]);
 
         $definition = $registry->profileDefinition('empty_capabilities_profile');
@@ -218,19 +209,13 @@ class ConnectorProfileRegistryTest extends TestCase
         $this->assertSame([], $adapterMethods);
 
         $registryWithConnectionCheck = $this->registryWithProfiles([
-            'configurable_profile' => [
-                'enabled' => true,
-                'adapter' => TestConnectorAdapter::class,
+            'configurable_profile' => $this->validProfile([
                 'capabilities' => ['connection_check'],
-            ],
+            ]),
         ]);
 
         $registryWithoutCapabilities = $this->registryWithProfiles([
-            'configurable_profile' => [
-                'enabled' => true,
-                'adapter' => TestConnectorAdapter::class,
-                'capabilities' => [],
-            ],
+            'configurable_profile' => $this->validProfile(),
         ]);
 
         $withCapability = $registryWithConnectionCheck->profileDefinition('configurable_profile');
@@ -254,17 +239,78 @@ class ConnectorProfileRegistryTest extends TestCase
             ->willReturn($expectedAdapter);
 
         $registry = new ConnectorProfileRegistry($container, [
-            'container_profile' => [
-                'enabled' => true,
-                'adapter' => TestConnectorAdapter::class,
-                'capabilities' => [],
-            ],
+            'container_profile' => $this->validProfile(),
         ]);
 
         $adapter = $registry->resolveAdapter('container_profile');
 
         $this->assertSame($expectedAdapter, $adapter);
         $this->assertSame('container-bound', $adapter->marker);
+    }
+
+    #[Test]
+    public function throws_invalid_configuration_for_missing_account_schema_key(): void
+    {
+        $this->expectException(InvalidConnectorProfileConfiguration::class);
+        $this->expectExceptionMessage('Connector profile [broken_profile] is missing required key [account_schema].');
+
+        $this->registryWithProfiles([
+            'broken_profile' => [
+                'enabled' => true,
+                'adapter' => TestConnectorAdapter::class,
+                'capabilities' => [],
+            ],
+        ]);
+    }
+
+    #[Test]
+    public function throws_invalid_configuration_for_account_schema_not_implementing_contract(): void
+    {
+        $this->expectException(InvalidConnectorProfileConfiguration::class);
+        $this->expectExceptionMessage(
+            'Connector profile [broken_profile] account schema class [Tests\\Unit\\Connectors\\NotAConnectorAccountSchema] must implement App\\Support\\Connectors\\ConnectorAccountSchema.',
+        );
+
+        $this->registryWithProfiles([
+            'broken_profile' => $this->validProfile([
+                'account_schema' => NotAConnectorAccountSchema::class,
+            ]),
+        ]);
+    }
+
+    #[Test]
+    public function resolves_account_schema_through_container_not_direct_instantiation(): void
+    {
+        $expectedSchema = new TestConnectorAccountSchema('container-bound');
+
+        $container = $this->createMock(Container::class);
+        $container->expects($this->once())
+            ->method('make')
+            ->with(TestConnectorAccountSchema::class)
+            ->willReturn($expectedSchema);
+
+        $registry = new ConnectorProfileRegistry($container, [
+            'container_profile' => $this->validProfile(),
+        ]);
+
+        $schema = $registry->resolveAccountSchema('container_profile');
+
+        $this->assertSame($expectedSchema, $schema);
+        $this->assertSame('container-bound', $schema->marker);
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function validProfile(array $overrides = []): array
+    {
+        return array_merge([
+            'enabled' => true,
+            'adapter' => TestConnectorAdapter::class,
+            'account_schema' => TestConnectorAccountSchema::class,
+            'capabilities' => [],
+        ], $overrides);
     }
 
     /**
@@ -282,3 +328,18 @@ final class TestConnectorAdapter implements ConnectorAdapter
 }
 
 final class NotAConnectorAdapter {}
+
+final class NotAConnectorAccountSchema {}
+
+final class TestConnectorAccountSchema implements ConnectorAccountSchema
+{
+    public function __construct(public string $marker = 'default') {}
+
+    public function validate(
+        ConnectorAccountSettingsInput $settings,
+        CredentialMutation $credentialMutation,
+        ConnectorAccountMutationMode $mode,
+    ): ValidatedConnectorAccountState {
+        return new ValidatedConnectorAccountState('https://example.com', 'default', null, []);
+    }
+}
