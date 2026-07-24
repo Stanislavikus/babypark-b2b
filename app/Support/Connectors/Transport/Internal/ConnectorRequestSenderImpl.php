@@ -111,24 +111,26 @@ final class ConnectorRequestSenderImpl implements ConnectorRequestSender
         }
 
         $sink = new CappedResponseSink($limits->maxResponseBodyBytes, $sinkPath);
+        $options['sink'] = $sink;
 
         try {
             $response = $this->client->send($request, $options);
-            $wrappedBody = CountingStreamWrapper::create($response->getBody(), $sink);
-            $body = $wrappedBody->getContents();
+            $body = $sink->getContents();
         } catch (ResponseSizeExceededAbort) {
             $sink->cleanup();
             throw new ConnectorTransportException(TransportFailureReason::ResponseSizeExceeded);
         } catch (ConnectException $exception) {
             $sink->cleanup();
+            if ($this->isResponseSizeExceededCause($exception)) {
+                throw new ConnectorTransportException(TransportFailureReason::ResponseSizeExceeded);
+            }
             throw $this->mapException($exception, $deadline);
         } catch (RequestException $exception) {
             $sink->cleanup();
-            throw $this->mapException($exception, $deadline);
-        } finally {
-            if (isset($wrappedBody)) {
-                $wrappedBody->close();
+            if ($this->isResponseSizeExceededCause($exception)) {
+                throw new ConnectorTransportException(TransportFailureReason::ResponseSizeExceeded);
             }
+            throw $this->mapException($exception, $deadline);
         }
 
         $sink->cleanup();
@@ -225,5 +227,19 @@ final class ConnectorRequestSenderImpl implements ConnectorRequestSender
             83, // CURLE_SSL_ISSUER_ERROR
             91, // CURLE_SSL_PINNEDPUBKEYNOTMATCH
         ], true) || (defined('CURLE_SSL_CONNECT_ERROR') && $errno === CURLE_SSL_CONNECT_ERROR);
+    }
+
+    private function isResponseSizeExceededCause(\Throwable $exception): bool
+    {
+        $current = $exception;
+        while ($current !== null) {
+            if ($current instanceof ResponseSizeExceededAbort) {
+                return true;
+            }
+
+            $current = $current->getPrevious();
+        }
+
+        return false;
     }
 }

@@ -165,4 +165,26 @@ class DnsResponseParserTest extends TestCase
         $result = $this->parser->parse($json, 'api.example.com');
         $this->assertTrue($result['protocolFailed']);
     }
+
+    #[Test]
+    public function rejects_duplicate_terminal_addresses_with_different_ipv6_textual_forms(): void
+    {
+        $json = json_encode([
+            'version' => 1,
+            'status' => 'ok',
+            'requested_hostname' => 'api.example.com',
+            'cname_chain' => [],
+            'terminal' => [
+                'owner' => 'api.example.com',
+                'addresses' => [
+                    ['family' => 'ipv6', 'address' => '2001:0db8:0000:0000:0000:0000:0000:0001'],
+                    ['family' => 'ipv6', 'address' => '2001:db8::1'],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $this->parser->parse($json, 'api.example.com');
+        $this->assertFalse($result['success']);
+        $this->assertTrue($result['protocolFailed']);
+    }
 }

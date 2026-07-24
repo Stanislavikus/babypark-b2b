@@ -20,6 +20,7 @@ use Psr\Http\Message\ResponseInterface;
 use Tests\TestCase;
 use Tests\Unit\Connectors\Transport\Support\FakeMonotonicClock;
 use Tests\Unit\Connectors\Transport\Support\LocalHttpServer;
+use Tests\Unit\Connectors\Transport\Support\SlowChunkedBodyHttpServer;
 
 class ConnectorRequestSenderTest extends TestCase
 {
@@ -244,6 +245,47 @@ class ConnectorRequestSenderTest extends TestCase
         } finally {
             $server->close();
         }
+    }
+
+    #[Test]
+    public function aborts_oversized_response_during_transfer_before_server_finishes(): void
+    {
+        $totalBodyBytes = 256 * 1024;
+        $byteLimit = 8 * 1024;
+
+        $server = new SlowChunkedBodyHttpServer;
+        $server->serveInBackground(
+            totalBodyBytes: $totalBodyBytes,
+            chunkSize: 4096,
+            interChunkDelayMicroseconds: 50_000,
+        );
+
+        $sender = new ConnectorRequestSenderImpl(new DefaultCurlClientFactory, true);
+        $destination = new ValidatedConnectorDestination(
+            ConnectorDestinationKind::IpLiteral,
+            'http',
+            $server->host(),
+            $server->port(),
+            null,
+        );
+
+        try {
+            $sender->send(
+                new Request('GET', 'http://'.$server->host().':'.$server->port().'/'),
+                $destination,
+                new ConnectorTransportLimits(2, 10, $byteLimit),
+                $this->deadline(),
+            );
+            $this->fail('Expected response size failure.');
+        } catch (ConnectorTransportException $exception) {
+            $this->assertSame(TransportFailureReason::ResponseSizeExceeded, $exception->reason);
+        } finally {
+            $server->waitForHandler();
+            $server->close();
+        }
+
+        $this->assertFalse($server->completionMarkerExists());
+        $this->assertLessThan($totalBodyBytes, $server->bytesSuccessfullyWritten());
     }
 
     #[Test]
