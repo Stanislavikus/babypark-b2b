@@ -10,7 +10,7 @@ use App\Support\Connectors\Exceptions\UnsupportedConnectorCapabilityException;
 use Illuminate\Contracts\Container\Container;
 use ValueError;
 
-final class ConnectorProfileRegistry
+class ConnectorProfileRegistry
 {
     /** @var array<string, ConnectorProfileDefinition> */
     private readonly array $profiles;
@@ -35,26 +35,21 @@ final class ConnectorProfileRegistry
 
     public function resolveAdapter(string $profileCode): ConnectorAdapter
     {
-        $definition = $this->profileDefinition($profileCode);
-
-        if (! $definition->enabled) {
-            throw new DisabledConnectorProfileException(
-                sprintf('Connector profile [%s] is disabled.', $profileCode),
-            );
-        }
+        $definition = $this->enabledProfileDefinition($profileCode);
 
         return $this->container->make($definition->adapterClass);
     }
 
+    public function resolveAccountSchema(string $profileCode): ConnectorAccountSchema
+    {
+        $definition = $this->enabledProfileDefinition($profileCode);
+
+        return $this->container->make($definition->accountSchemaClass);
+    }
+
     public function requireCapability(string $profileCode, ConnectorCapability $capability): void
     {
-        $definition = $this->profileDefinition($profileCode);
-
-        if (! $definition->enabled) {
-            throw new DisabledConnectorProfileException(
-                sprintf('Connector profile [%s] is disabled.', $profileCode),
-            );
-        }
+        $definition = $this->enabledProfileDefinition($profileCode);
 
         if (! $definition->supports($capability)) {
             throw new UnsupportedConnectorCapabilityException(
@@ -65,6 +60,19 @@ final class ConnectorProfileRegistry
                 ),
             );
         }
+    }
+
+    private function enabledProfileDefinition(string $profileCode): ConnectorProfileDefinition
+    {
+        $definition = $this->profileDefinition($profileCode);
+
+        if (! $definition->enabled) {
+            throw new DisabledConnectorProfileException(
+                sprintf('Connector profile [%s] is disabled.', $profileCode),
+            );
+        }
+
+        return $definition;
     }
 
     /**
@@ -121,6 +129,18 @@ final class ConnectorProfileRegistry
             );
         }
 
+        if (! array_key_exists('account_schema', $profileConfig)) {
+            throw new InvalidConnectorProfileConfiguration(
+                sprintf('Connector profile [%s] is missing required key [account_schema].', $profileCode),
+            );
+        }
+
+        if (! is_string($profileConfig['account_schema']) || $profileConfig['account_schema'] === '') {
+            throw new InvalidConnectorProfileConfiguration(
+                sprintf('Connector profile [%s] key [account_schema] must be a non-empty class-string.', $profileCode),
+            );
+        }
+
         if (! array_key_exists('capabilities', $profileConfig)) {
             throw new InvalidConnectorProfileConfiguration(
                 sprintf('Connector profile [%s] is missing required key [capabilities].', $profileCode),
@@ -134,6 +154,7 @@ final class ConnectorProfileRegistry
         }
 
         $adapterClass = $profileConfig['adapter'];
+        $accountSchemaClass = $profileConfig['account_schema'];
 
         if (! class_exists($adapterClass)) {
             throw new InvalidConnectorProfileConfiguration(
@@ -148,6 +169,28 @@ final class ConnectorProfileRegistry
                     $profileCode,
                     $adapterClass,
                     ConnectorAdapter::class,
+                ),
+            );
+        }
+
+        if (! class_exists($accountSchemaClass)) {
+            throw new InvalidConnectorProfileConfiguration(
+                sprintf(
+                    'Connector profile [%s] account schema class [%s] does not exist.',
+                    $profileCode,
+                    $accountSchemaClass,
+                ),
+            );
+        }
+
+        if (! is_subclass_of($accountSchemaClass, ConnectorAccountSchema::class)
+            && $accountSchemaClass !== ConnectorAccountSchema::class) {
+            throw new InvalidConnectorProfileConfiguration(
+                sprintf(
+                    'Connector profile [%s] account schema class [%s] must implement %s.',
+                    $profileCode,
+                    $accountSchemaClass,
+                    ConnectorAccountSchema::class,
                 ),
             );
         }
@@ -183,6 +226,7 @@ final class ConnectorProfileRegistry
             profileCode: $profileCode,
             enabled: $profileConfig['enabled'],
             adapterClass: $adapterClass,
+            accountSchemaClass: $accountSchemaClass,
             capabilities: $capabilities,
         );
     }

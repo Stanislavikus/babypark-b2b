@@ -39,16 +39,11 @@ final class AdobePaaSConnectionCheckRequestFactory
             throw new InvalidAdobePaaSRequestContextException('Adobe PaaS store code must not be empty.');
         }
 
-        $parsed = parse_url($context->baseUrl);
+        $baseUrl = AdobePaaSBaseUrl::parse($context->baseUrl);
+        $parsed = parse_url($baseUrl->value);
 
         if ($parsed === false || ! isset($parsed['scheme'], $parsed['host'])) {
             throw new InvalidAdobePaaSRequestContextException('Adobe PaaS base URL must be an absolute URL.');
-        }
-
-        if (isset($parsed['query']) || isset($parsed['fragment'])) {
-            throw new InvalidAdobePaaSRequestContextException(
-                'Adobe PaaS base URL must not contain a query string or fragment.',
-            );
         }
 
         $path = rtrim($parsed['path'] ?? '', '/');

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Workspace\WorkspaceContext;
+use App\Support\Workspace\WorkspaceMembership;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -15,6 +16,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(WorkspaceContext::class);
         $this->app->singleton(ConnectorProfileRegistry::class);
+        $this->app->singleton(WorkspaceMembership::class);
     }
 
     /**

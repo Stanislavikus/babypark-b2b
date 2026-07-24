@@ -8,12 +8,14 @@ final readonly class ConnectorProfileDefinition
 {
     /**
      * @param  class-string<ConnectorAdapter>  $adapterClass
+     * @param  class-string<ConnectorAccountSchema>  $accountSchemaClass
      * @param  list<ConnectorCapability>  $capabilities
      */
     public function __construct(
         public string $profileCode,
         public bool $enabled,
         public string $adapterClass,
+        public string $accountSchemaClass,
         public array $capabilities,
     ) {}
 

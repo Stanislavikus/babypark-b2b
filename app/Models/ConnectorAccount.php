@@ -68,6 +68,11 @@ class ConnectorAccount extends Model
         return $this->belongsTo(ConnectorDefinition::class);
     }
 
+    public function workspace(): BelongsTo
+    {
+        return $this->belongsTo(Workspace::class);
+    }
+
     public function connectionChecks(): HasMany
     {
         return $this->hasMany(ConnectorConnectionCheck::class);
