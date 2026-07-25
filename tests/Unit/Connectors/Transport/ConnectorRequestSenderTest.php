@@ -248,6 +248,39 @@ class ConnectorRequestSenderTest extends TestCase
     }
 
     #[Test]
+    public function accepts_response_body_at_exact_max_byte_limit(): void
+    {
+        $maxResponseBodyBytes = 1024;
+        $body = str_repeat('B', $maxResponseBodyBytes);
+
+        $server = new LocalHttpServer(function (string $request) use ($body): string {
+            return "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
+                .strlen($body)."\r\n\r\n".$body;
+        });
+
+        $sender = new ConnectorRequestSenderImpl(new DefaultCurlClientFactory, true);
+        $destination = new ValidatedConnectorDestination(
+            ConnectorDestinationKind::IpLiteral,
+            'http',
+            $server->host(),
+            $server->port(),
+            null,
+        );
+
+        $server->serveOnceInBackground();
+        $result = $sender->send(
+            new Request('GET', 'http://'.$server->host().':'.$server->port().'/'),
+            $destination,
+            new ConnectorTransportLimits(1, 2, $maxResponseBodyBytes),
+            $this->deadline(),
+        );
+        $server->close();
+
+        $this->assertSame(200, $result->statusCode);
+        $this->assertSame($body, $result->body);
+    }
+
+    #[Test]
     public function aborts_oversized_response_during_transfer_before_server_finishes(): void
     {
         $totalBodyBytes = 256 * 1024;
