@@ -2232,6 +2232,103 @@ may split this category later — that is not part of this decision.
 
 Raw vendor response bodies are never user-facing.
 
+#### Adobe OAuth identifier vocabulary (Task 4B-2a-2b)
+
+Protected REST API calls on Magento/Adobe Commerce use the Web API `ErrorProcessor`,
+which serializes authentication and authorization failures as JSON
+(`{"message": "..."}`), not the `oauth_problem=<identifier>` form-style body used
+only on OAuth token endpoints (`/oauth/token/request`, `/oauth/token/access`).
+Because no stable, machine-readable OAuth identifier can be extracted from
+protected-REST error responses, connection-check execution uses HTTP-status-only
+fallback for 401/403. The identifier vocabulary below is retained for enum
+completeness and future use if Adobe exposes a reliable extraction path.
+
+| Adobe identifier | HTTP | Cause | Actionability | Message key |
+|---|---|---|---|---|
+| `timestamp_refused` | 400 | `authentication` | `user_action_required` | `connectors.errors.invalid_signature` |
+| `signature_method_rejected` | 400 | `authentication` | `user_action_required` | `connectors.errors.invalid_signature` |
+| `nonce_used` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_signature` |
+| `signature_invalid` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_signature` |
+| `consumer_key_rejected` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| `token_used` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| `token_expired` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| `token_revoke` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| `token_rejected` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| `verifier_invalid` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| `consumer_key_invalid` | 403 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| `permission_unknown` | 403 | `authorization` | `user_action_required` | `connectors.errors.insufficient_permissions` |
+| `permission_denied` | 403 | `authorization` | `user_action_required` | `connectors.errors.insufficient_permissions` |
+| `method_not_allowed` | 405 | `configuration` | `user_action_required` | `connectors.errors.invalid_or_unsupported_endpoint` |
+| `version_rejected` | 400 | `unknown` | `support_required` | `connectors.errors.connection_check_failed` |
+| `parameter_absent` | 400 | `unknown` | `support_required` | `connectors.errors.connection_check_failed` |
+| `parameter_rejected` | 400 | `unknown` | `support_required` | `connectors.errors.connection_check_failed` |
+
+#### HTTP-status fallback table (Task 4B-2a-2b)
+
+Extends the B7 table above for statuses B7 does not enumerate. B7 rows are
+unchanged.
+
+| HTTP result | Mapping |
+|---|---|
+| `200` + valid Adobe list shape | success |
+| `200` + invalid JSON or wrong shape | B7 row: `schema_validation`/`support_required`/`unexpected_response` |
+| other `2xx` | `schema_validation`/`support_required`/`connectors.errors.unexpected_response` |
+| `3xx` | `configuration`/`user_action_required`/`connectors.errors.invalid_or_unsupported_endpoint` |
+| `400`/`401`/`403`/`405` with a recognized Adobe identifier | per Adobe OAuth identifier table |
+| `400` unrecognized | `unknown`/`support_required`/`connectors.errors.connection_check_failed` |
+| `401` unrecognized | B7 row: `authentication`/`user_action_required`/`invalid_credentials` |
+| `403` unrecognized | B7 row: `authorization`/`user_action_required`/`insufficient_permissions` |
+| `404` | B7 row: exact single-category mapping |
+| `405` without a recognized OAuth identifier | `configuration`/`user_action_required`/`connectors.errors.invalid_or_unsupported_endpoint` |
+| `408` | B7 row: `network`/`automatic_retry`/`connectors.errors.timeout` |
+| `429` | B7 row: `rate_limit`/`automatic_retry`/`connectors.errors.rate_limited` |
+| `5xx` | B7 row: `vendor_unavailable`/`automatic_retry`/`connectors.errors.vendor_unavailable` |
+| any other `4xx` | `unknown`/`support_required`/`connectors.errors.connection_check_failed` |
+
+#### Transport-failure mapping (Task 4B-2a-2b)
+
+| `TransportFailureReason` | Cause | Actionability | Message key |
+|---|---|---|---|
+| `InvalidDestination` | `configuration` | `user_action_required` | `connectors.errors.invalid_or_unsupported_endpoint` |
+| `UnsafeDestination` | `configuration` | `user_action_required` | `connectors.errors.invalid_or_unsupported_endpoint` |
+| `DnsResolutionFailed` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
+| `Timeout` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
+| `ConnectionFailed` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
+| `TlsVerificationFailed` | `network` | `support_required` | `connectors.errors.tls_verification_failed` |
+| `ResponseSizeExceeded` | `schema_validation` | `support_required` | `connectors.errors.unexpected_response` |
+| `ChildProcessProtocolFailed` | `unknown` | `support_required` | `connectors.errors.connection_check_failed` |
+| `ChildProcessCleanupFailed` | `unknown` | `support_required` | `connectors.errors.connection_check_failed` |
+| `OtherTransportFailure` | `unknown` | `support_required` | `connectors.errors.connection_check_failed` |
+
+`DestinationRequestMismatch` and `TransportConfigurationException` propagate
+uncaught (internal wiring/deployment defects, not connection-check outcomes).
+
+#### `ConnectorConnectionCheckErrorCode` enum vocabulary (Task 4B-2a-2b)
+
+Persisted in `connector_connection_checks.error_code` (Task 4B-2a-2c):
+
+Adobe OAuth: `adobe_oauth_version_rejected`, `adobe_oauth_parameter_absent`,
+`adobe_oauth_parameter_rejected`, `adobe_oauth_timestamp_refused`,
+`adobe_oauth_nonce_used`, `adobe_oauth_signature_method_rejected`,
+`adobe_oauth_signature_invalid`, `adobe_oauth_consumer_key_rejected`,
+`adobe_oauth_token_used`, `adobe_oauth_token_expired`, `adobe_oauth_token_revoke`,
+`adobe_oauth_token_rejected`, `adobe_oauth_verifier_invalid`,
+`adobe_oauth_permission_unknown`, `adobe_oauth_permission_denied`,
+`adobe_oauth_method_not_allowed`, `adobe_oauth_consumer_key_invalid`.
+
+HTTP fallback: `adobe_unexpected_response`, `adobe_unexpected_success_status`,
+`adobe_redirect_response`, `adobe_unrecognized_bad_request`,
+`adobe_invalid_credentials`, `adobe_insufficient_permissions`,
+`adobe_invalid_or_unsupported_endpoint`, `adobe_request_timeout`,
+`adobe_rate_limited`, `adobe_vendor_unavailable`,
+`adobe_unrecognized_client_error`.
+
+Transport: `transport_invalid_destination`, `transport_unsafe_destination`,
+`transport_dns_resolution_failed`, `transport_timeout`,
+`transport_connection_failed`, `transport_tls_verification_failed`,
+`transport_response_size_exceeded`, `transport_child_process_protocol_failed`,
+`transport_child_process_cleanup_failed`, `transport_other_failure`.
+
 ### Connection-check enqueue state (Resolved)
 
 Task 4B-2a will add `Queued` to `ConnectorConnectionCheckStatus` and make
