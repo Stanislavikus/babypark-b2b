@@ -383,7 +383,7 @@ class ConnectorConnectionCheckErrorCodeTest extends TestCase
 
         yield 'transport_tls_verification_failed' => [
             ConnectorConnectionCheckErrorCode::TransportTlsVerificationFailed,
-            ConnectorErrorCause::Unknown,
+            ConnectorErrorCause::Network,
             ConnectorErrorActionability::SupportRequired,
             'connectors.errors.tls_verification_failed',
             false,

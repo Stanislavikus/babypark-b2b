@@ -2294,7 +2294,7 @@ unchanged.
 | `DnsResolutionFailed` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
 | `Timeout` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
 | `ConnectionFailed` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
-| `TlsVerificationFailed` | `unknown` | `support_required` | `connectors.errors.tls_verification_failed` |
+| `TlsVerificationFailed` | `network` | `support_required` | `connectors.errors.tls_verification_failed` |
 | `ResponseSizeExceeded` | `schema_validation` | `support_required` | `connectors.errors.unexpected_response` |
 | `ChildProcessProtocolFailed` | `unknown` | `support_required` | `connectors.errors.connection_check_failed` |
 | `ChildProcessCleanupFailed` | `unknown` | `support_required` | `connectors.errors.connection_check_failed` |

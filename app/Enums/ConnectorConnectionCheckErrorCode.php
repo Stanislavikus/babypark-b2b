@@ -74,7 +74,8 @@ enum ConnectorConnectionCheckErrorCode: string
             self::AdobeRequestTimeout,
             self::TransportDnsResolutionFailed,
             self::TransportTimeout,
-            self::TransportConnectionFailed => ConnectorErrorCause::Network,
+            self::TransportConnectionFailed,
+            self::TransportTlsVerificationFailed => ConnectorErrorCause::Network,
 
             self::AdobeRateLimited => ConnectorErrorCause::RateLimit,
 
@@ -89,7 +90,6 @@ enum ConnectorConnectionCheckErrorCode: string
             self::AdobeUnexpectedSuccessStatus,
             self::AdobeUnrecognizedBadRequest,
             self::AdobeUnrecognizedClientError,
-            self::TransportTlsVerificationFailed,
             self::TransportChildProcessProtocolFailed,
             self::TransportChildProcessCleanupFailed,
             self::TransportOtherFailure => ConnectorErrorCause::Unknown,
