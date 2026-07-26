@@ -34,10 +34,33 @@ class ConnectorConnectionCheckMigrationTest extends TestCase
         $this->assertTrue(Schema::hasColumn('connector_connection_checks', 'retry_until_at'));
         $this->assertTrue(Schema::hasColumn('connector_connection_checks', 'next_attempt_at'));
 
-        $indexes = collect(DB::select("PRAGMA index_list('connector_connection_checks')"))
-            ->pluck('name');
+        $this->assertTrue($this->indexExists('connector_connection_checks', 'connector_checks_active_lookup_idx'));
+    }
 
-        $this->assertTrue($indexes->contains('connector_checks_active_lookup_idx'));
+    private function indexExists(string $table, string $index): bool
+    {
+        $connection = Schema::getConnection();
+        $driver = $connection->getDriverName();
+
+        if ($driver === 'sqlite') {
+            $rows = $connection->select("PRAGMA index_list('{$table}')");
+
+            foreach ($rows as $row) {
+                if (($row->name ?? null) === $index) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        $database = $connection->getDatabaseName();
+        $result = $connection->select(
+            'SELECT 1 FROM information_schema.statistics WHERE table_schema = ? AND table_name = ? AND index_name = ? LIMIT 1',
+            [$database, $table, $index]
+        );
+
+        return $result !== [];
     }
 
     #[Test]
