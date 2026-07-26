@@ -545,7 +545,7 @@ class ConnectorAccountDocumentationTest extends TestCase
         $this->assertStringContainsString('Merchandiser may run **manual** discovery', $domainModel);
         $this->assertStringContainsString('### Connection-check capability and error mapping (Resolved)', $domainModel);
         $this->assertStringContainsString('### Connection-check enqueue state (Resolved)', $domainModel);
-        $this->assertStringContainsString('add `Queued` to `ConnectorConnectionCheckStatus`', $domainModel);
+        $this->assertStringContainsString('`ConnectorConnectionCheckStatus` includes `Queued`', $domainModel);
 
         $this->assertStringContainsString('**Capability-gated adapters:**', $architecture);
         $this->assertStringContainsString('**Account-level execution lock:**', $architecture);

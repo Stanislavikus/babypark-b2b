@@ -146,8 +146,8 @@ class AdobePaaSConnectionCheckServiceTest extends TestCase
     }
 
     #[Test]
-    public function adobe_capabilities_remain_empty_in_config(): void
+    public function adobe_profile_advertises_connection_check_capability(): void
     {
-        $this->assertSame([], config('connectors.profiles.adobe_commerce_paas_oauth1_integration.capabilities'));
+        $this->assertSame(['connection_check'], config('connectors.profiles.adobe_commerce_paas_oauth1_integration.capabilities'));
     }
 }

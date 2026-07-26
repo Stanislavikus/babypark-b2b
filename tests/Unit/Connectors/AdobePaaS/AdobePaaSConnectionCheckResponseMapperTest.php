@@ -23,6 +23,15 @@ class AdobePaaSConnectionCheckResponseMapperTest extends TestCase
     }
 
     #[Test]
+    public function maps_429_with_retry_after_header(): void
+    {
+        $result = $this->mapper->map(new ConnectorHttpResult(429, ['Retry-After' => ['90']], ''));
+
+        $this->assertSame(ConnectorConnectionCheckErrorCode::AdobeRateLimited, $result->errorCode);
+        $this->assertSame(90, $result->retryAfterSeconds);
+    }
+
+    #[Test]
     public function valid_empty_items_body_is_success(): void
     {
         $body = json_encode([

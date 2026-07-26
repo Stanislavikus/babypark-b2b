@@ -277,9 +277,30 @@ full-stack; production must verify worker + deploy restart separately —
   corresponding queued or executing job.
 
 - **Concurrent execution prevention:** `WithoutOverlapping("connector-account:{id}")`
-  with `->shared()` across the connection-check and discovery job classes —
-  one account-level lock; check and discovery must not overlap for the same
-  account.
+  with `->shared()`, `->releaseAfter(30)`, and `->expireAfter(120)` across the
+  connection-check and discovery job classes — one account-level lock; check and
+  discovery must not overlap for the same account. On the `database` cache driver,
+  `expireAfter(0)` falls back to ~24h; `expireAfter(120)` replaces that with a
+  bounded TTL above the 45s job timeout and 90s `retry_after`.
+
+- **Connection-check retry (Task 4B-2a-2c):** classified `AutomaticRetry`
+  results use manual `release($delay)` — not `backoff()`. Unhandled exceptions
+  use `maxExceptions = 1`; the job wraps all of `handle()` in a sanitized
+  `ConnectorConnectionCheckJobExecutionException` (fixed message, no `$previous`)
+  because Laravel's `failed_jobs.exception` stores raw exception text regardless
+  of `#[\SensitiveParameter]`. Retry deadline is `retryUntil()` 15 minutes from
+  dispatch (not numeric `$tries`). Three vendor-execution slots are tracked via
+  `execution_attempts` on the history row. Lock order for every transaction
+  touching both tables: `connector_accounts` then `connector_connection_checks`.
+
+- **Retry-After normalization:** single-valued header only; delta-seconds must
+  be ASCII digits; HTTP-date per RFC 9110 with ceiling-rounded delta; cap 300s;
+  only for `AdobeRateLimited` + HTTP 429; raw header never stored.
+
+- **Stale-row recovery:** inline in dispatch before creating a new row;
+  `Queued` rows past `retry_until_at`; `Running` rows past `retry_until_at + 120s`;
+  vendor-result precedence applies (projection updated when a real vendor
+  classification exists).
 
 - **Retry:** a new queue attempt reuses the same history row ID; the terminal
   update uses `lockForUpdate()` on that row.
@@ -297,12 +318,14 @@ full-stack; production must verify worker + deploy restart separately —
 ### Connector timeout and retry policy (Resolved)
 
 **Connection check (single GET):** connect timeout 5s; request total timeout 30s;
-job timeout 45s; max 3 queue attempts; backoff 30s/120s (no jitter on 4xx);
+job timeout 45s; max **3 claimed vendor-execution slots** (`execution_attempts`);
+classified retry delays 30s/120s via `release()` (no jitter on 4xx);
 retryable: timeout, 408, 429, 5xx, connection reset; non-retryable: 401, 403,
 404, schema_validation; 429 honors `Retry-After` capped at 300s and
 counts toward the attempt budget; 0 redirects; max response 256 KB; HTTP
 client itself does not retry (queue handles retry, to avoid multiplying
-attempts).
+attempts). Job uses `retryUntil()` 15 minutes from dispatch instead of numeric
+`$tries`; worker `--tries=3` does not override `retryUntil()`.
 
 **Paginated discovery:** per-page connect timeout 10s, per-page request total
 timeout 60s; job timeout 900s; max 50 pages per run; max 10,000 fields per
@@ -332,6 +355,11 @@ For every connector queue:
 The exact production values must be verified against `config/queue.php` and
 the process-manager (`supervisor`/`docker-compose`) worker command — do not
 assume defaults are already aligned.
+
+**Verified (Task 4B-2a-2c):** `config/queue.php` `database.retry_after` = 90s;
+job timeout = 45s; `docker-compose.yml` queue worker =
+`php artisan queue:work --sleep=3 --tries=3 --max-time=3600`; `pcntl` present
+in `docker/php/Dockerfile`; `cache_locks` table from standard cache migration.
 
 ### SSRF-safe connector outbound transport
 
