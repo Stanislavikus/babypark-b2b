@@ -4,6 +4,7 @@ namespace App\Support\Connectors\AdobePaaS;
 
 use App\Enums\ConnectorConnectionCheckErrorCode;
 use App\Support\Connectors\ConnectorConnectionCheckResult;
+use App\Support\Connectors\RetryAfterHeaderNormalizer;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 
 final class AdobePaaSConnectionCheckResponseMapper
@@ -14,7 +15,7 @@ final class AdobePaaSConnectionCheckResponseMapper
             return $this->mapSuccessResponse($result->body);
         }
 
-        return $this->mapHttpStatus($result->statusCode);
+        return $this->mapHttpStatus($result->statusCode, $result->headers);
     }
 
     private function mapSuccessResponse(#[\SensitiveParameter] string $body): ConnectorConnectionCheckResult
@@ -56,7 +57,10 @@ final class AdobePaaSConnectionCheckResponseMapper
         return true;
     }
 
-    private function mapHttpStatus(int $status): ConnectorConnectionCheckResult
+    /**
+     * @param  array<string, list<string>>  $headers
+     */
+    private function mapHttpStatus(int $status, array $headers): ConnectorConnectionCheckResult
     {
         $errorCode = match (true) {
             $status >= 201 && $status <= 299 => ConnectorConnectionCheckErrorCode::AdobeUnexpectedSuccessStatus,
@@ -72,6 +76,10 @@ final class AdobePaaSConnectionCheckResponseMapper
             default => throw new \InvalidArgumentException('Unexpected HTTP status: '.$status),
         };
 
-        return ConnectorConnectionCheckResult::httpFailure($errorCode, $status);
+        $retryAfterSeconds = $status === 429
+            ? RetryAfterHeaderNormalizer::normalize($headers)
+            : null;
+
+        return ConnectorConnectionCheckResult::httpFailure($errorCode, $status, $retryAfterSeconds);
     }
 }

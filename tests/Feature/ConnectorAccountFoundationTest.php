@@ -80,7 +80,7 @@ class ConnectorAccountFoundationTest extends TestCase
     #[Test]
     public function migration_rolls_back_cleanly(): void
     {
-        $this->artisan('migrate:rollback', ['--step' => 1]);
+        $this->artisan('migrate:rollback', ['--step' => 2]);
 
         foreach ([
             'connector_schema_diff_items',

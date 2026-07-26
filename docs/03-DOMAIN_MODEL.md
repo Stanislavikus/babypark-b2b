@@ -2331,19 +2331,65 @@ Transport: `transport_invalid_destination`, `transport_unsafe_destination`,
 
 ### Connection-check enqueue state (Resolved)
 
-Task 4B-2a will add `Queued` to `ConnectorConnectionCheckStatus` and make
-`connector_connection_checks.started_at` nullable (null while `status` is
-`queued`; set when the worker begins HTTP work).
+`ConnectorConnectionCheckStatus` includes `Queued`, `Running`, `Succeeded`, and
+`Failed`. `connector_connection_checks.started_at` is nullable (null while
+`status` is `queued`; set when the worker begins HTTP work).
+
+Additional queue-lifecycle columns on `connector_connection_checks`:
+- `execution_attempts` (unsigned tinyint, default `0`) — counts **claimed
+  vendor-execution slots**, not confirmed HTTP calls; atomically incremented
+  before each vendor call, capped at 3; conservative over-counting is
+  acceptable, under-counting is not.
+- `retry_until_at` — absolute 15-minute deadline from dispatch, shared by the
+  job's `retryUntil()` and persisted on the row for deterministic stale-row
+  recovery.
+- `next_attempt_at` — guards against the database queue driver's independent
+  `retry_after` redelivery bypassing an Adobe-mandated `Retry-After` or
+  classified backoff delay.
 
 Time semantics:
 - `created_at` — operator requested / enqueued
 - `started_at` — worker began external work (null while `queued`)
 - `finished_at` — terminal
-- `duration_ms` — HTTP/work duration only (`started_at` → `finished_at`), excludes queue wait
+- `duration_ms` — cumulative HTTP/work duration across attempts (hrtime-based,
+  summed per attempt), excludes queue wait
 
-This mirrors `ConnectorDiscoveryRunStatus` / `connector_discovery_runs` and is
-an approved future migration for Task 4B-2a — not applied by documentation
-promotion alone.
+#### `ConnectorConnectionCheckLifecycleErrorCode` (queue/infrastructure only)
+
+Never mixed into `ConnectorConnectionCheckErrorCode` (Adobe OAuth/HTTP/transport).
+Lifecycle codes never change `connector_accounts` projection.
+
+| Code | Cause | Actionability | Message key | Technical summary |
+|---|---|---|---|---|
+| `connection_check_dispatch_failed` | `unknown` | `support_required` | `connectors.errors.connection_check_failed` | `queue_dispatch_failed` |
+| `connection_check_job_failed` | `unknown` | `support_required` | `connectors.errors.connection_check_failed` | `queue_job_failed` |
+| `connection_check_attempts_exhausted_without_result` | `unknown` | `support_required` | `connectors.errors.connection_check_failed` | `vendor_attempt_budget_exhausted_without_result` |
+| `connection_check_account_disabled_before_execution` | `configuration` | `workspace_admin_required` | `connectors.errors.account_disabled` | `account_disabled_before_execution` |
+
+**Vendor-result precedence:** when a real vendor classification is already
+persisted on a row (intermediate retry persistence), that classification is the
+terminal truth in the attempts-exhausted branch, `failed()`, and stale-row
+recovery — lifecycle codes never overwrite it.
+
+#### Authorization and projection
+
+- `ConnectorAccountPolicy::runConnectionCheck()` — dedicated ability (currently
+  delegates to the same workspace/role rules as `view()`); dispatch uses
+  `Gate::forUser($actor)->authorize('runConnectionCheck', $account)`.
+- Account projection mapping on terminal **vendor** outcomes:
+
+| Terminal vendor outcome | `connection_status` |
+|---|---|
+| `Succeeded` | `Connected` (clears all four `last_error_*` fields) |
+| Failure, `AutomaticRetry`, attempts exhausted | `TemporarilyUnavailable` |
+| Failure, `UserActionRequired` / `WorkspaceAdminRequired` / `SupportRequired` | `AttentionRequired` |
+| Lifecycle/infrastructure failure | **unchanged** |
+| Disabled account (before execution) | **unchanged** |
+
+On any terminal vendor failure, also write `last_error_cause`,
+`last_error_actionability`, `last_error_message_key`, and `last_error_at`.
+Set `last_checked_at` on vendor terminal writes; set `last_successful_check_at`
+only on `Succeeded`.
 
 ### Workspace isolation (Resolved)
 

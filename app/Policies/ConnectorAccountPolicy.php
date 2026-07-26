@@ -20,6 +20,11 @@ class ConnectorAccountPolicy
         return $this->allowsManagementAbility($user, $connectorAccount);
     }
 
+    public function runConnectionCheck(User $user, ConnectorAccount $connectorAccount): bool
+    {
+        return $this->allowsManagementAbility($user, $connectorAccount);
+    }
+
     public function create(User $user, Workspace $workspace): bool
     {
         return $this->allowsManagementAbilityForWorkspace($user, $workspace);

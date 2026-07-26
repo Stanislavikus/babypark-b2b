@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ConnectorConnectionCheckErrorCode;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Enums\ConnectorConnectionCheckTrigger;
 use App\Enums\ConnectorErrorActionability;
@@ -26,6 +27,9 @@ class ConnectorConnectionCheck extends Model
         'trigger',
         'initiated_by_user_id',
         'status',
+        'execution_attempts',
+        'retry_until_at',
+        'next_attempt_at',
         'cause_category',
         'actionability',
         'error_code',
@@ -44,6 +48,9 @@ class ConnectorConnectionCheck extends Model
         return [
             'trigger' => ConnectorConnectionCheckTrigger::class,
             'status' => ConnectorConnectionCheckStatus::class,
+            'execution_attempts' => 'integer',
+            'retry_until_at' => 'datetime',
+            'next_attempt_at' => 'datetime',
             'cause_category' => ConnectorErrorCause::class,
             'actionability' => ConnectorErrorActionability::class,
             'safe_message_parameters' => 'array',
@@ -62,5 +69,22 @@ class ConnectorConnectionCheck extends Model
     public function initiatedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'initiated_by_user_id');
+    }
+
+    public function isTerminal(): bool
+    {
+        return in_array($this->status, [
+            ConnectorConnectionCheckStatus::Succeeded,
+            ConnectorConnectionCheckStatus::Failed,
+        ], true);
+    }
+
+    public function hasVendorClassification(): bool
+    {
+        if ($this->error_code === null) {
+            return false;
+        }
+
+        return ConnectorConnectionCheckErrorCode::tryFrom($this->error_code) !== null;
     }
 }

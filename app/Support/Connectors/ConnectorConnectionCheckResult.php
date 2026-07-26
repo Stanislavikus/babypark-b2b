@@ -15,16 +15,18 @@ final readonly class ConnectorConnectionCheckResult
         public ?ConnectorConnectionCheckErrorCode $errorCode,
         public ?TimeoutPhase $timeoutPhase,
         public ?string $vendorRequestId,
+        public ?int $retryAfterSeconds,
     ) {}
 
     public static function success(): self
     {
-        return new self(true, 200, null, null, null);
+        return new self(true, 200, null, null, null, null);
     }
 
     public static function httpFailure(
         ConnectorConnectionCheckErrorCode $errorCode,
         int $httpStatus,
+        ?int $retryAfterSeconds = null,
     ): self {
         if ($httpStatus < 100 || $httpStatus > 599) {
             throw new \InvalidArgumentException('Invalid HTTP status.');
@@ -34,7 +36,17 @@ final readonly class ConnectorConnectionCheckResult
             throw new \InvalidArgumentException('Error code does not accept this HTTP status.');
         }
 
-        return new self(false, $httpStatus, $errorCode, null, null);
+        if ($retryAfterSeconds !== null) {
+            if ($errorCode !== ConnectorConnectionCheckErrorCode::AdobeRateLimited || $httpStatus !== 429) {
+                throw new \InvalidArgumentException('Retry-After only applies to AdobeRateLimited with HTTP 429.');
+            }
+
+            if ($retryAfterSeconds < 0 || $retryAfterSeconds > 300) {
+                throw new \InvalidArgumentException('Retry-After seconds must be between 0 and 300.');
+            }
+        }
+
+        return new self(false, $httpStatus, $errorCode, null, null, $retryAfterSeconds);
     }
 
     public static function transportFailure(
@@ -49,7 +61,7 @@ final readonly class ConnectorConnectionCheckResult
             throw new \InvalidArgumentException('TimeoutPhase only applies to TransportTimeout.');
         }
 
-        return new self(false, null, $errorCode, $timeoutPhase, null);
+        return new self(false, null, $errorCode, $timeoutPhase, null, null);
     }
 
     public function cause(): ?ConnectorErrorCause

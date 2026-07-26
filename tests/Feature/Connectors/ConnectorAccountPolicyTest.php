@@ -96,6 +96,7 @@ class ConnectorAccountPolicyTest extends TestCase
     {
         return [
             'view' => ['view'],
+            'runConnectionCheck' => ['runConnectionCheck'],
             'updateSettings' => ['updateSettings'],
             'replaceCredentials' => ['replaceCredentials'],
             'removeCredentials' => ['removeCredentials'],

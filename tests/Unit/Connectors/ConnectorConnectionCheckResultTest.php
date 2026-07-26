@@ -145,4 +145,40 @@ class ConnectorConnectionCheckResultTest extends TestCase
             TimeoutPhase::Connect,
         );
     }
+
+    #[Test]
+    public function http_failure_accepts_retry_after_only_for_rate_limited_429(): void
+    {
+        $result = ConnectorConnectionCheckResult::httpFailure(
+            ConnectorConnectionCheckErrorCode::AdobeRateLimited,
+            429,
+            120,
+        );
+
+        $this->assertSame(120, $result->retryAfterSeconds);
+    }
+
+    #[Test]
+    public function http_failure_rejects_retry_after_for_non_429(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        ConnectorConnectionCheckResult::httpFailure(
+            ConnectorConnectionCheckErrorCode::AdobeInvalidCredentials,
+            401,
+            30,
+        );
+    }
+
+    #[Test]
+    public function http_failure_rejects_retry_after_out_of_range(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        ConnectorConnectionCheckResult::httpFailure(
+            ConnectorConnectionCheckErrorCode::AdobeRateLimited,
+            429,
+            301,
+        );
+    }
 }
