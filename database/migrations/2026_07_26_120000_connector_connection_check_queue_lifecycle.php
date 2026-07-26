@@ -43,10 +43,27 @@ return new class extends Migration
                 'finished_at' => now(),
             ]);
 
+        $driver = Schema::getConnection()->getDriverName();
+
+        if ($driver === 'mysql') {
+            Schema::table('connector_connection_checks', function (Blueprint $table) {
+                $table->dropForeign('ccc_ws_account_fk');
+            });
+        }
+
         Schema::table('connector_connection_checks', function (Blueprint $table) {
             $table->dropIndex('connector_checks_active_lookup_idx');
             $table->dropColumn(['execution_attempts', 'retry_until_at', 'next_attempt_at']);
             $table->timestamp('started_at')->nullable(false)->change();
         });
+
+        if ($driver === 'mysql') {
+            Schema::table('connector_connection_checks', function (Blueprint $table) {
+                $table->foreign(
+                    ['workspace_id', 'connector_account_id'],
+                    'ccc_ws_account_fk',
+                )->references(['workspace_id', 'id'])->on('connector_accounts')->restrictOnDelete();
+            });
+        }
     }
 };
