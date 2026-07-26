@@ -48,6 +48,7 @@ return new class extends Migration
         if ($driver === 'mysql') {
             Schema::table('connector_connection_checks', function (Blueprint $table) {
                 $table->dropForeign('ccc_ws_account_fk');
+                $table->dropForeign('connector_connection_checks_workspace_id_foreign');
             });
         }
 
@@ -59,6 +60,9 @@ return new class extends Migration
 
         if ($driver === 'mysql') {
             Schema::table('connector_connection_checks', function (Blueprint $table) {
+                $table->foreign('workspace_id')
+                    ->references('id')
+                    ->on('workspaces');
                 $table->foreign(
                     ['workspace_id', 'connector_account_id'],
                     'ccc_ws_account_fk',
