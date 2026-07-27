@@ -112,6 +112,8 @@
     "connectors.ui.notifications.check_completed": "Check completed. Connection data has been updated.",
     "connectors.ui.notifications.check_failed": "Connection check failed",
     "connectors.ui.notifications.check_started": "Check started. Status will update automatically.",
+    "connectors.ui.history.empty_description": "Run a connection check to verify this account and see results here.",
+    "connectors.ui.history.empty_heading": "No connection checks yet",
     "connectors.ui.relation.connection_checks": "Recent connection checks",
     "connectors.ui.resource.navigation_group": "Data model & connectors",
     "connectors.ui.resource.model_label": "connector account",

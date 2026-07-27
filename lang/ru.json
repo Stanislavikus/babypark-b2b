@@ -112,6 +112,8 @@
     "connectors.ui.notifications.check_completed": "Проверка завершена. Данные подключения обновлены.",
     "connectors.ui.notifications.check_failed": "Проверка подключения не удалась",
     "connectors.ui.notifications.check_started": "Проверка запущена. Статус обновится автоматически.",
+    "connectors.ui.history.empty_description": "Запустите проверку подключения, чтобы подтвердить учётную запись и увидеть результаты здесь.",
+    "connectors.ui.history.empty_heading": "Проверок подключения пока нет",
     "connectors.ui.relation.connection_checks": "Последние проверки подключения",
     "connectors.ui.resource.navigation_group": "Модель данных и коннекторы",
     "connectors.ui.resource.model_label": "учётная запись коннектора",

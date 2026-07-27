@@ -38,6 +38,8 @@ class ConnectionChecksRelationManager extends RelationManager
         $uiState = app(ConnectorAccountUiState::class);
 
         return $table
+            ->emptyStateHeading(__('connectors.ui.history.empty_heading'))
+            ->emptyStateDescription(__('connectors.ui.history.empty_description'))
             ->modifyQueryUsing(
                 fn (Builder $query) => $query
                     ->with('initiatedByUser')

@@ -70,12 +70,14 @@ class ConnectorAccountResourceReviewTest extends TestCase
     public function denied_user_does_not_see_connector_accounts_in_navigation(): void
     {
         $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $deniedManager = $this->createStaffUser(UserRole::Manager);
         $admin = $this->createStaffUser(UserRole::Admin);
 
         App::setLocale('uk');
         $label = __('connectors.ui.resource.navigation_label', locale: 'uk');
 
         $this->assertFalse($merchandiser->can('viewAny', ConnectorAccount::class));
+        $this->assertFalse($deniedManager->can('viewAny', ConnectorAccount::class));
 
         $this->actingAs($admin)
             ->get(ConnectorAccountResource::getUrl('index'))
@@ -84,6 +86,12 @@ class ConnectorAccountResourceReviewTest extends TestCase
         $this->actingAs($merchandiser)
             ->get(ConnectorAccountResource::getUrl('index'))
             ->assertForbidden();
+
+        $this->actingAs($deniedManager)
+            ->followingRedirects()
+            ->get('/admin')
+            ->assertSuccessful()
+            ->assertDontSee($label);
     }
 
     #[Test]
@@ -505,6 +513,42 @@ class ConnectorAccountResourceReviewTest extends TestCase
 
         $this->assertStringNotContainsString(self::CREDENTIAL_CANARY, $loggedPayload);
         $this->assertStringNotContainsString('SENTINEL_EXCEPTION_MESSAGE', $loggedPayload);
+    }
+
+    #[Test]
+    #[DataProvider('historyEmptyStateLocaleProvider')]
+    public function connection_check_history_empty_state_is_localized(string $locale): void
+    {
+        App::setLocale($locale);
+
+        $admin = $this->createStaffUser(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+
+        $component = Livewire::actingAs($admin)
+            ->test(ConnectionChecksRelationManager::class, [
+                'ownerRecord' => $account,
+                'pageClass' => ViewConnectorAccount::class,
+            ])
+            ->assertSee(__('connectors.ui.history.empty_heading', locale: $locale))
+            ->assertSee(__('connectors.ui.history.empty_description', locale: $locale));
+
+        $html = $component->html(stripInitialData: true);
+
+        $this->assertStringNotContainsString('connector connection checks', strtolower($html));
+        $this->assertStringNotContainsString('connectionChecks', $html);
+        $this->assertStringNotContainsString('connectors.ui.history.', $html);
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function historyEmptyStateLocaleProvider(): array
+    {
+        return [
+            'en' => ['en'],
+            'uk' => ['uk'],
+            'ru' => ['ru'],
+        ];
     }
 
     #[Test]

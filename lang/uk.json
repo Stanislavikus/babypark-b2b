@@ -112,6 +112,8 @@
     "connectors.ui.notifications.check_completed": "Перевірку завершено. Дані з'єднання оновлено.",
     "connectors.ui.notifications.check_failed": "Перевірка з'єднання не вдалася",
     "connectors.ui.notifications.check_started": "Перевірку запущено. Статус оновиться автоматично.",
+    "connectors.ui.history.empty_description": "Запустіть перевірку з'єднання, щоб підтвердити обліковий запис і переглянути результати тут.",
+    "connectors.ui.history.empty_heading": "Перевірок з'єднання ще немає",
     "connectors.ui.relation.connection_checks": "Останні перевірки з'єднання",
     "connectors.ui.resource.navigation_group": "Модель даних і коннектори",
     "connectors.ui.resource.model_label": "обліковий запис конектора",
