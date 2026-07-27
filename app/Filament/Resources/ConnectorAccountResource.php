@@ -6,6 +6,7 @@ use App\Enums\ConnectorConnectionCheckStatus;
 use App\Filament\Resources\ConnectorAccountResource\Pages;
 use App\Models\ConnectorAccount;
 use App\Support\Connectors\ConnectorAccountUiState;
+use App\Support\Connectors\ConnectorUiFormatter;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
@@ -20,9 +21,12 @@ class ConnectorAccountResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-link';
 
-    protected static ?string $navigationGroup = 'Модель даних і коннектори';
-
     protected static ?int $navigationSort = 3;
+
+    public static function getNavigationGroup(): ?string
+    {
+        return __('connectors.ui.resource.navigation_group');
+    }
 
     public static function getNavigationLabel(): string
     {
@@ -49,10 +53,12 @@ class ConnectorAccountResource extends Resource
         if ($record instanceof ConnectorAccount) {
             $record->loadMissing([
                 'connectorDefinition',
-                'connectionChecks' => fn ($query) => $query->whereIn('status', [
-                    ConnectorConnectionCheckStatus::Queued,
-                    ConnectorConnectionCheckStatus::Running,
-                ]),
+                'connectionChecks' => fn ($query) => $query
+                    ->select(['id', 'connector_account_id', 'status'])
+                    ->whereIn('status', [
+                        ConnectorConnectionCheckStatus::Queued,
+                        ConnectorConnectionCheckStatus::Running,
+                    ]),
             ]);
         }
 
@@ -85,11 +91,11 @@ class ConnectorAccountResource extends Resource
                             ]),
                         Infolists\Components\TextEntry::make('last_checked_at')
                             ->label(__('connectors.ui.columns.last_check'))
-                            ->dateTime('d.m.Y H:i')
+                            ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
                             ->placeholder(__('connectors.ui.common.dash')),
                         Infolists\Components\TextEntry::make('last_successful_check_at')
                             ->label(__('connectors.ui.columns.last_successful_check'))
-                            ->dateTime('d.m.Y H:i')
+                            ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
                             ->placeholder(__('connectors.ui.common.dash')),
                         Infolists\Components\TextEntry::make('last_error_message_key')
                             ->label(__('connectors.ui.columns.attention'))
@@ -163,13 +169,13 @@ class ConnectorAccountResource extends Resource
                     }),
                 Tables\Columns\TextColumn::make('last_checked_at')
                     ->label(__('connectors.ui.columns.last_check'))
-                    ->dateTime('d.m.Y H:i')
+                    ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
                     ->placeholder(__('connectors.ui.common.dash'))
                     ->sortable()
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('last_successful_check_at')
                     ->label(__('connectors.ui.columns.last_successful_check'))
-                    ->dateTime('d.m.Y H:i')
+                    ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
                     ->placeholder(__('connectors.ui.common.dash'))
                     ->sortable()
                     ->toggleable(),
@@ -218,10 +224,12 @@ class ConnectorAccountResource extends Resource
     {
         return $query->with([
             'connectorDefinition',
-            'connectionChecks' => fn ($connectionChecksQuery) => $connectionChecksQuery->whereIn('status', [
-                ConnectorConnectionCheckStatus::Queued,
-                ConnectorConnectionCheckStatus::Running,
-            ]),
+            'connectionChecks' => fn ($connectionChecksQuery) => $connectionChecksQuery
+                ->select(['id', 'connector_account_id', 'status'])
+                ->whereIn('status', [
+                    ConnectorConnectionCheckStatus::Queued,
+                    ConnectorConnectionCheckStatus::Running,
+                ]),
         ]);
     }
 }

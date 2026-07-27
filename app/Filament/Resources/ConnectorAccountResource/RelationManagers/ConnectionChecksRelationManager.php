@@ -5,11 +5,13 @@ namespace App\Filament\Resources\ConnectorAccountResource\RelationManagers;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Models\ConnectorConnectionCheck;
 use App\Support\Connectors\ConnectorAccountUiState;
+use App\Support\Connectors\ConnectorUiFormatter;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Attributes\On;
 
 class ConnectionChecksRelationManager extends RelationManager
 {
@@ -23,6 +25,12 @@ class ConnectionChecksRelationManager extends RelationManager
     public function isReadOnly(): bool
     {
         return true;
+    }
+
+    #[On('refreshRelationManagers')]
+    public function refreshRelationManagers(): void
+    {
+        $this->resetTable();
     }
 
     public function table(Table $table): Table
@@ -41,7 +49,7 @@ class ConnectionChecksRelationManager extends RelationManager
             ->columns([
                 Tables\Columns\TextColumn::make('created_at')
                     ->label(__('connectors.ui.columns.checked_at'))
-                    ->dateTime('d.m.Y H:i')
+                    ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->label(__('connectors.ui.columns.check_status'))

@@ -13,11 +13,20 @@ use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 
 class ViewConnectorAccount extends ViewRecord
 {
     protected static string $resource = ConnectorAccountResource::class;
+
+    public function getSubheading(): string|Htmlable|null
+    {
+        $disabledReason = app(ConnectorAccountUiState::class)
+            ->manualCheckActionState($this->record)['disabled_reason'];
+
+        return filled($disabledReason) ? $disabledReason : null;
+    }
 
     public function refreshConnectionState(): void
     {
@@ -38,6 +47,13 @@ class ViewConnectorAccount extends ViewRecord
             Action::make('runConnectionCheck')
                 ->label(fn (): string => app(ConnectorAccountUiState::class)
                     ->manualCheckActionState($this->record)['label'])
+                ->tooltip(fn (): ?string => app(ConnectorAccountUiState::class)
+                    ->manualCheckActionState($this->record)['disabled_reason'])
+                ->extraAttributes(fn (): array => filled(app(ConnectorAccountUiState::class)
+                    ->manualCheckActionState($this->record)['disabled_reason'])
+                    ? ['title' => app(ConnectorAccountUiState::class)
+                        ->manualCheckActionState($this->record)['disabled_reason']]
+                    : [])
                 ->icon('heroicon-o-arrow-path')
                 ->authorize('runConnectionCheck')
                 ->disabled(fn (): bool => ! app(ConnectorAccountUiState::class)

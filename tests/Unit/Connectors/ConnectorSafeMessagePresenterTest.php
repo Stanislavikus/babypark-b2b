@@ -3,6 +3,7 @@
 namespace Tests\Unit\Connectors;
 
 use App\Support\Connectors\ConnectorSafeMessagePresenter;
+use Illuminate\Support\Facades\Lang;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -60,7 +61,7 @@ class ConnectorSafeMessagePresenterTest extends TestCase
     {
         app()->setLocale('en');
 
-        app('translator')->addLines([
+        Lang::addLines([
             'connectors.errors.test_param' => 'Safe :name value',
         ], 'en');
 
@@ -76,5 +77,12 @@ class ConnectorSafeMessagePresenterTest extends TestCase
             __('connectors.errors.connection_check_failed'),
             $this->presenter->present(''),
         );
+    }
+
+    #[Test]
+    public function is_allowed_key_uses_lang_has(): void
+    {
+        $this->assertTrue($this->presenter->isAllowedKey('connectors.errors.invalid_credentials'));
+        $this->assertFalse($this->presenter->isAllowedKey('connectors.errors.missing_key_xyz'));
     }
 }

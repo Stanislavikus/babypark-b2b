@@ -5,6 +5,7 @@ namespace App\Support\Connectors;
 use App\Enums\ConnectorAccountConnectionStatus;
 use App\Enums\ConnectorCapability;
 use App\Enums\ConnectorConnectionCheckStatus;
+use App\Enums\ConnectorProfileAvailability;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorConnectionCheck;
 use App\Support\Connectors\Exceptions\ConnectorProfileNotFoundException;
@@ -109,30 +110,30 @@ final class ConnectorAccountUiState
 
     public function profileSupportsManualCheck(ConnectorAccount $account): bool
     {
-        return $this->profileAvailabilityState($account) === 'available';
+        return $this->profileAvailabilityState($account) === ConnectorProfileAvailability::Available;
     }
 
-    public function profileAvailabilityState(ConnectorAccount $account): string
+    public function profileAvailabilityState(ConnectorAccount $account): ConnectorProfileAvailability
     {
         try {
             $definition = $this->profileRegistry->profileDefinition($account->auth_profile);
         } catch (ConnectorProfileNotFoundException) {
-            return 'unavailable';
+            return ConnectorProfileAvailability::ProfileNotFound;
         }
 
         if (! $definition->enabled) {
-            return 'unavailable';
+            return ConnectorProfileAvailability::ProfileDisabled;
         }
 
         if (! $definition->supports(ConnectorCapability::ConnectionCheck)) {
-            return 'unavailable';
+            return ConnectorProfileAvailability::CapabilityUnsupported;
         }
 
-        return 'available';
+        return ConnectorProfileAvailability::Available;
     }
 
     /**
-     * @return array{enabled: bool, label: string}
+     * @return array{enabled: bool, label: string, disabled_reason: ?string}
      */
     public function manualCheckActionState(ConnectorAccount $account): array
     {
@@ -140,13 +141,19 @@ final class ConnectorAccountUiState
             return [
                 'enabled' => false,
                 'label' => __('connectors.ui.actions.run_connection_check'),
+                'disabled_reason' => __('connectors.ui.disabled_reasons.account_disabled'),
             ];
         }
 
-        if ($this->profileAvailabilityState($account) !== 'available') {
+        $profileAvailability = $this->profileAvailabilityState($account);
+
+        if ($profileAvailability !== ConnectorProfileAvailability::Available) {
+            $reasonKey = $profileAvailability->disabledReasonKey();
+
             return [
                 'enabled' => false,
                 'label' => __('connectors.ui.actions.run_connection_check'),
+                'disabled_reason' => $reasonKey !== null ? __($reasonKey) : null,
             ];
         }
 
@@ -154,28 +161,20 @@ final class ConnectorAccountUiState
             return [
                 'enabled' => false,
                 'label' => __('connectors.ui.actions.check_already_active'),
+                'disabled_reason' => __('connectors.ui.disabled_reasons.check_already_active'),
             ];
         }
 
         return [
             'enabled' => true,
             'label' => __('connectors.ui.actions.run_connection_check'),
+            'disabled_reason' => null,
         ];
     }
 
     public function formatDuration(?int $durationMs): ?string
     {
-        if ($durationMs === null) {
-            return null;
-        }
-
-        if ($durationMs < 1000) {
-            return __('connectors.ui.duration.milliseconds', ['value' => $durationMs]);
-        }
-
-        $seconds = round($durationMs / 1000, 1);
-
-        return __('connectors.ui.duration.seconds', ['value' => rtrim(rtrim(number_format($seconds, 1, '.', ''), '0'), '.')]);
+        return ConnectorUiFormatter::formatDuration($durationMs);
     }
 
     public function initiatorLabel(?ConnectorConnectionCheck $check): string

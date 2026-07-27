@@ -257,10 +257,12 @@ class ConnectorAccountResourceTest extends TestCase
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()]);
 
         $html = $component->html();
-        $payload = json_encode($component->instance());
+        $snapshot = json_encode($component->snapshot, JSON_THROW_ON_ERROR);
+        $effects = json_encode($component->effects, JSON_THROW_ON_ERROR);
 
         $this->assertStringNotContainsString(self::CREDENTIAL_CANARY, $html);
-        $this->assertStringNotContainsString(self::CREDENTIAL_CANARY, (string) $payload);
+        $this->assertStringNotContainsString(self::CREDENTIAL_CANARY, $snapshot);
+        $this->assertStringNotContainsString(self::CREDENTIAL_CANARY, $effects);
         $this->assertStringNotContainsString('cs_'.self::CREDENTIAL_CANARY, $html);
     }
 

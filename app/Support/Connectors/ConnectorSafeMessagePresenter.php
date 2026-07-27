@@ -2,6 +2,8 @@
 
 namespace App\Support\Connectors;
 
+use Illuminate\Support\Facades\Lang;
+
 final class ConnectorSafeMessagePresenter
 {
     public const FALLBACK_KEY = 'connectors.errors.connection_check_failed';
@@ -17,13 +19,7 @@ final class ConnectorSafeMessagePresenter
             return __(self::FALLBACK_KEY);
         }
 
-        $translated = __($messageKey, $parameters ?? []);
-
-        if ($translated === $messageKey) {
-            return __(self::FALLBACK_KEY);
-        }
-
-        return $translated;
+        return __($messageKey, $parameters ?? []);
     }
 
     public function isAllowedKey(?string $messageKey): bool
@@ -36,8 +32,6 @@ final class ConnectorSafeMessagePresenter
             return false;
         }
 
-        $translated = __($messageKey);
-
-        return $translated !== $messageKey;
+        return Lang::has($messageKey);
     }
 }
