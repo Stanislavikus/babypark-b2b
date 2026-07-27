@@ -46,24 +46,28 @@ class ConnectorAccountPolicyTest extends TestCase
 
         foreach ([UserRole::Admin, UserRole::Director] as $role) {
             $user = $this->createStaffUser($role);
-            $this->assertTrue(Gate::forUser($user)->allows($ability, $ability === 'create' ? [$account::class, $workspace] : $account));
+            $this->assertTrue(Gate::forUser($user)->allows($ability, $this->policyArguments($ability, $account, $workspace)));
         }
 
         $permissionHolder = $this->createStaffUser(UserRole::Manager);
         $permissionHolder->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
-        $this->assertTrue(Gate::forUser($permissionHolder)->allows($ability, $ability === 'create' ? [$account::class, $workspace] : $account));
+        $this->assertTrue(Gate::forUser($permissionHolder)->allows($ability, $this->policyArguments($ability, $account, $workspace)));
     }
 
     #[Test]
     #[DataProvider('accountAbilityProvider')]
     public function account_abilities_deny_same_roles_in_different_workspace(string $ability): void
     {
+        if ($ability === 'viewAny') {
+            $this->markTestSkipped('viewAny is workspace-scoped via current workspace, not a foreign record.');
+        }
+
         $workspace = $this->defaultWorkspace();
         $otherWorkspace = Workspace::query()->create(['name' => 'Other', 'is_default' => false]);
         $account = $this->createConnectorAccount($otherWorkspace);
         $admin = $this->createStaffUser(UserRole::Admin);
 
-        $this->assertFalse(Gate::forUser($admin)->allows($ability, $ability === 'create' ? [$account::class, $otherWorkspace] : $account));
+        $this->assertFalse(Gate::forUser($admin)->allows($ability, $this->policyArguments($ability, $account, $otherWorkspace)));
     }
 
     #[Test]
@@ -75,7 +79,7 @@ class ConnectorAccountPolicyTest extends TestCase
         $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
         $merchandiser->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
 
-        $this->assertFalse(Gate::forUser($merchandiser)->allows($ability, $ability === 'create' ? [$account::class, $workspace] : $account));
+        $this->assertFalse(Gate::forUser($merchandiser)->allows($ability, $this->policyArguments($ability, $account, $workspace)));
     }
 
     #[Test]
@@ -95,6 +99,7 @@ class ConnectorAccountPolicyTest extends TestCase
     public static function accountAbilityProvider(): array
     {
         return [
+            'viewAny' => ['viewAny'],
             'view' => ['view'],
             'runConnectionCheck' => ['runConnectionCheck'],
             'updateSettings' => ['updateSettings'],
@@ -102,5 +107,17 @@ class ConnectorAccountPolicyTest extends TestCase
             'removeCredentials' => ['removeCredentials'],
             'create' => ['create'],
         ];
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function policyArguments(string $ability, ConnectorAccount $account, Workspace $workspace): array
+    {
+        return match ($ability) {
+            'create' => [ConnectorAccount::class, $workspace],
+            'viewAny' => [ConnectorAccount::class],
+            default => [$account],
+        };
     }
 }

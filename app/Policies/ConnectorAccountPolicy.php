@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\ConnectorAccount;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspaceMembership;
 use App\Support\Workspace\WorkspacePermissions;
 
@@ -13,7 +14,16 @@ class ConnectorAccountPolicy
 {
     public function __construct(
         private readonly WorkspaceMembership $workspaceMembership,
+        private readonly WorkspaceContext $workspaceContext,
     ) {}
+
+    public function viewAny(User $user): bool
+    {
+        return $this->allowsManagementAbilityForWorkspace(
+            $user,
+            $this->workspaceContext->current(),
+        );
+    }
 
     public function view(User $user, ConnectorAccount $connectorAccount): bool
     {
