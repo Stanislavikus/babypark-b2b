@@ -1775,6 +1775,19 @@ human states (queued/waiting, running, succeeded, failed) without queue/job
 terminology. Task 4B-2a ships connection surfaces together with check runtime;
 Task 4B-2b ships Discovery Overview together with discovery runtime.
 
+### Connector runtime state presentation
+
+- The connector account projection remains the stable five-state result.
+- An active connection check is displayed separately:
+  - queued runtime state → localized "Очікує перевірки";
+  - running runtime state → localized "Перевірка виконується".
+- While a check is active, the previous stable account projection remains
+  visible as "Останній результат: …".
+- User-facing text must not expose queue, job, worker, retry, execution
+  attempt, or transport terminology.
+- The runtime state disappears after the check reaches a terminal outcome.
+- Runtime and connection-check history surfaces refresh asynchronously.
+
 ## Empty States and Onboarding Rules
 
 Empty states must help the user take the next action.

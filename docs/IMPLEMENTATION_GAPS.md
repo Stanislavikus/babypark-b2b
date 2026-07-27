@@ -263,9 +263,16 @@ yet), but should be scheduled before any payment gateway integration work starts
   enums, SQLite coverage, and MySQL 8 CI verification.
 - `SyncLog` remains the legacy global summary log and is not reused for connector
   operational history.
-- Runtime adapter implementations, credential-management UI, connection-check
-  execution, discovery execution, snapshot publication, diff computation,
-  retention jobs, and operational UI are still absent.
+- Tasks 4B-2a-1 through 4B-2a-2c merged the Adobe PaaS adapter, OAuth signing,
+  outbound transport (SSRF/response-size), connection-check execution, queue
+  lifecycle, retry/stale recovery, and dispatch service — deployed with worker
+  confirmed running.
+- Task 4B-2a-3 adds the first read/status/check operational admin surface
+  (`ConnectorAccountResource` list/detail/history) on top of that backend chain.
+- Connector-account **creation** and **credential-management/settings UI** remain
+  absent (explicitly out of scope for 4B-2a-3).
+- Discovery execution, snapshot publication, diff computation, retention jobs,
+  and broader operational UI remain absent.
 - `FieldMapping` remains Task 4C.
 
 **Task sequence (GAP-006 remains Open until implementation lands):**
@@ -338,7 +345,7 @@ Connector production-readiness also depends on **GAP-024** (Laravel 11
 framework upgrade) — see that gap for scope and scheduling; it does not block
 this docs promotion or isolated 4B-2a development.
 
-Next task: Task 4B-2a (Connection vertical slice).
+Next task: Task 4B-2b (Discovery vertical slice) after 4B-2a-3 review.
 
 **Task 4B UI handoff:**
 

@@ -1,0 +1,113 @@
+<?php
+
+namespace App\Filament\Resources\ConnectorAccountResource\Pages;
+
+use App\Enums\ConnectorConnectionCheckStatus;
+use App\Filament\Resources\ConnectorAccountResource;
+use App\Filament\Resources\ConnectorAccountResource\RelationManagers\ConnectionChecksRelationManager;
+use App\Models\ConnectorConnectionCheck;
+use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
+use App\Support\Connectors\ConnectorAccountUiState;
+use App\Support\Connectors\ConnectorSafeMessagePresenter;
+use App\Support\Workspace\WorkspaceContext;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
+use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Database\Eloquent\Model;
+
+class ViewConnectorAccount extends ViewRecord
+{
+    protected static string $resource = ConnectorAccountResource::class;
+
+    public function refreshConnectionState(): void
+    {
+        $this->record = $this->resolveRecord($this->record->getKey());
+        $this->record = ConnectorAccountResource::loadAccountPresentationRelations($this->record);
+    }
+
+    protected function getAllRelationManagers(): array
+    {
+        return [
+            ConnectionChecksRelationManager::class,
+        ];
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('runConnectionCheck')
+                ->label(fn (): string => app(ConnectorAccountUiState::class)
+                    ->manualCheckActionState($this->record)['label'])
+                ->icon('heroicon-o-arrow-path')
+                ->authorize('runConnectionCheck')
+                ->disabled(fn (): bool => ! app(ConnectorAccountUiState::class)
+                    ->manualCheckActionState($this->record)['enabled'])
+                ->action(function (): void {
+                    $actor = auth()->user();
+                    $workspaceId = app(WorkspaceContext::class)->id();
+                    $accountId = $this->record->getKey();
+
+                    try {
+                        $checkId = app(ConnectorConnectionCheckDispatchService::class)->executeManual(
+                            $actor,
+                            $workspaceId,
+                            $accountId,
+                        );
+
+                        $check = ConnectorConnectionCheck::query()->findOrFail($checkId);
+
+                        $this->refreshConnectionState();
+
+                        $presenter = app(ConnectorSafeMessagePresenter::class);
+
+                        if (in_array($check->status, [
+                            ConnectorConnectionCheckStatus::Queued,
+                            ConnectorConnectionCheckStatus::Running,
+                        ], true)) {
+                            Notification::make()
+                                ->success()
+                                ->title(__('connectors.ui.notifications.check_started'))
+                                ->send();
+                        } elseif ($check->status === ConnectorConnectionCheckStatus::Succeeded) {
+                            Notification::make()
+                                ->success()
+                                ->title(__('connectors.ui.notifications.check_completed'))
+                                ->send();
+                        } elseif ($check->status === ConnectorConnectionCheckStatus::Failed) {
+                            Notification::make()
+                                ->danger()
+                                ->title(__('connectors.ui.notifications.check_failed'))
+                                ->body($presenter->present(
+                                    $check->user_message_key,
+                                    $check->safe_message_parameters,
+                                ))
+                                ->send();
+                        }
+
+                        $this->dispatch('refreshRelationManagers');
+                    } catch (\Throwable $exception) {
+                        report($exception);
+
+                        Notification::make()
+                            ->danger()
+                            ->title(__('connectors.ui.notifications.action_failed'))
+                            ->send();
+                    }
+                }),
+        ];
+    }
+
+    protected function resolveRecord(int|string $key): Model
+    {
+        $record = parent::resolveRecord($key);
+
+        $record->makeHidden([
+            'credentials',
+            'settings',
+            'base_url',
+            'auth_profile',
+        ]);
+
+        return ConnectorAccountResource::loadAccountPresentationRelations($record);
+    }
+}
