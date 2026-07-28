@@ -121,7 +121,15 @@ class ConnectorAccountDocumentationTest extends TestCase
         $gap006 = $this->gap006Section();
 
         $this->assertMatchesRegularExpression(
-            '/\*\*4B-2a\*\*.*connection list.*connection check\/result UI/s',
+            '/\*\*4B-2a\*\*.*connection-check execution and queue lifecycle/s',
+            $gap006
+        );
+        $this->assertMatchesRegularExpression(
+            '/\*\*4B-2a\*\*.*list\/detail\/history admin UI and current projection/s',
+            $gap006
+        );
+        $this->assertMatchesRegularExpression(
+            '/\*\*4B-2a\*\*.*Done, PRs #87, #89–#94/s',
             $gap006
         );
     }
@@ -152,7 +160,8 @@ class ConnectorAccountDocumentationTest extends TestCase
         $gap006 = $this->gap006Section();
 
         $this->assertStringNotContainsString('blocked on GAP-016', $gap006);
-        $this->assertStringContainsString('GAP-016 and GAP-017 are Closed in code', $gap006);
+        $this->assertStringNotContainsString('GAP-016 and GAP-017 are Closed in code', $gap006);
+        $this->assertStringContainsString('**Status:** Open. Task 4B-2a is complete.', $gap006);
     }
 
     #[Test]
@@ -286,7 +295,12 @@ class ConnectorAccountDocumentationTest extends TestCase
         $gap006 = $this->gap006Section();
 
         $this->assertStringContainsString('GAP-006 stays Open', File::get(base_path('docs/IMPLEMENTATION_GAPS.md')));
-        $this->assertStringContainsString('**Status:** Open. Unblocked', $gap006);
+        $this->assertStringContainsString('**Status:** Open. Task 4B-2a is complete.', $gap006);
+        $this->assertStringNotContainsString('**Status:** Open. Unblocked', $gap006);
+        $this->assertStringNotContainsString(
+            'Runtime connection/discovery behavior and FieldMapping remain unimplemented',
+            $gap006
+        );
     }
 
     #[Test]

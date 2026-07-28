@@ -281,8 +281,8 @@ yet), but should be scheduled before any payment gateway integration work starts
 |---|---|
 | **4B-0** | Stop-and-Amend: architecture docs, six-surface visual contract, documentation tests — Done |
 | **4B-1** | Generic `ConnectorAccount` persistence/domain foundation — Done, PR #85 |
-| **4B-2-0** | Runtime Stop-and-Amend: deployment-family capabilities, adapter/auth, authorization, queue, transaction, retry and SSRF decisions — this task |
-| **4B-2a** | Connection vertical slice: PaaS adapter/auth, credentials settings service and UI, connection list, connection check/result UI, current projection |
+| **4B-2-0** | Runtime Stop-and-Amend: deployment-family capabilities, adapter/auth, authorization, queue, transaction, retry and SSRF decisions — Done |
+| **4B-2a** | Adobe PaaS adapter/OAuth signing, SSRF-safe transport, connection-check execution and queue lifecycle, plus list/detail/history admin UI and current projection — Done, PRs #87, #89–#94 |
 | **4B-2b** | Queued discovery execution, normalization, snapshot publication, and Discovery Overview UI |
 | **4B-2c** | Diff computation, discovery field list, filters, and field inspection |
 | **4B-2d** | Activity history, retention/pruning service, recovery states, and operational polish |
@@ -297,12 +297,10 @@ Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
 - **`ImportedPriceTaxBasis`** (whether an imported row is net or gross) must be
   captured during connector import design — see GAP-018 cross-reference.
 
-**Next task:** Task 4B-2-0 runtime Stop-and-Amend (this cycle), then Task 4B-2a
-connection vertical slice after human approval of runtime decisions.
-
-**Status:** Open. Unblocked — GAP-016 and GAP-017 are Closed in code, and
-Task 4B-1 is merged. Runtime connection/discovery behavior and FieldMapping remain
-unimplemented.
+**Status:** Open. Task 4B-2a is complete. Connector-account creation and
+credential-management/settings UI remain absent. Discovery execution, snapshot
+publication, diff computation, retention jobs, broader operational UI, and
+FieldMapping remain unimplemented.
 
 **Task 4A note (added 2026-07-16):** Task 4A implements the first concrete
 schema for `ConnectorDefinition` and introduces `ConnectorSchemaSource`, plus
@@ -345,7 +343,7 @@ Connector production-readiness also depends on **GAP-024** (Laravel 11
 framework upgrade) — see that gap for scope and scheduling; it does not block
 this docs promotion or isolated 4B-2a development.
 
-Next task: Task 4B-2b (Discovery vertical slice) after 4B-2a-3 review.
+Next task: Task 4B-2b (Discovery vertical slice).
 
 **Task 4B UI handoff:**
 
