@@ -58,6 +58,9 @@ class ConnectorConnectionCheckJobTest extends TestCase
 
         $this->assertCount(1, $middleware);
         $this->assertInstanceOf(WithoutOverlapping::class, $middleware[0]);
+        $this->assertSame(120, $middleware[0]->expiresAfter);
+        $this->assertSame(30, $middleware[0]->releaseAfter);
+        $this->assertTrue($middleware[0]->shareKey);
     }
 
     #[Test]

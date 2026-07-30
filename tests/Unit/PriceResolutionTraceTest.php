@@ -178,7 +178,12 @@ class PriceResolutionTraceTest extends TestCase
             validUntil: CarbonImmutable::parse('2026-01-01'),
         );
 
-        $result = $this->resolver->resolveWithTrace($variant, $customer, 5);
+        $result = $this->resolver->resolveWithTrace(
+            $variant,
+            $customer,
+            5,
+            CarbonImmutable::parse('2026-07-15'),
+        );
 
         $customerSteps = collect($result->trace->steps)
             ->filter(fn ($step) => $step->source === PriceResolutionSource::CustomerPriceList)

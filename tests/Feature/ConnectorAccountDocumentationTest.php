@@ -304,6 +304,30 @@ class ConnectorAccountDocumentationTest extends TestCase
     }
 
     #[Test]
+    public function ui_design_system_documents_discovery_overview_diff_summary_timing(): void
+    {
+        $content = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
+
+        $this->assertStringContainsString(
+            'diff summary, when diff computation is available from Task 4B-2c',
+            $content
+        );
+    }
+
+    #[Test]
+    public function implementation_gaps_records_task_4b2b0_runtime_prerequisite(): void
+    {
+        $gap006 = $this->gap006Section();
+
+        $this->assertStringContainsString('**Task 4B-2b-0 note (added 2026-07-29):**', $gap006);
+        $this->assertStringContainsString('database_connectors', $gap006);
+        $this->assertMatchesRegularExpression(
+            '/Prerequisite for\s+Task 4B-2b-1 discovery execution/',
+            $gap006
+        );
+    }
+
+    #[Test]
     public function prototype_desktop_and_mobile_screenshots_are_distinct(): void
     {
         $dir = base_path('docs/prototypes/task-4b0-connector-account/screenshots');
@@ -589,6 +613,18 @@ class ConnectorAccountDocumentationTest extends TestCase
         $this->assertStringContainsString('### Connector timeout and retry policy (Resolved)', $connectorRuntime);
         $this->assertStringContainsString('### Queue timeout alignment (Resolved)', $connectorRuntime);
         $this->assertStringContainsString('`pcntl` PHP extension', $connectorRuntime);
+        $this->assertStringContainsString('database_connectors', $connectorRuntime);
+        $this->assertStringContainsString('Connection check and discovery use the same shared account-level lock key', $connectorRuntime);
+        $this->assertMatchesRegularExpression(
+            '/its relationship\s+to `retry_after` is lane-specific and must follow the Queue timeout alignment\s+table below/',
+            $connectorRuntime
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            "/bounded TTL above each job's timeout and its lane's\s+`retry_after`/",
+            $connectorRuntime
+        );
+        $this->assertStringContainsString('1100 seconds for the future 900-second discovery job', $connectorRuntime);
+        $this->assertStringContainsString('`deploy.sh` runs `php artisan queue:restart`', $connectorRuntime);
         $this->assertStringContainsString('### SSRF-safe connector outbound transport', $connectorRuntime);
         $this->assertStringContainsString('CURLOPT_RESOLVE', $connectorRuntime);
         $this->assertStringContainsString('### Connector secret lifecycle (Resolved)', $connectorRuntime);
@@ -596,9 +632,11 @@ class ConnectorAccountDocumentationTest extends TestCase
 
         $this->assertStringContainsString('**Task 4B-2-0 note (added 2026-07-22):**', $gaps);
         $this->assertStringContainsString('SaaS `Store`-header vs `store_code` reuse (B3)', $gaps);
-        $this->assertStringContainsString('Production queue-worker verification', $gaps);
-        $this->assertStringContainsString('non-blocking for 4B-2a', $gaps);
+        $this->assertStringContainsString('The B9 repository implementation and host-prerequisite verification are', $gaps);
+        $this->assertStringContainsString('complete: this PR adds `php artisan queue:restart` to `deploy.sh`', $gaps);
+        $this->assertStringContainsString('babypark-connector-queue` remains intentionally uninstalled and is deferred until Task 4B-2b-1', $gaps);
         $this->assertStringContainsString('**GAP-024**', $gaps);
+        $this->assertStringContainsString('does **not** close GAP-024', $gaps);
     }
 
     #[Test]

@@ -1741,7 +1741,7 @@ Applies to workspace-owned external connections (ERP, commerce platforms, feeds)
    replace credentials; **403** → update integration role/scopes — never a
    generic “Connection failed” when cause is known.
 4. **Discovery overview** — run status, source, captured time, field counts,
-   diff summary, first-snapshot label, link to current snapshot.
+   diff summary, when diff computation is available from Task 4B-2c, first-snapshot label, link to current snapshot.
 5. **Discovery field list** — Data List Search & Filter Pattern (search visible,
    filters in right-side slide-over, badge semantics, mobile single overflow).
    Hundreds of fields → list + detail drawer/page, not accordion.

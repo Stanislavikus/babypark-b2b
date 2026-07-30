@@ -182,9 +182,14 @@ class ConnectorConnectionCheckJobAdvancedTest extends TestCase
     public function queue_alignment_values_match_committed_configuration(): void
     {
         $this->assertSame(90, (int) config('queue.connections.database.retry_after'));
+        $this->assertSame(1200, (int) config('queue.connections.database_connectors.retry_after'));
 
         $compose = file_get_contents(base_path('docker-compose.yml'));
         $this->assertStringContainsString('php artisan queue:work --sleep=3 --tries=3 --max-time=3600', $compose);
+        $this->assertStringContainsString(
+            'php artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600',
+            $compose
+        );
 
         $dockerfile = file_get_contents(base_path('docker/php/Dockerfile'));
         $this->assertStringContainsString('pcntl', $dockerfile);
