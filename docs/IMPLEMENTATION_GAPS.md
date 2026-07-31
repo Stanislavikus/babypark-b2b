@@ -331,19 +331,48 @@ the Task 4B-2a connection vertical slice but also discovery execution,
 diff computation, retention/pruning, and operational recovery states across
 4B-2b–4B-2d. Approved patches promoted into `03-DOMAIN_MODEL.md`,
 `04-ARCHITECTURE_PRINCIPLES.md`, `05-AI_WORKING_AGREEMENT.md`,
-`06-UI_DESIGN_SYSTEM.md`, and `07-TECH_STACK.md` in this same PR. Two items
-remain explicitly open, non-blocking for 4B-2a:
+`06-UI_DESIGN_SYSTEM.md`, and `07-TECH_STACK.md` in this same PR. One runtime-design item remains explicitly open and non-blocking for
+the completed 4B-2a scope:
 - SaaS `Store`-header vs `store_code` reuse (B3) — deferred to future SaaS work;
-- Production queue-worker verification and `deploy.sh` restart step (B9) — a
-  deployment prerequisite before connection-check/discovery go live, not a
-  blocker for building/testing 4B-2a locally or in CI (docker-compose already
-  provides a `queue` service).
+
+The B9 repository implementation and host-prerequisite verification are
+complete: this PR adds `php artisan queue:restart` to `deploy.sh`, and the
+pilot host was verified on 2026-07-31 to use the `database` cache store
+with a running Supervisor-managed default worker and `autorestart=true`.
+
+The amended `deploy.sh` has not yet been executed on the production host
+because this PR has not been merged or deployed. Its first real execution
+belongs to the normal post-merge deployment verification and is not
+evidence that the dedicated connector worker is installed.
+
+Verified on 2026-07-31 (pilot host):
+- existing `babypark-queue:babypark-queue_00` confirmed `RUNNING`;
+- PHP path confirmed as `/usr/bin/php`;
+- `pcntl` confirmed installed;
+- active cache store confirmed as `database`;
+- `lock_connection=null` resolves to the cache store's default DB connection (confirmed directly from the installed `laravel/framework` v11.54.0 source, `Illuminate\Cache\CacheManager::createDatabaseDriver`);
+- `lock_table=null` resolves to `cache_locks` (same source);
+- `cache` and `cache_locks` tables confirmed present with their expected structures (`key`/`value`/`expiration` and `key`/`owner`/`expiration`);
+- dedicated `babypark-connector-queue` remains intentionally uninstalled and is deferred until Task 4B-2b-1 introduces a real discovery job.
 
 Connector production-readiness also depends on **GAP-024** (Laravel 11
-framework upgrade) — see that gap for scope and scheduling; it does not block
-this docs promotion or isolated 4B-2a development.
+framework upgrade) — see that gap for scope and scheduling; closing the B9
+host-verification item does **not** close GAP-024 or make the connector
+runtime production-ready. GAP-024 does not block this docs promotion or
+isolated 4B-2a development.
 
 Next task: Task 4B-2b (Discovery vertical slice).
+
+**Task 4B-2b-0 note (added 2026-07-29):** Runtime alignment PR — adds
+`database_connectors` / `connectors` queue lane (`retry_after` 1200s), dedicated
+connector worker config (docker-compose + deferred Supervisor installation for
+the pilot host), and `deploy.sh` `queue:restart`. Connection-check lane unchanged.
+B9 host-prerequisite verification completed 2026-07-31 (default worker `RUNNING`,
+`database` cache/lock store confirmed). Dedicated `babypark-connector-queue`
+remains intentionally uninstalled until Task 4B-2b-1 introduces a discovery job.
+Prerequisite for Task 4B-2b-1 discovery execution; no discovery job or
+FieldMapping in this task. GAP-024 remains Open as the separate connector
+production-readiness blocker.
 
 **Task 4B UI handoff:**
 

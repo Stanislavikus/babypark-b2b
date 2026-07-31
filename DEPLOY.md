@@ -1,17 +1,165 @@
 # Deployment Guide — DigitalOcean
 
-This guide covers deploying **BabyPark B2B** on DigitalOcean using a single Droplet with Docker Compose.  
-For managed databases and production hardening, see the sections below.
+This repository documents **two deployment families**. Read the section that matches
+your environment — they are not interchangeable.
+
+| Section | When to use |
+|---------|-------------|
+| **[Current Supervisor-based pilot deployment](#current-supervisor-based-pilot-deployment)** | **Active today** for the Babypark pilot: bare Ubuntu host, native PHP, MySQL, `database` queue driver, Supervisor-managed default worker (`babypark-queue`), repo-root `deploy.sh`. Connector worker (`babypark-connector-queue`) is planned — not yet installed. |
+| **[Docker Compose reference deployment](#docker-compose-reference-deployment)** | Local full-stack parity and a possible future containerized layout. **Not** the current pilot's actual production setup (user-confirmed: production host does not run `docker compose`). |
 
 ---
 
-## Architecture Overview
+## Current Supervisor-based pilot deployment
+
+The Babypark pilot runs on a bare host (not Docker Compose). The default queue
+worker (`babypark-queue`) is managed by Supervisor today and was verified
+`RUNNING` on 2026-07-31. A second connector worker (`babypark-connector-queue`) is
+**intentionally not installed yet** — deferred until Task 4B-2b-1 introduces a
+discovery job that requires it. Deploys use the repo-root `deploy.sh` script run
+directly on the server.
+
+### Architecture overview (pilot)
+
+```
+Internet → Nginx → PHP-FPM (Laravel, /var/www/babypark-b2b)
+                    ├── MySQL 8 (native or managed)
+                    ├── Cache / locks (`database` store — verified on pilot host 2026-07-31)
+                    ├── Supervisor: babypark-queue (existing — default connection, short jobs)
+                    └── Supervisor: babypark-connector-queue (intentionally deferred until Task 4B-2b-1 — database_connectors, long discovery lane)
+```
+
+### Application path
+
+Typical checkout path (adjust if your host differs):
+
+```text
+/var/www/babypark-b2b
+```
+
+### Deploy (pilot)
+
+On the server, from the application directory:
+
+```bash
+cd /var/www/babypark-b2b
+./deploy.sh
+```
+
+`deploy.sh` runs `git pull`, `composer install --no-dev`, `npm ci`, `npm run build`,
+`php artisan optimize:clear`, and **`php artisan queue:restart`**.
+
+**`queue:restart` dependencies (must be true on the host):**
+
+1. **Shared cache store** — restart signals are delivered through the cache layer.
+   The pilot host uses the `database` cache/lock store (`cache` + `cache_locks`
+   tables), verified on 2026-07-31 via `php artisan config:show cache`.
+2. **Supervisor `autorestart=true`** — each worker must exit gracefully after
+   `queue:restart` and be restarted by Supervisor (`babypark-queue` today;
+   `babypark-connector-queue` once installed).
+
+### Current and planned queue workers (pilot)
+
+Two separate workers are required once Task 4B-2b-1 enables discovery
+execution — they must never be merged into one process. Until a real
+discovery job exists, only the existing default worker is required on the
+pilot host; the dedicated connector worker remains intentionally deferred.
+
+Only `babypark-queue` exists on the pilot host today; `babypark-connector-queue` is
+intentionally not installed until Task 4B-2b-1 introduces a discovery job that
+requires it. The connector worker command below is the **approved planned command**, not proof of
+an active process — read the live `babypark-queue` command from
+`/etc/supervisor/conf.d/babypark-queue.conf` rather than assuming the table values.
+
+| Supervisor program | Status | Queue connection | Queue name | Worker command |
+|--------------------|--------|------------------|------------|----------------|
+| `babypark-queue` | **existing** (read live config from host) | `database` (default) | `default` | *(read from `/etc/supervisor/conf.d/babypark-queue.conf` — illustrative only: `php artisan queue:work --sleep=3 --tries=3 --max-time=3600`)* |
+| `babypark-connector-queue` | **deferred** (not installed until Task 4B-2b-1) | `database_connectors` | `connectors` | *(approved planned command — not active until installed: `php artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600`)* |
+
+Connection-check jobs stay on the **default** lane (45s job timeout, 90s
+`retry_after`). Future discovery jobs use the **connector** lane (900s job
+timeout, 1200s `retry_after`). Both share the same account-level
+`WithoutOverlapping` lock key via the cache store.
+
+Ensure the `pcntl` PHP extension is installed (`php -m | grep -i '^pcntl$'`).
+
+### Verified current pilot state (2026-07-31)
+
+Host-prerequisite verification was completed on 2026-07-31 using read-only commands
+on the pilot host.
+
+**Active production cache store** (`php artisan config:show cache`):
+
+- default: `database`
+- `stores.database.connection`: `null` (→ default DB connection)
+- `stores.database.lock_connection`: `null` (→ same DB connection, per
+  `Illuminate\Cache\CacheManager::createDatabaseDriver` in installed
+  `laravel/framework` v11.54.0: `$config['lock_connection'] ?? $config['connection'] ?? null`)
+- `stores.database.lock_table`: `null` (→ falls back to `cache_locks`, per the same
+  source: `$config['lock_table'] ?? 'cache_locks'`)
+
+**Cache tables confirmed present:**
+
+- `cache`: columns `key` (varchar 255), `value` (mediumtext), `expiration` (int);
+  primary key on `key`
+- `cache_locks`: columns `key` (varchar 255), `owner` (varchar 255),
+  `expiration` (int); primary key on `key`
+
+**Existing Supervisor worker:**
+
+- `babypark-queue` registered as `babypark-queue:babypark-queue_00` (due to
+  `process_name` templating), confirmed `RUNNING`
+- Supervisor `user`: `root` (from existing `babypark-queue.conf`)
+
+**PHP path:**
+
+- `command -v php` on the host resolves to `/usr/bin/php`
+- The live `babypark-queue.conf` currently contains
+  `command=php /var/www/babypark-b2b/artisan queue:work ...` (bare `php`, resolved
+  via `PATH` at runtime), **not** the absolute path
+- A future connector-worker command (installed in Task 4B-2b-1) should use the
+  verified absolute path `/usr/bin/php` — that is a decision for that later
+  installation, not a claim about what the current config already contains
+
+**`pcntl`:** installed (`php -m | grep -i '^pcntl$'` confirms `pcntl`)
+
+### Deferred connector-worker installation
+
+The second worker (`babypark-connector-queue`) is **not installed** because no
+discovery job exists yet to process — **not** because host values remain unknown
+(see verified state above). Installation is deferred to Task 4B-2b-1's own deployment
+step, when a real discovery job requires a dedicated persistent worker.
+
+When Task 4B-2b-1 installs the connector worker, mirror the live `babypark-queue`
+Supervisor block for logging conventions and create
+`/etc/supervisor/conf.d/babypark-connector-queue.conf` with the approved planned
+command:
+
+```text
+php artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600
+```
+
+Use `/usr/bin/php` explicitly in the `command=` line. Then run
+`supervisorctl reread`, `supervisorctl update`, and `supervisorctl status`.
+
+---
+
+## Docker Compose reference deployment
+
+> **Reference only** — illustrates a containerized layout for local development and
+> possible future use. **Not** the Babypark pilot's current production mechanism.
+
+This guide covers deploying **BabyPark B2B** on DigitalOcean using a single Droplet with Docker Compose.
+For managed databases and production hardening, see the sections below.
+
+### Architecture Overview
 
 ```
 Internet → Nginx (port 80/443) → PHP-FPM (Laravel)
                                   ├── MySQL 8  (Docker volume)
                                   ├── Redis 7  (Docker volume)
-                                  ├── Queue worker (artisan queue:work)
+                                  ├── Queue worker (artisan queue:work — default lane)
+                                  ├── Connector queue worker (database_connectors / connectors lane)
                                   └── Scheduler (artisan schedule:run every 60s)
 ```
 

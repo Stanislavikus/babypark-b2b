@@ -277,11 +277,15 @@ full-stack; production must verify worker + deploy restart separately —
   corresponding queued or executing job.
 
 - **Concurrent execution prevention:** `WithoutOverlapping("connector-account:{id}")`
-  with `->shared()`, `->releaseAfter(30)`, and `->expireAfter(120)` across the
-  connection-check and discovery job classes — one account-level lock; check and
-  discovery must not overlap for the same account. On the `database` cache driver,
-  `expireAfter(0)` falls back to ~24h; `expireAfter(120)` replaces that with a
-  bounded TTL above the 45s job timeout and 90s `retry_after`.
+  with `->shared()` and `->releaseAfter(30)` across the connection-check and
+  discovery job classes — one account-level lock; check and discovery must not
+  overlap for the same account. On the `database` cache driver, `expireAfter(0)`
+  falls back to ~24h; use a bounded TTL above each job's timeout; its relationship
+  to `retry_after` is lane-specific and must follow the Queue timeout alignment
+  table below. Connection check and discovery use the same shared account-level lock key
+  and the same `releaseAfter(30)`, but each job uses an expiry appropriate
+  to its maximum runtime: 120 seconds for the 45-second connection check,
+  and 1100 seconds for the future 900-second discovery job.
 
 - **Connection-check retry (Task 4B-2a-2c):** classified `AutomaticRetry`
   results use manual `release($delay)` — not `backoff()`. Unhandled exceptions
@@ -337,7 +341,22 @@ run; max 2 queue attempts; backoff 60s/300s with jitter; same non-retryable
 
 ### Queue timeout alignment (Resolved)
 
-For every connector queue:
+Two queue **lanes** share one physical `jobs` table (Laravel `database` driver
+filters by the `queue` column) but use separate connections/workers so long
+discovery runs do not block short connection checks:
+
+| Lane | Connection | Queue name | Job timeout | Lock `expireAfter` | `retry_after` | Worker `--timeout` |
+|------|------------|------------|-------------|-------------------|---------------|-------------------|
+| Connection check (shipped) | `database` (default) | `default` | 45s | 120s | 90s | (default worker; no extra `--timeout`) |
+| Discovery (Task 4B-2b-1+) | `database_connectors` | `connectors` | 900s | 1100s | 1200s | 900s |
+
+The `900` / `1100` / `1200` ordering is a deliberately chosen operational margin
+(not an industry standard): `retry_after`'s clock starts when the queue reserves
+the job; `WithoutOverlapping` acquires its lock slightly later in the middleware
+pipeline — setting `expireAfter` equal to `retry_after` would create a narrow race
+where the lock could still be held when `retry_after` makes the job available again.
+
+For every connector queue lane:
 - job `$timeout` must be shorter than the queue connection's `retry_after`;
 - worker `--timeout` must also be shorter than `retry_after`;
 - `retry_after` must exceed the longest supported connector job timeout by a
@@ -349,17 +368,33 @@ For every connector queue:
   connector queue connection still uses a shorter `retry_after` — verify and,
   if needed, raise `retry_after` for the connector queue connection before
   enabling discovery. Task 4B-2a establishes and verifies the queue/worker
-  foundation required for connection checks; it does not implement discovery
-  execution.
+  foundation required for connection checks; Task 4B-2b-0 adds the
+  `database_connectors` / `connectors` lane prepared for discovery execution.
 
 The exact production values must be verified against `config/queue.php` and
 the process-manager (`supervisor`/`docker-compose`) worker command — do not
 assume defaults are already aligned.
 
 **Verified (Task 4B-2a-2c):** `config/queue.php` `database.retry_after` = 90s;
-job timeout = 45s; `docker-compose.yml` queue worker =
+connection-check job timeout = 45s; lock `expireAfter` = 120s; default-lane
+`docker-compose.yml` queue worker =
 `php artisan queue:work --sleep=3 --tries=3 --max-time=3600`; `pcntl` present
 in `docker/php/Dockerfile`; `cache_locks` table from standard cache migration.
+
+**Prepared (Task 4B-2b-0):** `database_connectors` connection with
+`retry_after` = 1200s (`CONNECTOR_QUEUE_RETRY_AFTER`); dedicated worker
+`php artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600`
+(`connector-queue` service in `docker-compose.yml`; planned
+`babypark-connector-queue` Supervisor program for the pilot host).
+Production Supervisor, PHP path, pcntl availability, and the active
+`database` cache/lock store were verified on the pilot host. The
+dedicated `babypark-connector-queue` worker is intentionally not created
+yet — it is deferred until Task 4B-2b-1 introduces a discovery job that
+actually needs it. Connection-check connection, queue,
+timeout (45s), and lock `expireAfter` (120s) are **unchanged**. Repo-root
+`deploy.sh` runs `php artisan queue:restart` after `optimize:clear`; that signal
+requires the verified shared `database` cache store and
+Supervisor `autorestart=true` on each worker program.
 
 ### SSRF-safe connector outbound transport
 
