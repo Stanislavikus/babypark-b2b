@@ -80,7 +80,7 @@ class ConnectorAccountFoundationTest extends TestCase
     #[Test]
     public function migration_rolls_back_cleanly(): void
     {
-        $this->artisan('migrate:rollback', ['--step' => 2]);
+        $this->rollbackThrough('2026_07_21_100000_connector_account_foundation');
 
         foreach ([
             'connector_schema_diff_items',
@@ -95,6 +95,27 @@ class ConnectorAccountFoundationTest extends TestCase
         }
 
         $this->artisan('migrate');
+    }
+
+    private function rollbackThrough(string $targetMigration): void
+    {
+        $migrations = DB::table('migrations')
+            ->orderByDesc('batch')
+            ->orderByDesc('migration')
+            ->pluck('migration')
+            ->values();
+
+        $position = $migrations->search($targetMigration);
+
+        $this->assertNotSame(
+            false,
+            $position,
+            "Target migration is not recorded as applied: {$targetMigration}",
+        );
+
+        $this->artisan('migrate:rollback', [
+            '--step' => ((int) $position) + 1,
+        ])->assertExitCode(0);
     }
 
     #[Test]

@@ -43,7 +43,7 @@ class ConnectorDiscoveryRunMigrationTest extends TestCase
     {
         $this->assertColumnSchema('execution_attempts', [
             'sqlite_type' => 'INTEGER',
-            'mysql_type' => 'tinyint',
+            'mysql_type' => 'tinyint unsigned',
             'nullable' => false,
             'default' => '0',
         ]);
@@ -89,7 +89,7 @@ class ConnectorDiscoveryRunMigrationTest extends TestCase
     #[Test]
     public function down_removes_index_and_columns_and_up_succeeds_again(): void
     {
-        $this->artisan('migrate:rollback', ['--step' => 1])->assertExitCode(0);
+        $this->rollbackThrough('2026_08_01_184500_connector_discovery_run_queue_lifecycle');
 
         $this->assertFalse(Schema::hasColumn(self::TABLE, 'execution_attempts'));
         $this->assertFalse(Schema::hasColumn(self::TABLE, 'retry_until_at'));
@@ -144,7 +144,7 @@ class ConnectorDiscoveryRunMigrationTest extends TestCase
         );
 
         $this->assertNotNull($info, "MySQL information_schema missing column: {$column}");
-        $this->assertStringContainsString($expected['mysql_type'], strtolower((string) $info->column_type), "{$column} MySQL type");
+        $this->assertSame($expected['mysql_type'], strtolower((string) $info->column_type), "{$column} MySQL type");
         $this->assertSame($expected['nullable'] ? 'YES' : 'NO', $info->is_nullable, "{$column} MySQL nullability");
 
         if ($expected['default'] === null) {
@@ -209,5 +209,26 @@ class ConnectorDiscoveryRunMigrationTest extends TestCase
         );
 
         return $result !== [];
+    }
+
+    private function rollbackThrough(string $targetMigration): void
+    {
+        $migrations = DB::table('migrations')
+            ->orderByDesc('batch')
+            ->orderByDesc('migration')
+            ->pluck('migration')
+            ->values();
+
+        $position = $migrations->search($targetMigration);
+
+        $this->assertNotSame(
+            false,
+            $position,
+            "Target migration is not recorded as applied: {$targetMigration}",
+        );
+
+        $this->artisan('migrate:rollback', [
+            '--step' => ((int) $position) + 1,
+        ])->assertExitCode(0);
     }
 }

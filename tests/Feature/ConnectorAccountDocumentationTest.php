@@ -809,10 +809,34 @@ class ConnectorAccountDocumentationTest extends TestCase
         $this->assertStringContainsString('`discovery_account_disabled_before_execution`', $section);
         $this->assertStringContainsString('`discovery_source_invalid_before_execution`', $section);
 
-        $this->assertStringContainsString("'transport_response_size_exceeded'", $section);
+        $this->assertStringContainsString('`transport_response_size_exceeded`', $section);
         $this->assertStringContainsString("'discovery_pagination_limit_exceeded'", $section);
         $this->assertStringContainsString("'discovery_incomplete_pagination'", $section);
         $this->assertStringContainsString("'discovery_schema_validation_failed'", $section);
+
+        $this->assertStringContainsString('is a **superset** of the', $section);
+        $this->assertStringContainsString('**Shared `automatic_retry` result codes (verbatim reuse):**', $section);
+
+        foreach ([
+            ['AdobeRequestTimeout', 'adobe_request_timeout'],
+            ['AdobeRateLimited', 'adobe_rate_limited'],
+            ['AdobeVendorUnavailable', 'adobe_vendor_unavailable'],
+            ['TransportDnsResolutionFailed', 'transport_dns_resolution_failed'],
+            ['TransportTimeout', 'transport_timeout'],
+            ['TransportConnectionFailed', 'transport_connection_failed'],
+        ] as [$case, $value]) {
+            $this->assertStringContainsString("| `{$case}` | `{$value}` |", $section);
+            $this->assertMatchesRegularExpression(
+                "/\| `{$case}` \| `{$value}` \| [^|]+ \| `automatic_retry` \|/s",
+                $section,
+                "Expected {$case} to be documented as automatic_retry in the discovery result table",
+            );
+        }
+
+        $this->assertStringContainsString(
+            'does **not** define a separate gateway-specific code',
+            $section
+        );
 
         $this->assertStringContainsString(
             '**`discovery_attempts_exhausted_without_result` never overwrites the',

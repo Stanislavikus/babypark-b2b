@@ -2013,26 +2013,48 @@ attempts ran out — that case is what can legitimately drive a
 below), not the lifecycle code itself. None of these five lifecycle codes
 overwrite an already-persisted vendor result.
 
-A separate, richer **`ConnectorDiscoveryRunErrorCode`** (mirroring
-`ConnectorConnectionCheckErrorCode` exactly) covers vendor/HTTP/schema
-outcomes — every case has an exact string value, `Cause`, `Actionability`,
-message key, and technical summary, the same as connection-check's own
-result enum:
+A separate, richer **`ConnectorDiscoveryRunErrorCode`** is a **superset** of the
+existing **`ConnectorConnectionCheckErrorCode`**. Every shared Adobe OAuth/HTTP/
+transport case name, string value, `Cause`, `Actionability`, message key, HTTP-
+status acceptance, and HTTP-vs-transport classification is reused **verbatim** —
+discovery does not rename, re-derive, or substitute competing terms for any
+shared case. The full shared vocabulary (Adobe OAuth identifiers, HTTP fallback,
+and transport cases) is defined once in `ConnectorConnectionCheckErrorCode` (see
+`ConnectorConnectionCheckErrorCode enum vocabulary` below) and applies unchanged
+to discovery result persistence on `connector_discovery_runs.error_code`.
+
+Discovery additionally defines exactly three discovery-specific result codes
+(no connection-check equivalent to reuse):
 
 | Code | Cause | Actionability | Message key | Technical summary |
 |---|---|---|---|---|
-| `TransportResponseSizeExceeded = 'transport_response_size_exceeded'` | `schema_validation` | `support_required` | `connectors.errors.unexpected_response` | (reused verbatim from connection-check's own value/mapping — do not rename) |
 | `DiscoveryPaginationLimitExceeded = 'discovery_pagination_limit_exceeded'` | `schema_validation` | `support_required` | `connectors.errors.discovery_failed` | `pagination_limit_exceeded` |
 | `DiscoveryIncompletePagination = 'discovery_incomplete_pagination'` | `schema_validation` | `support_required` | `connectors.errors.discovery_failed` | `incomplete_pagination` |
 | `DiscoverySchemaValidationFailed = 'discovery_schema_validation_failed'` | `schema_validation` | `support_required` | `connectors.errors.discovery_failed` | `schema_validation_failed` |
 
-`TransportResponseSizeExceeded` is mapped from
+**Shared `automatic_retry` result codes (verbatim reuse):** exactly these six
+shared cases retain `AutomaticRetry` actionability in discovery — no more, no
+fewer (same grouped match arm as
+`ConnectorConnectionCheckErrorCode::actionability()`):
+
+| Code | String value | Cause | Actionability | Message key |
+|---|---|---|---|---|
+| `AdobeRequestTimeout` | `adobe_request_timeout` | `network` | `automatic_retry` | `connectors.errors.timeout` |
+| `AdobeRateLimited` | `adobe_rate_limited` | `rate_limit` | `automatic_retry` | `connectors.errors.rate_limited` |
+| `AdobeVendorUnavailable` | `adobe_vendor_unavailable` | `vendor_unavailable` | `automatic_retry` | `connectors.errors.vendor_unavailable` |
+| `TransportDnsResolutionFailed` | `transport_dns_resolution_failed` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
+| `TransportTimeout` | `transport_timeout` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
+| `TransportConnectionFailed` | `transport_connection_failed` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
+
+HTTP 5xx / gateway outcomes map to the existing `AdobeVendorUnavailable` case —
+discovery does **not** define a separate gateway-specific code.
+
+`TransportResponseSizeExceeded` (`transport_response_size_exceeded`) is a
+shared case reused verbatim from connection-check; it is mapped from
 `TransportFailureReason::ResponseSizeExceeded` via a new
 `AdobePaaSDiscoveryTransportMapper` mirroring
 `AdobePaaSConnectionCheckTransportMapper` exactly — reusing the existing
-term, not inventing a competing one. The other three codes use a
-`discovery_` prefix since they have no connection-check equivalent to
-reuse.
+term, not inventing a competing one.
 
 **Pagination-error precedence (Resolved)** — explicit order, so
 implementation and tests cannot disagree on an overlapping case (e.g.
