@@ -696,6 +696,80 @@ class ConnectorAccountDocumentationTest extends TestCase
     }
 
     #[Test]
+    public function domain_model_documents_connector_schema_canonical_hashing_contract(): void
+    {
+        $section = $this->connectorSchemaCanonicalHashingSection();
+
+        $this->assertStringContainsString('babypark.connector-schema-field.v1', $section);
+        $this->assertStringContainsString('babypark.connector-schema-snapshot.v1', $section);
+        $this->assertStringContainsString('0x0A', $section);
+        $this->assertStringContainsString('no carriage return, and no', $section);
+        $this->assertStringContainsString('trailing newline after the JSON document', $section);
+        $this->assertStringContainsString('JSON_UNESCAPED_UNICODE', $section);
+        $this->assertStringContainsString('JSON_UNESCAPED_SLASHES', $section);
+        $this->assertStringContainsString('JSON_THROW_ON_ERROR', $section);
+        $this->assertStringContainsString('`JSON_FORCE_OBJECT` is forbidden', $section);
+        $this->assertStringContainsString('`JSON_PRETTY_PRINT`', $section);
+        $this->assertStringContainsString('`JSON_NUMERIC_CHECK`', $section);
+        $this->assertStringContainsString('`JSON_INVALID_UTF8_IGNORE`', $section);
+        $this->assertStringContainsString('`JSON_INVALID_UTF8_SUBSTITUTE`', $section);
+        $this->assertStringContainsString('`JSON_PARTIAL_OUTPUT_ON_ERROR`', $section);
+        $this->assertStringContainsString('SHA-256', $section);
+        $this->assertStringContainsString('`char(64)`', $section);
+
+        foreach ([
+            'external_field_key',
+            'external_label',
+            'normalized_data_type',
+            'is_required',
+            'is_multi_value',
+            'is_localizable',
+            'external_scope',
+            'normalized_payload',
+            'sort_order',
+        ] as $fieldName) {
+            $this->assertStringContainsString('`'.$fieldName.'`', $section);
+        }
+
+        $this->assertStringContainsString('`external_field_key`: UTF-8 string;', $section);
+        $this->assertStringContainsString('`external_label`: UTF-8 string or `null`;', $section);
+        $this->assertStringContainsString('`normalized_data_type`: UTF-8 string;', $section);
+        $this->assertStringContainsString('`is_required`: boolean or `null`;', $section);
+        $this->assertStringContainsString('`is_multi_value`: boolean or `null`;', $section);
+        $this->assertStringContainsString('`is_localizable`: boolean or `null`;', $section);
+        $this->assertStringContainsString('`external_scope`: UTF-8 string or `null`;', $section);
+        $this->assertStringContainsString('`normalized_payload`: JSON object', $section);
+        $this->assertStringContainsString('`sort_order`: non-negative integer or `null`.', $section);
+
+        $this->assertStringContainsString('Boolean fields must be encoded as JSON `true`/`false`/`null`, never as', $section);
+        $this->assertStringContainsString('`0`, `1`, `"0"`, or `"1"`', $section);
+        $this->assertStringContainsString('`null` and an empty', $section);
+        $this->assertStringContainsString('string are distinct canonical values', $section);
+        $this->assertStringContainsString('String fields must never be converted to', $section);
+        $this->assertStringContainsString('numbers merely because their contents are numeric', $section);
+
+        $this->assertStringContainsString('`value`: non-null UTF-8 string;', $section);
+        $this->assertStringContainsString('`label`: UTF-8 string or `null`', $section);
+        $this->assertStringContainsString('Duplicate values fail with `schema_validation`', $section);
+
+        $this->assertStringContainsString('page number, item offset,', $section);
+        $this->assertStringContainsString('response-array position, database insertion order', $section);
+        $this->assertStringContainsString('or the order in which', $section);
+        $this->assertStringContainsString('pages completed', $section);
+
+        $this->assertStringContainsString('`normalized_payload` is always a JSON object. When it has no keys, its', $section);
+        $this->assertStringContainsString('canonical encoding is `{}`, never `[]`', $section);
+        $this->assertStringContainsString('`options` is always a JSON list. When it has no items, its canonical', $section);
+        $this->assertStringContainsString('encoding is `[]`, never `{}`', $section);
+
+        $this->assertStringContainsString('{"fields":[{"canonical_hash":"...","external_field_key":"..."}]}', $section);
+
+        $this->assertStringContainsString('not full RFC 8785 (JSON', $section);
+        $this->assertStringContainsString('the algorithm must never change silently', $section);
+        $this->assertStringContainsString('requires an explicit documentation-level decision and a rebaseline plan', $section);
+    }
+
+    #[Test]
     public function gap_024_tracks_laravel_11_upgrade_for_connector_production_readiness(): void
     {
         $gap024 = $this->gap024Section();
@@ -746,6 +820,26 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         if (! preg_match('/## Approval checklist\n\n(.*?)(?=\n## Application-code gate)/s', $content, $matches)) {
             $this->fail('Could not locate approval checklist in proposal file');
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function connectorSchemaCanonicalHashingSection(): string
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        if (! preg_match(
+            '/### Connector schema canonical hashing \(Resolved\)\n\n'
+            .'(.*?)'
+            .'(?=\n### ConnectorSchemaDiff \/ ConnectorSchemaDiffItem \(Resolved\))/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate connector schema canonical hashing section');
         }
 
         return $matches[1];
