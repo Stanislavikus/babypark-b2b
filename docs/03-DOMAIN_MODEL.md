@@ -1940,6 +1940,187 @@ columns — diffs are separate entities.
 
 Unique: `(snapshot_id, external_field_key)`.
 
+### Connector schema canonical hashing (Resolved)
+
+Canonical hashes provide deterministic no-change detection for normalized
+external schemas. They never hash raw vendor responses.
+
+#### Field canonical hash
+
+`ConnectorSchemaSnapshotField.canonical_hash` is the lowercase hexadecimal
+SHA-256 digest of the following exact byte sequence:
+
+1. the ASCII bytes of `babypark.connector-schema-field.v1`;
+2. exactly one LF byte (`0x0A`) — not the two characters `\` and `n`;
+3. the canonical JSON UTF-8 bytes immediately after that LF, with no
+   further bytes following.
+
+The preimage contains no BOM, no NUL byte, no carriage return, and no
+trailing newline after the JSON document.
+
+The canonical field object contains exactly:
+
+- `external_field_key`
+- `external_label`
+- `normalized_data_type`
+- `is_required`
+- `is_multi_value`
+- `is_localizable`
+- `external_scope`
+- `normalized_payload`
+- `sort_order`
+
+Identifiers, workspace/snapshot foreign keys, timestamps, request metadata,
+pagination position, and the hash column itself are excluded.
+
+**The canonical field object's value types are fixed:**
+
+- `external_field_key`: UTF-8 string;
+- `external_label`: UTF-8 string or `null`;
+- `normalized_data_type`: UTF-8 string;
+- `is_required`: boolean or `null`;
+- `is_multi_value`: boolean or `null`;
+- `is_localizable`: boolean or `null`;
+- `external_scope`: UTF-8 string or `null`;
+- `normalized_payload`: JSON object, subject to the container and
+  whitelist rules elsewhere in this section;
+- `sort_order`: non-negative integer or `null`.
+
+Adapters must normalize values to these exact types before hashing.
+Boolean fields must be encoded as JSON `true`/`false`/`null`, never as
+`0`, `1`, `"0"`, or `"1"`. String fields must never be converted to
+numbers merely because their contents are numeric. `null` and an empty
+string are distinct canonical values.
+
+**Canonical JSON is produced in PHP as:**
+
+```php
+json_encode(
+    $value,
+    JSON_UNESCAPED_UNICODE
+    | JSON_UNESCAPED_SLASHES
+    | JSON_THROW_ON_ERROR
+)
+```
+
+No `JSON_*` flags other than the three listed above are permitted.
+`JSON_FORCE_OBJECT` is forbidden because it changes JSON container-type
+semantics by encoding PHP lists as objects; canonical container kinds
+must remain explicit and stable (see the container-kind rules below).
+`JSON_PRETTY_PRINT`, `JSON_NUMERIC_CHECK`, `JSON_INVALID_UTF8_IGNORE`,
+`JSON_INVALID_UTF8_SUBSTITUTE`, and `JSON_PARTIAL_OUTPUT_ON_ERROR` are
+likewise forbidden — each either introduces non-canonical whitespace,
+silently reinterprets values, or silently tolerates data that must
+instead fail with `schema_validation`.
+
+Canonical values may contain only `null`, booleans, integers, valid UTF-8
+strings, associative objects, and JSON lists. Floats, resources, and all
+other unsupported values fail with `schema_validation`. All enum
+instances, including backed enums, must be converted to their approved
+primitive string/integer representation before canonicalization — enum
+objects themselves are forbidden canonical input.
+
+Canonical container kinds are explicit and must survive normalization:
+
+- `normalized_payload` is always a JSON object. When it has no keys, its
+  canonical encoding is `{}`, never `[]`.
+- `options` is always a JSON list. When it has no items, its canonical
+  encoding is `[]`, never `{}`.
+- a JSON list is a zero-based contiguous sequence; a JSON object is a
+  string-keyed map;
+- the canonicalizer must not infer an empty object's kind from an empty
+  PHP array — before `json_encode()`, an empty object must be represented
+  as `(object)[]` or an equivalent explicit object node, since PHP's
+  `json_encode([])` produces `[]` while `json_encode((object)[])`
+  produces `{}`, and this distinction does not resolve itself.
+
+Canonical serialization rules:
+
+- top-level keys are always present; unknown top-level values are `null`;
+- object keys are recursively sorted using locale-independent bytewise order;
+- decoded string values are preserved exactly — no trimming, lowercasing, or
+  Unicode normalization;
+- invalid UTF-8 and unsupported values fail with `schema_validation`; they are
+  never silently replaced;
+- vendor identifiers and option values are normalized to strings;
+- `normalized_payload` contains only adapter-approved whitelisted metadata;
+- optional null-valued keys inside `normalized_payload` are omitted;
+- JSON list (array) element order is preserved by the canonical serializer
+  as-is — canonicalization only sorts object keys, never reorders arrays.
+  Before serialization, every collection whose vendor order is not
+  semantically meaningful must already be normalized by its adapter using
+  an explicit, documented stable comparator (`options` use the comparator
+  defined below). No unordered collection may enter `normalized_payload`
+  without an explicit normalization rule — silently retaining arbitrary
+  vendor response order, or silently sorting an array with no defined
+  comparator, are both forbidden.
+
+`sort_order` represents only an explicit semantic ordering value supplied
+by the external schema itself and normalized by the adapter (type per the
+value-type list above: non-negative integer or `null`, `null` when the
+external schema provides no such value). It must never be derived from
+page number, item offset,
+response-array position, database insertion order, or the order in which
+pages completed. This is what allows `sort_order` to affect the hash while
+pagination/fetch order does not — they are not the same kind of ordering.
+
+Each normalized option is an object containing exactly:
+
+- `value`: non-null UTF-8 string;
+- `label`: UTF-8 string or `null`.
+
+Option values must be unique by bytewise comparison after normalization.
+Duplicate values fail with `schema_validation`. After uniqueness
+validation, options are sorted by `value` using locale-independent
+bytewise ascending order — `label` is part of the hashed option object but
+is never used as a sort key or tie-breaker (uniqueness already guarantees
+`value` alone determines order). Vendor response order does not affect
+the hash.
+
+This is a deliberately custom v1 format, not full RFC 8785 (JSON
+Canonicalization Scheme) compliance — it borrows JCS's general principles
+(deterministic key sorting, no whitespace, UTF-8 output) without adopting
+JCS's ECMAScript-specific number serialization or UTF-16-code-unit-based
+property sorting, both unnecessary complexity for this fully-controlled,
+server-side-only DTO. Floats are forbidden entirely rather than given a
+JCS-style serialization rule, which sidesteps that complexity outright.
+
+#### Snapshot canonical hash
+
+`ConnectorSchemaSnapshot.canonical_hash` is the lowercase hexadecimal
+SHA-256 digest of the following exact byte sequence:
+
+1. the ASCII bytes of `babypark.connector-schema-snapshot.v1`;
+2. exactly one LF byte (`0x0A`);
+3. the canonical JSON UTF-8 bytes immediately after that LF, with no
+   further bytes following — for example (compact, single-line; shown
+   here on multiple lines only for display):
+
+```text
+babypark.connector-schema-snapshot.v1
+{"fields":[{"canonical_hash":"...","external_field_key":"..."}]}
+```
+
+Produced with the same `json_encode()` flag contract as the field hash
+above. The field pairs are sorted by `external_field_key` using
+locale-independent bytewise ascending order. Pagination order, vendor
+response order, database row IDs, and capture timestamps do not affect
+the snapshot hash.
+
+Duplicate `external_field_key` values in one discovery run are a
+`schema_validation` failure. Failed or incomplete discovery does not publish a
+snapshot.
+
+No-change is determined by comparing the canonical hash with the latest
+successful snapshot for the same connector account and schema source. An equal
+hash may still produce a new append-only audit snapshot; the operator UI labels
+the result «Без змін».
+
+This is canonicalization contract `v1`. It uses the existing `char(64)` columns
+and requires no migration. Any future change to the preimage or normalization
+rules requires an explicit documentation-level decision and a rebaseline plan;
+the algorithm must never change silently.
+
 ### ConnectorSchemaDiff / ConnectorSchemaDiffItem (Resolved)
 
 `connector_schema_diffs` compares `from_snapshot_id` → `to_snapshot_id` with
