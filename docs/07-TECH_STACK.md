@@ -331,10 +331,18 @@ client itself does not retry (queue handles retry, to avoid multiplying
 attempts). Job uses `retryUntil()` 15 minutes from dispatch instead of numeric
 `$tries`; worker `--tries=3` does not override `retryUntil()`.
 
-**Paginated discovery:** per-page connect timeout 10s, per-page request total
-timeout 60s; job timeout 900s; max 50 pages per run; max 10,000 fields per
-run; max 2 queue attempts; backoff 60s/300s with jitter; same non-retryable
-4xx rules.
+**Paginated discovery:** per-page connect timeout 10s, per-page request
+total timeout 60s, per-page response body limit 2 MiB; job timeout 900s;
+`pageSize=200` per request; max 50 pages per run; max 10,000 fields per
+run (200 × 50 = 10,000); maximum 3 total vendor-execution attempts
+(initial + 2 retries); base retry delays 60s then 300s with equal jitter;
+`retry_until_at` = dispatch + 60 minutes; HTTP-client-level automatic
+retries: 0; 429 responses respect `Retry-After` capped at 300s; same
+non-retryable 4xx rules as connection-check (401/403/404 never retry).
+
+`pageSize=200` and the 2 MiB per-page response limit are this task's own
+proposed operational values, not a pre-existing external standard —
+documented here as the binding project decision.
 
 **Token acquisition (IMS, later):** HTTP timeout 15s; cache TTL
 `expires_in - 60s` floor 60s; max 2 attempts.
@@ -395,6 +403,13 @@ timeout (45s), and lock `expireAfter` (120s) are **unchanged**. Repo-root
 `deploy.sh` runs `php artisan queue:restart` after `optimize:clear`; that signal
 requires the verified shared `database` cache store and
 Supervisor `autorestart=true` on each worker program.
+
+**Discovery worker activation gate:** The manual discovery trigger must not
+be enabled in production until `babypark-connector-queue` is confirmed
+`RUNNING` via `supervisorctl status`. Task 4B-2b-1's own delivery must
+include an explicit post-merge activation runbook (install/reread/update/start,
+plus an end-to-end smoke discovery run) as a separate, human-executed
+step — not silent deployment alongside the feature merge.
 
 ### SSRF-safe connector outbound transport
 
