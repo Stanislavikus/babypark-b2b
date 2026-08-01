@@ -56,7 +56,7 @@ class CustomerRenameMigrationTest extends TestCase
 
         $customersBeforeRollback = DB::table('customers')->count();
 
-        Artisan::call('migrate:rollback', ['--step' => 7]);
+        $this->rollbackThrough('2026_07_12_120000_rename_contractors_to_customers');
 
         $this->assertTrue(Schema::hasTable('contractors'));
         $this->assertFalse(Schema::hasTable('customers'));
@@ -385,5 +385,26 @@ class CustomerRenameMigrationTest extends TestCase
             $matching->count(),
             'Expected '.$expected.' compound FK on '.implode('+', $columns).' for '.$table
         );
+    }
+
+    private function rollbackThrough(string $targetMigration): void
+    {
+        $migrations = DB::table('migrations')
+            ->orderByDesc('batch')
+            ->orderByDesc('migration')
+            ->pluck('migration')
+            ->values();
+
+        $position = $migrations->search($targetMigration);
+
+        $this->assertNotSame(
+            false,
+            $position,
+            "Target migration is not recorded as applied: {$targetMigration}",
+        );
+
+        Artisan::call('migrate:rollback', [
+            '--step' => ((int) $position) + 1,
+        ]);
     }
 }
