@@ -770,6 +770,99 @@ class ConnectorAccountDocumentationTest extends TestCase
     }
 
     #[Test]
+    public function domain_model_documents_discovery_runtime_stop_and_amend_contract(): void
+    {
+        $section = $this->connectorDiscoveryRunRuntimeSection();
+
+        $this->assertStringContainsString('Maximum vendor-execution attempts: 3 total (initial + 2 retries).', $section);
+        $this->assertStringContainsString('Base retry delays: 60s before the first retry, 300s before the second.', $section);
+        $this->assertStringContainsString('`retry_until_at` = dispatch time + 60 minutes.', $section);
+        $this->assertStringContainsString('HTTP-client-level automatic retries: 0', $section);
+
+        $this->assertStringContainsString('`connector_definition_id` = the account\'s own `connector_definition_id`;', $section);
+        $this->assertStringContainsString('`schema_scope` = `Account`;', $section);
+        $this->assertStringContainsString('`source_kind` = `AccountApi`;', $section);
+        $this->assertStringContainsString('`acquisition_mode` = `LiveFetch`;', $section);
+        $this->assertStringContainsString('`is_primary` = `true`;', $section);
+        $this->assertStringContainsString('`endpoint_path` is not null.', $section);
+        $this->assertStringContainsString('all six conditions above', $section);
+        $this->assertStringContainsString('re-verifies, before any HTTP', $section);
+        $this->assertStringContainsString('pre-dispatch configuration failure — no', $section);
+
+        $this->assertStringContainsString('`searchCriteria[pageSize]=200` explicitly', $section);
+        $this->assertStringContainsString('if `total_count > 10,000`, the run fails before any further page is', $section);
+        $this->assertStringContainsString('a 51st page request is never issued', $section);
+        $this->assertStringContainsString('**Pagination-error precedence (Resolved)**', $section);
+        $this->assertStringContainsString('→ `DiscoveryPaginationLimitExceeded`, checked first;', $section);
+        $this->assertStringContainsString('`DiscoveryIncompletePagination`;', $section);
+
+        $this->assertStringContainsString('lifecycle and pre-execution', $section);
+        $this->assertStringContainsString(
+            'control failures that do not represent a classified vendor/HTTP/schema',
+            $section
+        );
+        $this->assertStringNotContainsString('queue/infrastructure only', $section);
+
+        $this->assertStringContainsString('`discovery_dispatch_failed`', $section);
+        $this->assertStringContainsString('`discovery_job_failed`', $section);
+        $this->assertStringContainsString('`discovery_attempts_exhausted_without_result`', $section);
+        $this->assertStringContainsString('`discovery_account_disabled_before_execution`', $section);
+        $this->assertStringContainsString('`discovery_source_invalid_before_execution`', $section);
+
+        $this->assertStringContainsString('`transport_response_size_exceeded`', $section);
+        $this->assertStringContainsString("'discovery_pagination_limit_exceeded'", $section);
+        $this->assertStringContainsString("'discovery_incomplete_pagination'", $section);
+        $this->assertStringContainsString("'discovery_schema_validation_failed'", $section);
+
+        $this->assertStringContainsString('is a **superset** of the', $section);
+        $this->assertStringContainsString('**Shared `automatic_retry` result codes (verbatim reuse):**', $section);
+
+        foreach ([
+            ['AdobeRequestTimeout', 'adobe_request_timeout'],
+            ['AdobeRateLimited', 'adobe_rate_limited'],
+            ['AdobeVendorUnavailable', 'adobe_vendor_unavailable'],
+            ['TransportDnsResolutionFailed', 'transport_dns_resolution_failed'],
+            ['TransportTimeout', 'transport_timeout'],
+            ['TransportConnectionFailed', 'transport_connection_failed'],
+        ] as [$case, $value]) {
+            $this->assertStringContainsString("| `{$case}` | `{$value}` |", $section);
+            $this->assertMatchesRegularExpression(
+                "/\| `{$case}` \| `{$value}` \| [^|]+ \| `automatic_retry` \|/s",
+                $section,
+                "Expected {$case} to be documented as automatic_retry in the discovery result table",
+            );
+        }
+
+        $this->assertStringContainsString(
+            'does **not** define a separate gateway-specific code',
+            $section
+        );
+
+        $this->assertStringContainsString(
+            '**`discovery_attempts_exhausted_without_result` never overwrites the',
+            $section
+        );
+        $this->assertStringContainsString('itself never changes `connection_status`**', $section);
+        $this->assertStringContainsString('actionability is `automatic_retry`', $section);
+        $this->assertStringContainsString('`connection_status = TemporarilyUnavailable`', $section);
+        $this->assertStringContainsString('only if this run is the newest run for', $section);
+
+        $this->assertStringContainsString('application-level invariant', $section);
+        $this->assertStringContainsString('does not enforce uniqueness by itself', $section);
+
+        $techStack = File::get(base_path('docs/07-TECH_STACK.md'));
+        $this->assertStringContainsString(
+            'proposed operational values, not a pre-existing external standard',
+            $techStack
+        );
+        $this->assertStringContainsString('**Discovery worker activation gate:**', $techStack);
+
+        $gap006 = $this->gap006Section();
+        $this->assertStringContainsString('Verified implementation gap (added 2026-08-01):', $gap006);
+        $this->assertStringContainsString('ConnectorAccountPolicy::viewAny()', $gap006);
+    }
+
+    #[Test]
     public function gap_024_tracks_laravel_11_upgrade_for_connector_production_readiness(): void
     {
         $gap024 = $this->gap024Section();
@@ -840,6 +933,25 @@ class ConnectorAccountDocumentationTest extends TestCase
             $matches,
         )) {
             $this->fail('Could not locate connector schema canonical hashing section');
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function connectorDiscoveryRunRuntimeSection(): string
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        if (! preg_match(
+            '/#### Retry contract \(Resolved\)\n\n(.*?)'
+            .'(?=\n### ConnectorSchemaSnapshot \(Resolved\))/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate connector discovery runtime section');
         }
 
         return $matches[1];

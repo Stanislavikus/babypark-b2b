@@ -120,7 +120,7 @@ class ConnectorConnectionCheckMigrationTest extends TestCase
             'technical_summary' => 'HTTP 429 (adobe_rate_limited)',
         ])->id;
 
-        $this->artisan('migrate:rollback', ['--step' => 1])->assertExitCode(0);
+        $this->rollbackThrough('2026_07_26_120000_connector_connection_check_queue_lifecycle');
 
         $queued = DB::table('connector_connection_checks')->where('id', $queuedId)->first();
         $this->assertSame('failed', $queued->status);
@@ -135,5 +135,26 @@ class ConnectorConnectionCheckMigrationTest extends TestCase
         $this->assertSame('automatic_retry', $running->actionability);
 
         $this->artisan('migrate')->assertExitCode(0);
+    }
+
+    private function rollbackThrough(string $targetMigration): void
+    {
+        $migrations = DB::table('migrations')
+            ->orderByDesc('batch')
+            ->orderByDesc('migration')
+            ->pluck('migration')
+            ->values();
+
+        $position = $migrations->search($targetMigration);
+
+        $this->assertNotSame(
+            false,
+            $position,
+            "Target migration is not recorded as applied: {$targetMigration}",
+        );
+
+        $this->artisan('migrate:rollback', [
+            '--step' => ((int) $position) + 1,
+        ])->assertExitCode(0);
     }
 }

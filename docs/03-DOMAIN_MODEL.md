@@ -1874,6 +1874,9 @@ Append-only history of schema discovery executions against one
 | `trigger` | enum | `manual`, `scheduled`, `after_connection_check` |
 | `initiated_by_user_id` | unsigned bigint FK nullable | Null for scheduled; matches `users.id` (bigint, not UUID) |
 | `status` | enum | `queued`, `running`, `succeeded`, `failed`, `cancelled` |
+| `execution_attempts` | unsigned tinyint, default 0 | Counts claimed full-discovery execution slots, not individual HTTP page requests. One discovery execution may issue up to 50 HTTP page requests; this counter is atomically incremented exactly once, before page 1, at the start of each complete paginated execution attempt, and is capped at 3. Conservative over-counting after a crash is acceptable; under-counting is forbidden. |
+| `retry_until_at` | timestamp nullable | Absolute deadline from initial dispatch, shared by the job's `retryUntil()` and persisted for deterministic stale-row recovery. |
+| `next_attempt_at` | timestamp nullable | Guards against the database queue driver's own `retry_after`-based redelivery bypassing the intended backoff delay. |
 | `started_at` | timestamp nullable | Null while `status: queued` |
 | `finished_at` | timestamp nullable | Set only on terminal state (`succeeded`/`failed`/`cancelled`) |
 | `duration_ms` | unsigned int nullable | |
@@ -1892,6 +1895,216 @@ Append-only history of schema discovery executions against one
 - `partial` is not a terminal success state for snapshot publication.
 - Latest successful snapshot for account+source is resolved via indexed query,
   not by mutating prior snapshots.
+
+#### Retry contract (Resolved)
+
+- Maximum vendor-execution attempts: 3 total (initial + 2 retries).
+- Base retry delays: 60s before the first retry, 300s before the second.
+- Jitter: equal jitter — actual delay = ceil(base / 2) + random(0, floor(base / 2)).
+- `retry_until_at` = dispatch time + 60 minutes.
+- Mechanism: the job uses the persisted `retry_until_at` via its own
+  `retryUntil()`; a classified-retryable failure records `next_attempt_at`
+  and calls `release($delay)` manually — the numeric queue `$tries`
+  property is not the business attempt counter, `execution_attempts` is.
+- HTTP-client-level automatic retries: 0 (all retry logic lives at the
+  job/persistence layer, not inside the HTTP client).
+- 429 responses respect `Retry-After`, capped at 300 seconds (mirrors the
+  connection-check pattern).
+- Retryable failure classes: timeout, connection reset, HTTP 408, HTTP
+  429, HTTP 5xx.
+- Non-retryable: HTTP 401, 403, 404; any schema-validation, pagination-
+  limit, or response-size classification (these are terminal outcomes,
+  not transient failures).
+
+#### Schema-source resolution rule (Resolved) — pre-dispatch, not a run field
+
+Before a discovery run row is created, the dispatch service resolves
+exactly one `ConnectorSchemaSource` for the target account, using:
+- `connector_definition_id` = the account's own `connector_definition_id`;
+- `schema_scope` = `Account`;
+- `source_kind` = `AccountApi`;
+- `acquisition_mode` = `LiveFetch`;
+- `is_primary` = `true`;
+- `endpoint_path` is not null.
+
+Exactly one matching row → dispatch proceeds and the resolved
+`connector_schema_source_id` is persisted on the new run row. **Zero or
+more than one matching row is a pre-dispatch configuration failure — no
+`ConnectorDiscoveryRun` row is created, and no HTTP call is made.** This
+is not a value of `connector_discovery_runs.error_code`, because the
+required, non-nullable `connector_schema_source_id` column makes it
+physically impossible to persist a run without a resolved source.
+
+After a run is created, the worker re-loads the `ConnectorAccount` and
+`ConnectorDiscoveryRun` within workspace context (both are
+workspace-scoped), then separately re-loads the *persisted*
+`ConnectorSchemaSource` by ID — this row is global platform
+configuration, not workspace-owned — and re-verifies, before any HTTP
+call, that it still belongs to the same `connector_definition_id` as the
+account and still satisfies all six conditions above — a different
+source is never substituted automatically. If the source has become
+invalid between dispatch and execution, the run terminates with the
+lifecycle code
+`discovery_source_invalid_before_execution` (see the lifecycle table
+below).
+
+Active-run uniqueness per (connector_account_id,
+connector_schema_source_id) pair is an **application-level invariant**
+— enforced by the dispatch service's locked lookup-then-create logic
+(mirroring connection-check), not by any database constraint. The new
+index accelerates this lookup; it does not enforce uniqueness by itself.
+
+#### Deterministic latest-snapshot ordering (Resolved)
+
+The "latest successful snapshot" for no-change comparison and current-
+snapshot linking is the row with the greatest `(created_at, id)` pair,
+ordered `created_at DESC, id DESC`, for the same (connector_account_id,
+connector_schema_source_id) pair.
+
+#### Deterministic pagination-success contract (Resolved)
+
+- pages are fetched sequentially starting at `currentPage=1`;
+- every request uses `searchCriteria[pageSize]=200` explicitly;
+- the response's `items` must be a JSON list; `total_count` must be a
+  non-negative integer and must remain identical across every page of
+  the same run;
+- if `total_count > 10,000`, the run fails before any further page is
+  fetched;
+- an empty page received before the accumulated count reaches
+  `total_count` is a terminal `discovery_incomplete_pagination` result —
+  not a retry condition;
+- if the final accumulated field count does not exactly equal the
+  stable `total_count`, the run fails — never publishes a snapshot for a
+  mismatched count;
+- a 51st page request is never issued, regardless of what `total_count`
+  claims;
+- a snapshot is published only when the accumulated count exactly equals
+  the stable `total_count` and normalization/hashing succeeded with no
+  `schema_validation` failure.
+
+#### Split lifecycle vs result error-code design (Resolved)
+
+`ConnectorDiscoveryRunLifecycleErrorCode` — lifecycle and pre-execution
+control failures that do not represent a classified vendor/HTTP/schema
+result (this includes queue/infrastructure failures **and**
+account/source invalidation checked before any HTTP call — it does not
+mean "queue-only"; it means "not a vendor/transport/schema outcome").
+Mirrors `ConnectorConnectionCheckLifecycleErrorCode`'s exact scope and
+actionability choices:
+
+| Code | Cause | Actionability | Message key | Technical summary |
+|---|---|---|---|---|
+| `discovery_dispatch_failed` | `unknown` | `support_required` | `connectors.errors.discovery_failed` | `queue_dispatch_failed` |
+| `discovery_job_failed` | `unknown` | `support_required` | `connectors.errors.discovery_failed` | `queue_job_failed` |
+| `discovery_attempts_exhausted_without_result` | `unknown` | `support_required` | `connectors.errors.discovery_failed` | `vendor_attempt_budget_exhausted_without_result` |
+| `discovery_account_disabled_before_execution` | `configuration` | `workspace_admin_required` | `connectors.errors.account_disabled` | `account_disabled_before_execution` |
+| `discovery_source_invalid_before_execution` | `configuration` | `support_required` | `connectors.errors.discovery_failed` | `source_invalid_before_execution` |
+
+**`discovery_attempts_exhausted_without_result` never overwrites the
+account projection** — it means retries were exhausted *without any
+persisted vendor result at all* (mirrors
+`ConnectorConnectionCheckLifecycleErrorCode::AttemptsExhaustedWithoutResult`'s
+own `SupportRequired` actionability exactly — not `AutomaticRetry`, which
+does not apply here). This is distinct from the case where a real,
+persisted vendor result *was* obtained and classified `AutomaticRetry`-
+actionable (a **result**-level classification, in the table below) before
+attempts ran out — that case is what can legitimately drive a
+`TemporarilyUnavailable` projection (see the account-projection mapping
+below), not the lifecycle code itself. None of these five lifecycle codes
+overwrite an already-persisted vendor result.
+
+A separate, richer **`ConnectorDiscoveryRunErrorCode`** is a **superset** of the
+existing **`ConnectorConnectionCheckErrorCode`**. Every shared Adobe OAuth/HTTP/
+transport case name, string value, `Cause`, `Actionability`, message key, HTTP-
+status acceptance, and HTTP-vs-transport classification is reused **verbatim** —
+discovery does not rename, re-derive, or substitute competing terms for any
+shared case. The full shared vocabulary (Adobe OAuth identifiers, HTTP fallback,
+and transport cases) is defined once in `ConnectorConnectionCheckErrorCode` (see
+`ConnectorConnectionCheckErrorCode enum vocabulary` below) and applies unchanged
+to discovery result persistence on `connector_discovery_runs.error_code`.
+
+Discovery additionally defines exactly three discovery-specific result codes
+(no connection-check equivalent to reuse):
+
+| Code | Cause | Actionability | Message key | Technical summary |
+|---|---|---|---|---|
+| `DiscoveryPaginationLimitExceeded = 'discovery_pagination_limit_exceeded'` | `schema_validation` | `support_required` | `connectors.errors.discovery_failed` | `pagination_limit_exceeded` |
+| `DiscoveryIncompletePagination = 'discovery_incomplete_pagination'` | `schema_validation` | `support_required` | `connectors.errors.discovery_failed` | `incomplete_pagination` |
+| `DiscoverySchemaValidationFailed = 'discovery_schema_validation_failed'` | `schema_validation` | `support_required` | `connectors.errors.discovery_failed` | `schema_validation_failed` |
+
+**Shared `automatic_retry` result codes (verbatim reuse):** exactly these six
+shared cases retain `AutomaticRetry` actionability in discovery — no more, no
+fewer (same grouped match arm as
+`ConnectorConnectionCheckErrorCode::actionability()`):
+
+| Code | String value | Cause | Actionability | Message key |
+|---|---|---|---|---|
+| `AdobeRequestTimeout` | `adobe_request_timeout` | `network` | `automatic_retry` | `connectors.errors.timeout` |
+| `AdobeRateLimited` | `adobe_rate_limited` | `rate_limit` | `automatic_retry` | `connectors.errors.rate_limited` |
+| `AdobeVendorUnavailable` | `adobe_vendor_unavailable` | `vendor_unavailable` | `automatic_retry` | `connectors.errors.vendor_unavailable` |
+| `TransportDnsResolutionFailed` | `transport_dns_resolution_failed` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
+| `TransportTimeout` | `transport_timeout` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
+| `TransportConnectionFailed` | `transport_connection_failed` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
+
+HTTP 5xx / gateway outcomes map to the existing `AdobeVendorUnavailable` case —
+discovery does **not** define a separate gateway-specific code.
+
+`TransportResponseSizeExceeded` (`transport_response_size_exceeded`) is a
+shared case reused verbatim from connection-check; it is mapped from
+`TransportFailureReason::ResponseSizeExceeded` via a new
+`AdobePaaSDiscoveryTransportMapper` mirroring
+`AdobePaaSConnectionCheckTransportMapper` exactly — reusing the existing
+term, not inventing a competing one.
+
+**Pagination-error precedence (Resolved)** — explicit order, so
+implementation and tests cannot disagree on an overlapping case (e.g.
+`total_count=10,000`, 50 pages fetched, only 9,900 items received —
+which would trigger *both* candidate rules under an unordered reading):
+1. if `total_count > 10,000` at any point, before fetching further pages
+   → `DiscoveryPaginationLimitExceeded`, checked first;
+2. after the 50th page, if the accumulated count is still less than
+   `total_count` → `DiscoveryPaginationLimitExceeded` (continuing would
+   require a forbidden 51st page) — this takes precedence over rule 3
+   whenever both would otherwise apply;
+3. an empty page received before the accumulated count reaches
+   `total_count`, and before the 50-page limit is hit →
+   `DiscoveryIncompletePagination`;
+4. an accumulated count greater than `total_count`, or any other
+   count mismatch not covered by rules 1–3 → `DiscoveryIncompletePagination`.
+
+#### Account projection mapping after discovery (Resolved)
+
+- any terminal vendor outcome (success or failure) updates
+  `ConnectorAccount.last_discovery_at`;
+- success additionally sets `last_successful_discovery_at`, sets
+  `connection_status = Connected`, and clears all four `last_error_*`
+  fields;
+- a **result-level** (`ConnectorDiscoveryRunErrorCode`) outcome whose
+  actionability is `automatic_retry` — meaning a real, persisted vendor
+  result exists and was classified retryable — sets
+  `connection_status = TemporarilyUnavailable` if it remains the terminal
+  state once retries are exhausted;
+- **`discovery_attempts_exhausted_without_result` (the lifecycle code) by
+  itself never changes `connection_status`** — it means no persisted
+  vendor result exists at all, so there is nothing retryable to reflect;
+  this keeps it consistent with "lifecycle codes never overwrite the
+  projection";
+- a result whose actionability is `user_action_required`,
+  `workspace_admin_required`, or `support_required` sets
+  `connection_status = AttentionRequired` and writes the four
+  `last_error_*` fields from that result;
+- a lifecycle-only failure (dispatch/job-failed) does not by itself
+  change `connection_status`;
+- `discovery_account_disabled_before_execution` never changes the
+  projection (the account is already disabled);
+- the projection is updated **only if this run is the newest run for
+  the account by `(created_at, id) DESC`** — a stale/delayed terminal
+  write from an older run must never overwrite a newer run's result.
+
+**Worker-activation gate:** the second production worker
+(`babypark-connector-queue`) remains deferred per Task 4B-2b-0's own
+note; Task 4B-2b-1 must gate the manual UI trigger on its confirmed
+`RUNNING` state — see `07-TECH_STACK.md`.
 
 ### ConnectorSchemaSnapshot (Resolved)
 

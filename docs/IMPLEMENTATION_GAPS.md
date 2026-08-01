@@ -302,6 +302,30 @@ credential-management/settings UI remain absent. Discovery execution, snapshot
 publication, diff computation, retention jobs, broader operational UI, and
 FieldMapping remain unimplemented.
 
+**Verified implementation gap (added 2026-08-01):** `ConnectorAccountPolicy::viewAny()`
+and `view()` both currently delegate to the same management-ability check
+used for credential/settings actions, which excludes Merchandiser. This
+contradicts the existing "ConnectorAccount authorization (Resolved)" text
+in `03-DOMAIN_MODEL.md`, which states Merchandiser may view discovery
+progress, result, and discovered data.
+
+Task 4B-2b-1 must fix this as a **combined** change, not policy alone —
+granting `viewAny()`/`view()` to Merchandiser without also restricting
+what's actually rendered would create a new information leak rather than
+closing this gap. It must:
+- grant `viewAny()`/`view()` to Merchandiser (without inventing a new
+  role or permission);
+- enforce field-level restrictions in the actual Filament
+  resource/infolist so Merchandiser's rendered view never includes
+  credentials, settings, base URL, store-specific configuration, or any
+  other management-only field — confirm the exact current field list
+  this applies to against the real resource/infolist code, don't assume;
+- add tests that don't stop at the policy layer — assert against the
+  actual rendered view/response for a Merchandiser-authenticated request,
+  proving the sensitive fields are genuinely absent from output, not
+  merely that the policy method returns `true`/`false` correctly;
+- update this note's status once fixed.
+
 **Task 4A note (added 2026-07-16):** Task 4A implements the first concrete
 schema for `ConnectorDefinition` and introduces `ConnectorSchemaSource`, plus
 a read-only admin surface over the existing Canonical Registry. It does not
