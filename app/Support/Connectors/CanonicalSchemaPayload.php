@@ -12,7 +12,7 @@ final class CanonicalSchemaPayload
 
     private readonly bool $hasOptions;
 
-    private function __construct(bool $hasOptions, array $options = [])
+    private function __construct(bool $hasOptions, #[\SensitiveParameter] array $options = [])
     {
         $this->hasOptions = $hasOptions;
         $this->options = $options;

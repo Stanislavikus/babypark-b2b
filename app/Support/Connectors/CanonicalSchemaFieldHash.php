@@ -8,8 +8,8 @@ use App\Support\Connectors\Exceptions\ConnectorDiscoverySchemaValidationExceptio
 final class CanonicalSchemaFieldHash
 {
     private function __construct(
-        private readonly string $externalFieldKey,
-        private readonly string $canonicalHash,
+        #[\SensitiveParameter] private readonly string $externalFieldKey,
+        #[\SensitiveParameter] private readonly string $canonicalHash,
     ) {}
 
     public static function create(
@@ -67,7 +67,7 @@ final class CanonicalSchemaFieldHash
     /**
      * @return ConnectorDiscoverySchemaValidationReason::InvalidType|ConnectorDiscoverySchemaValidationReason::UnsupportedCanonicalValue
      */
-    private static function classifyViolation(mixed $value): ConnectorDiscoverySchemaValidationReason
+    private static function classifyViolation(#[\SensitiveParameter] mixed $value): ConnectorDiscoverySchemaValidationReason
     {
         if ($value === null || is_scalar($value)) {
             return ConnectorDiscoverySchemaValidationReason::InvalidType;

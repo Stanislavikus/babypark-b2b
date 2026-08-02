@@ -469,6 +469,46 @@ class AdobePaaSAttributeNormalizerTest extends TestCase
     }
 
     #[Test]
+    public function empty_scope_is_unmapped_value_not_empty_required_string(): void
+    {
+        $this->assertNormalizationFailure(
+            '{"attribute_code":"color","frontend_input":"text","scope":""}',
+            ConnectorDiscoverySchemaValidationReason::UnmappedValue,
+            'scope',
+        );
+    }
+
+    #[Test]
+    public function explicit_null_option_label_normalizes_identically_to_missing_label(): void
+    {
+        $withNullLabel = json_decode(
+            '{"attribute_code":"color","frontend_input":"select","scope":"global","options":[{"label":null,"value":"red"}]}',
+            associative: false,
+            depth: 512,
+            flags: JSON_THROW_ON_ERROR,
+        );
+        $withoutLabel = json_decode(
+            '{"attribute_code":"color","frontend_input":"select","scope":"global","options":[{"value":"red"}]}',
+            associative: false,
+            depth: 512,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $fieldWithNullLabel = $this->normalizer->normalize($withNullLabel);
+        $fieldWithoutLabel = $this->normalizer->normalize($withoutLabel);
+
+        $canonicalWithNullLabel = json_encode($fieldWithNullLabel->normalizedPayload()->toCanonicalObject());
+        $canonicalWithoutLabel = json_encode($fieldWithoutLabel->normalizedPayload()->toCanonicalObject());
+
+        $this->assertSame('{"options":[{"value":"red"}]}', $canonicalWithNullLabel);
+        $this->assertSame('{"options":[{"value":"red"}]}', $canonicalWithoutLabel);
+        $this->assertSame(
+            $this->hasher->hash($fieldWithNullLabel),
+            $this->hasher->hash($fieldWithoutLabel),
+        );
+    }
+
+    #[Test]
     public function empty_external_label_string_is_preserved(): void
     {
         $raw = json_decode(

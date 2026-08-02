@@ -60,7 +60,7 @@ final class CanonicalSchemaSnapshotHasher
     /**
      * @param  list<CanonicalSchemaFieldHash>  $fields
      */
-    private function buildCanonicalSnapshotObject(array $fields): \stdClass
+    private function buildCanonicalSnapshotObject(#[\SensitiveParameter] array $fields): \stdClass
     {
         $snapshot = new \stdClass;
         $fieldObjects = [];
@@ -77,7 +77,7 @@ final class CanonicalSchemaSnapshotHasher
         return $this->sortObjectKeysRecursively($snapshot);
     }
 
-    private function encodeCanonicalJson(mixed $value): string
+    private function encodeCanonicalJson(#[\SensitiveParameter] mixed $value): string
     {
         try {
             return json_encode(
@@ -92,7 +92,7 @@ final class CanonicalSchemaSnapshotHasher
         }
     }
 
-    private function sortObjectKeysRecursively(mixed $value): mixed
+    private function sortObjectKeysRecursively(#[\SensitiveParameter] mixed $value): mixed
     {
         if ($value instanceof \stdClass) {
             $array = (array) $value;

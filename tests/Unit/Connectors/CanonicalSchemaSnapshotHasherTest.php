@@ -160,6 +160,29 @@ class CanonicalSchemaSnapshotHasherTest extends TestCase
     }
 
     #[Test]
+    public function fixture_h_non_ascii_snapshot_pair_bytewise_sort_order(): void
+    {
+        $fields = [
+            CanonicalSchemaFieldHash::create(
+                'ä_field',
+                str_repeat('b', 64),
+            ),
+            CanonicalSchemaFieldHash::create(
+                'z_field',
+                str_repeat('a', 64),
+            ),
+        ];
+
+        $expected = '614119395247c5b610ca60ebfeed6718df847f1214351d2fc824155674b520cd';
+        $actual = $this->snapshotHasher->hash($fields);
+
+        $this->assertSame(64, strlen($expected));
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $expected);
+        $this->assertSame($expected, $actual);
+        $this->assertSame($expected, $this->snapshotHasher->hash(array_reverse($fields)));
+    }
+
+    #[Test]
     public function snapshot_pairs_are_sorted_bytewise_not_locale_aware(): void
     {
         $hashZ = str_repeat('a', 64);

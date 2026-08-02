@@ -149,6 +149,18 @@ class CanonicalSchemaFieldTest extends TestCase
     }
 
     #[Test]
+    public function canonical_schema_option_rejects_invalid_utf8_label(): void
+    {
+        try {
+            CanonicalSchemaOption::fromRaw('red', "\xC3\x28", 'options[0]');
+            $this->fail('Expected validation exception');
+        } catch (ConnectorDiscoverySchemaValidationException $exception) {
+            $this->assertSame(ConnectorDiscoverySchemaValidationReason::InvalidUtf8, $exception->reason);
+            $this->assertSame('options[0].label', $exception->path);
+        }
+    }
+
+    #[Test]
     public function canonical_schema_option_distinguishes_invalid_type_from_unsupported_value(): void
     {
         try {

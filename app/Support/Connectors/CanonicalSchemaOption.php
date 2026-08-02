@@ -8,8 +8,8 @@ use App\Support\Connectors\Exceptions\ConnectorDiscoverySchemaValidationExceptio
 final class CanonicalSchemaOption
 {
     private function __construct(
-        private readonly string $value,
-        private readonly ?string $label,
+        #[\SensitiveParameter] private readonly string $value,
+        #[\SensitiveParameter] private readonly ?string $label,
     ) {}
 
     public static function fromRaw(
@@ -66,7 +66,7 @@ final class CanonicalSchemaOption
     /**
      * @return ConnectorDiscoverySchemaValidationReason::InvalidType|ConnectorDiscoverySchemaValidationReason::UnsupportedCanonicalValue
      */
-    private static function classifyViolation(mixed $value): ConnectorDiscoverySchemaValidationReason
+    private static function classifyViolation(#[\SensitiveParameter] mixed $value): ConnectorDiscoverySchemaValidationReason
     {
         if ($value === null || is_scalar($value)) {
             return ConnectorDiscoverySchemaValidationReason::InvalidType;

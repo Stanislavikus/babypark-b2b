@@ -24,7 +24,7 @@ final class AdobePaaSAttributeNormalizer
         $normalizedDataType = $this->mapFrontendInput($frontendInput);
         $externalLabel = $this->readNullableString($raw, 'default_frontend_label');
         $isRequired = $this->readNullableBool($raw, 'is_required');
-        $scope = $this->requirePresentNonEmptyString($raw, 'scope');
+        $scope = $this->requirePresentString($raw, 'scope');
         $externalScope = $this->mapScope($scope);
         $isLocalizable = $externalScope === 'store';
         $isMultiValue = in_array($frontendInput, ['multiselect', 'gallery'], true);
@@ -44,8 +44,10 @@ final class AdobePaaSAttributeNormalizer
         );
     }
 
-    private function requirePresentNonEmptyString(\stdClass $raw, string $property): string
-    {
+    private function requirePresentNonEmptyString(
+        #[\SensitiveParameter] \stdClass $raw,
+        string $property,
+    ): string {
         if (! property_exists($raw, $property)) {
             throw ConnectorDiscoverySchemaValidationException::at(
                 ConnectorDiscoverySchemaValidationReason::MissingRequiredValue,
@@ -79,8 +81,40 @@ final class AdobePaaSAttributeNormalizer
         return $value;
     }
 
-    private function readNullableString(\stdClass $raw, string $property): ?string
-    {
+    private function requirePresentString(
+        #[\SensitiveParameter] \stdClass $raw,
+        string $property,
+    ): string {
+        if (! property_exists($raw, $property)) {
+            throw ConnectorDiscoverySchemaValidationException::at(
+                ConnectorDiscoverySchemaValidationReason::MissingRequiredValue,
+                $property,
+            );
+        }
+
+        $value = $raw->{$property};
+
+        if (! is_string($value)) {
+            throw ConnectorDiscoverySchemaValidationException::at(
+                $this->classifyViolation($value),
+                $property,
+            );
+        }
+
+        if (! mb_check_encoding($value, 'UTF-8')) {
+            throw ConnectorDiscoverySchemaValidationException::at(
+                ConnectorDiscoverySchemaValidationReason::InvalidUtf8,
+                $property,
+            );
+        }
+
+        return $value;
+    }
+
+    private function readNullableString(
+        #[\SensitiveParameter] \stdClass $raw,
+        string $property,
+    ): ?string {
         if (! property_exists($raw, $property)) {
             return null;
         }
@@ -108,8 +142,10 @@ final class AdobePaaSAttributeNormalizer
         return $value;
     }
 
-    private function readNullableBool(\stdClass $raw, string $property): ?bool
-    {
+    private function readNullableBool(
+        #[\SensitiveParameter] \stdClass $raw,
+        string $property,
+    ): ?bool {
         if (! property_exists($raw, $property)) {
             return null;
         }
@@ -130,7 +166,7 @@ final class AdobePaaSAttributeNormalizer
         return $value;
     }
 
-    private function readPosition(\stdClass $raw): ?int
+    private function readPosition(#[\SensitiveParameter] \stdClass $raw): ?int
     {
         if (! property_exists($raw, 'position')) {
             return null;
@@ -159,7 +195,7 @@ final class AdobePaaSAttributeNormalizer
         return $value;
     }
 
-    private function mapFrontendInput(string $frontendInput): string
+    private function mapFrontendInput(#[\SensitiveParameter] string $frontendInput): string
     {
         return match ($frontendInput) {
             'text' => 'text',
@@ -180,7 +216,7 @@ final class AdobePaaSAttributeNormalizer
         };
     }
 
-    private function mapScope(string $scope): string
+    private function mapScope(#[\SensitiveParameter] string $scope): string
     {
         return match ($scope) {
             'global' => 'global',
@@ -193,8 +229,10 @@ final class AdobePaaSAttributeNormalizer
         };
     }
 
-    private function buildNormalizedPayload(\stdClass $raw, string $frontendInput): CanonicalSchemaPayload
-    {
+    private function buildNormalizedPayload(
+        #[\SensitiveParameter] \stdClass $raw,
+        #[\SensitiveParameter] string $frontendInput,
+    ): CanonicalSchemaPayload {
         if (! in_array($frontendInput, ['select', 'multiselect'], true)) {
             return CanonicalSchemaPayload::empty();
         }
@@ -244,7 +282,7 @@ final class AdobePaaSAttributeNormalizer
     /**
      * @return ConnectorDiscoverySchemaValidationReason::InvalidType|ConnectorDiscoverySchemaValidationReason::UnsupportedCanonicalValue
      */
-    private function classifyViolation(mixed $value): ConnectorDiscoverySchemaValidationReason
+    private function classifyViolation(#[\SensitiveParameter] mixed $value): ConnectorDiscoverySchemaValidationReason
     {
         if ($value === null || is_scalar($value)) {
             return ConnectorDiscoverySchemaValidationReason::InvalidType;

@@ -8,15 +8,15 @@ use App\Support\Connectors\Exceptions\ConnectorDiscoverySchemaValidationExceptio
 final class CanonicalSchemaField
 {
     private function __construct(
-        private readonly string $externalFieldKey,
-        private readonly ?string $externalLabel,
-        private readonly string $normalizedDataType,
-        private readonly ?bool $isRequired,
-        private readonly ?bool $isMultiValue,
-        private readonly ?bool $isLocalizable,
-        private readonly ?string $externalScope,
-        private readonly CanonicalSchemaPayload $normalizedPayload,
-        private readonly ?int $sortOrder,
+        #[\SensitiveParameter] private readonly string $externalFieldKey,
+        #[\SensitiveParameter] private readonly ?string $externalLabel,
+        #[\SensitiveParameter] private readonly string $normalizedDataType,
+        #[\SensitiveParameter] private readonly ?bool $isRequired,
+        #[\SensitiveParameter] private readonly ?bool $isMultiValue,
+        #[\SensitiveParameter] private readonly ?bool $isLocalizable,
+        #[\SensitiveParameter] private readonly ?string $externalScope,
+        #[\SensitiveParameter] private readonly CanonicalSchemaPayload $normalizedPayload,
+        #[\SensitiveParameter] private readonly ?int $sortOrder,
     ) {}
 
     public static function create(
@@ -88,7 +88,7 @@ final class CanonicalSchemaField
         return $this->sortOrder;
     }
 
-    private static function requirePayload(mixed $normalizedPayload): CanonicalSchemaPayload
+    private static function requirePayload(#[\SensitiveParameter] mixed $normalizedPayload): CanonicalSchemaPayload
     {
         if ($normalizedPayload instanceof CanonicalSchemaPayload) {
             return $normalizedPayload;
@@ -107,7 +107,7 @@ final class CanonicalSchemaField
         );
     }
 
-    private static function requireNonEmptyString(mixed $value, string $path): string
+    private static function requireNonEmptyString(#[\SensitiveParameter] mixed $value, string $path): string
     {
         if (! is_string($value)) {
             throw ConnectorDiscoverySchemaValidationException::at(
@@ -133,7 +133,7 @@ final class CanonicalSchemaField
         return $value;
     }
 
-    private static function requireNullableString(mixed $value, string $path): ?string
+    private static function requireNullableString(#[\SensitiveParameter] mixed $value, string $path): ?string
     {
         if ($value === null) {
             return null;
@@ -156,7 +156,7 @@ final class CanonicalSchemaField
         return $value;
     }
 
-    private static function requireNullableBool(mixed $value, string $path): ?bool
+    private static function requireNullableBool(#[\SensitiveParameter] mixed $value, string $path): ?bool
     {
         if ($value === null) {
             return null;
@@ -172,7 +172,7 @@ final class CanonicalSchemaField
         return $value;
     }
 
-    private static function requireNullableNonNegativeInt(mixed $value, string $path): ?int
+    private static function requireNullableNonNegativeInt(#[\SensitiveParameter] mixed $value, string $path): ?int
     {
         if ($value === null) {
             return null;
@@ -198,7 +198,7 @@ final class CanonicalSchemaField
     /**
      * @return ConnectorDiscoverySchemaValidationReason::InvalidType|ConnectorDiscoverySchemaValidationReason::UnsupportedCanonicalValue
      */
-    private static function classifyViolation(mixed $value): ConnectorDiscoverySchemaValidationReason
+    private static function classifyViolation(#[\SensitiveParameter] mixed $value): ConnectorDiscoverySchemaValidationReason
     {
         if ($value === null || is_scalar($value)) {
             return ConnectorDiscoverySchemaValidationReason::InvalidType;

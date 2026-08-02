@@ -16,7 +16,7 @@ final class CanonicalSchemaFieldHasher
         return hash('sha256', self::PREFIX."\n".$json);
     }
 
-    private function buildCanonicalFieldObject(CanonicalSchemaField $field): \stdClass
+    private function buildCanonicalFieldObject(#[\SensitiveParameter] CanonicalSchemaField $field): \stdClass
     {
         $object = new \stdClass;
         $object->external_field_key = $field->externalFieldKey();
@@ -32,7 +32,7 @@ final class CanonicalSchemaFieldHasher
         return $this->sortObjectKeysRecursively($object);
     }
 
-    private function encodeCanonicalJson(mixed $value): string
+    private function encodeCanonicalJson(#[\SensitiveParameter] mixed $value): string
     {
         try {
             return json_encode(
@@ -47,7 +47,7 @@ final class CanonicalSchemaFieldHasher
         }
     }
 
-    private function sortObjectKeysRecursively(mixed $value): mixed
+    private function sortObjectKeysRecursively(#[\SensitiveParameter] mixed $value): mixed
     {
         if ($value instanceof \stdClass) {
             $array = (array) $value;

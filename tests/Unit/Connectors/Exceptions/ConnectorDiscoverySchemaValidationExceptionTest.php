@@ -109,7 +109,8 @@ class ConnectorDiscoverySchemaValidationExceptionTest extends TestCase
         $previousIgnoreArgs = ini_get('zend.exception_ignore_args');
 
         try {
-            ini_set('zend.exception_ignore_args', '0');
+            $this->assertTrue(ini_set('zend.exception_ignore_args', '0') !== false);
+            $this->assertSame('0', ini_get('zend.exception_ignore_args'));
 
             try {
                 CanonicalSchemaPayload::withOptions([
@@ -122,8 +123,7 @@ class ConnectorDiscoverySchemaValidationExceptionTest extends TestCase
                     ConnectorDiscoverySchemaValidationReason::DuplicateOptionValue,
                     $exception->reason,
                 );
-                $this->assertStringNotContainsString($sentinel, $exception->getMessage());
-                $this->assertStringNotContainsString($sentinel, $exception->getTraceAsString());
+                $this->assertTraceDoesNotLeakSentinel($exception, $sentinel);
             }
         } finally {
             ini_set('zend.exception_ignore_args', (string) $previousIgnoreArgs);
@@ -137,28 +137,19 @@ class ConnectorDiscoverySchemaValidationExceptionTest extends TestCase
         $previousIgnoreArgs = ini_get('zend.exception_ignore_args');
 
         try {
-            ini_set('zend.exception_ignore_args', '0');
+            $this->assertTrue(ini_set('zend.exception_ignore_args', '0') !== false);
+            $this->assertSame('0', ini_get('zend.exception_ignore_args'));
 
             try {
                 CanonicalSchemaOption::fromRaw($sentinel, null, 'options[0]');
                 $this->fail('Expected validation exception');
             } catch (ConnectorDiscoverySchemaValidationException $exception) {
-                $trace = $exception->getTrace();
-                $this->assertNotEmpty($trace);
-
-                $fromRawFrame = null;
-
-                foreach ($trace as $frame) {
-                    if (($frame['function'] ?? '') === 'fromRaw') {
-                        $fromRawFrame = $frame;
-                        break;
-                    }
-                }
+                $fromRawFrame = $this->findTraceFrame($exception, 'fromRaw');
 
                 $this->assertNotNull($fromRawFrame);
                 $this->assertInstanceOf(SensitiveParameterValue::class, $fromRawFrame['args'][0] ?? null);
                 $this->assertSame('options[0]', $fromRawFrame['args'][2] ?? null);
-                $this->assertStringNotContainsString('SENTINEL_TRACE_REDACTION_4B2B1D', $exception->getTraceAsString());
+                $this->assertTraceDoesNotLeakSentinel($exception, 'SENTINEL_TRACE_REDACTION_4B2B1D');
             }
         } finally {
             ini_set('zend.exception_ignore_args', (string) $previousIgnoreArgs);
@@ -166,20 +157,169 @@ class ConnectorDiscoverySchemaValidationExceptionTest extends TestCase
     }
 
     #[Test]
-    public function all_data_bearing_parameters_carry_sensitive_parameter_attribute(): void
+    public function missing_attribute_code_trace_redacts_raw_std_class_from_private_helper(): void
+    {
+        $sentinel = 'SENTINEL_MISSING_ATTR_4B2B1D';
+        $previousIgnoreArgs = ini_get('zend.exception_ignore_args');
+        $normalizer = new AdobePaaSAttributeNormalizer;
+
+        try {
+            $this->assertTrue(ini_set('zend.exception_ignore_args', '0') !== false);
+            $this->assertSame('0', ini_get('zend.exception_ignore_args'));
+
+            $raw = json_decode(
+                sprintf(
+                    '{"frontend_input":"text","scope":"global","ignored_sentinel":"%s"}',
+                    $sentinel,
+                ),
+                associative: false,
+                depth: 512,
+                flags: JSON_THROW_ON_ERROR,
+            );
+
+            try {
+                $normalizer->normalize($raw);
+                $this->fail('Expected validation exception');
+            } catch (ConnectorDiscoverySchemaValidationException $exception) {
+                $this->assertSame(ConnectorDiscoverySchemaValidationReason::MissingRequiredValue, $exception->reason);
+                $this->assertSame('attribute_code', $exception->path);
+
+                $helperFrame = $this->findTraceFrame($exception, 'requirePresentNonEmptyString');
+                $this->assertNotNull($helperFrame);
+                $this->assertInstanceOf(SensitiveParameterValue::class, $helperFrame['args'][0] ?? null);
+                $this->assertSame('attribute_code', $helperFrame['args'][1] ?? null);
+                $this->assertTraceDoesNotLeakSentinel($exception, $sentinel);
+            }
+        } finally {
+            ini_set('zend.exception_ignore_args', (string) $previousIgnoreArgs);
+        }
+    }
+
+    #[Test]
+    public function unknown_scope_trace_redacts_scope_value_from_map_scope_helper(): void
+    {
+        $sentinel = 'SENTINEL_UNKNOWN_SCOPE_4B2B1D';
+        $previousIgnoreArgs = ini_get('zend.exception_ignore_args');
+        $normalizer = new AdobePaaSAttributeNormalizer;
+
+        try {
+            $this->assertTrue(ini_set('zend.exception_ignore_args', '0') !== false);
+            $this->assertSame('0', ini_get('zend.exception_ignore_args'));
+
+            $raw = json_decode(
+                sprintf(
+                    '{"attribute_code":"color","frontend_input":"text","scope":"%s","ignored_sentinel":"IGNORED"}',
+                    $sentinel,
+                ),
+                associative: false,
+                depth: 512,
+                flags: JSON_THROW_ON_ERROR,
+            );
+
+            try {
+                $normalizer->normalize($raw);
+                $this->fail('Expected validation exception');
+            } catch (ConnectorDiscoverySchemaValidationException $exception) {
+                $this->assertSame(ConnectorDiscoverySchemaValidationReason::UnmappedValue, $exception->reason);
+                $this->assertSame('scope', $exception->path);
+
+                $mapScopeFrame = $this->findTraceFrame($exception, 'mapScope');
+                $this->assertNotNull($mapScopeFrame);
+                $this->assertInstanceOf(SensitiveParameterValue::class, $mapScopeFrame['args'][0] ?? null);
+                $this->assertTraceDoesNotLeakSentinel($exception, $sentinel);
+            }
+        } finally {
+            ini_set('zend.exception_ignore_args', (string) $previousIgnoreArgs);
+        }
+    }
+
+    #[Test]
+    public function duplicate_option_trace_redacts_raw_payload_from_build_normalized_payload_helper(): void
+    {
+        $sentinel = 'SENTINEL_DUP_NORMALIZER_4B2B1D';
+        $previousIgnoreArgs = ini_get('zend.exception_ignore_args');
+        $normalizer = new AdobePaaSAttributeNormalizer;
+
+        try {
+            $this->assertTrue(ini_set('zend.exception_ignore_args', '0') !== false);
+            $this->assertSame('0', ini_get('zend.exception_ignore_args'));
+
+            $raw = json_decode(
+                sprintf(
+                    '{"attribute_code":"color","frontend_input":"select","scope":"global","options":[{"label":"A","value":"%s"},{"label":"B","value":"%s"}]}',
+                    $sentinel,
+                    $sentinel,
+                ),
+                associative: false,
+                depth: 512,
+                flags: JSON_THROW_ON_ERROR,
+            );
+
+            try {
+                $normalizer->normalize($raw);
+                $this->fail('Expected validation exception');
+            } catch (ConnectorDiscoverySchemaValidationException $exception) {
+                $this->assertSame(ConnectorDiscoverySchemaValidationReason::DuplicateOptionValue, $exception->reason);
+
+                $buildPayloadFrame = $this->findTraceFrame($exception, 'buildNormalizedPayload');
+                $this->assertNotNull($buildPayloadFrame);
+                $this->assertInstanceOf(SensitiveParameterValue::class, $buildPayloadFrame['args'][0] ?? null);
+                $this->assertInstanceOf(SensitiveParameterValue::class, $buildPayloadFrame['args'][1] ?? null);
+                $this->assertTraceDoesNotLeakSentinel($exception, $sentinel);
+            }
+        } finally {
+            ini_set('zend.exception_ignore_args', (string) $previousIgnoreArgs);
+        }
+    }
+
+    #[Test]
+    public function all_public_and_private_data_bearing_parameters_carry_sensitive_parameter_attribute(): void
     {
         $methods = [
-            [AdobePaaSAttributeNormalizer::class, 'normalize', [0]],
-            [CanonicalSchemaOption::class, 'fromRaw', [0, 1]],
-            [CanonicalSchemaPayload::class, 'withOptions', [0]],
-            [CanonicalSchemaField::class, 'create', [0, 1, 2, 3, 4, 5, 6, 7, 8]],
-            [CanonicalSchemaFieldHash::class, 'create', [0, 1]],
-            [CanonicalSchemaFieldHasher::class, 'hash', [0]],
-            [CanonicalSchemaSnapshotHasher::class, 'hash', [0]],
+            [AdobePaaSAttributeNormalizer::class, 'normalize', [0], false],
+            [AdobePaaSAttributeNormalizer::class, 'requirePresentNonEmptyString', [0], true],
+            [AdobePaaSAttributeNormalizer::class, 'requirePresentString', [0], true],
+            [AdobePaaSAttributeNormalizer::class, 'readNullableString', [0], true],
+            [AdobePaaSAttributeNormalizer::class, 'readNullableBool', [0], true],
+            [AdobePaaSAttributeNormalizer::class, 'readPosition', [0], true],
+            [AdobePaaSAttributeNormalizer::class, 'mapFrontendInput', [0], true],
+            [AdobePaaSAttributeNormalizer::class, 'mapScope', [0], true],
+            [AdobePaaSAttributeNormalizer::class, 'buildNormalizedPayload', [0, 1], true],
+            [AdobePaaSAttributeNormalizer::class, 'classifyViolation', [0], true],
+            [CanonicalSchemaOption::class, 'fromRaw', [0, 1], false],
+            [CanonicalSchemaOption::class, '__construct', [0, 1], true],
+            [CanonicalSchemaOption::class, 'classifyViolation', [0], true],
+            [CanonicalSchemaPayload::class, 'withOptions', [0], false],
+            [CanonicalSchemaPayload::class, '__construct', [1], true],
+            [CanonicalSchemaField::class, 'create', [0, 1, 2, 3, 4, 5, 6, 7, 8], false],
+            [CanonicalSchemaField::class, '__construct', [0, 1, 2, 3, 4, 5, 6, 7, 8], true],
+            [CanonicalSchemaField::class, 'requirePayload', [0], true],
+            [CanonicalSchemaField::class, 'requireNonEmptyString', [0], true],
+            [CanonicalSchemaField::class, 'requireNullableString', [0], true],
+            [CanonicalSchemaField::class, 'requireNullableBool', [0], true],
+            [CanonicalSchemaField::class, 'requireNullableNonNegativeInt', [0], true],
+            [CanonicalSchemaField::class, 'classifyViolation', [0], true],
+            [CanonicalSchemaFieldHash::class, 'create', [0, 1], false],
+            [CanonicalSchemaFieldHash::class, '__construct', [0, 1], true],
+            [CanonicalSchemaFieldHash::class, 'classifyViolation', [0], true],
+            [CanonicalSchemaFieldHasher::class, 'hash', [0], false],
+            [CanonicalSchemaFieldHasher::class, 'buildCanonicalFieldObject', [0], true],
+            [CanonicalSchemaFieldHasher::class, 'encodeCanonicalJson', [0], true],
+            [CanonicalSchemaFieldHasher::class, 'sortObjectKeysRecursively', [0], true],
+            [CanonicalSchemaSnapshotHasher::class, 'hash', [0], false],
+            [CanonicalSchemaSnapshotHasher::class, 'buildCanonicalSnapshotObject', [0], true],
+            [CanonicalSchemaSnapshotHasher::class, 'encodeCanonicalJson', [0], true],
+            [CanonicalSchemaSnapshotHasher::class, 'sortObjectKeysRecursively', [0], true],
         ];
 
-        foreach ($methods as [$class, $method, $sensitiveIndexes]) {
-            $reflection = new \ReflectionMethod($class, $method);
+        foreach ($methods as [$class, $method, $sensitiveIndexes, $isPrivate]) {
+            $reflection = $isPrivate
+                ? new \ReflectionMethod($class, $method)
+                : new \ReflectionMethod($class, $method);
+
+            if ($isPrivate) {
+                $this->assertTrue($reflection->isPrivate(), "{$class}::{$method} must be private");
+            }
 
             foreach ($sensitiveIndexes as $index) {
                 $parameter = $reflection->getParameters()[$index];
@@ -216,5 +356,61 @@ class ConnectorDiscoverySchemaValidationExceptionTest extends TestCase
         yield 'options[0].value' => ['options[0].value'];
         yield 'normalized_payload.options' => ['normalized_payload.options'];
         yield 'fields[0].canonical_hash' => ['fields[0].canonical_hash'];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $trace
+     * @return array<string, mixed>|null
+     */
+    private function findTraceFrame(\Throwable $exception, string $function): ?array
+    {
+        foreach ($exception->getTrace() as $frame) {
+            if (($frame['function'] ?? '') === $function) {
+                return $frame;
+            }
+        }
+
+        return null;
+    }
+
+    private function assertTraceDoesNotLeakSentinel(\Throwable $exception, string $sentinel): void
+    {
+        $this->inspectTraceArguments($exception->getTrace(), $sentinel);
+        $this->assertStringNotContainsString($sentinel, $exception->getTraceAsString());
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $trace
+     */
+    private function inspectTraceArguments(array $trace, string $sentinel): void
+    {
+        foreach ($trace as $frame) {
+            foreach ($frame['args'] ?? [] as $argument) {
+                $this->inspectTraceArgument($argument, $sentinel);
+            }
+        }
+    }
+
+    private function inspectTraceArgument(mixed $argument, string $sentinel): void
+    {
+        if ($argument instanceof SensitiveParameterValue) {
+            return;
+        }
+
+        if ($argument instanceof \stdClass) {
+            $this->fail('Raw stdClass must not be retained in exception trace arguments');
+        }
+
+        if (is_string($argument)) {
+            $this->assertStringNotContainsString($sentinel, $argument);
+
+            return;
+        }
+
+        if (is_array($argument)) {
+            foreach ($argument as $nested) {
+                $this->inspectTraceArgument($nested, $sentinel);
+            }
+        }
     }
 }
