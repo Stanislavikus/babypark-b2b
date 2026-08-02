@@ -2303,6 +2303,40 @@ Each is ignored because it's either Magento-internal wiring irrelevant to a
 merchant-facing canonical schema, or explicitly deferred per the
 `normalized_payload` whitelist decision above — not because it was overlooked.
 
+#### Raw value type validation (v1)
+
+- mapped Adobe string properties must arrive as JSON strings — no
+  int/bool/float-to-string coercion is performed;
+- `attribute_code` and `frontend_input` are required, non-empty strings;
+  any other type or an empty string is a whole-attempt failure;
+- `default_frontend_label`: missing/`null` → canonical `null`; a string
+  (including `""`) is preserved as-is; any other type is a whole-attempt
+  failure;
+- selectable `options` must be decoded as a genuine JSON list — after
+  decoding the response with `json_decode(..., associative: false)`, a
+  JSON list `[...]` becomes a plain PHP list array (PHP:
+  `array_is_list()` true regardless of the `associative` flag, since
+  that flag only affects how JSON *objects* decode); a JSON object in
+  this position (including `{}`) decodes to `\stdClass`, not a PHP
+  array, and is rejected as a whole-attempt failure — this distinction
+  is only reliable because the response is decoded with
+  `associative: false` throughout, never `true`;
+- each option row must decode as `\stdClass` (a JSON object); any other
+  shape — including a PHP array, which cannot occur here under
+  `associative: false` decoding unless the raw JSON itself was a nested
+  array where an object was expected — is a whole-attempt failure;
+- option `value` is required and must be a string (empty string valid);
+  any other type or absence is a whole-attempt failure;
+- option `label`: missing/`null` → canonical `null`; a string (including
+  `" "` and `""`) is preserved as-is; any other type is a whole-attempt
+  failure;
+- unknown keys inside an option row are ignored and never persisted;
+- on a non-selectable type, any raw `options` value is ignored
+  completely, even if malformed — malformed data in a field this
+  contract doesn't read is not a validation failure;
+- no scalar coercion occurs anywhere in this normalizer — a value must
+  already be the exact expected raw type, or the field/attempt fails.
+
 #### Placeholder select options (v1)
 
 Adobe list responses for `select`/`multiselect` attributes commonly include a
