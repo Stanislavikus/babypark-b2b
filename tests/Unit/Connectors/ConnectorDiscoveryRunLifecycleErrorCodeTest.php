@@ -11,6 +11,15 @@ use Tests\TestCase;
 class ConnectorDiscoveryRunLifecycleErrorCodeTest extends TestCase
 {
     #[Test]
+    public function lifecycle_enum_has_exactly_five_cases(): void
+    {
+        $this->assertCount(
+            5,
+            ConnectorDiscoveryRunLifecycleErrorCode::cases(),
+        );
+    }
+
+    #[Test]
     public function dispatch_failed_has_expected_mappings(): void
     {
         $case = ConnectorDiscoveryRunLifecycleErrorCode::DispatchFailed;
