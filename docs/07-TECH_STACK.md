@@ -411,6 +411,45 @@ include an explicit post-merge activation runbook (install/reread/update/start,
 plus an end-to-end smoke discovery run) as a separate, human-executed
 step — not silent deployment alongside the feature merge.
 
+**Activation config flag (Task 4B-2b-1b):** `config/connectors.php` exposes
+`discovery.manual_trigger_enabled`, backed by
+`CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED` (default `false` in
+`.env.example`). UI and dispatch-service code must read this **only** via
+`config('connectors.discovery.manual_trigger_enabled')` — never call `env()`
+directly outside the config file (direct `env()` calls elsewhere break
+`config:cache` in production). Enforce in **two places** so a direct
+dispatch-service call cannot bypass the UI gate:
+
+1. when `config('connectors.discovery.manual_trigger_enabled')` is `false`,
+   the Filament manual-trigger action is **hidden**, not disabled. This
+   deployment gate is **not** a user-facing disabled state — the five
+   disabled states remain the four feature states from discovery Scope 8 plus
+   source unavailable (`connectors.errors.discovery_source_unavailable`);
+2. the dispatch service checks
+   `config('connectors.discovery.manual_trigger_enabled')` and refuses to
+   execute even if called directly. This check runs **after** account/workspace
+   resolution and authorization, but **before** source resolution, any
+   database transaction, `ConnectorDiscoveryRun` row creation, queue dispatch,
+   or HTTP work. A direct authorized call while disabled throws
+   `ConnectorDiscoveryManualTriggerDisabledException` (documented here only —
+   the application exception class is added in Task 4B-2b-1). No
+   `ConnectorDiscoveryRun` row is created and no HTTP call is made.
+
+**Post-merge activation runbook (Task 4B-2b-1 delivery — not executed in
+4B-2b-1b):**
+
+1. Install/reread/update/start the Supervisor `babypark-connector-queue`
+   program on the pilot host.
+2. Confirm `supervisorctl status` shows `babypark-connector-queue` as
+   `RUNNING`.
+3. Set `CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=true` in production
+   environment.
+4. Run `php artisan config:cache` (or the project's equivalent deploy step).
+5. Execute one end-to-end smoke discovery from the admin UI.
+6. Verify resulting queue/run/snapshot state.
+7. If the smoke test fails, roll `CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED`
+   back to `false` and clear config cache again before further investigation.
+
 ### SSRF-safe connector outbound transport
 
 Connector outbound HTTP must use an isolated SSRF-safe transport that:

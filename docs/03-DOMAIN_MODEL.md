@@ -1935,6 +1935,27 @@ is not a value of `connector_discovery_runs.error_code`, because the
 required, non-nullable `connector_schema_source_id` column makes it
 physically impossible to persist a run without a resolved source.
 
+**Pre-dispatch source-resolution failure UX (Resolved):**
+
+- the dispatch service throws `ConnectorDiscoverySourceResolutionException`,
+  carrying an internal `reason` of `missing` or `ambiguous` (not exposed to
+  the end user — used only for logging);
+- the single safe translation key shown to the user in both cases, without
+  distinguishing missing from ambiguous (distinguishing them in the UI would
+  leak internal source-configuration detail):
+  `connectors.errors.discovery_source_unavailable`;
+- this is surfaced as a **pre-render disabled state** on the manual-trigger
+  action, alongside the other four disabled states from discovery Scope 8
+  (bringing the total to five user-facing disabled states: four feature states
+  plus source unavailable — the deployment activation gate is **hidden**, not
+  disabled, and is not counted here);
+- what gets logged for support: workspace ID, connector account ID, connector
+  definition ID, and the match count (0 or the actual count for ambiguous) —
+  never credentials, the full `endpoint_path`/URL, or other settings;
+- the actual HTTP fetch must use the **persisted**
+  `ConnectorSchemaSource.endpoint_path` value — never a hardcoded Adobe path.
+  This is a hard requirement, not an implementation detail left implicit.
+
 After a run is created, the worker re-loads the `ConnectorAccount` and
 `ConnectorDiscoveryRun` within workspace context (both are
 workspace-scoped), then separately re-loads the *persisted*
@@ -1947,6 +1968,30 @@ invalid between dispatch and execution, the run terminates with the
 lifecycle code
 `discovery_source_invalid_before_execution` (see the lifecycle table
 below).
+
+#### Discovery dispatch and execution transaction phases (Resolved)
+
+Do not describe discovery (or connection-check) execution as "two
+transactions." The verified persistence layer uses distinct phases:
+
+- **Phase A — dispatch-time reservation** (inside `executeManual()`'s own
+  `DB::transaction()` in the dispatch service, mirroring
+  `ConnectorConnectionCheckDispatchService::executeManual()`);
+- **Phase B — execution-slot reservation** (a separate transaction, inside the
+  job/persistence layer, mirroring `reserveExecutionSlot()` in
+  `ConnectorConnectionCheckPersistence`);
+- **Phase C — vendor execution** (paginated HTTP + normalization + hashing),
+  entirely outside any database transaction;
+- **Phase D — terminal finalization**, itself potentially one of several
+  distinct transacted methods depending on outcome (success via
+  `finalizeAfterVendorAttempt()`, lifecycle failure via `writeLifecycleFailure()`,
+  stored-vendor-classification terminal write via
+  `terminalizeWithStoredVendorClassification()`, attempts-exhausted terminal
+  write via `terminalizeAttemptsExhausted()`, account-disabled terminal write
+  via `terminalizeAccountDisabledBeforeExecution()`, stale-row recovery via
+  `recoverStaleRowIfNeeded()` / `recoverStaleRow()`) — mirroring
+  `ConnectorConnectionCheckPersistence`'s actual distinct methods, not a single
+  generic "Transaction B."
 
 Active-run uniqueness per (connector_account_id,
 connector_schema_source_id) pair is an **application-level invariant**
@@ -2152,6 +2197,128 @@ columns — diffs are separate entities.
 | `created_at` | timestamp | |
 
 Unique: `(snapshot_id, external_field_key)`.
+
+### Adobe attribute normalization (Resolved)
+
+This section defines how Adobe Commerce PaaS/on-prem `GET /V1/products/attributes`
+**list** responses are converted into the canonical
+`ConnectorSchemaSnapshotField` shape **before** hashing (see
+`Connector schema canonical hashing (Resolved)` below). It is versioned contract
+`v1` — the same discipline as the hashing contract: it must never change
+silently; any change requires an explicit documentation-level decision and a
+rebaseline plan.
+
+**Source: list endpoint only, no per-attribute enrichment.** Adobe's own
+documentation and field experience show that list/search endpoints may not
+reliably return full per-object detail (for example `frontend_labels` returning
+`null`, or `frontend_input` for a swatch attribute showing as plain `select`, on
+list responses). Given the 50-page/10,000-field budget assumes exactly one list
+endpoint, **do not add N+1 per-attribute detail requests in v1.** Normalize
+only fields reliably present in `GET /V1/products/attributes` list responses. A
+field this contract marks as sourced from the list response but which arrives as
+`null`/missing is handled per the missing-value rule below — it is **not**
+fetched via a follow-up detail call.
+
+Confirmed upstream service contracts (Magento 2.4 `AttributeInterface`,
+`EavAttributeInterface`, `ProductAttributeInterface`): list items expose
+`attribute_code`, `frontend_input`, `is_required`, `options[]`,
+`default_frontend_label`, `frontend_labels[]`, `scope`, `position`,
+`backend_type`, `validation_rules[]`, `is_unique`, `default_value`, `note`, and
+other standard properties — but v1 maps only the subset in the table below.
+
+| Canonical field | Adobe source (list response) | Conversion rule |
+|---|---|---|
+| `external_field_key` | `attribute_code` | direct copy, no transformation |
+| `external_label` | `default_frontend_label` | direct copy. `frontend_labels[]` (per-store labels) are **not** captured anywhere in v1 — not in this field, not in `normalized_payload`. Per-store label capture is deferred to a future version; capturing it now without a defined localization consumer would be premature scope |
+| `normalized_data_type` | `frontend_input` | mapped through this exact, closed lookup table for v1 — genuinely connector-neutral values, not raw Magento/Adobe terms (per the existing "Connector-neutral type code" note on this column): `text`→`text`, `textarea`→`long_text`, `texteditor`→`long_text`, `date`→`date`, `datetime`→`datetime`, `boolean`→`boolean`, `select`→`select`, `multiselect`→`multi_select`, `price`→`money`, `media_image`→`image`, `gallery`→`image_collection`. `weight` is deliberately **excluded** from this v1 list — research did not confirm it as an actual `frontend_input` value (as opposed to an attribute *code*/semantic concept); if the real pilot instance reveals a `weight`-typed `frontend_input`, add it as a rebaseline, don't guess it in now. Any `frontend_input` value not in this table terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed` — never guessed, never passed through unmapped. Explicitly **not** derived from `backend_type` (Magento's internal DB storage type is a different concept from the merchant-facing input type). This discovery-level vocabulary is not required to match the future `FieldDefinition`/Field Dictionary vocabulary exactly — reconciling the two (e.g. how `datetime` or `image_collection` map onto whatever Task 4C's import model uses) is that later task's own decision; discovery must not lose information just because a downstream consumer doesn't exist yet |
+| `is_required` | `is_required` | `true`/`false` → direct copy; missing or `null` → `null` (per the canonical value-type contract's own `is_required: boolean or null` — never defaulted to `false`, since an unknown value is not the same claim as "confirmed optional"); any other type terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed` |
+| `is_multi_value` | derived | `true` when `frontend_input` is `multiselect` or `gallery` (both represent a collection of values, per the `normalized_data_type` mapping above — `gallery`'s `image_collection` type is definitionally multi-value), else `false` |
+| `is_localizable` | derived from `scope` | `global`→`false`, `website`→`false`, `store`→`true`. This is a v1 approximation: it reflects "capable of varying by store view," not a verified match to this project's specific JSONB-language-dictionary localization model — `website`-scoped values are intentionally treated as non-localizable in v1 since website-level variation is not the same concept as language localization. Document this distinction explicitly: the boolean must not imply more than it means |
+| `external_scope` | `scope` (the REST-visible string field on the attribute object) | normalized to the closed lowercase vocabulary `global`/`website`/`store`; any other value terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed` |
+| `normalized_payload` | whitelist, closed for v1 | exactly: normalized `options[]` (per the already-Resolved option-normalization rule, sourced from the list response's own `options[]`) for `select`/`multiselect` types only, producing `{"options":[...]}` (empty list allowed: `{"options":[]}`); for all other `normalized_data_type` values, `normalized_payload` is always `{}` — vendor-supplied `options` on a non-selectable type are ignored, not copied. `validation_rules`, `note`, `is_unique`, `default_value` are explicitly **excluded from v1** — not because they're unimportant, but because their exact shape/reliability on the list endpoint hasn't been verified against this project's actual pilot Adobe instance; adding them later is a new versioned decision, not a silent addition |
+| `sort_order` | `position` | Adobe REST `ProductAttributeInterface` (extending `Magento\Catalog\Api\Data\EavAttributeInterface`) exposes the attribute ordering value as `position`. A JSON integer `>= 0` is copied directly into canonical `sort_order`; missing or `null` becomes `null`; any non-integer value — including a numeric string like `"10"`, since the canonical contract forbids coercing a numeric string into a number — or a negative integer terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed`. Never derived from page, array, database-insertion, or response order. A vendor extension field literally named `sort_order`, if one happens to be present, is not used in v1 — only `position` is read. **If the real pilot instance's actual response lacks a `position` field, stop and report the exact Adobe Commerce version, endpoint, and a redacted literal response item — do not silently fall back to any other field name, including `sort_order`.** This would signal a version/module drift from the documented service contract, not a reason to guess |
+
+#### Missing/null/empty handling (v1)
+
+- `attribute_code` missing, `null`, or empty string → terminates the whole
+  vendor execution attempt with `DiscoverySchemaValidationFailed` (this is the
+  field-hash primary key, it cannot be defaulted or absent);
+- `external_label` missing or `null` → the canonical field is `null`;
+  `external_label` present as an empty string → preserved as an empty string
+  (distinct from `null`, per the already-Resolved canonical contract);
+- `frontend_input` missing or `null` → terminates the whole vendor execution
+  attempt with `DiscoverySchemaValidationFailed` (load-bearing for
+  `normalized_data_type`, cannot be defaulted);
+- `is_required` missing or `null` → canonical `null` (never defaulted to
+  `false`);
+- `scope` missing or `null` → terminates the whole vendor execution attempt
+  with `DiscoverySchemaValidationFailed` (no safe default for a value that
+  determines `is_localizable`);
+- on a `select`/`multiselect` field: `options` missing or `null` → terminates
+  the whole vendor execution attempt with `DiscoverySchemaValidationFailed`;
+  `options` present as an empty list `[]` → valid, produces
+  `normalized_payload: {"options":[]}`;
+- on a non-selectable type, any `options` value present is ignored (not an
+  error);
+- `sort_order` missing or `null` → canonical `null` (not an error).
+
+#### Whole-attempt schema-validation semantics (v1)
+
+Any normalization or option-validation failure — in any Adobe attribute, any
+mapped property, or any option row — **invalidates the complete vendor
+execution attempt**. The adapter must **not** skip the invalid field and
+continue processing remaining attributes.
+
+On such a failure:
+
+- no `ConnectorSchemaSnapshot` row is published;
+- no `ConnectorSchemaSnapshotField` rows are published;
+- the terminal result code is `DiscoverySchemaValidationFailed`
+  (`discovery_schema_validation_failed`);
+- actionability is `support_required`;
+- the outcome is **non-retryable** (not `automatic_retry`).
+
+This applies uniformly to every rule in this section that terminates the
+whole vendor execution attempt with `DiscoverySchemaValidationFailed`, including
+unknown `frontend_input`, unknown `scope`, invalid `position`/`sort_order`,
+missing required `options` on selectable types, and duplicate option values per
+the canonical option-normalization rule.
+
+#### Ignored vendor properties (v1)
+
+Normalization reads only the explicitly mapped source fields listed in the
+table above. Every other vendor property on the response object — including
+unknown extension/module fields from any installed Magento module — is silently
+ignored and never persisted. The list below documents known, standard Adobe
+fields this v1 contract deliberately doesn't map, for clarity; it is **not** a
+closed allowlist for the entire response object, and an unrecognized field must
+never cause `schema_validation` failure by itself:
+
+`attribute_id`, `entity_type_id`, `is_visible_in_grid`, `is_filterable_in_grid`,
+`is_used_in_grid`, `is_visible_on_front`, `is_unique`, `is_wysiwyg_enabled`,
+`frontend_class`, `source_model`, `backend_model`, `backend_type`, `note`,
+`default_value`, `validation_rules`, `frontend_labels`.
+
+Each is ignored because it's either Magento-internal wiring irrelevant to a
+merchant-facing canonical schema, or explicitly deferred per the
+`normalized_payload` whitelist decision above — not because it was overlooked.
+
+#### Placeholder select options (v1)
+
+Adobe list responses for `select`/`multiselect` attributes commonly include a
+placeholder first option with an empty value and a single-space label (observed
+shape: `{"label": " ", "value": ""}`). **Do not introduce an unconfirmed
+heuristic to strip or special-case this row** — every option row Adobe returns,
+including this one, is normalized and hashed per the existing, already-Resolved
+option-normalization rule (unique `value` bytewise, sorted ascending) exactly
+like any other option. Inventing a stripping rule not already in the Resolved
+contract would itself be a silent, undocumented normalization decision.
+
+#### Raw payload prohibition
+
+Raw Adobe response bodies are never persisted, only the mapped canonical shape
+(already stated for the hash contract — restated here for the mapping step
+specifically, since that's where raw data first enters the system).
 
 ### Connector schema canonical hashing (Resolved)
 

@@ -1740,8 +1740,14 @@ Applies to workspace-owned external connections (ERP, commerce platforms, feeds)
    discovery); errors use cause-specific copy with one next step. **401** →
    replace credentials; **403** → update integration role/scopes — never a
    generic “Connection failed” when cause is known.
-4. **Discovery overview** — run status, source, captured time, field counts,
-   diff summary, when diff computation is available from Task 4B-2c, first-snapshot label, link to current snapshot.
+4. **Discovery overview** — run status, source display name (not a technical
+   identifier), captured time, field count, first-snapshot / «Без змін» status
+   label, and a **link to current snapshot** that opens a minimal read-only
+   snapshot detail page (Task 4B-2b-1): source display name, captured time,
+   field count, and first-snapshot / no-change label only — no field list, no
+   filters, no diff surface, and **no canonical hash** (technical identifier with
+   no operational meaning to Merchandiser). Task 4B-2c extends that same page
+   with diff summary, field list, and filters.
 5. **Discovery field list** — Data List Search & Filter Pattern (search visible,
    filters in right-side slide-over, badge semantics, mobile single overflow).
    Hundreds of fields → list + detail drawer/page, not accordion.

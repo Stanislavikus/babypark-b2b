@@ -320,6 +320,27 @@ closing this gap. It must:
   credentials, settings, base URL, store-specific configuration, or any
   other management-only field — confirm the exact current field list
   this applies to against the real resource/infolist code, don't assume;
+- perform an explicit **rendered-view audit** covering index/table columns,
+  searchable fields (confirmed current: includes `store_code`,
+  `tenant_context`), detail infolist, relation managers, header actions,
+  route access, and Livewire serialized state — not the infolist alone;
+- apply the binding role matrix below, confirmed against the real, current
+  `App\Enums\UserRole` enum (`Admin`, `Manager`, `Warehouse`,
+  `Merchandiser`, `Director`, `Programmer`):
+
+| Role | `viewAny`/`view` (safe fields only) | `runDiscovery` | Management (settings/credentials/disable) |
+|---|---|---|---|
+| Admin | Yes | Yes | Yes |
+| Director | Yes | Yes | Yes |
+| Manager, Warehouse, Programmer with `manage_connector_accounts` | Yes | Yes | Yes |
+| Manager, Warehouse, Programmer without `manage_connector_accounts` | No (unchanged) | No (unchanged) | No |
+| Merchandiser | Yes — **this task's fix** | Yes — **this task's fix** | No |
+| Any role, cross-workspace account | No (404) | No (404) | No |
+| Disabled account | Per the normal role matrix above (unaffected by disabled state) | No (disabled-state block) | Per the normal role matrix above — `allowsManagementAbility()` does not check account-disabled state; Admin/Director/permission-holder must still fix settings/credentials or reactivate a disabled account |
+
+If the actual current policy code differs from this table at implementation
+time, **stop and report the exact discrepancy** — do not silently edit this
+table to match whatever the code happens to do.
 - add tests that don't stop at the policy layer — assert against the
   actual rendered view/response for a Merchandiser-authenticated request,
   proving the sensitive fields are genuinely absent from output, not
