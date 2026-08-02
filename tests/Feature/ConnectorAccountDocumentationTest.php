@@ -893,24 +893,138 @@ class ConnectorAccountDocumentationTest extends TestCase
 
         $mappingRows = [
             ['external_field_key', '`attribute_code`', 'direct copy, no transformation'],
-            ['external_label', '`default_frontend_label`', 'direct copy'],
+            ['external_label', '`default_frontend_label`', 'direct copy. `frontend_labels[]`'],
             ['normalized_data_type', '`frontend_input`', '`text`→`text`'],
             ['is_required', '`is_required`', 'never defaulted to `false`'],
-            ['is_multi_value', 'derived', '`multiselect` or `gallery`'],
-            ['is_localizable', 'derived from `scope`', '`global`→`false`'],
-            ['external_scope', '`scope` (the REST-visible string field on the attribute object)', '`global`/`website`/`store`'],
-            ['normalized_payload', 'whitelist, closed for v1', '{"options":[...]}'],
-            ['sort_order', '`position`', 'JSON integer `>= 0`'],
+            ['is_multi_value', 'derived', '`true` when `frontend_input` is `multiselect` or `gallery`'],
+            ['is_localizable', 'derived from `scope`', '`global`→`false`, `website`→`false`, `store`→`true`'],
+            ['external_scope', '`scope` (the REST-visible string field on the attribute object)', 'normalized to the closed lowercase vocabulary `global`/`website`/`store`'],
+            ['normalized_payload', 'whitelist, closed for v1', 'producing `{"options":[...]}`'],
+            ['sort_order', '`position`', 'only `position` is read'],
         ];
 
-        foreach ($mappingRows as [$canonical, $source, $rule]) {
+        foreach ($mappingRows as [$canonical, $source, $ruleFragment]) {
             $this->assertStringContainsString("| `{$canonical}` | {$source} |", $section);
-            $this->assertStringContainsString($rule, $section);
+            $this->assertStringContainsString($ruleFragment, $section);
         }
 
-        $this->assertStringContainsString('`textarea`→`long_text`', $section);
-        $this->assertStringContainsString('`multiselect`→`multi_select`', $section);
-        $this->assertStringContainsString('`gallery`→`image_collection`', $section);
+        foreach ([
+            'text' => 'text',
+            'textarea' => 'long_text',
+            'texteditor' => 'long_text',
+            'date' => 'date',
+            'datetime' => 'datetime',
+            'boolean' => 'boolean',
+            'select' => 'select',
+            'multiselect' => 'multi_select',
+            'price' => 'money',
+            'media_image' => 'image',
+            'gallery' => 'image_collection',
+        ] as $adobeInput => $canonicalType) {
+            $this->assertStringContainsString(
+                "`{$adobeInput}`→`{$canonicalType}`",
+                $section,
+                "Missing closed lookup mapping for frontend_input {$adobeInput}"
+            );
+        }
+
+        $this->assertStringContainsString(
+            '| `is_multi_value` | derived | `true` when `frontend_input` is `multiselect` or `gallery`',
+            $section
+        );
+        $this->assertStringContainsString(
+            '| `is_localizable` | derived from `scope` | `global`→`false`, `website`→`false`, `store`→`true`',
+            $section
+        );
+        $this->assertStringContainsString(
+            'Any `frontend_input` value not in this table terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed`',
+            $section
+        );
+        $this->assertStringContainsString(
+            'any other value terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed`',
+            $section
+        );
+        $this->assertStringContainsString(
+            'for all other `normalized_data_type` values, `normalized_payload` is always `{}`',
+            $section
+        );
+        $this->assertStringContainsString(
+            'producing `{"options":[...]}` (empty list allowed: `{"options":[]}`)',
+            $section
+        );
+        $this->assertStringContainsString(
+            '`options` missing or `null` → terminates',
+            $section
+        );
+        $this->assertStringContainsString(
+            'the whole vendor execution attempt with `DiscoverySchemaValidationFailed`',
+            $section
+        );
+        $this->assertStringContainsString(
+            '`options` present as an empty list `[]` → valid, produces',
+            $section
+        );
+        $this->assertStringContainsString(
+            '`normalized_payload: {"options":[]}`',
+            $section
+        );
+        $this->assertStringContainsString(
+            'including a numeric string like `"10"`, since the canonical contract forbids coercing a numeric string into a number',
+            $section
+        );
+        $this->assertStringContainsString(
+            'A vendor extension field literally named `sort_order`, if one happens to be present, is not used in v1 — only `position` is read',
+            $section
+        );
+        $this->assertStringContainsString(
+            'unknown extension/module fields from any installed Magento module',
+            $section
+        );
+        $this->assertStringContainsString(
+            'is silently',
+            $section
+        );
+        $this->assertStringContainsString(
+            'ignored and never persisted',
+            $section
+        );
+        $this->assertStringContainsString('#### Whole-attempt schema-validation semantics (v1)', $section);
+        $this->assertStringContainsString(
+            '**invalidates the complete vendor',
+            $section
+        );
+        $this->assertStringContainsString(
+            'execution attempt**',
+            $section
+        );
+        $this->assertStringContainsString(
+            'must **not** skip the invalid field and',
+            $section
+        );
+        $this->assertStringContainsString(
+            'continue processing remaining attributes',
+            $section
+        );
+        $this->assertStringContainsString(
+            'no `ConnectorSchemaSnapshot` row is published',
+            $section
+        );
+        $this->assertStringContainsString(
+            'no `ConnectorSchemaSnapshotField` rows are published',
+            $section
+        );
+        $this->assertStringContainsString(
+            'terminal result code is `DiscoverySchemaValidationFailed`',
+            $section
+        );
+        $this->assertStringContainsString(
+            'actionability is `support_required`',
+            $section
+        );
+        $this->assertStringContainsString(
+            'outcome is **non-retryable**',
+            $section
+        );
         $this->assertStringContainsString('`weight` is deliberately **excluded**', $section);
         $this->assertStringContainsString('placeholder first option', $section);
         $this->assertStringContainsString('Raw Adobe response bodies are never persisted', $section);
@@ -923,14 +1037,55 @@ class ConnectorAccountDocumentationTest extends TestCase
         $connectorsConfig = File::get(base_path('config/connectors.php'));
         $envExample = File::get(base_path('.env.example'));
 
-        $this->assertStringContainsString('CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED', $envExample);
-        $this->assertStringContainsString('manual_trigger_enabled', $connectorsConfig);
+        $this->assertMatchesRegularExpression(
+            "/'manual_trigger_enabled'\s*=>\s*env\(\s*'CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED',\s*false,\s*\)/",
+            $connectorsConfig
+        );
+        $this->assertStringContainsString('CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=false', $envExample);
         $this->assertStringContainsString("config('connectors.discovery.manual_trigger_enabled')", $techStack);
         $this->assertStringContainsString('Enforce in **two places**', $techStack);
-        $this->assertStringContainsString('Filament manual-trigger action is hidden or disabled', $techStack);
-        $this->assertStringContainsString('dispatch service itself checks', $techStack);
+        $this->assertStringContainsString(
+            'the Filament manual-trigger action is **hidden**, not disabled',
+            $techStack
+        );
+        $this->assertStringNotContainsString('hidden or disabled', $techStack);
+        $this->assertStringContainsString(
+            'disabled states remain the four feature states from discovery Scope 8 plus',
+            $techStack
+        );
+        $this->assertStringContainsString(
+            'source unavailable (`connectors.errors.discovery_source_unavailable`)',
+            $techStack
+        );
+        $this->assertStringContainsString(
+            'deployment gate is **not** a user-facing disabled state',
+            $techStack
+        );
+        $this->assertStringContainsString(
+            'This check runs **after** account/workspace',
+            $techStack
+        );
+        $this->assertStringContainsString(
+            'resolution and authorization, but **before** source resolution',
+            $techStack
+        );
+        $this->assertStringContainsString(
+            '`ConnectorDiscoveryRun` row creation, queue dispatch,',
+            $techStack
+        );
+        $this->assertStringContainsString(
+            'or HTTP work',
+            $techStack
+        );
+        $this->assertStringContainsString('ConnectorDiscoveryManualTriggerDisabledException', $techStack);
+        $this->assertStringContainsString(
+            '`ConnectorDiscoveryRun` row is created and no HTTP call is made',
+            $techStack
+        );
         $this->assertStringContainsString('Post-merge activation runbook', $techStack);
         $this->assertStringContainsString('babypark-connector-queue', $techStack);
+        $this->assertStringNotContainsString("'schema_discovery'", $connectorsConfig);
+        $this->assertStringContainsString("'capabilities' => ['connection_check']", $connectorsConfig);
     }
 
     #[Test]
@@ -964,7 +1119,24 @@ class ConnectorAccountDocumentationTest extends TestCase
         $this->assertStringContainsString('`store_code`', $gap006);
         $this->assertStringContainsString('`tenant_context`', $gap006);
         $this->assertStringContainsString('Livewire serialized state', $gap006);
-        $this->assertStringContainsString('| Merchandiser | Yes — **this task\'s fix** | Yes — **this task\'s fix** | No |', $gap006);
+        $this->assertStringContainsString('| Admin | Yes | Yes | Yes |', $gap006);
+        $this->assertStringContainsString('| Director | Yes | Yes | Yes |', $gap006);
+        $this->assertStringContainsString(
+            '| Manager, Warehouse, Programmer with `manage_connector_accounts` | Yes | Yes | Yes |',
+            $gap006
+        );
+        $this->assertStringContainsString(
+            '| Manager, Warehouse, Programmer without `manage_connector_accounts` | No (unchanged) | No (unchanged) | No |',
+            $gap006
+        );
+        $this->assertStringContainsString(
+            '| Merchandiser | Yes — **this task\'s fix** | Yes — **this task\'s fix** | No |',
+            $gap006
+        );
+        $this->assertStringContainsString('| Any role, cross-workspace account | No (404) | No (404) | No |', $gap006);
+        $this->assertStringContainsString('| Disabled account |', $gap006);
+        $this->assertStringContainsString('No (disabled-state block)', $gap006);
+        $this->assertStringContainsString('allowsManagementAbility()` does not check account-disabled state', $gap006);
         $this->assertStringContainsString('stop and report the exact discrepancy', $gap006);
     }
 

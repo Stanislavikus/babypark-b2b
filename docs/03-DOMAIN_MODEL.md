@@ -1945,9 +1945,10 @@ physically impossible to persist a run without a resolved source.
   leak internal source-configuration detail):
   `connectors.errors.discovery_source_unavailable`;
 - this is surfaced as a **pre-render disabled state** on the manual-trigger
-  action, alongside the other disabled states from discovery Scope 8 (bringing
-  the total to five — resolving the count mismatch between the UI's four listed
-  states and the test matrix's five);
+  action, alongside the other four disabled states from discovery Scope 8
+  (bringing the total to five user-facing disabled states: four feature states
+  plus source unavailable — the deployment activation gate is **hidden**, not
+  disabled, and is not counted here);
 - what gets logged for support: workspace ID, connector account ID, connector
   definition ID, and the match count (0 or the actual count for ambiguous) —
   never credentials, the full `endpoint_path`/URL, or other settings;
@@ -2229,34 +2230,59 @@ other standard properties — but v1 maps only the subset in the table below.
 |---|---|---|
 | `external_field_key` | `attribute_code` | direct copy, no transformation |
 | `external_label` | `default_frontend_label` | direct copy. `frontend_labels[]` (per-store labels) are **not** captured anywhere in v1 — not in this field, not in `normalized_payload`. Per-store label capture is deferred to a future version; capturing it now without a defined localization consumer would be premature scope |
-| `normalized_data_type` | `frontend_input` | mapped through this exact, closed lookup table for v1 — genuinely connector-neutral values, not raw Magento/Adobe terms (per the existing "Connector-neutral type code" note on this column): `text`→`text`, `textarea`→`long_text`, `texteditor`→`long_text`, `date`→`date`, `datetime`→`datetime`, `boolean`→`boolean`, `select`→`select`, `multiselect`→`multi_select`, `price`→`money`, `media_image`→`image`, `gallery`→`image_collection`. `weight` is deliberately **excluded** from this v1 list — research did not confirm it as an actual `frontend_input` value (as opposed to an attribute *code*/semantic concept); if the real pilot instance reveals a `weight`-typed `frontend_input`, add it as a rebaseline, don't guess it in now. Any `frontend_input` value not in this table fails the field with `schema_validation` — never guessed, never passed through unmapped. Explicitly **not** derived from `backend_type` (Magento's internal DB storage type is a different concept from the merchant-facing input type). This discovery-level vocabulary is not required to match the future `FieldDefinition`/Field Dictionary vocabulary exactly — reconciling the two (e.g. how `datetime` or `image_collection` map onto whatever Task 4C's import model uses) is that later task's own decision; discovery must not lose information just because a downstream consumer doesn't exist yet |
-| `is_required` | `is_required` | `true`/`false` → direct copy; missing or `null` → `null` (per the canonical value-type contract's own `is_required: boolean or null` — never defaulted to `false`, since an unknown value is not the same claim as "confirmed optional"); any other type → `schema_validation` |
+| `normalized_data_type` | `frontend_input` | mapped through this exact, closed lookup table for v1 — genuinely connector-neutral values, not raw Magento/Adobe terms (per the existing "Connector-neutral type code" note on this column): `text`→`text`, `textarea`→`long_text`, `texteditor`→`long_text`, `date`→`date`, `datetime`→`datetime`, `boolean`→`boolean`, `select`→`select`, `multiselect`→`multi_select`, `price`→`money`, `media_image`→`image`, `gallery`→`image_collection`. `weight` is deliberately **excluded** from this v1 list — research did not confirm it as an actual `frontend_input` value (as opposed to an attribute *code*/semantic concept); if the real pilot instance reveals a `weight`-typed `frontend_input`, add it as a rebaseline, don't guess it in now. Any `frontend_input` value not in this table terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed` — never guessed, never passed through unmapped. Explicitly **not** derived from `backend_type` (Magento's internal DB storage type is a different concept from the merchant-facing input type). This discovery-level vocabulary is not required to match the future `FieldDefinition`/Field Dictionary vocabulary exactly — reconciling the two (e.g. how `datetime` or `image_collection` map onto whatever Task 4C's import model uses) is that later task's own decision; discovery must not lose information just because a downstream consumer doesn't exist yet |
+| `is_required` | `is_required` | `true`/`false` → direct copy; missing or `null` → `null` (per the canonical value-type contract's own `is_required: boolean or null` — never defaulted to `false`, since an unknown value is not the same claim as "confirmed optional"); any other type terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed` |
 | `is_multi_value` | derived | `true` when `frontend_input` is `multiselect` or `gallery` (both represent a collection of values, per the `normalized_data_type` mapping above — `gallery`'s `image_collection` type is definitionally multi-value), else `false` |
 | `is_localizable` | derived from `scope` | `global`→`false`, `website`→`false`, `store`→`true`. This is a v1 approximation: it reflects "capable of varying by store view," not a verified match to this project's specific JSONB-language-dictionary localization model — `website`-scoped values are intentionally treated as non-localizable in v1 since website-level variation is not the same concept as language localization. Document this distinction explicitly: the boolean must not imply more than it means |
-| `external_scope` | `scope` (the REST-visible string field on the attribute object) | normalized to the closed lowercase vocabulary `global`/`website`/`store`; any other value fails with `schema_validation` |
+| `external_scope` | `scope` (the REST-visible string field on the attribute object) | normalized to the closed lowercase vocabulary `global`/`website`/`store`; any other value terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed` |
 | `normalized_payload` | whitelist, closed for v1 | exactly: normalized `options[]` (per the already-Resolved option-normalization rule, sourced from the list response's own `options[]`) for `select`/`multiselect` types only, producing `{"options":[...]}` (empty list allowed: `{"options":[]}`); for all other `normalized_data_type` values, `normalized_payload` is always `{}` — vendor-supplied `options` on a non-selectable type are ignored, not copied. `validation_rules`, `note`, `is_unique`, `default_value` are explicitly **excluded from v1** — not because they're unimportant, but because their exact shape/reliability on the list endpoint hasn't been verified against this project's actual pilot Adobe instance; adding them later is a new versioned decision, not a silent addition |
-| `sort_order` | `position` | Adobe REST `ProductAttributeInterface` (extending `Magento\Catalog\Api\Data\EavAttributeInterface`) exposes the attribute ordering value as `position`. A JSON integer `>= 0` is copied directly into canonical `sort_order`; missing or `null` becomes `null`; any non-integer value — including a numeric string like `"10"`, since the canonical contract forbids coercing a numeric string into a number — or a negative integer fails with `schema_validation`. Never derived from page, array, database-insertion, or response order. A vendor extension field literally named `sort_order`, if one happens to be present, is not used in v1 — only `position` is read. **If the real pilot instance's actual response lacks a `position` field, stop and report the exact Adobe Commerce version, endpoint, and a redacted literal response item — do not silently fall back to any other field name, including `sort_order`.** This would signal a version/module drift from the documented service contract, not a reason to guess |
+| `sort_order` | `position` | Adobe REST `ProductAttributeInterface` (extending `Magento\Catalog\Api\Data\EavAttributeInterface`) exposes the attribute ordering value as `position`. A JSON integer `>= 0` is copied directly into canonical `sort_order`; missing or `null` becomes `null`; any non-integer value — including a numeric string like `"10"`, since the canonical contract forbids coercing a numeric string into a number — or a negative integer terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed`. Never derived from page, array, database-insertion, or response order. A vendor extension field literally named `sort_order`, if one happens to be present, is not used in v1 — only `position` is read. **If the real pilot instance's actual response lacks a `position` field, stop and report the exact Adobe Commerce version, endpoint, and a redacted literal response item — do not silently fall back to any other field name, including `sort_order`.** This would signal a version/module drift from the documented service contract, not a reason to guess |
 
 #### Missing/null/empty handling (v1)
 
-- `attribute_code` missing, `null`, or empty string → `schema_validation`
-  failure (this is the field-hash primary key, it cannot be defaulted or
-  absent);
+- `attribute_code` missing, `null`, or empty string → terminates the whole
+  vendor execution attempt with `DiscoverySchemaValidationFailed` (this is the
+  field-hash primary key, it cannot be defaulted or absent);
 - `external_label` missing or `null` → the canonical field is `null`;
   `external_label` present as an empty string → preserved as an empty string
   (distinct from `null`, per the already-Resolved canonical contract);
-- `frontend_input` missing or `null` → `schema_validation` failure
-  (load-bearing for `normalized_data_type`, cannot be defaulted);
+- `frontend_input` missing or `null` → terminates the whole vendor execution
+  attempt with `DiscoverySchemaValidationFailed` (load-bearing for
+  `normalized_data_type`, cannot be defaulted);
 - `is_required` missing or `null` → canonical `null` (never defaulted to
   `false`);
-- `scope` missing or `null` → `schema_validation` failure (no safe default for
-  a value that determines `is_localizable`);
-- on a `select`/`multiselect` field: `options` missing or `null` →
-  `schema_validation` failure; `options` present as an empty list `[]` → valid,
-  produces `normalized_payload: {"options":[]}`;
+- `scope` missing or `null` → terminates the whole vendor execution attempt
+  with `DiscoverySchemaValidationFailed` (no safe default for a value that
+  determines `is_localizable`);
+- on a `select`/`multiselect` field: `options` missing or `null` → terminates
+  the whole vendor execution attempt with `DiscoverySchemaValidationFailed`;
+  `options` present as an empty list `[]` → valid, produces
+  `normalized_payload: {"options":[]}`;
 - on a non-selectable type, any `options` value present is ignored (not an
   error);
 - `sort_order` missing or `null` → canonical `null` (not an error).
+
+#### Whole-attempt schema-validation semantics (v1)
+
+Any normalization or option-validation failure — in any Adobe attribute, any
+mapped property, or any option row — **invalidates the complete vendor
+execution attempt**. The adapter must **not** skip the invalid field and
+continue processing remaining attributes.
+
+On such a failure:
+
+- no `ConnectorSchemaSnapshot` row is published;
+- no `ConnectorSchemaSnapshotField` rows are published;
+- the terminal result code is `DiscoverySchemaValidationFailed`
+  (`discovery_schema_validation_failed`);
+- actionability is `support_required`;
+- the outcome is **non-retryable** (not `automatic_retry`).
+
+This applies uniformly to every rule in this section that terminates the
+whole vendor execution attempt with `DiscoverySchemaValidationFailed`, including
+unknown `frontend_input`, unknown `scope`, invalid `position`/`sort_order`,
+missing required `options` on selectable types, and duplicate option values per
+the canonical option-normalization rule.
 
 #### Ignored vendor properties (v1)
 

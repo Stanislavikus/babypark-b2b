@@ -417,14 +417,23 @@ step — not silent deployment alongside the feature merge.
 `.env.example`). UI and dispatch-service code must read this **only** via
 `config('connectors.discovery.manual_trigger_enabled')` — never call `env()`
 directly outside the config file (direct `env()` calls elsewhere break
-`config:cache` in production). Enforce in **two places** so the UI cannot be
-bypassed by a direct dispatch-service call:
+`config:cache` in production). Enforce in **two places** so a direct
+dispatch-service call cannot bypass the UI gate:
 
-1. the Filament manual-trigger action is hidden or disabled when the config
-   value is falsy;
-2. the dispatch service itself checks
+1. when `config('connectors.discovery.manual_trigger_enabled')` is `false`,
+   the Filament manual-trigger action is **hidden**, not disabled. This
+   deployment gate is **not** a user-facing disabled state — the five
+   disabled states remain the four feature states from discovery Scope 8 plus
+   source unavailable (`connectors.errors.discovery_source_unavailable`);
+2. the dispatch service checks
    `config('connectors.discovery.manual_trigger_enabled')` and refuses to
-   execute even if called directly.
+   execute even if called directly. This check runs **after** account/workspace
+   resolution and authorization, but **before** source resolution, any
+   database transaction, `ConnectorDiscoveryRun` row creation, queue dispatch,
+   or HTTP work. A direct authorized call while disabled throws
+   `ConnectorDiscoveryManualTriggerDisabledException` (documented here only —
+   the application exception class is added in Task 4B-2b-1). No
+   `ConnectorDiscoveryRun` row is created and no HTTP call is made.
 
 **Post-merge activation runbook (Task 4B-2b-1 delivery — not executed in
 4B-2b-1b):**
