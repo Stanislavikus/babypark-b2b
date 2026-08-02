@@ -1031,6 +1031,62 @@ class ConnectorAccountDocumentationTest extends TestCase
     }
 
     #[Test]
+    public function domain_model_documents_adobe_raw_value_type_validation_rules(): void
+    {
+        $section = $this->adobeAttributeNormalizationSection();
+
+        $this->assertStringContainsString('#### Raw value type validation (v1)', $section);
+        $this->assertStringContainsString(
+            'mapped Adobe string properties must arrive as JSON strings — no',
+            $section
+        );
+        $this->assertStringContainsString(
+            'int/bool/float-to-string coercion is performed',
+            $section
+        );
+        $this->assertStringContainsString(
+            '`attribute_code` and `frontend_input` are required, non-empty strings',
+            $section
+        );
+        $this->assertStringContainsString(
+            '`default_frontend_label`: missing/`null` → canonical `null`',
+            $section
+        );
+        $this->assertStringContainsString(
+            'selectable `options` must be decoded as a genuine JSON list',
+            $section
+        );
+        $this->assertStringContainsString(
+            'json_decode(..., associative: false)',
+            $section
+        );
+        $this->assertStringContainsString(
+            'each option row must decode as `\\stdClass` (a JSON object)',
+            $section
+        );
+        $this->assertStringContainsString(
+            'option `value` is required and must be a string (empty string valid)',
+            $section
+        );
+        $this->assertStringContainsString(
+            'option `label`: missing/`null` → canonical `null`',
+            $section
+        );
+        $this->assertStringContainsString(
+            'unknown keys inside an option row are ignored and never persisted',
+            $section
+        );
+        $this->assertStringContainsString(
+            'on a non-selectable type, any raw `options` value is ignored',
+            $section
+        );
+        $this->assertStringContainsString(
+            'no scalar coercion occurs anywhere in this normalizer',
+            $section
+        );
+    }
+
+    #[Test]
     public function tech_stack_documents_discovery_activation_gate_config_and_dual_enforcement(): void
     {
         $techStack = File::get(base_path('docs/07-TECH_STACK.md'));
