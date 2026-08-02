@@ -7,6 +7,7 @@ use App\Filament\Resources\ConnectorAccountResource;
 use App\Filament\Resources\ConnectorAccountResource\RelationManagers\ConnectionChecksRelationManager;
 use App\Models\ConnectorConnectionCheck;
 use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
+use App\Support\Connectors\ConnectorAccountMerchandiserPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorSafeMessagePresenter;
 use App\Support\Workspace\WorkspaceContext;
@@ -117,12 +118,19 @@ class ViewConnectorAccount extends ViewRecord
     {
         $record = parent::resolveRecord($key);
 
-        $record->makeHidden([
-            'credentials',
-            'settings',
-            'base_url',
-            'auth_profile',
-        ]);
+        $record = ConnectorAccountMerchandiserPresentation::sanitizeRecord(
+            $record,
+            auth()->user(),
+        );
+
+        if (! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+            $record->makeHidden([
+                'credentials',
+                'settings',
+                'base_url',
+                'auth_profile',
+            ]);
+        }
 
         return ConnectorAccountResource::loadAccountPresentationRelations($record);
     }

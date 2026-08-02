@@ -804,7 +804,7 @@ class ConnectorAccountDocumentationTest extends TestCase
         $this->assertStringContainsString('`source_kind` = `AccountApi`;', $section);
         $this->assertStringContainsString('`acquisition_mode` = `LiveFetch`;', $section);
         $this->assertStringContainsString('`is_primary` = `true`;', $section);
-        $this->assertStringContainsString('`endpoint_path` is not null.', $section);
+        $this->assertStringContainsString('`endpoint_path` is a non-null, non-empty **relative** API path', $section);
         $this->assertStringContainsString('all six conditions above', $section);
         $this->assertStringContainsString('re-verifies, before any HTTP', $section);
         $this->assertStringContainsString('pre-dispatch configuration failure — no', $section);
@@ -878,8 +878,8 @@ class ConnectorAccountDocumentationTest extends TestCase
         $this->assertStringContainsString('**Discovery worker activation gate:**', $techStack);
 
         $gap006 = $this->gap006Section();
-        $this->assertStringContainsString('Verified implementation gap (added 2026-08-01):', $gap006);
-        $this->assertStringContainsString('ConnectorAccountPolicy::viewAny()', $gap006);
+        $this->assertStringContainsString('ConnectorAccount authorization/rendered-view sub-gap (closed', $gap006);
+        $this->assertStringContainsString('ConnectorAccountPolicy', $gap006);
     }
 
     #[Test]
@@ -1140,8 +1140,8 @@ class ConnectorAccountDocumentationTest extends TestCase
         );
         $this->assertStringContainsString('Post-merge activation runbook', $techStack);
         $this->assertStringContainsString('babypark-connector-queue', $techStack);
-        $this->assertStringNotContainsString("'schema_discovery'", $connectorsConfig);
-        $this->assertStringContainsString("'capabilities' => ['connection_check']", $connectorsConfig);
+        $this->assertStringContainsString("'connection_check'", $connectorsConfig);
+        $this->assertStringContainsString("'schema_discovery'", $connectorsConfig);
     }
 
     #[Test]
@@ -1165,35 +1165,28 @@ class ConnectorAccountDocumentationTest extends TestCase
     }
 
     #[Test]
-    public function implementation_gaps_gap_006_requires_full_rendered_view_audit_and_role_matrix(): void
+    public function implementation_gaps_gap_006_records_closed_authorization_sub_gap_and_role_matrix(): void
     {
         $gap006 = $this->gap006Section();
 
-        $this->assertStringContainsString('rendered-view audit', $gap006);
-        $this->assertStringContainsString('index/table columns', $gap006);
-        $this->assertStringContainsString('searchable fields', $gap006);
-        $this->assertStringContainsString('`store_code`', $gap006);
-        $this->assertStringContainsString('`tenant_context`', $gap006);
-        $this->assertStringContainsString('Livewire serialized state', $gap006);
-        $this->assertStringContainsString('| Admin | Yes | Yes | Yes |', $gap006);
-        $this->assertStringContainsString('| Director | Yes | Yes | Yes |', $gap006);
+        $this->assertStringContainsString('ConnectorAccount authorization/rendered-view sub-gap (closed', $gap006);
+        $this->assertStringContainsString('ConnectorAccountMerchandiserPresentation', $gap006);
+        $this->assertStringContainsString('`credentials`, `settings`, `base_url`', $gap006);
+        $this->assertStringContainsString('`store_code`, `tenant_context`, `auth_profile`', $gap006);
+        $this->assertStringContainsString('**GAP-006 overall remains Open.**', $gap006);
+        $this->assertStringContainsString('| Admin | Yes | Yes (enabled accounts) | Yes |', $gap006);
+        $this->assertStringContainsString('| Director | Yes | Yes (enabled accounts) | Yes |', $gap006);
         $this->assertStringContainsString(
-            '| Manager, Warehouse, Programmer with `manage_connector_accounts` | Yes | Yes | Yes |',
+            '| Manager, Warehouse, Programmer with `manage_connector_accounts` | Yes | Yes (enabled accounts) | Yes |',
             $gap006
         );
         $this->assertStringContainsString(
-            '| Manager, Warehouse, Programmer without `manage_connector_accounts` | No (unchanged) | No (unchanged) | No |',
+            '| Manager, Warehouse, Programmer without `manage_connector_accounts` | No | No | No |',
             $gap006
         );
-        $this->assertStringContainsString(
-            '| Merchandiser | Yes — **this task\'s fix** | Yes — **this task\'s fix** | No |',
-            $gap006
-        );
+        $this->assertStringContainsString('| Merchandiser | Yes | Yes (enabled accounts) | No |', $gap006);
         $this->assertStringContainsString('| Any role, cross-workspace account | No (404) | No (404) | No |', $gap006);
-        $this->assertStringContainsString('| Disabled account |', $gap006);
-        $this->assertStringContainsString('No (disabled-state block)', $gap006);
-        $this->assertStringContainsString('allowsManagementAbility()` does not check account-disabled state', $gap006);
-        $this->assertStringContainsString('stop and report the exact discrepancy', $gap006);
+        $this->assertStringContainsString('| Disabled account | Per role matrix', $gap006);
     }
 
     #[Test]

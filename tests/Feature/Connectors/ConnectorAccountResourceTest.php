@@ -90,8 +90,8 @@ class ConnectorAccountResourceTest extends TestCase
     public static function viewAnyMatrixProvider(): array
     {
         return [
-            'merchandiser denied' => [UserRole::Merchandiser, false, false],
-            'merchandiser with permission denied' => [UserRole::Merchandiser, true, false],
+            'merchandiser allowed' => [UserRole::Merchandiser, false, true],
+            'merchandiser with permission allowed' => [UserRole::Merchandiser, true, true],
             'admin allowed' => [UserRole::Admin, false, true],
             'director allowed' => [UserRole::Director, false, true],
             'manager without permission denied' => [UserRole::Manager, false, false],
@@ -100,15 +100,54 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
-    public function unauthorized_user_cannot_see_navigation_or_list(): void
+    public function merchandiser_can_reach_list_and_detail_with_safe_fields_only(): void
     {
         $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $account = $this->createConnectorAccount(overrides: [
+            'store_code' => 'secret-store',
+            'tenant_context' => 'secret-tenant',
+            'credentials' => AdobePaaSCredentialMapper::toStorageArray(
+                new OAuth1Credentials(
+                    'ck_'.self::CREDENTIAL_CANARY,
+                    'cs_'.self::CREDENTIAL_CANARY,
+                    'at_'.self::CREDENTIAL_CANARY,
+                    'ts_'.self::CREDENTIAL_CANARY,
+                ),
+            ),
+        ]);
 
         $this->actingAs($merchandiser)
             ->get(ConnectorAccountResource::getUrl('index'))
+            ->assertSuccessful();
+
+        $listComponent = Livewire::actingAs($merchandiser)
+            ->test(ListConnectorAccounts::class)
+            ->assertSuccessful()
+            ->assertCanSeeTableRecords([$account]);
+
+        $this->assertStringNotContainsString('secret-store', $listComponent->html());
+        $this->assertStringNotContainsString(self::CREDENTIAL_CANARY, $listComponent->html());
+
+        $detailComponent = Livewire::actingAs($merchandiser)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSuccessful();
+
+        $snapshot = json_encode($detailComponent->snapshot, JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString(self::CREDENTIAL_CANARY, $snapshot);
+        $this->assertStringNotContainsString('secret-store', $snapshot);
+        $this->assertStringNotContainsString('secret-tenant', $snapshot);
+    }
+
+    #[Test]
+    public function manager_without_permission_cannot_see_navigation_or_list(): void
+    {
+        $manager = $this->createStaffUser(UserRole::Manager);
+
+        $this->actingAs($manager)
+            ->get(ConnectorAccountResource::getUrl('index'))
             ->assertForbidden();
 
-        Livewire::actingAs($merchandiser)
+        Livewire::actingAs($manager)
             ->test(ListConnectorAccounts::class)
             ->assertForbidden();
     }
@@ -126,12 +165,12 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
-    public function unauthorized_user_cannot_view_detail(): void
+    public function manager_without_permission_cannot_view_detail(): void
     {
         $account = $this->createConnectorAccount();
-        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $manager = $this->createStaffUser(UserRole::Manager);
 
-        $this->actingAs($merchandiser)
+        $this->actingAs($manager)
             ->get(ConnectorAccountResource::getUrl('view', ['record' => $account]))
             ->assertForbidden();
     }

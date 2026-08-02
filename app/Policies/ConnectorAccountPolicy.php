@@ -19,7 +19,7 @@ class ConnectorAccountPolicy
 
     public function viewAny(User $user): bool
     {
-        return $this->allowsManagementAbilityForWorkspace(
+        return $this->allowsReadAbilityForWorkspace(
             $user,
             $this->workspaceContext->current(),
         );
@@ -27,12 +27,33 @@ class ConnectorAccountPolicy
 
     public function view(User $user, ConnectorAccount $connectorAccount): bool
     {
-        return $this->allowsManagementAbility($user, $connectorAccount);
+        return $this->allowsReadAbility($user, $connectorAccount);
     }
 
     public function runConnectionCheck(User $user, ConnectorAccount $connectorAccount): bool
     {
         return $this->allowsManagementAbility($user, $connectorAccount);
+    }
+
+    public function runDiscovery(User $user, ConnectorAccount $connectorAccount): bool
+    {
+        if (! $this->workspaceMembership->belongs($user, $connectorAccount->workspace)) {
+            return false;
+        }
+
+        if (! $connectorAccount->is_enabled) {
+            return false;
+        }
+
+        if (in_array($user->role, [UserRole::Admin, UserRole::Director], true)) {
+            return true;
+        }
+
+        if ($user->role === UserRole::Merchandiser) {
+            return true;
+        }
+
+        return $user->can(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
     }
 
     public function create(User $user, Workspace $workspace): bool
@@ -53,6 +74,28 @@ class ConnectorAccountPolicy
     public function removeCredentials(User $user, ConnectorAccount $connectorAccount): bool
     {
         return $this->allowsManagementAbility($user, $connectorAccount);
+    }
+
+    private function allowsReadAbility(User $user, ConnectorAccount $connectorAccount): bool
+    {
+        if (! $this->workspaceMembership->belongs($user, $connectorAccount->workspace)) {
+            return false;
+        }
+
+        return $this->allowsReadAbilityForWorkspace($user, $connectorAccount->workspace);
+    }
+
+    private function allowsReadAbilityForWorkspace(User $user, Workspace $workspace): bool
+    {
+        if (! $this->workspaceMembership->belongs($user, $workspace)) {
+            return false;
+        }
+
+        if ($user->role === UserRole::Merchandiser) {
+            return true;
+        }
+
+        return $this->allowsManagementAbilityForWorkspace($user, $workspace);
     }
 
     private function allowsManagementAbility(User $user, ConnectorAccount $connectorAccount): bool

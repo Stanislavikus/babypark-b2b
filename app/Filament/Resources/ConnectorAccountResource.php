@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Filament\Resources\ConnectorAccountResource\Pages;
 use App\Models\ConnectorAccount;
+use App\Support\Connectors\ConnectorAccountMerchandiserPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorUiFormatter;
 use Filament\Infolists;
@@ -45,7 +46,12 @@ class ConnectorAccountResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return static::applyPresentationEagerLoads(parent::getEloquentQuery());
+        $query = ConnectorAccountMerchandiserPresentation::applySafeQuery(
+            parent::getEloquentQuery(),
+            auth()->user(),
+        );
+
+        return static::applyPresentationEagerLoads($query);
     }
 
     public static function loadAccountPresentationRelations(Model $record): Model
@@ -82,7 +88,8 @@ class ConnectorAccountResource extends Resource
                             ->label(__('connectors.ui.columns.account')),
                         Infolists\Components\TextEntry::make('store_code')
                             ->label(__('connectors.ui.columns.store_context'))
-                            ->formatStateUsing(fn ($state, ConnectorAccount $record): string => $uiState->storeContextLabel($record) ?? __('connectors.ui.common.dash')),
+                            ->formatStateUsing(fn ($state, ConnectorAccount $record): string => $uiState->storeContextLabel($record) ?? __('connectors.ui.common.dash'))
+                            ->visible(fn (): bool => ! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())),
                         Infolists\Components\View::make('filament.connector-accounts.runtime-state')
                             ->label(__('connectors.ui.columns.status'))
                             ->viewData(fn (ConnectorAccount $record): array => [
@@ -134,10 +141,15 @@ class ConnectorAccountResource extends Resource
                     ->label(__('connectors.ui.columns.store_context'))
                     ->formatStateUsing(fn ($state, ConnectorAccount $record): string => $uiState->storeContextLabel($record) ?? __('connectors.ui.common.dash'))
                     ->searchable(query: function (Builder $query, string $search): Builder {
+                        if (ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+                            return $query;
+                        }
+
                         return $query
                             ->where('store_code', 'like', "%{$search}%")
                             ->orWhere('tenant_context', 'like', "%{$search}%");
                     })
+                    ->visible(fn (): bool => ! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user()))
                     ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\TextColumn::make('connection_status')
                     ->label(__('connectors.ui.columns.status'))

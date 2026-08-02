@@ -76,16 +76,16 @@ class ConnectorAccountResourceReviewTest extends TestCase
         App::setLocale('uk');
         $label = __('connectors.ui.resource.navigation_label', locale: 'uk');
 
-        $this->assertFalse($merchandiser->can('viewAny', ConnectorAccount::class));
+        $this->assertTrue($merchandiser->can('viewAny', ConnectorAccount::class));
         $this->assertFalse($deniedManager->can('viewAny', ConnectorAccount::class));
 
         $this->actingAs($admin)
             ->get(ConnectorAccountResource::getUrl('index'))
             ->assertSee($label);
 
-        $this->actingAs($merchandiser)
-            ->get(ConnectorAccountResource::getUrl('index'))
-            ->assertForbidden();
+        Livewire::actingAs($merchandiser)
+            ->test(ListConnectorAccounts::class)
+            ->assertSuccessful();
 
         $this->actingAs($deniedManager)
             ->followingRedirects()

@@ -38,7 +38,7 @@ class ConnectorSchemaSnapshotField extends Model
             'is_required' => 'boolean',
             'is_multi_value' => 'boolean',
             'is_localizable' => 'boolean',
-            'normalized_payload' => 'array',
+            'normalized_payload' => 'object',
             'sort_order' => 'integer',
         ];
     }

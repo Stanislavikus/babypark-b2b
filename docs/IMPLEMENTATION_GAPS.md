@@ -302,50 +302,33 @@ credential-management/settings UI remain absent. Discovery execution, snapshot
 publication, diff computation, retention jobs, broader operational UI, and
 FieldMapping remain unimplemented.
 
-**Verified implementation gap (added 2026-08-01):** `ConnectorAccountPolicy::viewAny()`
-and `view()` both currently delegate to the same management-ability check
-used for credential/settings actions, which excludes Merchandiser. This
-contradicts the existing "ConnectorAccount authorization (Resolved)" text
-in `03-DOMAIN_MODEL.md`, which states Merchandiser may view discovery
-progress, result, and discovered data.
+**ConnectorAccount authorization/rendered-view sub-gap (closed 2026-08-02,
+Task 4B-2b-1e+1f):** `ConnectorAccountPolicy` now grants Merchandiser
+`viewAny()`/`view()` (safe fields only) and `runDiscovery()` (enabled
+accounts only). Management abilities remain denied to Merchandiser.
+Field-level restrictions enforced via `ConnectorAccountMerchandiserPresentation`:
+query column selection, hidden attributes on Livewire serialization, and
+Filament table/infolist visibility for `store_code`/`tenant_context`.
+Sensitive fields excluded: `credentials`, `settings`, `base_url`,
+`store_code`, `tenant_context`, `auth_profile`. Tests assert rendered HTML
+and Livewire payload absence, not policy-layer alone.
 
-Task 4B-2b-1 must fix this as a **combined** change, not policy alone —
-granting `viewAny()`/`view()` to Merchandiser without also restricting
-what's actually rendered would create a new information leak rather than
-closing this gap. It must:
-- grant `viewAny()`/`view()` to Merchandiser (without inventing a new
-  role or permission);
-- enforce field-level restrictions in the actual Filament
-  resource/infolist so Merchandiser's rendered view never includes
-  credentials, settings, base URL, store-specific configuration, or any
-  other management-only field — confirm the exact current field list
-  this applies to against the real resource/infolist code, don't assume;
-- perform an explicit **rendered-view audit** covering index/table columns,
-  searchable fields (confirmed current: includes `store_code`,
-  `tenant_context`), detail infolist, relation managers, header actions,
-  route access, and Livewire serialized state — not the infolist alone;
-- apply the binding role matrix below, confirmed against the real, current
-  `App\Enums\UserRole` enum (`Admin`, `Manager`, `Warehouse`,
-  `Merchandiser`, `Director`, `Programmer`):
+Implemented role matrix (confirmed against `App\Enums\UserRole`):
 
 | Role | `viewAny`/`view` (safe fields only) | `runDiscovery` | Management (settings/credentials/disable) |
 |---|---|---|---|
-| Admin | Yes | Yes | Yes |
-| Director | Yes | Yes | Yes |
-| Manager, Warehouse, Programmer with `manage_connector_accounts` | Yes | Yes | Yes |
-| Manager, Warehouse, Programmer without `manage_connector_accounts` | No (unchanged) | No (unchanged) | No |
-| Merchandiser | Yes — **this task's fix** | Yes — **this task's fix** | No |
+| Admin | Yes | Yes (enabled accounts) | Yes |
+| Director | Yes | Yes (enabled accounts) | Yes |
+| Manager, Warehouse, Programmer with `manage_connector_accounts` | Yes | Yes (enabled accounts) | Yes |
+| Manager, Warehouse, Programmer without `manage_connector_accounts` | No | No | No |
+| Merchandiser | Yes | Yes (enabled accounts) | No |
 | Any role, cross-workspace account | No (404) | No (404) | No |
-| Disabled account | Per the normal role matrix above (unaffected by disabled state) | No (disabled-state block) | Per the normal role matrix above — `allowsManagementAbility()` does not check account-disabled state; Admin/Director/permission-holder must still fix settings/credentials or reactivate a disabled account |
+| Disabled account | Per role matrix (unaffected by disabled state) | No | Per role matrix |
 
-If the actual current policy code differs from this table at implementation
-time, **stop and report the exact discrepancy** — do not silently edit this
-table to match whatever the code happens to do.
-- add tests that don't stop at the policy layer — assert against the
-  actual rendered view/response for a Merchandiser-authenticated request,
-  proving the sensitive fields are genuinely absent from output, not
-  merely that the policy method returns `true`/`false` correctly;
-- update this note's status once fixed.
+**GAP-006 overall remains Open.** Remaining scope: discovery UI (Task
+4B-2b-1g), diff computation (4B-2c), retention/pruning (4B-2d),
+FieldMapping/import (4C+), connector-account creation and
+credential-management/settings UI.
 
 **Task 4A note (added 2026-07-16):** Task 4A implements the first concrete
 schema for `ConnectorDefinition` and introduces `ConnectorSchemaSource`, plus

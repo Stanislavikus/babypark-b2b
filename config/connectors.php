@@ -16,7 +16,7 @@ return [
             'enabled' => true,
             'adapter' => AdobePaaSConnectorAdapter::class,
             'account_schema' => AdobePaaSAccountSchema::class,
-            'capabilities' => ['connection_check'],
+            'capabilities' => ['connection_check', 'schema_discovery'],
         ],
     ],
 ];

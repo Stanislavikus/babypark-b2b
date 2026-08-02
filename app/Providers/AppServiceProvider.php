@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapabilityImpl;
+use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapability;
+use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapabilityImpl;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspaceMembership;
@@ -23,6 +25,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             AdobePaaSConnectionCheckCapability::class,
             AdobePaaSConnectionCheckCapabilityImpl::class,
+        );
+
+        $this->app->bind(
+            AdobePaaSDiscoveryCapability::class,
+            AdobePaaSDiscoveryCapabilityImpl::class,
         );
     }
 
