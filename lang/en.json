@@ -73,6 +73,7 @@
     "connectors.enums.error_actionability.support_required": "Support required",
     "connectors.errors.account_disabled": "This connector account is disabled.",
     "connectors.errors.connection_check_failed": "Connection check failed. Please contact support.",
+    "connectors.errors.discovery_failed": "Field discovery failed. Please contact support.",
     "connectors.errors.insufficient_permissions": "The connected account does not have permission to access this resource.",
     "connectors.errors.invalid_credentials": "The credentials are invalid or have expired.",
     "connectors.errors.invalid_or_unsupported_endpoint": "The endpoint URL or store configuration is invalid or unsupported.",
