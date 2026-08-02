@@ -2,8 +2,10 @@
 
 namespace App\Jobs\Connectors;
 
+use App\Enums\ConnectorDiscoveryRunLifecycleErrorCode;
 use App\Services\Connectors\AdobePaaSDiscoveryService;
 use App\Services\Connectors\ConnectorDiscoveryRunPersistence;
+use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceInvalidAfterReservationException;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
@@ -93,6 +95,15 @@ class ConnectorDiscoveryRunJob implements ShouldQueue
                 $this->connectorAccountId,
                 $this->discoveryRunId,
             );
+        } catch (ConnectorDiscoverySourceInvalidAfterReservationException) {
+            $persistence->writeLifecycleFailure(
+                $this->workspaceId,
+                $this->connectorAccountId,
+                $this->discoveryRunId,
+                ConnectorDiscoveryRunLifecycleErrorCode::SourceInvalidBeforeExecution,
+            );
+
+            return;
         } catch (\Throwable) {
             $elapsedNs = hrtime(true) - $startedAtNs;
             $durationMs = (int) ceil($elapsedNs / 1_000_000);

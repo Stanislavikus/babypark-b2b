@@ -309,9 +309,12 @@ accounts only). Management abilities remain denied to Merchandiser.
 Field-level restrictions enforced via `ConnectorAccountMerchandiserPresentation`:
 query column selection, hidden attributes on Livewire serialization, and
 Filament table/infolist visibility for `store_code`/`tenant_context`.
+Merchandiser detail pages omit connection-check header actions and relation
+managers; `connectionChecks` presentation relations are not loaded.
 Sensitive fields excluded: `credentials`, `settings`, `base_url`,
 `store_code`, `tenant_context`, `auth_profile`. Tests assert rendered HTML
-and Livewire payload absence, not policy-layer alone.
+and Livewire payload absence, including connection-check management/history
+surfaces, not policy-layer alone.
 
 Implemented role matrix (confirmed against `App\Enums\UserRole`):
 

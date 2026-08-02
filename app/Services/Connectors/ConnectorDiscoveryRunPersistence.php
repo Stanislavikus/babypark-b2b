@@ -52,7 +52,7 @@ final class ConnectorDiscoveryRunPersistence
         string $workspaceId,
         string $connectorAccountId,
         string $discoveryRunId,
-        ConnectorDiscoveryAttemptResult $result,
+        #[\SensitiveParameter] ConnectorDiscoveryAttemptResult $result,
         int $attemptDurationMs,
         \DateTimeInterface $retryUntilAt,
     ): ?int {
@@ -388,7 +388,7 @@ final class ConnectorDiscoveryRunPersistence
     /**
      * @return array<string, mixed>
      */
-    private function classificationFromResult(ConnectorDiscoveryAttemptResult $result): array
+    private function classificationFromResult(#[\SensitiveParameter] ConnectorDiscoveryAttemptResult $result): array
     {
         return [
             'cause_category' => $result->cause(),
@@ -440,7 +440,7 @@ final class ConnectorDiscoveryRunPersistence
     private function publishSnapshot(
         ConnectorAccount $account,
         ConnectorDiscoveryRun $row,
-        ConnectorDiscoverySnapshotCandidate $candidate,
+        #[\SensitiveParameter] ConnectorDiscoverySnapshotCandidate $candidate,
         int $durationMs,
     ): void {
         $previousSnapshot = ConnectorSchemaSnapshot::withoutWorkspaceScope()
@@ -491,7 +491,7 @@ final class ConnectorDiscoveryRunPersistence
     private function createSnapshotField(
         ConnectorDiscoveryRun $row,
         ConnectorSchemaSnapshot $snapshot,
-        ConnectorDiscoveryNormalizedField $normalizedField,
+        #[\SensitiveParameter] ConnectorDiscoveryNormalizedField $normalizedField,
         int $index,
     ): void {
         $field = $normalizedField->field;
@@ -508,7 +508,7 @@ final class ConnectorDiscoveryRunPersistence
             'external_scope' => $field->externalScope(),
             'normalized_payload' => $field->normalizedPayload()->toCanonicalObject(),
             'canonical_hash' => $normalizedField->canonicalHash,
-            'sort_order' => $field->sortOrder() ?? $index,
+            'sort_order' => $field->sortOrder(),
         ]);
     }
 
@@ -587,7 +587,7 @@ final class ConnectorDiscoveryRunPersistence
         ]);
     }
 
-    private function computeRetryDelay(ConnectorDiscoveryAttemptResult $result, int $executionAttempts): int
+    private function computeRetryDelay(#[\SensitiveParameter] ConnectorDiscoveryAttemptResult $result, int $executionAttempts): int
     {
         if (
             $result->errorCode === ConnectorDiscoveryRunErrorCode::AdobeRateLimited

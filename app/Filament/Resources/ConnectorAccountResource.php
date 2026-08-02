@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Filament\Resources\ConnectorAccountResource\Pages;
 use App\Models\ConnectorAccount;
+use App\Models\User;
 use App\Support\Connectors\ConnectorAccountMerchandiserPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorUiFormatter;
@@ -54,18 +55,21 @@ class ConnectorAccountResource extends Resource
         return static::applyPresentationEagerLoads($query);
     }
 
-    public static function loadAccountPresentationRelations(Model $record): Model
+    public static function loadAccountPresentationRelations(Model $record, ?User $user = null): Model
     {
         if ($record instanceof ConnectorAccount) {
-            $record->loadMissing([
-                'connectorDefinition',
-                'connectionChecks' => fn ($query) => $query
+            $relations = ['connectorDefinition'];
+
+            if (! ConnectorAccountMerchandiserPresentation::isMerchandiser($user ?? auth()->user())) {
+                $relations['connectionChecks'] = fn ($query) => $query
                     ->select(['id', 'connector_account_id', 'status'])
                     ->whereIn('status', [
                         ConnectorConnectionCheckStatus::Queued,
                         ConnectorConnectionCheckStatus::Running,
-                    ]),
-            ]);
+                    ]);
+            }
+
+            $record->loadMissing($relations);
         }
 
         return $record;
@@ -234,14 +238,17 @@ class ConnectorAccountResource extends Resource
 
     private static function applyPresentationEagerLoads(Builder $query): Builder
     {
-        return $query->with([
-            'connectorDefinition',
-            'connectionChecks' => fn ($connectionChecksQuery) => $connectionChecksQuery
+        $with = ['connectorDefinition'];
+
+        if (! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+            $with['connectionChecks'] = fn ($connectionChecksQuery) => $connectionChecksQuery
                 ->select(['id', 'connector_account_id', 'status'])
                 ->whereIn('status', [
                     ConnectorConnectionCheckStatus::Queued,
                     ConnectorConnectionCheckStatus::Running,
-                ]),
-        ]);
+                ]);
+        }
+
+        return $query->with($with);
     }
 }

@@ -9,6 +9,7 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
 use App\Support\Connectors\ConnectorDiscoveryAttemptResult;
 use App\Support\Connectors\ConnectorSchemaSourceEndpointPathValidator;
 use App\Support\Connectors\Exceptions\ConnectorAccountNotFoundException;
+use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceInvalidAfterReservationException;
 
 final class AdobePaaSDiscoveryService
 {
@@ -37,7 +38,7 @@ final class AdobePaaSDiscoveryService
         $source = ConnectorSchemaSource::query()->find($run->connector_schema_source_id);
 
         if ($source === null) {
-            throw new ConnectorAccountNotFoundException('Schema source was not found.');
+            throw new ConnectorDiscoverySourceInvalidAfterReservationException('Schema source was not found.');
         }
 
         $context = $this->contextFactory->create($workspaceId, $connectorAccountId);
@@ -45,7 +46,7 @@ final class AdobePaaSDiscoveryService
         $account = $run->account()->withoutGlobalScopes()->firstOrFail();
 
         if (! $this->sourceResolver->reverify($account, $source)) {
-            throw new ConnectorAccountNotFoundException('Schema source is no longer valid.');
+            throw new ConnectorDiscoverySourceInvalidAfterReservationException('Schema source is no longer valid.');
         }
 
         $endpointPath = $this->endpointPathValidator->normalize($source->endpoint_path);

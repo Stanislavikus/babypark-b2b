@@ -11,12 +11,12 @@ final readonly class AdobePaaSDiscoveryPageResult
         public ?ConnectorDiscoveryAttemptResult $failure,
     ) {}
 
-    public static function success(AdobePaaSDiscoveryPage $page): self
+    public static function success(#[\SensitiveParameter] AdobePaaSDiscoveryPage $page): self
     {
         return new self($page, null);
     }
 
-    public static function failure(ConnectorDiscoveryAttemptResult $failure): self
+    public static function failure(#[\SensitiveParameter] ConnectorDiscoveryAttemptResult $failure): self
     {
         if ($failure->succeeded) {
             throw new \InvalidArgumentException('Failure result must not be a success.');

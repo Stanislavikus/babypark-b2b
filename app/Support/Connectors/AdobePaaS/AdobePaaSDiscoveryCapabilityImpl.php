@@ -3,6 +3,7 @@
 namespace App\Support\Connectors\AdobePaaS;
 
 use App\Enums\ConnectorDiscoveryRunErrorCode;
+use App\Enums\ConnectorDiscoverySchemaValidationReason;
 use App\Support\Connectors\CanonicalSchemaFieldHash;
 use App\Support\Connectors\CanonicalSchemaFieldHasher;
 use App\Support\Connectors\CanonicalSchemaSnapshotHasher;
@@ -41,6 +42,8 @@ final class AdobePaaSDiscoveryCapabilityImpl implements AdobePaaSDiscoveryCapabi
     ): ConnectorDiscoveryAttemptResult {
         /** @var list<ConnectorDiscoveryNormalizedField> $accumulatedFields */
         $accumulatedFields = [];
+        /** @var array<string, true> $seenFieldKeys */
+        $seenFieldKeys = [];
         $stableTotalCount = null;
         $currentPage = 1;
 
@@ -75,6 +78,12 @@ final class AdobePaaSDiscoveryCapabilityImpl implements AdobePaaSDiscoveryCapabi
 
             $page = $pageResult->page;
 
+            if ($page->totalCount > self::MAX_FIELDS) {
+                return ConnectorDiscoveryAttemptResult::paginationFailure(
+                    ConnectorDiscoveryRunErrorCode::DiscoveryPaginationLimitExceeded,
+                );
+            }
+
             if ($stableTotalCount === null) {
                 $stableTotalCount = $page->totalCount;
             } elseif ($page->totalCount !== $stableTotalCount) {
@@ -83,35 +92,27 @@ final class AdobePaaSDiscoveryCapabilityImpl implements AdobePaaSDiscoveryCapabi
                 );
             }
 
-            if ($stableTotalCount > self::MAX_FIELDS) {
-                return ConnectorDiscoveryAttemptResult::paginationFailure(
-                    ConnectorDiscoveryRunErrorCode::DiscoveryPaginationLimitExceeded,
-                );
-            }
-
-            if ($page->items === [] && count($accumulatedFields) < $stableTotalCount) {
-                if ($currentPage < self::MAX_PAGES) {
-                    return ConnectorDiscoveryAttemptResult::paginationFailure(
-                        ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination,
-                    );
-                }
-
-                return ConnectorDiscoveryAttemptResult::paginationFailure(
-                    ConnectorDiscoveryRunErrorCode::DiscoveryPaginationLimitExceeded,
-                );
-            }
-
-            foreach ($page->items as $rawItem) {
+            foreach ($page->items as $itemIndex => $rawItem) {
                 try {
                     $canonicalField = $this->normalizer->normalize($rawItem);
+                    $fieldKey = $canonicalField->externalFieldKey();
+
+                    if (isset($seenFieldKeys[$fieldKey])) {
+                        throw ConnectorDiscoverySchemaValidationException::at(
+                            ConnectorDiscoverySchemaValidationReason::DuplicateExternalFieldKey,
+                            "items[{$itemIndex}]",
+                        );
+                    }
+
+                    $seenFieldKeys[$fieldKey] = true;
+
+                    $accumulatedFields[] = new ConnectorDiscoveryNormalizedField(
+                        $canonicalField,
+                        $this->fieldHasher->hash($canonicalField),
+                    );
                 } catch (ConnectorDiscoverySchemaValidationException) {
                     return ConnectorDiscoveryAttemptResult::schemaValidationFailure();
                 }
-
-                $accumulatedFields[] = new ConnectorDiscoveryNormalizedField(
-                    $canonicalField,
-                    $this->fieldHasher->hash($canonicalField),
-                );
             }
 
             if (count($accumulatedFields) === $stableTotalCount) {
@@ -121,6 +122,12 @@ final class AdobePaaSDiscoveryCapabilityImpl implements AdobePaaSDiscoveryCapabi
             if ($currentPage === self::MAX_PAGES && count($accumulatedFields) < $stableTotalCount) {
                 return ConnectorDiscoveryAttemptResult::paginationFailure(
                     ConnectorDiscoveryRunErrorCode::DiscoveryPaginationLimitExceeded,
+                );
+            }
+
+            if ($page->items === [] && count($accumulatedFields) < $stableTotalCount) {
+                return ConnectorDiscoveryAttemptResult::paginationFailure(
+                    ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination,
                 );
             }
 

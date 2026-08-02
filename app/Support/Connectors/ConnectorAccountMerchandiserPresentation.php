@@ -19,7 +19,6 @@ final class ConnectorAccountMerchandiserPresentation
             'workspace_id',
             'connector_definition_id',
             'name',
-            'auth_profile',
             'is_enabled',
             'connection_status',
             'last_checked_at',

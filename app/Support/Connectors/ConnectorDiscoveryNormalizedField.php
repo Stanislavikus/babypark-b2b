@@ -5,7 +5,7 @@ namespace App\Support\Connectors;
 final readonly class ConnectorDiscoveryNormalizedField
 {
     public function __construct(
-        public CanonicalSchemaField $field,
-        public string $canonicalHash,
+        #[\SensitiveParameter] public CanonicalSchemaField $field,
+        #[\SensitiveParameter] public string $canonicalHash,
     ) {}
 }

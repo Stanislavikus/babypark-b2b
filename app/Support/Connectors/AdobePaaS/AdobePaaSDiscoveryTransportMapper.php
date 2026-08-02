@@ -9,7 +9,7 @@ use App\Support\Connectors\Transport\TransportFailureReason;
 
 final class AdobePaaSDiscoveryTransportMapper
 {
-    public function map(ConnectorTransportException $exception): ConnectorDiscoveryAttemptResult
+    public function map(#[\SensitiveParameter] ConnectorTransportException $exception): ConnectorDiscoveryAttemptResult
     {
         $errorCode = match ($exception->reason) {
             TransportFailureReason::InvalidDestination => ConnectorDiscoveryRunErrorCode::TransportInvalidDestination,

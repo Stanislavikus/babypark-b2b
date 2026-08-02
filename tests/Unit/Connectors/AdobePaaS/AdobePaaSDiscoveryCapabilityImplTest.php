@@ -3,6 +3,7 @@
 namespace Tests\Unit\Connectors\AdobePaaS;
 
 use App\Enums\ConnectorDiscoveryRunErrorCode;
+use App\Enums\ConnectorErrorActionability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSAttributeNormalizer;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapabilityImpl;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryRequestFactory;
@@ -312,6 +313,163 @@ class AdobePaaSDiscoveryCapabilityImplTest extends TestCase
 
         $this->assertFalse($result->succeeded);
         $this->assertSame(ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination, $result->errorCode);
+    }
+
+    #[Test]
+    public function later_page_total_count_above_limit_takes_precedence_over_stable_count(): void
+    {
+        $transport = new class implements ConnectorHttpTransport
+        {
+            public int $page = 0;
+
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                $this->page++;
+
+                if ($this->page === 1) {
+                    return new ConnectorHttpResult(200, [], json_encode([
+                        'items' => [json_decode('{"attribute_code":"a","frontend_input":"text","scope":"global"}', false, 512, JSON_THROW_ON_ERROR)],
+                        'total_count' => 2,
+                    ], JSON_THROW_ON_ERROR));
+                }
+
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'items' => [json_decode('{"attribute_code":"b","frontend_input":"text","scope":"global"}', false, 512, JSON_THROW_ON_ERROR)],
+                    'total_count' => 10001,
+                ], JSON_THROW_ON_ERROR));
+            }
+        };
+
+        $capability = $this->capabilityWithTransport($transport);
+        $result = $capability->discover($this->sampleContext(), self::ENDPOINT_PATH);
+
+        $this->assertFalse($result->succeeded);
+        $this->assertSame(ConnectorDiscoveryRunErrorCode::DiscoveryPaginationLimitExceeded, $result->errorCode);
+        $this->assertSame(2, $transport->page);
+    }
+
+    #[Test]
+    public function fiftieth_page_boundary_returns_limit_exceeded_without_fifty_first_request(): void
+    {
+        $transport = new class implements ConnectorHttpTransport
+        {
+            public int $sendCount = 0;
+
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                $this->sendCount++;
+                parse_str((string) $request->request->getUri()->getQuery(), $query);
+                $currentPage = (int) ($query['searchCriteria']['currentPage'] ?? 0);
+
+                $items = [];
+                $itemCount = $currentPage < 50 ? 200 : 100;
+
+                for ($index = 0; $index < $itemCount; $index++) {
+                    $items[] = $this->attribute('field_'.$currentPage.'_'.$index);
+                }
+
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'items' => $items,
+                    'total_count' => 10000,
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            private function attribute(string $code): \stdClass
+            {
+                return json_decode(
+                    sprintf('{"attribute_code":"%s","frontend_input":"text","scope":"global"}', $code),
+                    associative: false,
+                    depth: 512,
+                    flags: JSON_THROW_ON_ERROR,
+                );
+            }
+        };
+
+        $capability = $this->capabilityWithTransport($transport);
+        $result = $capability->discover($this->sampleContext(), self::ENDPOINT_PATH);
+
+        $this->assertFalse($result->succeeded);
+        $this->assertSame(ConnectorDiscoveryRunErrorCode::DiscoveryPaginationLimitExceeded, $result->errorCode);
+        $this->assertSame(50, $transport->sendCount);
+    }
+
+    #[Test]
+    public function pagination_order_checks_per_page_limit_before_stable_total_count(): void
+    {
+        $transport = new class implements ConnectorHttpTransport
+        {
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'items' => [],
+                    'total_count' => 10001,
+                ], JSON_THROW_ON_ERROR));
+            }
+        };
+
+        $capability = $this->capabilityWithTransport($transport);
+        $result = $capability->discover($this->sampleContext(), self::ENDPOINT_PATH);
+
+        $this->assertFalse($result->succeeded);
+        $this->assertSame(ConnectorDiscoveryRunErrorCode::DiscoveryPaginationLimitExceeded, $result->errorCode);
+        $this->assertNotSame(ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination, $result->errorCode);
+    }
+
+    #[Test]
+    public function duplicate_external_field_keys_return_schema_validation_failure(): void
+    {
+        $attribute = json_decode(
+            '{"attribute_code":"color","frontend_input":"text","scope":"global"}',
+            associative: false,
+            depth: 512,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $transport = new class($attribute) implements ConnectorHttpTransport
+        {
+            public function __construct(private readonly \stdClass $attribute) {}
+
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'items' => [$this->attribute, $this->attribute],
+                    'total_count' => 2,
+                ], JSON_THROW_ON_ERROR));
+            }
+        };
+
+        $capability = $this->capabilityWithTransport($transport);
+        $result = $capability->discover($this->sampleContext(), self::ENDPOINT_PATH);
+
+        $this->assertFalse($result->succeeded);
+        $this->assertSame(ConnectorDiscoveryRunErrorCode::DiscoverySchemaValidationFailed, $result->errorCode);
+        $this->assertSame(ConnectorErrorActionability::SupportRequired, $result->actionability());
+        $this->assertNull($result->snapshotCandidate);
+    }
+
+    #[Test]
+    public function invalid_endpoint_path_never_reaches_transport(): void
+    {
+        $transport = new class implements ConnectorHttpTransport
+        {
+            public int $sendCount = 0;
+
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                $this->sendCount++;
+
+                return new ConnectorHttpResult(200, [], '{"items":[],"total_count":0}');
+            }
+        };
+
+        $capability = $this->capabilityWithTransport($transport);
+
+        try {
+            $capability->discover($this->sampleContext(), '//evil.example.com/V1/products');
+            $this->fail('Expected InvalidArgumentException');
+        } catch (\InvalidArgumentException) {
+            $this->assertSame(0, $transport->sendCount);
+        }
     }
 
     private function capabilityWithTransport(ConnectorHttpTransport $transport): AdobePaaSDiscoveryCapabilityImpl

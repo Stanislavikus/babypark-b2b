@@ -18,8 +18,9 @@ final readonly class ConnectorDiscoveryAttemptResult
         public ?ConnectorDiscoverySnapshotCandidate $snapshotCandidate,
     ) {}
 
-    public static function success(ConnectorDiscoverySnapshotCandidate $candidate): self
-    {
+    public static function success(
+        #[\SensitiveParameter] ConnectorDiscoverySnapshotCandidate $candidate,
+    ): self {
         return new self(true, null, null, null, null, $candidate);
     }
 

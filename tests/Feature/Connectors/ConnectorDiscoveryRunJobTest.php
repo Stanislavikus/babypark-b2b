@@ -7,21 +7,33 @@ use App\Enums\ConnectorDiscoveryRunLifecycleErrorCode;
 use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Enums\ConnectorErrorActionability;
 use App\Enums\ConnectorErrorCause;
+use App\Jobs\Connectors\ConnectorConnectionCheckJob;
 use App\Jobs\Connectors\ConnectorDiscoveryRunJob;
 use App\Jobs\Connectors\ConnectorDiscoveryRunJobExecutionException;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorDiscoveryRun;
+use App\Models\ConnectorSchemaSource;
 use App\Services\Connectors\AdobePaaSDiscoveryService;
 use App\Services\Connectors\ConnectorDiscoveryRunPersistence;
 use App\Services\Connectors\ConnectorDiscoverySourceResolver;
 use App\Support\Connectors\AdobePaaS\AdobePaaSAttributeNormalizer;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapability;
+use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapabilityImpl;
+use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryRequestFactory;
+use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryResponseMapper;
+use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryTransportMapper;
 use App\Support\Connectors\CanonicalSchemaFieldHash;
 use App\Support\Connectors\CanonicalSchemaFieldHasher;
 use App\Support\Connectors\CanonicalSchemaSnapshotHasher;
 use App\Support\Connectors\ConnectorDiscoveryAttemptResult;
 use App\Support\Connectors\ConnectorDiscoveryNormalizedField;
 use App\Support\Connectors\ConnectorDiscoverySnapshotCandidate;
+use App\Support\Connectors\ConnectorSchemaSourceEndpointPathValidator;
+use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceInvalidAfterReservationException;
+use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
+use App\Support\Connectors\Transport\ConnectorHttpResult;
+use App\Support\Connectors\Transport\ConnectorHttpTransport;
+use App\Support\Connectors\Transport\ConnectorOutboundRequest;
 use Carbon\CarbonImmutable;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
@@ -68,6 +80,25 @@ class ConnectorDiscoveryRunJobTest extends TestCase
         $this->assertSame(1100, $middleware[0]->expiresAfter);
         $this->assertSame(30, $middleware[0]->releaseAfter);
         $this->assertTrue($middleware[0]->shareKey);
+        $this->assertSame('connector-account:acct', $middleware[0]->key);
+    }
+
+    #[Test]
+    public function discovery_and_connection_check_jobs_share_account_lock_key(): void
+    {
+        $accountId = '00000000-0000-4000-8000-000000000101';
+        $otherAccountId = '00000000-0000-4000-8000-000000000202';
+
+        $discoveryMiddleware = (new ConnectorDiscoveryRunJob('ws', $accountId, 'run', now()->addHour()->getTimestamp()))
+            ->middleware()[0];
+        $connectionCheckMiddleware = (new ConnectorConnectionCheckJob('ws', $accountId, 'check', now()->addHour()->getTimestamp()))
+            ->middleware()[0];
+        $otherAccountMiddleware = (new ConnectorDiscoveryRunJob('ws', $otherAccountId, 'run', now()->addHour()->getTimestamp()))
+            ->middleware()[0];
+
+        $this->assertSame('connector-account:'.$accountId, $discoveryMiddleware->key);
+        $this->assertSame($discoveryMiddleware->key, $connectionCheckMiddleware->key);
+        $this->assertNotSame($discoveryMiddleware->key, $otherAccountMiddleware->key);
     }
 
     #[Test]
@@ -301,6 +332,114 @@ class ConnectorDiscoveryRunJobTest extends TestCase
 
         $this->assertNull(ConnectorDiscoveryRunErrorCode::tryFrom($lifecycle));
         $this->assertNotNull(ConnectorDiscoveryRunLifecycleErrorCode::tryFrom($lifecycle));
+    }
+
+    #[Test]
+    public function duplicate_field_keys_classify_as_schema_validation_without_job_failed(): void
+    {
+        $account = $this->createConnectorAccount();
+        $row = $this->createQueuedRow($account);
+        $retryUntil = $row->retry_until_at->getTimestamp();
+
+        $duplicateAttribute = json_decode(
+            '{"attribute_code":"color","frontend_input":"text","scope":"global"}',
+            associative: false,
+            depth: 512,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $transport = new class($duplicateAttribute) implements ConnectorHttpTransport
+        {
+            public function __construct(private readonly \stdClass $duplicateAttribute) {}
+
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'items' => [$this->duplicateAttribute, $this->duplicateAttribute],
+                    'total_count' => 2,
+                ], JSON_THROW_ON_ERROR));
+            }
+        };
+
+        $this->app->instance(
+            AdobePaaSDiscoveryCapability::class,
+            new AdobePaaSDiscoveryCapabilityImpl(
+                new AdobePaaSDiscoveryRequestFactory(
+                    new OAuth1RequestSigner,
+                    new ConnectorSchemaSourceEndpointPathValidator,
+                ),
+                $transport,
+                new AdobePaaSDiscoveryResponseMapper,
+                new AdobePaaSDiscoveryTransportMapper,
+                new AdobePaaSAttributeNormalizer,
+                new CanonicalSchemaFieldHasher,
+                new CanonicalSchemaSnapshotHasher,
+            ),
+        );
+
+        $job = new ConnectorDiscoveryRunJob($account->workspace_id, $account->id, $row->id, $retryUntil);
+        $job->handle(app(AdobePaaSDiscoveryService::class), app(ConnectorDiscoveryRunPersistence::class));
+
+        $row->refresh();
+        $this->assertSame(ConnectorDiscoveryRunStatus::Failed, $row->status);
+        $this->assertSame('discovery_schema_validation_failed', $row->error_code);
+        $this->assertSame(ConnectorErrorActionability::SupportRequired, $row->actionability);
+        $this->assertNotSame('discovery_job_failed', $row->error_code);
+        $this->assertNull($row->snapshot_id);
+    }
+
+    #[Test]
+    public function service_reverify_failure_after_slot_reservation_uses_dedicated_boundary(): void
+    {
+        $account = $this->createConnectorAccount();
+        $row = $this->createQueuedRow($account);
+        $persistence = app(ConnectorDiscoveryRunPersistence::class);
+
+        $slot = $persistence->reserveExecutionSlot($account->workspace_id, $account->id, $row->id);
+        $this->assertTrue($slot['reserved']);
+
+        ConnectorSchemaSource::query()
+            ->whereKey($row->connector_schema_source_id)
+            ->update(['endpoint_path' => '//evil.example.com/V1/products']);
+
+        $capability = Mockery::mock(AdobePaaSDiscoveryCapability::class);
+        $capability->shouldNotReceive('discover');
+        $this->app->instance(AdobePaaSDiscoveryCapability::class, $capability);
+
+        try {
+            app(AdobePaaSDiscoveryService::class)->execute($account->workspace_id, $account->id, $row->id);
+            $this->fail('Expected ConnectorDiscoverySourceInvalidAfterReservationException');
+        } catch (ConnectorDiscoverySourceInvalidAfterReservationException) {
+            $this->addToAssertionCount(1);
+        }
+    }
+
+    #[Test]
+    public function job_terminalizes_when_source_invalid_before_first_http_call(): void
+    {
+        $account = $this->createConnectorAccount();
+        $row = $this->createQueuedRow($account);
+        $retryUntil = $row->retry_until_at->getTimestamp();
+        $originalLastDiscoveryAt = $account->last_discovery_at;
+
+        ConnectorSchemaSource::query()
+            ->whereKey($row->connector_schema_source_id)
+            ->update(['endpoint_path' => '//evil.example.com/V1/products']);
+
+        $capability = Mockery::mock(AdobePaaSDiscoveryCapability::class);
+        $capability->shouldNotReceive('discover');
+        $this->app->instance(AdobePaaSDiscoveryCapability::class, $capability);
+
+        $job = new ConnectorDiscoveryRunJob($account->workspace_id, $account->id, $row->id, $retryUntil);
+        $job->handle(app(AdobePaaSDiscoveryService::class), app(ConnectorDiscoveryRunPersistence::class));
+
+        $row->refresh();
+        $account->refresh();
+
+        $this->assertSame(ConnectorDiscoveryRunStatus::Failed, $row->status);
+        $this->assertSame('discovery_source_invalid_before_execution', $row->error_code);
+        $this->assertNotSame('discovery_job_failed', $row->error_code);
+        $this->assertSame($originalLastDiscoveryAt?->toJSON(), $account->last_discovery_at?->toJSON());
     }
 
     /**

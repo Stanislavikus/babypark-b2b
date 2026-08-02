@@ -10,8 +10,8 @@ final readonly class ConnectorDiscoverySnapshotCandidate
      * @param  list<ConnectorDiscoveryNormalizedField>  $fields
      */
     private function __construct(
-        public array $fields,
-        public string $canonicalHash,
+        #[\SensitiveParameter] public array $fields,
+        #[\SensitiveParameter] public string $canonicalHash,
         public CarbonImmutable $capturedAt,
     ) {}
 
@@ -19,8 +19,8 @@ final readonly class ConnectorDiscoverySnapshotCandidate
      * @param  list<ConnectorDiscoveryNormalizedField>  $fields
      */
     public static function create(
-        array $fields,
-        string $canonicalHash,
+        #[\SensitiveParameter] array $fields,
+        #[\SensitiveParameter] string $canonicalHash,
         CarbonImmutable $capturedAt,
     ): self {
         if (! array_is_list($fields)) {

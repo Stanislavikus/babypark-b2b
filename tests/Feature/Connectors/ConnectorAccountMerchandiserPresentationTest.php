@@ -2,10 +2,15 @@
 
 namespace Tests\Feature\Connectors;
 
+use App\Enums\ConnectorConnectionCheckStatus;
+use App\Enums\ConnectorConnectionCheckTrigger;
+use App\Enums\ConnectorErrorActionability;
+use App\Enums\ConnectorErrorCause;
 use App\Enums\UserRole;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ListConnectorAccounts;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
 use App\Models\ConnectorAccount;
+use App\Models\ConnectorConnectionCheck;
 use App\Support\Connectors\AdobePaaS\AdobePaaSCredentialMapper;
 use App\Support\Connectors\ConnectorAccountMerchandiserPresentation;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
@@ -15,6 +20,7 @@ use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
@@ -119,11 +125,20 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
 
         $record = $query->whereKey($account->id)->firstOrFail();
 
-        $this->assertFalse($record->offsetExists('credentials'));
-        $this->assertFalse($record->offsetExists('settings'));
-        $this->assertFalse($record->offsetExists('base_url'));
-        $this->assertFalse($record->offsetExists('store_code'));
-        $this->assertTrue($record->offsetExists('auth_profile'));
+        foreach ([
+            'credentials',
+            'settings',
+            'base_url',
+            'store_code',
+            'tenant_context',
+            'auth_profile',
+        ] as $sensitiveColumn) {
+            $this->assertFalse(
+                $record->offsetExists($sensitiveColumn),
+                "Sensitive column [{$sensitiveColumn}] must not be selected for merchandiser queries.",
+            );
+        }
+
         $this->assertTrue($record->offsetExists('name'));
         $this->assertTrue($record->offsetExists('connection_status'));
     }
@@ -143,6 +158,62 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
         }
     }
 
+    #[Test]
+    public function merchandiser_detail_hides_connection_check_management_and_history(): void
+    {
+        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $initiator = $this->createStaffUser(UserRole::Manager);
+        $account = $this->createConnectorAccount(overrides: [
+            'auth_profile' => 'adobe_commerce_paas_oauth1_integration',
+            'is_enabled' => false,
+        ]);
+
+        $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Failed, [
+            'initiated_by_user_id' => $initiator->id,
+            'trigger' => ConnectorConnectionCheckTrigger::Manual,
+            'cause_category' => ConnectorErrorCause::Authorization,
+            'actionability' => ConnectorErrorActionability::UserActionRequired,
+            'user_message_key' => 'connectors.errors.insufficient_permissions',
+            'duration_ms' => 1500,
+            'technical_summary' => 'SECRET_TECH_SUMMARY',
+        ]);
+
+        $detailComponent = Livewire::actingAs($merchandiser)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()]);
+
+        $detailComponent->assertSuccessful();
+        $detailComponent->assertDontSee(__('connectors.ui.relation.connection_checks'));
+
+        $forbidden = [
+            $initiator->email,
+            $initiator->name,
+            __('connectors.enums.connection_check_trigger.manual'),
+            __('connectors.enums.error_cause.authorization'),
+            __('connectors.enums.error_actionability.user_action_required'),
+            __('connectors.ui.disabled_reasons.account_disabled'),
+            'adobe_commerce_paas_oauth1_integration',
+            'SECRET_TECH_SUMMARY',
+            'connectionChecks',
+            'ConnectionChecksRelationManager',
+        ];
+
+        $this->assertNoCanariesInSurface(
+            $forbidden,
+            $detailComponent->html(),
+            json_encode($detailComponent->snapshot, JSON_THROW_ON_ERROR),
+            json_encode($detailComponent->effects, JSON_THROW_ON_ERROR),
+        );
+
+        $headerActions = (new \ReflectionMethod(ViewConnectorAccount::class, 'getHeaderActions'))
+            ->invoke($detailComponent->instance());
+        $relationManagers = (new \ReflectionMethod(ViewConnectorAccount::class, 'getAllRelationManagers'))
+            ->invoke($detailComponent->instance());
+
+        $this->assertSame([], $headerActions);
+        $this->assertSame([], $relationManagers);
+        $this->assertNull($detailComponent->instance()->getSubheading());
+    }
+
     /**
      * @param  list<string>  $canaries
      */
@@ -153,5 +224,37 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
                 $this->assertStringNotContainsString($canary, $surface, "Canary [{$canary}] leaked into merchandiser UI surface.");
             }
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function createConnectionCheck(
+        ConnectorAccount $account,
+        ConnectorConnectionCheckStatus $status,
+        array $overrides = [],
+    ): ConnectorConnectionCheck {
+        return ConnectorConnectionCheck::withoutWorkspaceScope()->create(array_merge([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'trigger' => ConnectorConnectionCheckTrigger::Manual,
+            'initiated_by_user_id' => null,
+            'status' => $status,
+            'execution_attempts' => 0,
+            'retry_until_at' => now()->addMinutes(15),
+            'next_attempt_at' => null,
+            'cause_category' => null,
+            'actionability' => null,
+            'error_code' => null,
+            'http_status' => null,
+            'user_message_key' => null,
+            'safe_message_parameters' => null,
+            'technical_summary' => null,
+            'vendor_request_id' => null,
+            'started_at' => now(),
+            'finished_at' => now(),
+            'duration_ms' => null,
+        ], $overrides));
     }
 }

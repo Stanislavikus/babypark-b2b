@@ -2,14 +2,12 @@
 
 namespace Tests\Feature\Connectors;
 
-use App\Enums\ConnectorDiscoveryRunLifecycleErrorCode;
 use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Enums\UserRole;
 use App\Jobs\Connectors\ConnectorDiscoveryRunJob;
 use App\Models\ConnectorDiscoveryRun;
 use App\Models\Workspace;
 use App\Services\Connectors\ConnectorDiscoveryRunDispatchService;
-use App\Services\Connectors\ConnectorDiscoveryRunPersistence;
 use App\Services\Connectors\ConnectorDiscoverySourceResolver;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\Exceptions\ConnectorAccountNotFoundException;
@@ -20,6 +18,7 @@ use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\Test;
@@ -59,17 +58,21 @@ class ConnectorDiscoveryRunDispatchServiceTest extends TestCase
         $admin = $this->createStaffUser(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
 
-        $runId = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
+        $decision = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
 
-        $row = ConnectorDiscoveryRun::withoutWorkspaceScope()->findOrFail($runId);
+        $this->assertTrue($decision->shouldDispatch);
+        $this->assertNotNull($decision->retryUntilTimestamp);
+
+        $row = ConnectorDiscoveryRun::withoutWorkspaceScope()->findOrFail($decision->discoveryRunId);
         $this->assertSame(ConnectorDiscoveryRunStatus::Queued, $row->status);
         $this->assertNull($row->started_at);
         $this->assertSame(0, $row->execution_attempts);
         $this->assertNotNull($row->retry_until_at);
         $this->assertNotNull($row->connector_schema_source_id);
 
-        Queue::assertPushed(ConnectorDiscoveryRunJob::class, function (ConnectorDiscoveryRunJob $job) use ($row): bool {
-            return $row->retry_until_at->getTimestamp() === $job->retryUntil()->getTimestamp();
+        Queue::assertPushed(ConnectorDiscoveryRunJob::class, function (ConnectorDiscoveryRunJob $job) use ($row, $decision): bool {
+            return $row->retry_until_at->getTimestamp() === $job->retryUntil()->getTimestamp()
+                && $decision->retryUntilTimestamp === $job->retryUntil()->getTimestamp();
         });
     }
 
@@ -80,10 +83,13 @@ class ConnectorDiscoveryRunDispatchServiceTest extends TestCase
         $admin = $this->createStaffUser(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
 
-        $firstId = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
-        $secondId = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
+        $firstDecision = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
+        $secondDecision = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
 
-        $this->assertSame($firstId, $secondId);
+        $this->assertSame($firstDecision->discoveryRunId, $secondDecision->discoveryRunId);
+        $this->assertTrue($firstDecision->shouldDispatch);
+        $this->assertFalse($secondDecision->shouldDispatch);
+        $this->assertNull($secondDecision->retryUntilTimestamp);
         $this->assertSame(1, ConnectorDiscoveryRun::withoutWorkspaceScope()->count());
         Queue::assertPushed(ConnectorDiscoveryRunJob::class, 1);
     }
@@ -172,28 +178,21 @@ class ConnectorDiscoveryRunDispatchServiceTest extends TestCase
     #[Test]
     public function dispatch_failure_compensates_row_to_failed(): void
     {
+        $this->mock(Dispatcher::class, function ($mock): void {
+            $mock->shouldReceive('dispatch')
+                ->once()
+                ->andThrow(new \RuntimeException('queue dispatch failed'));
+        });
+
         $admin = $this->createStaffUser(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
-        $source = app(ConnectorDiscoverySourceResolver::class)->resolve($account);
-        $row = ConnectorDiscoveryRun::withoutWorkspaceScope()->create([
-            'workspace_id' => $account->workspace_id,
-            'connector_account_id' => $account->id,
-            'connector_schema_source_id' => $source->id,
-            'trigger' => 'manual',
-            'status' => ConnectorDiscoveryRunStatus::Queued,
-            'execution_attempts' => 0,
-            'retry_until_at' => now()->addHour(),
-            'started_at' => null,
-        ]);
 
-        app(ConnectorDiscoveryRunPersistence::class)->writeLifecycleFailure(
-            $account->workspace_id,
-            $account->id,
-            $row->id,
-            ConnectorDiscoveryRunLifecycleErrorCode::DispatchFailed,
-        );
+        $decision = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
 
-        $row->refresh();
+        $this->assertTrue($decision->shouldDispatch);
+        $this->assertNotNull($decision->retryUntilTimestamp);
+
+        $row = ConnectorDiscoveryRun::withoutWorkspaceScope()->findOrFail($decision->discoveryRunId);
         $this->assertSame(ConnectorDiscoveryRunStatus::Failed, $row->status);
         $this->assertSame('discovery_dispatch_failed', $row->error_code);
     }
@@ -217,12 +216,13 @@ class ConnectorDiscoveryRunDispatchServiceTest extends TestCase
             'started_at' => null,
         ]);
 
-        $newId = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
+        $decision = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
 
         $stale->refresh();
         $this->assertSame(ConnectorDiscoveryRunStatus::Failed, $stale->status);
         $this->assertSame('discovery_dispatch_failed', $stale->error_code);
-        $this->assertNotSame($stale->id, $newId);
+        $this->assertNotSame($stale->id, $decision->discoveryRunId);
+        $this->assertTrue($decision->shouldDispatch);
         Queue::assertPushed(ConnectorDiscoveryRunJob::class, 1);
     }
 }

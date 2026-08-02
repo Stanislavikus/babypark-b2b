@@ -34,7 +34,7 @@ final class ConnectorDiscoveryRunDispatchService
         User $actor,
         string $workspaceId,
         string $connectorAccountId,
-    ): string {
+    ): ConnectorDiscoveryDispatchDecision {
         if (DB::transactionLevel() > 0 && ! app()->environment('testing')) {
             throw new \RuntimeException('executeManual must not run inside a nested transaction.');
         }
@@ -171,6 +171,6 @@ final class ConnectorDiscoveryRunDispatchService
             }
         }
 
-        return $decision->discoveryRunId;
+        return $decision;
     }
 }

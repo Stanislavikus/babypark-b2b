@@ -41,10 +41,44 @@ class ConnectorSchemaSourceEndpointPathValidatorTest extends TestCase
     }
 
     #[Test]
-    public function normalize_strips_leading_slashes_consistently(): void
+    public function rejects_invalid_utf8(): void
     {
-        $this->assertSame('/V1/products/attributes', $this->validator->normalize('/V1/products/attributes'));
-        $this->assertSame('/V1/products/attributes', $this->validator->normalize('//V1/products/attributes'));
+        $this->assertFalse($this->validator->isValid("/V1/\xC3\x28/products"));
+    }
+
+    #[Test]
+    public function rejects_ascii_control_characters(): void
+    {
+        $this->assertFalse($this->validator->isValid("/V1/products\x07/attributes"));
+    }
+
+    #[Test]
+    public function rejects_backslashes(): void
+    {
+        $this->assertFalse($this->validator->isValid('/V1\\products\\attributes'));
+    }
+
+    #[Test]
+    public function rejects_scheme_relative_paths(): void
+    {
+        $this->assertFalse($this->validator->isValid('//evil.example.com/V1/products'));
+    }
+
+    #[Test]
+    public function rejects_percent_encoded_traversal_segments(): void
+    {
+        $this->assertFalse($this->validator->isValid('/V1/%2e%2E/products'));
+        $this->assertFalse($this->validator->isValid('/V1/%2e/products'));
+        $this->assertFalse($this->validator->isValid('/V1/%2E/products'));
+    }
+
+    #[Test]
+    public function rejects_encoded_slash_and_backslash_segments(): void
+    {
+        $this->assertFalse($this->validator->isValid('/V1/foo%2Fbar'));
+        $this->assertFalse($this->validator->isValid('/V1/foo%2fbar'));
+        $this->assertFalse($this->validator->isValid('/V1/foo%5Cbar'));
+        $this->assertFalse($this->validator->isValid('/V1/foo%5cbar'));
     }
 
     /**
@@ -75,6 +109,7 @@ class ConnectorSchemaSourceEndpointPathValidatorTest extends TestCase
             'dot segment' => ['/V1/./products'],
             'parent segment' => ['/V1/../products'],
             'missing leading slash' => ['V1/products/attributes'],
+            'double leading slash' => ['//V1/products/attributes'],
         ];
     }
 }
