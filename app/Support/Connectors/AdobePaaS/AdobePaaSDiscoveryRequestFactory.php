@@ -43,7 +43,7 @@ final class AdobePaaSDiscoveryRequestFactory
     }
 
     private function buildAbsoluteUrl(
-        AdobePaaSRequestContext $context,
+        #[\SensitiveParameter] AdobePaaSRequestContext $context,
         string $endpointPath,
         int $currentPage,
     ): string {

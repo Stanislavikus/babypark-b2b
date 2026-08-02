@@ -7,8 +7,8 @@ use App\Support\Connectors\ConnectorDiscoveryAttemptResult;
 final readonly class AdobePaaSDiscoveryPageResult
 {
     private function __construct(
-        public ?AdobePaaSDiscoveryPage $page,
-        public ?ConnectorDiscoveryAttemptResult $failure,
+        #[\SensitiveParameter] public ?AdobePaaSDiscoveryPage $page,
+        #[\SensitiveParameter] public ?ConnectorDiscoveryAttemptResult $failure,
     ) {}
 
     public static function success(#[\SensitiveParameter] AdobePaaSDiscoveryPage $page): self

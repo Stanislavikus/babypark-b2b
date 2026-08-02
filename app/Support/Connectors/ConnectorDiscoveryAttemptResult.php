@@ -15,7 +15,7 @@ final readonly class ConnectorDiscoveryAttemptResult
         public ?ConnectorDiscoveryRunErrorCode $errorCode,
         public ?TimeoutPhase $timeoutPhase,
         public ?int $retryAfterSeconds,
-        public ?ConnectorDiscoverySnapshotCandidate $snapshotCandidate,
+        #[\SensitiveParameter] public ?ConnectorDiscoverySnapshotCandidate $snapshotCandidate,
     ) {}
 
     public static function success(

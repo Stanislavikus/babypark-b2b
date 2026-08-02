@@ -41,8 +41,6 @@ final class AdobePaaSDiscoveryService
             throw new ConnectorDiscoverySourceInvalidAfterReservationException('Schema source was not found.');
         }
 
-        $context = $this->contextFactory->create($workspaceId, $connectorAccountId);
-
         $account = $run->account()->withoutGlobalScopes()->firstOrFail();
 
         if (! $this->sourceResolver->reverify($account, $source)) {
@@ -50,6 +48,7 @@ final class AdobePaaSDiscoveryService
         }
 
         $endpointPath = $this->endpointPathValidator->normalize($source->endpoint_path);
+        $context = $this->contextFactory->create($workspaceId, $connectorAccountId);
 
         return $this->capability->discover($context, $endpointPath);
     }

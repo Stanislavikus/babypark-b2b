@@ -22,6 +22,7 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapabilityImpl;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryRequestFactory;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryResponseMapper;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryTransportMapper;
+use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
 use App\Support\Connectors\CanonicalSchemaFieldHash;
 use App\Support\Connectors\CanonicalSchemaFieldHasher;
 use App\Support\Connectors\CanonicalSchemaSnapshotHasher;
@@ -401,6 +402,40 @@ class ConnectorDiscoveryRunJobTest extends TestCase
         ConnectorSchemaSource::query()
             ->whereKey($row->connector_schema_source_id)
             ->update(['endpoint_path' => '//evil.example.com/V1/products']);
+
+        $capability = Mockery::mock(AdobePaaSDiscoveryCapability::class);
+        $capability->shouldNotReceive('discover');
+        $this->app->instance(AdobePaaSDiscoveryCapability::class, $capability);
+
+        try {
+            app(AdobePaaSDiscoveryService::class)->execute($account->workspace_id, $account->id, $row->id);
+            $this->fail('Expected ConnectorDiscoverySourceInvalidAfterReservationException');
+        } catch (ConnectorDiscoverySourceInvalidAfterReservationException) {
+            $this->addToAssertionCount(1);
+        }
+    }
+
+    #[Test]
+    public function service_source_invalid_wins_over_incomplete_credentials_regression(): void
+    {
+        $account = $this->createConnectorAccount(overrides: [
+            'base_url' => null,
+            'store_code' => null,
+            'credentials' => [],
+        ]);
+        $row = $this->createQueuedRow($account);
+        $persistence = app(ConnectorDiscoveryRunPersistence::class);
+
+        $slot = $persistence->reserveExecutionSlot($account->workspace_id, $account->id, $row->id);
+        $this->assertTrue($slot['reserved']);
+
+        ConnectorSchemaSource::query()
+            ->whereKey($row->connector_schema_source_id)
+            ->update(['endpoint_path' => '//evil.example.com/V1/products']);
+
+        $contextFactory = Mockery::mock(AdobePaaSRequestContextFactory::class);
+        $contextFactory->shouldNotReceive('create');
+        $this->app->instance(AdobePaaSRequestContextFactory::class, $contextFactory);
 
         $capability = Mockery::mock(AdobePaaSDiscoveryCapability::class);
         $capability->shouldNotReceive('discover');

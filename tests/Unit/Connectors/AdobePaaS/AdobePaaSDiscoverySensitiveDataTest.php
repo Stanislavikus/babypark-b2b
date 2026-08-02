@@ -82,12 +82,16 @@ class AdobePaaSDiscoverySensitiveDataTest extends TestCase
         $methods = [
             [AdobePaaSDiscoveryCapabilityImpl::class, 'discover', [0], false],
             [AdobePaaSDiscoveryRequestFactory::class, 'build', [0, 3], false],
+            [AdobePaaSDiscoveryRequestFactory::class, 'buildAbsoluteUrl', [0], true],
             [AdobePaaSDiscoveryResponseMapper::class, 'map', [0], false],
             [AdobePaaSDiscoveryResponseMapper::class, 'mapSuccessResponse', [0], true],
+            [AdobePaaSDiscoveryResponseMapper::class, 'mapHttpStatus', [1], true],
             [AdobePaaSDiscoveryTransportMapper::class, 'map', [0], false],
             [AdobePaaSDiscoveryPage::class, '__construct', [0], false],
+            [AdobePaaSDiscoveryPageResult::class, '__construct', [0, 1], true],
             [AdobePaaSDiscoveryPageResult::class, 'success', [0], false],
             [AdobePaaSDiscoveryPageResult::class, 'failure', [0], false],
+            [ConnectorDiscoveryAttemptResult::class, '__construct', [5], true],
             [ConnectorDiscoveryAttemptResult::class, 'success', [0], false],
             [ConnectorDiscoveryNormalizedField::class, '__construct', [0, 1], false],
             [ConnectorDiscoverySnapshotCandidate::class, 'create', [0, 1], false],
@@ -121,13 +125,14 @@ class AdobePaaSDiscoverySensitiveDataTest extends TestCase
 
         try {
             $this->assertTrue(ini_set('zend.exception_ignore_args', '0') !== false);
+            $this->assertSame('0', ini_get('zend.exception_ignore_args'));
 
             $context = $this->sampleContext($sentinel);
             $transport = new class implements ConnectorHttpTransport
             {
                 public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): never
                 {
-                    throw new \RuntimeException('forced transport throw '.$request->request->getHeaderLine('Authorization'));
+                    throw new \RuntimeException('forced transport throw');
                 }
             };
 
@@ -138,8 +143,7 @@ class AdobePaaSDiscoverySensitiveDataTest extends TestCase
                 $discoverFrame = $this->findTraceFrame($exception, 'discover');
                 $this->assertNotNull($discoverFrame);
                 $this->assertInstanceOf(SensitiveParameterValue::class, $discoverFrame['args'][0] ?? null);
-                $this->inspectTraceArguments($exception->getTrace(), $sentinel);
-                $this->assertStringNotContainsString($sentinel, $exception->getTraceAsString());
+                $this->assertExceptionChainDoesNotLeakSentinel($exception, $sentinel);
             }
         } finally {
             ini_set('zend.exception_ignore_args', (string) $previousIgnoreArgs);
@@ -176,6 +180,19 @@ class AdobePaaSDiscoverySensitiveDataTest extends TestCase
         );
     }
 
+    private function assertExceptionChainDoesNotLeakSentinel(\Throwable $exception, string $sentinel): void
+    {
+        $current = $exception;
+
+        while ($current !== null) {
+            $this->assertStringNotContainsString($sentinel, $current->getMessage());
+            $this->assertStringNotContainsString($sentinel, (string) $current);
+            $this->assertStringNotContainsString($sentinel, $current->getTraceAsString());
+            $this->inspectTraceArguments($current->getTrace(), $sentinel);
+            $current = $current->getPrevious();
+        }
+    }
+
     /**
      * @param  array<int, array<string, mixed>>  $trace
      */
@@ -203,6 +220,18 @@ class AdobePaaSDiscoverySensitiveDataTest extends TestCase
         if (is_array($argument)) {
             foreach ($argument as $nested) {
                 $this->inspectTraceArgument($nested, $sentinel);
+            }
+
+            return;
+        }
+
+        if (is_object($argument)) {
+            $reflection = new \ReflectionObject($argument);
+
+            foreach ($reflection->getProperties() as $property) {
+                if ($property->isInitialized($argument)) {
+                    $this->inspectTraceArgument($property->getValue($argument), $sentinel);
+                }
             }
         }
     }

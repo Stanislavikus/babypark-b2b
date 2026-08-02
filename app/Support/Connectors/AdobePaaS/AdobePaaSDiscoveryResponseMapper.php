@@ -68,7 +68,7 @@ final class AdobePaaSDiscoveryResponseMapper
     /**
      * @param  array<string, list<string>>  $headers
      */
-    private function mapHttpStatus(int $status, array $headers): ConnectorDiscoveryAttemptResult
+    private function mapHttpStatus(int $status, #[\SensitiveParameter] array $headers): ConnectorDiscoveryAttemptResult
     {
         $errorCode = match (true) {
             $status >= 201 && $status <= 299 => ConnectorDiscoveryRunErrorCode::AdobeUnexpectedSuccessStatus,
