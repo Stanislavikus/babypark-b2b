@@ -24,6 +24,7 @@ use App\Support\Connectors\Transport\ConnectorHttpTransport;
 use App\Support\Connectors\Transport\ConnectorOutboundRequest;
 use App\Support\Connectors\Transport\ConnectorTransportException;
 use App\Support\Connectors\Transport\TransportFailureReason;
+use PHPUnit\Framework\AssertionFailedError;
 use PHPUnit\Framework\Attributes\Test;
 use SensitiveParameterValue;
 use Tests\TestCase;
@@ -31,6 +32,10 @@ use Tests\TestCase;
 class AdobePaaSDiscoverySensitiveDataTest extends TestCase
 {
     private const CREDENTIAL_CANARY = 'CANARY_DISCOVERY_SECRET_4B2B1F';
+
+    private const MAX_TRACE_INSPECTION_DEPTH = 32;
+
+    private const MAX_TRACE_INSPECTION_NODES = 4096;
 
     #[Test]
     public function secrets_do_not_leak_through_discovery_capability_stack(): void
@@ -118,6 +123,43 @@ class AdobePaaSDiscoverySensitiveDataTest extends TestCase
     }
 
     #[Test]
+    public function trace_inspection_terminates_on_cyclic_object_graph_and_detects_sentinel(): void
+    {
+        $sentinel = 'CYCLE_SENTINEL_4B2B1F';
+        $nodeA = new CycleInspectionNode;
+        $nodeB = new CycleInspectionNode;
+        $nodeA->next = $nodeB;
+        $nodeB->next = $nodeA;
+        $nodeB->payload = $sentinel;
+
+        $this->expectException(AssertionFailedError::class);
+        $this->inspectTraceArguments([['args' => [$nodeA]]], $sentinel);
+    }
+
+    #[Test]
+    public function trace_inspection_completes_on_cyclic_graph_without_sentinel(): void
+    {
+        $nodeA = new CycleInspectionNode;
+        $nodeB = new CycleInspectionNode;
+        $nodeA->next = $nodeB;
+        $nodeB->next = $nodeA;
+        $nodeB->payload = 'benign-cycle-payload';
+
+        $this->inspectTraceArguments([['args' => [$nodeA]]], 'CYCLE_SENTINEL_4B2B1F');
+        $this->addToAssertionCount(1);
+    }
+
+    #[Test]
+    public function trace_inspection_treats_sensitive_parameter_value_as_terminal_boundary(): void
+    {
+        $sentinel = 'WRAPPED_SENTINEL_4B2B1F';
+        $wrapped = new SensitiveParameterValue('secret '.$sentinel);
+
+        $this->inspectTraceArguments([['args' => [$wrapped]]], $sentinel);
+        $this->addToAssertionCount(1);
+    }
+
+    #[Test]
     public function capability_discover_trace_redacts_context_when_transport_throws(): void
     {
         $sentinel = self::CREDENTIAL_CANARY;
@@ -198,42 +240,98 @@ class AdobePaaSDiscoverySensitiveDataTest extends TestCase
      */
     private function inspectTraceArguments(array $trace, string $sentinel): void
     {
+        $visitedObjects = new \SplObjectStorage;
+        $visitedNodes = 0;
+
         foreach ($trace as $frame) {
             foreach ($frame['args'] ?? [] as $argument) {
-                $this->inspectTraceArgument($argument, $sentinel);
+                $this->inspectTraceValue($argument, $sentinel, $visitedObjects, 0, $visitedNodes);
             }
         }
     }
 
-    private function inspectTraceArgument(mixed $argument, string $sentinel): void
-    {
-        if ($argument instanceof SensitiveParameterValue) {
+    private function inspectTraceValue(
+        mixed $value,
+        string $sentinel,
+        \SplObjectStorage $visitedObjects,
+        int $depth = 0,
+        int &$visitedNodes = 0,
+    ): void {
+        $visitedNodes++;
+
+        if ($visitedNodes > self::MAX_TRACE_INSPECTION_NODES) {
+            $this->fail(sprintf(
+                'Trace inspection node budget exceeded (%d nodes); traversal aborted to avoid infinite loops.',
+                self::MAX_TRACE_INSPECTION_NODES,
+            ));
+        }
+
+        if ($depth > self::MAX_TRACE_INSPECTION_DEPTH) {
+            $this->fail(sprintf(
+                'Trace inspection depth limit exceeded (%d); traversal aborted to avoid infinite loops.',
+                self::MAX_TRACE_INSPECTION_DEPTH,
+            ));
+        }
+
+        if ($value instanceof SensitiveParameterValue) {
             return;
         }
 
-        if (is_string($argument)) {
-            $this->assertStringNotContainsString($sentinel, $argument);
+        if (is_string($value)) {
+            $this->assertStringNotContainsString($sentinel, $value);
 
             return;
         }
 
-        if (is_array($argument)) {
-            foreach ($argument as $nested) {
-                $this->inspectTraceArgument($nested, $sentinel);
+        if (is_array($value)) {
+            foreach ($value as $nested) {
+                $this->inspectTraceValue($nested, $sentinel, $visitedObjects, $depth + 1, $visitedNodes);
             }
 
             return;
         }
 
-        if (is_object($argument)) {
-            $reflection = new \ReflectionObject($argument);
+        if (! is_object($value)) {
+            return;
+        }
 
-            foreach ($reflection->getProperties() as $property) {
-                if ($property->isInitialized($argument)) {
-                    $this->inspectTraceArgument($property->getValue($argument), $sentinel);
+        if ($visitedObjects->contains($value)) {
+            return;
+        }
+
+        $visitedObjects->attach($value);
+
+        if (! $this->shouldInspectObjectProperties($value)) {
+            return;
+        }
+
+        $reflection = new \ReflectionObject($value);
+
+        foreach ($reflection->getProperties() as $property) {
+            if ($property->isStatic()) {
+                continue;
+            }
+
+            try {
+                if (! $property->isInitialized($value)) {
+                    continue;
                 }
+
+                $propertyValue = $property->getValue($value);
+            } catch (\Throwable) {
+                continue;
             }
+
+            $this->inspectTraceValue($propertyValue, $sentinel, $visitedObjects, $depth + 1, $visitedNodes);
         }
+    }
+
+    private function shouldInspectObjectProperties(object $value): bool
+    {
+        return $value instanceof AdobePaaSRequestContext
+            || $value instanceof OAuth1Credentials
+            || $value instanceof ConnectorOutboundRequest
+            || $value instanceof CycleInspectionNode;
     }
 
     /**
@@ -249,4 +347,12 @@ class AdobePaaSDiscoverySensitiveDataTest extends TestCase
 
         return null;
     }
+}
+
+/** @internal */
+final class CycleInspectionNode
+{
+    public ?CycleInspectionNode $next = null;
+
+    public string $payload = '';
 }
