@@ -81,6 +81,41 @@ class ConnectorSchemaSourceEndpointPathValidatorTest extends TestCase
         $this->assertFalse($this->validator->isValid('/V1/foo%5cbar'));
     }
 
+    #[Test]
+    public function rejects_double_and_triple_encoded_traversal_segments(): void
+    {
+        $this->assertFalse($this->validator->isValid('/V1/%252e%252e/products'));
+        $this->assertFalse($this->validator->isValid('/V1/%252E/products'));
+        $this->assertFalse($this->validator->isValid('/V1/%25252e%25252e/products'));
+    }
+
+    #[Test]
+    public function rejects_double_encoded_separator_segments(): void
+    {
+        $this->assertFalse($this->validator->isValid('/V1/foo%252Fbar'));
+        $this->assertFalse($this->validator->isValid('/V1/foo%252fbar'));
+        $this->assertFalse($this->validator->isValid('/V1/foo%255Cbar'));
+        $this->assertFalse($this->validator->isValid('/V1/foo%255cbar'));
+    }
+
+    #[Test]
+    public function accepts_percent_encoded_space_in_segment(): void
+    {
+        $path = '/V1/product%20attributes';
+
+        $this->assertTrue($this->validator->isValid($path));
+        $this->assertSame($path, $this->validator->normalize($path));
+    }
+
+    #[Test]
+    public function accepts_normal_adobe_endpoint_path(): void
+    {
+        $path = '/V1/products/attributes';
+
+        $this->assertTrue($this->validator->isValid($path));
+        $this->assertSame($path, $this->validator->normalize($path));
+    }
+
     /**
      * @return array<string, array{0: string}>
      */

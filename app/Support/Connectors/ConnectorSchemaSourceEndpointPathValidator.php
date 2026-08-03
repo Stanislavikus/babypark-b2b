@@ -4,6 +4,8 @@ namespace App\Support\Connectors;
 
 final class ConnectorSchemaSourceEndpointPathValidator
 {
+    private const int MAX_DECODE_ITERATIONS = 4;
+
     public function isValid(?string $endpointPath): bool
     {
         if ($endpointPath === null || $endpointPath === '') {
@@ -46,12 +48,6 @@ final class ConnectorSchemaSourceEndpointPathValidator
             return false;
         }
 
-        if (preg_match('/%(?:2f|2F|5c|5C|2e|2E)/', $endpointPath) === 1) {
-            if ($this->containsEncodedTraversalOrSeparator($endpointPath)) {
-                return false;
-            }
-        }
-
         return $this->segmentsAreValid($endpointPath);
     }
 
@@ -73,25 +69,7 @@ final class ConnectorSchemaSourceEndpointPathValidator
                 return false;
             }
 
-            if ($segment === '.' || $segment === '..') {
-                return false;
-            }
-
-            if (preg_match('/%(?:2f|2F|5c|5C)/', $segment) === 1) {
-                return false;
-            }
-
-            $decoded = rawurldecode($segment);
-
-            if ($decoded === '.' || $decoded === '..') {
-                return false;
-            }
-
-            if (str_contains($decoded, '/') || str_contains($decoded, '\\')) {
-                return false;
-            }
-
-            if (preg_match('/[\x00-\x1F\x7F]/', $decoded) === 1) {
+            if (! $this->segmentIsSafeAfterBoundedDecoding($segment)) {
                 return false;
             }
         }
@@ -99,22 +77,56 @@ final class ConnectorSchemaSourceEndpointPathValidator
         return true;
     }
 
-    private function containsEncodedTraversalOrSeparator(string $endpointPath): bool
+    private function segmentIsSafeAfterBoundedDecoding(string $segment): bool
     {
-        $segments = explode('/', ltrim($endpointPath, '/'));
+        $current = $segment;
 
-        foreach ($segments as $segment) {
-            if (preg_match('/%(?:2f|2F|5c|5C)/', $segment) === 1) {
-                return true;
+        for ($iteration = 0; $iteration < self::MAX_DECODE_ITERATIONS; $iteration++) {
+            if (! $this->decodedSegmentValueIsSafe($current)) {
+                return false;
             }
 
-            $decoded = rawurldecode($segment);
+            if ($this->containsEncodedTraversalOrSeparator($current)) {
+                $decoded = rawurldecode($current);
 
-            if ($decoded === '.' || $decoded === '..') {
-                return true;
+                if ($decoded === $current) {
+                    return false;
+                }
+
+                $current = $decoded;
+
+                continue;
             }
+
+            return true;
         }
 
-        return false;
+        if ($this->containsEncodedTraversalOrSeparator($current)) {
+            return false;
+        }
+
+        return $this->decodedSegmentValueIsSafe($current);
+    }
+
+    private function decodedSegmentValueIsSafe(string $value): bool
+    {
+        if ($value === '.' || $value === '..') {
+            return false;
+        }
+
+        if (str_contains($value, '/') || str_contains($value, '\\')) {
+            return false;
+        }
+
+        if (preg_match('/[\x00-\x1F\x7F]/', $value) === 1) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function containsEncodedTraversalOrSeparator(string $value): bool
+    {
+        return preg_match('/%(?:2f|2F|5c|5C|2e|2E)/', $value) === 1;
     }
 }

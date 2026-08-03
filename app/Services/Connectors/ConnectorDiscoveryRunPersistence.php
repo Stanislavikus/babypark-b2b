@@ -204,24 +204,35 @@ final class ConnectorDiscoveryRunPersistence
         });
     }
 
-    public function terminalizeAccountDisabledBeforeExecution(
+    public function terminalizePreExecutionFailure(
         string $workspaceId,
         string $connectorAccountId,
         string $discoveryRunId,
+        ConnectorDiscoveryRunLifecycleErrorCode $lifecycleCode,
     ): void {
-        DB::transaction(function () use ($workspaceId, $connectorAccountId, $discoveryRunId): void {
-            $this->lockAccount($workspaceId, $connectorAccountId);
+        DB::transaction(function () use ($workspaceId, $connectorAccountId, $discoveryRunId, $lifecycleCode): void {
+            $account = $this->lockAccount($workspaceId, $connectorAccountId);
             $row = $this->lockHistoryRow($workspaceId, $connectorAccountId, $discoveryRunId);
 
             if ($row === null || $row->isTerminal()) {
                 return;
             }
 
-            $this->writeLifecycleFailureInTransaction(
-                $row,
-                ConnectorDiscoveryRunLifecycleErrorCode::AccountDisabledBeforeExecution,
-            );
+            $this->terminalizePreExecutionFailureInTransaction($account, $row, $lifecycleCode);
         });
+    }
+
+    public function terminalizeAccountDisabledBeforeExecution(
+        string $workspaceId,
+        string $connectorAccountId,
+        string $discoveryRunId,
+    ): void {
+        $this->terminalizePreExecutionFailure(
+            $workspaceId,
+            $connectorAccountId,
+            $discoveryRunId,
+            ConnectorDiscoveryRunLifecycleErrorCode::AccountDisabledBeforeExecution,
+        );
     }
 
     /**
@@ -241,7 +252,8 @@ final class ConnectorDiscoveryRunPersistence
             }
 
             if (! $account->is_enabled) {
-                $this->writeLifecycleFailureInTransaction(
+                $this->terminalizePreExecutionFailureInTransaction(
+                    $account,
                     $row,
                     ConnectorDiscoveryRunLifecycleErrorCode::AccountDisabledBeforeExecution,
                 );
@@ -252,7 +264,8 @@ final class ConnectorDiscoveryRunPersistence
             $source = ConnectorSchemaSource::query()->find($row->connector_schema_source_id);
 
             if ($source === null || ! $this->sourceResolver->reverify($account, $source)) {
-                $this->writeLifecycleFailureInTransaction(
+                $this->terminalizePreExecutionFailureInTransaction(
+                    $account,
                     $row,
                     ConnectorDiscoveryRunLifecycleErrorCode::SourceInvalidBeforeExecution,
                 );
@@ -418,6 +431,26 @@ final class ConnectorDiscoveryRunPersistence
             'fields_received' => null,
             'fields_normalized' => null,
         ]));
+    }
+
+    private function terminalizePreExecutionFailureInTransaction(
+        ConnectorAccount $account,
+        ConnectorDiscoveryRun $row,
+        ConnectorDiscoveryRunLifecycleErrorCode $lifecycleCode,
+    ): void {
+        if ($row->hasVendorClassification()) {
+            $row->update([
+                'status' => ConnectorDiscoveryRunStatus::Failed,
+                'finished_at' => now(),
+                'next_attempt_at' => null,
+            ]);
+
+            $this->applyVendorProjectionIfNewest($account, $row, succeeded: false);
+
+            return;
+        }
+
+        $this->writeLifecycleFailureInTransaction($row, $lifecycleCode);
     }
 
     private function writeLifecycleFailureInTransaction(

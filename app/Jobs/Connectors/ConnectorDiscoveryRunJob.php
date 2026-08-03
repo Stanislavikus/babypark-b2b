@@ -96,7 +96,7 @@ class ConnectorDiscoveryRunJob implements ShouldQueue
                 $this->discoveryRunId,
             );
         } catch (ConnectorDiscoverySourceInvalidAfterReservationException) {
-            $persistence->writeLifecycleFailure(
+            $persistence->terminalizePreExecutionFailure(
                 $this->workspaceId,
                 $this->connectorAccountId,
                 $this->discoveryRunId,
