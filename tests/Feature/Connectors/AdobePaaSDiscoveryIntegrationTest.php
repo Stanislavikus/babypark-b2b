@@ -46,7 +46,7 @@ class AdobePaaSDiscoveryIntegrationTest extends TestCase
     }
 
     #[Test]
-    public function oauth_nonce_is_unique_per_paginated_discovery_page_request(): void
+    public function oauth_o_auth_nonce_is_unique_per_paginated_discovery_page_request(): void
     {
         $transport = new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request, int $sendCount): ConnectorHttpResult {
             parse_str((string) $request->request->getUri()->getQuery(), $query);
@@ -91,7 +91,7 @@ class AdobePaaSDiscoveryIntegrationTest extends TestCase
     }
 
     #[Test]
-    public function canonical_hash_is_invariant_across_pagination_and_item_order(): void
+    public function canonical_canonical_hash_is_invariant_across_pagination_and_item_order(): void
     {
         $runA = $this->discoverWithTransport(new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request): ConnectorHttpResult {
             parse_str((string) $request->request->getUri()->getQuery(), $query);
