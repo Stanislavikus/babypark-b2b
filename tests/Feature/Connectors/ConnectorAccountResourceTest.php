@@ -254,9 +254,7 @@ class ConnectorAccountResourceTest extends TestCase
     public function management_user_list_and_detail_still_show_active_runtime_status(): void
     {
         $admin = $this->createStaffUser(UserRole::Admin);
-        $account = $this->createConnectorAccount(overrides: [
-            'connection_status' => ConnectorAccountConnectionStatus::Connected,
-        ]);
+        $account = $this->createConnectorAccount();
 
         $this->createActiveCheck($account, ConnectorConnectionCheckStatus::Running);
 
@@ -266,11 +264,15 @@ class ConnectorAccountResourceTest extends TestCase
             ->assertSee(__('connectors.ui.runtime.running'))
             ->assertSee(__('connectors.ui.runtime.last_result_prefix'));
 
-        Livewire::actingAs($admin)
+        $detailComponent = Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
             ->assertSuccessful()
-            ->assertSee(__('connectors.ui.runtime.running'))
-            ->assertSee('wire:poll.5s="refreshConnectionState"');
+            ->assertSee(__('connectors.ui.runtime.running'));
+
+        $this->assertStringContainsString(
+            'wire:poll.5s="refreshConnectionState"',
+            $detailComponent->html(),
+        );
     }
 
     #[Test]
@@ -290,10 +292,12 @@ class ConnectorAccountResourceTest extends TestCase
         ]);
 
         $connectionCheckQueries = [];
+        $connectionCheckBindings = [];
 
-        DB::listen(function ($query) use (&$connectionCheckQueries): void {
+        DB::listen(function ($query) use (&$connectionCheckQueries, &$connectionCheckBindings): void {
             if (str_contains(strtolower($query->sql), 'connector_connection_checks')) {
                 $connectionCheckQueries[] = strtolower($query->sql);
+                $connectionCheckBindings[] = $query->bindings;
             }
         });
 
@@ -304,14 +308,13 @@ class ConnectorAccountResourceTest extends TestCase
 
         $this->assertNotEmpty($connectionCheckQueries);
 
-        foreach ($connectionCheckQueries as $sql) {
+        foreach ($connectionCheckQueries as $index => $sql) {
             $this->assertStringContainsString('status', $sql);
             $this->assertStringContainsString('connector_account_id', $sql);
-            $this->assertMatchesRegularExpression(
-                '/\bqueued\b|\brunning\b/',
-                $sql,
-                'Management loading must restrict connection checks to active statuses.',
-            );
+            $this->assertStringContainsString('"status" in', $sql);
+            $bindings = $connectionCheckBindings[$index];
+            $this->assertContains(ConnectorConnectionCheckStatus::Queued->value, $bindings);
+            $this->assertContains(ConnectorConnectionCheckStatus::Running->value, $bindings);
             $this->assertStringNotContainsString('technical_summary', $sql);
             $this->assertStringNotContainsString('cause_category', $sql);
             $this->assertStringNotContainsString('actionability', $sql);
