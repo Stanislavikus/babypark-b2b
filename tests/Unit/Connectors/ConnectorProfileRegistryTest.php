@@ -31,7 +31,7 @@ class ConnectorProfileRegistryTest extends TestCase
         $this->assertInstanceOf(ConnectorProfileDefinition::class, $definition);
         $this->assertSame('adobe_commerce_paas_oauth1_integration', $definition->profileCode);
         $this->assertTrue($definition->enabled);
-        $this->assertSame([ConnectorCapability::ConnectionCheck], $definition->capabilities);
+        $this->assertSame([ConnectorCapability::ConnectionCheck, ConnectorCapability::SchemaDiscovery], $definition->capabilities);
 
         $adapter = $registry->resolveAdapter('adobe_commerce_paas_oauth1_integration');
 

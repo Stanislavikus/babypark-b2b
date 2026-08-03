@@ -5,6 +5,8 @@ namespace App\Filament\Resources;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Filament\Resources\ConnectorAccountResource\Pages;
 use App\Models\ConnectorAccount;
+use App\Models\User;
+use App\Support\Connectors\ConnectorAccountMerchandiserPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorUiFormatter;
 use Filament\Infolists;
@@ -45,21 +47,29 @@ class ConnectorAccountResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return static::applyPresentationEagerLoads(parent::getEloquentQuery());
+        $query = ConnectorAccountMerchandiserPresentation::applySafeQuery(
+            parent::getEloquentQuery(),
+            auth()->user(),
+        );
+
+        return static::applyPresentationEagerLoads($query);
     }
 
-    public static function loadAccountPresentationRelations(Model $record): Model
+    public static function loadAccountPresentationRelations(Model $record, ?User $user = null): Model
     {
         if ($record instanceof ConnectorAccount) {
-            $record->loadMissing([
-                'connectorDefinition',
-                'connectionChecks' => fn ($query) => $query
+            $relations = ['connectorDefinition'];
+
+            if (! ConnectorAccountMerchandiserPresentation::isMerchandiser($user ?? auth()->user())) {
+                $relations['connectionChecks'] = fn ($query) => $query
                     ->select(['id', 'connector_account_id', 'status'])
                     ->whereIn('status', [
                         ConnectorConnectionCheckStatus::Queued,
                         ConnectorConnectionCheckStatus::Running,
-                    ]),
-            ]);
+                    ]);
+            }
+
+            $record->loadMissing($relations);
         }
 
         return $record;
@@ -82,12 +92,14 @@ class ConnectorAccountResource extends Resource
                             ->label(__('connectors.ui.columns.account')),
                         Infolists\Components\TextEntry::make('store_code')
                             ->label(__('connectors.ui.columns.store_context'))
-                            ->formatStateUsing(fn ($state, ConnectorAccount $record): string => $uiState->storeContextLabel($record) ?? __('connectors.ui.common.dash')),
+                            ->formatStateUsing(fn ($state, ConnectorAccount $record): string => $uiState->storeContextLabel($record) ?? __('connectors.ui.common.dash'))
+                            ->visible(fn (): bool => ! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())),
                         Infolists\Components\View::make('filament.connector-accounts.runtime-state')
                             ->label(__('connectors.ui.columns.status'))
                             ->viewData(fn (ConnectorAccount $record): array => [
                                 'record' => $record,
                                 'uiState' => $uiState,
+                                'showActiveConnectionCheck' => ConnectorAccountMerchandiserPresentation::showActiveConnectionCheck(auth()->user()),
                             ]),
                         Infolists\Components\TextEntry::make('last_checked_at')
                             ->label(__('connectors.ui.columns.last_check'))
@@ -134,16 +146,23 @@ class ConnectorAccountResource extends Resource
                     ->label(__('connectors.ui.columns.store_context'))
                     ->formatStateUsing(fn ($state, ConnectorAccount $record): string => $uiState->storeContextLabel($record) ?? __('connectors.ui.common.dash'))
                     ->searchable(query: function (Builder $query, string $search): Builder {
+                        if (ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+                            return $query;
+                        }
+
                         return $query
                             ->where('store_code', 'like', "%{$search}%")
                             ->orWhere('tenant_context', 'like', "%{$search}%");
                     })
+                    ->visible(fn (): bool => ! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user()))
                     ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\TextColumn::make('connection_status')
                     ->label(__('connectors.ui.columns.status'))
                     ->html()
                     ->formatStateUsing(function ($state, ConnectorAccount $record) use ($uiState): string {
-                        $activeCheck = $uiState->activeConnectionCheck($record);
+                        $activeCheck = ConnectorAccountMerchandiserPresentation::showActiveConnectionCheck(auth()->user())
+                            ? $uiState->activeConnectionCheck($record)
+                            : null;
 
                         if ($activeCheck !== null) {
                             $runtimeLabel = e($uiState->runtimeStatusLabel($activeCheck));
@@ -222,14 +241,17 @@ class ConnectorAccountResource extends Resource
 
     private static function applyPresentationEagerLoads(Builder $query): Builder
     {
-        return $query->with([
-            'connectorDefinition',
-            'connectionChecks' => fn ($connectionChecksQuery) => $connectionChecksQuery
+        $with = ['connectorDefinition'];
+
+        if (! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+            $with['connectionChecks'] = fn ($connectionChecksQuery) => $connectionChecksQuery
                 ->select(['id', 'connector_account_id', 'status'])
                 ->whereIn('status', [
                     ConnectorConnectionCheckStatus::Queued,
                     ConnectorConnectionCheckStatus::Running,
-                ]),
-        ]);
+                ]);
+        }
+
+        return $query->with($with);
     }
 }

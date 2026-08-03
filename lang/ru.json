@@ -74,6 +74,7 @@
     "connectors.errors.account_disabled": "Эта учётная запись коннектора отключена.",
     "connectors.errors.connection_check_failed": "Проверка подключения не удалась. Обратитесь в службу поддержки.",
     "connectors.errors.discovery_failed": "Не удалось получить поля. Обратитесь в службу поддержки.",
+    "connectors.errors.discovery_source_unavailable": "Получение полей недоступно для этой учётной записи. Обратитесь в службу поддержки.",
     "connectors.errors.insufficient_permissions": "Подключённая учётная запись не имеет разрешения на доступ к этому ресурсу.",
     "connectors.errors.invalid_credentials": "Учётные данные недействительны или просрочены.",
     "connectors.errors.invalid_or_unsupported_endpoint": "URL конечной точки или конфигурация магазина недействительны или не поддерживаются.",

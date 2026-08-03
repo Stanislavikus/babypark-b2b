@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ConnectorDiscoveryRunErrorCode;
 use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Enums\ConnectorDiscoveryRunTrigger;
 use App\Enums\ConnectorErrorActionability;
@@ -96,5 +97,23 @@ class ConnectorDiscoveryRun extends Model
     public function previousSnapshot(): BelongsTo
     {
         return $this->belongsTo(ConnectorSchemaSnapshot::class, 'previous_snapshot_id');
+    }
+
+    public function isTerminal(): bool
+    {
+        return in_array($this->status, [
+            ConnectorDiscoveryRunStatus::Succeeded,
+            ConnectorDiscoveryRunStatus::Failed,
+            ConnectorDiscoveryRunStatus::Cancelled,
+        ], true);
+    }
+
+    public function hasVendorClassification(): bool
+    {
+        if ($this->error_code === null) {
+            return false;
+        }
+
+        return ConnectorDiscoveryRunErrorCode::tryFrom($this->error_code) !== null;
     }
 }

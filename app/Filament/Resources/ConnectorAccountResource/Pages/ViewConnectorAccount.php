@@ -7,6 +7,7 @@ use App\Filament\Resources\ConnectorAccountResource;
 use App\Filament\Resources\ConnectorAccountResource\RelationManagers\ConnectionChecksRelationManager;
 use App\Models\ConnectorConnectionCheck;
 use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
+use App\Support\Connectors\ConnectorAccountMerchandiserPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorSafeMessagePresenter;
 use App\Support\Workspace\WorkspaceContext;
@@ -22,6 +23,10 @@ class ViewConnectorAccount extends ViewRecord
 
     public function getSubheading(): string|Htmlable|null
     {
+        if (ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+            return null;
+        }
+
         $disabledReason = app(ConnectorAccountUiState::class)
             ->manualCheckActionState($this->record)['disabled_reason'];
 
@@ -31,11 +36,18 @@ class ViewConnectorAccount extends ViewRecord
     public function refreshConnectionState(): void
     {
         $this->record = $this->resolveRecord($this->record->getKey());
-        $this->record = ConnectorAccountResource::loadAccountPresentationRelations($this->record);
+        $this->record = ConnectorAccountResource::loadAccountPresentationRelations(
+            $this->record,
+            auth()->user(),
+        );
     }
 
     protected function getAllRelationManagers(): array
     {
+        if (ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+            return [];
+        }
+
         return [
             ConnectionChecksRelationManager::class,
         ];
@@ -43,6 +55,10 @@ class ViewConnectorAccount extends ViewRecord
 
     protected function getHeaderActions(): array
     {
+        if (ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+            return [];
+        }
+
         return [
             Action::make('runConnectionCheck')
                 ->label(fn (): string => app(ConnectorAccountUiState::class)
@@ -117,13 +133,20 @@ class ViewConnectorAccount extends ViewRecord
     {
         $record = parent::resolveRecord($key);
 
-        $record->makeHidden([
-            'credentials',
-            'settings',
-            'base_url',
-            'auth_profile',
-        ]);
+        $record = ConnectorAccountMerchandiserPresentation::sanitizeRecord(
+            $record,
+            auth()->user(),
+        );
 
-        return ConnectorAccountResource::loadAccountPresentationRelations($record);
+        if (! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+            $record->makeHidden([
+                'credentials',
+                'settings',
+                'base_url',
+                'auth_profile',
+            ]);
+        }
+
+        return ConnectorAccountResource::loadAccountPresentationRelations($record, auth()->user());
     }
 }

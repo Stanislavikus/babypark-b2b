@@ -74,6 +74,7 @@
     "connectors.errors.account_disabled": "Цей обліковий запис конектора вимкнено.",
     "connectors.errors.connection_check_failed": "Перевірка з'єднання не вдалася. Зверніться до служби підтримки.",
     "connectors.errors.discovery_failed": "Не вдалося отримати поля. Зверніться до служби підтримки.",
+    "connectors.errors.discovery_source_unavailable": "Отримання полів недоступне для цього облікового запису. Зверніться до служби підтримки.",
     "connectors.errors.insufficient_permissions": "Підключений обліковий запис не має дозволу на доступ до цього ресурсу.",
     "connectors.errors.invalid_credentials": "Облікові дані недійсні або прострочені.",
     "connectors.errors.invalid_or_unsupported_endpoint": "URL-адреса кінцевої точки або конфігурація магазину недійсні або не підтримуються.",

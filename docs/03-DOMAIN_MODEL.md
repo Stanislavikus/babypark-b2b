@@ -1925,7 +1925,10 @@ exactly one `ConnectorSchemaSource` for the target account, using:
 - `source_kind` = `AccountApi`;
 - `acquisition_mode` = `LiveFetch`;
 - `is_primary` = `true`;
-- `endpoint_path` is not null.
+- `endpoint_path` is a non-null, non-empty **relative** API path — no scheme,
+  host, user, password, or port; no query or fragment; no `.`/`..` traversal
+  segment; normalized to exactly one leading slash. The host always comes from
+  the account's own base URL, never from `endpoint_path` itself.
 
 Exactly one matching row → dispatch proceeds and the resolved
 `connector_schema_source_id` is persisted on the new run row. **Zero or
