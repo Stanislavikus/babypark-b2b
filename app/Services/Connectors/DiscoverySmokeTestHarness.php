@@ -2,6 +2,7 @@
 
 namespace App\Services\Connectors;
 
+use App\Enums\ConnectorAccountConnectionStatus;
 use App\Enums\ConnectorCapability;
 use App\Enums\ConnectorDefinitionStatus;
 use App\Enums\ConnectorDiscoveryRunStatus;
@@ -36,6 +37,8 @@ final class DiscoverySmokeTestHarness
     public const AUTH_PROFILE = 'adobe_commerce_paas_oauth1_integration';
 
     public const DEFINITION_CODE = 'adobe_commerce';
+
+    public const CANONICAL_SCHEMA_SOURCE_CODE = 'live_account_attributes';
 
     public const POLL_INTERVAL_SECONDS = 2;
 
@@ -196,7 +199,16 @@ final class DiscoverySmokeTestHarness
             );
         }
 
-        return $sources->first();
+        $source = $sources->first();
+
+        if ($source->code !== self::CANONICAL_SCHEMA_SOURCE_CODE) {
+            throw new DiscoverySmokeTestAbortedException(
+                'Canonical ConnectorFoundationSeeder schema source [live_account_attributes] appears to be missing or damaged. '
+                .'Expected exactly one AccountApi/LiveFetch/Account primary source with a valid endpoint_path for adobe_commerce.',
+            );
+        }
+
+        return $source;
     }
 
     public function buildSmokeTestName(
@@ -221,23 +233,81 @@ final class DiscoverySmokeTestHarness
         return 'Smoke Test — '.$hash;
     }
 
-    public function findMatchingAccount(
+    public function findMatchingSmokeTestAccount(
         Workspace $workspace,
         ConnectorDefinition $definition,
         ValidatedConnectorAccountState $validated,
     ): ?ConnectorAccount {
-        return ConnectorAccount::withoutWorkspaceScope()
+        $expectedName = $this->buildSmokeTestName(
+            $workspace->id,
+            $definition->id,
+            self::AUTH_PROFILE,
+            $validated->baseUrl,
+            $validated->storeCode,
+            $validated->tenantContext,
+        );
+
+        $namedAccounts = ConnectorAccount::withoutWorkspaceScope()
             ->where('workspace_id', $workspace->id)
-            ->where('connector_definition_id', $definition->id)
-            ->where('auth_profile', self::AUTH_PROFILE)
-            ->where('base_url', $validated->baseUrl)
-            ->where('store_code', $validated->storeCode)
-            ->when(
-                $validated->tenantContext === null,
-                fn ($query) => $query->whereNull('tenant_context'),
-                fn ($query) => $query->where('tenant_context', $validated->tenantContext),
-            )
-            ->first();
+            ->where('name', $expectedName)
+            ->get();
+
+        $tupleMatches = $namedAccounts->filter(
+            fn (ConnectorAccount $account): bool => $this->accountMatchesSmokeTestTuple($account, $definition, $validated),
+        )->values();
+
+        if ($tupleMatches->count() > 1) {
+            throw new DiscoverySmokeTestAbortedException(
+                sprintf(
+                    'Ambiguous smoke-test connector accounts: found %d accounts named [%s] with matching settings.',
+                    $tupleMatches->count(),
+                    $expectedName,
+                ),
+            );
+        }
+
+        if ($tupleMatches->count() === 1) {
+            return $tupleMatches->first();
+        }
+
+        if ($namedAccounts->isNotEmpty()) {
+            throw new DiscoverySmokeTestAbortedException(
+                sprintf(
+                    'Smoke-test account identity collision: account named [%s] exists but its stored settings do not match the normalized tuple.',
+                    $expectedName,
+                ),
+            );
+        }
+
+        return null;
+    }
+
+    private function accountMatchesSmokeTestTuple(
+        ConnectorAccount $account,
+        ConnectorDefinition $definition,
+        ValidatedConnectorAccountState $validated,
+    ): bool {
+        if ($account->connector_definition_id !== $definition->id) {
+            return false;
+        }
+
+        if ($account->auth_profile !== self::AUTH_PROFILE) {
+            return false;
+        }
+
+        if ($account->base_url !== $validated->baseUrl) {
+            return false;
+        }
+
+        if ($account->store_code !== $validated->storeCode) {
+            return false;
+        }
+
+        if ($validated->tenantContext === null) {
+            return $account->tenant_context === null;
+        }
+
+        return $account->tenant_context === $validated->tenantContext;
     }
 
     /**
@@ -336,12 +406,13 @@ final class DiscoverySmokeTestHarness
         Workspace $workspace,
         ConnectorAccount $account,
         ?callable $sleep = null,
+        ?OutputStyle $output = null,
     ): ConnectorDiscoveryDispatchDecision {
         $decision = $this->dispatchService->executeManual($actor, $workspace->id, $account->id);
 
         if (! $decision->shouldDispatch) {
             $existingRun = ConnectorDiscoveryRun::withoutWorkspaceScope()->findOrFail($decision->discoveryRunId);
-            $this->pollRunToTerminal($existingRun, $sleep);
+            $this->pollRunToTerminal($existingRun, $sleep, null, $output);
             $decision = $this->dispatchService->executeManual($actor, $workspace->id, $account->id);
         }
 
@@ -371,6 +442,7 @@ final class DiscoverySmokeTestHarness
         ConnectorDiscoveryRun $run,
         ?callable $sleep = null,
         ?CarbonInterface $deadline = null,
+        ?OutputStyle $output = null,
     ): ConnectorDiscoveryRun {
         $deadline ??= $this->computePollingDeadline(
             ConnectorDiscoveryDispatchDecision::dispatch(
@@ -386,6 +458,14 @@ final class DiscoverySmokeTestHarness
 
         while (now()->lt($deadline)) {
             $run->refresh();
+
+            $output?->writeln(sprintf(
+                '  Polling run [%s]: status=%s, execution_attempts=%d, next_attempt_at=%s',
+                $run->id,
+                $run->status->value,
+                $run->execution_attempts,
+                $run->next_attempt_at?->toIso8601String() ?? 'null',
+            ));
 
             if ($run->isTerminal()) {
                 return $run;
@@ -412,9 +492,23 @@ final class DiscoverySmokeTestHarness
         ConnectorDiscoveryRun $run,
         ConnectorSchemaSource $schemaSource,
         ConnectorAccount $accountBefore,
+        Workspace $workspace,
+        ConnectorAccount $account,
     ): array {
         if ($schemaSource->acquisition_mode !== ConnectorSchemaAcquisitionMode::LiveFetch) {
             throw new DiscoverySmokeTestAbortedException('Schema source is not LiveFetch.');
+        }
+
+        if ($run->workspace_id !== $workspace->id) {
+            throw new DiscoverySmokeTestAbortedException('Discovery run workspace does not match the expected workspace.');
+        }
+
+        if ($run->connector_account_id !== $account->id) {
+            throw new DiscoverySmokeTestAbortedException('Discovery run account does not match the expected account.');
+        }
+
+        if ($run->connector_schema_source_id !== $schemaSource->id) {
+            throw new DiscoverySmokeTestAbortedException('Discovery run schema source does not match the canonical source.');
         }
 
         if ($run->status !== ConnectorDiscoveryRunStatus::Succeeded) {
@@ -423,6 +517,10 @@ final class DiscoverySmokeTestHarness
 
         if ($run->execution_attempts < 1) {
             throw new DiscoverySmokeTestAbortedException('Discovery run has no execution attempts.');
+        }
+
+        if ($run->finished_at === null) {
+            throw new DiscoverySmokeTestAbortedException('Discovery run finished_at is not set.');
         }
 
         if ($run->snapshot_id === null) {
@@ -446,12 +544,53 @@ final class DiscoverySmokeTestHarness
         }
 
         $snapshot = ConnectorSchemaSnapshot::withoutWorkspaceScope()->findOrFail($run->snapshot_id);
+
+        if ($snapshot->id !== $run->snapshot_id) {
+            throw new DiscoverySmokeTestAbortedException('Snapshot ID does not match the run snapshot reference.');
+        }
+
+        if ($snapshot->discovery_run_id !== $run->id) {
+            throw new DiscoverySmokeTestAbortedException('Snapshot discovery_run_id does not match the run.');
+        }
+
+        if ($snapshot->workspace_id !== $workspace->id) {
+            throw new DiscoverySmokeTestAbortedException('Snapshot workspace does not match the expected workspace.');
+        }
+
+        if ($snapshot->connector_account_id !== $account->id) {
+            throw new DiscoverySmokeTestAbortedException('Snapshot account does not match the expected account.');
+        }
+
+        if ($snapshot->connector_schema_source_id !== $schemaSource->id) {
+            throw new DiscoverySmokeTestAbortedException('Snapshot schema source does not match the canonical source.');
+        }
+
+        if ($snapshot->canonical_hash === null || $snapshot->canonical_hash === '') {
+            throw new DiscoverySmokeTestAbortedException('Snapshot canonical_hash is empty.');
+        }
+
+        if ($snapshot->field_count !== $run->fields_normalized) {
+            throw new DiscoverySmokeTestAbortedException(
+                sprintf(
+                    'Snapshot field_count (%d) does not match fields_normalized (%d).',
+                    $snapshot->field_count,
+                    $run->fields_normalized,
+                ),
+            );
+        }
+
         $fieldCount = ConnectorSchemaSnapshotField::withoutWorkspaceScope()
             ->where('snapshot_id', $snapshot->id)
             ->count();
 
-        if ($fieldCount === 0) {
-            throw new DiscoverySmokeTestAbortedException('Snapshot has no field rows.');
+        if ($fieldCount !== $run->fields_normalized) {
+            throw new DiscoverySmokeTestAbortedException(
+                sprintf(
+                    'Persisted snapshot-field row count (%d) does not match fields_normalized (%d).',
+                    $fieldCount,
+                    $run->fields_normalized,
+                ),
+            );
         }
 
         $sampleFieldKeys = ConnectorSchemaSnapshotField::withoutWorkspaceScope()
@@ -461,7 +600,25 @@ final class DiscoverySmokeTestHarness
             ->pluck('external_field_key')
             ->all();
 
-        $accountAfter = ConnectorAccount::withoutWorkspaceScope()->findOrFail($accountBefore->id);
+        $accountAfter = ConnectorAccount::withoutWorkspaceScope()->findOrFail($account->id);
+
+        if ($accountAfter->connection_status !== ConnectorAccountConnectionStatus::Connected) {
+            throw new DiscoverySmokeTestAbortedException(
+                sprintf(
+                    'Account connection_status is [%s], expected [%s].',
+                    $accountAfter->connection_status?->value ?? 'null',
+                    ConnectorAccountConnectionStatus::Connected->value,
+                ),
+            );
+        }
+
+        if (! $accountAfter->last_discovery_at?->equalTo($run->finished_at)) {
+            throw new DiscoverySmokeTestAbortedException('Account last_discovery_at does not match the run finished_at.');
+        }
+
+        if (! $accountAfter->last_successful_discovery_at?->equalTo($run->finished_at)) {
+            throw new DiscoverySmokeTestAbortedException('Account last_successful_discovery_at does not match the run finished_at.');
+        }
 
         $beforeDiscoveryAt = $accountBefore->last_discovery_at;
         $afterDiscoveryAt = $accountAfter->last_discovery_at;
@@ -522,7 +679,7 @@ final class DiscoverySmokeTestHarness
         for ($iteration = 1; $iteration <= 2; $iteration++) {
             $output->writeln(sprintf('<info>Proof run %d/2 — dispatching...</info>', $iteration));
 
-            $decision = $this->obtainFreshDispatch($actor, $workspace, $account, $sleep);
+            $decision = $this->obtainFreshDispatch($actor, $workspace, $account, $sleep, $output);
             $run = ConnectorDiscoveryRun::withoutWorkspaceScope()->findOrFail($decision->discoveryRunId);
             $deadline = $this->computePollingDeadline($decision, $run);
 
@@ -532,8 +689,8 @@ final class DiscoverySmokeTestHarness
                 $deadline->toIso8601String(),
             ));
 
-            $terminalRun = $this->pollRunToTerminal($run, $sleep, $deadline);
-            $evidence = $this->validateSuccessfulRun($terminalRun, $schemaSource, $accountBaseline);
+            $terminalRun = $this->pollRunToTerminal($run, $sleep, $deadline, $output);
+            $evidence = $this->validateSuccessfulRun($terminalRun, $schemaSource, $accountBaseline, $workspace, $account);
 
             $output->writeln(sprintf(
                 '  Run [%s] succeeded — snapshot [%s], %d fields, hash [%s]',

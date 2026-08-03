@@ -56,7 +56,7 @@ class ConnectorsDiscoverySmokeTestCommand extends Command
             $schemaSource = $harness->resolveCanonicalSchemaSource($definition);
             $this->info(sprintf('Schema source: %s (%s, %s)', $schemaSource->code, $schemaSource->source_kind->value, $schemaSource->acquisition_mode->value));
 
-            $existingAccount = $harness->findMatchingAccount($workspace, $definition, $validated);
+            $existingAccount = $harness->findMatchingSmokeTestAccount($workspace, $definition, $validated);
 
             if ($existingAccount !== null) {
                 $this->info(sprintf('Matched existing account: %s (%s)', $existingAccount->name, $existingAccount->id));
@@ -109,6 +109,11 @@ class ConnectorsDiscoverySmokeTestCommand extends Command
             return self::FAILURE;
         } catch (DiscoverySmokeTestAbortedException $exception) {
             $this->error($exception->getMessage());
+
+            return self::FAILURE;
+        } catch (\Throwable $exception) {
+            $this->error('An unexpected error occurred during the discovery smoke test.');
+            $this->line('Exception type: '.$exception::class);
 
             return self::FAILURE;
         }
