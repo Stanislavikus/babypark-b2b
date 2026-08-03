@@ -215,13 +215,13 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     public function existing_keep_path_does_not_prompt_for_secrets_or_call_settings_service(): void
     {
         $admin = $this->createStaffUser(UserRole::Admin);
-        $account = $this->createConnectorAccount($this->workspace);
         $definition = $this->adobeConnectorDefinition();
         $validated = app(DiscoverySmokeTestHarness::class)->normalizeAccountSettings(
-            (string) $account->base_url,
-            (string) $account->store_code,
-            $account->tenant_context,
+            'https://shop.example.com',
+            'default',
+            null,
         );
+        $account = $this->createSmokeTestConnectorAccount($validated);
 
         $prompts = new RecordingDiscoverySmokeTestPromptGateway;
 
@@ -408,46 +408,193 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     }
 
     #[Test]
-    public function account_reuse_matches_full_six_part_tuple(): void
+    public function ordinary_account_with_same_tuple_is_not_reused_by_smoke_test_lookup(): void
     {
         $harness = app(DiscoverySmokeTestHarness::class);
         $definition = $this->adobeConnectorDefinition();
 
-        $baseAccount = $this->createConnectorAccount($this->workspace, [
+        $ordinaryAccount = $this->createConnectorAccount($this->workspace, [
+            'name' => 'Production Magento Store',
             'base_url' => 'https://shop.example.com',
             'store_code' => 'default',
-            'tenant_context' => 'tenant-a',
+            'tenant_context' => null,
         ]);
 
-        $differentTenant = $this->createConnectorAccount($this->workspace, [
+        $validated = $harness->normalizeAccountSettings(
+            (string) $ordinaryAccount->base_url,
+            (string) $ordinaryAccount->store_code,
+            $ordinaryAccount->tenant_context,
+        );
+
+        $this->assertNull($harness->findMatchingSmokeTestAccount($this->workspace, $definition, $validated));
+    }
+
+    #[Test]
+    public function replace_credentials_cannot_modify_ordinary_account_with_same_tuple(): void
+    {
+        $admin = $this->createStaffUser(UserRole::Admin);
+        $definition = $this->adobeConnectorDefinition();
+        $ordinaryAccount = $this->createConnectorAccount($this->workspace, [
+            'name' => 'Production Magento Store',
             'base_url' => 'https://shop.example.com',
             'store_code' => 'default',
-            'tenant_context' => 'tenant-b',
-            'name' => 'Other tenant',
         ]);
+        $originalCredentials = $ordinaryAccount->credentials;
+        $validated = app(DiscoverySmokeTestHarness::class)->normalizeAccountSettings(
+            (string) $ordinaryAccount->base_url,
+            (string) $ordinaryAccount->store_code,
+            $ordinaryAccount->tenant_context,
+        );
+
+        $settingsService = Mockery::mock(ConnectorAccountPersistencePort::class);
+        $settingsService->shouldNotReceive('update');
+        $settingsService->shouldReceive('create')
+            ->once()
+            ->andReturnUsing(function () use ($definition, $validated): ConnectorAccountSettingsResult {
+                $account = ConnectorAccount::withoutWorkspaceScope()->create([
+                    'id' => (string) Str::uuid(),
+                    'workspace_id' => $this->workspace->id,
+                    'connector_definition_id' => $definition->id,
+                    'name' => app(DiscoverySmokeTestHarness::class)->buildSmokeTestName(
+                        $this->workspace->id,
+                        $definition->id,
+                        DiscoverySmokeTestHarness::AUTH_PROFILE,
+                        $validated->baseUrl,
+                        $validated->storeCode,
+                        $validated->tenantContext,
+                    ),
+                    'auth_profile' => DiscoverySmokeTestHarness::AUTH_PROFILE,
+                    'base_url' => $validated->baseUrl,
+                    'store_code' => $validated->storeCode,
+                    'tenant_context' => $validated->tenantContext,
+                    'is_enabled' => true,
+                    'settings' => [],
+                    'credentials' => [],
+                    'connection_status' => ConnectorAccountConnectionStatus::Untested,
+                ]);
+
+                return new ConnectorAccountSettingsResult(
+                    id: $account->id,
+                    connectorDefinitionId: $definition->id,
+                    authProfile: DiscoverySmokeTestHarness::AUTH_PROFILE,
+                    baseUrl: $validated->baseUrl,
+                    storeCode: $validated->storeCode,
+                    tenantContext: $validated->tenantContext,
+                    settings: [],
+                    isEnabled: true,
+                    hasCredentials: true,
+                );
+            });
+        $this->app->instance(ConnectorAccountPersistencePort::class, $settingsService);
+
+        $harness = app(DiscoverySmokeTestHarness::class);
+        $this->assertNull($harness->findMatchingSmokeTestAccount($this->workspace, $definition, $validated));
+
+        $prompts = new RecordingDiscoverySmokeTestPromptGateway;
+        $result = $harness->resolveAccountPath(
+            $admin,
+            $this->workspace,
+            $definition,
+            $validated,
+            null,
+            true,
+            $prompts,
+            new OAuth1Credentials('ck-new', 'cs-new', 'at-new', 'ts-new'),
+        );
+
+        $this->assertSame('create', $result['path']);
+        $this->assertNotSame($ordinaryAccount->id, $result['account']->id);
+        $ordinaryAccount->refresh();
+        $this->assertSame($originalCredentials, $ordinaryAccount->credentials);
+        $this->assertNotContains('askOAuth1Credentials', $prompts->calls);
+    }
+
+    #[Test]
+    public function smoke_test_account_is_created_and_reused_on_subsequent_lookup(): void
+    {
+        $harness = app(DiscoverySmokeTestHarness::class);
+        $definition = $this->adobeConnectorDefinition();
+        $validated = $harness->normalizeAccountSettings('https://shop.example.com', 'default', null);
+
+        $this->createConnectorAccount($this->workspace, [
+            'name' => 'Production Magento Store',
+            'base_url' => 'https://shop.example.com',
+            'store_code' => 'default',
+        ]);
+
+        $smokeAccount = $this->createSmokeTestConnectorAccount($validated);
+
+        $this->assertSame(
+            $smokeAccount->id,
+            $harness->findMatchingSmokeTestAccount($this->workspace, $definition, $validated)?->id,
+        );
+    }
+
+    #[Test]
+    public function exact_smoke_test_name_with_mismatched_tuple_stops_without_secret_prompt(): void
+    {
+        $harness = app(DiscoverySmokeTestHarness::class);
+        $definition = $this->adobeConnectorDefinition();
+        $validated = $harness->normalizeAccountSettings('https://shop.example.com', 'default', null);
+        $expectedName = $harness->buildSmokeTestName(
+            $this->workspace->id,
+            $definition->id,
+            DiscoverySmokeTestHarness::AUTH_PROFILE,
+            $validated->baseUrl,
+            $validated->storeCode,
+            $validated->tenantContext,
+        );
+
+        $this->createConnectorAccount($this->workspace, [
+            'name' => $expectedName,
+            'base_url' => 'https://other.example.com',
+            'store_code' => 'default',
+        ]);
+
+        $prompts = new RecordingDiscoverySmokeTestPromptGateway;
+
+        $this->expectException(DiscoverySmokeTestAbortedException::class);
+        $this->expectExceptionMessage('identity collision');
+
+        try {
+            $harness->findMatchingSmokeTestAccount($this->workspace, $definition, $validated);
+        } finally {
+            $this->assertNotContains('askOAuth1Credentials', $prompts->calls);
+        }
+    }
+
+    #[Test]
+    public function smoke_test_account_reuse_matches_full_six_part_tuple_and_name(): void
+    {
+        $harness = app(DiscoverySmokeTestHarness::class);
+        $definition = $this->adobeConnectorDefinition();
 
         $validatedA = $harness->normalizeAccountSettings(
             'https://shop.example.com',
             'default',
             'tenant-a',
         );
-
-        $this->assertSame(
-            $baseAccount->id,
-            $harness->findMatchingAccount($this->workspace, $definition, $validatedA)?->id,
-        );
+        $accountA = $this->createSmokeTestConnectorAccount($validatedA);
 
         $validatedB = $harness->normalizeAccountSettings(
             'https://shop.example.com',
             'default',
             'tenant-b',
         );
+        $accountB = $this->createSmokeTestConnectorAccount($validatedB);
 
         $this->assertSame(
-            $differentTenant->id,
-            $harness->findMatchingAccount($this->workspace, $definition, $validatedB)?->id,
+            $accountA->id,
+            $harness->findMatchingSmokeTestAccount($this->workspace, $definition, $validatedA)?->id,
         );
-        $this->assertNotSame($baseAccount->id, $harness->findMatchingAccount($this->workspace, $definition, $validatedB)?->id);
+        $this->assertSame(
+            $accountB->id,
+            $harness->findMatchingSmokeTestAccount($this->workspace, $definition, $validatedB)?->id,
+        );
+        $this->assertNotSame(
+            $accountA->id,
+            $harness->findMatchingSmokeTestAccount($this->workspace, $definition, $validatedB)?->id,
+        );
     }
 
     #[Test]
@@ -502,16 +649,16 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     }
 
     #[Test]
-    public function disabled_matched_account_stops_without_mutation(): void
+    public function disabled_matched_smoke_test_account_stops_without_mutation(): void
     {
         $admin = $this->createStaffUser(UserRole::Admin);
-        $account = $this->createConnectorAccount($this->workspace, ['is_enabled' => false]);
         $definition = $this->adobeConnectorDefinition();
         $validated = app(DiscoverySmokeTestHarness::class)->normalizeAccountSettings(
-            (string) $account->base_url,
-            (string) $account->store_code,
-            $account->tenant_context,
+            'https://shop.example.com',
+            'default',
+            null,
         );
+        $account = $this->createSmokeTestConnectorAccount($validated, ['is_enabled' => false]);
 
         $harness = app(DiscoverySmokeTestHarness::class);
 
@@ -527,6 +674,204 @@ class DiscoverySmokeTestHarnessTest extends TestCase
             false,
             new RecordingDiscoverySmokeTestPromptGateway,
         );
+    }
+
+    #[Test]
+    public function wrong_resolver_valid_source_code_fails_as_canonical_missing(): void
+    {
+        $definition = $this->adobeConnectorDefinition();
+
+        ConnectorSchemaSource::query()
+            ->where('code', 'live_account_attributes')
+            ->delete();
+
+        ConnectorSchemaSource::query()->create([
+            'connector_definition_id' => $definition->id,
+            'code' => 'replacement_live_source',
+            'label' => 'Replacement',
+            'source_kind' => ConnectorSchemaSourceKind::AccountApi,
+            'acquisition_mode' => ConnectorSchemaAcquisitionMode::LiveFetch,
+            'schema_scope' => ConnectorSchemaScope::Account,
+            'reference_url' => 'https://example.com',
+            'endpoint_path' => '/V1/replacement/attributes',
+            'schema_version' => 'test',
+            'is_primary' => true,
+            'verification_status' => ConnectorSchemaVerificationStatus::Verified,
+            'sort_order' => 99,
+        ]);
+
+        $harness = app(DiscoverySmokeTestHarness::class);
+
+        $this->expectException(DiscoverySmokeTestAbortedException::class);
+        $this->expectExceptionMessage('live_account_attributes');
+
+        $harness->resolveCanonicalSchemaSource($definition);
+    }
+
+    #[Test]
+    public function unexpected_persistence_exception_does_not_leak_secrets_to_console(): void
+    {
+        $admin = $this->createStaffUser(UserRole::Admin);
+        $sentinels = [
+            'sentinel-consumer-key-'.Str::random(6),
+            'sentinel-consumer-secret-'.Str::random(6),
+            'sentinel-access-token-'.Str::random(6),
+            'sentinel-access-token-secret-'.Str::random(6),
+        ];
+        $beforeCount = ConnectorAccount::withoutWorkspaceScope()->count();
+
+        $settingsService = Mockery::mock(ConnectorAccountPersistencePort::class);
+        $settingsService->shouldReceive('create')
+            ->once()
+            ->andThrow(new \RuntimeException(
+                'Persistence failed with '.$sentinels[0].' and '.$sentinels[1],
+                0,
+                new \RuntimeException('Nested '.$sentinels[2].' / '.$sentinels[3]),
+            ));
+        $this->app->instance(ConnectorAccountPersistencePort::class, $settingsService);
+
+        $this->artisan('connectors:discovery-smoke-test', [
+            '--actor-email' => $admin->email,
+        ])
+            ->expectsQuestion('Magento base URL (e.g. https://magento.example.com)', 'https://shop.example.com')
+            ->expectsQuestion('Store code', 'default')
+            ->expectsQuestion('Tenant context (optional, press Enter to skip)', '')
+            ->expectsQuestion('Consumer Key', $sentinels[0])
+            ->expectsQuestion('Consumer Secret', $sentinels[1])
+            ->expectsQuestion('Access Token', $sentinels[2])
+            ->expectsQuestion('Access Token Secret', $sentinels[3])
+            ->expectsOutputToContain('unexpected error occurred')
+            ->doesntExpectOutput($sentinels[0])
+            ->doesntExpectOutput($sentinels[1])
+            ->doesntExpectOutput($sentinels[2])
+            ->doesntExpectOutput($sentinels[3])
+            ->assertFailed();
+
+        $this->assertSame($beforeCount, ConnectorAccount::withoutWorkspaceScope()->count());
+    }
+
+    #[Test]
+    public function validate_successful_run_rejects_incorrect_run_account_linkage(): void
+    {
+        $harness = app(DiscoverySmokeTestHarness::class);
+        $account = $this->createConnectorAccount($this->workspace);
+        $otherAccount = $this->createConnectorAccount($this->workspace, ['name' => 'Other account']);
+        $source = ConnectorSchemaSource::query()->where('code', 'live_account_attributes')->firstOrFail();
+        $bundle = $this->seedQueuedRun($account, $source, hash('sha256', 'hash'), 1);
+        $this->completeQueuedRun($account, $source, $bundle['run']->id, $bundle['snapshot']->id, hash('sha256', 'hash'), 1);
+
+        $run = ConnectorDiscoveryRun::withoutWorkspaceScope()->findOrFail($bundle['run']->id);
+        $run->update(['connector_account_id' => $otherAccount->id]);
+        $run->refresh();
+
+        $this->expectException(DiscoverySmokeTestAbortedException::class);
+        $this->expectExceptionMessage('account does not match');
+
+        $harness->validateSuccessfulRun(
+            $run,
+            $source,
+            $account,
+            $this->workspace,
+            $account,
+        );
+    }
+
+    #[Test]
+    public function validate_successful_run_rejects_incorrect_field_row_count(): void
+    {
+        $harness = app(DiscoverySmokeTestHarness::class);
+        $account = $this->createConnectorAccount($this->workspace);
+        $source = ConnectorSchemaSource::query()->where('code', 'live_account_attributes')->firstOrFail();
+        $bundle = $this->seedQueuedRun($account, $source, hash('sha256', 'hash'), 1);
+        $this->completeQueuedRun($account, $source, $bundle['run']->id, $bundle['snapshot']->id, hash('sha256', 'hash'), 1);
+
+        $run = ConnectorDiscoveryRun::withoutWorkspaceScope()->findOrFail($bundle['run']->id);
+
+        ConnectorSchemaSnapshotField::withoutWorkspaceScope()
+            ->where('snapshot_id', $bundle['snapshot']->id)
+            ->where('external_field_key', 'size')
+            ->delete();
+
+        $run->refresh();
+
+        $this->expectException(DiscoverySmokeTestAbortedException::class);
+        $this->expectExceptionMessage('snapshot-field row count');
+
+        $harness->validateSuccessfulRun(
+            $run,
+            $source,
+            $account,
+            $this->workspace,
+            $account,
+        );
+    }
+
+    #[Test]
+    public function validate_successful_run_rejects_incorrect_connection_status(): void
+    {
+        $harness = app(DiscoverySmokeTestHarness::class);
+        $account = $this->createConnectorAccount($this->workspace);
+        $source = ConnectorSchemaSource::query()->where('code', 'live_account_attributes')->firstOrFail();
+        $bundle = $this->seedQueuedRun($account, $source, hash('sha256', 'hash'), 1);
+        $this->completeQueuedRun($account, $source, $bundle['run']->id, $bundle['snapshot']->id, hash('sha256', 'hash'), 1);
+
+        $account->update(['connection_status' => ConnectorAccountConnectionStatus::AttentionRequired]);
+        $run = ConnectorDiscoveryRun::withoutWorkspaceScope()->findOrFail($bundle['run']->id);
+
+        $this->expectException(DiscoverySmokeTestAbortedException::class);
+        $this->expectExceptionMessage('connection_status');
+
+        $harness->validateSuccessfulRun(
+            $run,
+            $source,
+            $account,
+            $this->workspace,
+            $account,
+        );
+    }
+
+    #[Test]
+    public function poll_run_to_terminal_prints_status_on_each_iteration(): void
+    {
+        Carbon::setTestNow('2026-08-03 12:00:00');
+
+        $harness = app(DiscoverySmokeTestHarness::class);
+        $account = $this->createConnectorAccount($this->workspace);
+        $source = ConnectorSchemaSource::query()->where('code', 'live_account_attributes')->firstOrFail();
+        $bundle = $this->seedQueuedRun($account, $source, hash('sha256', 'hash'), 1);
+        $run = $bundle['run'];
+        $iterations = 0;
+
+        $buffer = new BufferedOutput;
+        $output = new OutputStyle(new ArrayInput([]), $buffer);
+        $deadline = now()->addSeconds(10);
+
+        $result = $harness->pollRunToTerminal(
+            $run,
+            function () use (&$iterations, $account, $source, $bundle): void {
+                $iterations++;
+
+                if ($iterations === 2) {
+                    $this->completeQueuedRun(
+                        $account,
+                        $source,
+                        $bundle['run']->id,
+                        $bundle['snapshot']->id,
+                        hash('sha256', 'hash'),
+                        1,
+                    );
+                }
+            },
+            $deadline,
+            $output,
+        );
+
+        $capturedOutput = $buffer->fetch();
+        $this->assertGreaterThanOrEqual(2, $iterations);
+        $this->assertGreaterThanOrEqual(2, substr_count($capturedOutput, 'Polling run ['));
+        $this->assertTrue($result->isTerminal());
+
+        Carbon::setTestNow();
     }
 
     #[Test]
@@ -805,6 +1150,29 @@ class DiscoverySmokeTestHarnessTest extends TestCase
         Carbon::setTestNow();
     }
 
+    private function createSmokeTestConnectorAccount(
+        ValidatedConnectorAccountState $validated,
+        array $overrides = [],
+    ): ConnectorAccount {
+        $harness = app(DiscoverySmokeTestHarness::class);
+        $definition = $this->adobeConnectorDefinition();
+        $name = $harness->buildSmokeTestName(
+            $this->workspace->id,
+            $definition->id,
+            DiscoverySmokeTestHarness::AUTH_PROFILE,
+            $validated->baseUrl,
+            $validated->storeCode,
+            $validated->tenantContext,
+        );
+
+        return $this->createConnectorAccount($this->workspace, array_merge([
+            'name' => $name,
+            'base_url' => $validated->baseUrl,
+            'store_code' => $validated->storeCode,
+            'tenant_context' => $validated->tenantContext,
+        ], $overrides));
+    }
+
     private function createSucceededSnapshot(
         ConnectorAccount $account,
         ConnectorSchemaSource $source,
@@ -878,6 +1246,24 @@ class DiscoverySmokeTestHarnessTest extends TestCase
             'canonical_hash' => hash('sha256', 'color'),
             'sort_order' => 1,
         ]);
+        ConnectorSchemaSnapshotField::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $this->workspace->id,
+            'snapshot_id' => $snapshotId,
+            'external_field_key' => 'size',
+            'external_label' => 'Size',
+            'normalized_data_type' => 'string',
+            'is_required' => false,
+            'is_multi_value' => false,
+            'is_localizable' => false,
+            'normalized_payload' => (object) ['key' => 'size'],
+            'canonical_hash' => hash('sha256', 'size'),
+            'sort_order' => 2,
+        ]);
+
+        ConnectorSchemaSnapshot::withoutWorkspaceScope()
+            ->where('id', $snapshotId)
+            ->update(['field_count' => 2]);
 
         ConnectorDiscoveryRun::withoutWorkspaceScope()
             ->where('id', $runId)
