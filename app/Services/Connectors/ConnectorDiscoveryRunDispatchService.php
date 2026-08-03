@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
-final class ConnectorDiscoveryRunDispatchService
+final class ConnectorDiscoveryRunDispatchService implements ConnectorDiscoveryDispatchPort
 {
     public function __construct(
         private readonly ConnectorProfileRegistry $profileRegistry,
