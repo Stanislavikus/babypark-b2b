@@ -306,7 +306,7 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
             'actionability',
             'vendor_request_id',
             'duration_ms',
-            'wire:poll',
+            'refreshConnectionState',
         ];
 
         $this->assertNoCanariesInSurface(
@@ -321,6 +321,10 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
 
         $this->assertStringContainsString(
             e(__('connectors.enums.account_connection_status.connected')),
+            $detailComponent->html(),
+        );
+        $this->assertStringNotContainsString(
+            'wire:poll.5s="refreshConnectionState"',
             $detailComponent->html(),
         );
     }
