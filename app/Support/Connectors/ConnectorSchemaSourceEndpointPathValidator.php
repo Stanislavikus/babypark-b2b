@@ -86,26 +86,28 @@ final class ConnectorSchemaSourceEndpointPathValidator
                 return false;
             }
 
-            if ($this->containsEncodedTraversalOrSeparator($current)) {
-                $decoded = rawurldecode($current);
-
-                if ($decoded === $current) {
-                    return false;
-                }
-
-                $current = $decoded;
-
-                continue;
+            if (! str_contains($current, '%')) {
+                return true;
             }
 
-            return true;
+            $decoded = rawurldecode($current);
+
+            if ($decoded === $current) {
+                return true;
+            }
+
+            $current = $decoded;
         }
 
-        if ($this->containsEncodedTraversalOrSeparator($current)) {
+        if (! $this->decodedSegmentValueIsSafe($current)) {
             return false;
         }
 
-        return $this->decodedSegmentValueIsSafe($current);
+        if (str_contains($current, '%') && rawurldecode($current) !== $current) {
+            return false;
+        }
+
+        return true;
     }
 
     private function decodedSegmentValueIsSafe(string $value): bool
@@ -123,10 +125,5 @@ final class ConnectorSchemaSourceEndpointPathValidator
         }
 
         return true;
-    }
-
-    private function containsEncodedTraversalOrSeparator(string $value): bool
-    {
-        return preg_match('/%(?:2f|2F|5c|5C|2e|2E)/', $value) === 1;
     }
 }

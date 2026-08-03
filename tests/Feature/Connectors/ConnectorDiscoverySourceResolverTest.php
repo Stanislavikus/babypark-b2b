@@ -13,7 +13,6 @@ use App\Models\ConnectorDiscoveryRun;
 use App\Models\ConnectorSchemaSource;
 use App\Services\Connectors\AdobePaaSDiscoveryService;
 use App\Services\Connectors\ConnectorDiscoverySourceResolver;
-use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapability;
 use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceInvalidAfterReservationException;
 use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceResolutionException;
 use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceResolutionReason;
@@ -21,7 +20,6 @@ use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
-use Mockery;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\TestCase;
@@ -136,10 +134,6 @@ class ConnectorDiscoverySourceResolverTest extends TestCase
         ConnectorSchemaSource::query()
             ->whereKey($row->connector_schema_source_id)
             ->update(['endpoint_path' => '/V1/%252e%252e/products']);
-
-        $capability = Mockery::mock(AdobePaaSDiscoveryCapability::class);
-        $capability->shouldNotReceive('discover');
-        $this->app->instance(AdobePaaSDiscoveryCapability::class, $capability);
 
         try {
             app(AdobePaaSDiscoveryService::class)->execute($account->workspace_id, $account->id, $row->id);
