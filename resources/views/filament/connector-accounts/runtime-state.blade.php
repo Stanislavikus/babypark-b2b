@@ -1,7 +1,10 @@
 @php
     /** @var \App\Models\ConnectorAccount $record */
     /** @var \App\Support\Connectors\ConnectorAccountUiState $uiState */
-    $activeCheck = $uiState->activeConnectionCheck($record);
+    /** @var bool $showActiveConnectionCheck */
+    $activeCheck = ($showActiveConnectionCheck ?? true)
+        ? $uiState->activeConnectionCheck($record)
+        : null;
     $runtimeLabel = $uiState->runtimeStatusLabel($activeCheck);
     $runtimeColor = $uiState->runtimeStatusColor($activeCheck);
     $stableLabel = $uiState->stableStatusLabel($record->connection_status);

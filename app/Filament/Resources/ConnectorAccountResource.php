@@ -99,6 +99,7 @@ class ConnectorAccountResource extends Resource
                             ->viewData(fn (ConnectorAccount $record): array => [
                                 'record' => $record,
                                 'uiState' => $uiState,
+                                'showActiveConnectionCheck' => ConnectorAccountMerchandiserPresentation::showActiveConnectionCheck(auth()->user()),
                             ]),
                         Infolists\Components\TextEntry::make('last_checked_at')
                             ->label(__('connectors.ui.columns.last_check'))
@@ -159,7 +160,9 @@ class ConnectorAccountResource extends Resource
                     ->label(__('connectors.ui.columns.status'))
                     ->html()
                     ->formatStateUsing(function ($state, ConnectorAccount $record) use ($uiState): string {
-                        $activeCheck = $uiState->activeConnectionCheck($record);
+                        $activeCheck = ConnectorAccountMerchandiserPresentation::showActiveConnectionCheck(auth()->user())
+                            ? $uiState->activeConnectionCheck($record)
+                            : null;
 
                         if ($activeCheck !== null) {
                             $runtimeLabel = e($uiState->runtimeStatusLabel($activeCheck));

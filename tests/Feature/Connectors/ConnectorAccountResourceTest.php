@@ -251,6 +251,79 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
+    public function management_user_list_and_detail_still_show_active_runtime_status(): void
+    {
+        $admin = $this->createStaffUser(UserRole::Admin);
+        $account = $this->createConnectorAccount(overrides: [
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+        ]);
+
+        $this->createActiveCheck($account, ConnectorConnectionCheckStatus::Running);
+
+        Livewire::actingAs($admin)
+            ->test(ListConnectorAccounts::class)
+            ->assertCanSeeTableRecords([$account])
+            ->assertSee(__('connectors.ui.runtime.running'))
+            ->assertSee(__('connectors.ui.runtime.last_result_prefix'));
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
+            ->assertSuccessful()
+            ->assertSee(__('connectors.ui.runtime.running'))
+            ->assertSee('wire:poll.5s="refreshConnectionState"');
+    }
+
+    #[Test]
+    public function management_connection_check_loading_queries_only_active_status_columns(): void
+    {
+        $admin = $this->createStaffUser(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+        $this->createActiveCheck($account, ConnectorConnectionCheckStatus::Queued);
+        $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Failed, [
+            'technical_summary' => 'FAILED_CHECK_SUMMARY',
+            'cause_category' => ConnectorErrorCause::Authorization,
+            'actionability' => ConnectorErrorActionability::UserActionRequired,
+            'user_message_key' => 'connectors.errors.insufficient_permissions',
+            'http_status' => 401,
+            'vendor_request_id' => 'vendor-request-456',
+            'duration_ms' => 2500,
+        ]);
+
+        $connectionCheckQueries = [];
+
+        DB::listen(function ($query) use (&$connectionCheckQueries): void {
+            if (str_contains(strtolower($query->sql), 'connector_connection_checks')) {
+                $connectionCheckQueries[] = strtolower($query->sql);
+            }
+        });
+
+        Livewire::actingAs($admin)
+            ->test(ListConnectorAccounts::class)
+            ->assertCanSeeTableRecords([$account])
+            ->assertSee(__('connectors.ui.runtime.waiting'));
+
+        $this->assertNotEmpty($connectionCheckQueries);
+
+        foreach ($connectionCheckQueries as $sql) {
+            $this->assertStringContainsString('status', $sql);
+            $this->assertStringContainsString('connector_account_id', $sql);
+            $this->assertMatchesRegularExpression(
+                '/\bqueued\b|\brunning\b/',
+                $sql,
+                'Management loading must restrict connection checks to active statuses.',
+            );
+            $this->assertStringNotContainsString('technical_summary', $sql);
+            $this->assertStringNotContainsString('cause_category', $sql);
+            $this->assertStringNotContainsString('actionability', $sql);
+            $this->assertStringNotContainsString('user_message_key', $sql);
+            $this->assertStringNotContainsString('vendor_request_id', $sql);
+            $this->assertStringNotContainsString('duration_ms', $sql);
+            $this->assertStringNotContainsString('initiated_by_user_id', $sql);
+            $this->assertStringNotContainsString('trigger', $sql);
+        }
+    }
+
+    #[Test]
     public function list_query_count_does_not_grow_linearly_with_account_count(): void
     {
         $admin = $this->createStaffUser(UserRole::Admin);

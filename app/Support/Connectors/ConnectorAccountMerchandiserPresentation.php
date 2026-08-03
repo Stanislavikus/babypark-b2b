@@ -55,6 +55,11 @@ final class ConnectorAccountMerchandiserPresentation
         return $user !== null && $user->role === UserRole::Merchandiser;
     }
 
+    public static function showActiveConnectionCheck(?User $user): bool
+    {
+        return ! self::isMerchandiser($user);
+    }
+
     public static function applySafeQuery(Builder $query, ?User $user): Builder
     {
         if (! self::isMerchandiser($user)) {

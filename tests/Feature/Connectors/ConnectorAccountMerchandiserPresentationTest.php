@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Connectors;
 
+use App\Enums\ConnectorAccountConnectionStatus;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Enums\ConnectorConnectionCheckTrigger;
 use App\Enums\ConnectorErrorActionability;
@@ -19,6 +20,7 @@ use Database\Seeders\WorkspacePermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -212,6 +214,133 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
         $this->assertSame([], $headerActions);
         $this->assertSame([], $relationManagers);
         $this->assertNull($detailComponent->instance()->getSubheading());
+    }
+
+    #[Test]
+    public function merchandiser_list_rendering_executes_no_connection_check_queries(): void
+    {
+        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $account = $this->createConnectorAccount(overrides: [
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+        ]);
+
+        $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Running, [
+            'technical_summary' => 'SECRET_RUNTIME_SUMMARY',
+            'cause_category' => ConnectorErrorCause::Authorization,
+            'actionability' => ConnectorErrorActionability::UserActionRequired,
+            'user_message_key' => 'connectors.errors.insufficient_permissions',
+            'http_status' => 401,
+            'vendor_request_id' => 'vendor-request-123',
+        ]);
+
+        $connectionCheckQueries = $this->captureConnectionCheckQueriesDuring(function () use ($merchandiser, $account): void {
+            Livewire::actingAs($merchandiser)
+                ->test(ListConnectorAccounts::class)
+                ->assertCanSeeTableRecords([$account]);
+        });
+
+        $this->assertSame([], $connectionCheckQueries);
+    }
+
+    #[Test]
+    public function merchandiser_detail_rendering_executes_no_connection_check_queries(): void
+    {
+        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $account = $this->createConnectorAccount(overrides: [
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+        ]);
+
+        $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Queued, [
+            'technical_summary' => 'SECRET_RUNTIME_SUMMARY',
+            'cause_category' => ConnectorErrorCause::Authorization,
+            'actionability' => ConnectorErrorActionability::UserActionRequired,
+            'user_message_key' => 'connectors.errors.insufficient_permissions',
+            'http_status' => 401,
+            'vendor_request_id' => 'vendor-request-123',
+        ]);
+
+        $connectionCheckQueries = $this->captureConnectionCheckQueriesDuring(function () use ($merchandiser, $account): void {
+            Livewire::actingAs($merchandiser)
+                ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+                ->assertSuccessful();
+        });
+
+        $this->assertSame([], $connectionCheckQueries);
+    }
+
+    #[Test]
+    public function merchandiser_list_and_detail_show_only_stable_connection_status_without_runtime_overlay(): void
+    {
+        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $account = $this->createConnectorAccount(overrides: [
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+        ]);
+
+        $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Running, [
+            'technical_summary' => 'SECRET_RUNTIME_SUMMARY',
+            'cause_category' => ConnectorErrorCause::Authorization,
+            'actionability' => ConnectorErrorActionability::UserActionRequired,
+            'user_message_key' => 'connectors.errors.insufficient_permissions',
+            'http_status' => 401,
+            'vendor_request_id' => 'vendor-request-123',
+            'duration_ms' => 1500,
+        ]);
+
+        $listComponent = Livewire::actingAs($merchandiser)
+            ->test(ListConnectorAccounts::class)
+            ->assertCanSeeTableRecords([$account]);
+
+        $detailComponent = Livewire::actingAs($merchandiser)
+            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
+            ->assertSuccessful();
+
+        $forbidden = [
+            __('connectors.ui.runtime.running'),
+            __('connectors.ui.runtime.waiting'),
+            __('connectors.ui.runtime.last_result_prefix'),
+            'SECRET_RUNTIME_SUMMARY',
+            'vendor-request-123',
+            'connectionChecks',
+            'technical_summary',
+            'cause_category',
+            'actionability',
+            'vendor_request_id',
+            'duration_ms',
+            'wire:poll',
+        ];
+
+        $this->assertNoCanariesInSurface(
+            $forbidden,
+            $listComponent->html(),
+            json_encode($listComponent->snapshot, JSON_THROW_ON_ERROR),
+            json_encode($listComponent->effects, JSON_THROW_ON_ERROR),
+            $detailComponent->html(),
+            json_encode($detailComponent->snapshot, JSON_THROW_ON_ERROR),
+            json_encode($detailComponent->effects, JSON_THROW_ON_ERROR),
+        );
+
+        $this->assertStringContainsString(
+            e(__('connectors.enums.account_connection_status.connected')),
+            $detailComponent->html(),
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function captureConnectionCheckQueriesDuring(callable $callback): array
+    {
+        $connectionCheckQueries = [];
+
+        DB::listen(function ($query) use (&$connectionCheckQueries): void {
+            if (str_contains(strtolower($query->sql), 'connector_connection_checks')) {
+                $connectionCheckQueries[] = $query->sql;
+            }
+        });
+
+        $callback();
+
+        return $connectionCheckQueries;
     }
 
     /**
