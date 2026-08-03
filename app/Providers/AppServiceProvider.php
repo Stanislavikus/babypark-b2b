@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Services\Connectors\ConnectorAccountPersistencePort;
+use App\Services\Connectors\ConnectorAccountSettingsService;
+use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
+use App\Services\Connectors\ConnectorDiscoveryRunDispatchService;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapabilityImpl;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapability;
@@ -31,6 +35,9 @@ class AppServiceProvider extends ServiceProvider
             AdobePaaSDiscoveryCapability::class,
             AdobePaaSDiscoveryCapabilityImpl::class,
         );
+
+        $this->app->bind(ConnectorAccountPersistencePort::class, ConnectorAccountSettingsService::class);
+        $this->app->bind(ConnectorDiscoveryDispatchPort::class, ConnectorDiscoveryRunDispatchService::class);
     }
 
     /**
