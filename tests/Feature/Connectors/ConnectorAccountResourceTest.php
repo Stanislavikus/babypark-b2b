@@ -311,7 +311,8 @@ class ConnectorAccountResourceTest extends TestCase
         foreach ($connectionCheckQueries as $index => $sql) {
             $this->assertStringContainsString('status', $sql);
             $this->assertStringContainsString('connector_account_id', $sql);
-            $this->assertStringContainsString('"status" in', $sql);
+            $normalizedSql = str_replace(['"', '`'], '', $sql);
+            $this->assertStringContainsString('status in', $normalizedSql);
             $bindings = $connectionCheckBindings[$index];
             $this->assertContains(ConnectorConnectionCheckStatus::Queued->value, $bindings);
             $this->assertContains(ConnectorConnectionCheckStatus::Running->value, $bindings);
