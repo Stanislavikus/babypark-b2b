@@ -6,6 +6,8 @@ use Carbon\CarbonImmutable;
 
 final readonly class ConnectorDiscoverySnapshotCandidate
 {
+    private int $fieldsReceivedCount;
+
     /**
      * @param  list<ConnectorDiscoveryNormalizedField>  $fields
      */
@@ -13,7 +15,10 @@ final readonly class ConnectorDiscoverySnapshotCandidate
         #[\SensitiveParameter] public array $fields,
         #[\SensitiveParameter] public string $canonicalHash,
         public CarbonImmutable $capturedAt,
-    ) {}
+        int $fieldsReceived,
+    ) {
+        $this->fieldsReceivedCount = $fieldsReceived;
+    }
 
     /**
      * @param  list<ConnectorDiscoveryNormalizedField>  $fields
@@ -22,9 +27,24 @@ final readonly class ConnectorDiscoverySnapshotCandidate
         #[\SensitiveParameter] array $fields,
         #[\SensitiveParameter] string $canonicalHash,
         CarbonImmutable $capturedAt,
+        int $fieldsReceived,
     ): self {
         if (! array_is_list($fields)) {
             throw new \InvalidArgumentException('Fields must be a list.');
+        }
+
+        if ($fieldsReceived < 0) {
+            throw new \InvalidArgumentException('fieldsReceived must not be negative.');
+        }
+
+        $fieldsNormalized = count($fields);
+
+        if ($fieldsNormalized < 0) {
+            throw new \InvalidArgumentException('fieldsNormalized must not be negative.');
+        }
+
+        if ($fieldsReceived < $fieldsNormalized) {
+            throw new \InvalidArgumentException('fieldsReceived must be greater than or equal to fieldsNormalized.');
         }
 
         $seenKeys = [];
@@ -58,12 +78,12 @@ final readonly class ConnectorDiscoverySnapshotCandidate
             throw new \InvalidArgumentException('Supplied snapshot hash does not match computed hash.');
         }
 
-        return new self($fields, $canonicalHash, $capturedAt);
+        return new self($fields, $canonicalHash, $capturedAt, $fieldsReceived);
     }
 
     public function fieldsReceived(): int
     {
-        return count($this->fields);
+        return $this->fieldsReceivedCount;
     }
 
     public function fieldsNormalized(): int

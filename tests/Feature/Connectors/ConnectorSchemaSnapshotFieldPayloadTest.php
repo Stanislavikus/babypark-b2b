@@ -205,6 +205,7 @@ class ConnectorSchemaSnapshotFieldPayloadTest extends TestCase
             $fields,
             $snapshotHasher->hash($fieldHashes),
             CarbonImmutable::now(),
+            count($fields),
         );
 
         $result = ConnectorDiscoveryAttemptResult::success($candidate);

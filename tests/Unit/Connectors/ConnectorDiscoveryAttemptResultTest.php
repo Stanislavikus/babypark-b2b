@@ -196,6 +196,7 @@ class ConnectorDiscoveryAttemptResultTest extends TestCase
                 ),
             ]),
             CarbonImmutable::now(),
+            1,
         );
     }
 }

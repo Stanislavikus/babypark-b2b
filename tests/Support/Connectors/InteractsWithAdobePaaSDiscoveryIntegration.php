@@ -14,6 +14,7 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryRequestFactory;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryResponseMapper;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryTransportMapper;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
+use App\Support\Connectors\AdobePaaS\AdobePaaSServiceOnlyAttributeEligibility;
 use App\Support\Connectors\CanonicalSchemaFieldHasher;
 use App\Support\Connectors\CanonicalSchemaSnapshotHasher;
 use App\Support\Connectors\ConnectorDiscoveryAttemptResult;
@@ -36,6 +37,14 @@ trait InteractsWithAdobePaaSDiscoveryIntegration
     ): string {
         $row = $this->createQueuedRow($account);
 
+        return $this->publishCandidateForRow($account, $row, $result);
+    }
+
+    private function publishCandidateForRow(
+        ConnectorAccount $account,
+        ConnectorDiscoveryRun $row,
+        ConnectorDiscoveryAttemptResult $result,
+    ): string {
         app(ConnectorDiscoveryRunPersistence::class)->finalizeAfterVendorAttempt(
             $account->workspace_id,
             $account->id,
@@ -80,6 +89,7 @@ trait InteractsWithAdobePaaSDiscoveryIntegration
             new AdobePaaSDiscoveryResponseMapper,
             new AdobePaaSDiscoveryTransportMapper,
             new AdobePaaSAttributeNormalizer,
+            new AdobePaaSServiceOnlyAttributeEligibility,
             new CanonicalSchemaFieldHasher,
             new CanonicalSchemaSnapshotHasher,
         );

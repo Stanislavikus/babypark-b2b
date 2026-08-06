@@ -1173,6 +1173,119 @@ class DiscoverySmokeTestHarnessTest extends TestCase
         ], $overrides));
     }
 
+    #[Test]
+    public function validate_successful_run_accepts_received_greater_than_normalized(): void
+    {
+        $harness = app(DiscoverySmokeTestHarness::class);
+        $account = $this->createConnectorAccount($this->workspace);
+        $source = ConnectorSchemaSource::query()->where('code', 'live_account_attributes')->firstOrFail();
+        $accountBefore = new ConnectorAccount([
+            'last_discovery_at' => null,
+            'last_successful_discovery_at' => null,
+        ]);
+        $bundle = $this->seedQueuedRun($account, $source, hash('sha256', 'pilot-hash'), 1);
+        $this->completeQueuedRun($account, $source, $bundle['run']->id, $bundle['snapshot']->id, hash('sha256', 'pilot-hash'), 1);
+
+        $run = ConnectorDiscoveryRun::withoutWorkspaceScope()->findOrFail($bundle['run']->id);
+        $run->update([
+            'fields_received' => 106,
+            'fields_normalized' => 2,
+        ]);
+
+        $evidence = $harness->validateSuccessfulRun(
+            $run->refresh(),
+            $source,
+            $accountBefore,
+            $this->workspace,
+            $account,
+        );
+
+        $this->assertSame(106, $evidence['run']->fields_received);
+        $this->assertSame(2, $evidence['run']->fields_normalized);
+        $this->assertSame(2, $evidence['snapshot']->field_count);
+    }
+
+    #[Test]
+    public function validate_successful_run_rejects_received_less_than_normalized(): void
+    {
+        $harness = app(DiscoverySmokeTestHarness::class);
+        $account = $this->createConnectorAccount($this->workspace);
+        $source = ConnectorSchemaSource::query()->where('code', 'live_account_attributes')->firstOrFail();
+        $bundle = $this->seedQueuedRun($account, $source, hash('sha256', 'hash'), 1);
+        $this->completeQueuedRun($account, $source, $bundle['run']->id, $bundle['snapshot']->id, hash('sha256', 'hash'), 1);
+
+        $run = ConnectorDiscoveryRun::withoutWorkspaceScope()->findOrFail($bundle['run']->id);
+        $run->update([
+            'fields_received' => 1,
+            'fields_normalized' => 2,
+        ]);
+
+        $this->expectException(DiscoverySmokeTestAbortedException::class);
+        $this->expectExceptionMessage('Resolved success invariant failed');
+
+        $harness->validateSuccessfulRun(
+            $run->refresh(),
+            $source,
+            $account,
+            $this->workspace,
+            $account,
+        );
+    }
+
+    #[Test]
+    public function validate_successful_run_rejects_zero_or_null_field_counts(): void
+    {
+        $harness = app(DiscoverySmokeTestHarness::class);
+        $account = $this->createConnectorAccount($this->workspace);
+        $source = ConnectorSchemaSource::query()->where('code', 'live_account_attributes')->firstOrFail();
+        $bundle = $this->seedQueuedRun($account, $source, hash('sha256', 'hash'), 1);
+        $this->completeQueuedRun($account, $source, $bundle['run']->id, $bundle['snapshot']->id, hash('sha256', 'hash'), 1);
+
+        $run = ConnectorDiscoveryRun::withoutWorkspaceScope()->findOrFail($bundle['run']->id);
+        $run->update([
+            'fields_received' => 0,
+            'fields_normalized' => 0,
+        ]);
+
+        $this->expectException(DiscoverySmokeTestAbortedException::class);
+        $this->expectExceptionMessage('Resolved success invariant failed');
+
+        $harness->validateSuccessfulRun(
+            $run->refresh(),
+            $source,
+            $account,
+            $this->workspace,
+            $account,
+        );
+    }
+
+    #[Test]
+    public function validate_successful_run_rejects_snapshot_field_count_mismatch_with_normalized_count(): void
+    {
+        $harness = app(DiscoverySmokeTestHarness::class);
+        $account = $this->createConnectorAccount($this->workspace);
+        $source = ConnectorSchemaSource::query()->where('code', 'live_account_attributes')->firstOrFail();
+        $bundle = $this->seedQueuedRun($account, $source, hash('sha256', 'hash'), 1);
+        $this->completeQueuedRun($account, $source, $bundle['run']->id, $bundle['snapshot']->id, hash('sha256', 'hash'), 1);
+
+        $run = ConnectorDiscoveryRun::withoutWorkspaceScope()->findOrFail($bundle['run']->id);
+        $run->update([
+            'fields_received' => 106,
+            'fields_normalized' => 102,
+        ]);
+
+        $this->expectException(DiscoverySmokeTestAbortedException::class);
+        $this->expectExceptionMessage('field_count (2) does not match fields_normalized (102)');
+
+        $harness->validateSuccessfulRun(
+            $run->refresh(),
+            $source,
+            $account,
+            $this->workspace,
+            $account,
+        );
+    }
+
     private function createSucceededSnapshot(
         ConnectorAccount $account,
         ConnectorSchemaSource $source,

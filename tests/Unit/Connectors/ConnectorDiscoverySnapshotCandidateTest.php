@@ -27,6 +27,7 @@ class ConnectorDiscoverySnapshotCandidateTest extends TestCase
             [$field],
             $hash,
             CarbonImmutable::parse('2026-08-02 12:00:00'),
+            1,
         );
 
         $this->assertSame(1, $candidate->fieldsReceived());
@@ -47,6 +48,7 @@ class ConnectorDiscoverySnapshotCandidateTest extends TestCase
             ['color' => $field],
             str_repeat('a', 64),
             CarbonImmutable::now(),
+            1,
         );
     }
 
@@ -60,6 +62,7 @@ class ConnectorDiscoverySnapshotCandidateTest extends TestCase
             [new \stdClass],
             str_repeat('a', 64),
             CarbonImmutable::now(),
+            1,
         );
     }
 
@@ -79,6 +82,7 @@ class ConnectorDiscoverySnapshotCandidateTest extends TestCase
             [$field, $field],
             $hash,
             CarbonImmutable::now(),
+            2,
         );
     }
 
@@ -94,7 +98,90 @@ class ConnectorDiscoverySnapshotCandidateTest extends TestCase
             [$field],
             str_repeat('b', 64),
             CarbonImmutable::now(),
+            1,
         );
+    }
+
+    #[Test]
+    public function create_accepts_received_greater_than_normalized(): void
+    {
+        $field = $this->normalizedField('color');
+        $snapshotHasher = new CanonicalSchemaSnapshotHasher;
+        $hash = $snapshotHasher->hash([
+            CanonicalSchemaFieldHash::create('color', $field->canonicalHash),
+        ]);
+
+        $candidate = ConnectorDiscoverySnapshotCandidate::create(
+            [$field],
+            $hash,
+            CarbonImmutable::now(),
+            106,
+        );
+
+        $this->assertSame(106, $candidate->fieldsReceived());
+        $this->assertSame(1, $candidate->fieldsNormalized());
+    }
+
+    #[Test]
+    public function create_rejects_received_less_than_normalized(): void
+    {
+        $field = $this->normalizedField('color');
+        $snapshotHasher = new CanonicalSchemaSnapshotHasher;
+        $hash = $snapshotHasher->hash([
+            CanonicalSchemaFieldHash::create('color', $field->canonicalHash),
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('fieldsReceived must be greater than or equal to fieldsNormalized.');
+
+        ConnectorDiscoverySnapshotCandidate::create(
+            [$field],
+            $hash,
+            CarbonImmutable::now(),
+            0,
+        );
+    }
+
+    #[Test]
+    public function create_rejects_negative_received_count(): void
+    {
+        $field = $this->normalizedField('color');
+        $snapshotHasher = new CanonicalSchemaSnapshotHasher;
+        $hash = $snapshotHasher->hash([
+            CanonicalSchemaFieldHash::create('color', $field->canonicalHash),
+        ]);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('fieldsReceived must not be negative.');
+
+        ConnectorDiscoverySnapshotCandidate::create(
+            [$field],
+            $hash,
+            CarbonImmutable::now(),
+            -1,
+        );
+    }
+
+    #[Test]
+    public function fields_normalized_remains_derived_from_fields_list(): void
+    {
+        $first = $this->normalizedField('color');
+        $second = $this->normalizedField('size');
+        $snapshotHasher = new CanonicalSchemaSnapshotHasher;
+        $hash = $snapshotHasher->hash([
+            CanonicalSchemaFieldHash::create('color', $first->canonicalHash),
+            CanonicalSchemaFieldHash::create('size', $second->canonicalHash),
+        ]);
+
+        $candidate = ConnectorDiscoverySnapshotCandidate::create(
+            [$first, $second],
+            $hash,
+            CarbonImmutable::now(),
+            5,
+        );
+
+        $this->assertSame(2, $candidate->fieldsNormalized());
+        $this->assertCount(2, $candidate->fields);
     }
 
     private function normalizedField(string $attributeCode): ConnectorDiscoveryNormalizedField

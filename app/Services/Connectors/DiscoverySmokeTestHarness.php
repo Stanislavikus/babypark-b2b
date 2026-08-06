@@ -532,7 +532,7 @@ final class DiscoverySmokeTestHarness
             || $run->fields_normalized === null
             || $run->fields_received < 1
             || $run->fields_normalized < 1
-            || $run->fields_received !== $run->fields_normalized
+            || $run->fields_received < $run->fields_normalized
         ) {
             throw new DiscoverySmokeTestAbortedException(
                 sprintf(

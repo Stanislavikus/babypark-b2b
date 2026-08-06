@@ -1880,8 +1880,8 @@ Append-only history of schema discovery executions against one
 | `started_at` | timestamp nullable | Null while `status: queued` |
 | `finished_at` | timestamp nullable | Set only on terminal state (`succeeded`/`failed`/`cancelled`) |
 | `duration_ms` | unsigned int nullable | |
-| `fields_received` | unsigned int nullable | |
-| `fields_normalized` | unsigned int nullable | |
+| `fields_received` | unsigned int nullable | Count of raw Magento list items received across all pages, including service-only attributes excluded from normalization. Must be `>= fields_normalized` on success. |
+| `fields_normalized` | unsigned int nullable | Count of merchant-facing attributes that were normalized into `ConnectorSchemaSnapshotField` rows. Equals `ConnectorSchemaSnapshot.field_count` on success. |
 | `added_count` / `changed_count` / `removed_count` / `unchanged_count` | unsigned int nullable | Populated when diff computed |
 | `cause_category` / `actionability` / `error_code` / `http_status` | nullable | Same vocabulary as checks |
 | `user_message_key` / `technical_summary` / `vendor_request_id` | nullable | |
@@ -2167,7 +2167,7 @@ Immutable successful normalized schema capture.
 | `discovery_run_id` | UUID FK | Producing run |
 | `previous_snapshot_id` | UUID FK nullable | Chain |
 | `schema_version` | string nullable | From source/account context |
-| `field_count` | unsigned int | |
+| `field_count` | unsigned int | Count of normalized snapshot fields only (`fields_normalized`), never the raw received total. |
 | `canonical_hash` | char(64) | Hash of ordered normalized field hashes |
 | `captured_at` | timestamp | Vendor-normalized capture instant |
 | `created_at` | timestamp | Append-only |
@@ -2241,6 +2241,57 @@ other standard properties — but v1 maps only the subset in the table below.
 | `normalized_payload` | whitelist, closed for v1 | exactly: normalized `options[]` (per the already-Resolved option-normalization rule, sourced from the list response's own `options[]`) for `select`/`multiselect` types only, producing `{"options":[...]}` (empty list allowed: `{"options":[]}`); for all other `normalized_data_type` values, `normalized_payload` is always `{}` — vendor-supplied `options` on a non-selectable type are ignored, not copied. `validation_rules`, `note`, `is_unique`, `default_value` are explicitly **excluded from v1** — not because they're unimportant, but because their exact shape/reliability on the list endpoint hasn't been verified against this project's actual pilot Adobe instance; adding them later is a new versioned decision, not a silent addition |
 | `sort_order` | `position` | Adobe REST `ProductAttributeInterface` (extending `Magento\Catalog\Api\Data\EavAttributeInterface`) exposes the attribute ordering value as `position`. A JSON integer `>= 0` is copied directly into canonical `sort_order`; missing or `null` becomes `null`; any non-integer value — including a numeric string like `"10"`, since the canonical contract forbids coercing a numeric string into a number — or a negative integer terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed`. Never derived from page, array, database-insertion, or response order. A vendor extension field literally named `sort_order`, if one happens to be present, is not used in v1 — only `position` is read. **If the real pilot instance's actual response lacks a `position` field, stop and report the exact Adobe Commerce version, endpoint, and a redacted literal response item — do not silently fall back to any other field name, including `sort_order`.** This would signal a version/module drift from the documented service contract, not a reason to guess |
 
+#### Discovery eligibility before normalization (v1)
+
+Before `AdobePaaSAttributeNormalizer` runs, each raw list item is classified as
+one of:
+
+- **merchant-facing discoverable attribute** — normalized, hashed, and persisted;
+- **Magento internal/service-only attribute without `frontend_input`** — counted
+  as received, excluded from normalization and the canonical hash, and not a
+  schema-validation failure;
+- **unknown or malformed merchant-facing attribute** — fails the whole vendor
+  execution attempt via the existing schema-validation contract.
+
+A raw item may be excluded as service-only **only when all** of the following
+hold simultaneously:
+
+1. the raw item is a JSON object (`\stdClass`);
+2. `attribute_code` passes the same structural identifier contract as the
+   normalizer: property present, JSON string, non-empty, valid UTF-8 (this is
+   identifier validation, not an allowlist of specific codes — an invalid
+   `attribute_code` never permits skip and must fail schema validation even when
+   the other three conditions below match);
+3. `frontend_input` is present and exactly `null` (read with `property_exists()`
+   plus `is_null()` — missing `frontend_input` is not skip-eligible);
+4. `is_user_defined` is present and exactly boolean `false` (read with
+   `property_exists()` plus `is_bool()` — no truthy checks, no `== false`, no
+   implicit cast; `"0"`, `0`, or any non-boolean value is not skip-eligible);
+5. `is_visible` is present and exactly boolean `false` (same strict mechanics as
+   `is_user_defined`).
+
+`apply_to` is **not** part of this rule. All four service-only examples
+observed on the pilot store happened to carry `apply_to = ["downloadable"]`, but
+that is a single-store observation, not proof that `apply_to` is irrelevant in
+general. The three-condition rule above was deliberately chosen to stay
+independent of `apply_to`; if a future real store exposes a
+`frontend_input = null` / `is_user_defined = false` / `is_visible = false`
+attribute with a different `apply_to` value, skipping it is expected behavior,
+not a bug.
+
+`backend_type` is never used to infer canonical type or to justify skip —
+Magento's internal storage type is unrelated to merchant-facing input type.
+
+`is_visible = false` alone is not sufficient for exclusion. Useful invisible
+merchant-facing attributes (for example `created_at`, `minimal_price`,
+`url_path`) remain normalized when they carry a non-null `frontend_input`.
+
+Skipped service-only attributes are operational, not anomalous. After a fully
+successful paginated discovery, when one or more were skipped, the adapter emits
+**exactly one** `INFO`-level log entry summarizing the skipped count and their
+(now-validated) `attribute_code` values. No entry is emitted when the skipped
+count is zero, and no per-page skip logging occurs.
+
 #### Missing/null/empty handling (v1)
 
 - `attribute_code` missing, `null`, or empty string → terminates the whole
@@ -2249,9 +2300,12 @@ other standard properties — but v1 maps only the subset in the table below.
 - `external_label` missing or `null` → the canonical field is `null`;
   `external_label` present as an empty string → preserved as an empty string
   (distinct from `null`, per the already-Resolved canonical contract);
-- `frontend_input` missing or `null` → terminates the whole vendor execution
-  attempt with `DiscoverySchemaValidationFailed` (load-bearing for
+- `frontend_input` missing → terminates the whole vendor execution attempt
+  with `DiscoverySchemaValidationFailed` (load-bearing for
   `normalized_data_type`, cannot be defaulted);
+- `frontend_input` present as `null` → service-only skip **only** when the
+  eligibility rule above matches; otherwise terminates the whole vendor execution
+  attempt with `DiscoverySchemaValidationFailed`;
 - `is_required` missing or `null` → canonical `null` (never defaulted to
   `false`);
 - `scope` missing or `null` → terminates the whole vendor execution attempt
@@ -2267,10 +2321,12 @@ other standard properties — but v1 maps only the subset in the table below.
 
 #### Whole-attempt schema-validation semantics (v1)
 
-Any normalization or option-validation failure — in any Adobe attribute, any
-mapped property, or any option row — **invalidates the complete vendor
+Any normalization or option-validation failure — in any **merchant-facing**
+Adobe attribute, any mapped property, or any option row — **invalidates the complete vendor
 execution attempt**. The adapter must **not** skip the invalid field and
-continue processing remaining attributes.
+continue processing remaining attributes. Service-only
+attributes excluded by the eligibility rule above are not merchant-facing and
+are intentionally skipped without failing the attempt.
 
 On such a failure:
 

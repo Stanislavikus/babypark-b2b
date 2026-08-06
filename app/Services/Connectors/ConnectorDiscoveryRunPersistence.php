@@ -493,7 +493,7 @@ final class ConnectorDiscoveryRunPersistence
             'discovery_run_id' => $row->id,
             'previous_snapshot_id' => $previousSnapshot?->id,
             'schema_version' => $source->schema_version,
-            'field_count' => $candidate->fieldsReceived(),
+            'field_count' => $candidate->fieldsNormalized(),
             'canonical_hash' => $candidate->canonicalHash,
             'captured_at' => $candidate->capturedAt,
         ]);
