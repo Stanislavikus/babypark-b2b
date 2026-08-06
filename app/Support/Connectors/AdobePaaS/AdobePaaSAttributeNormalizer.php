@@ -209,6 +209,7 @@ final class AdobePaaSAttributeNormalizer
             'price' => 'money',
             'media_image' => 'image',
             'gallery' => 'image_collection',
+            'weight' => 'number',
             default => throw ConnectorDiscoverySchemaValidationException::at(
                 ConnectorDiscoverySchemaValidationReason::UnmappedValue,
                 'frontend_input',

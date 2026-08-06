@@ -331,6 +331,7 @@ class AdobePaaSAttributeNormalizerTest extends TestCase
         yield 'price' => ['price', 'money'];
         yield 'media_image' => ['media_image', 'image'];
         yield 'gallery' => ['gallery', 'image_collection'];
+        yield 'weight' => ['weight', 'number'];
     }
 
     #[Test]
@@ -390,7 +391,7 @@ class AdobePaaSAttributeNormalizerTest extends TestCase
         ];
 
         yield 'unknown frontend_input' => [
-            '{"attribute_code":"color","frontend_input":"weight","scope":"global"}',
+            '{"attribute_code":"color","frontend_input":"unsupported_vendor_input","scope":"global"}',
             ConnectorDiscoverySchemaValidationReason::UnmappedValue,
             'frontend_input',
         ];
