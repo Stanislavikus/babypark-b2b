@@ -920,6 +920,7 @@ class ConnectorAccountDocumentationTest extends TestCase
             'price' => 'money',
             'media_image' => 'image',
             'gallery' => 'image_collection',
+            'weight' => 'number',
         ] as $adobeInput => $canonicalType) {
             $this->assertStringContainsString(
                 "`{$adobeInput}`→`{$canonicalType}`",
@@ -1025,7 +1026,8 @@ class ConnectorAccountDocumentationTest extends TestCase
             'outcome is **non-retryable**',
             $section
         );
-        $this->assertStringContainsString('`weight` is deliberately **excluded**', $section);
+        $this->assertStringContainsString('`weight` was confirmed as a real `frontend_input` value', $section);
+        $this->assertStringNotContainsString('`weight` is deliberately **excluded**', $section);
         $this->assertStringContainsString('placeholder first option', $section);
         $this->assertStringContainsString('Raw Adobe response bodies are never persisted', $section);
     }
