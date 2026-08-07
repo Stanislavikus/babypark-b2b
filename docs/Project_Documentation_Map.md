@@ -267,8 +267,9 @@ state of the codebase on `develop`.
 
 This document describes:
 
-- GAP-001 through GAP-007 — documented mismatches where architectural decisions are
-  **Resolved** in docs but code has not yet caught up;
+- the authoritative current list of verified implementation gaps between approved
+  project documentation and `develop` — see `docs/IMPLEMENTATION_GAPS.md` for every
+  open, partially closed, and historically closed gap entry;
 - rules for linking temporary workarounds to their GAP entry;
 - explicit scope boundaries for Product Fields Foundation, Pricing, Availability,
   Workspace isolation, and Connector work.

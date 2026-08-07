@@ -269,10 +269,21 @@ yet), but should be scheduled before any payment gateway integration work starts
   confirmed running.
 - Task 4B-2a-3 adds the first read/status/check operational admin surface
   (`ConnectorAccountResource` list/detail/history) on top of that backend chain.
+- Tasks 4B-2b-0 through 4B-2b (PRs #96, #98–#102, correction PR #105) merged
+  the `database_connectors` / `connectors` discovery lane, queued discovery
+  execution (`ConnectorDiscoveryRunJob`), Adobe discovery execution and
+  normalization, canonical field/snapshot hashing, snapshot publication and
+  persistence, discovery-run received/normalized accounting (106 received /
+  102 normalized on the committed Magento pilot regression fixture), and
+  account projection updates after successful discovery.
+- `ConnectorAccountMerchandiserPresentation` plus `ConnectorAccountPolicy`
+  updates (PR #102) close the Merchandiser `viewAny()`/`view()` and rendered
+  management-field security gap — `store_code`, `tenant_context`, credentials,
+  and other management-only connector details are not rendered to Merchandiser.
 - Connector-account **creation** and **credential-management/settings UI** remain
   absent (explicitly out of scope for 4B-2a-3).
-- Discovery execution, snapshot publication, diff computation, retention jobs,
-  and broader operational UI remain absent.
+- Discovery Overview UI, diff computation, retention jobs, and broader operational
+  UI beyond the current connector-account list/detail surface remain absent.
 - `FieldMapping` remains Task 4C.
 
 **Task sequence (GAP-006 remains Open until implementation lands):**
@@ -283,7 +294,7 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4B-1** | Generic `ConnectorAccount` persistence/domain foundation — Done, PR #85 |
 | **4B-2-0** | Runtime Stop-and-Amend: deployment-family capabilities, adapter/auth, authorization, queue, transaction, retry and SSRF decisions — Done |
 | **4B-2a** | Adobe PaaS adapter/OAuth signing, SSRF-safe transport, connection-check execution and queue lifecycle, plus list/detail/history admin UI and current projection — Done, PRs #87, #89–#94 |
-| **4B-2b** | Queued discovery execution, normalization, snapshot publication, and Discovery Overview UI |
+| **4B-2b** | Discovery backend runtime (queued execution, Adobe normalization, canonical hashing, snapshot publication/persistence, account projection) — Done, PRs #96, #98–#102, #105; Discovery Overview UI — Pending |
 | **4B-2c** | Diff computation, discovery field list, filters, and field inspection |
 | **4B-2d** | Activity history, retention/pruning service, recovery states, and operational polish |
 | **4C** | `FieldMapping` suggestions, confidence, confirmation and manual resolution |
@@ -297,13 +308,14 @@ Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
 - **`ImportedPriceTaxBasis`** (whether an imported row is net or gross) must be
   captured during connector import design — see GAP-018 cross-reference.
 
-**Status:** Open. Task 4B-2a is complete. Connector-account creation and
-credential-management/settings UI remain absent. Discovery execution, snapshot
-publication, diff computation, retention jobs, broader operational UI, and
+**Status:** Open. Task 4B-2a is complete. Task 4B-2b backend discovery runtime is
+complete (PRs #96, #98–#102, correction PR #105). Connector-account creation and
+credential-management/settings UI remain absent. Discovery Overview UI (remaining
+4B-2b scope), diff computation, retention jobs, broader operational UI, and
 FieldMapping remain unimplemented.
 
-**ConnectorAccount authorization/rendered-view sub-gap (closed 2026-08-02,
-Task 4B-2b-1e+1f):** `ConnectorAccountPolicy` now grants Merchandiser
+**ConnectorAccount authorization/rendered-view sub-gap (closed, PR #102 /
+Task 4B-2b-1e+1f):** `ConnectorAccountPolicy` grants Merchandiser
 `viewAny()`/`view()` (safe fields only) and `runDiscovery()` (enabled
 accounts only). Management abilities remain denied to Merchandiser.
 Field-level restrictions enforced via `ConnectorAccountMerchandiserPresentation`:
@@ -312,9 +324,12 @@ Filament table/infolist visibility for `store_code`/`tenant_context`.
 Merchandiser detail pages omit connection-check header actions and relation
 managers; `connectionChecks` presentation relations are not loaded.
 Sensitive fields excluded: `credentials`, `settings`, `base_url`,
-`store_code`, `tenant_context`, `auth_profile`. Tests assert rendered HTML
-and Livewire payload absence, including connection-check management/history
-surfaces, not policy-layer alone.
+`store_code`, `tenant_context`, `auth_profile`. Current code in
+`ConnectorAccountResource`, `ViewConnectorAccount`, and
+`ConnectorAccountPolicy` confirms management-only fields such as `store_code`
+are not rendered to Merchandiser. Tests assert rendered HTML and Livewire
+payload absence, including connection-check management/history surfaces, not
+policy-layer alone.
 
 Implemented role matrix (confirmed against `App\Enums\UserRole`):
 
@@ -328,9 +343,9 @@ Implemented role matrix (confirmed against `App\Enums\UserRole`):
 | Any role, cross-workspace account | No (404) | No (404) | No |
 | Disabled account | Per role matrix (unaffected by disabled state) | No | Per role matrix |
 
-**GAP-006 overall remains Open.** Remaining scope: discovery UI (Task
-4B-2b-1g), diff computation (4B-2c), retention/pruning (4B-2d),
-FieldMapping/import (4C+), connector-account creation and
+**GAP-006 overall remains Open.** Remaining scope: Discovery Overview UI
+(remaining Task 4B-2b work), diff computation (4B-2c), retention/pruning
+(4B-2d), FieldMapping/import (4C+), connector-account creation and
 credential-management/settings UI.
 
 **Task 4A note (added 2026-07-16):** Task 4A implements the first concrete
@@ -371,10 +386,10 @@ complete: this PR adds `php artisan queue:restart` to `deploy.sh`, and the
 pilot host was verified on 2026-07-31 to use the `database` cache store
 with a running Supervisor-managed default worker and `autorestart=true`.
 
-The amended `deploy.sh` has not yet been executed on the production host
-because this PR has not been merged or deployed. Its first real execution
-belongs to the normal post-merge deployment verification and is not
-evidence that the dedicated connector worker is installed.
+Historical state at the time of this verification: the amended `deploy.sh`
+had not yet been executed on the production host because the PR had not yet
+been merged or deployed. Its future first execution was not evidence that the
+dedicated connector worker had been installed.
 
 Verified on 2026-07-31 (pilot host):
 - existing `babypark-queue:babypark-queue_00` confirmed `RUNNING`;
@@ -384,7 +399,7 @@ Verified on 2026-07-31 (pilot host):
 - `lock_connection=null` resolves to the cache store's default DB connection (confirmed directly from the installed `laravel/framework` v11.54.0 source, `Illuminate\Cache\CacheManager::createDatabaseDriver`);
 - `lock_table=null` resolves to `cache_locks` (same source);
 - `cache` and `cache_locks` tables confirmed present with their expected structures (`key`/`value`/`expiration` and `key`/`owner`/`expiration`);
-- dedicated `babypark-connector-queue` remains intentionally uninstalled and is deferred until Task 4B-2b-1 introduces a real discovery job.
+- dedicated `babypark-connector-queue` remains intentionally uninstalled and is deferred until Task 4B-2b-1 introduces a real discovery job (historical 2026-07-31 snapshot — discovery job now exists in application code via PR #102; permanent production Supervisor activation remains a separate gate).
 
 Connector production-readiness also depends on **GAP-024** (Laravel 11
 framework upgrade) — see that gap for scope and scheduling; closing the B9
@@ -392,18 +407,37 @@ host-verification item does **not** close GAP-024 or make the connector
 runtime production-ready. GAP-024 does not block this docs promotion or
 isolated 4B-2a development.
 
-Next task: Task 4B-2b (Discovery vertical slice).
+Next task: remaining Task 4B-2b scope — Discovery Overview UI.
+
+**Task 4B-2b note (added 2026-08-07):** PR #102 merged queued discovery
+execution (`ConnectorDiscoveryRunJob`), the dispatch/persistence execution
+chain, Adobe discovery execution, account projection updates, and Merchandiser
+authorization/presentation closure (`ConnectorAccountMerchandiserPresentation`).
+Earlier PRs #98–#101 delivered discovery runtime Stop-and-Amend, normalization,
+error vocabulary, and canonical hashing groundwork; PR #96/#4B-2b-0 added the
+`database_connectors` lane. PR #105 corrected received-vs-normalized discovery
+accounting and added the committed Magento pilot payload regression fixture
+(106 received attributes, 102 normalized attributes, 102 persisted normalized
+snapshot fields) with deterministic canonical hashing coverage in tests.
+Discovery Overview UI remains Pending within 4B-2b. Permanent production
+`babypark-connector-queue` Supervisor activation remains a separate readiness
+gate — not established by the discovery job alone.
 
 **Task 4B-2b-0 note (added 2026-07-29):** Runtime alignment PR — adds
 `database_connectors` / `connectors` queue lane (`retry_after` 1200s), dedicated
-connector worker config (docker-compose + deferred Supervisor installation for
-the pilot host), and `deploy.sh` `queue:restart`. Connection-check lane unchanged.
+connector worker config (docker-compose + deferred permanent Supervisor
+installation for the pilot host), and `deploy.sh` `queue:restart`. Connection-check lane unchanged.
 B9 host-prerequisite verification completed 2026-07-31 (default worker `RUNNING`,
 `database` cache/lock store confirmed). Dedicated `babypark-connector-queue`
-remains intentionally uninstalled until Task 4B-2b-1 introduces a discovery job.
-Prerequisite for Task 4B-2b-1 discovery execution; no discovery job or
-FieldMapping in this task. GAP-024 remains Open as the separate connector
-production-readiness blocker.
+on the pilot production host remains a separate permanent-activation gate —
+`ConnectorDiscoveryRunJob` now exists in application code (PR #102), but
+permanent Supervisor activation is not yet confirmed. Historical note: at
+2026-07-31 verification, `babypark-connector-queue` remains intentionally
+uninstalled and is deferred until Task 4B-2b-1 introduces a discovery job.
+Prerequisite for Task 4B-2b-1 discovery execution (satisfied in application
+code); permanent production worker activation and Discovery Overview UI remain
+open. GAP-024 remains Open as the separate connector production-readiness
+blocker.
 
 **Task 4B UI handoff:**
 
