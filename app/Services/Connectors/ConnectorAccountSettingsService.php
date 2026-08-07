@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
-final class ConnectorAccountSettingsService
+final class ConnectorAccountSettingsService implements ConnectorAccountPersistencePort
 {
     public function __construct(
         private readonly WorkspaceMembership $workspaceMembership,

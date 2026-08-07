@@ -17,6 +17,7 @@ use App\Support\Connectors\Transport\ConnectorOutboundRequest;
 use App\Support\Connectors\Transport\ConnectorTransportException;
 use App\Support\Connectors\Transport\ConnectorTransportLimits;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Log;
 
 final class AdobePaaSDiscoveryCapabilityImpl implements AdobePaaSDiscoveryCapability
 {
@@ -32,6 +33,7 @@ final class AdobePaaSDiscoveryCapabilityImpl implements AdobePaaSDiscoveryCapabi
         private readonly AdobePaaSDiscoveryResponseMapper $responseMapper,
         private readonly AdobePaaSDiscoveryTransportMapper $transportMapper,
         private readonly AdobePaaSAttributeNormalizer $normalizer,
+        private readonly AdobePaaSServiceOnlyAttributeEligibility $serviceOnlyAttributeEligibility,
         private readonly CanonicalSchemaFieldHasher $fieldHasher,
         private readonly CanonicalSchemaSnapshotHasher $snapshotHasher,
     ) {}
@@ -44,6 +46,9 @@ final class AdobePaaSDiscoveryCapabilityImpl implements AdobePaaSDiscoveryCapabi
         $accumulatedFields = [];
         /** @var array<string, true> $seenFieldKeys */
         $seenFieldKeys = [];
+        /** @var list<string> $skippedAttributeCodes */
+        $skippedAttributeCodes = [];
+        $receivedItemsCount = 0;
         $stableTotalCount = null;
         $currentPage = 1;
 
@@ -93,6 +98,14 @@ final class AdobePaaSDiscoveryCapabilityImpl implements AdobePaaSDiscoveryCapabi
             }
 
             foreach ($page->items as $itemIndex => $rawItem) {
+                $receivedItemsCount++;
+
+                if ($this->serviceOnlyAttributeEligibility->shouldSkip($rawItem)) {
+                    $skippedAttributeCodes[] = $rawItem->attribute_code;
+
+                    continue;
+                }
+
                 try {
                     $canonicalField = $this->normalizer->normalize($rawItem);
                     $fieldKey = $canonicalField->externalFieldKey();
@@ -115,23 +128,23 @@ final class AdobePaaSDiscoveryCapabilityImpl implements AdobePaaSDiscoveryCapabi
                 }
             }
 
-            if (count($accumulatedFields) === $stableTotalCount) {
+            if ($receivedItemsCount === $stableTotalCount) {
                 break;
             }
 
-            if ($currentPage === self::MAX_PAGES && count($accumulatedFields) < $stableTotalCount) {
+            if ($currentPage === self::MAX_PAGES && $receivedItemsCount < $stableTotalCount) {
                 return ConnectorDiscoveryAttemptResult::paginationFailure(
                     ConnectorDiscoveryRunErrorCode::DiscoveryPaginationLimitExceeded,
                 );
             }
 
-            if ($page->items === [] && count($accumulatedFields) < $stableTotalCount) {
+            if ($page->items === [] && $receivedItemsCount < $stableTotalCount) {
                 return ConnectorDiscoveryAttemptResult::paginationFailure(
                     ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination,
                 );
             }
 
-            if (count($accumulatedFields) > $stableTotalCount) {
+            if ($receivedItemsCount > $stableTotalCount) {
                 return ConnectorDiscoveryAttemptResult::paginationFailure(
                     ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination,
                 );
@@ -140,7 +153,7 @@ final class AdobePaaSDiscoveryCapabilityImpl implements AdobePaaSDiscoveryCapabi
             $currentPage++;
         }
 
-        if ($stableTotalCount === null || count($accumulatedFields) !== $stableTotalCount) {
+        if ($stableTotalCount === null || $receivedItemsCount !== $stableTotalCount) {
             return ConnectorDiscoveryAttemptResult::paginationFailure(
                 ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination,
             );
@@ -160,7 +173,15 @@ final class AdobePaaSDiscoveryCapabilityImpl implements AdobePaaSDiscoveryCapabi
             $accumulatedFields,
             $snapshotHash,
             CarbonImmutable::now(),
+            $receivedItemsCount,
         );
+
+        if ($skippedAttributeCodes !== []) {
+            Log::info('Adobe Commerce discovery skipped service-only attributes.', [
+                'skipped_count' => count($skippedAttributeCodes),
+                'attribute_codes' => $skippedAttributeCodes,
+            ]);
+        }
 
         return ConnectorDiscoveryAttemptResult::success($candidate);
     }

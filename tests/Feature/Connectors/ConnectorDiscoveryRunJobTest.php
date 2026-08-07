@@ -22,6 +22,7 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapabilityImpl;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryRequestFactory;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryResponseMapper;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryTransportMapper;
+use App\Support\Connectors\AdobePaaS\AdobePaaSServiceOnlyAttributeEligibility;
 use App\Support\Connectors\CanonicalSchemaFieldHash;
 use App\Support\Connectors\CanonicalSchemaFieldHasher;
 use App\Support\Connectors\CanonicalSchemaSnapshotHasher;
@@ -372,6 +373,7 @@ class ConnectorDiscoveryRunJobTest extends TestCase
                 new AdobePaaSDiscoveryResponseMapper,
                 new AdobePaaSDiscoveryTransportMapper,
                 new AdobePaaSAttributeNormalizer,
+                new AdobePaaSServiceOnlyAttributeEligibility,
                 new CanonicalSchemaFieldHasher,
                 new CanonicalSchemaSnapshotHasher,
             ),
@@ -514,6 +516,7 @@ class ConnectorDiscoveryRunJobTest extends TestCase
                 ),
             ]),
             CarbonImmutable::now(),
+            1,
         );
 
         return ConnectorDiscoveryAttemptResult::success($candidate);

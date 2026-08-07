@@ -10,6 +10,7 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryRequestFactory;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryResponseMapper;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryTransportMapper;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
+use App\Support\Connectors\AdobePaaS\AdobePaaSServiceOnlyAttributeEligibility;
 use App\Support\Connectors\CanonicalSchemaFieldHasher;
 use App\Support\Connectors\CanonicalSchemaSnapshotHasher;
 use App\Support\Connectors\ConnectorSchemaSourceEndpointPathValidator;
@@ -448,6 +449,32 @@ class AdobePaaSDiscoveryCapabilityImplTest extends TestCase
     }
 
     #[Test]
+    public function service_only_null_frontend_input_attributes_are_counted_as_received_but_not_normalized(): void
+    {
+        $transport = new class implements ConnectorHttpTransport
+        {
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'items' => [
+                        json_decode('{"attribute_code":"color","frontend_input":"text","scope":"global"}', false, 512, JSON_THROW_ON_ERROR),
+                        json_decode('{"attribute_code":"links_title","frontend_input":null,"scope":"global","is_user_defined":false,"is_visible":false,"apply_to":["downloadable"]}', false, 512, JSON_THROW_ON_ERROR),
+                    ],
+                    'total_count' => 2,
+                ], JSON_THROW_ON_ERROR));
+            }
+        };
+
+        $capability = $this->capabilityWithTransport($transport);
+        $result = $capability->discover($this->sampleContext(), self::ENDPOINT_PATH);
+
+        $this->assertTrue($result->succeeded);
+        $this->assertSame(2, $result->snapshotCandidate?->fieldsReceived());
+        $this->assertSame(1, $result->snapshotCandidate?->fieldsNormalized());
+        $this->assertSame('color', $result->snapshotCandidate?->fields[0]->field->externalFieldKey());
+    }
+
+    #[Test]
     public function invalid_endpoint_path_never_reaches_transport(): void
     {
         $transport = new class implements ConnectorHttpTransport
@@ -483,6 +510,7 @@ class AdobePaaSDiscoveryCapabilityImplTest extends TestCase
             new AdobePaaSDiscoveryResponseMapper,
             new AdobePaaSDiscoveryTransportMapper,
             new AdobePaaSAttributeNormalizer,
+            new AdobePaaSServiceOnlyAttributeEligibility,
             new CanonicalSchemaFieldHasher,
             new CanonicalSchemaSnapshotHasher,
         );
