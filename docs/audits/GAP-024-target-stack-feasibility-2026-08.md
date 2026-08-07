@@ -859,9 +859,26 @@ Two consequences make this the single largest risk in the migration:
 
    In Filament 5 the `<form>` elements the project needs to reach have moved: `packages/support/resources/views/components/modal/index.blade.php:196` emits `wire:submit.prevent="{!! $wireSubmitHandler !!}"`, and `packages/actions/resources/views/action-modal.blade.php:60` sets `:wire:submit.prevent="$actionLivewireCallMountedActionName"`. The re-derivation therefore targets a different package (`filament/support`, `filament/actions`) and a different view namespace than today.
 
-**This must be an explicit, human-reviewed migration step with a dedicated
-regression test asserting `novalidate` is present on rendered panel forms** —
-not a mechanical file copy.
+**A regression test for this already exists and is the migration's tripwire.**
+`tests/Feature/FilamentFormValidationTest::test_panel_forms_render_with_novalidate`
+(lines 220–231) performs real HTTP `GET` requests against `/admin/users/create`
+and `/admin/price-inspector` and asserts `->assertSee('novalidate', false)` on
+each. That is exactly the assertion that would fail the moment a stale published
+override stops resolving — so the silent-regression risk described above is
+**already instrumented**, and the correct instruction is *keep this test green
+through both Filament steps*, not "write a new test".
+
+Two gaps in its current coverage should be closed as part of the migration
+rather than after it: it exercises only the `/admin` panel (not the
+`customer`-guard `/cabinet` panel) and only page-level forms (not the modal
+forms that `filament-actions::components.modals` governs — the fork whose
+upstream counterpart drops from 315 lines to 19 and loses its `<form>`
+elements entirely). Extending it to both panels and to at least one modal form
+is the cheapest way to make the tripwire cover the full surface the four forks
+own.
+
+**The re-derivation itself remains an explicit, human-reviewed migration step,
+not a mechanical file copy.**
 
 ### 7.5 Custom Filament Blade views
 
@@ -893,13 +910,56 @@ not processed. All 45 component usages above need manual verification.
 `fi-ta-*` CSS class names, and Filament 5's compiled stylesheet is a Tailwind-4
 rebuild, **every selector in that partial must be re-validated against v5 markup**.
 
+**Three of the 13 custom Filament views are orphaned** — `filament.product-photo-entry`
+(44 lines), `filament.product-image-modal` (20) and `filament.product-image-lightbox`
+(21) have **0** references anywhere in `app/` or `resources/`. That is 85 lines of
+dead Blade which must **not** be re-derived or re-validated during the migration;
+delete them in PR1 so they do not inflate the review surface or the visual-check
+list.
+
+**Two Filament couplings live outside `app/Filament/**` and belong in the
+migration scope:**
+
+* `app/Models/User.php` implements `Filament\Models\Contracts\FilamentUser` (line 7) and declares `canAccessPanel(Panel $panel): bool` (line 57). This is the authorization entry point for both panels (Architecture Review Checklist item 3) and must be re-verified against the v5 contract signature.
+* `app/Support/Filament/RevalidatesOnUpdate.php` is the concrete implementation of the `04-ARCHITECTURE_PRINCIPLES.md` requirement that "a required-field error for a specific input must disappear once the user supplies a valid value — without resubmitting the whole form". It calls `->live()` plus `$livewire->validateOnly($component->getStatePath())` inside `afterStateUpdated`, typed against `Filament\Forms\Components\Component`, `Filament\Forms\Contracts\HasForms` and `Filament\Forms\Set`. **All three of those imports move in Filament 4** (`Forms\Components\Component` → `Schemas\Components\Component`, `Forms\Set` → `Schemas\Components\Utilities\Set`), and the class deliberately implements a documented architectural standard — so its migration is Rector-automatable but its *behaviour* must be re-verified by the 24 existing form-error assertions, not assumed.
+
 ### 7.6 Filament-related tests
 
-23 of 149 test files reference Filament. Only 2 use `Livewire::test(` /
-`livewire(`. Filament resource tests are therefore mostly authorization- and
-render-level rather than deep interaction tests — which means the existing suite
-will catch namespace/class breakage well, but will **not** catch toolbar layout,
-`novalidate` or visual regressions. §15 and §16 address this gap.
+25 of 149 test files reference Filament, and the interaction coverage is
+substantially deeper than a bare `Livewire::test(` count suggests. The dominant
+idiom is `Livewire::actingAs($user)->test(SomeFilamentClass::class)`, so counting
+only `Livewire::test(` (2 occurrences) badly understates it. Literal counts
+across `tests/`:
+
+| Filament/Livewire test helper | Occurrences |
+|---|---|
+| `Livewire::actingAs` | **206** |
+| `->test(` | **206** |
+| `fillForm` | **37** |
+| `Filament::setCurrentPanel` | **22** (across 21 files) |
+| `assertCanSeeTableRecords` | **18** |
+| `assertHasNoFormErrors` | **14** |
+| `assertHasFormErrors` | **10** |
+| `callTableAction` | **8** |
+| `assertTableColumnFormattedState*` | **5** |
+| `novalidate` | **4** |
+| `mountTableAction` | **1** |
+| `assertActionExists` | **1** |
+| `assertFormSet`, `mountAction`, `assertTableActionExists` | 0 each |
+
+This changes the assessment materially, in the project's favour. Form filling,
+form-error assertions, table-record assertions, table-action invocation and
+column-state formatting are all genuinely exercised, so the suite will catch a
+large share of Filament 4/5 API breakage at the **interaction** level, not merely
+at compile time. The `04-ARCHITECTURE_PRINCIPLES.md` form-validation contract in
+particular is already guarded by `assertHasFormErrors`/`assertHasNoFormErrors`
+(24 assertions) plus the `novalidate` test in §7.4.
+
+What the suite still cannot catch is unchanged: **toolbar layout, spacing,
+palette, dark-mode contrast and every other purely visual property** owned by the
+four vendor forks and Filament's compiled stylesheet. That is the gap §16 exists
+to close, and it remains the reason visual verification is a mandatory gate
+rather than an optional one.
 
 ---
 
@@ -1674,7 +1734,7 @@ when the migration adds or reorders MySQL test steps.
 | Layer | Files / evidence | Migration exposure |
 |---|---|---|
 | **Filament Resource tests** | 23 test files reference `Filament\` / `filament` | **High.** Namespace unification (`Form`→`Schema`, `Infolist`→`Schema`, `Tables\Actions\*`→`Actions\*`) breaks imports and action-name assertions. Mostly compile-time, so failures will be loud |
-| **Livewire tests** | Only **2** files use `Livewire::test(` / `livewire(` | **Medium, and a coverage gap.** So little Livewire interaction testing exists that Livewire 4 runtime changes would largely go unobserved by the suite |
+| **Livewire tests** | **206** `Livewire::actingAs(...)->test(...)` chains across 22 files, plus 37 `fillForm`, 24 form-error assertions, 18 `assertCanSeeTableRecords`, 8 `callTableAction` | **High, but well covered.** Livewire 4 runtime changes will be observed by the suite at the interaction level. The residual gap is visual, not behavioural |
 | **Connector UI tests** | `ConnectorAccountResource` + `ConnectionChecksRelationManager` render tests; `tests/Feature/ConnectorAccountFoundationTest.php` | **High.** Both classes carry `->poll('5s')`, which moves from Filament 3 tables to Filament 5 tables *and* onto Livewire 4's non-blocking poll implementation |
 | **Authorization / rendered-view tests** | e.g. `WorkspaceTaxDefaultsFeatureTest` ("admin can access…", "manager without permission cannot access…") | **High.** `VerifyCsrfToken` → `PreventRequestForgery` plus Filament 5 panel auth changes; Checklist item 3 |
 | **Localization tests** | `lang/**` (uk/ru/en); GAP-019 tracks partial localization | **Medium.** Filament ships its own translations; a major bump can change vendor translation keys. `04`'s `validation.required` message contract must still hold |
@@ -1702,7 +1762,7 @@ implementation PR (§17) must clear every applicable row before merge.
 | V8 | **npm build** | `npm ci && npm run build` **in CI** | succeeds; added by PR1 | ● | ● | ● | ● | ● |
 | V9 | Panel smoke — `/admin` | authenticated render of login, dashboard, product table, a form, a resource view page | HTTP 200, no console error | — | ● | ● | ● | ● |
 | V10 | Panel smoke — `/cabinet` | `customer`-guard login, catalogue table, card view, cart drawer, order submit | HTTP 200, functional | — | ● | ● | ● | ● |
-| V11 | **`novalidate` assertion** | new test asserting `novalidate` on rendered panel `<form>` elements in both panels | present (per `04`) | — | — | ● | ● | ● |
+| V11 | **`novalidate` assertion** | **`tests/Feature/FilamentFormValidationTest::test_panel_forms_render_with_novalidate` already exists** — keep it green; extend it to cover `/cabinet` and a modal form | present (per `04`) | — | — | ● | ● | ● |
 | V12 | **Connector polling concurrency** | new test: poll refresh concurrent with dispatch creates no duplicate and no orphan `queued` row | no duplicate/orphan | — | — | ● | ● | ● |
 | V13 | Connector queue lane alignment | re-verify `config/queue.php` `retry_after` (90 / 1200) vs job `$timeout` (45 / 900) vs lock `expireAfter` (120 / 1100) against the process manager | matches `07-TECH_STACK.md` | ● | ● | — | — | ● |
 | V14 | `pcntl` present on workers | `php -m` on the host / in the worker image | present | ● | — | — | — | ● |
@@ -1791,7 +1851,8 @@ taken.
 * Add a Node version pin (`.nvmrc` and/or `package.json` `engines`) and pin the Alpine Node install in `docker/php/Dockerfile` (§12).
 * **Add a Node setup + `npm ci` + `npm run build` step to `.github/workflows/mysql-tests.yml`** (§12) and `sqlite3`/`pdo_sqlite` to the Docker image if the local SQLite suite is wanted there.
 * Establish the visual-regression baseline capture over the 20 surfaces in §16, on `develop`, before anything changes.
-* Add the currently-missing regression tests as *pre-migration* tests so they are known-green on Filament 3: the `novalidate` assertion (V11) and the connector polling-concurrency test (V12).
+* Delete the three orphaned Blade views identified in §7.5 (85 lines, 0 references) so they do not enter the migration review surface.
+* Extend the **existing** `novalidate` test (V11) to cover the `/cabinet` panel and at least one modal form, and add the connector polling-concurrency test (V12) — both while still green on Filament 3.
 * Gates: V1–V8, V13–V16, V19.
 
 ### PR2 — Laravel 11 → 13 (Filament stays on 3.3.54, Livewire on 3.x)
@@ -1989,8 +2050,12 @@ timeouts 45 / 900 vs lock `expireAfter` 120 / 1100) must be re-verified against
 
 ### Application migration scope
 
-**Filament (largest):** 85 files in `app/Filament/**`; 15 Resources, 51 resource
-Pages, 5 RelationManagers, 4 standalone Pages; both panel providers. Namespace
+**Filament (largest):** 85 files in `app/Filament/**`; 15 Resources (14 admin +
+1 cabinet), 51 resource Pages, 5 RelationManagers, 4 standalone admin Pages,
+1 custom auth Page, 1 custom resource Page, **0 custom widgets**
+(`app/Filament/Widgets/` does not exist, so the admin panel's
+`->discoverWidgets()` call targets a missing directory and only the built-in
+`Widgets\AccountWidget` is registered); both panel providers. Namespace
 and API counts: 19 `Forms\Form` imports and signatures, 6 `Infolists\Infolist`
 imports with 5 signatures, 54 `->schema(` calls, 135 inline
 `Forms\Components\`, 140 inline `Tables\Columns\`, 68 inline
@@ -1999,8 +2064,12 @@ imports with 5 signatures, 54 `->schema(` calls, 135 inline
 6 `Forms\Get`/`Set`, 11 `Notifications\` imports. Static properties needing type
 widening: 19 `$navigationIcon`, 17 `$navigationGroup`. Plus
 `app/Support/FilamentTableToolbar.php`, `app/Support/ProductLightbox.php`,
-`app/Support/Brand.php`, and `TagResource/Support/GuardedDeleteTagAction.php`
-(aliased `Tables\Actions\DeleteAction` import).
+`app/Support/Brand.php`, `app/Support/Filament/RevalidatesOnUpdate.php`,
+`app/Models/User.php` (`FilamentUser` + `canAccessPanel()`), and
+`TagResource/Support/GuardedDeleteTagAction.php`, which imports **both**
+`Filament\Actions\DeleteAction` and `Filament\Tables\Actions\DeleteAction as TableDeleteAction`
+— the dual-namespace pattern Filament 4 unifies, and the one place where a
+Rector rename could collapse two distinct imports into one.
 
 **Vendor Blade forks (highest risk):** the four files totalling 1,658 lines
 listed under "Biggest blocker".
