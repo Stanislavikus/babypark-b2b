@@ -193,7 +193,8 @@ vite                   6.4.3   6.4.3   8.2.1
 * `resources/js/app.js` — `import './bootstrap';` only.
 * `@vite(...)` appears in exactly **2** Blade files: `resources/views/layouts/cabinet.blade.php:7` and `resources/views/welcome.blade.php:15`.
 * **Neither Filament panel registers a custom theme.** `->viteTheme(` occurrence count across the repository (excluding `vendor/`, `node_modules/`): **0**.
-* `/public/build` is gitignored (`.gitignore:6`), so assets are built at deploy time.
+* `/public/build` is gitignored (`.gitignore:6`), so Vite assets are built at deploy time.
+* **But 16 Filament 3 published JavaScript assets *are* committed** under `public/js/filament/**` — `filament/{app,echo}.js`, `forms/components/{color-picker,date-time-picker,file-upload,key-value,markdown-editor,rich-editor,select,tags-input,textarea}.js`, `notifications/notifications.js`, `support/support.js`, `tables/components/table.js`, `widgets/components/chart.js`, `widgets/components/stats-overview/stat/chart.js`. These are the output of `php artisan filament:assets` (referenced in `DEPLOY.md:309`) and are version-locked to Filament 3.3.52. Five of them contain `Livewire.hook` / `$wire.` calls (`tables/components/table.js`, `notifications/notifications.js`, `forms/components/{markdown-editor,color-picker}.js`, `widgets/components/chart.js`) — the `Livewire.hook` API that Livewire 4 deprecates. See §9.5.
 
 ### 1.6 Filament panel providers
 
@@ -910,7 +911,7 @@ inventory (occurrence counts from `rg -o` across `resources/` and `app/`):
 | Migration item from the official guide | Impact per guide | Repository evidence | Classification |
 |---|---|---|---|
 | **Config file updates** (`layout`→`component_layout`, `lazy_placeholder`→`component_placeholder`, `smart_wire_keys` default `true`, new `component_locations`/`component_namespaces`/`make_command`/`csp_safe`) | High | **`config/livewire.php` does not exist** — the project uses framework defaults throughout | **Not used.** The single highest-impact v4 change does not apply. If a config is published later, `make_command.type` must be set to `'class'` to preserve v3 generator behavior |
-| **Routing: `Route::get($uri, Component::class)` → `Route::livewire(...)`** | High | No Livewire full-page route registration; `app/Livewire/**` components are reached through Blade/Filament, not routed classes | **Backward-compatible** (the guide states the old form "still works but not recommended") |
+| **Routing: `Route::get($uri, Component::class)` → `Route::livewire(...)`** | High | **4 full-page components are registered as route classes** in `routes/web.php`: `Route::get('/login', Login::class)`, `/dashboard` → `Dashboard::class`, `/catalog` → `Catalog::class`, `/catalog/{product}` → `ProductDetail::class`. All four use `#[Layout('layouts.cabinet')]` rather than the `layout` config key | **Backward-compatible** — the guide states the old form "still works but not recommended", and `Route::livewire()` is required only for single-file and multi-file components, which this project does not use. **Recommended (not required) manual change:** move all four to `Route::livewire()`. Note these are the `customer`-guard cabinet entry points behind `guest:customer` and `CustomerAuthenticated` middleware, so any change here needs functional auth testing |
 | **`wire:model` ignores child events by default (add `.deep` to restore)** | High | `wire:model` total **22**, all on real form inputs (`login.blade.php` 3, `catalog.blade.php` 5, `quantity-order.blade.php` 1, `governance.blade.php` 1, `field-matrix.blade.php` 4, `preview-as-customer.blade.php` 6, forked `search-field.blade.php` 1). No `wire:model` on a container element | **Backward-compatible.** Guide: "Standard form input bindings (inputs, selects, textareas) are unaffected." |
 | **`wire:model.blur` / `.change` now gate client-side sync; use `.live.blur` for v3 behavior** | Medium | `wire:model.blur` occurrences: **1**, at `resources/views/vendor/filament-tables/components/search-field.blade.php:13` — inside a **forked vendor view**: `$wireModelAttribute = $onBlur ? 'wire:model.blur' : "wire:model.live.debounce.{$debounce}"` | **Manual code change**, and it lands in the vendor fork that must be re-derived anyway (§7.4). `.change`: **0** occurrences |
 | **`wire:model.lazy` unchanged** | — | **3** occurrences: `livewire/cabinet/catalog.blade.php:496`, `:633`, `filament/cabinet/columns/quantity-order.blade.php:29` — all quantity inputs | **Backward-compatible** (guide: "`wire:model.lazy` continues to work as it did in v3—no migration needed") |
@@ -920,7 +921,7 @@ inventory (occurrence counts from `rg -o` across `resources/` and `app/`):
 | **Asset/endpoint URLs move from `/livewire/…` to `/livewire-{hash}/…`** | Low | `docker/nginx/default.conf` contains **0** references to `livewire`; no firewall/CDN path rules in the repository | **Backward-compatible** — but flag as a **production infrastructure check**: any host-level rule outside the repo (WAF, CDN, reverse proxy) that matches `/livewire/` would break |
 | **`Livewire::setUpdateRoute` signature adds `$path`** | Low | **0** occurrences | **Not used** |
 | **`stream()` parameter order (`to:` → `el:`)** | Medium | **0** occurrences | **Not used** |
-| **`LivewireManager::mount()` gains a `$slots` parameter** | Medium | No `Livewire::component(`, `Livewire\Mechanisms`, `Livewire\Features` or `LivewireManager` usage in `app/` | **Not used** |
+| **`LivewireManager::mount()` gains a `$slots` parameter** | Medium | No `Livewire::component(`, `Livewire::setUpdateRoute`, `Livewire::forceAssetInjection`, `Livewire\Mechanisms` or `Livewire\Features` usage. `mount()` is never called directly and `LivewireManager` is never extended. **However, the `Livewire` facade *is* used to reach the manager: `Livewire::current()` appears 9 times** — `app/Filament/Resources/ProductResource.php` (lines 179, 183, 368, 372), `app/Filament/Cabinet/Resources/ProductResource.php` (lines 129, 135, 323, 331) and `resources/views/filament/cabinet/columns/quantity-order.blade.php:14`, all reading `?->marginFormat` off the current component | **Not used** for the `mount()` signature change specifically. `Livewire::current()` is **not** listed as a breaking change in the v4 guide, but because it reaches into the live component instance from inside Filament column closures it is a **regression-test-required** item: the margin-format toggle must be verified in both product tables after the upgrade |
 | **`commit` / `request` JS hooks deprecated in favour of `interceptMessage` / `interceptRequest`** | Low | **0** occurrences of `Livewire.hook`, `Livewire.on`, `Livewire.dispatch`, `$wire.$js(`, `$js(` | **Not used** (deprecated, still functional regardless) |
 | **`$wire.` usage** | — | **17** occurrences, all inside the three forked vendor views (`filament-tables/index.blade.php` 3, `search-field.blade.php` 1, `filament-actions/components/modals.blade.php` 13) | Covered by the §7.4 re-derivation |
 | **Volt migration** | — | `livewire/volt` is not a dependency | **Not used** |
@@ -1035,14 +1036,51 @@ Every Tailwind-v4-removed or renamed utility class was searched across
 | `flex-shrink-`, `flex-grow-` | **0** each |
 | `overflow-ellipsis`, `decoration-slice`, `decoration-clone` | **0** each |
 
+**However, the utilities Tailwind 4 *renamed* (rather than removed) are present in
+volume.** Tailwind 4 shifted the shadow/radius/blur scale down one step
+(`shadow-sm` → `shadow-xs`, bare `shadow` → `shadow-sm`, `rounded-sm` →
+`rounded-xs`, `blur-sm` → `blur-xs`) and changed `outline-none` semantics.
+Counts across `resources/` and `app/`, **excluding** `resources/views/vendor/**`:
+
+| Renamed / changed in Tailwind v4 | First-party occurrences |
+|---|---|
+| `shadow-sm` | **22** |
+| `rounded-sm` | **12** |
+| `outline-none` | **20** |
+| `space-y-` (behavior change) | **24** |
+| `shrink-` (already the modern form — no change needed) | 19 |
+| `space-x-`, `blur-sm` | 0 each |
+
+That is **78 occurrences requiring migration attention**, versus 0 for the
+removed-utility set. These are silent visual changes — a `shadow-sm` that becomes
+one step heavier and a `rounded-sm` that becomes one step rounder will render,
+just differently — which is precisely why §16's visual verification is mandatory
+rather than advisory.
+
 Other measurements:
 
-* `dark:` variants: **190** occurrences, spread across `resources/views/filament/pages` (3 files), the vendor tables fork, `livewire/cabinet`, `filament/resources/customer-resource/pages`, `filament/connector-accounts`, `filament/cabinet/columns`, `components/filament`, `components`, and the views root.
-* Arbitrary-value utilities (`w-[…]`, `bg-[#…]`, etc.): **57** occurrences across `welcome.blade.php`, the vendor tables fork, `livewire/cabinet/{login,catalog,cart-toolbar,cart-indicator}.blade.php`, and `filament/pages/field-matrix.blade.php`.
+* `dark:` variants: **190** occurrences across `resources/` and `app/` (**182** first-party, excluding the vendor forks), concentrated in `filament/pages/price-inspector.blade.php` (22), `filament/pages/governance.blade.php` (18), `filament/pages/field-matrix.blade.php` (17) and `filament/resources/customer-resource/pages/preview-as-customer.blade.php` (11).
+* Arbitrary-value utilities (`w-[…]`, `bg-[#…]`, `text-[…]`): **57** occurrences across `welcome.blade.php`, the vendor tables fork, `livewire/cabinet/{login,catalog,cart-toolbar,cart-indicator}.blade.php`, and `filament/pages/field-matrix.blade.php`. Supported in Tailwind 4, but under a different custom-property resolution model, so these need visual spot-checking rather than mechanical rewriting.
+* `resources/css/design-tokens.css` defines `--color-primary-50` … `--color-primary-700`, but `var(--color-primary…)` is referenced **0** times. Primary styling flows through Tailwind's `primary-*` classes (**61** first-party occurrences) generated from `tailwind.config.js`, while the panels get their primary from `Filament\Support\Colors\Color::Amber` via `app/Support/Brand.php`. The `--bp-muted-*` variables *are* consumed, by the `.bp-muted-*` classes (**21** first-party occurrences). **The primary palette is therefore defined three times and the CSS-variable copy is dead** — worth consolidating during the Tailwind 4 `@theme` conversion, since a v3→v4 config rewrite touches exactly that definition.
+* `resources/views/welcome.blade.php:18` embeds a **precompiled Tailwind v3.4.17 stylesheet inline** (`/* ! tailwindcss v3.4.17 | MIT License */`) as a fallback for when `public/build/manifest.json` and `public/hot` are both absent. It is not processed by Vite and will not be regenerated by the Tailwind 4 migration, so it becomes a stale v3 artifact. Low risk (a scaffold page), but it must not be mistaken for live Tailwind output.
 
-Arbitrary values are supported in Tailwind 4, but under a different resolution
-model for custom properties, so these 57 need visual spot-checking rather than
-mechanical rewriting.
+### 9.5 Committed Filament 3 JavaScript assets — an overlooked migration item
+
+The 16 files under `public/js/filament/**` (§1.5) are `php artisan filament:assets`
+output committed at Filament 3.3.52. They are **not** produced by `npm run build`
+and are **not** covered by `/public/build` being gitignored, so nothing in the
+Vite or Composer pipeline refreshes them automatically.
+
+Two consequences for the migration:
+
+* **They must be re-published at each Filament major step** (`php artisan filament:assets` after PR3 and again after PR4) and the regenerated files committed. If they are not, the browser loads Filament 3 component JavaScript against Filament 4/5 server-rendered markup — a class of breakage that renders without any PHP error and that no existing test would catch.
+* **Five of them call `Livewire.hook`** (`tables/components/table.js`, `notifications/notifications.js`, `forms/components/markdown-editor.js`, `forms/components/color-picker.js`, `widgets/components/chart.js`), the API Livewire 4 deprecates in favour of `interceptMessage` / `interceptRequest`. This is *vendor* code, so the project does not migrate it by hand — but it does mean the committed assets are Livewire-3-generation artifacts, and re-publishing from Filament 5 is the only correct remedy. Note that the repository's own first-party code uses `Livewire.hook` **0** times (§8), so no application-side hook migration is required.
+
+Worth stating plainly because it is easy to misread: the earlier `Livewire.hook`
+and `$wire.` counts in §8 are scoped to `resources/` and `app/`. Including
+`public/js/filament/**` raises `$wire.` from 17 to **30** and `Livewire.hook`
+from 0 to **2 files**. Every one of those additional occurrences is vendor-published
+JavaScript, not project code.
 
 **Dark mode / design tokens.** `design-tokens.css` defines its dark values under
 a plain `.dark { … }` selector, matching Filament's own dark-mode class strategy.
@@ -1613,6 +1651,8 @@ implementation PR (§17) must clear every applicable row before merge.
 | V17 | Localization | uk/ru/en assertions; `validation.required` message contract from `04` | unchanged | — | ● | ● | ● | ● |
 | V18 | **Visual regression** | §16 before/after comparison on both panels | human sign-off | — | — | ● | ● | ● |
 | V19 | Docs tests | `php artisan test --filter=Documentation`, `--filter=ImplementationGaps` | green | ● | ● | ● | ● | ● |
+| V20 | **Filament published JS assets re-published** | `php artisan filament:assets`, then confirm `git status` shows the 16 files under `public/js/filament/**` regenerated and committed | no Filament-3-generation asset survives | — | — | ● | ● | ● |
+| V21 | **Margin-format toggle via `Livewire::current()`** | exercise the margin toggle in both admin and cabinet product tables (9 call sites) | percent/absolute switch still works | — | — | ● | ● | ● |
 
 ---
 
@@ -1720,25 +1760,27 @@ UI has not been touched at all.**
 * **Re-derive the four published vendor Blade overrides against Filament 4** (§7.4), with the `novalidate` test (V11) as the gate.
 * Rename `TOOLBAR_TOGGLE_COLUMN_TRIGGER_AFTER` → `TOOLBAR_COLUMN_MANAGER_TRIGGER_AFTER`; re-verify the `BODY_END` and `STYLES_AFTER` hooks.
 * Verify all 45 `<x-filament*::…>` Blade component usages and every `fi-ta-*` selector in `table-toolbar-overrides.blade.php`.
-* Gates: V1–V6, V8–V12, V17–V19. **V18 (visual) is mandatory here.**
+* **Re-publish the 16 committed Filament JS assets** (`php artisan filament:assets`) and commit the regenerated files (§9.5).
+* Gates: V1–V6, V8–V12, V17–V21. **V18 (visual) is mandatory here.**
 
 ### PR4 — Filament 4 → 5 + Livewire 3 → 4 + Tailwind 4
 
 *The step where the three UI generations move together, because Filament 5 requires Livewire 4 and Tailwind 4.*
 
 * `filament/filament ^5.0`, `livewire/livewire ^4.0`; run `vendor/bin/filament-v5` (which will make the `Resource::can()`/`authorize()`/`getAuthorizationResponse()` `$action` signature change).
-* Livewire 4: change `wire:model.blur` → `wire:model.live.blur` in the re-derived `search-field` fork (§8). Everything else in the guide is not-used or backward-compatible.
-* Tailwind 4: `@tailwindcss/vite` on the existing Vite 6 line; `@import "tailwindcss"` in `app.css`; `content` globs → `@source`; `theme.extend` → `@theme`; drop `autoprefixer` (§9.2, §9.4).
+* Livewire 4: change `wire:model.blur` → `wire:model.live.blur` in the re-derived `search-field` fork (§8). Optionally move the 4 cabinet route registrations to `Route::livewire()`. Everything else in the guide is not-used or backward-compatible.
+* Tailwind 4: `@tailwindcss/vite` on the existing Vite 6 line; `@import "tailwindcss"` in `app.css`; `content` globs → `@source`; `theme.extend` → `@theme`; drop `autoprefixer` (§9.2, §9.4). Audit the **78 renamed-scale utility occurrences** (`shadow-sm` 22, `rounded-sm` 12, `outline-none` 20, `space-y-` 24) and consolidate the triple-defined primary palette (§9.3).
+* **Re-publish the 16 committed Filament JS assets again** from Filament 5 (§9.5).
 * **Resolve the custom-Filament-theme decision (§9.1 Option A vs Option B).** This needs the human decision before merge.
 * Re-derive the four vendor Blade forks **again**, this time against Filament 5's restructured templates — including the fact that `filament-panels::components.form.index` no longer exists and `filament-actions::components.modals` is now 19 lines with no `<form>` (§7.4).
-* Gates: V1–V6, V8–V12, V17–V19. **V18 is mandatory and is the primary gate.**
+* Gates: V1–V6, V8–V12, V17–V21. **V18 is mandatory and is the primary gate.**
 
 ### PR5 — Application compatibility corrections and runtime hardening
 
 * Fix whatever V9–V12 and V18 surfaced in PR3/PR4 that was deferred rather than blocking.
 * Re-verify the full connector runtime contract set end to end: queue lane timings, `WithoutOverlapping` shared locks, `retryUntil()` deadlines, dispatch-failure compensation, stale-row recovery, sanitized failed-job exceptions, SSRF fail-closed transport, `encrypted:array` round-trip, `APP_PREVIOUS_KEYS`.
 * Confirm the discovery manual-trigger gate still behaves per `07-TECH_STACK.md`: hidden (not disabled) while `CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=false`, and refused at the dispatch service even when called directly.
-* Gates: V1–V19.
+* Gates: V1–V21.
 
 ### PR6 — Documentation and GAP-024 closure
 
@@ -1909,19 +1951,29 @@ applicable — verified individually in §10.5, including 0 `upsert`, 0
 `array_first`/`array_last`, 0 `Schema::getTables`, 0 `Storage::disk('local')`,
 0 `JobAttempted`/`QueueBusy` listeners and 0 `env()` calls outside `config/`.
 
-**Livewire:** 6 components in `app/Livewire/Cabinet/**`; 22 `wire:model`
-bindings; exactly **1** `wire:model.blur` needing `.live.blur` (and it sits
-inside a vendor fork); 4 polling sites (2 Filament `->poll('5s')`, 2
-`wire:poll`); 17 `$wire.` references, all inside vendor forks. Not used at all:
-`config/livewire.php`, `<livewire:` tags, `wire:transition`, `wire:scroll`,
-`wire:navigate`, `setUpdateRoute`, `stream()`, Livewire JS hooks, Volt.
+**Livewire:** 6 components in `app/Livewire/Cabinet/**`, **all 4 page-level ones
+registered as route classes in `routes/web.php`** (recommended, not required, move
+to `Route::livewire()`); 22 `wire:model` bindings; exactly **1**
+`wire:model.blur` needing `.live.blur` (and it sits inside a vendor fork); 4
+polling sites (2 Filament `->poll('5s')`, 2 `wire:poll`); 9 `Livewire::current()`
+calls in the two `ProductResource` classes and `quantity-order.blade.php`
+(regression-test the margin-format toggle); 17 first-party `$wire.` references,
+all inside vendor forks. Not used at all: `config/livewire.php`, `<livewire:`
+tags, `wire:transition`, `wire:scroll`, `wire:navigate`, `setUpdateRoute`,
+`stream()`, first-party Livewire JS hooks, Volt.
 
 **Frontend:** `tailwind.config.js`, `postcss.config.js`, `vite.config.js`,
 `resources/css/app.css`. **`resources/css/design-tokens.css` needs no change** —
 38 lines of plain CSS custom properties with no `@apply`, `@layer` or `theme()`,
-injected via `file_get_contents()` rather than compiled. Zero occurrences of
-every Tailwind-v4-removed utility checked. 190 `dark:` variants and 57
-arbitrary-value utilities need visual spot-checking rather than rewriting.
+injected via `file_get_contents()` rather than compiled (though its
+`--color-primary-*` block is dead code worth consolidating). Zero occurrences of
+every Tailwind-v4-*removed* utility checked, but **78 occurrences of v4-*renamed*
+scale utilities** (`shadow-sm` 22, `rounded-sm` 12, `outline-none` 20, `space-y-`
+24) plus 190 `dark:` variants and 57 arbitrary-value utilities needing visual
+spot-checking. **16 committed Filament 3 JS assets under `public/js/filament/**`
+must be re-published at each Filament major step** — not covered by
+`npm run build`, not covered by the gitignored `public/build`, and invisible to
+every existing test.
 
 **Tests:** 149 files (67 Feature, 80 Unit), 1303 passing / 2 skipped at
 baseline. 23 reference Filament; only 2 use `Livewire::test` — a coverage gap
@@ -2100,5 +2152,6 @@ each checked inside the UTC window declared at the top.
 * `config/cache.php`, `config/database.php`, `config/session.php`, `config/queue.php`, `config/connectors.php`
 * `resources/views/vendor/filament-tables/index.blade.php`, `resources/views/vendor/filament-tables/components/search-field.blade.php`, `resources/views/vendor/filament-actions/components/modals.blade.php`, `resources/views/vendor/filament-panels/components/form/index.blade.php`
 * `resources/views/filament/**` (13 files), `resources/views/components/filament/data-list-toolbar.blade.php`, `resources/views/layouts/cabinet.blade.php`, `resources/views/welcome.blade.php`
+* `routes/web.php` (4 Livewire route-class registrations), `resources/views/livewire/cabinet/**` (6 views), `public/js/filament/**` (16 committed Filament 3 published assets)
 * `docker/php/Dockerfile`, `docker/nginx/default.conf`, `docker-compose.yml`, `deploy.sh`, `DEPLOY.md`, `scripts/cloud-setup.sh`
 * `.github/workflows/mysql-tests.yml`, `.github/workflows/deploy.yml`, `phpunit.xml`, `phpunit.mysql.xml`, `tests/**` (149 files)
