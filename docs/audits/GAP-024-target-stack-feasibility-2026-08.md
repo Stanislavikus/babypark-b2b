@@ -1242,17 +1242,48 @@ changes this, so the mitigation remains necessary and remains sufficient.
 `QueueBusy::$connection` → `$connectionName` are both **Low** impact in the
 Laravel 13 guide. Repository listeners for either: **0**. Not applicable.
 
-**HTTP client.** Laravel 13 changes only `Response::throw`/`throwIf` signatures
-(**Very Low**, affecting overriders of custom response classes). The connector
-transport uses the standard `Http` facade with `withOptions`/`timeout`/
-`connectTimeout` plus Guzzle's raw `curl` option array — per `07-TECH_STACK.md`,
-`['curl' => [CURLOPT_RESOLVE => ["{host}:{port}:{ip}"]]]` with a fail-closed
-check that Guzzle's cURL handler (not `StreamHandler`) is in use. Guzzle moves
-`7.10.6 → 7.15.3` inside the same major; the cURL handler and raw-option
-passthrough are unchanged. **Classification: compatible, but the fail-closed
-handler assertion is exactly the kind of behavior a Guzzle minor bump can
-perturb, so its existing test must be re-run** (Architecture Review Checklist
-item 21).
+**HTTP client — the connector transport does not use Laravel's HTTP client at all.**
+`Http::` facade occurrences in `app/`: **0**. `Illuminate\Http\Client\*` imports in
+`app/`: **0**. The connector transport instead depends on **Guzzle directly**, with
+11 `GuzzleHttp\*` imports across 5 files:
+`app/Support/Connectors/Transport/Internal/ConnectorRequestSenderImpl.php` (5 —
+`Client`, `Exception\{ConnectException,RequestException,TransferException}`,
+`Promise\PromiseInterface` in an `on_headers` callback),
+`app/Support/Connectors/Transport/Curl/DefaultCurlClientFactory.php` (3 —
+`Client`, `Handler\CurlHandler`, `HandlerStack`),
+`app/Support/Connectors/Transport/Curl/CurlClientFactory.php` (1),
+`app/Support/Connectors/AdobePaaS/AdobePaaSDiscoveryRequestFactory.php` (1) and
+`AdobePaaSConnectionCheckRequestFactory.php` (1). `DefaultCurlClientFactory::create()`
+builds `new Client(array_merge(['handler' => HandlerStack::create(new CurlHandler)], …))`
+after an `extension_loaded('curl')` guard, and `ConnectorRequestSenderImpl:101` sets
+`$options['curl'][\CURLOPT_RESOLVE]` — exactly the mechanism `07-TECH_STACK.md`
+specifies.
+
+Two consequences, pulling in opposite directions:
+
+* **Laravel 13's `Response::throw`/`throwIf` signature change is definitively not applicable** — the project never touches `Illuminate\Http\Client`. That removes the HTTP-client row from the framework migration surface entirely.
+* **But the transport is more directly exposed to the Guzzle `7.10.6 → 7.15.3` bump than a `Http`-facade consumer would be**, because it depends on Guzzle's own `HandlerStack`, `CurlHandler`, `on_headers` streaming callback and raw `curl` option passthrough rather than on Laravel's stable wrapper. Guzzle **7.15.2** is the release that fixed `PKSA-gcrk-3vtt-1r14` / CVE-2026-69246, "Noncanonical host can bypass host-based checks" (§14.1) — precisely the bug class an SSRF host-validation layer depends on being absent. **Classification: compatible, and the Guzzle bump is security-desirable here rather than merely incidental — but the fail-closed `CurlHandler`-vs-`StreamHandler` assertion is exactly the behavior a Guzzle minor bump can perturb, so its existing test must be re-run** (Architecture Review Checklist item 21).
+
+**Guzzle is a direct code dependency but not a direct Composer dependency.**
+`composer.json` declares `guzzlehttp/guzzle` in neither `require` nor
+`require-dev`; the package is present only transitively via `laravel/framework`.
+The solver output in §4.1 states this literally:
+
+```console
+laravel/laravel  dev-develop does not require guzzlehttp/guzzle (but 7.10.6 is installed)
+```
+
+Because `app/Support/Connectors/**` imports `GuzzleHttp\*` classes in 11 places,
+the SSRF-safe transport's correctness currently rests on a version constraint the
+project does not control. Laravel 13 requires `guzzlehttp/guzzle ^7.8.2`, so the
+target state happens to be satisfied — but a future framework change to that
+constraint, or a framework release that drops Guzzle, would silently move the
+transport's floor. **`guzzlehttp/guzzle` should be promoted to an explicit direct
+`require` entry as part of PR2**, pinned to at least `^7.15.2` so the
+host-canonicalization fix is a stated project requirement rather than an accident
+of Laravel's own dependency tree. This is the same class of mistake
+`07-TECH_STACK.md` already guards against for the OAuth1 signer (depending on a
+third-party library's classes rather than an owned port).
 
 **Connector secret lifecycle.** `encrypted:array` casts, `APP_PREVIOUS_KEYS`
 rotation and the "jobs carry IDs, not decrypted credentials" rule are untouched
@@ -1281,7 +1312,7 @@ compatibility verification only.
 | L13 `Container::call` nullable class defaults | Low | No method-injection reliance on container-resolved nullable class params | Not applicable |
 | L13 `Manager::extend` callback binding | Low | No custom driver `extend` closures in `app/Providers/**` | Not applicable |
 | L13 domain-route precedence | Low | No `->domain()` routes | Not applicable |
-| L13 `withScheduling()` deferral | Very Low | Scheduling lives in `routes/console.php`, not `withScheduling()` | Not applicable |
+| L13 `withScheduling()` deferral | Very Low | **Applies.** `bootstrap/app.php:13` uses `->withSchedule(fn ($schedule) => $schedule->command('reservations:expire')->everyMinute()->withoutOverlapping())`. `routes/console.php` contains only the stock `inspire` command and registers no schedule. Laravel 13's `ApplicationBuilder` declares `public function withSchedule(callable $callback)` (line 375) and has no separate `withScheduling()` method, so the guide's wording refers to this same builder entry point | **Applies, but no change required.** The guide's condition is "if your application relied on immediate schedule registration timing during bootstrap" — this registration is purely declarative and reads nothing at bootstrap. **Regression check:** confirm `reservations:expire` still fires every minute and still honours `withoutOverlapping()` after the upgrade, since deferred registration changes *when* the closure runs |
 | L13 pagination Bootstrap-3 view renames | Low | No direct `pagination::default` references | Not applicable |
 | L13 `Str` factories reset between tests | Low | No custom `Str::createUuidsUsing`-style factories | Not applicable |
 | L13 model booting / nested instantiation `LogicException` | Very Low | No model instantiation inside `boot*()` | Not applicable |
@@ -1298,9 +1329,24 @@ compatibility verification only.
 | **L12** route-name precedence unification | Low | No duplicate route names relied upon | Not applicable |
 | **L12** `Concurrency::run` keyed results | Low | No `Concurrency` usage | Not applicable |
 
-Also verified: **`env()` calls outside `config/**`: 0**, so `config:cache` remains
-safe in production — the standing requirement recorded in `07-TECH_STACK.md`
-("never call `env()` directly outside the config file") still holds.
+Also verified: **`env()` calls in `app/`, `bootstrap/`, `routes/` and `database/`: 0**,
+so `config:cache` remains safe in production — the standing requirement recorded in
+`07-TECH_STACK.md` ("never call `env()` directly outside the config file") still
+holds for all runtime code. There is exactly **one** `env()` call outside
+`config/**` anywhere in the repository, at
+`tests/Feature/Connectors/ConnectorQueueRuntimeAlignmentTest.php:48`
+(`env('DB_QUEUE_TABLE', 'jobs')`), which is test-only and cannot affect a cached
+production config.
+
+**Migration driver branching is the sharpest database-compatibility risk.** Across
+**39** migration files there are **37** `getDriverName()` checks and **18**
+`DB::statement` calls, concentrated in the connector foundation, pricing,
+availability and the contractors→customers rename migrations. None of the
+Laravel 12/13 schema changes listed above touch that code, but a framework jump is
+exactly when hand-written MySQL-vs-SQLite branches diverge silently. This is why
+verification layer **V7 requires `migrate:fresh --seed` on both SQLite *and*
+MySQL 8**, not just the default driver, and why the two MySQL-isolated migration
+tests (§15.2) matter disproportionately.
 
 **Net assessment: the Laravel 11 → 13 step is low-risk for this codebase.**
 Exactly one High-impact item applies (`VerifyCsrfToken` → `PreventRequestForgery`,
@@ -1607,7 +1653,21 @@ $ php artisan test
   Duration: 51.12s
 ```
 
-149 test files: 67 under `tests/Feature`, 80 under `tests/Unit`.
+149 test files, totalling **1305** test methods (`php artisan test --list-tests`):
+80 under `tests/Unit`, 67 under `tests/Feature`, and **2 under
+`tests/Integration/MySql`** (`ProductTagWorkspaceForeignKeyTest`,
+`WorkspaceTaxDefaultsMigrationTest`).
+
+Note that `phpunit.mysql.xml` defines a deliberately **isolated** `MySQLMigration`
+suite containing only `tests/Feature/CustomerRenameMigrationTest.php` and
+`tests/Feature/FieldFoundationMigrationTest.php`, with a committed comment
+explaining why: "MySQL migration tests that run raw DDL must not share a PHPUnit
+run with ordinary `RefreshDatabase` tests: DDL on MySQL implicitly commits any
+open transaction and breaks isolation for every subsequent test in the same run."
+The CI workflow reaches those tests via `--filter` rather than by using
+`phpunit.mysql.xml`, so **the isolation contract that file documents is currently
+enforced by convention, not by CI configuration** — worth preserving deliberately
+when the migration adds or reorders MySQL test steps.
 
 ### 15.2 Classification of the affected test surface
 
@@ -1743,7 +1803,8 @@ taken.
 * Resolve the **`HasUuids` UUIDv4-vs-UUIDv7 decision** for the 18 affected models and implement it explicitly (§10.3). **This needs the human decision before merge.**
 * Optionally add `'serializable_classes' => false` to `config/cache.php` as hardening (§10.2).
 * Re-verify the connector queue lane alignment against `config/queue.php` and the process manager, per the standing `07-TECH_STACK.md` instruction (§10.4).
-* Re-run the SSRF fail-closed and encrypted-credential tests after the Guzzle `7.15.3` bump.
+* **Promote `guzzlehttp/guzzle` to an explicit direct `require` entry** at `^7.15.2` or higher (§10.4): `app/Support/Connectors/**` imports `GuzzleHttp\*` in 11 places while the package is only a transitive Laravel dependency.
+* Re-run the SSRF fail-closed `CurlHandler` assertion and the encrypted-credential round-trip after the Guzzle `7.15.3` bump.
 * Gates: V1–V10, V13–V17, V19.
 
 **After PR2 the project is on a fully supported framework with the unfixable
@@ -1877,6 +1938,12 @@ which is directly relevant to the SSRF transport); `guzzlehttp/psr7` → `2.13.0
 `spatie/color` — all v3-only `filament/*` dependencies. The Filament v4 guide
 notes `doctrine/dbal` must be re-added explicitly if the *application* needs it;
 this project has no direct usage.
+
+**Must be promoted to a direct dependency:** `guzzlehttp/guzzle` — imported
+directly by `app/Support/Connectors/**` in 11 places, but declared in neither
+`require` nor `require-dev`. Add it explicitly at `^7.15.2`+ so the
+host-canonicalization fix behind CVE-2026-69246 is a stated project requirement
+rather than an accident of Laravel's dependency tree (§10.4).
 
 **Must be investigated, not silently changed:** `spatie/laravel-permission` —
 **not a blocker** (the locked `6.25.0` already declares `illuminate/* …|^13.0`),
