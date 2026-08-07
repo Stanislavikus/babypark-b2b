@@ -43,6 +43,7 @@ class AdobePaaSPilotPayloadDiscoveryTest extends TestCase
         $candidate = $first->snapshotCandidate;
         $this->assertSame(MagentoPilotAttributesDiscoveryFixture::RECEIVED_COUNT, $candidate->fieldsReceived());
         $this->assertSame(MagentoPilotAttributesDiscoveryFixture::NORMALIZED_COUNT, $candidate->fieldsNormalized());
+        $this->assertCount(MagentoPilotAttributesDiscoveryFixture::NORMALIZED_COUNT, $candidate->fields);
         $this->assertSame($first->snapshotCandidate->canonicalHash, $second->snapshotCandidate->canonicalHash);
 
         $keys = array_map(

@@ -4,6 +4,8 @@ namespace Tests\Support\Connectors\Fixtures;
 
 final class MagentoPilotAttributesDiscoveryFixture
 {
+    private const FIXTURE_FILENAME = 'magento_pilot_attributes_discovery_real.json';
+
     public const RECEIVED_COUNT = 106;
 
     public const NORMALIZED_COUNT = 102;
@@ -32,16 +34,7 @@ final class MagentoPilotAttributesDiscoveryFixture
      */
     public static function allItems(): array
     {
-        $items = array_merge(
-            self::merchantFacingItems(),
-            self::serviceOnlyItems(),
-        );
-
-        if (count($items) !== self::RECEIVED_COUNT) {
-            throw new \LogicException('Fixture item count drifted from the pilot payload contract.');
-        }
-
-        return $items;
+        return self::freshItems(self::canonicalPayload()->items);
     }
 
     /**
@@ -49,9 +42,11 @@ final class MagentoPilotAttributesDiscoveryFixture
      */
     public static function singlePageResponse(): array
     {
+        $payload = self::canonicalPayload();
+
         return [
-            'items' => self::allItems(),
-            'total_count' => self::RECEIVED_COUNT,
+            'items' => self::freshItems($payload->items),
+            'total_count' => $payload->total_count,
         ];
     }
 
@@ -60,7 +55,8 @@ final class MagentoPilotAttributesDiscoveryFixture
      */
     public static function paginatedResponse(int $firstPageSize = 60): array
     {
-        $items = self::allItems();
+        $payload = self::canonicalPayload();
+        $items = self::freshItems($payload->items);
         $firstPage = array_slice($items, 0, $firstPageSize);
         $secondPage = array_slice($items, $firstPageSize);
 
@@ -68,143 +64,107 @@ final class MagentoPilotAttributesDiscoveryFixture
             'pages' => [
                 [
                     'items' => $firstPage,
-                    'total_count' => self::RECEIVED_COUNT,
+                    'total_count' => $payload->total_count,
                 ],
                 [
                     'items' => $secondPage,
-                    'total_count' => self::RECEIVED_COUNT,
+                    'total_count' => $payload->total_count,
                 ],
             ],
-            'total_count' => self::RECEIVED_COUNT,
+            'total_count' => $payload->total_count,
         ];
     }
 
-    /**
-     * @return list<\stdClass>
-     */
-    private static function merchantFacingItems(): array
+    private static function fixturePath(): string
     {
-        $frontendInputs = [
-            'text', 'textarea', 'texteditor', 'date', 'datetime', 'boolean',
-            'select', 'multiselect', 'price', 'media_image', 'gallery', 'weight',
-        ];
+        return __DIR__.'/'.self::FIXTURE_FILENAME;
+    }
 
-        $scopes = ['global', 'website', 'store'];
-        $items = [];
+    private static function rawJson(): string
+    {
+        static $json = null;
 
-        $items[] = self::attribute(
-            'created_at',
-            'datetime',
-            'global',
-            isVisible: false,
-            label: 'Created At',
-        );
-        $items[] = self::attribute(
-            'minimal_price',
-            'price',
-            'global',
-            isVisible: false,
-            label: 'Minimal Price',
-        );
-        $items[] = self::attribute(
-            'url_path',
-            'text',
-            'store',
-            isVisible: false,
-            label: 'URL Path',
-        );
+        if ($json !== null) {
+            return $json;
+        }
 
-        for ($index = 0; $index < 99; $index++) {
-            $code = sprintf('fixture_attr_%03d', $index + 1);
-            $frontendInput = $frontendInputs[$index % count($frontendInputs)];
-            $scope = $scopes[$index % count($scopes)];
-            $options = in_array($frontendInput, ['select', 'multiselect'], true)
-                ? [
-                    ['label' => 'Option A', 'value' => 'a'],
-                    ['label' => 'Option B', 'value' => 'b'],
-                ]
-                : null;
+        $path = self::fixturePath();
 
-            $items[] = self::attribute(
-                $code,
-                $frontendInput,
-                $scope,
-                isVisible: $index % 7 !== 0,
-                label: 'Fixture Attribute '.$index,
-                options: $options,
-                position: $index,
+        if (! is_readable($path)) {
+            throw new \RuntimeException(sprintf(
+                'Magento pilot attributes discovery fixture is unreadable at [%s].',
+                $path,
+            ));
+        }
+
+        $contents = file_get_contents($path);
+
+        if ($contents === false) {
+            throw new \RuntimeException(sprintf(
+                'Magento pilot attributes discovery fixture could not be read from [%s].',
+                $path,
+            ));
+        }
+
+        $json = $contents;
+
+        return $json;
+    }
+
+    private static function canonicalPayload(): \stdClass
+    {
+        try {
+            $payload = json_decode(self::rawJson(), false, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $exception) {
+            throw new \RuntimeException(
+                'Magento pilot attributes discovery fixture contains malformed JSON.',
+                previous: $exception,
             );
         }
 
-        if (count($items) !== self::NORMALIZED_COUNT) {
-            throw new \LogicException('Fixture normalized item count drifted from the pilot payload contract.');
+        if (! $payload instanceof \stdClass) {
+            throw new \RuntimeException('Magento pilot attributes discovery fixture root must be a JSON object.');
         }
 
-        return $items;
+        if (! property_exists($payload, 'total_count') || ! is_int($payload->total_count)) {
+            throw new \RuntimeException('Magento pilot attributes discovery fixture must contain integer total_count.');
+        }
+
+        if ($payload->total_count !== self::RECEIVED_COUNT) {
+            throw new \RuntimeException(sprintf(
+                'Magento pilot attributes discovery fixture total_count must be %d.',
+                self::RECEIVED_COUNT,
+            ));
+        }
+
+        if (! property_exists($payload, 'items') || ! is_array($payload->items) || ! array_is_list($payload->items)) {
+            throw new \RuntimeException('Magento pilot attributes discovery fixture must contain a list of items.');
+        }
+
+        if (count($payload->items) !== self::RECEIVED_COUNT) {
+            throw new \RuntimeException(sprintf(
+                'Magento pilot attributes discovery fixture must contain exactly %d items.',
+                self::RECEIVED_COUNT,
+            ));
+        }
+
+        return $payload;
     }
 
     /**
+     * @param  list<mixed>  $items
      * @return list<\stdClass>
      */
-    private static function serviceOnlyItems(): array
+    private static function freshItems(array $items): array
     {
-        $items = [];
-
-        foreach (self::SERVICE_ONLY_ATTRIBUTE_CODES as $attributeCode) {
-            $items[] = self::serviceOnlyAttribute($attributeCode);
-        }
-
-        return $items;
-    }
-
-    /**
-     * @param  ?list<array{label: string, value: string}>  $options
-     */
-    private static function attribute(
-        string $attributeCode,
-        string $frontendInput,
-        string $scope,
-        bool $isVisible = true,
-        ?string $label = null,
-        ?array $options = null,
-        ?int $position = null,
-    ): \stdClass {
-        $payload = [
-            'attribute_code' => $attributeCode,
-            'frontend_input' => $frontendInput,
-            'scope' => $scope,
-            'is_user_defined' => false,
-            'is_visible' => $isVisible,
-            'default_frontend_label' => $label,
-            'is_required' => $attributeCode === 'fixture_attr_001',
-            'backend_type' => 'varchar',
-            'apply_to' => [],
-        ];
-
-        if ($position !== null) {
-            $payload['position'] = $position;
-        }
-
-        if ($options !== null) {
-            $payload['options'] = $options;
-        }
-
-        return json_decode(json_encode($payload, JSON_THROW_ON_ERROR), false, 512, JSON_THROW_ON_ERROR);
-    }
-
-    private static function serviceOnlyAttribute(string $attributeCode): \stdClass
-    {
-        $payload = [
-            'attribute_code' => $attributeCode,
-            'frontend_input' => null,
-            'scope' => 'global',
-            'is_user_defined' => false,
-            'is_visible' => false,
-            'default_frontend_label' => null,
-            'backend_type' => in_array($attributeCode, ['links_purchased_separately', 'links_exist'], true) ? 'int' : 'varchar',
-            'apply_to' => ['downloadable'],
-        ];
-
-        return json_decode(json_encode($payload, JSON_THROW_ON_ERROR), false, 512, JSON_THROW_ON_ERROR);
+        return array_map(
+            static fn (mixed $item): \stdClass => json_decode(
+                json_encode($item, JSON_THROW_ON_ERROR),
+                false,
+                512,
+                JSON_THROW_ON_ERROR,
+            ),
+            $items,
+        );
     }
 }

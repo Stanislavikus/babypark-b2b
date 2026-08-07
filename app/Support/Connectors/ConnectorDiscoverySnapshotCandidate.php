@@ -39,10 +39,6 @@ final readonly class ConnectorDiscoverySnapshotCandidate
 
         $fieldsNormalized = count($fields);
 
-        if ($fieldsNormalized < 0) {
-            throw new \InvalidArgumentException('fieldsNormalized must not be negative.');
-        }
-
         if ($fieldsReceived < $fieldsNormalized) {
             throw new \InvalidArgumentException('fieldsReceived must be greater than or equal to fieldsNormalized.');
         }
