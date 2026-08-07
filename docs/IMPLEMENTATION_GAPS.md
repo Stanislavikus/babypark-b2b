@@ -386,10 +386,10 @@ complete: this PR adds `php artisan queue:restart` to `deploy.sh`, and the
 pilot host was verified on 2026-07-31 to use the `database` cache store
 with a running Supervisor-managed default worker and `autorestart=true`.
 
-The amended `deploy.sh` has not yet been executed on the production host
-because this PR has not been merged or deployed. Its first real execution
-belongs to the normal post-merge deployment verification and is not
-evidence that the dedicated connector worker is installed.
+Historical state at the time of this verification: the amended `deploy.sh`
+had not yet been executed on the production host because the PR had not yet
+been merged or deployed. Its future first execution was not evidence that the
+dedicated connector worker had been installed.
 
 Verified on 2026-07-31 (pilot host):
 - existing `babypark-queue:babypark-queue_00` confirmed `RUNNING`;

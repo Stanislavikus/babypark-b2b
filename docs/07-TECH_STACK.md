@@ -376,8 +376,9 @@ For every connector queue lane:
   connector queue connection still uses a shorter `retry_after` — verify and,
   if needed, raise `retry_after` for the connector queue connection before
   enabling discovery. Task 4B-2a establishes and verifies the queue/worker
-  foundation required for connection checks; Task 4B-2b-0 adds the
-  `database_connectors` / `connectors` lane prepared for discovery execution.
+  foundation required for connection checks; Task 4B-2b-0 added the
+  `database_connectors` / `connectors` lane, and the merged 4B-2b backend
+  discovery runtime now executes on that lane.
 
 The exact production values must be verified against `config/queue.php` and
 the process-manager (`supervisor`/`docker-compose`) worker command — do not
@@ -389,8 +390,7 @@ connection-check job timeout = 45s; lock `expireAfter` = 120s; default-lane
 `php artisan queue:work --sleep=3 --tries=3 --max-time=3600`; `pcntl` present
 in `docker/php/Dockerfile`; `cache_locks` table from standard cache migration.
 
-**Implemented discovery lane (Task 4B-2b-0 queue foundation + Task 4B-2b
-discovery runtime, PRs #96/#98–#102):** `database_connectors` connection with
+**Implemented discovery lane (Task 4B-2b-0 queue foundation + Task 4B-2b backend discovery runtime, PRs #96/#98–#102):** `database_connectors` connection with
 `retry_after` = 1200s (`CONNECTOR_QUEUE_RETRY_AFTER`); `ConnectorDiscoveryRunJob`
 on queue `connectors`; dedicated worker command
 `php artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600`
