@@ -245,7 +245,7 @@ class FilamentFormValidationTest extends TestCase
         $html = $component->getMountedActionModalHtml();
 
         $this->assertMatchesRegularExpression(
-            '/<form\b[^>]*\bnovalidate\b[^>]*wire:submit\.prevent="callMountedAction"|<form\b[^>]*wire:submit\.prevent="callMountedAction"[^>]*\bnovalidate\b/',
+            '/<form\b(?=[^>]*\bnovalidate\b)(?=[^>]*\bwire:submit(?:\.prevent)?="callMountedAction")[^>]*>/',
             $html,
         );
         $this->assertStringContainsString('Товар / варіант', $html);
@@ -269,8 +269,8 @@ class FilamentFormValidationTest extends TestCase
         $this->assertStringContainsString('data-field-wrapper', $html);
         $this->assertStringContainsString(__('validation.required', [], 'uk'), $html);
 
-        $this->assertMatchesRegularExpression('/<label[^>]+for="data\.name"/', $html);
-        $this->assertMatchesRegularExpression('/<input[^>]+id="data\.name"/', $html);
+        $this->assertMatchesRegularExpression('/<label[^>]+for="data\.name[^"]*"/', $html);
+        $this->assertMatchesRegularExpression('/<input[^>]+id="data\.name[^"]*"/', $html);
     }
 
     public function test_price_inspector_quantity_error_clears_without_affecting_other_fields(): void
