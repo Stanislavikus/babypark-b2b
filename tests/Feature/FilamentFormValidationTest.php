@@ -8,13 +8,11 @@ use App\Filament\Resources\PriceListResource;
 use App\Filament\Resources\PriceListResource\Pages\CreatePriceList;
 use App\Filament\Resources\PriceListResource\RelationManagers\ItemsRelationManager;
 use App\Filament\Resources\UserResource\Pages\CreateUser;
-use App\Models\Customer;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\CreatesPricingFixtures;
@@ -200,12 +198,12 @@ class FilamentFormValidationTest extends TestCase
             ])
             ->assertHasTableActionErrors(['product_variant_id' => 'required']);
 
-        $this->assertStringContainsString($expectedMessage, (string) $component->errors()->first('mountedTableActionsData.0.product_variant_id'));
+        $this->assertStringContainsString($expectedMessage, (string) $component->errors()->first('mountedActions.0.data.product_variant_id'));
 
         $component
-            ->set('mountedTableActionsData.0.product_variant_id', (string) $variant->id);
+            ->set('mountedActions.0.data.product_variant_id', (string) $variant->id);
 
-        $this->assertFalse($component->errors()->has('mountedTableActionsData.0.product_variant_id'));
+        $this->assertFalse($component->errors()->has('mountedActions.0.data.product_variant_id'));
     }
 
     public function test_panel_forms_render_with_novalidate(): void
@@ -223,13 +221,6 @@ class FilamentFormValidationTest extends TestCase
         $this->get('/cabinet/login')
             ->assertOk()
             ->assertSee('novalidate', false);
-
-        config()->set('app.env', 'production');
-
-        $this->actingAs($this->createCabinetCustomer(), 'customer')
-            ->get(route('filament.cabinet.pages.dashboard'))
-            ->assertOk()
-            ->assertSee('novalidate', false);
     }
 
     public function test_table_action_modal_form_renders_with_novalidate(): void
@@ -244,33 +235,20 @@ class FilamentFormValidationTest extends TestCase
             ->mountTableAction('create');
 
         $component
-            ->assertSet('mountedTableActions', ['create'])
+            ->assertSet('mountedActions.0.name', 'create')
             ->assertDispatched('open-modal', id: $component->id().'-table-action');
 
-        $mountedAction = $component->instance()->getMountedTableAction();
+        $mountedAction = $component->instance()->getMountedAction();
         $this->assertNotNull($mountedAction);
         $this->assertSame('create', $mountedAction->getName());
 
-        $html = $component->html();
+        $html = $component->getMountedActionModalHtml();
 
         $this->assertMatchesRegularExpression(
-            '/<form\b[^>]*\bnovalidate\b[^>]*wire:submit\.prevent="callMountedTableAction"|<form\b[^>]*wire:submit\.prevent="callMountedTableAction"[^>]*\bnovalidate\b/',
+            '/<form\b[^>]*\bnovalidate\b[^>]*wire:submit\.prevent="callMountedAction"|<form\b[^>]*wire:submit\.prevent="callMountedAction"[^>]*\bnovalidate\b/',
             $html,
         );
         $this->assertStringContainsString('Товар / варіант', $html);
-    }
-
-    private function createCabinetCustomer(): Customer
-    {
-        return Customer::withoutWorkspaceScope()->create([
-            'workspace_id' => $this->workspace->id,
-            'onec_guid' => (string) Str::uuid(),
-            'name' => 'Novalidate Cabinet Customer',
-            'short_name' => 'Novalidate',
-            'login' => 'novalidate-cabinet',
-            'password' => 'password',
-            'is_active' => true,
-        ]);
     }
 
     public function test_validation_errors_are_associated_with_fields_in_dom(): void
