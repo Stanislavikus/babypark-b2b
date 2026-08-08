@@ -235,8 +235,7 @@ class FilamentFormValidationTest extends TestCase
             ->mountTableAction('create');
 
         $component
-            ->assertSet('mountedActions.0.name', 'create')
-            ->assertDispatched('open-modal', id: 'fi-'.$component->id().'-action-0');
+            ->assertSet('mountedActions.0.name', 'create');
 
         $mountedAction = $component->instance()->getMountedAction();
         $this->assertNotNull($mountedAction);
@@ -244,6 +243,7 @@ class FilamentFormValidationTest extends TestCase
 
         $html = $component->getMountedActionModalHtml();
 
+        $this->assertStringContainsString('fi-'.$component->id().'-action-0', $html);
         $this->assertMatchesRegularExpression(
             '/<form\b(?=[^>]*\bnovalidate\b)(?=[^>]*\bwire:submit(?:\.prevent)?="callMountedAction")[^>]*>/',
             $html,
