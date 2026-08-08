@@ -3,16 +3,19 @@
 namespace Tests\Feature;
 
 use App\Enums\UserRole;
+use App\Filament\Cabinet\Resources\ProductResource\Pages\ListProducts as CabinetListProducts;
 use App\Filament\Pages\PriceInspector;
 use App\Filament\Resources\PriceListResource;
 use App\Filament\Resources\PriceListResource\Pages\CreatePriceList;
 use App\Filament\Resources\PriceListResource\RelationManagers\ItemsRelationManager;
 use App\Filament\Resources\UserResource\Pages\CreateUser;
+use App\Models\Customer;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\Concerns\CreatesPricingFixtures;
 use Tests\TestCase;
@@ -228,6 +231,49 @@ class FilamentFormValidationTest extends TestCase
             ->get('/admin/price-inspector')
             ->assertOk()
             ->assertSee('novalidate', false);
+
+        $customer = $this->createCabinetCustomer();
+
+        $this->get('/cabinet/login')
+            ->assertOk()
+            ->assertSee('novalidate', false);
+
+        Filament::setCurrentPanel(Filament::getPanel('cabinet'));
+
+        $cabinetHtml = Livewire::actingAs($customer, 'customer')
+            ->test(CabinetListProducts::class)
+            ->assertOk()
+            ->html();
+
+        $this->assertStringContainsString('novalidate', $cabinetHtml);
+    }
+
+    public function test_table_action_modal_form_renders_with_novalidate(): void
+    {
+        $list = $this->createPriceList($this->workspace);
+
+        $html = Livewire::actingAs($this->admin)
+            ->test(ItemsRelationManager::class, [
+                'ownerRecord' => $list,
+                'pageClass' => PriceListResource\Pages\EditPriceList::class,
+            ])
+            ->mountTableAction('create')
+            ->html();
+
+        $this->assertStringContainsString('novalidate', $html);
+    }
+
+    private function createCabinetCustomer(): Customer
+    {
+        return Customer::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'name' => 'Novalidate Cabinet Customer',
+            'short_name' => 'Novalidate',
+            'login' => 'novalidate-cabinet',
+            'password' => 'password',
+            'is_active' => true,
+        ]);
     }
 
     public function test_validation_errors_are_associated_with_fields_in_dom(): void
