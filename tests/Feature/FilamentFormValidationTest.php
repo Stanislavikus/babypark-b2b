@@ -247,15 +247,28 @@ class FilamentFormValidationTest extends TestCase
     {
         $list = $this->createPriceList($this->workspace);
 
-        $html = Livewire::actingAs($this->admin)
+        $component = Livewire::actingAs($this->admin)
             ->test(ItemsRelationManager::class, [
                 'ownerRecord' => $list,
                 'pageClass' => PriceListResource\Pages\EditPriceList::class,
             ])
-            ->mountTableAction('create')
-            ->html();
+            ->mountTableAction('create');
 
-        $this->assertStringContainsString('novalidate', $html);
+        $component
+            ->assertSet('mountedTableActions', ['create'])
+            ->assertDispatched('open-modal', id: $component->id().'-table-action');
+
+        $mountedAction = $component->instance()->getMountedTableAction();
+        $this->assertNotNull($mountedAction);
+        $this->assertSame('create', $mountedAction->getName());
+
+        $html = $component->html();
+
+        $this->assertMatchesRegularExpression(
+            '/<form\b[^>]*\bnovalidate\b[^>]*wire:submit\.prevent="callMountedTableAction"|<form\b[^>]*wire:submit\.prevent="callMountedTableAction"[^>]*\bnovalidate\b/',
+            $html,
+        );
+        $this->assertStringContainsString('Товар / варіант', $html);
     }
 
     private function createCabinetCustomer(): Customer
