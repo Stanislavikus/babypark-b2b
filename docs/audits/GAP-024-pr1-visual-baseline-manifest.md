@@ -28,17 +28,23 @@ captured them during GAP-024 PR1.
 
 ## Surfaces captured (audit §16 mapping)
 
+PR1 capture set at `/opt/cursor/artifacts/gap-024-baseline/` (11 files from the
+final baseline run on `b45e013`; an earlier partial capture with overlapping
+surfaces also exists in the same directory):
+
 | # | Surface | Route / context | Theme | File |
 |---|---------|-----------------|-------|------|
-| 1 | Admin login | `/admin/login` | Light | `01-admin-login-light.webp` |
-| 2 | Cabinet login | `/cabinet/login` | Light | `02-cabinet-login-light.webp` |
-| 3 | Admin dashboard | `/admin` | Light | `03-admin-dashboard-light.webp` |
-| 4 | Admin products table | `/admin/products` | Light | `04-admin-products-table-light.webp` |
-| 5 | Admin price lists | `/admin/price-lists` | Light | `05-admin-price-lists-light.webp` |
-| 6 | Admin customer edit form | customer edit page | Light | `06-admin-customer-edit-form-light.webp` |
+| 1 | Admin login | `/admin/login` | Light | `01-admin-login.webp` |
+| 2 | Admin login (form) | `/admin/login` | Light | `02-admin-login-form.webp` |
+| 3 | Admin dashboard | `/admin` | Light | `03-admin-dashboard.webp` |
+| 4 | Admin products table | `/admin/products` | Light | `04-admin-products-list.webp` |
+| 5 | Cabinet login | `/cabinet/login` | Light | `05-cabinet-login.webp` |
+| 6 | Cabinet dashboard | `/cabinet` | Light | `06-cabinet-dashboard-light.webp` |
 | 7 | Cabinet products | `/cabinet/products` | Light | `07-cabinet-products-light.webp` |
 | 8 | Cabinet products | `/cabinet/products` | Dark | `08-cabinet-products-dark.webp` |
-| 9 | Admin dashboard | `/admin` | Dark | `09-admin-dashboard-dark.webp` |
+| 9 | Admin products table | `/admin/products` | Dark | `09-admin-products-dark.webp` |
+| 10 | Admin dashboard | `/admin` | Dark | `10-admin-dashboard-dark.webp` |
+| 11 | Cabinet dashboard | `/cabinet` | Dark | `11-cabinet-dashboard-dark.webp` |
 
 ## Surfaces not captured in PR1
 
@@ -47,7 +53,8 @@ during PR3 visual verification if not already covered by the files above:
 
 - Shared data-list toolbar responsive `md` breakpoint behavior
 - Product context drawer / modal
-- Field Matrix, Governance, Price Inspector custom pages (partial overlap with admin forms)
+- Field Matrix, Governance, Price Inspector custom pages
+- Admin price lists and customer edit form (present in earlier partial capture files in the same directory, not in the final 11-file set)
 - Connector account list/detail/history polling UI
 - B2B quantity selector, cart drawer, checkout
 - Availability/pricing display tokens
