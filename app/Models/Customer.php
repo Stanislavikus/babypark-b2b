@@ -3,12 +3,14 @@
 namespace App\Models;
 
 use App\Support\Workspace\BelongsToWorkspace;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 
-class Customer extends Authenticatable
+class Customer extends Authenticatable implements FilamentUser
 {
     use BelongsToWorkspace;
     use HasFactory;
@@ -132,5 +134,11 @@ class Customer extends Authenticatable
         }
 
         return $fallback;
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        return $panel->getId() === 'cabinet'
+            && $this->is_active;
     }
 }

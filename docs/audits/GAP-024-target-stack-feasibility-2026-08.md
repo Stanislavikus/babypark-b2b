@@ -960,7 +960,8 @@ list.
 **Two Filament couplings live outside `app/Filament/**` and belong in the
 migration scope:**
 
-* `app/Models/User.php` implements `Filament\Models\Contracts\FilamentUser` (line 7) and declares `canAccessPanel(Panel $panel): bool` (line 57). This is the authorization entry point for both panels (Architecture Review Checklist item 3) and must be re-verified against the v5 contract signature.
+* `app/Models/User.php` implements `Filament\Models\Contracts\FilamentUser` (line 7) and declares `canAccessPanel(Panel $panel): bool` (line 57). This is the Filament panel-access entry point for the **`/admin`** panel (`User` principal on the `web` guard). It must be re-verified against the v5 contract signature.
+* `app/Models/Customer.php` implements `Filament\Models\Contracts\FilamentUser` and declares `canAccessPanel(Panel $panel): bool` for the **`/cabinet`** panel (`Customer` principal on the `customer` guard). Access is controlled through `Customer::canAccessPanel()` and allows only the `cabinet` panel for active customers. **Pre-upgrade baseline defect (discovered by the feasibility/smoke audit, not a migration regression):** before this correction, `Customer` did not implement `FilamentUser`, and Filament 3 middleware returns `403` for authenticated non-`FilamentUser` models when `config('app.env') !== 'local'` — a production-only failure masked in `local`/test environments.
 * `app/Support/Filament/RevalidatesOnUpdate.php` is the concrete implementation of the `04-ARCHITECTURE_PRINCIPLES.md` requirement that "a required-field error for a specific input must disappear once the user supplies a valid value — without resubmitting the whole form". It calls `->live()` plus `$livewire->validateOnly($component->getStatePath())` inside `afterStateUpdated`, typed against `Filament\Forms\Components\Component`, `Filament\Forms\Contracts\HasForms` and `Filament\Forms\Set`. **All three of those imports move in Filament 4** (`Forms\Components\Component` → `Schemas\Components\Component`, `Forms\Set` → `Schemas\Components\Utilities\Set`), and the class deliberately implements a documented architectural standard — so its migration is Rector-automatable but its *behaviour* must be re-verified by the 24 existing form-error assertions, not assumed.
 
 ### 7.6 Filament-related tests
@@ -2251,7 +2252,8 @@ imports with 5 signatures, 54 `->schema(` calls, 135 inline
 widening: 19 `$navigationIcon`, 17 `$navigationGroup`. Plus
 `app/Support/FilamentTableToolbar.php`, `app/Support/ProductLightbox.php`,
 `app/Support/Brand.php`, `app/Support/Filament/RevalidatesOnUpdate.php`,
-`app/Models/User.php` (`FilamentUser` + `canAccessPanel()`), and
+`app/Models/User.php` (`FilamentUser` + `canAccessPanel()` for `/admin`),
+`app/Models/Customer.php` (`FilamentUser` + `canAccessPanel()` for `/cabinet`), and
 `TagResource/Support/GuardedDeleteTagAction.php`, which imports **both**
 `Filament\Actions\DeleteAction` and `Filament\Tables\Actions\DeleteAction as TableDeleteAction`
 — the dual-namespace pattern Filament 4 unifies, and the one place where a

@@ -6,6 +6,7 @@ use App\Livewire\Cabinet\Dashboard;
 use App\Livewire\Cabinet\Login;
 use App\Models\Customer;
 use App\Models\Workspace;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -92,5 +93,47 @@ class CustomerAuthRegressionTest extends TestCase
         Livewire::actingAs($this->customer, 'customer')
             ->test(Dashboard::class)
             ->assertOk();
+    }
+
+    public function test_active_customer_can_access_cabinet_panel_contract(): void
+    {
+        $cabinetPanel = Filament::getPanel('cabinet');
+
+        $this->assertTrue($this->customer->canAccessPanel($cabinetPanel));
+    }
+
+    public function test_inactive_customer_is_denied_cabinet_panel_contract(): void
+    {
+        $this->customer->update(['is_active' => false]);
+
+        $cabinetPanel = Filament::getPanel('cabinet');
+
+        $this->assertFalse($this->customer->fresh()->canAccessPanel($cabinetPanel));
+    }
+
+    public function test_customer_cannot_access_admin_panel_contract(): void
+    {
+        $adminPanel = Filament::getPanel('admin');
+
+        $this->assertFalse($this->customer->canAccessPanel($adminPanel));
+    }
+
+    public function test_active_customer_can_access_filament_cabinet_dashboard_in_production_mode(): void
+    {
+        config()->set('app.env', 'production');
+
+        $this->actingAs($this->customer, 'customer')
+            ->get(route('filament.cabinet.pages.dashboard'))
+            ->assertOk();
+    }
+
+    public function test_inactive_customer_cannot_access_filament_cabinet_dashboard_when_force_authenticated_in_production_mode(): void
+    {
+        config()->set('app.env', 'production');
+        $this->customer->update(['is_active' => false]);
+
+        $this->actingAs($this->customer->fresh(), 'customer')
+            ->get(route('filament.cabinet.pages.dashboard'))
+            ->assertForbidden();
     }
 }
