@@ -13,6 +13,17 @@
 > **Dependency information is time-sensitive.** Re-verify before acting on this
 > report; Packagist, npm and the Laravel/Filament/Livewire release lines all
 > published new versions within days of this audit.
+>
+> **Correction pass applied 2026-08-08 (UTC).** This pass incorporated
+> independently verified corrections without re-running the full research
+> programme: the Composer advisory-policy conclusion (§4.2), the custom-theme
+> direction (§9.1), Tailwind's move to the Filament 3→4 checkpoint (§17 PR3),
+> Vite-major deferral (§9.4, §12), UUIDv4 preservation (§10.3), live-filter
+> preservation (§7.7), the authorization inventory (§7.8), the Filament
+> published-asset mechanism (§9.5), the polling-test scope (§8.1) and the PR5
+> no-deferred-defects rule (§17). Commands executed during the correction pass
+> are dated 2026-08-08 inline. `origin/develop` was re-verified unchanged at
+> `9713d03` before editing.
 
 **Repository state audited**
 
@@ -58,10 +69,10 @@ and is not reopened here. Filament 4 appears in this report only as a
 * **Affected Domain Contexts:** none mutated. Compatibility surface touches Connectors (queue runtime, discovery, HTTP transport, secret lifecycle), B2B Channel (cabinet panel UI), Product Catalogue (admin tables/forms), Pricing (Price Inspector page), Workspace (UUID primary keys on 18 workspace-owned models), Users and Permissions (`spatie/laravel-permission`, Filament panel auth middleware)
 * **Primary Sources & Standards:** Laravel official docs (`laravel.com/docs/13.x/releases`, `laravel.com/docs/13.x/upgrade`, `laravel.com/docs/12.x/upgrade`); Filament official docs and GitHub repository (`filamentphp.com/docs/5.x/upgrade-guide`, `raw.githubusercontent.com/filamentphp/filament/{5.x,4.x}/docs/14-upgrade-guide.md`, Filament 5 styling docs, `filament/upgrade` package source at tags `v5.7.6` / `v4.12.6`, Filament v5.7.6 monorepo tarball); Livewire official docs (`livewire.laravel.com/docs/upgrading`, v4.x); Packagist metadata API (`repo.packagist.org/p2/*.json`); npm registry (`registry.npmjs.org`); Composer solver output (`composer why-not`, `composer prohibits`, `composer update --dry-run -W`, `composer audit --locked`); Rector dry-run output from the official `filament/upgrade` configs
 * **Architecture Checklist Result:** No checklist item is *violated* by this task, because the task adds one Markdown file and changes no schema, model, service, policy, UI or dependency. Verified as unaffected-by-construction: items 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20 (no table, column, attribute definition, alias, domain boundary, variant rule, projection, order/payment field, status matrix, webhook route, reservation, availability formula, order snapshot, client-specific branch, payment field or user-facing terminology is added or altered). Items **3 (Authorization/RBAC)**, **17 (Connector Encapsulation)**, **21 (External URL / SSRF Safety)** and **22 (Connector Secret Handling)** are the checklist items whose *implementations* the eventual migration could regress, so this audit explicitly verifies their compatibility surface rather than marking them non-applicable — see §10 (`spatie/laravel-permission`, Filament panel auth guard/middleware, `WithoutOverlapping`/`Cache::lock`, Guzzle `CURLOPT_RESOLVE` pinning, `encrypted:array` casts and `APP_PREVIOUS_KEYS`). The `## Filament form validation standard` requirement in `04` (every panel form must render `novalidate`) is likewise treated as a first-class migration constraint — see §7.4, where it is identified as a silent-regression risk.
-* **Architecture Risks Identified:** (a) silent loss of the mandated `novalidate` form behavior because the Blade views the project forks to achieve it are removed or restructured in Filament 5; (b) silent visual regression in the two panels because 1,658 lines of forked Filament 3 Blade cannot be carried forward; (c) UUID version change (v4 → v7) on 18 workspace-owned models introduced by Laravel 12's `HasUuids`, producing mixed UUID versions in existing columns — a behavior change requiring an explicit human decision; (d) explicit `VerifyCsrfToken::class` references in both panel providers against a middleware Laravel 13 renames; (e) connector queue lane timing contracts (`retry_after` 90s/1200s, job timeouts 45s/900s, lock `expireAfter` 120s/1100s) must be re-verified, not assumed, after the framework jump; (f) the frontend build is never exercised in CI, so a Vite/Tailwind regression would first surface on the production host inside `deploy.sh`
+* **Architecture Risks Identified:** (a) silent loss of the mandated `novalidate` form behavior because the Blade views the project forks to achieve it are removed or restructured in Filament 5; (b) silent visual regression in the two panels because 1,658 lines of forked Filament 3 Blade cannot be carried forward; (c) UUID version change (v4 → v7) on 18 workspace-owned models that Laravel 12's `HasUuids` would introduce silently — resolved in this report as a behavior-preserving direction: preserve UUIDv4 via the framework-supported mechanism (§10.3); (d) explicit `VerifyCsrfToken::class` references in both panel providers against a middleware Laravel 13 renames; (e) connector queue lane timing contracts (`retry_after` 90s/1200s, job timeouts 45s/900s, lock `expireAfter` 120s/1100s) must be re-verified, not assumed, after the framework jump; (f) the frontend build is never exercised in CI, so a Vite/Tailwind regression would first surface on the production host inside `deploy.sh`; (g) 22 of the 23 `can*()` overrides across 10 Resources are deny-only rules with no backing policy, and Filament 4 changes their invocation path — an authorization-broadening risk (§7.8)
 * **Chosen Technical Approach:** produce a documentation-only audit under `docs/audits/`. All dependency-solver and upgrade-tool experiments were performed in throwaway `git worktree` copies under `/tmp/solver/**`, which were destroyed before commit; the audit branch carries no dependency, lockfile, application, Blade, CSS, migration, config, CI or Docker change. This protects the architecture by keeping an unverified framework migration out of `develop` while still producing executable evidence (literal solver and Rector output) instead of documentation-derived guesswork.
 * **Non-Technical Simplicity Check:** no user-facing change. The report explicitly requires that the eventual migration preserve the merchant-facing surfaces defined in `06-UI_DESIGN_SYSTEM.md` (product table defaults, context drawer, quantity/cart, availability wording, Ukrainian labels) and defines the visual-verification gate (§16) that protects them. No enterprise jargon is introduced into any UI string.
-* **Stop & Amend Required:** **No** for this audit (documentation only; GAP-024 already exists as the approved project source for why the upgrade is required). **Yes, before the real migration begins** — three items need explicit human decisions that this audit deliberately does not make: (1) `HasUuids` UUIDv4-vs-UUIDv7 policy for the 18 affected models (§10.3); (2) whether the forked `filament-tables::index` toolbar layout is re-derived, replaced by public Filament 5 configuration, or dropped (§7.4); (3) the production PHP and Node versions, which are not verifiable from repository evidence (§11, §12).
+* **Stop & Amend Required:** **No** for this audit (documentation only; GAP-024 already exists as the approved project source for why the upgrade is required). **Before the real migration begins**, two items still need external input that this audit cannot provide: (1) the production PHP and Node versions, which are not verifiable from repository evidence (§11, §12); (2) for each vendor Blade fork, whether a supported public Filament extension point can replace it — investigated first, with re-derivation only where no public extension satisfies the normative behavior (§7.4). Two items previously framed as open decisions are now recorded migration directions, not open questions: UUID policy (**preserve UUIDv4** during GAP-024; §10.3) and panel styling (**proper custom Filament themes are the recommended direction**, required by upstream documentation for the project's own Tailwind usage; §9.1).
 
 ---
 
@@ -79,9 +90,10 @@ Nothing in the current dependency graph *prevents* the approved target state. Th
 classification is `GO WITH PREREQUISITES` rather than `GO` because a specific,
 enumerable set of prerequisite changes must land as part of the migration:
 PHP 8.3+ floor everywhere, `laravel/tinker ^3.0`, PHPUnit 12, re-derivation of
-four published vendor Blade views, a Tailwind 4 / Vite toolchain decision, an
-explicit UUID-version decision, and a Node-version guarantee in CI and
-production. These are listed exhaustively in §18.
+four published vendor Blade views, proper custom Filament themes for both panels
+together with the Tailwind 4 toolchain (on the current Vite major),
+behavior-preserving UUIDv4 handling for 18 models, and a Node-version guarantee
+in CI and production. These are listed exhaustively in §18.
 
 ---
 
@@ -366,9 +378,9 @@ evidence:
 2. **`laravel/tinker` must move to `^3.0`.** The locked `v2.11.1` caps `illuminate/*` at `^12.0` and is a hard solver blocker for Laravel 13 (§4.1).
 3. **PHPUnit must move to `^12.0`.** Both the Laravel 13 upgrade guide and the 13.x skeleton specify PHPUnit 12; PHPUnit 13 requires PHP `>=8.4.1` and is therefore *not* the right target on PHP 8.3 (§4.3, §15).
 4. **Four published vendor Blade views must be re-derived, not carried forward.** Their Filament 5 counterparts are restructured (1,286 → 2,604 lines), collapsed (315 → 19 lines) or removed entirely. Two of them are the sole mechanism implementing the `novalidate` mandate in `04-ARCHITECTURE_PRINCIPLES.md` (§7.4).
-5. **A Tailwind 4 frontend decision is required**, because Filament 5 lists Tailwind CSS v4.0+ as an unconditional requirement while this repository has no Filament custom theme and uses Tailwind only for the legacy cabinet Blade layout (§9).
-6. **An explicit UUID-version decision** for the 18 models using `HasUuids`, which Laravel 12 switched from ordered UUIDv4 to UUIDv7 (§10.3).
-7. **A Node-version guarantee in CI and production.** `laravel-vite-plugin@3` and `vite@8` require Node `^20.19.0 || >=22.12.0`; CI has no Node step at all and the production Node version is not verifiable from repository evidence (§12).
+5. **The Tailwind 4 migration plus proper custom Filament themes for both panels.** Filament 5 lists Tailwind CSS v4.0+ as an unconditional requirement; Filament 4 requires Tailwind v4.1+ once a custom theme CSS file exists; and both the v4 and v5 styling docs require a custom theme for the project's own Tailwind usage in panel Blade/PHP — which this repository has in volume while owning no theme today (§9.1, §9.2). This lands at the Filament 3→4 checkpoint (§17 PR3), on the **current Vite major** (§9.4).
+6. **Behavior-preserving UUID handling** for the 18 models using `HasUuids`: preserve UUIDv4 semantics via the Laravel-supported UUIDv4 mechanism (`HasVersion4Uuids` or the exact current equivalent verified at execution time), so the framework major does not silently change identifier generation (§10.3).
+7. **A Node-version guarantee in CI and production.** CI has no Node step at all and the production Node version is not verifiable from repository evidence, while the Tailwind 4 toolchain (including the official upgrade tool) requires a modern Node (§12). This is required regardless of the Vite major, and the Vite 8 / `laravel-vite-plugin` 3 jump itself is explicitly **out of GAP-024 scope** (§9.4).
 
 None of these depend on an external event. All are inside the project's control.
 
@@ -445,9 +457,9 @@ Your requirements could not be resolved to an installable set of packages.
 EXIT=2
 ```
 
-Composer 2.10's default advisory policy (`policy.advisories.block`) refuses to
-load **every** `laravel/framework` 11.x release and the exact locked
-`filament/forms` version. Two consequences:
+Composer's default advisory policy refuses to load **every**
+`laravel/framework` 11.x release and the exact locked `filament/forms` version
+when the full graph is re-resolved. The precise operational consequences are:
 
 * `composer install` from the committed lockfile still works, so CI and `deploy.sh` are not broken today:
 
@@ -456,10 +468,24 @@ load **every** `laravel/framework` 11.x release and the exact locked
   … - Installing spatie/laravel-permission (6.25.0)
   EXIT=0
   ```
-* But **no dependency can be added, removed or updated on `develop` any more** without either upgrading off Laravel 11 or deliberately disabling Composer's advisory policy. Practically, the repository has already lost the ability to take a routine security patch for any dependency.
+* **Full dependency re-resolution of the current Laravel-11 graph — and any update that requires re-resolving the advisory-blocked Laravel 11 line — is blocked** by the current Composer security policy, as the EXIT=2 output above shows literally.
+* **Partial updates that leave the advisory-affected locked packages untouched still work.** Composer's 2.9.2 changelog (released 2025-11-19) explicitly records: "Fixed partial updates failing when another package in the lock file has a known security advisory" (composer/composer #12626). Verified against this repository during the correction pass (2026-08-08), on the untouched `composer.json`/`composer.lock`:
 
-This materially strengthens GAP-024: the framework upgrade is no longer only a
-support-lifecycle concern, it is a live dependency-management blocker.
+  ```console
+  $ composer update predis/predis --dry-run --no-scripts --no-plugins
+  Lock file operations: 0 installs, 1 update, 0 removals
+    - Upgrading predis/predis (v3.4.2 => v3.5.1)
+  Found 21 security vulnerability advisories affecting 5 packages.
+  EXIT=0
+  ```
+
+  It is therefore **too broad to claim that no dependency whatsoever can be updated** on `develop`. Routine partial updates of packages outside the blocked lines remain possible; what is blocked is the full re-solve and anything that must re-resolve `laravel/framework` 11.x or the advisory-affected `filament/forms` v3.3.52.
+* Composer also provides a `--no-security-blocking` flag (added in 2.9.2, same changelog). It is noted here only as an available Composer mechanism for exceptional situations — it is **not** the migration strategy, and it is not a reason to stay on Laravel 11.
+
+This corrected framing does not weaken GAP-024. Laravel 11 itself carries
+advisories with **no fix on the 11.x line** (§14.3) and is out of security
+support; the advisory policy blocking its full re-resolution is a symptom of
+that, and the remediation is the framework upgrade, not policy suppression.
 
 ### 4.3 Target-state resolution — **succeeds**
 
@@ -522,7 +548,8 @@ Scenario 1 is the most operationally valuable result in this audit: **Laravel 13
 can be reached with zero Filament or Livewire code changes**, because Filament
 `v3.3.54` already declares `illuminate/* ^13.0`. Scenario 2 shows the *reverse*
 ordering (Filament first, framework later) is not available — not for a Filament
-reason, but because Laravel 11 can no longer be resolved at all.
+reason, but because that update requires re-resolving the advisory-blocked
+Laravel 11 line, which Composer's security policy refuses (§4.2).
 
 ### 4.5 Per-blocker record
 
@@ -878,7 +905,14 @@ is the cheapest way to make the tripwire cover the full surface the four forks
 own.
 
 **The re-derivation itself remains an explicit, human-reviewed migration step,
-not a mechanical file copy.**
+not a mechanical file copy.** For each of the four forks the migration must
+first investigate whether a **supported public Filament extension point** (a
+render hook, a component slot, a configuration method, or a smaller targeted
+view override) can satisfy the normative behavior — and re-derive a large
+vendor-view fork **only where no public extension can**. Reproducing a
+1,000+-line fork against a rewritten upstream template is the last resort, not
+the default, because every re-derived line re-acquires the silent-staleness
+failure mode described above.
 
 ### 7.5 Custom Filament Blade views
 
@@ -961,6 +995,81 @@ four vendor forks and Filament's compiled stylesheet. That is the gap §16 exist
 to close, and it remains the reason visual verification is a mandatory gate
 rather than an optional one.
 
+### 7.7 Filter behavior — Filament 4 defers filters by default; preserve live filters explicitly
+
+Filament 4 changed the table-filter default: filters are **deferred** by
+default, requiring the user to press an Apply button before they take effect
+(the v3 `deferFilters()` opt-in became the v4 default). The official API for
+preserving the current behavior is `->deferFilters(false)`.
+
+Repository state (verified 2026-08-08): `deferFilters` occurrences in `app/`:
+**0** — every one of the **20** `table(Table $table)` definitions and **25**
+inline `Tables\Filters\` usages currently relies on the v3 live-filter default.
+The `06-UI_DESIGN_SYSTEM.md` Data List filter contract (slide-over panel,
+active-count badges, removable indicators) is written around filters that apply
+immediately; nothing in it specifies Apply-button semantics.
+
+**Migration direction: preserve the current live-filter behavior.** This is a
+framework migration, not a UX redesign — "live vs Apply" must not change as an
+incidental side effect. Apply `deferFilters(false)` through the smallest shared
+public-Filament mechanism that avoids per-table drift (a single
+`Table::configureUsing(fn (Table $table) => $table->deferFilters(false))` in a
+service provider is the natural shape; the implementation PR chooses the exact
+placement), rather than pasting the call into all 20 tables. If the product
+later *wants* Apply-button filter semantics, that is a separate UI-design task
+that deliberately updates `06-UI_DESIGN_SYSTEM.md` — not part of GAP-024.
+
+### 7.8 Authorization surface — explicit high-risk coverage
+
+Filament 4 changed how Resource authorization is resolved: the undocumented
+`can*()` static overrides "aren't always called in v4" (official v4 upgrade
+guide), with policies and `get*AuthorizationResponse()` methods as the
+supported customization points. That change lands on a repository whose
+authorization posture depends heavily on exactly those overrides.
+
+Fresh inventory (verified 2026-08-08 on `9713d03`): **23 `can*()` overrides
+across 10 Resources**, plus **6 `canAccess()` methods** on standalone
+pages/resources:
+
+| Resource | Overrides | Body |
+|---|---|---|
+| `app/Filament/Cabinet/Resources/ProductResource.php` | `canCreate`, `canEdit`, `canDelete` | all `return false` (read-only buyer catalogue) |
+| `app/Filament/Resources/CategoryResource.php` | `canCreate`, `canDelete` | both `return false` |
+| `app/Filament/Resources/ConnectorAccountResource.php` | `canCreate`, `canEdit`, `canDelete` | all `return false` (creation/settings UI deliberately absent per GAP-006) |
+| `app/Filament/Resources/CustomerResource.php` | `canCreate` | `return false` |
+| `app/Filament/Resources/FieldDefinitionResource.php` | `canCreate`, `canDelete` | `canCreate` `return false`; `canDelete` conditional — `$record instanceof FieldDefinition && $record->scope !== AttributeScope::System` (the Attribute Dictionary "system fields cannot be deleted" rule) |
+| `app/Filament/Resources/OrderResource.php` | `canCreate` | `return false` |
+| `app/Filament/Resources/ProductResource.php` | `canCreate`, `canDelete` | both `return false` |
+| `app/Filament/Resources/ReservationResource.php` | `canCreate`, `canEdit`, `canDelete` | all `return false` |
+| `app/Filament/Resources/StockResource.php` | `canCreate`, `canEdit`, `canDelete` | all `return false` (read-only per project spec) |
+| `app/Filament/Resources/SyncLogResource.php` | `canCreate`, `canEdit`, `canDelete` | all `return false` (read-only log) |
+
+`canAccess()` methods: `FieldMatrix`, `Governance`, `PriceInspector`,
+`WorkspaceTaxSettings` (role/permission checks on the `User` model),
+`ConnectorDefinitionResource` (`PlatformAdminAuthorization::canManage()`),
+`CustomerResource\Pages\PreviewAsCustomer`.
+
+Why this is high-risk rather than routine:
+
+* **22 of the 23 `can*()` overrides are deny-only rules (`return false`), and only `ConnectorAccountResource` has a backing policy** (`app/Policies/ConnectorAccountPolicy.php` — the only file in `app/Policies/`). For the other 9 Resources these overrides are the *sole* mechanism suppressing Create/Edit/Delete. If Filament 4 stops consulting an override on any invocation path, the failure direction is **access broadening** — a hidden Create button appearing, a Delete action becoming callable — not a lockout that users would report.
+* The one conditional override (`FieldDefinitionResource::canDelete`) enforces an Attribute Dictionary integrity rule (Architecture Review Checklist item 4): system-scope field definitions must not be deletable.
+* Role/permission-sensitive behavior beyond CRUD gating is concentrated in `ConnectorAccountPolicy` and `ConnectorAccountMerchandiserPresentation`: the Merchandiser role matrix (safe-fields-only `viewAny`/`view`, `runDiscovery` on enabled accounts, no management abilities), connector-account rendered-field security (`store_code`, `tenant_context`, credentials never rendered to Merchandiser), and workspace isolation (cross-workspace access → 404). These are already covered by rendered-HTML and Livewire-payload assertions in `tests/Feature/Connectors/ConnectorAccountMerchandiserPresentationTest.php` and `ConnectorAccountResourceTest.php`, which must stay green through both Filament steps.
+
+**Migration requirement (PR3 merge blocker).** For every override in the table
+above: verify whether Filament 4 still consults it on every invocation path
+(table actions, header actions, bulk actions, page mounting, URL access); where
+it does not, migrate the rule to a policy or the `get*AuthorizationResponse()`
+API; and verify the migrated form **does not broaden access** for any role.
+The testing principle is **test security behavior, not implementation-method
+cardinality**: inventory all affected methods, map them onto the existing
+authorization tests (the Merchandiser presentation suite, the
+`WorkspaceTaxDefaultsFeatureTest`-style role tests, and the
+`assertCanSeeTableRecords`/action-visibility assertions), retain those tests,
+and add **only the missing regression cases needed to prove the
+role/permission matrix is unchanged** — one new test per method merely to match
+the count of 23 is explicitly not required. Any known authorization regression
+is a **merge blocker for PR3**, not a deferrable finding.
+
 ---
 
 ## 8. Livewire 3 → 4 impact
@@ -1022,9 +1131,9 @@ updates**: `wire:model.live` requests now run in parallel". It then states:
 Assessment for this repository:
 
 * **No code change is required** by the polling change itself. `wire:poll.5s` and Filament's `->poll('5s')` keep working.
-* **But the behavioral change is real and testable.** In v3, a 5-second poll and a user-initiated action were serialized; in v4 they run concurrently. The connector UI polls `refreshConnectionState` every 5s while a user may simultaneously trigger a connection check or (once activated) a discovery run. Concurrency that was previously impossible becomes possible on the client.
-* **The server-side idempotency contract already covers this.** `07-TECH_STACK.md`, `### Connector idempotency and overlap locking (Resolved)`, specifies that "the authorized application service acquires a short database/application lock for `(workspace_id, connector_account_id, operation_kind)` and checks for an existing active history row before creating a new one", implemented via `Cache::lock($lockKey, 30)->block(5, …)` at `app/Services/Connectors/ConnectorConnectionCheckDispatchService.php:59` and `app/Services/Connectors/ConnectorDiscoveryRunDispatchService.php:70`. Parallel client requests therefore serialize at the lock, and duplicate logical operations return the existing history-row ID rather than creating a second row.
-* **Classification: regression-test required, no code change.** The migration must add an explicit test that a poll refresh concurrent with a dispatch action neither creates a duplicate `ConnectorConnectionCheck`/`ConnectorDiscoveryRun` row nor leaves a row orphaned in `queued`. The two existing `Livewire::test`-based tests are not sufficient to cover this.
+* **The domain invariant at stake is precisely scoped**: concurrent dispatches must not produce duplicate active operations or violate lifecycle consistency. That invariant belongs to the dispatch-service locking/idempotency layer, not to the UI. It is important to distinguish the two request kinds the client can now interleave: **poll = state read/refresh** — `refreshConnectionState` (`app/Filament/Resources/ConnectorAccountResource/Pages/ViewConnectorAccount.php:36`) only re-resolves the record and re-loads presentation relations, mutating nothing — versus **dispatch = state-changing operation**, which goes through the authorized dispatch services.
+* **The server-side idempotency contract already covers the invariant, and it is already tested.** `07-TECH_STACK.md`, `### Connector idempotency and overlap locking (Resolved)`, specifies the `(workspace_id, connector_account_id, operation_kind)` lock-and-check, implemented via `Cache::lock($lockKey, 30)->block(5, …)` at `app/Services/Connectors/ConnectorConnectionCheckDispatchService.php:59` and `app/Services/Connectors/ConnectorDiscoveryRunDispatchService.php:70`. The existing suites prove it at the owning layer (verified 2026-08-08): `ConnectorConnectionCheckDispatchServiceTest` and `ConnectorDiscoveryRunDispatchServiceTest` each carry `second_dispatch_returns_same_row_and_does_not_push_second_job`, `dispatch_failure_compensates_row_to_failed` and `stale_queued_row_is_recovered_and_new_dispatch_is_allowed` — duplicate-dispatch prevention, compensation, and stale-row recovery.
+* **Classification: existing coverage is mandatory; a new UI concurrency test is conditional, not automatic.** The migration must (a) keep the service-level concurrency/idempotency tests above green, (b) keep the existing connector polling/render assertions green, and (c) perform a runtime/manual polling smoke under Livewire 4 (observe one poll-driven state transition while triggering a dispatch). A **new automated concurrency test is required only if that work identifies a real uncovered mutable race** — a state-changing path reachable from the polling surface that bypasses the dispatch-service lock. Tests must not be created merely because the client can now issue requests concurrently: the poll handler is a pure read, and the mutation path is already lock-serialized and tested.
 
 **This audit changes no connector behavior.** The finding above is compatibility
 verification only.
@@ -1055,18 +1164,24 @@ hand-written CSS, not Tailwind output.
 
 This is the most important frontend finding, and it cuts both ways:
 
-* **It shrinks the Tailwind 4 migration surface dramatically.** There is no Filament theme CSS file to port, no `@source` graph to rebuild, no Filament-preset upgrade.
-* **But it collides with a Filament 5 documented constraint.** Filament 5's styling docs state: "**A custom theme is required to use Tailwind CSS classes in your own code.** Filament's default compiled stylesheet does not include arbitrary Tailwind classes… Without a custom theme, any Tailwind classes you add to your code will simply not work." The project's Filament-panel Blade views *do* use Tailwind utility classes (per `07-TECH_STACK.md`: "Use Tailwind utility classes for layout and spacing"). Today those classes render only insofar as Filament 3's compiled Tailwind-3 stylesheet happens to contain them. Filament 5's stylesheet is a **different Tailwind-4 build**, so the set of incidentally-available utilities changes.
+* **It shrinks the Tailwind 4 porting surface.** There is no existing Filament theme CSS file to port, no `@source` graph to rebuild, no Filament-preset upgrade.
+* **But it collides with a documented constraint of both target-side Filament majors.** Filament 5's styling docs state: "**A custom theme is required to use Tailwind CSS classes in your own code.** Filament's default compiled stylesheet does not include arbitrary Tailwind classes… Without a custom theme, any Tailwind classes you add to your code will simply not work." Filament **4**'s styling docs (`docs/08-styling/01-overview.md` at `4.x`, verified 2026-08-08) carry the **identical statement**, adding: "If you want to use Tailwind CSS utility classes (like `text-primary-600`, `bg-gray-100`, `p-4`, etc.) in your own Blade views, Livewire components, or PHP files, **you must create a custom theme first**." The project's Filament-panel Blade views *do* use Tailwind utility classes (per `07-TECH_STACK.md`: "Use Tailwind utility classes for layout and spacing"). Today those classes render only insofar as Filament 3's compiled Tailwind-3 stylesheet happens to contain them. Filament 4/5 stylesheets are **different Tailwind-4 builds**, so the set of incidentally-available utilities changes.
 
-**This is a genuine architectural fork in the road that requires a human
-decision, not an implementation detail:**
+**Recommendation — resolved, no longer an open decision: use proper custom
+Filament themes.** The upstream requirement is unambiguous for both Filament 4
+and 5, and the repository's extensive Tailwind usage in project-owned Filament
+views/PHP means continued reliance on incidental utilities inside Filament's
+precompiled internal stylesheet is exactly the pattern that breaks silently
+across a major. Recommended architecture:
 
-* **Option A — introduce a custom Filament theme** (`php artisan make:filament-theme` per panel, then `->viteTheme(...)` plus `@source` directives covering `app/Filament/**`, `resources/views/filament/**`, `resources/views/components/**`, `resources/views/livewire/**`, `app/Livewire/**`). This makes panel Tailwind usage *correct by construction* and aligns with the documented Filament 5 requirement. Cost: two new theme build inputs, a real Tailwind 4 build in the deployment pipeline, and the strongest possible need for visual regression review.
-* **Option B — keep no theme and treat every Tailwind class in panel Blade as unsupported**, converting the ones that matter into the existing hand-written `design-tokens.css` / `table-toolbar-overrides.blade.php` mechanism. Cheaper build, but continues to rely on undocumented incidental availability of Filament's internal utilities — which is precisely what breaks silently across a major.
+* one **thin theme entrypoint per panel** — one for `/admin`, one for `/cabinet` (`php artisan make:filament-theme` per panel, registered via `->viteTheme(...)`);
+* **shared CSS / design-token / `@source` definitions** reused by both entrypoints where technically sensible (the existing `design-tokens.css` and a common `@source` set covering `app/Filament/**`, `resources/views/filament/**`, `resources/views/components/**`, `resources/views/livewire/**`, `app/Livewire/**`) — do **not** duplicate the entire styling layer between panels;
+* preserve the panels' **different visibility / user-context policies** (`07-TECH_STACK.md`, `## Current Panels`) — theme sharing is a build concern and must not leak admin-only surface styling assumptions into the buyer panel;
+* preserve **Light / Dark / System** behavior (`07-TECH_STACK.md`, `## Application Stack`), including the `.dark`-tuned `--bp-muted-*` tokens.
 
-This audit does not choose between them. Option A is the direction the Filament
-5 documentation points to; Option B is closer to the project's current de facto
-pattern. Either way, §16's visual verification is mandatory.
+Cost: two new theme build inputs, a real Tailwind 4 build in the deployment
+pipeline, and the strongest possible need for visual regression review — all
+absorbed into PR3 (§17), where §16's visual verification is mandatory.
 
 ### 9.2 Tailwind v3-specific configuration that must change
 
@@ -1075,7 +1190,7 @@ pattern. Either way, §16's visual verification is mandatory.
 | `tailwind.config.js` | Tailwind v3 JS config: `content` (5 globs), `theme.extend.fontFamily.sans` (Figtree), `theme.extend.colors.primary` (6 stops), `plugins: []` | Tailwind 4 is CSS-first. `content` globs become `@source` directives; `theme.extend` becomes `@theme` CSS custom properties. The JS config file becomes optional/legacy |
 | `postcss.config.js` | `plugins: { tailwindcss: {}, autoprefixer: {} }` | Either replace `tailwindcss` with `@tailwindcss/postcss`, or drop PostCSS for Tailwind entirely and use `@tailwindcss/vite`. `autoprefixer` is no longer needed (Tailwind 4 handles prefixing via Lightning CSS) |
 | `resources/css/app.css` | `@import './design-tokens.css';` + `@tailwind base; @tailwind components; @tailwind utilities;` | The three `@tailwind` directives become a single `@import "tailwindcss";` |
-| `vite.config.js` | `laravel()` plugin only | Add `@tailwindcss/vite` if Option A/`@tailwindcss/vite` is chosen; add theme CSS to `input` if a Filament theme is created |
+| `vite.config.js` | `laravel()` plugin only | Add `@tailwindcss/vite` (the recommended delivery, §9.4) and add the two panel-theme CSS entrypoints to `input` (§9.1) |
 | `resources/css/design-tokens.css` | 38 lines of plain CSS custom properties, a `.dark` block, four `.bp-muted-*` classes. **No `@apply`, no `@layer`, no `theme()`** | **No change required.** It is Tailwind-version-agnostic and is injected by `file_get_contents()`, not compiled by Tailwind |
 
 Verified absence of Tailwind-version-sensitive CSS constructs:
@@ -1126,14 +1241,21 @@ Other measurements:
 
 ### 9.5 Committed Filament 3 JavaScript assets — an overlooked migration item
 
-The 16 files under `public/js/filament/**` (§1.5) are `php artisan filament:assets`
+The 16 files under `public/js/filament/**` (§1.5) are Filament published-asset
 output committed at Filament 3.3.52. They are **not** produced by `npm run build`
-and are **not** covered by `/public/build` being gitignored, so nothing in the
-Vite or Composer pipeline refreshes them automatically.
+and are **not** covered by `/public/build` being gitignored — but they are
+**not without a supported refresh mechanism either**. `composer.json` already
+contains `@php artisan filament:upgrade` inside `post-autoload-dump`, and
+Filament's official documentation states this is exactly its purpose: "After
+any updates, all Laravel caches need to be cleared, and frontend assets need to
+be republished. You can do this all at once using the `filament:upgrade`
+command, which should have been added to your `composer.json` file when you ran
+`filament:install` the first time" (Filament installation docs, `Upgrading`
+section; verified 2026-08-08).
 
 Two consequences for the migration:
 
-* **They must be re-published at each Filament major step** (`php artisan filament:assets` after PR3 and again after PR4) and the regenerated files committed. If they are not, the browser loads Filament 3 component JavaScript against Filament 4/5 server-rendered markup — a class of breakage that renders without any PHP error and that no existing test would catch.
+* **Keep the existing `post-autoload-dump` asset-upgrade mechanism — do not invent a second parallel asset-publishing process.** After each Filament-major Composer operation (PR3 and PR4), **verify** that the hook regenerated the 16 committed files and commit the result, and verify that **no Filament-3-generation browser asset survives** the major step. If a stale file did survive, the browser would load Filament 3 component JavaScript against Filament 4/5 server-rendered markup — a class of breakage that renders without any PHP error and that no existing test would catch. Manual `php artisan filament:assets` remains available as a diagnostic/repair command if the hook proves insufficient, but it is not the default architecture while the supported `filament:upgrade` hook is functioning.
 * **Five of them call `Livewire.hook`** (`tables/components/table.js`, `notifications/notifications.js`, `forms/components/markdown-editor.js`, `forms/components/color-picker.js`, `widgets/components/chart.js`), the API Livewire 4 deprecates in favour of `interceptMessage` / `interceptRequest`. This is *vendor* code, so the project does not migrate it by hand — but it does mean the committed assets are Livewire-3-generation artifacts, and re-publishing from Filament 5 is the only correct remedy. Note that the repository's own first-party code uses `Livewire.hook` **0** times (§8), so no application-side hook migration is required.
 
 Worth stating plainly because it is easy to misread: the earlier `Livewire.hook`
@@ -1154,7 +1276,7 @@ the comment in `design-tokens.css` explicitly tunes `--bp-muted-*` to be
 * `/public/build` is gitignored (`.gitignore:6`), so assets are built at deploy time — no committed build artifacts to reconcile.
 * `@tailwindcss/vite@4.3.3` peer-accepts `vite ^5.2.0 || ^6 || ^7 || ^8`, so **Tailwind 4 does not force a Vite major bump**. The project could adopt Tailwind 4 on its current `vite@6.4.3`.
 * Moving to `laravel-vite-plugin@3.1.3` *would* force `vite@^8.0.0` (its peer dependency) plus a new `fontaine ^0.8.0` peer. That is an independent decision from Tailwind 4 and should be treated as optional.
-* **Recommendation: adopt Tailwind 4 via `@tailwindcss/vite` on the existing Vite 6 / `laravel-vite-plugin` 1.3.0 line first, and treat the Vite 8 / plugin 3.x jump as a separate later change.** This keeps the frontend diff minimal during the Filament migration, which is when visual risk is highest.
+* **Recommendation — Vite 8 is explicitly out of GAP-024 migration scope.** Adopt Tailwind 4 via `@tailwindcss/vite` on the existing Vite 6 / `laravel-vite-plugin` 1.3.0 line, and keep the current Vite major and current compatible Laravel Vite plugin during the Filament/Tailwind migration **unless real solver/tooling evidence at implementation time makes this impossible**. The Vite 8 / `laravel-vite-plugin` 3 jump is a separate later modernization task. Rationale: do not combine an unrelated frontend-toolchain major with the highest-risk Filament/Tailwind migration when the target stack does not require it — `@tailwindcss/vite`'s peer range (`^5.2.0 || ^6 || ^7 || ^8`) proves it does not.
 
 ---
 
@@ -1216,7 +1338,7 @@ sites), with no `Cache::put`/`remember`/`forever` of PHP objects. **Classificati
 no change required**, but adding `'serializable_classes' => false` explicitly is
 a recommended hardening step, consistent with `04`'s security posture.
 
-### 10.3 Medium-impact: `HasUuids` and UUIDv7 — requires a human decision
+### 10.3 Medium-impact: `HasUuids` and UUIDv7 — resolved direction: preserve UUIDv4
 
 The Laravel 12 guide marks this **Medium**: "The `HasUuids` trait now returns
 UUIDs that are compatible with version 7 of the UUID spec (ordered UUIDs). If
@@ -1239,21 +1361,30 @@ app/Models/ConnectorSchemaSnapshotField.php  app/Models/Tag.php
                                              app/Models/WorkspaceImportAlias.php
 ```
 
-Existing rows keep their UUIDv4 values; new rows would get UUIDv7. The result is
-**mixed UUID versions within the same primary-key columns** across 18
-workspace-owned tables — including `workspaces`, the tenant-isolation root
-(Architecture Review Checklist items 1 and 2).
+Existing rows keep their UUIDv4 values; new rows would silently get UUIDv7. The
+result would be **mixed UUID versions within the same primary-key columns**
+across 18 workspace-owned tables — including `workspaces`, the tenant-isolation
+root (Architecture Review Checklist items 1 and 2).
 
-There is no correctness bug in either choice, but they are not equivalent, and
-per `05-AI_WORKING_AGREEMENT.md`'s No-Hallucination and Stop-and-Amend rules
-this audit will not pick one silently. The two options:
+**Migration direction — resolved, no longer an open decision: preserve UUIDv4
+behavior during GAP-024.** A framework major upgrade must not silently change
+identifier-generation semantics across 18 existing models. The Laravel 13
+implementation task uses the current Laravel-supported UUIDv4 mechanism —
+`Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids` (verified present on
+the `laravel/framework` `13.x` branch, 2026-08-08; it layers over `HasUuids`
+and generates via `Str::orderedUuid()`) or the exact current equivalent
+re-verified at execution time.
 
-* **Accept UUIDv7 for new rows** (keep `HasUuids`). Gains time-ordered primary keys, which is generally better for index locality on the append-heavy connector history and inventory-ledger tables. Cost: mixed versions in existing columns; anything that infers creation order or UUID version from the key must be re-checked.
-* **Pin UUIDv4** (`use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids;`). Preserves exact current behavior across all 18 models; zero data-shape change. Cost: forgoes the ordering benefit and diverges from the framework default.
+The reasoning, recorded so the trade-off is not re-litigated accidentally:
 
-**Human decision required before the Laravel 13 PR merges.** `HasVersion7Uuids`
-was removed in Laravel 12; the repository does not use it
-(`HasVersion7Uuids` occurrences: 0), so there is no removal to handle.
+* existing UUID values stay valid under either choice — nothing breaks retroactively;
+* allowing new UUIDv7 values is technically possible and would gain time-ordered index locality on the append-heavy connector-history and inventory-ledger tables;
+* but changing identifier semantics is **unrelated to GAP-024's objective** (framework security support), and mixed UUID versions across 18 tables would increase the migration's blast radius — anything that infers creation order or version from the key would need re-checking — without helping that objective;
+* UUIDv7 therefore remains available as a **separate future architectural decision**, to be taken only if evidence shows its index-locality benefit justifies a deliberate behavior change.
+
+`HasVersion7Uuids` was removed in Laravel 12; the repository does not use it
+(`HasVersion7Uuids` occurrences: 0), so there is no removal to handle. This
+correction task modifies no models — the trait swap happens in PR2.
 
 ### 10.4 Connector runtime compatibility verification
 
@@ -1410,8 +1541,9 @@ tests (§15.2) matter disproportionately.
 
 **Net assessment: the Laravel 11 → 13 step is low-risk for this codebase.**
 Exactly one High-impact item applies (`VerifyCsrfToken` → `PreventRequestForgery`,
-4 references) and exactly one Medium-impact item requires a decision
-(`HasUuids` UUIDv7, 18 models). Every other documented breaking change across
+4 references) and exactly one Medium-impact item requires an explicit
+implementation step (`HasUuids` on 18 models — preserve UUIDv4 per the recorded
+direction in §10.3). Every other documented breaking change across
 both guides is verifiably not applicable.
 
 ---
@@ -1763,7 +1895,7 @@ implementation PR (§17) must clear every applicable row before merge.
 | V9 | Panel smoke — `/admin` | authenticated render of login, dashboard, product table, a form, a resource view page | HTTP 200, no console error | — | ● | ● | ● | ● |
 | V10 | Panel smoke — `/cabinet` | `customer`-guard login, catalogue table, card view, cart drawer, order submit | HTTP 200, functional | — | ● | ● | ● | ● |
 | V11 | **`novalidate` assertion** | **`tests/Feature/FilamentFormValidationTest::test_panel_forms_render_with_novalidate` already exists** — keep it green; extend it to cover `/cabinet` and a modal form | present (per `04`) | — | — | ● | ● | ● |
-| V12 | **Connector polling concurrency** | new test: poll refresh concurrent with dispatch creates no duplicate and no orphan `queued` row | no duplicate/orphan | — | — | ● | ● | ● |
+| V12 | **Connector dispatch idempotency + polling smoke** | existing service-level tests stay green (`second_dispatch_returns_same_row_and_does_not_push_second_job`, compensation, stale-row recovery in both dispatch-service suites) plus a runtime/manual polling smoke under Livewire 4; a new automated concurrency test **only if** a real uncovered mutable race is identified (§8.1) | no duplicate/orphan `queued` row | — | — | ● | ● | ● |
 | V13 | Connector queue lane alignment | re-verify `config/queue.php` `retry_after` (90 / 1200) vs job `$timeout` (45 / 900) vs lock `expireAfter` (120 / 1100) against the process manager | matches `07-TECH_STACK.md` | ● | ● | — | — | ● |
 | V14 | `pcntl` present on workers | `php -m` on the host / in the worker image | present | ● | — | — | — | ● |
 | V15 | SSRF transport fail-closed | existing Guzzle cURL-handler assertion test after the `7.15.3` bump | still fails closed | ● | — | — | — | ● |
@@ -1771,8 +1903,10 @@ implementation PR (§17) must clear every applicable row before merge.
 | V17 | Localization | uk/ru/en assertions; `validation.required` message contract from `04` | unchanged | — | ● | ● | ● | ● |
 | V18 | **Visual regression** | §16 before/after comparison on both panels | human sign-off | — | — | ● | ● | ● |
 | V19 | Docs tests | `php artisan test --filter=Documentation`, `--filter=ImplementationGaps` | green | ● | ● | ● | ● | ● |
-| V20 | **Filament published JS assets re-published** | `php artisan filament:assets`, then confirm `git status` shows the 16 files under `public/js/filament/**` regenerated and committed | no Filament-3-generation asset survives | — | — | ● | ● | ● |
+| V20 | **Filament published JS assets regenerated** | verify the existing `post-autoload-dump` → `@php artisan filament:upgrade` hook regenerated the 16 files under `public/js/filament/**` after the Filament-major Composer operation, and commit the result (`php artisan filament:assets` only as diagnostic/repair; §9.5) | no Filament-3-generation asset survives | — | — | ● | ● | ● |
 | V21 | **Margin-format toggle via `Livewire::current()`** | exercise the margin toggle in both admin and cabinet product tables (9 call sites) | percent/absolute switch still works | — | — | ● | ● | ● |
+| V22 | **Authorization matrix unchanged** | the §7.8 inventory (23 `can*()` overrides, 6 `canAccess()`, `ConnectorAccountPolicy`, Merchandiser presentation) verified against the migrated invocation path; existing authorization tests green plus only the missing role/permission regression cases | **no access broadening; merge blocker** | — | — | ● | ● | ● |
+| V23 | **Live filter behavior preserved** | filters still apply immediately (no Apply button) via the shared `deferFilters(false)` mechanism (§7.7) | behavior identical to Filament 3 | — | — | ● | ● | ● |
 
 ---
 
@@ -1829,11 +1963,11 @@ must be checked later.
 
 Ordering constraints established by evidence, not preference:
 
-1. Laravel 11 cannot be resolved by Composer at all today (§4.2), and Filament 4 on Laravel 11 fails for that reason (§4.4 scenario 2). **The framework must move before, or together with, any Filament change.**
+1. Full re-resolution of the current Laravel-11 graph is blocked by Composer's advisory policy (§4.2), and Filament 4 on Laravel 11 fails for exactly that reason (§4.4 scenario 2). **The framework must move before, or together with, any Filament change.**
 2. Laravel 13 can be reached with Filament and Livewire untouched, because Filament `v3.3.54` already declares `illuminate/* ^13.0` (§4.4 scenario 1). **A runnable, testable Laravel-13-on-Filament-3 state exists.**
 3. Filament 4 requires Livewire `^3.5` and Filament 5 requires Livewire `^4.1` (§2.2). **The Livewire major bump belongs to the 4→5 step, not the 3→4 step.**
 4. All v3→v4 automation lives in the v4 tool; the v5 tool changes 0 files on this codebase (§13.4). **The Filament work must be split at the 3→4 boundary.**
-5. Tailwind 4 is required unconditionally by Filament 5 but only conditionally by Filament 4 (§2.2). **The Tailwind decision is gated on the 4→5 step**, though the toolchain can be prepared earlier.
+5. The Filament 4 upgrade guide requires **Tailwind CSS v4.1+** when a custom theme CSS file is in use, and custom themes are the recommended (upstream-required) direction for this project's own Tailwind usage (§9.1). **Tailwind 3 → 4.1+ and the custom themes therefore belong to the Filament 3→4 checkpoint (PR3)**, not to the 4→5 step — PR4 inherits an already-supported Tailwind 4.x and performs no further Tailwind major migration.
 
 The decomposition the task proposed is therefore technically possible and is
 adopted, with one refinement: **the Laravel 13 step should be its own PR that
@@ -1851,8 +1985,9 @@ taken.
 * Add a Node version pin (`.nvmrc` and/or `package.json` `engines`) and pin the Alpine Node install in `docker/php/Dockerfile` (§12).
 * **Add a Node setup + `npm ci` + `npm run build` step to `.github/workflows/mysql-tests.yml`** (§12) and `sqlite3`/`pdo_sqlite` to the Docker image if the local SQLite suite is wanted there.
 * Establish the visual-regression baseline capture over the 20 surfaces in §16, on `develop`, before anything changes.
-* Delete the three orphaned Blade views identified in §7.5 (85 lines, 0 references) so they do not enter the migration review surface.
-* Extend the **existing** `novalidate` test (V11) to cover the `/cabinet` panel and at least one modal form, and add the connector polling-concurrency test (V12) — both while still green on Filament 3.
+* Delete the three orphaned Blade views identified in §7.5 (85 lines, 0 references) — removal is behavior-neutral by evidence — so they do not enter the migration review surface. No other cleanup or redesign.
+* Extend the **existing** `novalidate` test (V11) to cover the `/cabinet` panel and at least one modal form, while still green on Filament 3. The connector dispatch-idempotency suites already exist (§8.1) and simply remain part of the gates — no new concurrency test is written speculatively.
+* Ensure the current baseline remains green throughout (V5/V6).
 * Gates: V1–V8, V13–V16, V19.
 
 ### PR2 — Laravel 11 → 13 (Filament stays on 3.3.54, Livewire on 3.x)
@@ -1861,48 +1996,70 @@ taken.
 
 * `composer.json`: `php ^8.3`, `laravel/framework ^13.0`, `laravel/tinker ^3.0`, `phpunit/phpunit ^12.0`. Allow `filament/*` to float to `v3.3.54` — which also clears the `filament/forms` XSS advisory `PKSA-n7tx-gkfb-14yj` (§14.1).
 * `VerifyCsrfToken::class` → `PreventRequestForgery::class` in both panel providers (4 references; §10.1). Functionally test both logins and form POSTs.
-* Resolve the **`HasUuids` UUIDv4-vs-UUIDv7 decision** for the 18 affected models and implement it explicitly (§10.3). **This needs the human decision before merge.**
+* **Preserve UUIDv4 behavior** on the 18 `HasUuids` models via the current Laravel-supported UUIDv4 mechanism (`HasVersion4Uuids` or the exact equivalent re-verified at execution time; §10.3) — the recorded behavior-preserving direction, not an open decision.
 * Optionally add `'serializable_classes' => false` to `config/cache.php` as hardening (§10.2).
-* Re-verify the connector queue lane alignment against `config/queue.php` and the process manager, per the standing `07-TECH_STACK.md` instruction (§10.4).
-* **Promote `guzzlehttp/guzzle` to an explicit direct `require` entry** at `^7.15.2` or higher (§10.4): `app/Support/Connectors/**` imports `GuzzleHttp\*` in 11 places while the package is only a transitive Laravel dependency.
-* Re-run the SSRF fail-closed `CurlHandler` assertion and the encrypted-credential round-trip after the Guzzle `7.15.3` bump.
+* Resolve Laravel breaking changes only — no Filament UI migration in this PR.
+* Re-verify the connector queue lane alignment against `config/queue.php` and the process manager, per the standing `07-TECH_STACK.md` instruction (§10.4) — queue-runtime invariants must be preserved, not assumed.
+* **Promote `guzzlehttp/guzzle` to an explicit direct `require` entry** at `^7.15.2` or higher (§10.4): the direct `GuzzleHttp\*` imports were re-verified during the correction pass (2026-08-08: 10 `use GuzzleHttp` statements importing 11 classes across 5 files under `app/Support/Connectors/**`) while the package remains only a transitive Laravel dependency.
+* Re-run the connector transport / SSRF regression coverage — the fail-closed `CurlHandler` assertion and the encrypted-credential round-trip — after the Guzzle `7.15.3` bump.
 * Gates: V1–V10, V13–V17, V19.
 
 **After PR2 the project is on a fully supported framework with the unfixable
 Laravel 11 advisories resolved — the core of GAP-024's stated impact — while the
 UI has not been touched at all.**
 
-### PR3 — Filament 3 → 4 bridge (Livewire stays on 3.x)
+### PR3 — Filament 3 → 4 + Tailwind 3 → 4.1+ + custom themes (Livewire stays on 3.x)
 
-*Solver-proven state (§4.4 scenario 3). Explicitly a bridge, not a destination.*
+*Solver-proven state (§4.4 scenario 3). Explicitly a bridge, not a destination.
+Intermediate state: Laravel 13 + Filament 4 + Livewire 3.x + Tailwind 4.1+ with
+custom admin and cabinet themes.*
 
 * Run `filament/upgrade ^4.0` / `vendor/bin/filament-v4` with a **narrowed path set** (`app/Filament`, `app/Providers/Filament`, the Filament helpers in `app/Support`), keeping the import-normalization churn out of the connector runtime (§13.3).
 * Review all 115 proposed changes; apply Category A, reject or separate Category B, hand-resolve Category C.
+* **Create the proper custom Filament themes** (§9.1): one thin entrypoint per panel, shared design-token/`@source` definitions, panel visibility policies and Light/Dark/System behavior preserved.
+* **Migrate Tailwind 3 → 4.1+** in the same checkpoint — required by the Filament 4 upgrade guide once custom themes exist: `@tailwindcss/vite` on the **current Vite major** (§9.4); `@import "tailwindcss"` in `app.css`; `content` globs → `@source`; `theme.extend` → `@theme`; drop `autoprefixer` (§9.2). Audit the **78 renamed-scale utility occurrences** (`shadow-sm` 22, `rounded-sm` 12, `outline-none` 20, `space-y-` 24) and consolidate the triple-defined primary palette (§9.3).
+* **Authorization review per §7.8** — verify every `can*()`/`canAccess()` rule against the v4 invocation path, migrate to policy/authorization-response API where needed, and add only the missing role/permission regression tests. **Any authorization regression is a merge blocker.**
+* **Preserve live filter behavior** via the shared `deferFilters(false)` mechanism (§7.7).
 * Publish `config/filament.php`; pin `default_filesystem_disk` to `FILAMENT_FILESYSTEM_DISK` and set the `file_generation.flags` to preserve the v3 directory/embedding style (§7.3).
-* **Re-derive the four published vendor Blade overrides against Filament 4** (§7.4), with the `novalidate` test (V11) as the gate.
+* **Reconcile the four published vendor Blade overrides against Filament 4** (§7.4) — public extension points investigated first, re-derivation only where none suffices — with the `novalidate` test (V11) as the gate and its extended `/cabinet`/modal coverage kept green.
 * Rename `TOOLBAR_TOGGLE_COLUMN_TRIGGER_AFTER` → `TOOLBAR_COLUMN_MANAGER_TRIGGER_AFTER`; re-verify the `BODY_END` and `STYLES_AFTER` hooks.
 * Verify all 45 `<x-filament*::…>` Blade component usages and every `fi-ta-*` selector in `table-toolbar-overrides.blade.php`.
-* **Re-publish the 16 committed Filament JS assets** (`php artisan filament:assets`) and commit the regenerated files (§9.5).
-* Gates: V1–V6, V8–V12, V17–V21. **V18 (visual) is mandatory here.**
+* **Verify the 16 committed Filament JS assets were regenerated by the existing `post-autoload-dump` `filament:upgrade` hook** and commit the result (§9.5).
+* Gates: V1–V6, V8–V12, V17–V23. **V18 (visual) is mandatory here.** **PR3 may not merge with a known UI, security, authorization, `novalidate`, filter-behavior or required-visual regression.**
 
-### PR4 — Filament 4 → 5 + Livewire 3 → 4 + Tailwind 4
+### PR4 — Filament 4 → 5 + Livewire 3 → 4
 
-*The step where the three UI generations move together, because Filament 5 requires Livewire 4 and Tailwind 4.*
+*Final target state: Laravel 13 + Filament 5 + Livewire 4 + Tailwind 4.x.
+Tailwind is already on a supported 4.x from PR3 — this PR performs **no further
+Tailwind major migration** (a Tailwind 4 patch/minor bump is permitted only if
+solver/security evidence at execution time requires it).*
 
 * `filament/filament ^5.0`, `livewire/livewire ^4.0`; run `vendor/bin/filament-v5` (which will make the `Resource::can()`/`authorize()`/`getAuthorizationResponse()` `$action` signature change).
-* Livewire 4: change `wire:model.blur` → `wire:model.live.blur` in the re-derived `search-field` fork (§8). Optionally move the 4 cabinet route registrations to `Route::livewire()`. Everything else in the guide is not-used or backward-compatible.
-* Tailwind 4: `@tailwindcss/vite` on the existing Vite 6 line; `@import "tailwindcss"` in `app.css`; `content` globs → `@source`; `theme.extend` → `@theme`; drop `autoprefixer` (§9.2, §9.4). Audit the **78 renamed-scale utility occurrences** (`shadow-sm` 22, `rounded-sm` 12, `outline-none` 20, `space-y-` 24) and consolidate the triple-defined primary palette (§9.3).
-* **Re-publish the 16 committed Filament JS assets again** from Filament 5 (§9.5).
-* **Resolve the custom-Filament-theme decision (§9.1 Option A vs Option B).** This needs the human decision before merge.
-* Re-derive the four vendor Blade forks **again**, this time against Filament 5's restructured templates — including the fact that `filament-panels::components.form.index` no longer exists and `filament-actions::components.modals` is now 19 lines with no `<form>` (§7.4).
-* Gates: V1–V6, V8–V12, V17–V21. **V18 is mandatory and is the primary gate.**
+* Livewire 4: change `wire:model.blur` → `wire:model.live.blur` in the reconciled `search-field` override if it still exists after PR3 (§8). Optionally move the 4 cabinet route registrations to `Route::livewire()`. Everything else in the guide is not-used or backward-compatible.
+* Re-check the vendor Blade overrides **again** against Filament 5's restructured templates — including the fact that `filament-panels::components.form.index` no longer exists and `filament-actions::components.modals` is now 19 lines with no `<form>` (§7.4). Verify `novalidate` (V11).
+* Verify connector polling behavior under Livewire 4's non-blocking `wire:poll` (§8.1, V12) and the margin-format / `Livewire::current()` surfaces (V21) if still applicable.
+* **Verify the Filament JS assets were regenerated by the existing Composer hook** and commit the result (§9.5).
+* **No Vite major modernization** unless forced by fresh implementation-time evidence (§9.4).
+* Gates: V1–V6, V8–V12, V17–V23. **V18 is mandatory and is the primary gate.** **PR4 may not merge with a known regression.**
 
-### PR5 — Application compatibility corrections and runtime hardening
+### PR5 — Optional hardening and cleanup (no deferred defects)
 
-* Fix whatever V9–V12 and V18 surfaced in PR3/PR4 that was deferred rather than blocking.
-* Re-verify the full connector runtime contract set end to end: queue lane timings, `WithoutOverlapping` shared locks, `retryUntil()` deadlines, dispatch-failure compensation, stale-row recovery, sanitized failed-job exceptions, SSRF fail-closed transport, `encrypted:array` round-trip, `APP_PREVIOUS_KEYS`.
-* Confirm the discovery manual-trigger gate still behaves per `07-TECH_STACK.md`: hidden (not disabled) while `CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=false`, and refused at the dispatch service even when called directly.
-* Gates: V1–V21.
+*Only after PR1–PR4 are green. **PR5 is not a defect backlog for PR3 or PR4** —
+any known regression in authorization, workspace isolation, security, form
+validation, `novalidate`, filtering behavior, panel login/auth, connector
+runtime behavior, required business behavior, or a visual contract included in
+the applicable migration gate must have been fixed inside the PR that
+introduced it, before that PR merged.*
+
+PR5 may contain only:
+
+* optional hardening (e.g. the `'serializable_classes' => false` explicit pin if not already added in PR2);
+* deprecation cleanup that is proven behavior-neutral;
+* extra runtime verification — e.g. re-running the full connector runtime contract set end to end (queue lane timings, `WithoutOverlapping` shared locks, `retryUntil()` deadlines, dispatch-failure compensation, stale-row recovery, sanitized failed-job exceptions, SSRF fail-closed transport, `encrypted:array` round-trip, `APP_PREVIOUS_KEYS`) and confirming the discovery manual-trigger gate still behaves per `07-TECH_STACK.md` (hidden, not disabled, while `CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=false`; refused at the dispatch service even when called directly);
+* removal of temporary compatibility scaffolding if proven safe;
+* non-blocking technical debt identified after all mandatory gates were already green.
+
+Gates: V1–V23 (as applicable to what PR5 actually touches).
 
 ### PR6 — Documentation and GAP-024 closure
 
@@ -1910,6 +2067,9 @@ UI has not been touched at all.**
 * Move GAP-024 to Closed in `docs/IMPLEMENTATION_GAPS.md`, preserving the section structure that `ConnectorAccountDocumentationTest::gap024Section()` matches (`/## GAP-024 —.*?(?=\n## GAP-021 —)/s`; §15.2).
 * Update `DEPLOY.md` with the verified production PHP/Node versions and any changed Supervisor commands.
 * Gates: V4, V5, V6, V19.
+
+**Discovery Overview UI remains blocked until the PR4 target state is complete
+and verified** (§18, "Discovery UI gate").
 
 **No PR in this decomposition is implemented by this audit.**
 
@@ -2028,11 +2188,16 @@ each Supervisor program's PHP binary path is a **required pre-upgrade deployment
 check**. `pcntl` must be re-confirmed on every worker runtime, because without it
 Laravel does not enforce the 45s and 900s connector job timeouts at all.
 
-**Node:** `vite@8` and `laravel-vite-plugin@3` require `^20.19.0 || >=22.12.0`.
-The repository declares no Node version anywhere (no `.nvmrc`, no `engines`), and
-`docker/php/Dockerfile` installs Alpine's unpinned `nodejs npm`. **The production
-Node version cannot be verified from repository evidence** — also a required
-pre-upgrade deployment check.
+**Node:** the repository declares no Node version anywhere (no `.nvmrc`, no
+`engines`), and `docker/php/Dockerfile` installs Alpine's unpinned `nodejs npm`.
+**The production Node version cannot be verified from repository evidence** —
+a required pre-upgrade deployment check, and a Node pin must be established
+regardless of the Vite major, because the Tailwind 4 toolchain requires a
+modern Node. The Vite 8 / `laravel-vite-plugin` 3 jump (which would require
+Node `^20.19.0 || >=22.12.0`) is **explicitly out of GAP-024 scope** (§9.4):
+keep the current Vite major and the current compatible Laravel Vite plugin
+during the Filament/Tailwind migration unless real solver/tooling evidence at
+implementation time makes that impossible.
 
 **CI:** `.github/workflows/mysql-tests.yml` has **no Node step and no
 `npm run build`**. The frontend build is currently verified only on the
@@ -2081,7 +2246,8 @@ listed under "Biggest blocker".
 `fi-ta-*` classes), and 45 `<x-filament*::…>` component usages.
 
 **Laravel:** 4 `VerifyCsrfToken` references in the two panel providers
-(**High**); 18 models using `HasUuids` (**Medium**, decision required). Every
+(**High**); 18 models using `HasUuids` (**Medium** — resolved direction:
+preserve UUIDv4 via the framework-supported mechanism, §10.3). Every
 other documented breaking change across both sequential guides is verifiably not
 applicable — verified individually in §10.5, including 0 `upsert`, 0
 `array_first`/`array_last`, 0 `Schema::getTables`, 0 `Storage::disk('local')`,
@@ -2107,30 +2273,38 @@ every Tailwind-v4-*removed* utility checked, but **78 occurrences of v4-*renamed
 scale utilities** (`shadow-sm` 22, `rounded-sm` 12, `outline-none` 20, `space-y-`
 24) plus 190 `dark:` variants and 57 arbitrary-value utilities needing visual
 spot-checking. **16 committed Filament 3 JS assets under `public/js/filament/**`
-must be re-published at each Filament major step** — not covered by
-`npm run build`, not covered by the gitignored `public/build`, and invisible to
-every existing test.
+must be verified as regenerated (via the existing `post-autoload-dump`
+`filament:upgrade` hook) and committed at each Filament major step** (§9.5) —
+they are not covered by `npm run build`, not covered by the gitignored
+`public/build`, and invisible to every existing test.
 
 **Tests:** 149 files (67 Feature, 80 Unit), 1303 passing / 2 skipped at
-baseline. 23 reference Filament; only 2 use `Livewire::test` — a coverage gap
-that requires two new tests (`novalidate` presence, connector polling
-concurrency) before the migration, not after.
+baseline. 25 reference Filament, with deep interaction coverage (206
+`Livewire::actingAs(...)->test(...)` chains, 37 `fillForm`, 24 form-error
+assertions — §7.6) that must be preserved. The `novalidate` tripwire already
+exists (`FilamentFormValidationTest::test_panel_forms_render_with_novalidate`)
+and needs its `/cabinet` and modal coverage gaps closed in PR1; the connector
+dispatch-idempotency invariant is already tested at the service layer (§8.1),
+so a new UI concurrency test is written only if a real uncovered mutable race
+is identified.
 
 ### Upgrade decomposition
 
 Six PRs, each leaving the repository runnable and testable:
 
-1. **Runtime, toolchain and verification prerequisites** — PHP/Node pins, `pcntl` confirmation, **CI frontend build step**, visual baseline capture, and the two missing regression tests added while still green on Filament 3.
-2. **Laravel 11 → 13**, deliberately leaving Filament on `3.3.54` and Livewire on 3.x — solver-proven (§4.4 scenario 1). Includes `PreventRequestForgery` and the UUID decision. **This PR alone resolves the unfixable Laravel 11 advisories and the "unsupported framework" core of GAP-024, with zero UI risk.**
-3. **Filament 3 → 4 bridge** (Livewire stays 3.x) — the 115-file Rector migration with a narrowed path set, `config/filament.php` compatibility flags, and the first re-derivation of the four vendor Blade forks. First mandatory visual gate.
-4. **Filament 4 → 5 + Livewire 3 → 4 + Tailwind 3 → 4** — the coupled UI generation jump, the custom-theme decision, and the second re-derivation of the vendor forks against Filament 5's restructured templates. Primary visual gate.
-5. **Application compatibility corrections and runtime hardening** — resolve deferred findings; full connector runtime re-verification.
-6. **Documentation and GAP-024 closure** — `07-TECH_STACK.md`, `IMPLEMENTATION_GAPS.md`, `DEPLOY.md`, only after 2–5 are merged and verified.
+1. **Runtime, toolchain and verification prerequisites / safety net** — PHP/Node/`pcntl` verification, Node pin, **CI frontend build step** (`npm ci && npm run build`), visual baseline capture, extension of the existing `novalidate` test to `/cabinet` and a modal form, and removal of the three verified-orphaned Blade views — all while still green on Filament 3, with no unrelated redesign.
+2. **Laravel 11 → 13**, deliberately leaving Filament on `3.3.54` and Livewire on 3.x — solver-proven (§4.4 scenario 1). Includes `PreventRequestForgery`, **UUIDv4 preservation** (§10.3), Tinker 3, PHPUnit 12, the Guzzle direct-dependency promotion, and connector transport/SSRF regression coverage. Laravel breaking changes only — no Filament UI migration. **This PR alone resolves the unfixable Laravel 11 advisories and the "unsupported framework" core of GAP-024, with zero UI risk.**
+3. **Filament 3 → 4 + Tailwind 3 → 4.1+ + custom themes** (Livewire stays 3.x) — the 115-file Rector migration with a narrowed path set, `config/filament.php` compatibility flags, the custom admin/cabinet themes, the Tailwind 4.1+ migration on the current Vite major, the §7.8 authorization review, `deferFilters(false)` behavior preservation, and the first reconciliation of the four vendor Blade forks. First mandatory visual gate; **may not merge with a known UI/security/authorization regression**.
+4. **Filament 4 → 5 + Livewire 3 → 4** — the coupled Filament/Livewire generation jump onto the already-supported Tailwind 4.x, with the second reconciliation of the vendor forks against Filament 5's restructured templates, connector-polling and `novalidate` verification. Primary visual gate; **may not merge with a known regression**. No Tailwind major, no Vite major.
+5. **Optional hardening and cleanup** — behavior-neutral only; **no deferred defects from PR3/PR4**; extra end-to-end connector runtime verification.
+6. **Documentation and GAP-024 closure / truth sync** — `07-TECH_STACK.md`, `IMPLEMENTATION_GAPS.md`, `DEPLOY.md` updated with actually verified runtime information, documentation tests run — only after 2–5 are merged and verified.
 
-The ordering is dictated by evidence: Laravel 11 can no longer be resolved by
-Composer at all (§4.2), Filament 4 on Laravel 11 fails for that reason (§4.4
-scenario 2), Laravel 13 on Filament 3.3.54 succeeds (§4.4 scenario 1), and
-Filament 4 requires Livewire 3 while Filament 5 requires Livewire 4 (§2.2).
+The ordering is dictated by evidence: full re-resolution of the Laravel 11
+graph is blocked by Composer's advisory policy (§4.2), Filament 4 on Laravel 11
+fails for that reason (§4.4 scenario 2), Laravel 13 on Filament 3.3.54 succeeds
+(§4.4 scenario 1), Filament 4 requires Livewire 3 while Filament 5 requires
+Livewire 4 (§2.2), and Filament 4 with custom themes requires Tailwind 4.1+
+(§2.2, §9.1) — which places Tailwind at the PR3 checkpoint.
 
 ### Discovery UI gate
 
@@ -2144,7 +2318,7 @@ architectural direction, and found four concrete reasons to confirm it:
 
 1. **New Filament 3 UI code is guaranteed rework.** Discovery Overview would be built with `Filament\Forms\Form`, `Filament\Infolists\Infolist`, `Filament\Tables\Actions\*`, `->schema()`, `->bulkActions()` and static `$navigationIcon`/`$navigationGroup` — every one of which is renamed or restructured by the v3→v4 Rector migration. The tool already proposes changes to 58 files under `app/Filament/**`; each new Resource, Page or RelationManager adds directly to that number and to the manual review burden.
 2. **Discovery is the polling-heaviest surface in the product**, and polling semantics change. Livewire 4 makes `wire:poll` non-blocking and runs `wire:model.live` requests in parallel. The existing connector UI already polls at 5s in three places. Building a new polling-heavy surface against Livewire 3 semantics, then migrating it, means validating concurrency behavior twice — and the second validation would happen on brand-new code that has no established visual or behavioral baseline.
-3. **New panel Tailwind usage is on unstable ground.** Filament 5's docs are explicit that arbitrary Tailwind classes do not work without a custom theme, and this project has none (§9.1). Any Tailwind utility written into a new Discovery Blade view today works only by incidental inclusion in Filament 3's compiled stylesheet, and has no guarantee of surviving the Tailwind 4 rebuild. The theme decision (§9.1 Option A vs B) should be made *before* new panel UI is written against it, not after.
+3. **New panel Tailwind usage is on unstable ground.** Filament 4's and 5's docs are explicit that arbitrary Tailwind classes do not work without a custom theme, and this project has none yet (§9.1). Any Tailwind utility written into a new Discovery Blade view today works only by incidental inclusion in Filament 3's compiled stylesheet, and has no guarantee of surviving the Tailwind 4 rebuild. The recommended custom themes (§9.1) should exist — built in PR3 — *before* new panel UI is written against them, not after.
 4. **It would enlarge the visual-regression surface at exactly the wrong moment.** §16 already lists 20 high-value surfaces across three appearance modes and two breakpoint ranges, with no visual-regression harness in place. Adding an unfinished Discovery Overview to that set before PR1 establishes the baseline means the new screens have no "before" state to compare against — they would be migrated and visually validated simultaneously, which is the specific combination this audit recommends avoiding everywhere else.
 
 The recommended sequencing is therefore: land PR1–PR4, confirm the visual gates,
@@ -2231,6 +2405,51 @@ application file, Blade template, CSS, migration, configuration, CI workflow or
 Docker file is modified on this branch.** The committed diff contains exactly one
 new documentation file.
 
+### Correction-pass verification (2026-08-08)
+
+Before editing, `origin/develop` was re-fetched and re-verified unchanged:
+
+```console
+$ git fetch origin --prune
+$ git merge-base --is-ancestor 9713d03 origin/develop && echo ANCESTOR-OK
+ANCESTOR-OK
+$ git rev-parse origin/develop
+9713d03d862a549bc5738071a55e58fab0b2e647
+```
+
+No integration with a newer `develop` was required. All ten required project
+documents, `composer.json`, the complete current Architecture Review Checklist
+in `04-ARCHITECTURE_PRINCIPLES.md` (items 1–22 plus the Filament form
+validation standard), and this entire report were read at that commit before
+editing.
+
+New verification commands executed during the correction pass, with results
+recorded inline where cited: the untouched-graph partial-update proof
+(`composer update predis/predis --dry-run` → EXIT=0; §4.2), the `can*()`
+override inventory (23 overrides / 10 Resources / 22 deny-only; §7.8), the
+`deferFilters` absence check (0 occurrences; §7.7), the dispatch-service
+idempotency test inventory and the read-only `refreshConnectionState` body
+(§8.1), the direct-Guzzle-import recount (10 `use GuzzleHttp` statements, 11
+classes, 5 files; §17 PR2), and the `HasVersion4Uuids` presence check on
+`laravel/framework` `13.x` (§10.3).
+
+Documentation tests and the full suite were re-run with the corrected report
+present:
+
+```console
+$ php artisan test --filter=Documentation
+  Tests:    57 passed (471 assertions)
+
+$ php artisan test --filter=ImplementationGaps
+  Tests:    3 passed (10 assertions)
+
+$ php artisan test
+  Tests:    2 skipped, 1303 passed (30183 assertions)
+```
+
+The correction-pass diff modifies only this report; no dependency, code, test,
+CI, Docker, deployment or configuration file changed.
+
 ---
 
 ## 20. Source index
@@ -2263,6 +2482,13 @@ each checked inside the UTC window declared at the top.
 
 **Packagist metadata (`https://repo.packagist.org/p2/{package}.json`)**
 * `laravel/framework`, `laravel/tinker`, `laravel/pail`, `laravel/sail`, `laravel/pint`, `laravel/pao`, `filament/filament`, `filament/support`, `filament/forms`, `filament/tables`, `filament/schemas`, `filament/actions`, `filament/upgrade`, `livewire/livewire`, `spatie/laravel-permission`, `laravel-lang/lang`, `predis/predis`, `phpunit/phpunit`, `mockery/mockery`, `nunomaduro/collision`, `fakerphp/faker`, `danharrin/livewire-rate-limiting`, `kirschbaum-development/eloquent-power-joins`
+
+**Correction-pass primary sources (checked 2026-08-08)**
+* `https://getcomposer.org/changelog/2.9.2` — "Fixed partial updates failing when another package in the lock file has a known security advisory" (composer/composer #12626); `--no-security-blocking` flag addition
+* `https://raw.githubusercontent.com/laravel/framework/13.x/src/Illuminate/Database/Eloquent/Concerns/HasVersion4Uuids.php` — UUIDv4-preserving trait present on the 13.x branch
+* `https://raw.githubusercontent.com/filamentphp/filament/4.x/docs/08-styling/01-overview.md` — Filament 4 custom-theme-required statement ("A custom theme is required to use Tailwind CSS classes in your own code… you must create a custom theme first")
+* `https://raw.githubusercontent.com/filamentphp/filament/3.x/packages/panels/docs/01-installation.md` — `filament:upgrade` in `post-autoload-dump` keeps caches cleared and published assets current
+* `composer update predis/predis --dry-run --no-scripts --no-plugins` on the untouched repository — EXIT=0 (§4.2)
 
 **Composer / npm / Rector command output (executed during this audit)**
 * `composer why-not` and `composer prohibits` for `laravel/framework ^13.0`, `filament/filament ^5.0`, `livewire/livewire ^4.0` — §4.1
