@@ -2,29 +2,26 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Actions\EditAction;
-use App\Filament\Resources\TagResource\Pages\ListTags;
 use App\Filament\Resources\TagResource\Pages\CreateTag;
 use App\Filament\Resources\TagResource\Pages\EditTag;
-use App\Filament\Resources\TagResource\Pages;
+use App\Filament\Resources\TagResource\Pages\ListTags;
 use App\Filament\Resources\TagResource\Support\GuardedDeleteTagAction;
 use App\Models\Tag;
-use Filament\Forms;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
 class TagResource extends Resource
 {
     protected static ?string $model = Tag::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-hashtag';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-hashtag';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Каталог';
+    protected static string|\UnitEnum|null $navigationGroup = 'Каталог';
 
     protected static ?string $modelLabel = 'тег';
 

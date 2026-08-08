@@ -2,34 +2,31 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Actions\EditAction;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use App\Filament\Resources\DeliverySettingResource\Pages\ListDeliverySettings;
 use App\Filament\Resources\DeliverySettingResource\Pages\CreateDeliverySetting;
 use App\Filament\Resources\DeliverySettingResource\Pages\EditDeliverySetting;
-use App\Filament\Resources\DeliverySettingResource\Pages;
+use App\Filament\Resources\DeliverySettingResource\Pages\ListDeliverySettings;
 use App\Models\DeliverySetting;
-use Filament\Forms;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class DeliverySettingResource extends Resource
 {
     protected static ?string $model = DeliverySetting::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-truck';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-truck';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Система';
+    protected static string|\UnitEnum|null $navigationGroup = 'Система';
 
     protected static ?string $modelLabel = 'доставка';
 

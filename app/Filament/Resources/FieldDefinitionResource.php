@@ -2,38 +2,34 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\TextInput;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\EditAction;
-use App\Filament\Resources\FieldDefinitionResource\Pages\ListFieldDefinitions;
-use App\Filament\Resources\FieldDefinitionResource\Pages\EditFieldDefinition;
 use App\Enums\AttributeScope;
 use App\Enums\AttributeStatus;
 use App\Enums\FieldObjectType;
-use App\Filament\Resources\FieldDefinitionResource\Pages;
+use App\Filament\Resources\FieldDefinitionResource\Pages\EditFieldDefinition;
+use App\Filament\Resources\FieldDefinitionResource\Pages\ListFieldDefinitions;
 use App\Models\FieldBinding;
 use App\Models\FieldDefinition;
-use Filament\Forms;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-
 use Illuminate\Auth\Access\Response;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class FieldDefinitionResource extends Resource
 {
     protected static ?string $model = FieldDefinition::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-adjustments-horizontal';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Система';
+    protected static string|\UnitEnum|null $navigationGroup = 'Система';
 
     protected static ?string $navigationLabel = 'Поля товару';
 
@@ -197,8 +193,6 @@ class FieldDefinitionResource extends Resource
             'edit' => EditFieldDefinition::route('/{record}/edit'),
         ];
     }
-
-
 
     public static function getCreateAuthorizationResponse(): Response
     {

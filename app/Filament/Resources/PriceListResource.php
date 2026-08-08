@@ -2,38 +2,34 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Actions\EditAction;
-use App\Filament\Resources\PriceListResource\RelationManagers\ItemsRelationManager;
-use App\Filament\Resources\PriceListResource\Pages\ListPriceLists;
+use App\Enums\PriceListStatus;
 use App\Filament\Resources\PriceListResource\Pages\CreatePriceList;
 use App\Filament\Resources\PriceListResource\Pages\EditPriceList;
-use App\Enums\PriceListStatus;
-use App\Filament\Resources\PriceListResource\Pages;
-use App\Filament\Resources\PriceListResource\RelationManagers;
+use App\Filament\Resources\PriceListResource\Pages\ListPriceLists;
+use App\Filament\Resources\PriceListResource\RelationManagers\ItemsRelationManager;
 use App\Filament\Resources\PriceListResource\Support\GuardedDeletePriceListAction;
 use App\Filament\Resources\PriceListResource\Support\MakeDefaultPriceListAction;
 use App\Models\PriceList;
 use App\Support\Filament\RevalidatesOnUpdate;
-use Filament\Forms;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class PriceListResource extends Resource
 {
     protected static ?string $model = PriceList::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-currency-dollar';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-currency-dollar';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'B2B';
+    protected static string|\UnitEnum|null $navigationGroup = 'B2B';
 
     protected static ?string $navigationLabel = 'Прайс-листи';
 

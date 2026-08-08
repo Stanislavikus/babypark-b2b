@@ -2,9 +2,8 @@
 
 namespace App\Filament\Resources\SyncLogResource\Pages;
 
-use Filament\Actions\EditAction;
 use App\Filament\Resources\SyncLogResource;
-use Filament\Actions;
+use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewSyncLog extends ViewRecord

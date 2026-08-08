@@ -2,15 +2,14 @@
 
 namespace App\Filament\Resources\OrderResource\Pages;
 
-use Filament\Support\Enums\Width;
-use Filament\Schemas\Schema;
-use Filament\Actions\EditAction;
 use App\Filament\Resources\OrderResource;
-use Filament\Actions;
 use Filament\Actions\Action;
+use Filament\Actions\EditAction;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
+use Filament\Support\Enums\Width;
 
 class ViewOrder extends ViewRecord
 {

@@ -2,11 +2,10 @@
 
 namespace App\Filament\Resources\ConnectorDefinitionResource\Pages;
 
-use Filament\Actions\DeleteAction;
 use App\Filament\Resources\ConnectorDefinitionResource;
 use App\Models\ConnectorDefinition;
 use App\Services\Connectors\ConnectorDefinitionGovernanceService;
-use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 

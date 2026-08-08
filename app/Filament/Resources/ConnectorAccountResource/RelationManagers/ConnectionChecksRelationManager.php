@@ -2,13 +2,12 @@
 
 namespace App\Filament\Resources\ConnectorAccountResource\RelationManagers;
 
-use Filament\Tables\Columns\TextColumn;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Models\ConnectorConnectionCheck;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorUiFormatter;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;

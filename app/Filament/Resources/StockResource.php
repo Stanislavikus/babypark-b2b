@@ -2,33 +2,29 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\ViewAction;
 use App\Filament\Resources\StockResource\Pages\ListStocks;
 use App\Filament\Resources\StockResource\Pages\ViewStock;
-use App\Filament\Resources\StockResource\Pages;
 use App\Models\Category;
 use App\Models\Stock;
-use Filament\Infolists;
+use Filament\Actions\ViewAction;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-
 use Illuminate\Auth\Access\Response;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class StockResource extends Resource
 {
     protected static ?string $model = Stock::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-archive-box';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-archive-box';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Каталог';
+    protected static string|\UnitEnum|null $navigationGroup = 'Каталог';
 
     protected static ?string $modelLabel = 'залишок';
 
@@ -149,9 +145,6 @@ class StockResource extends Resource
             'view' => ViewStock::route('/{record}'),
         ];
     }
-
-
-
 
     public static function getCreateAuthorizationResponse(): Response
     {

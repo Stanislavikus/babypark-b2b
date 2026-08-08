@@ -2,8 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Utilities\Set;
 use App\Models\User;
 use App\Support\CanonicalRegistry\CanonicalRegistryReader;
 use App\Support\CanonicalRegistry\FieldMatrixPresenter;
@@ -12,6 +10,8 @@ use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
 
@@ -21,13 +21,13 @@ class FieldMatrix extends Page implements HasForms
 
     private const ALLOWED_FILTER_KEYS = ['fieldGroup', 'bindingStrategy', 'scope'];
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-table-cells';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-table-cells';
 
     protected static ?string $navigationLabel = null;
 
     protected static ?string $title = null;
 
-    protected static string | \UnitEnum | null $navigationGroup = null;
+    protected static string|\UnitEnum|null $navigationGroup = null;
 
     protected static ?int $navigationSort = 1;
 

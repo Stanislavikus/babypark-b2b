@@ -2,35 +2,31 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\ViewEntry;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Actions\ViewAction;
+use App\Enums\ConnectorConnectionCheckStatus;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ListConnectorAccounts;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
-use App\Enums\ConnectorConnectionCheckStatus;
-use App\Filament\Resources\ConnectorAccountResource\Pages;
 use App\Models\ConnectorAccount;
 use App\Models\User;
 use App\Support\Connectors\ConnectorAccountMerchandiserPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorUiFormatter;
-use Filament\Infolists;
+use Filament\Actions\ViewAction;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-
-use Illuminate\Auth\Access\Response;
 
 class ConnectorAccountResource extends Resource
 {
     protected static ?string $model = ConnectorAccount::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-link';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-link';
 
     protected static ?int $navigationSort = 3;
 
@@ -233,9 +229,6 @@ class ConnectorAccountResource extends Resource
             'view' => ViewConnectorAccount::route('/{record}'),
         ];
     }
-
-
-
 
     private static function applyPresentationEagerLoads(Builder $query): Builder
     {

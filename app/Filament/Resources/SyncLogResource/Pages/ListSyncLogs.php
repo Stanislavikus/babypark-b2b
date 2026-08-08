@@ -2,9 +2,8 @@
 
 namespace App\Filament\Resources\SyncLogResource\Pages;
 
-use Filament\Actions\CreateAction;
 use App\Filament\Resources\SyncLogResource;
-use Filament\Actions;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListSyncLogs extends ListRecords

@@ -2,9 +2,8 @@
 
 namespace App\Filament\Resources\StockResource\Pages;
 
-use Filament\Actions\CreateAction;
 use App\Filament\Resources\StockResource;
-use Filament\Actions;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListStocks extends ListRecords

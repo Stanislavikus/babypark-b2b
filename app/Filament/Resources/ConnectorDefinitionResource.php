@@ -2,27 +2,24 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\EditAction;
-use App\Filament\Resources\ConnectorDefinitionResource\Pages\ListConnectorDefinitions;
-use App\Filament\Resources\ConnectorDefinitionResource\Pages\CreateConnectorDefinition;
-use App\Filament\Resources\ConnectorDefinitionResource\Pages\EditConnectorDefinition;
 use App\Enums\ConnectorDefinitionStatus;
 use App\Enums\ConnectorDirection;
-use App\Filament\Resources\ConnectorDefinitionResource\Pages;
+use App\Filament\Resources\ConnectorDefinitionResource\Pages\CreateConnectorDefinition;
+use App\Filament\Resources\ConnectorDefinitionResource\Pages\EditConnectorDefinition;
+use App\Filament\Resources\ConnectorDefinitionResource\Pages\ListConnectorDefinitions;
 use App\Filament\Resources\ConnectorDefinitionResource\RelationManagers\SchemaSourcesRelationManager;
 use App\Models\ConnectorDefinition;
 use App\Models\User;
 use App\Support\Platform\PlatformAdminAuthorization;
-use Filament\Forms;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
 
@@ -32,9 +29,9 @@ class ConnectorDefinitionResource extends Resource
 
     protected static ?string $model = ConnectorDefinition::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-server-stack';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-server-stack';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Модель даних і коннектори';
+    protected static string|\UnitEnum|null $navigationGroup = 'Модель даних і коннектори';
 
     protected static ?string $navigationLabel = 'Платформи та джерела';
 

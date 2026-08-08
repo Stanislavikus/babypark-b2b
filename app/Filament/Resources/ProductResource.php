@@ -2,29 +2,13 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Select;
-use Filament\Schemas\Components\Group;
-use Filament\Actions\Action;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\ViewAction;
-use Filament\Actions\BulkActionGroup;
-use App\Filament\Resources\ProductResource\Pages\ListProducts;
-use App\Filament\Resources\ProductResource\Pages\ViewProduct;
-use App\Filament\Resources\ProductResource\Pages\EditProduct;
-use Filament\Actions\BulkAction;
 use App\Enums\TagBulkOperation;
 use App\Exceptions\Catalog\InvalidTagBulkSelectionException;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource\Pages;
+use App\Filament\Resources\ProductResource\Pages\EditProduct;
+use App\Filament\Resources\ProductResource\Pages\ListProducts;
+use App\Filament\Resources\ProductResource\Pages\ViewProduct;
 use App\Filament\Resources\ProductResource\Support\TagBulkUi;
 use App\Models\Product;
 use App\Models\Tag;
@@ -37,21 +21,33 @@ use App\Support\ProductFields\MarginToggle;
 use App\Support\ProductFields\ProductColumnVisibility;
 use App\Support\ProductTableLink;
 use App\Support\Workspace\WorkspaceContext;
-use Filament\Forms;
-use Filament\Infolists;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
 use Filament\Support\Exceptions\Halt;
-use Filament\Tables;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
 use Livewire\Livewire;
 use LogicException;
-
-use Illuminate\Auth\Access\Response;
-use Illuminate\Database\Eloquent\Model;
 
 class ProductResource extends Resource
 {
@@ -59,9 +55,9 @@ class ProductResource extends Resource
 
     protected static ?string $model = Product::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cube';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cube';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Каталог';
+    protected static string|\UnitEnum|null $navigationGroup = 'Каталог';
 
     protected static ?string $modelLabel = 'товар';
 
@@ -560,8 +556,6 @@ class ProductResource extends Resource
             'edit' => EditProduct::route('/{record}/edit'),
         ];
     }
-
-
 
     // -------------------------------------------------------------------------
     // Bulk tag actions

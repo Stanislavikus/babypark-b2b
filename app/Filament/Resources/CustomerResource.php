@@ -2,58 +2,52 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Select;
-use Filament\Schemas\Components\Utilities\Get;
-use Closure;
-use Filament\Forms\Components\Placeholder;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\IconEntry;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\TernaryFilter;
-use Filament\Actions\ViewAction;
-use Filament\Actions\EditAction;
-use Filament\Actions\Action;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\BulkAction;
-use App\Filament\Resources\CustomerResource\Pages\ListCustomers;
-use App\Filament\Resources\CustomerResource\RelationManagers\OrdersRelationManager;
-use App\Filament\Resources\CustomerResource\Pages\ViewCustomer;
-use App\Filament\Resources\CustomerResource\Pages\EditCustomer;
-use App\Filament\Resources\CustomerResource\Pages\PreviewAsCustomer;
 use App\Enums\UserRole;
 use App\Exceptions\Pricing\InvalidCustomerBatchException;
 use App\Exceptions\Pricing\InvalidPriceListAssignmentException;
-use App\Filament\Resources\CustomerResource\Pages;
-use App\Filament\Resources\CustomerResource\RelationManagers;
+use App\Filament\Resources\CustomerResource\Pages\EditCustomer;
+use App\Filament\Resources\CustomerResource\Pages\ListCustomers;
+use App\Filament\Resources\CustomerResource\Pages\PreviewAsCustomer;
+use App\Filament\Resources\CustomerResource\Pages\ViewCustomer;
+use App\Filament\Resources\CustomerResource\RelationManagers\OrdersRelationManager;
 use App\Filament\Resources\CustomerResource\Support\CustomerPriceListUi;
 use App\Models\Customer;
 use App\Models\PriceList;
 use App\Models\User;
 use App\Services\Pricing\CustomerPriceListAssignmentDisplayState;
 use App\Support\Workspace\WorkspaceContext;
-use Filament\Forms;
-use Filament\Infolists;
+use Closure;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
 use Filament\Support\Exceptions\Halt;
-use Filament\Tables;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Collection;
-
 use Illuminate\Auth\Access\Response;
+use Illuminate\Database\Eloquent\Collection;
 
 class CustomerResource extends Resource
 {
     protected static ?string $model = Customer::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-building-office-2';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-building-office-2';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'B2B';
+    protected static string|\UnitEnum|null $navigationGroup = 'B2B';
 
     protected static ?string $modelLabel = 'клієнт';
 
@@ -421,7 +415,6 @@ class CustomerResource extends Resource
             'preview' => PreviewAsCustomer::route('/{record}/preview'),
         ];
     }
-
 
     public static function getCreateAuthorizationResponse(): Response
     {

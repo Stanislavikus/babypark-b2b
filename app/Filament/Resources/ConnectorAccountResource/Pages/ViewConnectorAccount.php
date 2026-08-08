@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\ConnectorAccountResource\Pages;
 
-use Throwable;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Filament\Resources\ConnectorAccountResource;
 use App\Filament\Resources\ConnectorAccountResource\RelationManagers\ConnectionChecksRelationManager;
@@ -17,6 +16,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
+use Throwable;
 
 class ViewConnectorAccount extends ViewRecord
 {

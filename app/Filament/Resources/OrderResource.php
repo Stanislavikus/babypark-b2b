@@ -2,42 +2,37 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\Toggle;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Forms\Components\DatePicker;
-use Filament\Actions\ViewAction;
-use Filament\Actions\EditAction;
-use App\Filament\Resources\OrderResource\RelationManagers\ItemsRelationManager;
+use App\Enums\OrderStatus;
+use App\Filament\Resources\OrderResource\Pages\EditOrder;
 use App\Filament\Resources\OrderResource\Pages\ListOrders;
 use App\Filament\Resources\OrderResource\Pages\ViewOrder;
-use App\Filament\Resources\OrderResource\Pages\EditOrder;
-use App\Enums\OrderStatus;
-use App\Filament\Resources\OrderResource\Pages;
-use App\Filament\Resources\OrderResource\RelationManagers;
+use App\Filament\Resources\OrderResource\RelationManagers\ItemsRelationManager;
 use App\Models\Order;
-use Filament\Forms;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-
 use Illuminate\Auth\Access\Response;
+use Illuminate\Database\Eloquent\Builder;
 
 class OrderResource extends Resource
 {
     protected static ?string $model = Order::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-shopping-cart';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-shopping-cart';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'B2B';
+    protected static string|\UnitEnum|null $navigationGroup = 'B2B';
 
     protected static ?string $modelLabel = 'замовлення';
 
@@ -151,7 +146,6 @@ class OrderResource extends Resource
             'edit' => EditOrder::route('/{record}/edit'),
         ];
     }
-
 
     public static function getCreateAuthorizationResponse(): Response
     {

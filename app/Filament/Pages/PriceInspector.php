@@ -2,9 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Get;
 use App\Enums\UserRole;
 use App\Models\Customer;
 use App\Models\Product;
@@ -26,15 +23,18 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
 
 class PriceInspector extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-magnifying-glass';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-magnifying-glass';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'B2B';
+    protected static string|\UnitEnum|null $navigationGroup = 'B2B';
 
     protected static ?string $navigationLabel = null;
 

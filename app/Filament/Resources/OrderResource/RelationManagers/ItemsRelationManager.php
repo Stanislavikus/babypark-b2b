@@ -2,13 +2,11 @@
 
 namespace App\Filament\Resources\OrderResource\RelationManagers;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\TextInput;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Actions\EditAction;
-use Filament\Forms;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
 class ItemsRelationManager extends RelationManager

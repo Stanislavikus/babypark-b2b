@@ -2,18 +2,6 @@
 
 namespace App\Filament\Resources\ConnectorDefinitionResource\RelationManagers;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Textarea;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Actions\CreateAction;
-use Filament\Actions\EditAction;
-use Filament\Actions\DeleteAction;
 use App\Enums\ConnectorDefinitionStatus;
 use App\Enums\ConnectorSchemaAcquisitionMode;
 use App\Enums\ConnectorSchemaScope;
@@ -22,10 +10,20 @@ use App\Enums\ConnectorSchemaVerificationStatus;
 use App\Models\ConnectorDefinition;
 use App\Models\ConnectorSchemaSource;
 use App\Services\Connectors\ConnectorDefinitionGovernanceService;
-use Filament\Forms;
+use Filament\Actions\CreateAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 

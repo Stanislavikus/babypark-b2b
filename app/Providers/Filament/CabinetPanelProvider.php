@@ -2,7 +2,6 @@
 
 namespace App\Providers\Filament;
 
-use Filament\Pages\Dashboard;
 use App\Filament\Cabinet\Pages\Auth\Login;
 use App\Filament\Cabinet\Resources\ProductResource\Pages\ListProducts;
 use App\Support\Brand;
@@ -14,7 +13,7 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationItem;
-use Filament\Pages;
+use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Tables\View\TablesRenderHook;

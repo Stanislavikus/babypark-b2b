@@ -2,9 +2,8 @@
 
 namespace App\Filament\Resources\PriceListResource\Pages;
 
-use Filament\Actions\CreateAction;
 use App\Filament\Resources\PriceListResource;
-use Filament\Actions;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListPriceLists extends ListRecords

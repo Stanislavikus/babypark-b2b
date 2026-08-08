@@ -2,10 +2,9 @@
 
 namespace App\Filament\Resources\ProductResource\Pages;
 
-use Filament\Actions\EditAction;
 use App\Filament\Concerns\HasMarginFormatToggle;
 use App\Filament\Resources\ProductResource;
-use Filament\Actions;
+use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewProduct extends ViewRecord

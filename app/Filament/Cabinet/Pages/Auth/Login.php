@@ -2,9 +2,9 @@
 
 namespace App\Filament\Cabinet\Pages\Auth;
 
-use Filament\Schemas\Components\Component;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Component;
 use Illuminate\Validation\ValidationException;
 
 class Login extends \Filament\Auth\Pages\Login

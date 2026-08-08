@@ -2,12 +2,11 @@
 
 namespace App\Filament\Resources\CustomerResource\RelationManagers;
 
-use Filament\Tables\Columns\TextColumn;
-use Filament\Actions\ViewAction;
 use App\Enums\OrderStatus;
 use App\Filament\Resources\OrderResource;
+use Filament\Actions\ViewAction;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
 class OrdersRelationManager extends RelationManager

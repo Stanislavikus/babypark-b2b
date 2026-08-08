@@ -1,5 +1,7 @@
 <?php
 
+use Filament\Support\Commands\FileGenerators\FileGenerationFlag;
+
 return [
 
     /*
@@ -122,10 +124,10 @@ return [
         // Preserve Filament 3 resource layout during the GAP-024 PR3 bridge.
         // Do not run filament:upgrade-directory-structure-to-v4 in this PR.
         'flags' => [
-            \Filament\Support\Commands\FileGenerators\FileGenerationFlag::PANEL_RESOURCE_CLASSES_OUTSIDE_DIRECTORIES,
-            \Filament\Support\Commands\FileGenerators\FileGenerationFlag::EMBEDDED_PANEL_RESOURCE_SCHEMAS,
-            \Filament\Support\Commands\FileGenerators\FileGenerationFlag::EMBEDDED_PANEL_RESOURCE_TABLES,
-            \Filament\Support\Commands\FileGenerators\FileGenerationFlag::PARTIAL_IMPORTS,
+            FileGenerationFlag::PANEL_RESOURCE_CLASSES_OUTSIDE_DIRECTORIES,
+            FileGenerationFlag::EMBEDDED_PANEL_RESOURCE_SCHEMAS,
+            FileGenerationFlag::EMBEDDED_PANEL_RESOURCE_TABLES,
+            FileGenerationFlag::PARTIAL_IMPORTS,
         ],
     ],
 

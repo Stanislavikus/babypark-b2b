@@ -2,8 +2,6 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
 use App\Enums\PriceDisplayMode;
 use App\Models\User;
 use App\Models\Workspace;
@@ -18,6 +16,8 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
 
 class WorkspaceTaxSettings extends Page implements HasActions, HasForms
@@ -25,9 +25,9 @@ class WorkspaceTaxSettings extends Page implements HasActions, HasForms
     use InteractsWithActions;
     use InteractsWithForms;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cog-6-tooth';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cog-6-tooth';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Налаштування';
+    protected static string|\UnitEnum|null $navigationGroup = 'Налаштування';
 
     protected static ?string $navigationLabel = 'Ціни та податки';
 

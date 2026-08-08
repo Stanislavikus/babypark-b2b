@@ -2,20 +2,17 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\SyncLogStatus;
+use App\Enums\SyncLogType;
+use App\Filament\Resources\SyncLogResource\Pages\ListSyncLogs;
+use App\Filament\Resources\SyncLogResource\Pages\ViewSyncLog;
+use App\Models\SyncLog;
+use Filament\Actions\ViewAction;
+use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\ViewAction;
-use App\Filament\Resources\SyncLogResource\Pages\ListSyncLogs;
-use App\Filament\Resources\SyncLogResource\Pages\ViewSyncLog;
-use App\Enums\SyncLogStatus;
-use App\Enums\SyncLogType;
-use App\Filament\Resources\SyncLogResource\Pages;
-use App\Models\SyncLog;
-use Filament\Resources\Resource;
-use Filament\Tables;
 use Filament\Tables\Table;
-
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Model;
 
@@ -23,9 +20,9 @@ class SyncLogResource extends Resource
 {
     protected static ?string $model = SyncLog::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-arrow-path';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-arrow-path';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'Система';
+    protected static string|\UnitEnum|null $navigationGroup = 'Система';
 
     protected static ?string $modelLabel = 'синхронізація';
 
@@ -90,9 +87,6 @@ class SyncLogResource extends Resource
             'view' => ViewSyncLog::route('/{record}'),
         ];
     }
-
-
-
 
     public static function getCreateAuthorizationResponse(): Response
     {

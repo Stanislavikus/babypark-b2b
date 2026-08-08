@@ -2,26 +2,22 @@
 
 namespace App\Filament\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\ViewAction;
-use Filament\Actions\Action;
+use App\Enums\ReservationStatus;
 use App\Filament\Resources\ReservationResource\Pages\ListReservations;
 use App\Filament\Resources\ReservationResource\Pages\ViewReservation;
-use App\Enums\ReservationStatus;
-use App\Filament\Resources\ReservationResource\Pages;
 use App\Models\Reservation;
 use App\Services\Availability\ReservationConfirmer;
 use App\Services\Availability\ReservationReleaser;
-use Filament\Forms;
+use Filament\Actions\Action;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Model;
 
@@ -29,9 +25,9 @@ class ReservationResource extends Resource
 {
     protected static ?string $model = Reservation::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-bookmark';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-bookmark';
 
-    protected static string | \UnitEnum | null $navigationGroup = 'B2B';
+    protected static string|\UnitEnum|null $navigationGroup = 'B2B';
 
     protected static ?string $modelLabel = 'резерв';
 
@@ -120,9 +116,6 @@ class ReservationResource extends Resource
             'view' => ViewReservation::route('/{record}'),
         ];
     }
-
-
-
 
     public static function getCreateAuthorizationResponse(): Response
     {

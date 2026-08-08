@@ -2,18 +2,8 @@
 
 namespace App\Filament\Cabinet\Resources;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Infolists\Components\RepeatableEntry;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ViewColumn;
-use Filament\Actions\Action;
-use Filament\Tables\Filters\SelectFilter;
 use App\Filament\Cabinet\Resources\ProductResource\Pages\ListProducts;
 use App\Filament\Cabinet\Resources\ProductResource\Pages\ViewProduct;
-use App\Filament\Cabinet\Resources\ProductResource\Pages;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource as AdminProductResource;
 use App\Models\Product;
@@ -29,16 +19,22 @@ use App\Support\ProductFields\MarginToggle;
 use App\Support\ProductFields\ProductColumnVisibility;
 use App\Support\ProductFields\ProductPanelVisibility;
 use App\Support\ProductTableLink;
-use Filament\Infolists;
+use Filament\Actions\Action;
+use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
 use Livewire\Livewire;
-
-use Illuminate\Auth\Access\Response;
-use Illuminate\Database\Eloquent\Model;
 
 class ProductResource extends Resource
 {
@@ -46,7 +42,7 @@ class ProductResource extends Resource
 
     protected static ?string $model = Product::class;
 
-    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cube';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cube';
 
     protected static ?string $modelLabel = 'товар';
 
@@ -432,9 +428,6 @@ class ProductResource extends Resource
             'view' => ViewProduct::route('/{record}'),
         ];
     }
-
-
-
 
     protected static function applyStockSorting(Builder $query, string $direction): Builder
     {
