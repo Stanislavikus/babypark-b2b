@@ -83,6 +83,28 @@ timeout, 1200s `retry_after`). Both share the same account-level
 
 Ensure the `pcntl` PHP extension is installed (`php -m | grep -i '^pcntl$'`).
 
+### Verified current pilot state (2026-08-08, GAP-024 PR1)
+
+Read-only verification on the pilot host before the GAP-024 migration programme
+began. These facts are recorded here so repository tooling and CI assumptions
+align with the live deployment baseline.
+
+| Runtime | Verified value |
+|---------|----------------|
+| PHP CLI | 8.3.6 |
+| PHP-FPM | 8.3.6 |
+| Supervisor queue worker PHP binary | `/usr/bin/php8.3` |
+| `pcntl` | present |
+| Node.js | v22.22.2 |
+| npm | 10.9.7 |
+
+The main Supervisor queue worker (`babypark-queue`) was confirmed running.
+`babypark-connector-queue` remains intentionally deferred per the table above.
+
+A separate smoke checkout exists at `/var/www/babypark-b2b-smoke`, synchronized
+to merged `develop` at `b45e01385778a9fd69b7051389452f447ad9a85d`, with PHPUnit
+dev tooling and `pdo_sqlite` / `sqlite3` available for CLI smoke runs.
+
 ### Verified current pilot state (2026-07-31)
 
 Host-prerequisite verification was completed on 2026-07-31 using read-only commands

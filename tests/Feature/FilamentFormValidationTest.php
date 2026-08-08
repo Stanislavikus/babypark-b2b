@@ -8,11 +8,13 @@ use App\Filament\Resources\PriceListResource;
 use App\Filament\Resources\PriceListResource\Pages\CreatePriceList;
 use App\Filament\Resources\PriceListResource\RelationManagers\ItemsRelationManager;
 use App\Filament\Resources\UserResource\Pages\CreateUser;
+use App\Models\Customer;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Tests\Concerns\CreatesPricingFixtures;
 use Tests\TestCase;
@@ -228,6 +230,58 @@ class FilamentFormValidationTest extends TestCase
             ->get('/admin/price-inspector')
             ->assertOk()
             ->assertSee('novalidate', false);
+
+        $this->get('/cabinet/login')
+            ->assertOk()
+            ->assertSee('novalidate', false);
+
+        config()->set('app.env', 'production');
+
+        $this->actingAs($this->createCabinetCustomer(), 'customer')
+            ->get(route('filament.cabinet.pages.dashboard'))
+            ->assertOk()
+            ->assertSee('novalidate', false);
+    }
+
+    public function test_table_action_modal_form_renders_with_novalidate(): void
+    {
+        $list = $this->createPriceList($this->workspace);
+
+        $component = Livewire::actingAs($this->admin)
+            ->test(ItemsRelationManager::class, [
+                'ownerRecord' => $list,
+                'pageClass' => PriceListResource\Pages\EditPriceList::class,
+            ])
+            ->mountTableAction('create');
+
+        $component
+            ->assertSet('mountedTableActions', ['create'])
+            ->assertDispatched('open-modal', id: $component->id().'-table-action');
+
+        $mountedAction = $component->instance()->getMountedTableAction();
+        $this->assertNotNull($mountedAction);
+        $this->assertSame('create', $mountedAction->getName());
+
+        $html = $component->html();
+
+        $this->assertMatchesRegularExpression(
+            '/<form\b[^>]*\bnovalidate\b[^>]*wire:submit\.prevent="callMountedTableAction"|<form\b[^>]*wire:submit\.prevent="callMountedTableAction"[^>]*\bnovalidate\b/',
+            $html,
+        );
+        $this->assertStringContainsString('Товар / варіант', $html);
+    }
+
+    private function createCabinetCustomer(): Customer
+    {
+        return Customer::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'name' => 'Novalidate Cabinet Customer',
+            'short_name' => 'Novalidate',
+            'login' => 'novalidate-cabinet',
+            'password' => 'password',
+            'is_active' => true,
+        ]);
     }
 
     public function test_validation_errors_are_associated_with_fields_in_dom(): void
