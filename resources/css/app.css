@@ -1,6 +1,9 @@
 @import 'tailwindcss';
 @import './design-tokens.css' layer(base);
 
+/* Preserve Filament/panel class-based dark mode for shared Blade utilities. */
+@variant dark (&:where(.dark, .dark *));
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
