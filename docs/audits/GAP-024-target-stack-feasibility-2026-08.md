@@ -24,6 +24,12 @@
 > no-deferred-defects rule (§17). Commands executed during the correction pass
 > are dated 2026-08-08 inline. `origin/develop` was re-verified unchanged at
 > `9713d03` before editing.
+>
+> A same-day micro-correction (2026-08-08) fixed two internal inconsistencies:
+> PR5 is optional and not intrinsically required for GAP-024 closure (PR6
+> follows PR1–PR4, and follows PR5 only if PR5 is actually performed before
+> closure), and Discovery Overview UI becomes technically ready after PR4 but
+> begins only after the PR6 truth-sync merges (§17, §18).
 
 **Repository state audited**
 
@@ -2044,7 +2050,11 @@ solver/security evidence at execution time requires it).*
 
 ### PR5 — Optional hardening and cleanup (no deferred defects)
 
-*Only after PR1–PR4 are green. **PR5 is not a defect backlog for PR3 or PR4** —
+*Only after PR1–PR4 are green. **PR5 is optional and is not intrinsically
+required to close GAP-024** — PR1–PR4 are the mandatory migration path; PR5
+exists only if hardening/cleanup work is actually identified and wanted before
+closure. If PR5 is skipped, PR6 follows PR4 directly. **PR5 is not a defect
+backlog for PR3 or PR4** —
 any known regression in authorization, workspace isolation, security, form
 validation, `novalidate`, filtering behavior, panel login/auth, connector
 runtime behavior, required business behavior, or a visual contract included in
@@ -2061,15 +2071,26 @@ PR5 may contain only:
 
 Gates: V1–V23 (as applicable to what PR5 actually touches).
 
-### PR6 — Documentation and GAP-024 closure
+### PR6 — Documentation and GAP-024 closure (truth sync)
 
-* Update `docs/07-TECH_STACK.md` to describe the now-active Laravel 13 / Filament 5 / Livewire 4 / Tailwind 4 stack — **only after PR2–PR5 have merged and been verified**, per `05-AI_WORKING_AGREEMENT.md`'s prohibition on prematurely rewriting project truth.
+*Mandatory. Follows the mandatory PR1–PR4 path once the target state is fully
+implemented and verified — and follows PR5 as well only if PR5 is actually
+performed before closure. If PR5 is skipped, PR6 follows PR4 directly.*
+
+* Update `docs/07-TECH_STACK.md` to describe the now-active Laravel 13 / Filament 5 / Livewire 4 / Tailwind 4 stack — **only after PR1–PR4 (plus PR5, if performed) have merged and been verified**, per `05-AI_WORKING_AGREEMENT.md`'s prohibition on prematurely rewriting project truth.
 * Move GAP-024 to Closed in `docs/IMPLEMENTATION_GAPS.md`, preserving the section structure that `ConnectorAccountDocumentationTest::gap024Section()` matches (`/## GAP-024 —.*?(?=\n## GAP-021 —)/s`; §15.2).
 * Update `DEPLOY.md` with the verified production PHP/Node versions and any changed Supervisor commands.
 * Gates: V4, V5, V6, V19.
 
-**Discovery Overview UI remains blocked until the PR4 target state is complete
-and verified** (§18, "Discovery UI gate").
+**Discovery Overview UI becomes technically ready after PR4 (the target-stack
+completion gate), but implementation begins only after this PR6 truth-sync /
+GAP-024 closure is merged** — `docs/07-TECH_STACK.md` is the implementation
+guardrail future UI tasks must read before writing code, and
+`05-AI_WORKING_AGREEMENT.md` requires documentation and implementation to stay
+synchronized, so no new panel UI may be started while `07-TECH_STACK.md` still
+describes the pre-migration active stack. Canonical sequence:
+`PR1 → PR2 → PR3 → PR4 → [PR5 if needed] → PR6 → Discovery Overview UI`
+(§18, "Discovery UI gate").
 
 **No PR in this decomposition is implemented by this audit.**
 
@@ -2290,14 +2311,18 @@ is identified.
 
 ### Upgrade decomposition
 
-Six PRs, each leaving the repository runnable and testable:
+Four mandatory migration PRs (PR1–PR4), followed by **optional** PR5 if
+hardening/cleanup is actually needed, and mandatory PR6 truth-sync / GAP-024
+closure — each leaving the repository runnable and testable. Canonical
+sequence: `PR1 → PR2 → PR3 → PR4 → [PR5 if needed] → PR6 → Discovery Overview
+UI`.
 
 1. **Runtime, toolchain and verification prerequisites / safety net** — PHP/Node/`pcntl` verification, Node pin, **CI frontend build step** (`npm ci && npm run build`), visual baseline capture, extension of the existing `novalidate` test to `/cabinet` and a modal form, and removal of the three verified-orphaned Blade views — all while still green on Filament 3, with no unrelated redesign.
 2. **Laravel 11 → 13**, deliberately leaving Filament on `3.3.54` and Livewire on 3.x — solver-proven (§4.4 scenario 1). Includes `PreventRequestForgery`, **UUIDv4 preservation** (§10.3), Tinker 3, PHPUnit 12, the Guzzle direct-dependency promotion, and connector transport/SSRF regression coverage. Laravel breaking changes only — no Filament UI migration. **This PR alone resolves the unfixable Laravel 11 advisories and the "unsupported framework" core of GAP-024, with zero UI risk.**
 3. **Filament 3 → 4 + Tailwind 3 → 4.1+ + custom themes** (Livewire stays 3.x) — the 115-file Rector migration with a narrowed path set, `config/filament.php` compatibility flags, the custom admin/cabinet themes, the Tailwind 4.1+ migration on the current Vite major, the §7.8 authorization review, `deferFilters(false)` behavior preservation, and the first reconciliation of the four vendor Blade forks. First mandatory visual gate; **may not merge with a known UI/security/authorization regression**.
 4. **Filament 4 → 5 + Livewire 3 → 4** — the coupled Filament/Livewire generation jump onto the already-supported Tailwind 4.x, with the second reconciliation of the vendor forks against Filament 5's restructured templates, connector-polling and `novalidate` verification. Primary visual gate; **may not merge with a known regression**. No Tailwind major, no Vite major.
-5. **Optional hardening and cleanup** — behavior-neutral only; **no deferred defects from PR3/PR4**; extra end-to-end connector runtime verification.
-6. **Documentation and GAP-024 closure / truth sync** — `07-TECH_STACK.md`, `IMPLEMENTATION_GAPS.md`, `DEPLOY.md` updated with actually verified runtime information, documentation tests run — only after 2–5 are merged and verified.
+5. **Optional hardening and cleanup** — behavior-neutral only; **not intrinsically required for GAP-024 closure**; **no deferred defects from PR3/PR4**; extra end-to-end connector runtime verification.
+6. **Documentation and GAP-024 closure / truth sync (mandatory)** — `07-TECH_STACK.md`, `IMPLEMENTATION_GAPS.md`, `DEPLOY.md` updated with actually verified runtime information, documentation tests run — only after the mandatory PR1–PR4 are merged and verified (and after PR5 as well, only if PR5 is actually performed before closure; if PR5 is skipped, PR6 follows PR4 directly).
 
 The ordering is dictated by evidence: full re-resolution of the Laravel 11
 graph is blocked by Composer's advisory policy (§4.2), Filament 4 on Laravel 11
@@ -2321,12 +2346,29 @@ architectural direction, and found four concrete reasons to confirm it:
 3. **New panel Tailwind usage is on unstable ground.** Filament 4's and 5's docs are explicit that arbitrary Tailwind classes do not work without a custom theme, and this project has none yet (§9.1). Any Tailwind utility written into a new Discovery Blade view today works only by incidental inclusion in Filament 3's compiled stylesheet, and has no guarantee of surviving the Tailwind 4 rebuild. The recommended custom themes (§9.1) should exist — built in PR3 — *before* new panel UI is written against them, not after.
 4. **It would enlarge the visual-regression surface at exactly the wrong moment.** §16 already lists 20 high-value surfaces across three appearance modes and two breakpoint ranges, with no visual-regression harness in place. Adding an unfinished Discovery Overview to that set before PR1 establishes the baseline means the new screens have no "before" state to compare against — they would be migrated and visually validated simultaneously, which is the specific combination this audit recommends avoiding everywhere else.
 
-The recommended sequencing is therefore: land PR1–PR4, confirm the visual gates,
-and build Discovery Overview UI natively on Filament 5 + Livewire 4 + Tailwind 4.
-The one nuance worth recording is that PR2 (Laravel 13 on Filament 3.3.54)
-resolves the *security and support* dimension of GAP-024 without touching the
-UI — so if Discovery Overview becomes commercially urgent, the meaningful gate
-to discuss is PR4's completion, not PR2's.
+Two distinct gates govern the start, and both must be stated to avoid a
+documentation/implementation split:
+
+* **Technical target-stack gate — PR4.** Once PR4 completes and is verified,
+  Laravel 13 + Filament 5 + Livewire 4 + Tailwind 4 exist in code, and
+  Discovery Overview UI becomes **technically ready** to build natively on the
+  target stack.
+* **Project-truth / implementation gate — PR6.** `05-AI_WORKING_AGREEMENT.md`
+  requires documentation and implementation to stay synchronized, and
+  `docs/07-TECH_STACK.md` is the implementation guardrail every future Cursor
+  UI task must read before writing code. Between PR4 and PR6 that file still
+  describes the pre-migration active stack, so **Discovery Overview UI must
+  not begin between PR4 and PR6** — implementation starts only after the PR6
+  truth-sync / GAP-024 closure is merged.
+
+The recommended sequencing is therefore:
+`PR1 → PR2 → PR3 → PR4 → [PR5 if needed] → PR6 → Discovery Overview UI`,
+with the UI built natively on Filament 5 + Livewire 4 + Tailwind 4. The one
+nuance worth recording is that PR2 (Laravel 13 on Filament 3.3.54) resolves the
+*security and support* dimension of GAP-024 without touching the UI — so if
+Discovery Overview becomes commercially urgent, the schedule conversation is
+about how quickly PR3–PR4 and the PR6 truth-sync can land, not about starting
+UI work early on Filament 3.
 
 **No Discovery Overview UI work was begun in this task.**
 
