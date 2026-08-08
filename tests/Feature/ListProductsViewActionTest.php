@@ -91,7 +91,7 @@ class ListProductsViewActionTest extends TestCase
         $component
             ->assertSet('mountedActions.0.name', 'view')
             ->assertSet('mountedActions.0.context.recordKey', $recordKey)
-            ->assertDispatched('open-modal', id: $component->id().'-table-action');
+            ->assertDispatched('open-modal', id: 'fi-'.$component->id().'-action-0');
 
         $mountedAction = $component->instance()->getMountedAction();
         $this->assertNotNull($mountedAction);

@@ -147,7 +147,7 @@ class ProductTagBulkActionTest extends TestCase
             ->mountTableBulkAction('add_tags', [$product])
             ->setTableBulkActionData(['tag_ids' => [Str::uuid()->toString()]])
             ->callMountedTableBulkAction()
-            ->assertHasTableBulkActionErrors(['tag_ids'])
+            ->assertHasTableBulkActionErrors(['tag_ids.0'])
             ->assertTableBulkActionMounted('add_tags');
 
         $this->assertAuthenticatedAs($this->admin);

@@ -236,7 +236,7 @@ class FilamentFormValidationTest extends TestCase
 
         $component
             ->assertSet('mountedActions.0.name', 'create')
-            ->assertDispatched('open-modal', id: $component->id().'-table-action');
+            ->assertDispatched('open-modal', id: 'fi-'.$component->id().'-action-0');
 
         $mountedAction = $component->instance()->getMountedAction();
         $this->assertNotNull($mountedAction);
@@ -269,8 +269,8 @@ class FilamentFormValidationTest extends TestCase
         $this->assertStringContainsString('data-field-wrapper', $html);
         $this->assertStringContainsString(__('validation.required', [], 'uk'), $html);
 
-        $this->assertMatchesRegularExpression('/<label[^>]+for="data\.name[^"]*"/', $html);
-        $this->assertMatchesRegularExpression('/<input[^>]+id="data\.name[^"]*"/', $html);
+        $this->assertMatchesRegularExpression('/<label[^>]+for="form\.name"/', $html);
+        $this->assertMatchesRegularExpression('/<input[^>]+id="form\.name"[^>]+wire:model\.live="data\.name"/', $html);
     }
 
     public function test_price_inspector_quantity_error_clears_without_affecting_other_fields(): void
