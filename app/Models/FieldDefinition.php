@@ -7,7 +7,7 @@ use App\Enums\AttributeScope;
 use App\Enums\AttributeStatus;
 use App\Enums\FieldObjectType;
 use App\Support\Workspace\BelongsToWorkspaceOrGlobal;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;

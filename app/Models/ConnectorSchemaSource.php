@@ -6,7 +6,7 @@ use App\Enums\ConnectorSchemaAcquisitionMode;
 use App\Enums\ConnectorSchemaScope;
 use App\Enums\ConnectorSchemaSourceKind;
 use App\Enums\ConnectorSchemaVerificationStatus;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;

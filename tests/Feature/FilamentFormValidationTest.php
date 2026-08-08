@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\CreatesPricingFixtures;
 use Tests\TestCase;
 
@@ -44,9 +45,7 @@ class FilamentFormValidationTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
     }
 
-    /**
-     * @dataProvider requiredLocaleProvider
-     */
+    #[DataProvider('requiredLocaleProvider')]
     public function test_short_required_message_is_localized(string $locale, string $expected): void
     {
         App::setLocale($locale);
@@ -76,9 +75,7 @@ class FilamentFormValidationTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider requiredLocaleProvider
-     */
+    #[DataProvider('requiredLocaleProvider')]
     public function test_text_input_stale_error_clears_independently(string $locale, string $expectedMessage): void
     {
         App::setLocale($locale);
@@ -103,9 +100,7 @@ class FilamentFormValidationTest extends TestCase
         $this->assertTrue($component->errors()->has('data.email'));
     }
 
-    /**
-     * @dataProvider requiredLocaleProvider
-     */
+    #[DataProvider('requiredLocaleProvider')]
     public function test_select_stale_error_clears_independently(string $locale, string $expectedMessage): void
     {
         App::setLocale($locale);
@@ -129,9 +124,7 @@ class FilamentFormValidationTest extends TestCase
         $this->assertFalse($component->errors()->has('data.name'));
     }
 
-    /**
-     * @dataProvider requiredLocaleProvider
-     */
+    #[DataProvider('requiredLocaleProvider')]
     public function test_searchable_select_stale_error_clears_independently(string $locale, string $expectedMessage): void
     {
         App::setLocale($locale);
@@ -161,9 +154,7 @@ class FilamentFormValidationTest extends TestCase
             ->assertHasNoFormErrors(['variant_id']);
     }
 
-    /**
-     * @dataProvider requiredLocaleProvider
-     */
+    #[DataProvider('requiredLocaleProvider')]
     public function test_conditionally_required_field_stale_error_clears_independently(string $locale, string $expectedMessage): void
     {
         App::setLocale($locale);
@@ -188,9 +179,7 @@ class FilamentFormValidationTest extends TestCase
         $this->assertFalse($component->errors()->has('data.name'));
     }
 
-    /**
-     * @dataProvider requiredLocaleProvider
-     */
+    #[DataProvider('requiredLocaleProvider')]
     public function test_searchable_select_in_table_action_clears_stale_error(string $locale, string $expectedMessage): void
     {
         App::setLocale($locale);

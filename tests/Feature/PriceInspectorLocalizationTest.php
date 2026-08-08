@@ -16,6 +16,7 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\App;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\CreatesPricingFixtures;
 use Tests\TestCase;
 
@@ -44,9 +45,7 @@ class PriceInspectorLocalizationTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
     }
 
-    /**
-     * @dataProvider localeExpectationsProvider
-     */
+    #[DataProvider('localeExpectationsProvider')]
     public function test_price_inspector_shows_expected_locale_labels(string $locale, array $expected, array $forbidden): void
     {
         App::setLocale($locale);
@@ -135,9 +134,7 @@ class PriceInspectorLocalizationTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider validationLocaleProvider
-     */
+    #[DataProvider('validationLocaleProvider')]
     public function test_validation_required_is_localized(string $locale, string $expectedFragment): void
     {
         App::setLocale($locale);
@@ -157,9 +154,7 @@ class PriceInspectorLocalizationTest extends TestCase
         $this->assertStringNotContainsString('validation.required', $messages);
     }
 
-    /**
-     * @dataProvider validationLocaleProvider
-     */
+    #[DataProvider('validationLocaleProvider')]
     public function test_price_list_form_validation_required_is_localized(string $locale, string $expectedFragment): void
     {
         App::setLocale($locale);

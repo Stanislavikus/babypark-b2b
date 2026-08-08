@@ -6,7 +6,7 @@ use App\Enums\ConnectorAccountConnectionStatus;
 use App\Enums\ConnectorErrorActionability;
 use App\Enums\ConnectorErrorCause;
 use App\Support\Workspace\BelongsToWorkspace;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
