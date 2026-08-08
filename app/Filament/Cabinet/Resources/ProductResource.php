@@ -2,6 +2,17 @@
 
 namespace App\Filament\Cabinet\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
+use Filament\Actions\Action;
+use Filament\Tables\Filters\SelectFilter;
+use App\Filament\Cabinet\Resources\ProductResource\Pages\ListProducts;
+use App\Filament\Cabinet\Resources\ProductResource\Pages\ViewProduct;
 use App\Filament\Cabinet\Resources\ProductResource\Pages;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource as AdminProductResource;
@@ -19,7 +30,6 @@ use App\Support\ProductFields\ProductColumnVisibility;
 use App\Support\ProductFields\ProductPanelVisibility;
 use App\Support\ProductTableLink;
 use Filament\Infolists;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -27,13 +37,16 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Livewire\Livewire;
 
+use Illuminate\Auth\Access\Response;
+use Illuminate\Database\Eloquent\Model;
+
 class ProductResource extends Resource
 {
     use HasProductLightbox;
 
     protected static ?string $model = Product::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-cube';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cube';
 
     protected static ?string $modelLabel = 'товар';
 
@@ -41,7 +54,7 @@ class ProductResource extends Resource
 
     protected static ?string $slug = 'products';
 
-    public static function infolist(Infolist $infolist): Infolist
+    public static function infolist(Schema $infolist): Schema
     {
         $panel = 'cabinet';
         $visible = ProductPanelVisibility::visibleDetailFields($panel);
@@ -51,9 +64,9 @@ class ProductResource extends Resource
         $schema = [];
 
         if (in_array('variants', $visible, true)) {
-            $schema[] = Infolists\Components\Section::make('Основне')
+            $schema[] = Section::make('Основне')
                 ->schema([
-                    Infolists\Components\RepeatableEntry::make('active_variants')
+                    RepeatableEntry::make('active_variants')
                         ->label('')
                         ->getStateUsing(function (Product $record) use ($customer, $summary) {
                             return $record->variants
@@ -62,29 +75,29 @@ class ProductResource extends Resource
                                 ->values();
                         })
                         ->schema([
-                            Infolists\Components\TextEntry::make('sku')
+                            TextEntry::make('sku')
                                 ->label('Артикул')
                                 ->getStateUsing(fn (ProductVariant $record): string => $record->product->sku),
 
-                            Infolists\Components\TextEntry::make('barcode_ean')
+                            TextEntry::make('barcode_ean')
                                 ->label('EAN')
                                 ->placeholder('—'),
 
-                            Infolists\Components\TextEntry::make('brand')
+                            TextEntry::make('brand')
                                 ->label('Бренд')
                                 ->getStateUsing(fn (ProductVariant $record): ?string => $record->product->brand)
                                 ->placeholder('—'),
 
-                            Infolists\Components\TextEntry::make('name')
+                            TextEntry::make('name')
                                 ->label('Назва')
                                 ->getStateUsing(fn (ProductVariant $record): string => $record->product->name),
 
-                            Infolists\Components\TextEntry::make('category')
+                            TextEntry::make('category')
                                 ->label('Категорія')
                                 ->getStateUsing(fn (ProductVariant $record): ?string => $record->product->category?->name)
                                 ->placeholder('—'),
 
-                            Infolists\Components\TextEntry::make('stock_status')
+                            TextEntry::make('stock_status')
                                 ->label('Наявність')
                                 ->getStateUsing(function (ProductVariant $record): string {
                                     $threshold = $record->product->category?->stock_display_threshold ?? 10;
@@ -103,7 +116,7 @@ class ProductResource extends Resource
                                     };
                                 }),
 
-                            Infolists\Components\TextEntry::make('customer_price')
+                            TextEntry::make('customer_price')
                                 ->label('Ваша ціна')
                                 ->getStateUsing(function (ProductVariant $record) use ($customer, $summary): ?string {
                                     $display = $summary->tryResolveVariantDisplay($record, $customer);
@@ -112,7 +125,7 @@ class ProductResource extends Resource
                                 })
                                 ->placeholder('—'),
 
-                            Infolists\Components\TextEntry::make('rrp')
+                            TextEntry::make('rrp')
                                 ->label('РРЦ')
                                 ->getStateUsing(function (ProductVariant $record): ?string {
                                     $rrp = $record->recommended_retail_price_cache;
@@ -124,7 +137,7 @@ class ProductResource extends Resource
                                 ->placeholder('—')
                                 ->extraAttributes(['class' => 'line-through text-gray-400']),
 
-                            Infolists\Components\TextEntry::make('customer_margin')
+                            TextEntry::make('customer_margin')
                                 ->label(fn (): HtmlString => MarginToggle::labelHtml(
                                     Livewire::current()?->marginFormat ?? 'percent'
                                 ))
@@ -145,8 +158,8 @@ class ProductResource extends Resource
         }
 
         if (in_array('url', $visible, true)) {
-            $schema[] = Infolists\Components\Section::make('Сайт')->schema([
-                Infolists\Components\TextEntry::make('url')
+            $schema[] = Section::make('Сайт')->schema([
+                TextEntry::make('url')
                     ->label('URL товару на сайті')
                     ->placeholder('—')
                     ->url(fn (?string $state) => $state)
@@ -157,7 +170,7 @@ class ProductResource extends Resource
                         ? parse_url($state, PHP_URL_HOST).rtrim(parse_url($state, PHP_URL_PATH) ?? '', '/')
                         : null),
 
-                Infolists\Components\TextEntry::make('photo_preview')
+                TextEntry::make('photo_preview')
                     ->label('Фото товару')
                     ->getStateUsing(function (Product $record) {
                         if (! $record) {
@@ -185,7 +198,7 @@ class ProductResource extends Resource
             ])->columns(2);
         }
 
-        return $infolist->schema($schema);
+        return $infolist->components($schema);
     }
 
     public static function table(Table $table): Table
@@ -196,7 +209,7 @@ class ProductResource extends Resource
         $columns = [];
 
         if (in_array('photo', $visible, true)) {
-            $columns[] = Tables\Columns\ImageColumn::make('first_image')
+            $columns[] = ImageColumn::make('first_image')
                 ->label('Фото')
                 ->state(fn (Product $record): ?string => self::firstImage($record))
                 ->size(48)
@@ -206,14 +219,14 @@ class ProductResource extends Resource
         }
 
         if (in_array('sku', $visible, true)) {
-            $columns[] = Tables\Columns\TextColumn::make('sku')
+            $columns[] = TextColumn::make('sku')
                 ->label('Артикул')
                 ->searchable()
                 ->sortable();
         }
 
         if (in_array('barcode_ean', $visible, true)) {
-            $columns[] = Tables\Columns\TextColumn::make('barcode_ean')
+            $columns[] = TextColumn::make('barcode_ean')
                 ->label('EAN')
                 ->searchable()
                 ->sortable()
@@ -222,7 +235,7 @@ class ProductResource extends Resource
         }
 
         if (in_array('name', $visible, true)) {
-            $columns[] = Tables\Columns\TextColumn::make('name')
+            $columns[] = TextColumn::make('name')
                 ->label('Назва')
                 ->searchable()
                 ->sortable()
@@ -231,14 +244,14 @@ class ProductResource extends Resource
         }
 
         if (in_array('category', $visible, true)) {
-            $columns[] = Tables\Columns\TextColumn::make('category.name')
+            $columns[] = TextColumn::make('category.name')
                 ->label('Категорія')
                 ->sortable()
                 ->toggleable(in_array('category', $toggleable));
         }
 
         if (in_array('brand', $visible, true)) {
-            $columns[] = Tables\Columns\TextColumn::make('brand')
+            $columns[] = TextColumn::make('brand')
                 ->label('Бренд')
                 ->searchable()
                 ->sortable()
@@ -246,7 +259,7 @@ class ProductResource extends Resource
         }
 
         if (in_array('stock', $visible, true)) {
-            $columns[] = Tables\Columns\TextColumn::make('stock_status')
+            $columns[] = TextColumn::make('stock_status')
                 ->label('Наявність')
                 ->getStateUsing(function (Product $record): string {
                     $customer = auth('customer')->user();
@@ -270,7 +283,7 @@ class ProductResource extends Resource
         }
 
         if (in_array('price', $visible, true)) {
-            $columns[] = Tables\Columns\TextColumn::make('customer_price')
+            $columns[] = TextColumn::make('customer_price')
                 ->label('Ваша ціна')
                 ->getStateUsing(function (Product $record): ?string {
                     $customer = auth('customer')->user();
@@ -301,7 +314,7 @@ class ProductResource extends Resource
         }
 
         if (in_array('rrp', $visible, true)) {
-            $columns[] = Tables\Columns\TextColumn::make('rrp')
+            $columns[] = TextColumn::make('rrp')
                 ->label('РРЦ')
                 ->getStateUsing(function (Product $record): ?string {
                     $summary = app(ProductPricingSummary::class);
@@ -318,7 +331,7 @@ class ProductResource extends Resource
         }
 
         if (in_array('margin', $visible, true)) {
-            $columns[] = Tables\Columns\TextColumn::make('margin')
+            $columns[] = TextColumn::make('margin')
                 ->label(fn (): HtmlString => MarginToggle::labelHtml(
                     Livewire::current()?->marginFormat ?? 'percent'
                 ))
@@ -356,14 +369,14 @@ class ProductResource extends Resource
         }
 
         if (in_array('order', $visible, true)) {
-            $columns[] = Tables\Columns\ViewColumn::make('order')
+            $columns[] = ViewColumn::make('order')
                 ->label('Замовити')
                 ->disableClick()
                 ->view('filament.cabinet.columns.quantity-order');
         }
 
         if (in_array('url', $visible, true)) {
-            $columns[] = Tables\Columns\TextColumn::make('url')
+            $columns[] = TextColumn::make('url')
                 ->label('URL на сайті')
                 ->formatStateUsing(fn (?string $state): HtmlString|string => ProductTableLink::externalUrlHtml($state))
                 ->tooltip(fn (?string $state) => $state)
@@ -376,17 +389,17 @@ class ProductResource extends Resource
             ->defaultSort('sku')
             ->recordUrl(fn (Product $record): string => static::getUrl('view', ['record' => $record]))
             ->toggleColumnsTriggerAction(
-                fn (Tables\Actions\Action $action) => $action
+                fn (Action $action) => $action
                     ->label('Стовпці')
                     ->tooltip('Стовпці')
             )
             ->filters([
-                Tables\Filters\SelectFilter::make('category_id')
+                SelectFilter::make('category_id')
                     ->label('Категорії')
                     ->relationship('category', 'name')
                     ->multiple()
                     ->preload(),
-                Tables\Filters\SelectFilter::make('brand')
+                SelectFilter::make('brand')
                     ->label('Бренди')
                     ->options(fn (): array => CustomerPricingScope::applyProductScope(
                         Product::query()->where('is_active', true),
@@ -399,7 +412,7 @@ class ProductResource extends Resource
                         ->toArray())
                     ->multiple(),
             ])
-            ->bulkActions([]);
+            ->toolbarActions([]);
     }
 
     public static function getEloquentQuery(): Builder
@@ -415,25 +428,13 @@ class ProductResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListProducts::route('/'),
-            'view' => Pages\ViewProduct::route('/{record}'),
+            'index' => ListProducts::route('/'),
+            'view' => ViewProduct::route('/{record}'),
         ];
     }
 
-    public static function canCreate(): bool
-    {
-        return false;
-    }
 
-    public static function canDelete($record): bool
-    {
-        return false;
-    }
 
-    public static function canEdit($record): bool
-    {
-        return false;
-    }
 
     protected static function applyStockSorting(Builder $query, string $direction): Builder
     {
@@ -455,5 +456,20 @@ class ProductResource extends Resource
             ->orderByRaw("{$priorityExpr} {$direction}")
             ->orderByRaw("{$totalQty} DESC")
             ->orderByRaw("{$minExpectedDate} ASC");
+    }
+
+    public static function getCreateAuthorizationResponse(): Response
+    {
+        return Response::deny();
+    }
+
+    public static function getEditAuthorizationResponse(Model $record): Response
+    {
+        return Response::deny();
+    }
+
+    public static function getDeleteAuthorizationResponse(Model $record): Response
+    {
+        return Response::deny();
     }
 }

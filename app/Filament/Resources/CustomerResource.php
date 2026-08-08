@@ -2,6 +2,29 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Select;
+use Filament\Schemas\Components\Utilities\Get;
+use Closure;
+use Filament\Forms\Components\Placeholder;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\BulkAction;
+use App\Filament\Resources\CustomerResource\Pages\ListCustomers;
+use App\Filament\Resources\CustomerResource\RelationManagers\OrdersRelationManager;
+use App\Filament\Resources\CustomerResource\Pages\ViewCustomer;
+use App\Filament\Resources\CustomerResource\Pages\EditCustomer;
+use App\Filament\Resources\CustomerResource\Pages\PreviewAsCustomer;
 use App\Enums\UserRole;
 use App\Exceptions\Pricing\InvalidCustomerBatchException;
 use App\Exceptions\Pricing\InvalidPriceListAssignmentException;
@@ -14,10 +37,7 @@ use App\Models\User;
 use App\Services\Pricing\CustomerPriceListAssignmentDisplayState;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Forms\Get;
 use Filament\Infolists;
-use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Exceptions\Halt;
@@ -25,13 +45,15 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Collection;
 
+use Illuminate\Auth\Access\Response;
+
 class CustomerResource extends Resource
 {
     protected static ?string $model = Customer::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-building-office-2';
 
-    protected static ?string $navigationGroup = 'B2B';
+    protected static string | \UnitEnum | null $navigationGroup = 'B2B';
 
     protected static ?string $modelLabel = 'клієнт';
 
@@ -39,51 +61,51 @@ class CustomerResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Основне')->schema([
-                    Forms\Components\TextInput::make('name')
+        return $schema
+            ->components([
+                Section::make('Основне')->schema([
+                    TextInput::make('name')
                         ->label('Назва')
                         ->required()
                         ->maxLength(255),
-                    Forms\Components\TextInput::make('short_name')
+                    TextInput::make('short_name')
                         ->label('Коротка назва')
                         ->maxLength(255),
-                    Forms\Components\TextInput::make('login')
+                    TextInput::make('login')
                         ->label('Логін')
                         ->required()
                         ->maxLength(255),
-                    Forms\Components\TextInput::make('password')
+                    TextInput::make('password')
                         ->label('Пароль')
                         ->password()
                         ->dehydrated(fn (?string $state): bool => filled($state))
                         ->required(fn (string $operation): bool => $operation === 'create')
                         ->maxLength(255),
-                    Forms\Components\Toggle::make('is_active')
+                    Toggle::make('is_active')
                         ->label('Активний')
                         ->default(true),
                 ])->columns(2),
-                Forms\Components\Section::make('Реквізити')->schema([
-                    Forms\Components\TextInput::make('edrpou')
+                Section::make('Реквізити')->schema([
+                    TextInput::make('edrpou')
                         ->label('ЄДРПОУ')
                         ->maxLength(20),
-                    Forms\Components\TextInput::make('ipn')
+                    TextInput::make('ipn')
                         ->label('ІПН')
                         ->maxLength(20),
-                    Forms\Components\TextInput::make('manager_name')
+                    TextInput::make('manager_name')
                         ->label('Менеджер (текст)')
                         ->maxLength(255),
-                    Forms\Components\TextInput::make('manager_phone')
+                    TextInput::make('manager_phone')
                         ->label('Телефон менеджера (текст)')
                         ->tel()
                         ->maxLength(255),
-                    Forms\Components\TextInput::make('email')
+                    TextInput::make('email')
                         ->label('Email')
                         ->email()
                         ->maxLength(255),
-                    Forms\Components\Select::make('account_manager_id')
+                    Select::make('account_manager_id')
                         ->label('Акаунт менеджер')
                         ->options(
                             User::whereIn('role', [
@@ -98,7 +120,7 @@ class CustomerResource extends Resource
                         ->searchable()
                         ->nullable()
                         ->placeholder('— не призначено —'),
-                    Forms\Components\Select::make('backup_manager_id')
+                    Select::make('backup_manager_id')
                         ->label('Резервний менеджер')
                         ->options(
                             User::whereIn('role', [
@@ -114,22 +136,22 @@ class CustomerResource extends Resource
                         ->nullable()
                         ->placeholder('— не призначено —'),
                 ])->columns(2),
-                Forms\Components\Section::make('Кредит')->schema([
-                    Forms\Components\TextInput::make('payment_delay_days')
+                Section::make('Кредит')->schema([
+                    TextInput::make('payment_delay_days')
                         ->label('Відстрочка (днів)')
                         ->numeric()
                         ->default(0),
-                    Forms\Components\TextInput::make('credit_limit')
+                    TextInput::make('credit_limit')
                         ->label('Кредитний ліміт')
                         ->numeric()
                         ->prefix('₴'),
-                    Forms\Components\TextInput::make('current_debt')
+                    TextInput::make('current_debt')
                         ->label('Поточний борг')
                         ->numeric()
                         ->prefix('₴'),
                 ])->columns(3),
-                Forms\Components\Section::make('Ціни')->schema([
-                    Forms\Components\Select::make('default_price_list_id')
+                Section::make('Ціни')->schema([
+                    Select::make('default_price_list_id')
                         ->label('Прайс-лист')
                         ->options(fn (Customer $record): array => CustomerPriceListUi::assignmentService()
                             ->selectableOptions($record->workspace_id))
@@ -152,7 +174,7 @@ class CustomerResource extends Resource
                         ->helperText(fn (Get $get, Customer $record): string => CustomerPriceListUi::resolveDisplay($record)
                             ->formHelperText($get('default_price_list_id')))
                         ->rules([
-                            fn (Customer $record): \Closure => function (string $attribute, mixed $value, \Closure $fail) use ($record): void {
+                            fn (Customer $record): Closure => function (string $attribute, mixed $value, Closure $fail) use ($record): void {
                                 $originalTargetId = $record->getOriginal('default_price_list_id');
                                 $submittedTargetId = $value === '' ? null : $value;
 
@@ -168,7 +190,7 @@ class CustomerResource extends Resource
                                 }
                             },
                         ]),
-                    Forms\Components\Placeholder::make('price_list_warning')
+                    Placeholder::make('price_list_warning')
                         ->label('')
                         ->content(function (Get $get, Customer $record): ?string {
                             $selected = $get('default_price_list_id');
@@ -205,44 +227,44 @@ class CustomerResource extends Resource
             ]);
     }
 
-    public static function infolist(Infolist $infolist): Infolist
+    public static function infolist(Schema $schema): Schema
     {
-        return $infolist
-            ->schema([
-                Infolists\Components\Section::make('Клієнт')->schema([
-                    Infolists\Components\TextEntry::make('name')->label('Назва'),
-                    Infolists\Components\TextEntry::make('login')->label('Логін'),
-                    Infolists\Components\IconEntry::make('is_active')->label('Активний')->boolean(),
-                    Infolists\Components\TextEntry::make('manager_name')->label('Менеджер (текст)'),
-                    Infolists\Components\TextEntry::make('manager_phone')->label('Телефон (текст)'),
-                    Infolists\Components\TextEntry::make('email')->label('Email'),
-                    Infolists\Components\TextEntry::make('accountManager.name')
+        return $schema
+            ->components([
+                Section::make('Клієнт')->schema([
+                    TextEntry::make('name')->label('Назва'),
+                    TextEntry::make('login')->label('Логін'),
+                    IconEntry::make('is_active')->label('Активний')->boolean(),
+                    TextEntry::make('manager_name')->label('Менеджер (текст)'),
+                    TextEntry::make('manager_phone')->label('Телефон (текст)'),
+                    TextEntry::make('email')->label('Email'),
+                    TextEntry::make('accountManager.name')
                         ->label('Акаунт менеджер')
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('backupManager.name')
+                    TextEntry::make('backupManager.name')
                         ->label('Резервний менеджер')
                         ->placeholder('—'),
                 ])->columns(2),
-                Infolists\Components\Section::make('Кредит')->schema([
-                    Infolists\Components\TextEntry::make('credit_limit')
+                Section::make('Кредит')->schema([
+                    TextEntry::make('credit_limit')
                         ->label('Кредитний ліміт')
                         ->money('UAH'),
-                    Infolists\Components\TextEntry::make('current_debt')
+                    TextEntry::make('current_debt')
                         ->label('Поточний борг')
                         ->money('UAH'),
-                    Infolists\Components\TextEntry::make('payment_delay_days')
+                    TextEntry::make('payment_delay_days')
                         ->label('Відстрочка')
                         ->suffix(' дн.'),
-                    Infolists\Components\TextEntry::make('available_credit')
+                    TextEntry::make('available_credit')
                         ->label('Доступний кредит')
                         ->state(fn (Customer $record): float => max(0, (float) $record->credit_limit - (float) $record->current_debt))
                         ->money('UAH'),
                 ])->columns(2),
-                Infolists\Components\Section::make('Ціни')->schema([
-                    Infolists\Components\TextEntry::make('price_list_assignment')
+                Section::make('Ціни')->schema([
+                    TextEntry::make('price_list_assignment')
                         ->label('Прайс-лист')
                         ->state(fn (Customer $record): string => CustomerPriceListUi::resolveDisplay($record)->infolistLabel()),
-                    Infolists\Components\TextEntry::make('price_list_assignment_description')
+                    TextEntry::make('price_list_assignment_description')
                         ->label('')
                         ->state(fn (Customer $record): ?string => CustomerPriceListUi::resolveDisplay($record)->infolistDescription())
                         ->placeholder('—')
@@ -256,31 +278,31 @@ class CustomerResource extends Resource
         return $table
             ->modifyQueryUsing(fn ($query) => $query->with('defaultPriceList'))
             ->columns([
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->label('Назва')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('login')
+                TextColumn::make('login')
                     ->label('Логін')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('email')
+                TextColumn::make('email')
                     ->label('Email')
                     ->searchable()
                     ->copyable()
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('credit_limit')
+                TextColumn::make('credit_limit')
                     ->label('Ліміт')
                     ->money('UAH')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('current_debt')
+                TextColumn::make('current_debt')
                     ->label('Борг')
                     ->money('UAH')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('payment_delay_days')
+                TextColumn::make('payment_delay_days')
                     ->label('Відстрочка')
                     ->suffix(' дн.')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('default_price_list_id')
+                TextColumn::make('default_price_list_id')
                     ->label('Прайс-лист')
                     ->state(fn (Customer $record): string => CustomerPriceListUi::resolveDisplay($record)->tableLabel())
                     ->description(fn (Customer $record): ?string => CustomerPriceListUi::resolveDisplay($record)->tableDescription())
@@ -289,34 +311,34 @@ class CustomerResource extends Resource
                         CustomerPriceListAssignmentDisplayState::RedundantDirect => 'warning',
                         default => 'gray',
                     }),
-                Tables\Columns\IconColumn::make('is_active')
+                IconColumn::make('is_active')
                     ->label('Активний')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('orders_count')
+                TextColumn::make('orders_count')
                     ->label('Замовлень')
                     ->counts('orders')
                     ->sortable(),
             ])
             ->defaultSort('name')
             ->filters([
-                Tables\Filters\TernaryFilter::make('is_active')
+                TernaryFilter::make('is_active')
                     ->label('Активний'),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\Action::make('preview_as_customer')
+            ->recordActions([
+                ViewAction::make(),
+                EditAction::make(),
+                Action::make('preview_as_customer')
                     ->label('Перегляд як клієнт')
                     ->icon('heroicon-o-eye')
                     ->url(fn (Customer $record): string => static::getUrl('preview', ['record' => $record])),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\BulkAction::make('assign_price_list')
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    BulkAction::make('assign_price_list')
                         ->label('Призначити прайс-лист')
                         ->icon('heroicon-o-currency-dollar')
-                        ->form([
-                            Forms\Components\Select::make('target_price_list_id')
+                        ->schema([
+                            Select::make('target_price_list_id')
                                 ->label('Прайс-лист')
                                 ->options(fn (): array => CustomerPriceListUi::assignmentService()
                                     ->bulkSelectableOptions(app(WorkspaceContext::class)->id()))
@@ -324,9 +346,9 @@ class CustomerResource extends Resource
                                 ->native(false)
                                 ->searchable()
                                 ->live(),
-                            Forms\Components\Placeholder::make('assignment_preview')
+                            Placeholder::make('assignment_preview')
                                 ->label('Попередній перегляд')
-                                ->content(function (Get $get, Pages\ListCustomers $livewire): string {
+                                ->content(function (Get $get, ListCustomers $livewire): string {
                                     $sentinel = $get('target_price_list_id');
 
                                     if (blank($sentinel)) {
@@ -352,7 +374,7 @@ class CustomerResource extends Resource
                                 })
                                 ->visible(fn (Get $get): bool => filled($get('target_price_list_id'))),
                         ])
-                        ->action(function (Collection $records, array $data, Pages\ListCustomers $livewire): void {
+                        ->action(function (Collection $records, array $data, ListCustomers $livewire): void {
                             $workspaceId = app(WorkspaceContext::class)->id();
                             $service = CustomerPriceListUi::assignmentService();
                             $targetId = $service->resolveTargetFromSentinel($data['target_price_list_id'] ?? null);
@@ -386,22 +408,23 @@ class CustomerResource extends Resource
     public static function getRelations(): array
     {
         return [
-            RelationManagers\OrdersRelationManager::class,
+            OrdersRelationManager::class,
         ];
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListCustomers::route('/'),
-            'view' => Pages\ViewCustomer::route('/{record}'),
-            'edit' => Pages\EditCustomer::route('/{record}/edit'),
-            'preview' => Pages\PreviewAsCustomer::route('/{record}/preview'),
+            'index' => ListCustomers::route('/'),
+            'view' => ViewCustomer::route('/{record}'),
+            'edit' => EditCustomer::route('/{record}/edit'),
+            'preview' => PreviewAsCustomer::route('/{record}/preview'),
         ];
     }
 
-    public static function canCreate(): bool
+
+    public static function getCreateAuthorizationResponse(): Response
     {
-        return false;
+        return Response::deny();
     }
 }

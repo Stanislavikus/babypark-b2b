@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ProductResource\Pages;
 
+use Filament\Actions\EditAction;
 use App\Filament\Concerns\HasMarginFormatToggle;
 use App\Filament\Resources\ProductResource;
 use Filament\Actions;
@@ -16,7 +17,7 @@ class ViewProduct extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\EditAction::make(),
+            EditAction::make(),
         ];
     }
 }

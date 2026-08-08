@@ -6,14 +6,13 @@ use App\Enums\PriceListStatus;
 use App\Models\PriceList;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
-use Filament\Tables\Actions\Action as TableAction;
 use Illuminate\Support\Facades\DB;
 
 class MakeDefaultPriceListAction
 {
-    public static function makeTableAction(): TableAction
+    public static function makeTableAction(): Action
     {
-        return TableAction::make('makeDefault')
+        return Action::make('makeDefault')
             ->label('Зробити списком за замовчуванням')
             ->icon('heroicon-o-star')
             ->color('warning')

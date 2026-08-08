@@ -2,6 +2,25 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
+use Filament\Schemas\Components\Group;
+use Filament\Actions\Action;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Actions\ViewAction;
+use Filament\Actions\BulkActionGroup;
+use App\Filament\Resources\ProductResource\Pages\ListProducts;
+use App\Filament\Resources\ProductResource\Pages\ViewProduct;
+use App\Filament\Resources\ProductResource\Pages\EditProduct;
+use Filament\Actions\BulkAction;
 use App\Enums\TagBulkOperation;
 use App\Exceptions\Catalog\InvalidTagBulkSelectionException;
 use App\Filament\Concerns\HasProductLightbox;
@@ -19,10 +38,7 @@ use App\Support\ProductFields\ProductColumnVisibility;
 use App\Support\ProductTableLink;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Forms\Get;
 use Filament\Infolists;
-use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Support\Exceptions\Halt;
@@ -34,15 +50,18 @@ use Illuminate\Support\HtmlString;
 use Livewire\Livewire;
 use LogicException;
 
+use Illuminate\Auth\Access\Response;
+use Illuminate\Database\Eloquent\Model;
+
 class ProductResource extends Resource
 {
     use HasProductLightbox;
 
     protected static ?string $model = Product::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-cube';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-cube';
 
-    protected static ?string $navigationGroup = 'Каталог';
+    protected static string | \UnitEnum | null $navigationGroup = 'Каталог';
 
     protected static ?string $modelLabel = 'товар';
 
@@ -54,32 +73,32 @@ class ProductResource extends Resource
     // Form (edit)
     // -------------------------------------------------------------------------
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Основне (з 1С)')->schema([
-                    Forms\Components\TextInput::make('sku')
+        return $schema
+            ->components([
+                Section::make('Основне (з 1С)')->schema([
+                    TextInput::make('sku')
                         ->label('Артикул')
                         ->disabled(),
-                    Forms\Components\TextInput::make('name')
+                    TextInput::make('name')
                         ->label('Назва')
                         ->disabled(),
-                    Forms\Components\TextInput::make('brand')
+                    TextInput::make('brand')
                         ->label('Бренд')
                         ->disabled(),
-                    Forms\Components\TextInput::make('category.name')
+                    TextInput::make('category.name')
                         ->label('Категорія')
                         ->disabled(),
-                    Forms\Components\Placeholder::make('cost_price_summary')
+                    Placeholder::make('cost_price_summary')
                         ->label('Вхідна ціна')
                         ->content(fn (?Product $record): string => $record
                             ? (app(ProductPricingSummary::class)->formatCostPrice($record) ?? '—')
                             : '—'),
                 ])->columns(2),
 
-                Forms\Components\Section::make('Класифікація')->schema([
-                    Forms\Components\TextInput::make('merchant_type')
+                Section::make('Класифікація')->schema([
+                    TextInput::make('merchant_type')
                         ->label('Внутрішній тип товару')
                         ->maxLength(255)
                         ->datalist(fn (): array => Product::query()
@@ -90,12 +109,12 @@ class ProductResource extends Resource
                             ->pluck('merchant_type')
                             ->all())
                         ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? trim($state) : null),
-                    Forms\Components\Select::make('tags')
+                    Select::make('tags')
                         ->label('Теги')
                         ->multiple()
                         ->relationship(titleAttribute: 'name')
                         ->createOptionForm([
-                            Forms\Components\TextInput::make('name')
+                            TextInput::make('name')
                                 ->label('Назва')
                                 ->required()
                                 ->maxLength(255),
@@ -113,16 +132,16 @@ class ProductResource extends Resource
                         ->searchable(),
                 ])->columns(2),
 
-                Forms\Components\Section::make('Сайт')->schema([
+                Section::make('Сайт')->schema([
                     // Left column: URL field
-                    Forms\Components\Group::make([
-                        Forms\Components\TextInput::make('url')
+                    Group::make([
+                        TextInput::make('url')
                             ->label('URL товару на сайті')
                             ->url()
                             ->placeholder('https://babypark.ua/product/...')
                             ->maxLength(2048)
                             ->suffixAction(
-                                Forms\Components\Actions\Action::make('open_url')
+                                Action::make('open_url')
                                     ->icon('heroicon-m-arrow-top-right-on-square')
                                     ->url(fn (?string $state) => $state)
                                     ->openUrlInNewTab()
@@ -131,8 +150,8 @@ class ProductResource extends Resource
                     ]),
 
                     // Right column: photo preview
-                    Forms\Components\Group::make([
-                        Forms\Components\Placeholder::make('photo_preview')
+                    Group::make([
+                        Placeholder::make('photo_preview')
                             ->label('Фото товару')
                             ->content(fn (Get $get, ?Product $record) => new HtmlString(
                                 $record
@@ -148,33 +167,33 @@ class ProductResource extends Resource
     // Infolist (view) — used both on the dedicated view page and in the slideOver
     // -------------------------------------------------------------------------
 
-    public static function infolist(Infolist $infolist): Infolist
+    public static function infolist(Schema $schema): Schema
     {
-        return $infolist
-            ->schema([
-                Infolists\Components\Section::make('Основне (з 1С)')->schema([
-                    Infolists\Components\TextEntry::make('sku')->label('Артикул'),
-                    Infolists\Components\TextEntry::make('variant_ean')
+        return $schema
+            ->components([
+                Section::make('Основне (з 1С)')->schema([
+                    TextEntry::make('sku')->label('Артикул'),
+                    TextEntry::make('variant_ean')
                         ->label('EAN')
                         ->getStateUsing(fn (Product $record): ?string => $record->variants->first()?->barcode_ean)
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('brand')->label('Бренд')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('name')->label('Назва'),
-                    Infolists\Components\TextEntry::make('category.name')->label('Категорія')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('admin_stock_status')
+                    TextEntry::make('brand')->label('Бренд')->placeholder('—'),
+                    TextEntry::make('name')->label('Назва'),
+                    TextEntry::make('category.name')->label('Категорія')->placeholder('—'),
+                    TextEntry::make('admin_stock_status')
                         ->label('Наявність')
                         ->getStateUsing(fn (Product $record): string => AdminAvailabilityPresenter::adminLabel($record))
                         ->badge()
                         ->color(fn (string $state): string => AdminAvailabilityPresenter::badgeColor($state)),
-                    Infolists\Components\TextEntry::make('cost_price_summary')
+                    TextEntry::make('cost_price_summary')
                         ->label('Вхідна ціна')
                         ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatCostPrice($record))
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('admin_rrp')
+                    TextEntry::make('admin_rrp')
                         ->label('РРЦ')
                         ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatRrp($record))
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('admin_margin')
+                    TextEntry::make('admin_margin')
                         ->label(fn (): HtmlString => MarginToggle::labelHtml(
                             Livewire::current()?->marginFormat ?? 'percent'
                         ))
@@ -184,26 +203,26 @@ class ProductResource extends Resource
                         ))
                         ->color(fn (Product $record): ?string => AdminProductMargin::isNegative($record) ? 'danger' : null)
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('admin_status')
+                    TextEntry::make('admin_status')
                         ->label('Статус')
                         ->getStateUsing(fn (Product $record): string => $record->is_active ? 'Активний' : 'Неактивний')
                         ->badge()
                         ->color(fn (string $state): string => $state === 'Активний' ? 'success' : 'gray'),
                 ])->columns(2),
 
-                Infolists\Components\Section::make('Класифікація')->schema([
-                    Infolists\Components\TextEntry::make('merchant_type')
+                Section::make('Класифікація')->schema([
+                    TextEntry::make('merchant_type')
                         ->label('Внутрішній тип товару')
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('tags.name')
+                    TextEntry::make('tags.name')
                         ->label('Теги')
                         ->badge()
                         ->placeholder('—'),
                 ])->columns(2),
 
-                Infolists\Components\Section::make('Сайт')->schema([
+                Section::make('Сайт')->schema([
                     // Left: clickable URL
-                    Infolists\Components\TextEntry::make('url')
+                    TextEntry::make('url')
                         ->label('URL товару на сайті')
                         ->placeholder('—')
                         ->url(fn (?string $state) => $state)
@@ -215,7 +234,7 @@ class ProductResource extends Resource
                             : null),
 
                     // Right: 48×48 thumbnail — click opens the shared bpOpenLightbox() JS overlay.
-                    Infolists\Components\TextEntry::make('photo_preview')
+                    TextEntry::make('photo_preview')
                         ->label('Фото товару')
                         ->getStateUsing(function ($record) {
                             if (! $record) {
@@ -258,7 +277,7 @@ class ProductResource extends Resource
                 // --- Default visible columns (7 total) ---
 
                 // 1. Фото: thumbnail — click opens shared bpOpenLightbox(); does NOT trigger row action
-                Tables\Columns\ImageColumn::make('first_image')
+                ImageColumn::make('first_image')
                     ->label('Фото')
                     ->state(fn (Product $record): ?string => self::firstImage($record))
                     ->size(48)
@@ -267,33 +286,33 @@ class ProductResource extends Resource
                     ->toggleable(in_array('photo', $toggleable)),
 
                 // 2. Назва
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->label('Назва')
                     ->searchable()
                     ->sortable()
                     ->limit(50),
 
                 // 3. Артикул
-                Tables\Columns\TextColumn::make('sku')
+                TextColumn::make('sku')
                     ->label('Артикул')
                     ->searchable()
                     ->sortable(),
 
                 // 4. Бренд — default visible; user may toggle it off
-                Tables\Columns\TextColumn::make('brand')
+                TextColumn::make('brand')
                     ->label('Бренд')
                     ->searchable()
                     ->sortable()
                     ->toggleable(in_array('brand', $toggleable)),
 
                 // 5. Ціна — placeholder until admin/base sale price model is resolved (Follow-up 3)
-                Tables\Columns\TextColumn::make('admin_sale_price')
+                TextColumn::make('admin_sale_price')
                     ->label('Ціна')
                     ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatDefaultSalePrice($record))
                     ->placeholder('—'),
 
                 // 6. Наявність — uses AvailabilityResolver net qty; consistent with filter and infolist
-                Tables\Columns\TextColumn::make('stock_status')
+                TextColumn::make('stock_status')
                     ->label('Наявність')
                     ->getStateUsing(fn (Product $record): string => AdminAvailabilityPresenter::adminLabel($record))
                     ->badge()
@@ -316,7 +335,7 @@ class ProductResource extends Resource
                     }),
 
                 // 7. Статус
-                Tables\Columns\IconColumn::make('is_active')
+                IconColumn::make('is_active')
                     ->label('Статус')
                     ->boolean()
                     ->sortable(query: function (Builder $query, string $direction): Builder {
@@ -325,19 +344,19 @@ class ProductResource extends Resource
 
                 // --- Optional / hidden by default columns ---
 
-                Tables\Columns\TextColumn::make('barcode_ean')
+                TextColumn::make('barcode_ean')
                     ->label('EAN')
                     ->searchable()
                     ->sortable()
                     ->placeholder('—')
                     ->toggleable(in_array('barcode_ean', $toggleable), isToggledHiddenByDefault: true),
 
-                Tables\Columns\TextColumn::make('category.name')
+                TextColumn::make('category.name')
                     ->label('Категорія')
                     ->sortable()
                     ->toggleable(in_array('category', $toggleable), isToggledHiddenByDefault: true),
 
-                Tables\Columns\TextColumn::make('rrp')
+                TextColumn::make('rrp')
                     ->label('РРЦ')
                     ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatRrp($record))
                     ->placeholder('—')
@@ -348,7 +367,7 @@ class ProductResource extends Resource
                         );
                     }),
 
-                Tables\Columns\TextColumn::make('cost_price_summary')
+                TextColumn::make('cost_price_summary')
                     ->label('Вхідна ціна')
                     ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatCostPrice($record))
                     ->placeholder('—')
@@ -363,7 +382,7 @@ class ProductResource extends Resource
                         );
                     }),
 
-                Tables\Columns\TextColumn::make('margin')
+                TextColumn::make('margin')
                     ->label(fn (): HtmlString => MarginToggle::labelHtml(
                         Livewire::current()?->marginFormat ?? 'percent'
                     ))
@@ -381,28 +400,28 @@ class ProductResource extends Resource
                     }),
 
                 // Clickable external link column
-                Tables\Columns\TextColumn::make('url')
+                TextColumn::make('url')
                     ->label('URL на сайті')
                     ->formatStateUsing(fn (?string $state): HtmlString|string => ProductTableLink::externalUrlHtml($state))
                     ->tooltip(fn (?string $state) => $state)
                     ->disableClick()
                     ->toggleable(in_array('url', $toggleable), isToggledHiddenByDefault: true),
 
-                Tables\Columns\TextColumn::make('merchant_type')
+                TextColumn::make('merchant_type')
                     ->label('Внутрішній тип товару')
                     ->searchable()
                     ->sortable()
                     ->placeholder('—')
                     ->toggleable(in_array('merchant_type', $toggleable), isToggledHiddenByDefault: true),
 
-                Tables\Columns\TextColumn::make('tags.name')
+                TextColumn::make('tags.name')
                     ->label('Теги')
                     ->placeholder('—')
                     ->toggleable(in_array('tags', $toggleable), isToggledHiddenByDefault: true),
             ])
             ->defaultSort('sku')
             ->toggleColumnsTriggerAction(
-                fn (Tables\Actions\Action $action) => $action
+                fn (Action $action) => $action
                     ->label('Стовпці')
                     ->tooltip('Стовпці')
             )
@@ -410,13 +429,13 @@ class ProductResource extends Resource
             ->recordUrl(null)
             ->recordAction('view')
             ->filters([
-                Tables\Filters\SelectFilter::make('category_id')
+                SelectFilter::make('category_id')
                     ->label('Категорії')
                     ->relationship('category', 'name')
                     ->multiple()
                     ->preload(),
 
-                Tables\Filters\SelectFilter::make('brand')
+                SelectFilter::make('brand')
                     ->label('Бренди')
                     ->options(fn (): array => Product::query()
                         ->distinct()
@@ -426,7 +445,7 @@ class ProductResource extends Resource
                         ->toArray())
                     ->multiple(),
 
-                Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->label('Статус')
                     ->placeholder('Всі')
                     ->options([
@@ -445,7 +464,7 @@ class ProductResource extends Resource
                 // Availability filter — uses same net-qty calculation as the column and infolist.
                 // Status buckets: У наявності / Очікується / Немає в наявності.
                 // NOTE: Follow-up 1 — migrate to AvailabilityResolver when implemented.
-                Tables\Filters\SelectFilter::make('availability')
+                SelectFilter::make('availability')
                     ->label('Наявність')
                     ->placeholder('Всі')
                     ->options([
@@ -467,14 +486,14 @@ class ProductResource extends Resource
                         };
                     }),
 
-                Tables\Filters\SelectFilter::make('tags')
+                SelectFilter::make('tags')
                     ->label('Теги')
                     ->relationship('tags', 'name')
                     ->multiple()
                     ->searchable()
                     ->preload(),
 
-                Tables\Filters\SelectFilter::make('merchant_type')
+                SelectFilter::make('merchant_type')
                     ->label('Внутрішній тип товару')
                     ->options(fn (): array => Product::query()
                         ->distinct()
@@ -485,20 +504,20 @@ class ProductResource extends Resource
                         ->toArray())
                     ->multiple(),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make()
+            ->recordActions([
+                ViewAction::make()
                     ->extraAttributes(['class' => 'bp-admin-row-view-action-hidden'])
                     ->slideOver()
                     ->extraModalFooterActions(fn (Product $record) => [
-                        Tables\Actions\Action::make('open_full_page_footer')
+                        Action::make('open_full_page_footer')
                             ->label('Відкрити повну картку')
                             ->icon('heroicon-m-arrow-top-right-on-square')
                             ->color('gray')
                             ->url(static::getUrl('view', ['record' => $record])),
                     ]),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
+            ->toolbarActions([
+                BulkActionGroup::make([
                     self::makeTagBulkAction(
                         operation: TagBulkOperation::Add,
                         name: 'add_tags',
@@ -536,21 +555,13 @@ class ProductResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListProducts::route('/'),
-            'view' => Pages\ViewProduct::route('/{record}'),
-            'edit' => Pages\EditProduct::route('/{record}/edit'),
+            'index' => ListProducts::route('/'),
+            'view' => ViewProduct::route('/{record}'),
+            'edit' => EditProduct::route('/{record}/edit'),
         ];
     }
 
-    public static function canCreate(): bool
-    {
-        return false;
-    }
 
-    public static function canDelete($record): bool
-    {
-        return false;
-    }
 
     // -------------------------------------------------------------------------
     // Bulk tag actions
@@ -563,12 +574,12 @@ class ProductResource extends Resource
         string $icon,
         string $successTitle,
         string $failureTitle,
-    ): Tables\Actions\BulkAction {
-        return Tables\Actions\BulkAction::make($name)
+    ): BulkAction {
+        return BulkAction::make($name)
             ->label($label)
             ->icon($icon)
-            ->form([
-                Forms\Components\Select::make('tag_ids')
+            ->schema([
+                Select::make('tag_ids')
                     ->label('Теги')
                     ->multiple()
                     ->required()
@@ -580,9 +591,9 @@ class ProductResource extends Resource
                     ->searchable()
                     ->preload()
                     ->live(),
-                Forms\Components\Placeholder::make('bulk_preview')
+                Placeholder::make('bulk_preview')
                     ->label('Попередній перегляд')
-                    ->content(function (Get $get, Pages\ListProducts $livewire) use ($operation): string {
+                    ->content(function (Get $get, ListProducts $livewire) use ($operation): string {
                         $tagIds = $get('tag_ids') ?? [];
 
                         if ($tagIds === []) {
@@ -610,7 +621,7 @@ class ProductResource extends Resource
                     })
                     ->visible(fn (Get $get): bool => filled($get('tag_ids'))),
             ])
-            ->action(function (Collection $records, array $data, Pages\ListProducts $livewire) use ($operation, $successTitle, $failureTitle): void {
+            ->action(function (Collection $records, array $data, ListProducts $livewire) use ($operation, $successTitle, $failureTitle): void {
                 $workspaceId = app(WorkspaceContext::class)->id();
                 $productIds = $livewire->getSelectedTableRecords()->modelKeys();
                 $tagIds = $data['tag_ids'] ?? [];
@@ -728,5 +739,15 @@ HTML;
 </a>
 <span style="display:block; margin-top:4px; font-size:11px; color:#9ca3af;">🔍 Відкрити фото</span>
 HTML;
+    }
+
+    public static function getCreateAuthorizationResponse(): Response
+    {
+        return Response::deny();
+    }
+
+    public static function getDeleteAuthorizationResponse(Model $record): Response
+    {
+        return Response::deny();
     }
 }

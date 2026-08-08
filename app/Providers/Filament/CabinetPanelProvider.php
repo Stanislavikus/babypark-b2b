@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use Filament\Pages\Dashboard;
 use App\Filament\Cabinet\Pages\Auth\Login;
 use App\Filament\Cabinet\Resources\ProductResource\Pages\ListProducts;
 use App\Support\Brand;
@@ -39,6 +40,7 @@ class CabinetPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Brand::primaryColor(),
             ])
+            ->viteTheme('resources/css/filament/theme.css')
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn () => ProductLightbox::bodyEndHook()
@@ -54,7 +56,7 @@ class CabinetPanelProvider extends PanelProvider
             )
             ->discoverResources(in: app_path('Filament/Cabinet/Resources'), for: 'App\\Filament\\Cabinet\\Resources')
             ->pages([
-                Pages\Dashboard::class,
+                Dashboard::class,
             ])
             ->navigationItems([
                 NavigationItem::make('Кошик')

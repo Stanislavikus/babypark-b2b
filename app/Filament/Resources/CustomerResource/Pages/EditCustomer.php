@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\CustomerResource\Pages;
 
+use Filament\Actions\ViewAction;
+use Filament\Actions\DeleteAction;
 use App\Exceptions\Pricing\InvalidPriceListAssignmentException;
 use App\Filament\Resources\CustomerResource;
 use App\Models\PriceList;
@@ -17,8 +19,8 @@ class EditCustomer extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\ViewAction::make(),
-            Actions\DeleteAction::make(),
+            ViewAction::make(),
+            DeleteAction::make(),
         ];
     }
 

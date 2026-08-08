@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ProductResource\Pages;
 
+use Filament\Actions\CreateAction;
 use App\Filament\Concerns\HasMarginFormatToggle;
 use App\Filament\Resources\ProductResource;
 use Filament\Actions;
@@ -16,7 +17,7 @@ class ListProducts extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            CreateAction::make(),
         ];
     }
 }

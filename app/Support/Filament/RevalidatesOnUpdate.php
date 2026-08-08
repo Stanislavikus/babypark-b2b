@@ -2,9 +2,9 @@
 
 namespace App\Support\Filament;
 
-use Filament\Forms\Components\Component;
-use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Set;
+use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Contracts\HasSchemas;
 
 /**
  * Clears stale inline validation errors after the user fixes a field.
@@ -19,7 +19,7 @@ final class RevalidatesOnUpdate
     {
         return $field
             ->live()
-            ->afterStateUpdated(function (HasForms $livewire, Component $component): void {
+            ->afterStateUpdated(function (HasSchemas $livewire, Component $component): void {
                 $livewire->validateOnly($component->getStatePath());
             });
     }
@@ -31,7 +31,7 @@ final class RevalidatesOnUpdate
     {
         return $field
             ->live()
-            ->afterStateUpdated(function (HasForms $livewire, Component $component, Set $set) use ($reset): void {
+            ->afterStateUpdated(function (HasSchemas $livewire, Component $component, Set $set) use ($reset): void {
                 $reset($set);
                 $livewire->validateOnly($component->getStatePath());
             });

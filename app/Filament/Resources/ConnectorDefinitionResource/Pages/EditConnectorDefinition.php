@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ConnectorDefinitionResource\Pages;
 
+use Filament\Actions\DeleteAction;
 use App\Filament\Resources\ConnectorDefinitionResource;
 use App\Models\ConnectorDefinition;
 use App\Services\Connectors\ConnectorDefinitionGovernanceService;
@@ -16,7 +17,7 @@ class EditConnectorDefinition extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make()
+            DeleteAction::make()
                 ->using(function (ConnectorDefinition $record): bool {
                     app(ConnectorDefinitionGovernanceService::class)
                         ->deleteDefinitionWhenUnreferenced($record);

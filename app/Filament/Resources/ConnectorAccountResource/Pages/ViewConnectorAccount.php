@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ConnectorAccountResource\Pages;
 
+use Throwable;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Filament\Resources\ConnectorAccountResource;
 use App\Filament\Resources\ConnectorAccountResource\RelationManagers\ConnectionChecksRelationManager;
@@ -117,7 +118,7 @@ class ViewConnectorAccount extends ViewRecord
                         }
 
                         $this->dispatch('refreshRelationManagers');
-                    } catch (\Throwable $exception) {
+                    } catch (Throwable $exception) {
                         report($exception);
 
                         Notification::make()

@@ -2,14 +2,15 @@
 
 namespace App\Filament\Resources\OrderResource\Pages;
 
+use Filament\Support\Enums\Width;
+use Filament\Schemas\Schema;
+use Filament\Actions\EditAction;
 use App\Filament\Resources\OrderResource;
 use Filament\Actions;
 use Filament\Actions\Action;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Support\Enums\FontWeight;
-use Filament\Support\Enums\MaxWidth;
 
 class ViewOrder extends ViewRecord
 {
@@ -23,11 +24,11 @@ class ViewOrder extends ViewRecord
                 ->icon('heroicon-o-building-office-2')
                 ->color('info')
                 ->modalHeading(fn () => $this->record->customer?->name ?? 'Клієнт')
-                ->modalWidth(MaxWidth::Medium)
+                ->modalWidth(Width::Medium)
                 ->modalSubmitAction(false)
                 ->modalCancelActionLabel('Закрити')
-                ->infolist(
-                    fn (Infolist $infolist) => $infolist
+                ->schema(
+                    fn (Schema $schema) => $schema
                         ->record($this->record->customer)
                         ->schema([
                             TextEntry::make('name')
@@ -47,7 +48,7 @@ class ViewOrder extends ViewRecord
                         ])
                         ->columns(2)
                 ),
-            Actions\EditAction::make(),
+            EditAction::make(),
         ];
     }
 }

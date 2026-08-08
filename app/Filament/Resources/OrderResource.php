@@ -2,25 +2,42 @@
 
 namespace App\Filament\Resources;
 
+use Filament\Schemas\Schema;
+use Filament\Schemas\Components\Section;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Toggle;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Forms\Components\DatePicker;
+use Filament\Actions\ViewAction;
+use Filament\Actions\EditAction;
+use App\Filament\Resources\OrderResource\RelationManagers\ItemsRelationManager;
+use App\Filament\Resources\OrderResource\Pages\ListOrders;
+use App\Filament\Resources\OrderResource\Pages\ViewOrder;
+use App\Filament\Resources\OrderResource\Pages\EditOrder;
 use App\Enums\OrderStatus;
 use App\Filament\Resources\OrderResource\Pages;
 use App\Filament\Resources\OrderResource\RelationManagers;
 use App\Models\Order;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
+use Illuminate\Auth\Access\Response;
+
 class OrderResource extends Resource
 {
     protected static ?string $model = Order::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-shopping-cart';
+    protected static string | \BackedEnum | null $navigationIcon = 'heroicon-o-shopping-cart';
 
-    protected static ?string $navigationGroup = 'B2B';
+    protected static string | \UnitEnum | null $navigationGroup = 'B2B';
 
     protected static ?string $modelLabel = 'замовлення';
 
@@ -28,36 +45,36 @@ class OrderResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Замовлення')->schema([
-                    Forms\Components\Select::make('customer_id')
+        return $schema
+            ->components([
+                Section::make('Замовлення')->schema([
+                    Select::make('customer_id')
                         ->label('Клієнт')
                         ->relationship('customer', 'name')
                         ->disabled(),
-                    Forms\Components\TextInput::make('onec_number')
+                    TextInput::make('onec_number')
                         ->label('№ 1С')
                         ->disabled(),
-                    Forms\Components\Select::make('status')
+                    Select::make('status')
                         ->label('Статус')
                         ->options(OrderStatus::options())
                         ->required(),
-                    Forms\Components\TextInput::make('total_with_vat')
+                    TextInput::make('total_with_vat')
                         ->label('Сума з ПДВ')
                         ->disabled()
                         ->prefix('₴'),
-                    Forms\Components\Textarea::make('comment')
+                    Textarea::make('comment')
                         ->label('Коментар клієнта')
                         ->disabled()
                         ->columnSpanFull(),
                 ])->columns(2),
-                Forms\Components\Section::make('Менеджер')->schema([
-                    Forms\Components\Textarea::make('manager_comment')
+                Section::make('Менеджер')->schema([
+                    Textarea::make('manager_comment')
                         ->label('Коментар менеджера')
                         ->columnSpanFull(),
-                    Forms\Components\Toggle::make('needs_call')
+                    Toggle::make('needs_call')
                         ->label('Потрібен дзвінок'),
                 ]),
             ]);
@@ -67,44 +84,44 @@ class OrderResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')
+                TextColumn::make('id')
                     ->label('#')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('customer.name')
+                TextColumn::make('customer.name')
                     ->label('Клієнт')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->label('Статус')
                     ->badge()
                     ->formatStateUsing(fn ($state): string => $state instanceof OrderStatus ? $state->label() : (string) $state),
-                Tables\Columns\TextColumn::make('total_with_vat')
+                TextColumn::make('total_with_vat')
                     ->label('Сума з ПДВ')
                     ->money('UAH')
                     ->sortable(),
-                Tables\Columns\IconColumn::make('needs_call')
+                IconColumn::make('needs_call')
                     ->label('Дзвінок')
                     ->boolean(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label('Дата')
                     ->dateTime('d.m.Y H:i')
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
-                Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->label('Статус')
                     ->options(OrderStatus::options()),
-                Tables\Filters\SelectFilter::make('customer_id')
+                SelectFilter::make('customer_id')
                     ->label('Клієнт')
                     ->relationship('customer', 'name')
                     ->searchable()
                     ->preload(),
                 Filter::make('created_at')
                     ->label('Період')
-                    ->form([
-                        Forms\Components\DatePicker::make('from')->label('Від'),
-                        Forms\Components\DatePicker::make('until')->label('До'),
+                    ->schema([
+                        DatePicker::make('from')->label('Від'),
+                        DatePicker::make('until')->label('До'),
                     ])
                     ->query(function (Builder $query, array $data): Builder {
                         return $query
@@ -112,31 +129,32 @@ class OrderResource extends Resource
                             ->when($data['until'], fn (Builder $q, $date) => $q->whereDate('created_at', '<=', $date));
                     }),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                ViewAction::make(),
+                EditAction::make(),
             ])
-            ->bulkActions([]);
+            ->toolbarActions([]);
     }
 
     public static function getRelations(): array
     {
         return [
-            RelationManagers\ItemsRelationManager::class,
+            ItemsRelationManager::class,
         ];
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListOrders::route('/'),
-            'view' => Pages\ViewOrder::route('/{record}'),
-            'edit' => Pages\EditOrder::route('/{record}/edit'),
+            'index' => ListOrders::route('/'),
+            'view' => ViewOrder::route('/{record}'),
+            'edit' => EditOrder::route('/{record}/edit'),
         ];
     }
 
-    public static function canCreate(): bool
+
+    public static function getCreateAuthorizationResponse(): Response
     {
-        return false;
+        return Response::deny();
     }
 }

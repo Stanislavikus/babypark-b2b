@@ -5,14 +5,13 @@ namespace App\Filament\Resources\PriceListResource\Support;
 use App\Models\PriceList;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
-use Filament\Tables\Actions\DeleteAction as TableDeleteAction;
 
 class GuardedDeletePriceListAction
 {
-    public static function makeTableAction(): TableDeleteAction
+    public static function makeTableAction(): DeleteAction
     {
-        return TableDeleteAction::make()
-            ->before(function (TableDeleteAction $action, PriceList $record): void {
+        return DeleteAction::make()
+            ->before(function (DeleteAction $action, PriceList $record): void {
                 self::guardOrCancel($action, $record);
             });
     }
@@ -25,7 +24,7 @@ class GuardedDeletePriceListAction
             });
     }
 
-    private static function guardOrCancel(DeleteAction|TableDeleteAction $action, PriceList $record): void
+    private static function guardOrCancel(DeleteAction $action, PriceList $record): void
     {
         $reason = PriceListGuard::deleteBlockReason($record);
 

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\CustomerResource\RelationManagers;
 
+use Filament\Tables\Columns\TextColumn;
+use Filament\Actions\ViewAction;
 use App\Enums\OrderStatus;
 use App\Filament\Resources\OrderResource;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -19,32 +21,32 @@ class OrdersRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('id')
             ->columns([
-                Tables\Columns\TextColumn::make('id')
+                TextColumn::make('id')
                     ->label('#')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('onec_number')
+                TextColumn::make('onec_number')
                     ->label('№ 1С')
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->label('Статус')
                     ->badge()
                     ->formatStateUsing(fn ($state): string => $state instanceof OrderStatus ? $state->label() : (string) $state),
-                Tables\Columns\TextColumn::make('total_with_vat')
+                TextColumn::make('total_with_vat')
                     ->label('Сума з ПДВ')
                     ->money('UAH')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label('Створено')
                     ->dateTime('d.m.Y H:i')
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
             ->headerActions([])
-            ->actions([
-                Tables\Actions\ViewAction::make()
+            ->recordActions([
+                ViewAction::make()
                     ->url(fn ($record) => OrderResource::getUrl('view', ['record' => $record])),
             ])
-            ->bulkActions([]);
+            ->toolbarActions([]);
     }
 
     public function isReadOnly(): bool
