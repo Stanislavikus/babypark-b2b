@@ -7,9 +7,11 @@ use App\Models\FieldDefinition;
 use App\Models\Workspace;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Encryption\Encrypter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -60,7 +62,7 @@ class Laravel13UpgradeRegressionTest extends TestCase
         $credentials = ['client_secret' => 'rotation-test-secret'];
 
         config(['app.key' => $oldKey, 'app.previous_keys' => []]);
-        $this->forgetEncrypter();
+        $this->resetApplicationEncrypter();
 
         $account = ConnectorAccount::factory()->create([
             'credentials' => $credentials,
@@ -72,11 +74,37 @@ class Laravel13UpgradeRegressionTest extends TestCase
             'app.key' => $newKey,
             'app.previous_keys' => [$oldKey],
         ]);
-        $this->forgetEncrypter();
+        $this->resetApplicationEncrypter();
 
         $reloaded = ConnectorAccount::query()->findOrFail($accountId);
 
         $this->assertSame($credentials, $reloaded->credentials);
+    }
+
+    #[Test]
+    public function connector_account_credentials_fail_to_decrypt_after_rotation_without_previous_key(): void
+    {
+        $oldKey = 'base64:'.base64_encode(random_bytes(32));
+        $newKey = 'base64:'.base64_encode(random_bytes(32));
+
+        config(['app.key' => $oldKey, 'app.previous_keys' => []]);
+        $this->resetApplicationEncrypter();
+
+        $account = ConnectorAccount::factory()->create([
+            'credentials' => ['client_secret' => 'rotation-negative-control'],
+        ]);
+
+        $accountId = $account->id;
+
+        config([
+            'app.key' => $newKey,
+            'app.previous_keys' => [],
+        ]);
+        $this->resetApplicationEncrypter();
+
+        $this->expectException(DecryptException::class);
+
+        ConnectorAccount::query()->findOrFail($accountId)->credentials;
     }
 
     #[Test]
@@ -91,9 +119,10 @@ class Laravel13UpgradeRegressionTest extends TestCase
         Artisan::call('optimize:clear');
     }
 
-    private function forgetEncrypter(): void
+    private function resetApplicationEncrypter(): void
     {
         $this->app->forgetInstance('encrypter');
         $this->app->forgetInstance(Encrypter::class);
+        Crypt::clearResolvedInstance('encrypter');
     }
 }
