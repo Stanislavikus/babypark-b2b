@@ -422,6 +422,85 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     }
 
     #[Test]
+    public function default_table_ordering_puts_null_sort_order_last_then_orders_by_field_key(): void
+    {
+        $admin = $this->createStaffUser(UserRole::Admin);
+        [$account, $snapshot] = $this->createSnapshotWithFields([
+            ['external_field_key' => 'field_zebra', 'sort_order' => 2],
+            ['external_field_key' => 'field_alpha', 'sort_order' => null],
+            ['external_field_key' => 'field_beta', 'sort_order' => 1],
+        ]);
+
+        $orderedRecords = ConnectorSchemaSnapshotField::query()
+            ->where('snapshot_id', $snapshot->id)
+            ->whereIn('external_field_key', ['field_beta', 'field_zebra', 'field_alpha'])
+            ->get()
+            ->sortBy(fn (ConnectorSchemaSnapshotField $field): array => [
+                $field->sort_order === null ? 1 : 0,
+                $field->sort_order ?? PHP_INT_MAX,
+                $field->external_field_key,
+            ])
+            ->values();
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorSchemaSnapshot::class, [
+                'record' => $account->getKey(),
+                'snapshot' => $snapshot->getKey(),
+            ])
+            ->assertCanSeeTableRecords($orderedRecords, inOrder: true);
+    }
+
+    #[Test]
+    public function explicit_sort_by_external_field_key_overrides_default_ordering(): void
+    {
+        $admin = $this->createStaffUser(UserRole::Admin);
+        [$account, $snapshot] = $this->createSnapshotWithFields([
+            ['external_field_key' => 'field_zebra', 'sort_order' => 2],
+            ['external_field_key' => 'field_alpha', 'sort_order' => null],
+            ['external_field_key' => 'field_beta', 'sort_order' => 1],
+        ]);
+
+        $orderedRecords = ConnectorSchemaSnapshotField::query()
+            ->where('snapshot_id', $snapshot->id)
+            ->whereIn('external_field_key', ['field_beta', 'field_zebra', 'field_alpha'])
+            ->orderByDesc('external_field_key')
+            ->get();
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorSchemaSnapshot::class, [
+                'record' => $account->getKey(),
+                'snapshot' => $snapshot->getKey(),
+            ])
+            ->sortTable('external_field_key', 'desc')
+            ->assertCanSeeTableRecords($orderedRecords, inOrder: true);
+    }
+
+    #[Test]
+    public function explicit_sort_by_normalized_data_type_overrides_default_ordering(): void
+    {
+        $admin = $this->createStaffUser(UserRole::Admin);
+        [$account, $snapshot] = $this->createSnapshotWithFields([
+            ['external_field_key' => 'field_text', 'normalized_data_type' => 'text', 'sort_order' => 10],
+            ['external_field_key' => 'field_boolean', 'normalized_data_type' => 'boolean', 'sort_order' => 1],
+            ['external_field_key' => 'field_number', 'normalized_data_type' => 'number', 'sort_order' => 5],
+        ]);
+
+        $orderedRecords = ConnectorSchemaSnapshotField::query()
+            ->where('snapshot_id', $snapshot->id)
+            ->whereIn('external_field_key', ['field_text', 'field_boolean', 'field_number'])
+            ->orderBy('normalized_data_type')
+            ->get();
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorSchemaSnapshot::class, [
+                'record' => $account->getKey(),
+                'snapshot' => $snapshot->getKey(),
+            ])
+            ->sortTable('normalized_data_type', 'asc')
+            ->assertCanSeeTableRecords($orderedRecords, inOrder: true);
+    }
+
+    #[Test]
     public function field_browser_localization_keys_exist_in_all_locales(): void
     {
         $locales = ['en', 'uk', 'ru'];

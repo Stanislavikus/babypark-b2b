@@ -30,9 +30,7 @@ use Livewire\Attributes\Url;
 
 class ViewConnectorSchemaSnapshot extends Page implements HasTable
 {
-    use InteractsWithTable {
-        makeTable as makeBaseTable;
-    }
+    use InteractsWithTable;
 
     protected static string $resource = ConnectorAccountResource::class;
 
@@ -100,7 +98,17 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
             ->emptyStateDescription(__('connectors.ui.snapshot.fields.empty_description'))
             ->paginated([20, 50, 100])
             ->defaultPaginationPageOption(20)
-            ->defaultSort('sort_order')
+            ->defaultSort(function (Builder $query): Builder {
+                if (filled($this->tableSort)) {
+                    return $query;
+                }
+
+                return $query
+                    ->reorder()
+                    ->orderByRaw('CASE WHEN sort_order IS NULL THEN 1 ELSE 0 END')
+                    ->orderBy('sort_order')
+                    ->orderBy('external_field_key');
+            })
             ->searchable()
             ->columns([
                 TextColumn::make('external_field_key')
@@ -175,18 +183,6 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
             ])
             ->headerActions([])
             ->toolbarActions([]);
-    }
-
-    protected function makeTable(): Table
-    {
-        return $this->makeBaseTable()
-            ->modifyQueryUsing(function (Builder $query): Builder {
-                return $query
-                    ->reorder()
-                    ->orderByRaw('CASE WHEN sort_order IS NULL THEN 1 ELSE 0 END')
-                    ->orderBy('sort_order')
-                    ->orderBy('external_field_key');
-            });
     }
 
     /**
