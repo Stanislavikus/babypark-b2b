@@ -13,8 +13,8 @@
 | Target captures | 144 |
 | Successful | 144 |
 | Failed | 0 |
-| Total runtime | 152.8s |
-| WebP output size | ~4.79 MB |
+| Total runtime | 151.3s |
+| WebP output size | ~4.86 MB |
 
 ## Output locations
 
@@ -31,7 +31,7 @@
 
 | Surface | State |
 |---|---|
-| s06 | ViewAction slideOver (row click + Livewire fallback) |
+| s06 | ViewAction slideOver (neutral row click per supplemental-s06) |
 | s10–12 | Connector account list / detail / connection-check history |
 | s15 | Quantity set + cart dropdown open |
 | s17 | `bpOpenLightbox` overlay |
