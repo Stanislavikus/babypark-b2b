@@ -255,11 +255,18 @@ class ViewConnectorAccount extends ViewRecord
                         ->body(__('connectors.errors.account_disabled'))
                         ->send();
                 } catch (AuthorizationException) {
-                    Notification::make()
-                        ->danger()
-                        ->title(__('connectors.ui.notifications.discovery_failed'))
-                        ->body(__('connectors.errors.account_disabled'))
-                        ->send();
+                    if (! $this->record->is_enabled) {
+                        Notification::make()
+                            ->danger()
+                            ->title(__('connectors.ui.notifications.discovery_failed'))
+                            ->body(__('connectors.errors.account_disabled'))
+                            ->send();
+                    } else {
+                        Notification::make()
+                            ->danger()
+                            ->title(__('connectors.ui.notifications.action_failed'))
+                            ->send();
+                    }
                 } catch (Throwable $exception) {
                     report($exception);
 

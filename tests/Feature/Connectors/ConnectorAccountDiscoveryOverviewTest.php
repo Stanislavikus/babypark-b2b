@@ -21,6 +21,7 @@ use App\Support\Connectors\ConnectorDiscoveryDispatchDecision;
 use App\Support\Connectors\ConnectorUiFormatter;
 use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceResolutionException;
 use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceResolutionReason;
+use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
@@ -376,9 +377,50 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
 
         $this->dispatchStub->executeManualThrowable = new \RuntimeException('SHOULD_NOT_DISPATCH');
 
+        $component->callAction('runDiscovery');
+
+        $this->assertSame(0, $this->dispatchStub->callCount);
+        $html = $component->html();
+        $this->assertStringContainsString(
+            __('connectors.errors.account_disabled', locale: 'uk'),
+            $html,
+        );
+        $this->assertStringNotContainsString(
+            __('connectors.ui.notifications.action_failed', locale: 'uk'),
+            $html,
+        );
+    }
+
+    #[Test]
+    public function run_discovery_execution_denied_when_eligibility_lost_before_action(): void
+    {
+        Config::set('connectors.discovery.manual_trigger_enabled', true);
+        $manager = $this->createStaffUser(UserRole::Manager);
+        $manager->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
+        $account = $this->createConnectorAccount();
+
+        $component = Livewire::actingAs($manager)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertActionEnabled('runDiscovery');
+
+        $manager->revokePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
+        $manager->refresh();
+
+        $this->assertTrue($account->fresh()->is_enabled);
+        $this->assertFalse($manager->can('viewRunDiscovery', $account));
+        $this->assertFalse($manager->can('runDiscovery', $account));
+
+        $this->dispatchStub->executeManualThrowable = new \RuntimeException('SHOULD_NOT_DISPATCH');
+
         $component->call('mountAction', 'runDiscovery');
 
         $this->assertSame(0, $this->dispatchStub->callCount);
+
+        $html = $component->html();
+        $this->assertStringNotContainsString(
+            __('connectors.errors.account_disabled', locale: 'uk'),
+            $html,
+        );
     }
 
     #[Test]
