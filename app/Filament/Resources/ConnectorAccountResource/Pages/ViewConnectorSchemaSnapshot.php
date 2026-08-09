@@ -16,6 +16,7 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\Page;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -173,6 +174,7 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
             ->recordActions([
                 ViewAction::make()
                     ->slideOver()
+                    ->modalWidth(Width::Medium)
                     ->modalHeading(__('connectors.ui.snapshot.fields.detail.title'))
                     ->schema($this->fieldDetailSchema(...)),
             ])
