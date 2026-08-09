@@ -269,21 +269,30 @@ yet), but should be scheduled before any payment gateway integration work starts
   confirmed running.
 - Task 4B-2a-3 adds the first read/status/check operational admin surface
   (`ConnectorAccountResource` list/detail/history) on top of that backend chain.
-- Tasks 4B-2b-0 through 4B-2b (PRs #96, #98–#102, correction PR #105) merged
-  the `database_connectors` / `connectors` discovery lane, queued discovery
-  execution (`ConnectorDiscoveryRunJob`), Adobe discovery execution and
-  normalization, canonical field/snapshot hashing, snapshot publication and
-  persistence, discovery-run received/normalized accounting (106 received /
-  102 normalized on the committed Magento pilot regression fixture), and
-  account projection updates after successful discovery.
+- Tasks 4B-2b-0 through 4B-2b (PRs #96, #98–#102, correction PR #105, Discovery
+  Overview UI PR #114) merged the `database_connectors` / `connectors` discovery
+  lane, queued discovery execution (`ConnectorDiscoveryRunJob`), Adobe discovery
+  execution and normalization, canonical field/snapshot hashing, snapshot
+  publication and persistence, discovery-run received/normalized accounting (106
+  received / 102 normalized on the committed Magento pilot regression fixture),
+  account projection updates after successful discovery, and Discovery Overview UI.
 - `ConnectorAccountMerchandiserPresentation` plus `ConnectorAccountPolicy`
   updates (PR #102) close the Merchandiser `viewAny()`/`view()` and rendered
   management-field security gap — `store_code`, `tenant_context`, credentials,
   and other management-only connector details are not rendered to Merchandiser.
 - Connector-account **creation** and **credential-management/settings UI** remain
   absent (explicitly out of scope for 4B-2a-3).
-- Discovery Overview UI, diff computation, retention jobs, and broader operational
-  UI beyond the current connector-account list/detail surface remain absent.
+- Task 4B-2b Discovery Overview UI (PR #114) delivers Connector Account list
+  last-successful-discovery projection, account-detail Discovery summary,
+  Discovery history, minimal snapshot summary, and manual Discovery action
+  behind the existing deployment flag and authorization contract; Merchandiser
+  receives the documented safe Discovery surface with workspace isolation and
+  sensitive-field presentation gates.
+- Diff computation, retention jobs, and broader operational UI beyond the
+  current connector-account list/detail/discovery surface remain absent.
+- Successful discovery persists `ConnectorSchemaSnapshot` and
+  `ConnectorSchemaSnapshotField`; `ConnectorSchemaDiff` /
+  `ConnectorSchemaDiffItem` remain model/schema scaffolding without a write path.
 - `FieldMapping` remains Task 4C.
 
 **Task sequence (GAP-006 remains Open until implementation lands):**
@@ -294,8 +303,8 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4B-1** | Generic `ConnectorAccount` persistence/domain foundation — Done, PR #85 |
 | **4B-2-0** | Runtime Stop-and-Amend: deployment-family capabilities, adapter/auth, authorization, queue, transaction, retry and SSRF decisions — Done |
 | **4B-2a** | Adobe PaaS adapter/OAuth signing, SSRF-safe transport, connection-check execution and queue lifecycle, plus list/detail/history admin UI and current projection — Done, PRs #87, #89–#94 |
-| **4B-2b** | Discovery backend runtime (queued execution, Adobe normalization, canonical hashing, snapshot publication/persistence, account projection) — Done, PRs #96, #98–#102, #105; Discovery Overview UI — Pending |
-| **4B-2c** | Diff computation, discovery field list, filters, and field inspection |
+| **4B-2b** | Discovery backend runtime plus Discovery Overview UI — Done, PRs #96, #98–#102, #105, #114 |
+| **4B-2c** | Discovered schema fields and change inspection: field list, filters, and field inspection from persisted snapshots; `ConnectorSchemaDiff` computation (models exist, no write path yet) |
 | **4B-2d** | Activity history, retention/pruning service, recovery states, and operational polish |
 | **4C** | `FieldMapping` suggestions, confidence, confirmation and manual resolution |
 
@@ -308,11 +317,11 @@ Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
 - **`ImportedPriceTaxBasis`** (whether an imported row is net or gross) must be
   captured during connector import design — see GAP-018 cross-reference.
 
-**Status:** Open. Task 4B-2a is complete. Task 4B-2b backend discovery runtime is
-complete (PRs #96, #98–#102, correction PR #105). Connector-account creation and
-credential-management/settings UI remain absent. Discovery Overview UI (remaining
-4B-2b scope), diff computation, retention jobs, broader operational UI, and
-FieldMapping remain unimplemented.
+**Status:** Open. Task 4B-2a is complete. Task 4B-2b is complete (PRs #96,
+#98–#102, correction PR #105, Discovery Overview UI PR #114). Connector-account
+creation and credential-management/settings UI remain absent. Task 4B-2c
+(discovered schema fields / change inspection), retention jobs, broader operational
+UI, and FieldMapping remain unimplemented.
 
 **ConnectorAccount authorization/rendered-view sub-gap (closed, PR #102 /
 Task 4B-2b-1e+1f):** `ConnectorAccountPolicy` grants Merchandiser
@@ -343,10 +352,9 @@ Implemented role matrix (confirmed against `App\Enums\UserRole`):
 | Any role, cross-workspace account | No (404) | No (404) | No |
 | Disabled account | Per role matrix (unaffected by disabled state) | No | Per role matrix |
 
-**GAP-006 overall remains Open.** Remaining scope: Discovery Overview UI
-(remaining Task 4B-2b work), diff computation (4B-2c), retention/pruning
-(4B-2d), FieldMapping/import (4C+), connector-account creation and
-credential-management/settings UI.
+**GAP-006 overall remains Open.** Remaining scope: Task 4B-2c (discovered
+schema fields / change inspection), retention/pruning (4B-2d), FieldMapping/import
+(4C+), connector-account creation and credential-management/settings UI.
 
 **Task 4A note (added 2026-07-16):** Task 4A implements the first concrete
 schema for `ConnectorDefinition` and introduces `ConnectorSchemaSource`, plus
@@ -406,7 +414,7 @@ production-readiness also depended on **GAP-024** (framework upgrade). GAP-024
 is now **closed** on `develop` — see the GAP-024 entry for the final stack.
 Closing the B9 host-verification item did not, by itself, close GAP-024.
 
-Next task: remaining Task 4B-2b scope — Discovery Overview UI.
+Next task: Task 4B-2c — discovered schema fields / change inspection.
 
 **Task 4B-2b note (added 2026-08-07):** PR #102 merged queued discovery
 execution (`ConnectorDiscoveryRunJob`), the dispatch/persistence execution
@@ -418,9 +426,20 @@ error vocabulary, and canonical hashing groundwork; PR #96/#4B-2b-0 added the
 accounting and added the committed Magento pilot payload regression fixture
 (106 received attributes, 102 normalized attributes, 102 persisted normalized
 snapshot fields) with deterministic canonical hashing coverage in tests.
-Discovery Overview UI remains Pending within 4B-2b. Permanent production
-`babypark-connector-queue` Supervisor activation remains a separate readiness
-gate — not established by the discovery job alone.
+Discovery Overview UI merged in PR #114 (Task 4B-2b complete). Permanent
+production `babypark-connector-queue` Supervisor activation remains a separate
+readiness gate — not established by the discovery job alone.
+
+**Task 4B-2b UI note (added 2026-08-09):** PR #114 merged Discovery Overview UI
+on Connector Account — list last-successful-discovery projection, account-detail
+Discovery summary, Discovery history, minimal snapshot summary page, and manual
+Discovery action behind the existing deployment flag and authorization
+contract; Merchandiser safe surface, workspace isolation, and sensitive-field
+presentation gates covered. Successful discovery already persists
+`ConnectorSchemaSnapshot` and `ConnectorSchemaSnapshotField`; field-level
+inspection builds on that data. `ConnectorSchemaDiff` / `ConnectorSchemaDiffItem`
+remain scaffolding without a write path — diff computation is Task 4B-2c scope,
+not yet implemented.
 
 **Task 4B-2b-0 note (added 2026-07-29):** Runtime alignment PR — adds
 `database_connectors` / `connectors` queue lane (`retry_after` 1200s), dedicated
