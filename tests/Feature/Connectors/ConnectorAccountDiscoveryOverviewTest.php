@@ -339,7 +339,46 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertActionHidden('runDiscovery');
+            ->assertActionExists('runDiscovery')
+            ->assertActionDisabled('runDiscovery')
+            ->assertSee(__('connectors.ui.disabled_reasons.account_disabled'));
+    }
+
+    #[Test]
+    public function run_discovery_action_not_visible_for_actor_without_discovery_eligibility(): void
+    {
+        Config::set('connectors.discovery.manual_trigger_enabled', true);
+        $manager = $this->createStaffUser(UserRole::Manager);
+        $account = $this->createConnectorAccount();
+
+        $this->assertFalse($manager->can('viewRunDiscovery', $account));
+
+        Livewire::actingAs($manager)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertForbidden();
+    }
+
+    #[Test]
+    public function run_discovery_execution_denied_when_account_disabled_before_action(): void
+    {
+        Config::set('connectors.discovery.manual_trigger_enabled', true);
+        $admin = $this->createStaffUser(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+
+        $component = Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertActionEnabled('runDiscovery');
+
+        $account->update(['is_enabled' => false]);
+
+        $this->assertTrue($component->instance()->record->is_enabled);
+        $this->assertFalse($admin->can('runDiscovery', $account->fresh()));
+
+        $this->dispatchStub->executeManualThrowable = new \RuntimeException('SHOULD_NOT_DISPATCH');
+
+        $component->call('mountAction', 'runDiscovery');
+
+        $this->assertSame(0, $this->dispatchStub->callCount);
     }
 
     #[Test]

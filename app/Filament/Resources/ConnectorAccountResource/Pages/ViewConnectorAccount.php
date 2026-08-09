@@ -20,8 +20,10 @@ use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Gate;
 use Throwable;
 
 class ViewConnectorAccount extends ViewRecord
@@ -193,7 +195,7 @@ class ViewConnectorAccount extends ViewRecord
                     ->manualDiscoveryActionState($this->record)['disabled_reason']]
                 : [])
             ->icon('heroicon-o-magnifying-glass-circle')
-            ->authorize('runDiscovery')
+            ->authorize('viewRunDiscovery')
             ->disabled(fn (): bool => ! app(ConnectorAccountUiState::class)
                 ->manualDiscoveryActionState($this->record)['enabled'])
             ->action(function (): void {
@@ -202,6 +204,10 @@ class ViewConnectorAccount extends ViewRecord
                 $accountId = $this->record->getKey();
 
                 try {
+                    $this->record = $this->resolveRecord($accountId);
+
+                    Gate::forUser($actor)->authorize('runDiscovery', $this->record);
+
                     $decision = app(ConnectorDiscoveryDispatchPort::class)->executeManual(
                         $actor,
                         $workspaceId,
@@ -243,6 +249,12 @@ class ViewConnectorAccount extends ViewRecord
                         ->body(__('connectors.errors.discovery_source_unavailable'))
                         ->send();
                 } catch (ConnectorAccountDisabledException) {
+                    Notification::make()
+                        ->danger()
+                        ->title(__('connectors.ui.notifications.discovery_failed'))
+                        ->body(__('connectors.errors.account_disabled'))
+                        ->send();
+                } catch (AuthorizationException) {
                     Notification::make()
                         ->danger()
                         ->title(__('connectors.ui.notifications.discovery_failed'))
