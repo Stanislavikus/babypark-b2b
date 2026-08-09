@@ -6,13 +6,12 @@
  * Shared by Filament 4 (eb23a62 worktree) and Filament 5 (PR4) supplemental captures.
  * Visual-test setup only — not application/runtime architecture.
  */
-
 $root = getenv('GAP024_APP_ROOT') ?: dirname(__DIR__);
 
 require $root.'/vendor/autoload.php';
 
 $app = require $root.'/bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 
 use App\Enums\ConnectorAccountConnectionStatus;
 use App\Enums\ConnectorConnectionCheckStatus;
@@ -27,6 +26,7 @@ use App\Models\Product;
 use App\Models\Workspace;
 use App\Support\Connectors\AdobePaaS\AdobePaaSCredentialMapper;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Str;
 
 $workspace = Workspace::query()->where('is_default', true)->firstOrFail();
