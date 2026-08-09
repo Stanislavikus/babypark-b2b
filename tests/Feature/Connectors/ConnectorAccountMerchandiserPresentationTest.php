@@ -10,6 +10,7 @@ use App\Enums\ConnectorErrorCause;
 use App\Enums\UserRole;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ListConnectorAccounts;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
+use App\Filament\Resources\ConnectorAccountResource\RelationManagers\DiscoveryRunsRelationManager;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorConnectionCheck;
 use App\Support\Connectors\AdobePaaS\AdobePaaSCredentialMapper;
@@ -197,6 +198,7 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
             'SECRET_TECH_SUMMARY',
             'connectionChecks',
             'ConnectionChecksRelationManager',
+            'runConnectionCheck',
         ];
 
         $this->assertNoCanariesInSurface(
@@ -212,7 +214,9 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
             ->invoke($detailComponent->instance());
 
         $this->assertSame([], $headerActions);
-        $this->assertSame([], $relationManagers);
+        $this->assertSame([
+            DiscoveryRunsRelationManager::class,
+        ], $relationManagers);
         $this->assertNull($detailComponent->instance()->getSubheading());
     }
 
