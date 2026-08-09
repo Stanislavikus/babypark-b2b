@@ -81,6 +81,19 @@ Connection-check jobs stay on the **default** lane (45s job timeout, 90s
 timeout, 1200s `retry_after`). Both share the same account-level
 `WithoutOverlapping` lock key via the cache store.
 
+### Livewire 4 endpoint prefix (GAP-024 PR4)
+
+Livewire 4 serves update/upload endpoints under a hashed prefix derived from
+`APP_KEY`, for example `/livewire-{hash}/update` rather than the fixed
+`/livewire/update` path used in Livewire 3.
+
+- The hash depends on `APP_KEY`; rotating the key changes the prefix.
+- External WAF, CDN, or reverse-proxy allowlists must not assume the old fixed
+  `/livewire/*` paths.
+- The repository Nginx config uses generic front-controller routing and needs no
+  functional change for this behavior; verify any **host-level** rules outside the
+  repo if Livewire requests fail after upgrade.
+
 Ensure the `pcntl` PHP extension is installed (`php -m | grep -i '^pcntl$'`).
 
 ### Verified current pilot state (2026-08-08, GAP-024 PR1)
