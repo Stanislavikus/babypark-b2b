@@ -121,8 +121,8 @@ return [
     */
 
     'file_generation' => [
-        // Preserve Filament 3 resource layout during the GAP-024 PR3 bridge.
-        // Do not run filament:upgrade-directory-structure-to-v4 in this PR.
+        // Preserve the project's existing Filament Resource/Page directory layout;
+        // no resource-layout restructuring was performed during GAP-024.
         'flags' => [
             FileGenerationFlag::PANEL_RESOURCE_CLASSES_OUTSIDE_DIRECTORIES,
             FileGenerationFlag::EMBEDDED_PANEL_RESOURCE_SCHEMAS,

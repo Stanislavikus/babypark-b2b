@@ -656,7 +656,7 @@ class ConnectorAccountDocumentationTest extends TestCase
         $this->assertStringContainsString('complete: this PR adds `php artisan queue:restart` to `deploy.sh`', $gaps);
         $this->assertStringContainsString('babypark-connector-queue` remains intentionally uninstalled and is deferred until Task 4B-2b-1', $gaps);
         $this->assertStringContainsString('**GAP-024**', $gaps);
-        $this->assertStringContainsString('does **not** close GAP-024', $gaps);
+        $this->assertStringContainsString('GAP-024 is now **closed**', $gaps);
     }
 
     #[Test]
@@ -1206,17 +1206,21 @@ class ConnectorAccountDocumentationTest extends TestCase
     }
 
     #[Test]
-    public function gap_024_tracks_laravel_11_upgrade_for_connector_production_readiness(): void
+    public function gap_024_records_closed_framework_migration_to_target_stack(): void
     {
         $gap024 = $this->gap024Section();
 
-        $this->assertStringContainsString('**Status:** Open', $gap024);
-        $this->assertStringContainsString('2026-03-12', $gap024);
-        $this->assertStringContainsString('connector production-readiness', $gap024);
-        $this->assertStringContainsString('Does **not** block this Task 4B-2-0 documentation promotion', $gap024);
-        $this->assertStringContainsString('isolated Task 4B-2a development', $gap024);
-        $this->assertStringContainsString('Must not be bundled into PR #86', $gap024);
-        $this->assertStringContainsString('Task 4B-2a feature implementation', $gap024);
+        $this->assertStringContainsString('**Status:** Closed', $gap024);
+        $this->assertStringContainsString('Laravel 13', $gap024);
+        $this->assertStringContainsString('Filament 5', $gap024);
+        $this->assertStringContainsString('Livewire 4', $gap024);
+        $this->assertStringContainsString('Tailwind CSS 4', $gap024);
+        $this->assertStringContainsString('Vite 6', $gap024);
+        $this->assertStringContainsString('Node 22', $gap024);
+        $this->assertStringNotContainsString('**Status:** Open', $gap024);
+        $this->assertStringNotContainsString('`composer.lock` pins `laravel/framework` 11', $gap024);
+        $this->assertStringContainsString('**PR5** — deliberately skipped', $gap024);
+        $this->assertStringContainsString('**PR6**', $gap024);
     }
 
     /**

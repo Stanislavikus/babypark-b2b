@@ -401,11 +401,10 @@ Verified on 2026-07-31 (pilot host):
 - `cache` and `cache_locks` tables confirmed present with their expected structures (`key`/`value`/`expiration` and `key`/`owner`/`expiration`);
 - dedicated `babypark-connector-queue` remains intentionally uninstalled and is deferred until Task 4B-2b-1 introduces a real discovery job (historical 2026-07-31 snapshot — discovery job now exists in application code via PR #102; permanent production Supervisor activation remains a separate gate).
 
-Connector production-readiness also depends on **GAP-024** (Laravel 11
-framework upgrade) — see that gap for scope and scheduling; closing the B9
-host-verification item does **not** close GAP-024 or make the connector
-runtime production-ready. GAP-024 does not block this docs promotion or
-isolated 4B-2a development.
+**Historical (Task 4B-2-0, 2026-07-22):** At promotion time, connector
+production-readiness also depended on **GAP-024** (framework upgrade). GAP-024
+is now **closed** on `develop` — see the GAP-024 entry for the final stack.
+Closing the B9 host-verification item did not, by itself, close GAP-024.
 
 Next task: remaining Task 4B-2b scope — Discovery Overview UI.
 
@@ -436,8 +435,8 @@ permanent Supervisor activation is not yet confirmed. Historical note: at
 uninstalled and is deferred until Task 4B-2b-1 introduces a discovery job.
 Prerequisite for Task 4B-2b-1 discovery execution (satisfied in application
 code); permanent production worker activation and Discovery Overview UI remain
-open. GAP-024 remains Open as the separate connector production-readiness
-blocker.
+open. **Historical:** GAP-024 was open at 2026-07-31 verification; it is now
+**closed** (see GAP-024).
 
 **Task 4B UI handoff:**
 
@@ -832,31 +831,54 @@ It does not block mappings for unrelated fields.
 
 ---
 
-## GAP-024 — Laravel 11 framework upgrade required for connector production-readiness
+## GAP-024 — Framework upgrade to supported Laravel / Filament / Livewire / Tailwind stack
 
 **Approved docs:**
-- `07-TECH_STACK.md`: connector runtime, queue workers, OAuth signing, and SSRF
-  transport decisions promoted from Task 4B-2-0.
+- `07-TECH_STACK.md` — current application stack guardrails.
 
-**Current code:**
-- `composer.lock` pins `laravel/framework` 11.x.
-- Laravel 11 security support ended **2026-03-12** (per Laravel release policy).
+**Original gap:**
+- `composer.lock` pinned Laravel 11.x past security support; Filament 3,
+  Livewire 3, and Tailwind 3 were below the target production stack.
 
-**Impact:**
-- Connector runtime production deployment (connection check, discovery, queue
-  workers) should not be treated as production-ready on an unsupported
-  framework release.
-- Does **not** block this Task 4B-2-0 documentation promotion or isolated Task 4B-2a development and testing in the current environment.
+**Final target reached:**
+- Laravel 13
+- Filament 5
+- Livewire 4
+- Tailwind CSS 4
+- Vite 6
+- Node 22 project contract (`.nvmrc` = 22; npm engines `>=22 <23`)
 
-**Decision:**
-- Schedule a dedicated framework upgrade to a currently supported Laravel
-  release before connector runtime goes to production.
-- Must not be bundled into PR #86 or into Task 4B-2a feature implementation.
+**Completed migration sequence:**
+- **PR1** — runtime/toolchain/visual prerequisites
+- **PR2** — Laravel 11 → 13 bridge
+- **PR3** — Filament 3 → 4 + Tailwind 4 bridge
+- **PR4** — Filament 4 → 5 + Livewire 3 → 4
+- **PR5** — deliberately skipped after post-PR4 closure assessment found no
+  mandatory hardening blocker
+- **PR6** — truth-sync / documentation closure (this entry)
 
-**Next task:** Plan and execute Laravel framework upgrade as a separate task.
+**Verification evidence (high level):**
+- MySQL CI green on final PR4
+- Full SQLite suite green
+- Explicit MySQL `migrate:fresh --seed` green
+- Frontend build green
+- Filament authorization bridge green
+- `novalidate` bridge green
+- Live-filter bridge green
+- Customer/cabinet auth regression green
+- Livewire 4 quantity/cart/margin regression gates green
+- Browser smoke green
+- Visual regression matrix + corrected supplemental like-for-like evidence green
 
-**Status:** Open — blocks connector production-readiness; does not block 4B-2-0
-docs promotion or isolated Task 4B-2a development.
+Historical audit reports, visual baselines, and migration research remain under
+`docs/audits/` for evidence — they are not rewritten as current stack truth.
+
+**Verified closure base:** `41dbb97094df13df93e72e3eaab3a4c46976fc34` on
+`develop`.
+
+**Status:** Closed in code. Framework migration complete; connector
+production-readiness is no longer blocked by an unsupported Laravel release.
+Remaining connector gaps are tracked separately under GAP-006.
 
 ---
 

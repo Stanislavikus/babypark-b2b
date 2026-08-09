@@ -21,6 +21,19 @@ The goal is simple: extend the current Laravel / Filament application. Do not in
 - Theme: Filament theming, CSS variables and approved design tokens.
 - Appearance: Light / Dark / System mode through Filament and Tailwind dark-mode support.
 
+### Current major versions (verified on `develop`)
+
+Lockfiles are authoritative for exact patch versions. Normative major stack:
+
+- PHP 8.3+
+- Laravel 13
+- Filament 5
+- Livewire 4
+- Tailwind CSS 4
+- Vite 6
+- Node 22 project contract (`.nvmrc` = 22; npm engines `>=22 <23`)
+- PHPUnit 12
+
 Do not introduce React, Vue, Next.js, Nuxt, Inertia, a custom SPA, a second design system or a separate storefront frontend unless a later architecture document explicitly approves it.
 
 ---
