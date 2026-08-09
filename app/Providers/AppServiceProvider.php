@@ -13,6 +13,9 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapabilityImpl;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspaceMembership;
+use Filament\Actions\Action;
+use Filament\Schemas\Components\Form as SchemaForm;
+use Filament\Tables\Table;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -45,6 +48,19 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Preserve Filament 3 live filter behavior (Filament 4 defers filters by default).
+        Table::configureUsing(
+            fn (Table $table): Table => $table->deferFilters(false),
+        );
+
+        // Architecture mandate: disable native browser constraint validation on
+        // Filament schema/page forms and action/modal submission forms.
+        SchemaForm::configureUsing(
+            fn (SchemaForm $form): SchemaForm => $form->extraAttributes(['novalidate' => true], merge: true),
+        );
+
+        Action::configureUsing(
+            fn (Action $action): Action => $action->extraModalWindowAttributes(['novalidate' => true], merge: true),
+        );
     }
 }

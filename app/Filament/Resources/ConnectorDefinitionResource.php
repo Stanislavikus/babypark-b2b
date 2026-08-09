@@ -4,15 +4,22 @@ namespace App\Filament\Resources;
 
 use App\Enums\ConnectorDefinitionStatus;
 use App\Enums\ConnectorDirection;
-use App\Filament\Resources\ConnectorDefinitionResource\Pages;
+use App\Filament\Resources\ConnectorDefinitionResource\Pages\CreateConnectorDefinition;
+use App\Filament\Resources\ConnectorDefinitionResource\Pages\EditConnectorDefinition;
+use App\Filament\Resources\ConnectorDefinitionResource\Pages\ListConnectorDefinitions;
 use App\Filament\Resources\ConnectorDefinitionResource\RelationManagers\SchemaSourcesRelationManager;
 use App\Models\ConnectorDefinition;
 use App\Models\User;
 use App\Support\Platform\PlatformAdminAuthorization;
-use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
 
@@ -22,9 +29,9 @@ class ConnectorDefinitionResource extends Resource
 
     protected static ?string $model = ConnectorDefinition::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-server-stack';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-server-stack';
 
-    protected static ?string $navigationGroup = 'Модель даних і коннектори';
+    protected static string|\UnitEnum|null $navigationGroup = 'Модель даних і коннектори';
 
     protected static ?string $navigationLabel = 'Платформи та джерела';
 
@@ -41,12 +48,12 @@ class ConnectorDefinitionResource extends Resource
         return $user instanceof User && PlatformAdminAuthorization::canManage($user);
     }
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Платформа')->schema([
-                    Forms\Components\TextInput::make('code')
+        return $schema
+            ->components([
+                Section::make('Платформа')->schema([
+                    TextInput::make('code')
                         ->label('Код')
                         ->required()
                         ->maxLength(64)
@@ -55,23 +62,23 @@ class ConnectorDefinitionResource extends Resource
                         ->disabled(fn (?ConnectorDefinition $record): bool => $record !== null)
                         ->dehydrated(),
 
-                    Forms\Components\TextInput::make('name')
+                    TextInput::make('name')
                         ->label('Назва')
                         ->required()
                         ->maxLength(255),
 
-                    Forms\Components\Select::make('direction')
+                    Select::make('direction')
                         ->label('Напрямок')
                         ->options(ConnectorDirection::options())
                         ->required(),
 
-                    Forms\Components\Select::make('status')
+                    Select::make('status')
                         ->label('Статус')
                         ->options(ConnectorDefinitionStatus::options())
                         ->required()
                         ->visible(fn (?ConnectorDefinition $record): bool => $record !== null),
 
-                    Forms\Components\Textarea::make('notes')
+                    Textarea::make('notes')
                         ->label('Примітки')
                         ->rows(3)
                         ->columnSpanFull(),
@@ -83,19 +90,19 @@ class ConnectorDefinitionResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('code')
+                TextColumn::make('code')
                     ->label('Код')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->label('Назва')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('direction')
+                TextColumn::make('direction')
                     ->label('Напрямок')
                     ->badge()
                     ->formatStateUsing(fn ($state): string => $state instanceof ConnectorDirection ? $state->label() : (string) $state),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->label('Статус')
                     ->badge()
                     ->color(fn ($state): string => match ($state) {
@@ -104,24 +111,24 @@ class ConnectorDefinitionResource extends Resource
                         default => 'warning',
                     })
                     ->formatStateUsing(fn ($state): string => $state instanceof ConnectorDefinitionStatus ? $state->label() : (string) $state),
-                Tables\Columns\TextColumn::make('schema_sources_count')
+                TextColumn::make('schema_sources_count')
                     ->label('Джерела')
                     ->counts('schemaSources'),
-                Tables\Columns\TextColumn::make('updated_at')
+                TextColumn::make('updated_at')
                     ->label('Оновлено')
                     ->dateTime('d.m.Y H:i')
                     ->sortable(),
             ])
             ->defaultSort('code')
             ->filters([
-                Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->label('Статус')
                     ->options(ConnectorDefinitionStatus::options()),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                EditAction::make(),
             ])
-            ->bulkActions([]);
+            ->toolbarActions([]);
     }
 
     public static function getRelations(): array
@@ -134,9 +141,9 @@ class ConnectorDefinitionResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListConnectorDefinitions::route('/'),
-            'create' => Pages\CreateConnectorDefinition::route('/create'),
-            'edit' => Pages\EditConnectorDefinition::route('/{record}/edit'),
+            'index' => ListConnectorDefinitions::route('/'),
+            'create' => CreateConnectorDefinition::route('/create'),
+            'edit' => EditConnectorDefinition::route('/{record}/edit'),
         ];
     }
 }

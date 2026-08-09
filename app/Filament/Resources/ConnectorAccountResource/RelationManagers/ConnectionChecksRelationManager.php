@@ -7,7 +7,7 @@ use App\Models\ConnectorConnectionCheck;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorUiFormatter;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -49,11 +49,11 @@ class ConnectionChecksRelationManager extends RelationManager
             ->paginated([20, 50, 100])
             ->defaultPaginationPageOption(20)
             ->columns([
-                Tables\Columns\TextColumn::make('created_at')
+                TextColumn::make('created_at')
                     ->label(__('connectors.ui.columns.checked_at'))
                     ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
                     ->sortable(),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->label(__('connectors.ui.columns.check_status'))
                     ->badge()
                     ->color(fn (ConnectorConnectionCheckStatus $state): string => match ($state) {
@@ -63,30 +63,30 @@ class ConnectionChecksRelationManager extends RelationManager
                         ConnectorConnectionCheckStatus::Running => 'info',
                     })
                     ->formatStateUsing(fn (ConnectorConnectionCheckStatus $state): string => __($state->label())),
-                Tables\Columns\TextColumn::make('cause_category')
+                TextColumn::make('cause_category')
                     ->label(__('connectors.ui.columns.cause'))
                     ->formatStateUsing(fn ($state, ConnectorConnectionCheck $record): string => $record->status === ConnectorConnectionCheckStatus::Succeeded || $state === null
                         ? __('connectors.ui.common.dash')
                         : __($state->label()))
                     ->placeholder(__('connectors.ui.common.dash')),
-                Tables\Columns\TextColumn::make('actionability')
+                TextColumn::make('actionability')
                     ->label(__('connectors.ui.columns.action_required'))
                     ->formatStateUsing(fn ($state, ConnectorConnectionCheck $record): string => $record->status === ConnectorConnectionCheckStatus::Succeeded || $state === null
                         ? __('connectors.ui.common.dash')
                         : __($state->label()))
                     ->placeholder(__('connectors.ui.common.dash')),
-                Tables\Columns\TextColumn::make('initiator')
+                TextColumn::make('initiator')
                     ->label(__('connectors.ui.columns.initiator'))
                     ->getStateUsing(fn (ConnectorConnectionCheck $record): string => $uiState->initiatorLabel($record)),
-                Tables\Columns\TextColumn::make('trigger')
+                TextColumn::make('trigger')
                     ->label(__('connectors.ui.columns.trigger'))
                     ->formatStateUsing(fn ($state): string => $state ? __($state->label()) : __('connectors.ui.common.dash')),
-                Tables\Columns\TextColumn::make('duration_ms')
+                TextColumn::make('duration_ms')
                     ->label(__('connectors.ui.columns.duration'))
                     ->formatStateUsing(fn (?int $state): string => $uiState->formatDuration($state) ?? __('connectors.ui.common.dash')),
             ])
             ->headerActions([])
-            ->actions([])
-            ->bulkActions([]);
+            ->recordActions([])
+            ->toolbarActions([]);
     }
 }

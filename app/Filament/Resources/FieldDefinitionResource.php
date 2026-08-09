@@ -5,23 +5,31 @@ namespace App\Filament\Resources;
 use App\Enums\AttributeScope;
 use App\Enums\AttributeStatus;
 use App\Enums\FieldObjectType;
-use App\Filament\Resources\FieldDefinitionResource\Pages;
+use App\Filament\Resources\FieldDefinitionResource\Pages\EditFieldDefinition;
+use App\Filament\Resources\FieldDefinitionResource\Pages\ListFieldDefinitions;
 use App\Models\FieldBinding;
 use App\Models\FieldDefinition;
-use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class FieldDefinitionResource extends Resource
 {
     protected static ?string $model = FieldDefinition::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
-    protected static ?string $navigationGroup = 'Система';
+    protected static string|\UnitEnum|null $navigationGroup = 'Система';
 
     protected static ?string $navigationLabel = 'Поля товару';
 
@@ -41,18 +49,18 @@ class FieldDefinitionResource extends Resource
             ]));
     }
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Видимість')
+        return $schema
+            ->components([
+                Section::make('Видимість')
                     ->schema([
-                        Forms\Components\Toggle::make('visibility_settings.admin')
+                        Toggle::make('visibility_settings.admin')
                             ->label('Показувати в адмінці')
                             ->disabled(fn (FieldDefinition $record): bool => $record->visibilityRestricted())
                             ->dehydrated(fn (FieldDefinition $record): bool => ! $record->visibilityRestricted()),
 
-                        Forms\Components\Toggle::make('visibility_settings.b2b')
+                        Toggle::make('visibility_settings.b2b')
                             ->label('Показувати в B2B')
                             ->disabled(fn (FieldDefinition $record): bool => $record->visibilityRestricted())
                             ->dehydrated(fn (FieldDefinition $record): bool => ! $record->visibilityRestricted()),
@@ -65,29 +73,29 @@ class FieldDefinitionResource extends Resource
             ]);
     }
 
-    private static function bindingSection(string $label, FieldObjectType $objectType): Forms\Components\Section
+    private static function bindingSection(string $label, FieldObjectType $objectType): Section
     {
-        return Forms\Components\Section::make($label)
+        return Section::make($label)
             ->schema([
-                Forms\Components\TextInput::make("binding_{$objectType->value}.storage_path")
+                TextInput::make("binding_{$objectType->value}.storage_path")
                     ->label('Шлях зберігання')
                     ->disabled(),
 
-                Forms\Components\TextInput::make("binding_{$objectType->value}.field_group")
+                TextInput::make("binding_{$objectType->value}.field_group")
                     ->label('Група')
                     ->formatStateUsing(fn (?string $state): string => config('attribute_dictionary.groups.'.$state, $state ?? '—'))
                     ->disabled(),
 
-                Forms\Components\Toggle::make("binding_{$objectType->value}.is_required")
+                Toggle::make("binding_{$objectType->value}.is_required")
                     ->label('Обов\'язкове'),
 
-                Forms\Components\Toggle::make("binding_{$objectType->value}.is_filterable")
+                Toggle::make("binding_{$objectType->value}.is_filterable")
                     ->label('Фільтрувати'),
 
-                Forms\Components\Toggle::make("binding_{$objectType->value}.is_sortable")
+                Toggle::make("binding_{$objectType->value}.is_sortable")
                     ->label('Сортувати'),
 
-                Forms\Components\TextInput::make("binding_{$objectType->value}.sort_order")
+                TextInput::make("binding_{$objectType->value}.sort_order")
                     ->label('Порядок')
                     ->numeric(),
             ])
@@ -100,7 +108,7 @@ class FieldDefinitionResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('localized_label')
+                TextColumn::make('localized_label')
                     ->label('Назва поля')
                     ->state(fn (FieldDefinition $record): string => $record->localizedLabel())
                     ->searchable(query: function ($query, string $search) {
@@ -119,17 +127,17 @@ class FieldDefinitionResource extends Resource
                         );
                     }),
 
-                Tables\Columns\TextColumn::make('data_type')
+                TextColumn::make('data_type')
                     ->label('Тип')
                     ->badge()
                     ->formatStateUsing(fn ($state) => $state?->label() ?? (string) $state)
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('computed_value_level')
+                TextColumn::make('computed_value_level')
                     ->label('Product / Variant / Both')
                     ->state(fn (FieldDefinition $record): string => $record->computedValueLevelLabel()),
 
-                Tables\Columns\TextColumn::make('field_group')
+                TextColumn::make('field_group')
                     ->label('Група')
                     ->state(function (FieldDefinition $record): string {
                         $group = $record->fieldBindings
@@ -139,23 +147,23 @@ class FieldDefinitionResource extends Resource
                         return config('attribute_dictionary.groups.'.$group, $group ?? '—');
                     }),
 
-                Tables\Columns\TextColumn::make('scope')
+                TextColumn::make('scope')
                     ->label('Походження поля')
                     ->badge()
                     ->formatStateUsing(fn ($state) => $state?->label() ?? (string) $state)
                     ->sortable(),
 
-                Tables\Columns\IconColumn::make('visibility_settings.admin')
+                IconColumn::make('visibility_settings.admin')
                     ->label('Показувати в адмінці')
                     ->boolean()
                     ->state(fn (FieldDefinition $record): bool => (bool) ($record->fieldBindings->first()?->visibility_settings['admin'] ?? false)),
 
-                Tables\Columns\IconColumn::make('visibility_settings.b2b')
+                IconColumn::make('visibility_settings.b2b')
                     ->label('Показувати в B2B')
                     ->boolean()
                     ->state(fn (FieldDefinition $record): bool => (bool) ($record->fieldBindings->first()?->visibility_settings['b2b'] ?? false)),
 
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->label('Статус')
                     ->badge()
                     ->color(fn ($state) => $state === AttributeStatus::Active ? 'success' : 'gray')
@@ -164,36 +172,39 @@ class FieldDefinitionResource extends Resource
             ])
             ->defaultSort('code')
             ->filters([
-                Tables\Filters\SelectFilter::make('scope')
+                SelectFilter::make('scope')
                     ->label('Походження поля')
                     ->options(collect(AttributeScope::cases())->mapWithKeys(fn (AttributeScope $scope) => [$scope->value => $scope->label()])->all()),
 
-                Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->label('Статус')
                     ->options(collect(AttributeStatus::cases())->mapWithKeys(fn (AttributeStatus $status) => [$status->value => $status->label()])->all()),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                EditAction::make(),
             ])
-            ->bulkActions([]);
+            ->toolbarActions([]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListFieldDefinitions::route('/'),
-            'edit' => Pages\EditFieldDefinition::route('/{record}/edit'),
+            'index' => ListFieldDefinitions::route('/'),
+            'edit' => EditFieldDefinition::route('/{record}/edit'),
         ];
     }
 
-    public static function canCreate(): bool
+    public static function getCreateAuthorizationResponse(): Response
     {
-        return false;
+        return Response::deny();
     }
 
-    public static function canDelete($record): bool
+    public static function getDeleteAuthorizationResponse(Model $record): Response
     {
-        return $record instanceof FieldDefinition
-            && $record->scope !== AttributeScope::System;
+        if ($record instanceof FieldDefinition && $record->scope !== AttributeScope::System) {
+            return Response::allow();
+        }
+
+        return Response::deny();
     }
 }

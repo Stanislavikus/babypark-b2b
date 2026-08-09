@@ -5,15 +5,14 @@ namespace App\Filament\Resources\TagResource\Support;
 use App\Models\Tag;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
-use Filament\Tables\Actions\DeleteAction as TableDeleteAction;
 use Illuminate\Support\Facades\DB;
 
 class GuardedDeleteTagAction
 {
-    public static function makeTableAction(): TableDeleteAction
+    public static function makeTableAction(): DeleteAction
     {
-        return TableDeleteAction::make()
-            ->action(function (TableDeleteAction $action, Tag $record): void {
+        return DeleteAction::make()
+            ->action(function (DeleteAction $action, Tag $record): void {
                 self::deleteOrNotify($action, $record);
             });
     }
@@ -26,7 +25,7 @@ class GuardedDeleteTagAction
             });
     }
 
-    private static function deleteOrNotify(DeleteAction|TableDeleteAction $action, Tag $record): void
+    private static function deleteOrNotify(DeleteAction $action, Tag $record): void
     {
         try {
             DB::transaction(function () use ($record): void {

@@ -3,17 +3,22 @@
 namespace App\Filament\Resources;
 
 use App\Enums\ConnectorConnectionCheckStatus;
-use App\Filament\Resources\ConnectorAccountResource\Pages;
+use App\Filament\Resources\ConnectorAccountResource\Pages\ListConnectorAccounts;
+use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
 use App\Models\ConnectorAccount;
 use App\Models\User;
 use App\Support\Connectors\ConnectorAccountMerchandiserPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorUiFormatter;
-use Filament\Infolists;
-use Filament\Infolists\Infolist;
+use Filament\Actions\ViewAction;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
@@ -21,7 +26,7 @@ class ConnectorAccountResource extends Resource
 {
     protected static ?string $model = ConnectorAccount::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-link';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-link';
 
     protected static ?int $navigationSort = 3;
 
@@ -75,41 +80,42 @@ class ConnectorAccountResource extends Resource
         return $record;
     }
 
-    public static function infolist(Infolist $infolist): Infolist
+    public static function infolist(Schema $schema): Schema
     {
         $uiState = app(ConnectorAccountUiState::class);
 
-        return $infolist
-            ->schema([
-                Infolists\Components\Section::make(__('connectors.ui.sections.account'))
+        return $schema
+            ->components([
+                Section::make(__('connectors.ui.sections.account'))
                     ->schema([
-                        Infolists\Components\TextEntry::make('connectorDefinition.name')
+                        TextEntry::make('connectorDefinition.name')
                             ->label(__('connectors.ui.columns.platform'))
                             ->formatStateUsing(fn (?string $state, ConnectorAccount $record): string => filled($state)
                                 ? $state.' ('.$record->connectorDefinition?->code.')'
                                 : ($record->connectorDefinition?->code ?? __('connectors.ui.common.dash'))),
-                        Infolists\Components\TextEntry::make('name')
+                        TextEntry::make('name')
                             ->label(__('connectors.ui.columns.account')),
-                        Infolists\Components\TextEntry::make('store_code')
+                        TextEntry::make('store_code')
                             ->label(__('connectors.ui.columns.store_context'))
                             ->formatStateUsing(fn ($state, ConnectorAccount $record): string => $uiState->storeContextLabel($record) ?? __('connectors.ui.common.dash'))
                             ->visible(fn (): bool => ! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())),
-                        Infolists\Components\View::make('filament.connector-accounts.runtime-state')
+                        ViewEntry::make('runtime_state')
                             ->label(__('connectors.ui.columns.status'))
+                            ->view('filament.connector-accounts.runtime-state')
                             ->viewData(fn (ConnectorAccount $record): array => [
                                 'record' => $record,
                                 'uiState' => $uiState,
                                 'showActiveConnectionCheck' => ConnectorAccountMerchandiserPresentation::showActiveConnectionCheck(auth()->user()),
                             ]),
-                        Infolists\Components\TextEntry::make('last_checked_at')
+                        TextEntry::make('last_checked_at')
                             ->label(__('connectors.ui.columns.last_check'))
                             ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
                             ->placeholder(__('connectors.ui.common.dash')),
-                        Infolists\Components\TextEntry::make('last_successful_check_at')
+                        TextEntry::make('last_successful_check_at')
                             ->label(__('connectors.ui.columns.last_successful_check'))
                             ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
                             ->placeholder(__('connectors.ui.common.dash')),
-                        Infolists\Components\TextEntry::make('last_error_message_key')
+                        TextEntry::make('last_error_message_key')
                             ->label(__('connectors.ui.columns.attention'))
                             ->formatStateUsing(fn ($state, ConnectorAccount $record): ?string => $uiState->attentionMessage($record))
                             ->placeholder(__('connectors.ui.common.dash'))
@@ -126,7 +132,7 @@ class ConnectorAccountResource extends Resource
         return $table
             ->poll('5s')
             ->columns([
-                Tables\Columns\TextColumn::make('connectorDefinition.name')
+                TextColumn::make('connectorDefinition.name')
                     ->label(__('connectors.ui.columns.platform'))
                     ->description(fn (ConnectorAccount $record): ?string => $record->connectorDefinition?->code)
                     ->searchable(query: function (Builder $query, string $search): Builder {
@@ -138,11 +144,11 @@ class ConnectorAccountResource extends Resource
                         );
                     })
                     ->sortable(),
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->label(__('connectors.ui.columns.account'))
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('store_code')
+                TextColumn::make('store_code')
                     ->label(__('connectors.ui.columns.store_context'))
                     ->formatStateUsing(fn ($state, ConnectorAccount $record): string => $uiState->storeContextLabel($record) ?? __('connectors.ui.common.dash'))
                     ->searchable(query: function (Builder $query, string $search): Builder {
@@ -156,7 +162,7 @@ class ConnectorAccountResource extends Resource
                     })
                     ->visible(fn (): bool => ! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user()))
                     ->toggleable(isToggledHiddenByDefault: false),
-                Tables\Columns\TextColumn::make('connection_status')
+                TextColumn::make('connection_status')
                     ->label(__('connectors.ui.columns.status'))
                     ->html()
                     ->formatStateUsing(function ($state, ConnectorAccount $record) use ($uiState): string {
@@ -186,29 +192,29 @@ class ConnectorAccountResource extends Resource
                             }
                         .'">'.$label.'</span>';
                     }),
-                Tables\Columns\TextColumn::make('last_checked_at')
+                TextColumn::make('last_checked_at')
                     ->label(__('connectors.ui.columns.last_check'))
                     ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
                     ->placeholder(__('connectors.ui.common.dash'))
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('last_successful_check_at')
+                TextColumn::make('last_successful_check_at')
                     ->label(__('connectors.ui.columns.last_successful_check'))
                     ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
                     ->placeholder(__('connectors.ui.common.dash'))
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('last_error_message_key')
+                TextColumn::make('last_error_message_key')
                     ->label(__('connectors.ui.columns.attention'))
                     ->formatStateUsing(fn ($state, ConnectorAccount $record): ?string => $uiState->attentionMessage($record))
                     ->placeholder(__('connectors.ui.common.dash'))
                     ->toggleable(),
             ])
             ->defaultSort('name')
-            ->actions([
-                Tables\Actions\ViewAction::make(),
+            ->recordActions([
+                ViewAction::make(),
             ])
-            ->bulkActions([]);
+            ->toolbarActions([]);
     }
 
     public static function getRelations(): array
@@ -219,24 +225,9 @@ class ConnectorAccountResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListConnectorAccounts::route('/'),
-            'view' => Pages\ViewConnectorAccount::route('/{record}'),
+            'index' => ListConnectorAccounts::route('/'),
+            'view' => ViewConnectorAccount::route('/{record}'),
         ];
-    }
-
-    public static function canCreate(): bool
-    {
-        return false;
-    }
-
-    public static function canEdit(Model $record): bool
-    {
-        return false;
-    }
-
-    public static function canDelete(Model $record): bool
-    {
-        return false;
     }
 
     private static function applyPresentationEagerLoads(Builder $query): Builder
@@ -253,5 +244,20 @@ class ConnectorAccountResource extends Resource
         }
 
         return $query->with($with);
+    }
+
+    public static function getCreateAuthorizationResponse(): Response
+    {
+        return Response::deny();
+    }
+
+    public static function getEditAuthorizationResponse(Model $record): Response
+    {
+        return Response::deny();
+    }
+
+    public static function getDeleteAuthorizationResponse(Model $record): Response
+    {
+        return Response::deny();
     }
 }

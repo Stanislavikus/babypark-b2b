@@ -1,5 +1,5 @@
 @php
-    use Illuminate\View\ComponentAttributeBag;
+    use Filament\Support\View\ComponentAttributeBag as FilamentComponentAttributeBag;
 @endphp
 
 @props([
@@ -17,7 +17,7 @@
     x-id="['input']"
     {{ $attributes->class(['fi-ta-search-field']) }}
 >
-    <label x-bind:for="$id('input')" class="sr-only">
+    <label x-bind:for="$id('input')" class="fi-sr-only">
         {{ __('filament-tables::table.fields.search.label') }}
     </label>
 
@@ -25,7 +25,7 @@
     <x-filament::input.wrapper :wire:target="$wireModel">
         <x-filament::input
             :attributes="
-                (new ComponentAttributeBag)->merge([
+                (new FilamentComponentAttributeBag)->merge([
                     'autocomplete' => 'off',
                     'maxlength' => 1000,
                     'placeholder' => $placeholder,
@@ -34,7 +34,7 @@
                     $wireModelAttribute => $wireModel,
                     'x-bind:id' => '$id(\'input\')',
                     'x-on:keyup' => 'if ($event.key === \'Enter\') { $wire.$refresh() }',
-                ])
+                ], escape: false)
             "
         />
     </x-filament::input.wrapper>

@@ -9,9 +9,9 @@ use App\Support\Platform\PlatformAdminAuthorization;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
-use Filament\Forms\Set;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
 
@@ -21,17 +21,17 @@ class FieldMatrix extends Page implements HasForms
 
     private const ALLOWED_FILTER_KEYS = ['fieldGroup', 'bindingStrategy', 'scope'];
 
-    protected static ?string $navigationIcon = 'heroicon-o-table-cells';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-table-cells';
 
     protected static ?string $navigationLabel = null;
 
     protected static ?string $title = null;
 
-    protected static ?string $navigationGroup = null;
+    protected static string|\UnitEnum|null $navigationGroup = null;
 
     protected static ?int $navigationSort = 1;
 
-    protected static string $view = 'filament.pages.field-matrix';
+    protected string $view = 'filament.pages.field-matrix';
 
     /** @var list<array{channel: string, channel_schema_version: string}> */
     public array $availableColumns = [];
@@ -88,10 +88,10 @@ class FieldMatrix extends Page implements HasForms
         $this->refreshMatrix();
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 CheckboxList::make('selectedColumnKeys')
                     ->hiddenLabel()
                     ->helperText(__('field_matrix.compare_channels_helper'))

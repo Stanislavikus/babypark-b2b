@@ -29,7 +29,7 @@ class PreviewAsCustomer extends Page
 
     protected static string $resource = CustomerResource::class;
 
-    protected static string $view = 'filament.resources.customer-resource.pages.preview-as-customer';
+    protected string $view = 'filament.resources.customer-resource.pages.preview-as-customer';
 
     protected static ?string $title = 'Перегляд як клієнт';
 

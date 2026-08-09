@@ -2,24 +2,29 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\StockResource\Pages;
+use App\Filament\Resources\StockResource\Pages\ListStocks;
+use App\Filament\Resources\StockResource\Pages\ViewStock;
 use App\Models\Category;
 use App\Models\Stock;
-use Filament\Forms\Form;
-use Filament\Infolists;
-use Filament\Infolists\Infolist;
+use Filament\Actions\ViewAction;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class StockResource extends Resource
 {
     protected static ?string $model = Stock::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-archive-box';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-archive-box';
 
-    protected static ?string $navigationGroup = 'Каталог';
+    protected static string|\UnitEnum|null $navigationGroup = 'Каталог';
 
     protected static ?string $modelLabel = 'залишок';
 
@@ -27,43 +32,43 @@ class StockResource extends Resource
 
     protected static ?int $navigationSort = 5;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([]);
+        return $schema->components([]);
     }
 
-    public static function infolist(Infolist $infolist): Infolist
+    public static function infolist(Schema $schema): Schema
     {
-        return $infolist
-            ->schema([
-                Infolists\Components\Section::make('Товар')->schema([
-                    Infolists\Components\TextEntry::make('variant.product.category.name')
+        return $schema
+            ->components([
+                Section::make('Товар')->schema([
+                    TextEntry::make('variant.product.category.name')
                         ->label('Категорія')
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('variant.product.name')
+                    TextEntry::make('variant.product.name')
                         ->label('Назва товару')
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('variant.sku')
+                    TextEntry::make('variant.sku')
                         ->label('Артикул')
                         ->placeholder('—'),
                 ])->columns(3),
 
-                Infolists\Components\Section::make('Залишки')->schema([
-                    Infolists\Components\TextEntry::make('inventoryLocation.name')
+                Section::make('Залишки')->schema([
+                    TextEntry::make('inventoryLocation.name')
                         ->label('Локація'),
-                    Infolists\Components\TextEntry::make('quantity')
+                    TextEntry::make('quantity')
                         ->label('Кількість'),
-                    Infolists\Components\TextEntry::make('variant.available_quantity_cache')
+                    TextEntry::make('variant.available_quantity_cache')
                         ->label('Доступно (варіант)')
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('expected_date')
+                    TextEntry::make('expected_date')
                         ->label('Очікується')
                         ->date('d.m.Y')
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('expected_quantity')
+                    TextEntry::make('expected_quantity')
                         ->label('Очікувана кількість')
                         ->placeholder('—'),
-                    Infolists\Components\TextEntry::make('updated_at')
+                    TextEntry::make('updated_at')
                         ->label('Оновлено')
                         ->dateTime('d.m.Y H:i'),
                 ])->columns(3),
@@ -74,19 +79,19 @@ class StockResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('variant.product.category.name')
+                TextColumn::make('variant.product.category.name')
                     ->label('Категорія')
                     ->sortable()
                     ->searchable(),
-                Tables\Columns\TextColumn::make('variant.product.name')
+                TextColumn::make('variant.product.name')
                     ->label('Товар')
                     ->limit(40)
                     ->searchable(),
-                Tables\Columns\TextColumn::make('variant.sku')
+                TextColumn::make('variant.sku')
                     ->label('Артикул')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('inventoryLocation.name')
+                TextColumn::make('inventoryLocation.name')
                     ->label('Локація')
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query
@@ -99,60 +104,60 @@ class StockResource extends Resource
                             ->orderBy('inventory_locations.name', $direction)
                             ->select('stocks.*');
                     }),
-                Tables\Columns\TextColumn::make('quantity')
+                TextColumn::make('quantity')
                     ->label('Кількість')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('variant.available_quantity_cache')
+                TextColumn::make('variant.available_quantity_cache')
                     ->label('Доступно (варіант)')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('expected_date')
+                TextColumn::make('expected_date')
                     ->label('Очікується')
                     ->date('d.m.Y')
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('updated_at')
+                TextColumn::make('updated_at')
                     ->label('Оновлено')
                     ->dateTime('d.m.Y H:i')
                     ->sortable(),
             ])
             ->defaultSort('inventoryLocation.name', 'asc')
             ->filters([
-                Tables\Filters\SelectFilter::make('category')
+                SelectFilter::make('category')
                     ->label('Категорія')
                     ->options(fn () => Category::orderBy('name')->pluck('name', 'id')->all())
                     ->query(fn ($query, array $data) => $data['value']
                         ? $query->whereHas('variant.product', fn ($q) => $q->where('category_id', $data['value']))
                         : $query
                     ),
-                Tables\Filters\SelectFilter::make('inventory_location_id')
+                SelectFilter::make('inventory_location_id')
                     ->label('Локація')
                     ->relationship('inventoryLocation', 'name'),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
+            ->recordActions([
+                ViewAction::make(),
             ])
-            ->bulkActions([]);
+            ->toolbarActions([]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListStocks::route('/'),
-            'view' => Pages\ViewStock::route('/{record}'),
+            'index' => ListStocks::route('/'),
+            'view' => ViewStock::route('/{record}'),
         ];
     }
 
-    public static function canCreate(): bool
+    public static function getCreateAuthorizationResponse(): Response
     {
-        return false;
+        return Response::deny();
     }
 
-    public static function canEdit($record): bool
+    public static function getEditAuthorizationResponse(Model $record): Response
     {
-        return false;
+        return Response::deny();
     }
 
-    public static function canDelete($record): bool
+    public static function getDeleteAuthorizationResponse(Model $record): Response
     {
-        return false;
+        return Response::deny();
     }
 }

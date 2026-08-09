@@ -17,24 +17,24 @@ use App\Support\Workspace\WorkspaceContext;
 use Carbon\CarbonImmutable;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
-use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
 
 class PriceInspector extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-magnifying-glass';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-magnifying-glass';
 
-    protected static ?string $navigationGroup = 'B2B';
+    protected static string|\UnitEnum|null $navigationGroup = 'B2B';
 
     protected static ?string $navigationLabel = null;
 
@@ -42,7 +42,7 @@ class PriceInspector extends Page implements HasForms
 
     protected static ?int $navigationSort = 5;
 
-    protected static string $view = 'filament.pages.price-inspector';
+    protected string $view = 'filament.pages.price-inspector';
 
     public ?array $data = [];
 
@@ -105,13 +105,13 @@ class PriceInspector extends Page implements HasForms
         }
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
         $workspaceId = app(WorkspaceContext::class)->id();
         $timezone = config('app.timezone', 'UTC');
 
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Section::make(__('price_inspector.form.parameters'))->schema([
                     RevalidatesOnUpdate::apply(
                         Select::make('customer_id')

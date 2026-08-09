@@ -11,17 +11,17 @@ use Illuminate\Support\Facades\Auth;
 
 class Governance extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-o-document-text';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-text';
 
     protected static ?string $navigationLabel = null;
 
     protected static ?string $title = null;
 
-    protected static ?string $navigationGroup = null;
+    protected static string|\UnitEnum|null $navigationGroup = null;
 
     protected static ?int $navigationSort = 3;
 
-    protected static string $view = 'filament.pages.governance';
+    protected string $view = 'filament.pages.governance';
 
     /** @var list<array{id: string, type: string, title: string}> */
     public array $decisions = [];

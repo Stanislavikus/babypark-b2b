@@ -3,25 +3,33 @@
 namespace App\Filament\Resources;
 
 use App\Enums\PriceListStatus;
-use App\Filament\Resources\PriceListResource\Pages;
-use App\Filament\Resources\PriceListResource\RelationManagers;
+use App\Filament\Resources\PriceListResource\Pages\CreatePriceList;
+use App\Filament\Resources\PriceListResource\Pages\EditPriceList;
+use App\Filament\Resources\PriceListResource\Pages\ListPriceLists;
+use App\Filament\Resources\PriceListResource\RelationManagers\ItemsRelationManager;
 use App\Filament\Resources\PriceListResource\Support\GuardedDeletePriceListAction;
 use App\Filament\Resources\PriceListResource\Support\MakeDefaultPriceListAction;
 use App\Models\PriceList;
 use App\Support\Filament\RevalidatesOnUpdate;
-use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class PriceListResource extends Resource
 {
     protected static ?string $model = PriceList::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-currency-dollar';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-currency-dollar';
 
-    protected static ?string $navigationGroup = 'B2B';
+    protected static string|\UnitEnum|null $navigationGroup = 'B2B';
 
     protected static ?string $navigationLabel = 'Прайс-листи';
 
@@ -31,16 +39,16 @@ class PriceListResource extends Resource
 
     protected static ?int $navigationSort = 4;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Основне')->schema([
-                    Forms\Components\TextInput::make('name')
+        return $schema
+            ->components([
+                Section::make('Основне')->schema([
+                    TextInput::make('name')
                         ->label('Назва')
                         ->required()
                         ->maxLength(255),
-                    Forms\Components\Select::make('currency')
+                    Select::make('currency')
                         ->label('Валюта')
                         ->options([
                             'UAH' => 'UAH',
@@ -48,14 +56,14 @@ class PriceListResource extends Resource
                         ->default(config('pricing.default_currency', 'UAH'))
                         ->disabled()
                         ->dehydrated(),
-                    Forms\Components\TextInput::make('priority')
+                    TextInput::make('priority')
                         ->label('Пріоритет')
                         ->numeric()
                         ->integer()
                         ->default(0)
                         ->required(),
                     RevalidatesOnUpdate::apply(
-                        Forms\Components\Select::make('status')
+                        Select::make('status')
                             ->label('Статус')
                             ->options(PriceListStatus::options())
                             ->default(PriceListStatus::Active->value)
@@ -69,22 +77,22 @@ class PriceListResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->label('Назва')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('currency')
+                TextColumn::make('currency')
                     ->label('Валюта'),
-                Tables\Columns\IconColumn::make('is_default')
+                IconColumn::make('is_default')
                     ->label('За замовчуванням')
                     ->boolean()
                     ->trueIcon('heroicon-o-star')
                     ->falseIcon('heroicon-o-minus')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('priority')
+                TextColumn::make('priority')
                     ->label('Пріоритет')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->label('Статус')
                     ->badge()
                     ->formatStateUsing(
@@ -95,44 +103,44 @@ class PriceListResource extends Resource
                     ->color(fn ($state): string => ($state instanceof PriceListStatus ? $state : PriceListStatus::from((string) $state)) === PriceListStatus::Active
                         ? 'success'
                         : 'gray'),
-                Tables\Columns\TextColumn::make('items_count')
+                TextColumn::make('items_count')
                     ->label('Кількість позицій')
                     ->counts('items')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('customers_count')
+                TextColumn::make('customers_count')
                     ->label('Кількість клієнтів')
                     ->counts('customers')
                     ->sortable(),
             ])
             ->defaultSort('name')
             ->filters([
-                Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->label('Статус')
                     ->options(PriceListStatus::options()),
-                Tables\Filters\TernaryFilter::make('is_default')
+                TernaryFilter::make('is_default')
                     ->label('За замовчуванням'),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
+            ->recordActions([
+                EditAction::make(),
                 MakeDefaultPriceListAction::makeTableAction(),
                 GuardedDeletePriceListAction::makeTableAction(),
             ])
-            ->bulkActions([]);
+            ->toolbarActions([]);
     }
 
     public static function getRelations(): array
     {
         return [
-            RelationManagers\ItemsRelationManager::class,
+            ItemsRelationManager::class,
         ];
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListPriceLists::route('/'),
-            'create' => Pages\CreatePriceList::route('/create'),
-            'edit' => Pages\EditPriceList::route('/{record}/edit'),
+            'index' => ListPriceLists::route('/'),
+            'create' => CreatePriceList::route('/create'),
+            'edit' => EditPriceList::route('/{record}/edit'),
         ];
     }
 }

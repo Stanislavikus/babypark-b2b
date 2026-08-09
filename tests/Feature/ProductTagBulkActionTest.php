@@ -138,7 +138,7 @@ class ProductTagBulkActionTest extends TestCase
         $this->assertFalse($inactiveOffPage->fresh()->tags()->whereKey($tag->id)->exists());
     }
 
-    public function test_bulk_action_invalid_selection_shows_notification_without_partial_changes(): void
+    public function test_bulk_action_invalid_selection_shows_validation_without_partial_changes(): void
     {
         $product = $this->createProduct('UI-BULK-INVALID');
 
@@ -147,8 +147,10 @@ class ProductTagBulkActionTest extends TestCase
             ->mountTableBulkAction('add_tags', [$product])
             ->setTableBulkActionData(['tag_ids' => [Str::uuid()->toString()]])
             ->callMountedTableBulkAction()
-            ->assertNotified();
+            ->assertHasTableBulkActionErrors(['tag_ids.0'])
+            ->assertTableBulkActionMounted('add_tags');
 
+        $this->assertAuthenticatedAs($this->admin);
         $this->assertCount(0, $product->fresh()->tags);
     }
 

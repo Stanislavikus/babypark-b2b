@@ -3,23 +3,31 @@
 namespace App\Filament\Resources;
 
 use App\Enums\ReservationStatus;
-use App\Filament\Resources\ReservationResource\Pages;
+use App\Filament\Resources\ReservationResource\Pages\ListReservations;
+use App\Filament\Resources\ReservationResource\Pages\ViewReservation;
 use App\Models\Reservation;
 use App\Services\Availability\ReservationConfirmer;
 use App\Services\Availability\ReservationReleaser;
-use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Actions\Action;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
+use Illuminate\Database\Eloquent\Model;
 
 class ReservationResource extends Resource
 {
     protected static ?string $model = Reservation::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-bookmark';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-bookmark';
 
-    protected static ?string $navigationGroup = 'B2B';
+    protected static string|\UnitEnum|null $navigationGroup = 'B2B';
 
     protected static ?string $modelLabel = 'резерв';
 
@@ -27,26 +35,26 @@ class ReservationResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Select::make('customer_id')
+        return $schema
+            ->components([
+                Select::make('customer_id')
                     ->label('Клієнт')
                     ->relationship('customer', 'name')
                     ->disabled(),
-                Forms\Components\Select::make('variant_id')
+                Select::make('variant_id')
                     ->label('Варіант')
                     ->relationship('variant', 'sku')
                     ->disabled(),
-                Forms\Components\TextInput::make('quantity')
+                TextInput::make('quantity')
                     ->label('Кількість')
                     ->disabled(),
-                Forms\Components\Select::make('status')
+                Select::make('status')
                     ->label('Статус')
                     ->options(ReservationStatus::options())
                     ->disabled(),
-                Forms\Components\DateTimePicker::make('expires_at')
+                DateTimePicker::make('expires_at')
                     ->label('Діє до')
                     ->disabled(),
             ]);
@@ -56,41 +64,41 @@ class ReservationResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('customer.name')
+                TextColumn::make('customer.name')
                     ->label('Клієнт')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('variant.sku')
+                TextColumn::make('variant.sku')
                     ->label('Артикул')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('quantity')
+                TextColumn::make('quantity')
                     ->label('Кількість')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->label('Статус')
                     ->badge()
                     ->formatStateUsing(fn ($state): string => $state instanceof ReservationStatus ? $state->label() : (string) $state),
-                Tables\Columns\TextColumn::make('expires_at')
+                TextColumn::make('expires_at')
                     ->label('Діє до')
                     ->dateTime('d.m.Y H:i')
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
-                Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->label('Статус')
                     ->options(ReservationStatus::options()),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\Action::make('confirm')
+            ->recordActions([
+                ViewAction::make(),
+                Action::make('confirm')
                     ->label('Підтвердити')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
                     ->requiresConfirmation()
                     ->visible(fn (Reservation $record): bool => $record->status === ReservationStatus::Pending)
                     ->action(fn (Reservation $record) => app(ReservationConfirmer::class)->confirm($record)),
-                Tables\Actions\Action::make('cancel')
+                Action::make('cancel')
                     ->label('Скасувати')
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
@@ -98,29 +106,29 @@ class ReservationResource extends Resource
                     ->visible(fn (Reservation $record): bool => $record->status === ReservationStatus::Pending)
                     ->action(fn (Reservation $record) => app(ReservationReleaser::class)->release($record, 'cancelled')),
             ])
-            ->bulkActions([]);
+            ->toolbarActions([]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListReservations::route('/'),
-            'view' => Pages\ViewReservation::route('/{record}'),
+            'index' => ListReservations::route('/'),
+            'view' => ViewReservation::route('/{record}'),
         ];
     }
 
-    public static function canCreate(): bool
+    public static function getCreateAuthorizationResponse(): Response
     {
-        return false;
+        return Response::deny();
     }
 
-    public static function canEdit($record): bool
+    public static function getEditAuthorizationResponse(Model $record): Response
     {
-        return false;
+        return Response::deny();
     }
 
-    public static function canDelete($record): bool
+    public static function getDeleteAuthorizationResponse(Model $record): Response
     {
-        return false;
+        return Response::deny();
     }
 }

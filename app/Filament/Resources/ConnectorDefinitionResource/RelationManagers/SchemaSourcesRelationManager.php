@@ -10,11 +10,20 @@ use App\Enums\ConnectorSchemaVerificationStatus;
 use App\Models\ConnectorDefinition;
 use App\Models\ConnectorSchemaSource;
 use App\Services\Connectors\ConnectorDefinitionGovernanceService;
-use Filament\Forms;
-use Filament\Forms\Form;
+use Filament\Actions\CreateAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 
@@ -24,11 +33,11 @@ class SchemaSourcesRelationManager extends RelationManager
 
     protected static ?string $title = 'Джерела схеми';
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\TextInput::make('code')
+        return $schema
+            ->components([
+                TextInput::make('code')
                     ->label('Код')
                     ->required()
                     ->maxLength(64)
@@ -36,62 +45,62 @@ class SchemaSourcesRelationManager extends RelationManager
                     ->disabled(fn (?ConnectorSchemaSource $record): bool => $record !== null)
                     ->dehydrated(),
 
-                Forms\Components\TextInput::make('label')
+                TextInput::make('label')
                     ->label('Мітка')
                     ->required()
                     ->maxLength(255),
 
-                Forms\Components\Select::make('source_kind')
+                Select::make('source_kind')
                     ->label('Тип джерела')
                     ->options(ConnectorSchemaSourceKind::options())
                     ->required()
                     ->live(),
 
-                Forms\Components\Select::make('acquisition_mode')
+                Select::make('acquisition_mode')
                     ->label('Режим отримання')
                     ->options(ConnectorSchemaAcquisitionMode::options())
                     ->required(),
 
-                Forms\Components\Select::make('schema_scope')
+                Select::make('schema_scope')
                     ->label('Область схеми')
                     ->options(ConnectorSchemaScope::options())
                     ->required()
                     ->live(),
 
-                Forms\Components\TextInput::make('reference_url')
+                TextInput::make('reference_url')
                     ->label('URL довідки')
                     ->url()
                     ->maxLength(2048),
 
-                Forms\Components\TextInput::make('endpoint_path')
+                TextInput::make('endpoint_path')
                     ->label('Шлях endpoint')
                     ->maxLength(255)
-                    ->visible(fn (Forms\Get $get): bool => $get('schema_scope') === ConnectorSchemaScope::Account->value),
+                    ->visible(fn (Get $get): bool => $get('schema_scope') === ConnectorSchemaScope::Account->value),
 
-                Forms\Components\TextInput::make('schema_version')
+                TextInput::make('schema_version')
                     ->label('Версія схеми')
                     ->maxLength(64),
 
-                Forms\Components\Toggle::make('is_primary')
+                Toggle::make('is_primary')
                     ->label('Первинне')
                     ->helperText('Лише одне первинне джерело на область схеми.'),
 
-                Forms\Components\Select::make('verification_status')
+                Select::make('verification_status')
                     ->label('Статус перевірки')
                     ->options(ConnectorSchemaVerificationStatus::options())
                     ->required()
                     ->live(),
 
-                Forms\Components\DateTimePicker::make('last_verified_at')
+                DateTimePicker::make('last_verified_at')
                     ->label('Остання перевірка')
-                    ->visible(fn (Forms\Get $get): bool => $get('verification_status') === ConnectorSchemaVerificationStatus::Verified->value),
+                    ->visible(fn (Get $get): bool => $get('verification_status') === ConnectorSchemaVerificationStatus::Verified->value),
 
-                Forms\Components\TextInput::make('sort_order')
+                TextInput::make('sort_order')
                     ->label('Порядок')
                     ->numeric()
                     ->default(0),
 
-                Forms\Components\Textarea::make('notes')
+                Textarea::make('notes')
                     ->label('Примітки')
                     ->rows(2)
                     ->columnSpanFull(),
@@ -103,25 +112,25 @@ class SchemaSourcesRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('label')
             ->columns([
-                Tables\Columns\TextColumn::make('code')->label('Код'),
-                Tables\Columns\TextColumn::make('label')->label('Мітка'),
-                Tables\Columns\TextColumn::make('schema_scope')
+                TextColumn::make('code')->label('Код'),
+                TextColumn::make('label')->label('Мітка'),
+                TextColumn::make('schema_scope')
                     ->label('Область')
                     ->badge()
                     ->formatStateUsing(fn ($state): string => $state instanceof ConnectorSchemaScope ? $state->label() : (string) $state),
-                Tables\Columns\IconColumn::make('is_primary')->label('Первинне')->boolean(),
-                Tables\Columns\TextColumn::make('verification_status')
+                IconColumn::make('is_primary')->label('Первинне')->boolean(),
+                TextColumn::make('verification_status')
                     ->label('Перевірка')
                     ->badge()
                     ->formatStateUsing(fn ($state): string => $state instanceof ConnectorSchemaVerificationStatus ? $state->label() : (string) $state),
-                Tables\Columns\TextColumn::make('last_verified_at')
+                TextColumn::make('last_verified_at')
                     ->label('Перевірено')
                     ->dateTime('d.m.Y H:i')
                     ->placeholder('—'),
             ])
             ->defaultSort('sort_order')
             ->headerActions([
-                Tables\Actions\CreateAction::make()
+                CreateAction::make()
                     ->using(function (array $data, Table $table): Model {
                         $owner = $this->resolveOwnerDefinition($table);
 
@@ -131,8 +140,8 @@ class SchemaSourcesRelationManager extends RelationManager
                         );
                     }),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make()
+            ->recordActions([
+                EditAction::make()
                     ->using(function (array $data, Model $record, Table $table): Model {
                         $owner = $this->resolveOwnerDefinition($table);
 
@@ -141,7 +150,7 @@ class SchemaSourcesRelationManager extends RelationManager
                             fn () => app(ConnectorDefinitionGovernanceService::class)->updateSource($record, $data),
                         );
                     }),
-                Tables\Actions\DeleteAction::make()
+                DeleteAction::make()
                     ->using(function (Model $record, Table $table): bool {
                         $owner = $this->resolveOwnerDefinition($table);
 

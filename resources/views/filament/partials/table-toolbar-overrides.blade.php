@@ -19,8 +19,14 @@
 
     /* Shared Filament table toolbar layout (admin + cabinet). */
     .fi-ta-header-toolbar-search {
-        flex: 1 1 0%;
+        flex: 1 1 0% !important;
         min-width: 0;
+        margin-inline-start: 0 !important; /* override Filament 4 nth-child(2) ms-auto */
+    }
+
+    .fi-ta-header-toolbar-actions {
+        flex-shrink: 0;
+        margin-inline-start: 0; /* search already consumes middle space */
     }
 
     .fi-ta-header-toolbar-search .fi-ta-search-field {

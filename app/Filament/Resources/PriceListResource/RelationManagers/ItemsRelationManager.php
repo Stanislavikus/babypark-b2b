@@ -6,11 +6,16 @@ use App\Enums\PriceListItemStatus;
 use App\Models\ProductVariant;
 use App\Services\Pricing\WorkspaceTaxDefaults;
 use App\Support\Filament\RevalidatesOnUpdate;
-use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Forms\Get;
+use Filament\Actions\CreateAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\Rules\Unique;
@@ -23,14 +28,14 @@ class ItemsRelationManager extends RelationManager
 
     private ?float $resolvedWorkspaceDefaultVatRate = null;
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
         $defaultVatRate = (string) $this->workspaceDefaultVatRate();
 
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 RevalidatesOnUpdate::apply(
-                    Forms\Components\Select::make('product_variant_id')
+                    Select::make('product_variant_id')
                         ->label('Товар / варіант')
                         ->required()
                         ->searchable()
@@ -58,44 +63,44 @@ class ItemsRelationManager extends RelationManager
                             'unique' => 'Позиція з таким товаром і мінімальною кількістю вже існує в цьому списку.',
                         ]),
                 ),
-                Forms\Components\TextInput::make('quantity_min')
+                TextInput::make('quantity_min')
                     ->label('Кількість від')
                     ->numeric()
                     ->required()
                     ->integer()
                     ->minValue(1)
                     ->default(1),
-                Forms\Components\TextInput::make('price')
+                TextInput::make('price')
                     ->label('Ціна без податку')
                     ->numeric()
                     ->required()
                     ->minValue(0.01)
                     ->gt(0)
                     ->prefix('₴'),
-                Forms\Components\TextInput::make('sale_price')
+                TextInput::make('sale_price')
                     ->label('Акційна ціна без податку')
                     ->numeric()
                     ->nullable()
                     ->gt(0)
                     ->lt('price')
                     ->prefix('₴'),
-                Forms\Components\TextInput::make('vat_rate')
+                TextInput::make('vat_rate')
                     ->label('Ставка податку')
                     ->numeric()
                     ->nullable()
                     ->placeholder("за замовчуванням ({$defaultVatRate}%)"),
-                Forms\Components\DatePicker::make('valid_from')
+                DatePicker::make('valid_from')
                     ->label('Діє з')
                     ->nullable()
                     ->native(false)
                     ->displayFormat('d.m.Y'),
-                Forms\Components\DatePicker::make('valid_until')
+                DatePicker::make('valid_until')
                     ->label('Діє до')
                     ->nullable()
                     ->native(false)
                     ->displayFormat('d.m.Y')
                     ->afterOrEqual('valid_from'),
-                Forms\Components\Select::make('status')
+                Select::make('status')
                     ->label('Статус')
                     ->options(PriceListItemStatus::options())
                     ->default(PriceListItemStatus::Active->value)
@@ -109,40 +114,40 @@ class ItemsRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('id')
             ->columns([
-                Tables\Columns\TextColumn::make('productVariant.product.name')
+                TextColumn::make('productVariant.product.name')
                     ->label('Товар')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('productVariant.sku')
+                TextColumn::make('productVariant.sku')
                     ->label('Артикул')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('quantity_min')
+                TextColumn::make('quantity_min')
                     ->label('Кількість від')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('price')
+                TextColumn::make('price')
                     ->label('Ціна без податку')
                     ->money('UAH')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('sale_price')
+                TextColumn::make('sale_price')
                     ->label('Акційна ціна без податку')
                     ->money('UAH')
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('vat_rate')
+                TextColumn::make('vat_rate')
                     ->label('ПДВ %')
                     ->formatStateUsing(
                         fn (?string $state): string => $state !== null
                             ? $state.'%'
                             : 'за замовчуванням ('.$this->workspaceDefaultVatRate().'%)'
                     ),
-                Tables\Columns\TextColumn::make('valid_from')
+                TextColumn::make('valid_from')
                     ->label('Діє з')
                     ->date('d.m.Y')
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('valid_until')
+                TextColumn::make('valid_until')
                     ->label('Діє до')
                     ->date('d.m.Y')
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->label('Статус')
                     ->badge()
                     ->formatStateUsing(
@@ -153,20 +158,20 @@ class ItemsRelationManager extends RelationManager
             ])
             ->defaultSort('productVariant.product.name')
             ->headerActions([
-                Tables\Actions\CreateAction::make()
+                CreateAction::make()
                     ->label('Додати позицію')
-                    ->mutateFormDataUsing(function (array $data): array {
+                    ->mutateDataUsing(function (array $data): array {
                         $data['workspace_id'] = $this->getOwnerRecord()->workspace_id;
                         $data['price_list_id'] = $this->getOwnerRecord()->id;
 
                         return $data;
                     }),
             ])
-            ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+            ->recordActions([
+                EditAction::make(),
+                DeleteAction::make(),
             ])
-            ->bulkActions([]);
+            ->toolbarActions([]);
     }
 
     protected function mutateFormDataBeforeCreate(array $data): array

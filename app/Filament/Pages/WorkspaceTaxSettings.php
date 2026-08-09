@@ -11,13 +11,13 @@ use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Components\Radio;
-use Filament\Forms\Components\Section;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Illuminate\Support\Facades\Auth;
 
 class WorkspaceTaxSettings extends Page implements HasActions, HasForms
@@ -25,9 +25,9 @@ class WorkspaceTaxSettings extends Page implements HasActions, HasForms
     use InteractsWithActions;
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cog-6-tooth';
 
-    protected static ?string $navigationGroup = 'Налаштування';
+    protected static string|\UnitEnum|null $navigationGroup = 'Налаштування';
 
     protected static ?string $navigationLabel = 'Ціни та податки';
 
@@ -35,7 +35,7 @@ class WorkspaceTaxSettings extends Page implements HasActions, HasForms
 
     protected static ?int $navigationSort = 1;
 
-    protected static string $view = 'filament.pages.workspace-tax-settings';
+    protected string $view = 'filament.pages.workspace-tax-settings';
 
     public ?array $data = [];
 
@@ -62,10 +62,10 @@ class WorkspaceTaxSettings extends Page implements HasActions, HasForms
         $this->originalVatRate = (string) $workspace->default_vat_rate;
     }
 
-    public function form(Form $form): Form
+    public function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
+        return $schema
+            ->components([
                 Section::make('Налаштування → Ціни та податки')->schema([
                     TextInput::make('default_vat_rate')
                         ->label('Ставка податку за замовчуванням')

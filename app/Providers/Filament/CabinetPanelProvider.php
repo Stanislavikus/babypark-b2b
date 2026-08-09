@@ -13,7 +13,7 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationItem;
-use Filament\Pages;
+use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Tables\View\TablesRenderHook;
@@ -39,6 +39,7 @@ class CabinetPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Brand::primaryColor(),
             ])
+            ->viteTheme('resources/css/filament/theme.css')
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn () => ProductLightbox::bodyEndHook()
@@ -54,7 +55,7 @@ class CabinetPanelProvider extends PanelProvider
             )
             ->discoverResources(in: app_path('Filament/Cabinet/Resources'), for: 'App\\Filament\\Cabinet\\Resources')
             ->pages([
-                Pages\Dashboard::class,
+                Dashboard::class,
             ])
             ->navigationItems([
                 NavigationItem::make('Кошик')

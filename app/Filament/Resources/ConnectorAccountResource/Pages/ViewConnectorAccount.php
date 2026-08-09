@@ -16,6 +16,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
+use Throwable;
 
 class ViewConnectorAccount extends ViewRecord
 {
@@ -117,7 +118,7 @@ class ViewConnectorAccount extends ViewRecord
                         }
 
                         $this->dispatch('refreshRelationManagers');
-                    } catch (\Throwable $exception) {
+                    } catch (Throwable $exception) {
                         report($exception);
 
                         Notification::make()

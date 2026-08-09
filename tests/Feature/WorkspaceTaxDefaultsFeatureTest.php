@@ -122,7 +122,10 @@ class WorkspaceTaxDefaultsFeatureTest extends TestCase
             ->test(WorkspaceTaxSettings::class)
             ->set('data.default_vat_rate', 19)
             ->call('save')
-            ->assertActionExists('confirmSaveWithVatChange');
+            // Filament 4: save() mounts the confirmation action; assertActionExists()
+            // would nest into the already-mounted action and fail to resolve.
+            ->assertActionMounted('confirmSaveWithVatChange')
+            ->assertMountedActionModalSee('Підтвердження зміни ставки');
     }
 
     public function test_items_relation_manager_uses_workspace_default_vat_rate_not_config(): void
