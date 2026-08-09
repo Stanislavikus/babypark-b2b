@@ -1,0 +1,738 @@
+{
+  "capturedAt": "2026-08-09T06:35:26.985Z",
+  "baseUrl": "http://127.0.0.1:8765",
+  "outputRepo": "/workspace/docs/audits/visual-baselines/gap-024-filament5-pr4",
+  "outputArtifacts": "/opt/cursor/artifacts/gap-024-pr4-filament5-visual",
+  "baselinePr3": "/workspace/docs/audits/visual-baselines/gap-024-filament4-pr3",
+  "fixtures": {
+    "connectorAccountId": "a2758451-3c5f-49e8-98c2-4c76da555e2c",
+    "priceListId": "a275840a-6a59-42a3-bfda-9052cded3583"
+  },
+  "summary": {
+    "total": 144,
+    "success": 144,
+    "fail": 0
+  },
+  "results": [
+    {
+      "file": "s01-admin-login-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 715
+    },
+    {
+      "file": "s01-admin-login-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 663
+    },
+    {
+      "file": "s01-admin-login-light-desktop.webp",
+      "status": "success",
+      "durationMs": 711
+    },
+    {
+      "file": "s01-admin-login-light-mobile.webp",
+      "status": "success",
+      "durationMs": 667
+    },
+    {
+      "file": "s01-admin-login-system-desktop.webp",
+      "status": "success",
+      "durationMs": 716
+    },
+    {
+      "file": "s01-admin-login-system-mobile.webp",
+      "status": "success",
+      "durationMs": 663
+    },
+    {
+      "file": "s02-cabinet-login-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 707
+    },
+    {
+      "file": "s02-cabinet-login-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 668
+    },
+    {
+      "file": "s02-cabinet-login-light-desktop.webp",
+      "status": "success",
+      "durationMs": 709
+    },
+    {
+      "file": "s02-cabinet-login-light-mobile.webp",
+      "status": "success",
+      "durationMs": 652
+    },
+    {
+      "file": "s02-cabinet-login-system-desktop.webp",
+      "status": "success",
+      "durationMs": 711
+    },
+    {
+      "file": "s02-cabinet-login-system-mobile.webp",
+      "status": "success",
+      "durationMs": 668
+    },
+    {
+      "file": "s03-admin-navigation-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 785
+    },
+    {
+      "file": "s03-admin-navigation-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 708
+    },
+    {
+      "file": "s03-admin-navigation-light-desktop.webp",
+      "status": "success",
+      "durationMs": 768
+    },
+    {
+      "file": "s03-admin-navigation-light-mobile.webp",
+      "status": "success",
+      "durationMs": 727
+    },
+    {
+      "file": "s03-admin-navigation-system-desktop.webp",
+      "status": "success",
+      "durationMs": 770
+    },
+    {
+      "file": "s03-admin-navigation-system-mobile.webp",
+      "status": "success",
+      "durationMs": 712
+    },
+    {
+      "file": "s04-admin-products-table-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 885
+    },
+    {
+      "file": "s04-admin-products-table-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 836
+    },
+    {
+      "file": "s04-admin-products-table-light-desktop.webp",
+      "status": "success",
+      "durationMs": 907
+    },
+    {
+      "file": "s04-admin-products-table-light-mobile.webp",
+      "status": "success",
+      "durationMs": 838
+    },
+    {
+      "file": "s04-admin-products-table-system-desktop.webp",
+      "status": "success",
+      "durationMs": 890
+    },
+    {
+      "file": "s04-admin-products-table-system-mobile.webp",
+      "status": "success",
+      "durationMs": 852
+    },
+    {
+      "file": "s05-data-list-toolbar-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 853
+    },
+    {
+      "file": "s05-data-list-toolbar-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 814
+    },
+    {
+      "file": "s05-data-list-toolbar-light-desktop.webp",
+      "status": "success",
+      "durationMs": 813
+    },
+    {
+      "file": "s05-data-list-toolbar-light-mobile.webp",
+      "status": "success",
+      "durationMs": 819
+    },
+    {
+      "file": "s05-data-list-toolbar-system-desktop.webp",
+      "status": "success",
+      "durationMs": 810
+    },
+    {
+      "file": "s05-data-list-toolbar-system-mobile.webp",
+      "status": "success",
+      "durationMs": 829
+    },
+    {
+      "file": "s06-product-context-drawer-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 1591
+    },
+    {
+      "file": "s06-product-context-drawer-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 1481
+    },
+    {
+      "file": "s06-product-context-drawer-light-desktop.webp",
+      "status": "success",
+      "durationMs": 1616
+    },
+    {
+      "file": "s06-product-context-drawer-light-mobile.webp",
+      "status": "success",
+      "durationMs": 1477
+    },
+    {
+      "file": "s06-product-context-drawer-system-desktop.webp",
+      "status": "success",
+      "durationMs": 1543
+    },
+    {
+      "file": "s06-product-context-drawer-system-mobile.webp",
+      "status": "success",
+      "durationMs": 1500
+    },
+    {
+      "file": "s07-admin-forms-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 827
+    },
+    {
+      "file": "s07-admin-forms-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 758
+    },
+    {
+      "file": "s07-admin-forms-delivery-setting-dark-desktop-delivery-setting.webp",
+      "status": "success",
+      "durationMs": 786
+    },
+    {
+      "file": "s07-admin-forms-delivery-setting-dark-mobile-delivery-setting.webp",
+      "status": "success",
+      "durationMs": 727
+    },
+    {
+      "file": "s07-admin-forms-delivery-setting-light-desktop-delivery-setting.webp",
+      "status": "success",
+      "durationMs": 784
+    },
+    {
+      "file": "s07-admin-forms-delivery-setting-light-mobile-delivery-setting.webp",
+      "status": "success",
+      "durationMs": 728
+    },
+    {
+      "file": "s07-admin-forms-delivery-setting-system-desktop-delivery-setting.webp",
+      "status": "success",
+      "durationMs": 787
+    },
+    {
+      "file": "s07-admin-forms-delivery-setting-system-mobile-delivery-setting.webp",
+      "status": "success",
+      "durationMs": 724
+    },
+    {
+      "file": "s07-admin-forms-light-desktop.webp",
+      "status": "success",
+      "durationMs": 813
+    },
+    {
+      "file": "s07-admin-forms-light-mobile.webp",
+      "status": "success",
+      "durationMs": 749
+    },
+    {
+      "file": "s07-admin-forms-price-list-item-dark-desktop-price-list-item.webp",
+      "status": "success",
+      "durationMs": 820
+    },
+    {
+      "file": "s07-admin-forms-price-list-item-dark-mobile-price-list-item.webp",
+      "status": "success",
+      "durationMs": 744
+    },
+    {
+      "file": "s07-admin-forms-price-list-item-light-desktop-price-list-item.webp",
+      "status": "success",
+      "durationMs": 811
+    },
+    {
+      "file": "s07-admin-forms-price-list-item-light-mobile-price-list-item.webp",
+      "status": "success",
+      "durationMs": 750
+    },
+    {
+      "file": "s07-admin-forms-price-list-item-system-desktop-price-list-item.webp",
+      "status": "success",
+      "durationMs": 815
+    },
+    {
+      "file": "s07-admin-forms-price-list-item-system-mobile-price-list-item.webp",
+      "status": "success",
+      "durationMs": 730
+    },
+    {
+      "file": "s07-admin-forms-system-desktop.webp",
+      "status": "success",
+      "durationMs": 810
+    },
+    {
+      "file": "s07-admin-forms-system-mobile.webp",
+      "status": "success",
+      "durationMs": 752
+    },
+    {
+      "file": "s08-price-inspector-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 805
+    },
+    {
+      "file": "s08-price-inspector-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 741
+    },
+    {
+      "file": "s08-price-inspector-light-desktop.webp",
+      "status": "success",
+      "durationMs": 803
+    },
+    {
+      "file": "s08-price-inspector-light-mobile.webp",
+      "status": "success",
+      "durationMs": 741
+    },
+    {
+      "file": "s08-price-inspector-system-desktop.webp",
+      "status": "success",
+      "durationMs": 801
+    },
+    {
+      "file": "s08-price-inspector-system-mobile.webp",
+      "status": "success",
+      "durationMs": 746
+    },
+    {
+      "file": "s09-field-matrix-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 818
+    },
+    {
+      "file": "s09-field-matrix-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 777
+    },
+    {
+      "file": "s09-field-matrix-light-desktop.webp",
+      "status": "success",
+      "durationMs": 801
+    },
+    {
+      "file": "s09-field-matrix-light-mobile.webp",
+      "status": "success",
+      "durationMs": 744
+    },
+    {
+      "file": "s09-field-matrix-system-desktop.webp",
+      "status": "success",
+      "durationMs": 817
+    },
+    {
+      "file": "s09-field-matrix-system-mobile.webp",
+      "status": "success",
+      "durationMs": 759
+    },
+    {
+      "file": "s09-governance-dark-desktop-governance.webp",
+      "status": "success",
+      "durationMs": 790
+    },
+    {
+      "file": "s09-governance-dark-mobile-governance.webp",
+      "status": "success",
+      "durationMs": 725
+    },
+    {
+      "file": "s09-governance-light-desktop-governance.webp",
+      "status": "success",
+      "durationMs": 802
+    },
+    {
+      "file": "s09-governance-light-mobile-governance.webp",
+      "status": "success",
+      "durationMs": 744
+    },
+    {
+      "file": "s09-governance-system-desktop-governance.webp",
+      "status": "success",
+      "durationMs": 786
+    },
+    {
+      "file": "s09-governance-system-mobile-governance.webp",
+      "status": "success",
+      "durationMs": 725
+    },
+    {
+      "file": "s10-connector-account-list-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 813
+    },
+    {
+      "file": "s10-connector-account-list-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 757
+    },
+    {
+      "file": "s10-connector-account-list-light-desktop.webp",
+      "status": "success",
+      "durationMs": 802
+    },
+    {
+      "file": "s10-connector-account-list-light-mobile.webp",
+      "status": "success",
+      "durationMs": 738
+    },
+    {
+      "file": "s10-connector-account-list-system-desktop.webp",
+      "status": "success",
+      "durationMs": 805
+    },
+    {
+      "file": "s10-connector-account-list-system-mobile.webp",
+      "status": "success",
+      "durationMs": 741
+    },
+    {
+      "file": "s11-connector-account-detail-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 798
+    },
+    {
+      "file": "s11-connector-account-detail-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 736
+    },
+    {
+      "file": "s11-connector-account-detail-light-desktop.webp",
+      "status": "success",
+      "durationMs": 810
+    },
+    {
+      "file": "s11-connector-account-detail-light-mobile.webp",
+      "status": "success",
+      "durationMs": 734
+    },
+    {
+      "file": "s11-connector-account-detail-system-desktop.webp",
+      "status": "success",
+      "durationMs": 809
+    },
+    {
+      "file": "s11-connector-account-detail-system-mobile.webp",
+      "status": "success",
+      "durationMs": 734
+    },
+    {
+      "file": "s12-connector-connection-history-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 1894
+    },
+    {
+      "file": "s12-connector-connection-history-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 1818
+    },
+    {
+      "file": "s12-connector-connection-history-light-desktop.webp",
+      "status": "success",
+      "durationMs": 1894
+    },
+    {
+      "file": "s12-connector-connection-history-light-mobile.webp",
+      "status": "success",
+      "durationMs": 1818
+    },
+    {
+      "file": "s12-connector-connection-history-system-desktop.webp",
+      "status": "success",
+      "durationMs": 1877
+    },
+    {
+      "file": "s12-connector-connection-history-system-mobile.webp",
+      "status": "success",
+      "durationMs": 1820
+    },
+    {
+      "file": "s13-b2b-catalogue-table-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 939
+    },
+    {
+      "file": "s13-b2b-catalogue-table-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 875
+    },
+    {
+      "file": "s13-b2b-catalogue-table-light-desktop.webp",
+      "status": "success",
+      "durationMs": 935
+    },
+    {
+      "file": "s13-b2b-catalogue-table-light-mobile.webp",
+      "status": "success",
+      "durationMs": 876
+    },
+    {
+      "file": "s13-b2b-catalogue-table-system-desktop.webp",
+      "status": "success",
+      "durationMs": 916
+    },
+    {
+      "file": "s13-b2b-catalogue-table-system-mobile.webp",
+      "status": "success",
+      "durationMs": 863
+    },
+    {
+      "file": "s14-b2b-catalogue-cards-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 903
+    },
+    {
+      "file": "s14-b2b-catalogue-cards-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 767
+    },
+    {
+      "file": "s14-b2b-catalogue-cards-light-desktop.webp",
+      "status": "success",
+      "durationMs": 1010
+    },
+    {
+      "file": "s14-b2b-catalogue-cards-light-mobile.webp",
+      "status": "success",
+      "durationMs": 760
+    },
+    {
+      "file": "s14-b2b-catalogue-cards-system-desktop.webp",
+      "status": "success",
+      "durationMs": 930
+    },
+    {
+      "file": "s14-b2b-catalogue-cards-system-mobile.webp",
+      "status": "success",
+      "durationMs": 772
+    },
+    {
+      "file": "s15-qty-cart-checkout-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 3303
+    },
+    {
+      "file": "s15-qty-cart-checkout-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 3463
+    },
+    {
+      "file": "s15-qty-cart-checkout-light-desktop.webp",
+      "status": "success",
+      "durationMs": 3270
+    },
+    {
+      "file": "s15-qty-cart-checkout-light-mobile.webp",
+      "status": "success",
+      "durationMs": 3191
+    },
+    {
+      "file": "s15-qty-cart-checkout-system-desktop.webp",
+      "status": "success",
+      "durationMs": 3235
+    },
+    {
+      "file": "s15-qty-cart-checkout-system-mobile.webp",
+      "status": "success",
+      "durationMs": 3210
+    },
+    {
+      "file": "s16-availability-pricing-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 794
+    },
+    {
+      "file": "s16-availability-pricing-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 730
+    },
+    {
+      "file": "s16-availability-pricing-light-desktop.webp",
+      "status": "success",
+      "durationMs": 798
+    },
+    {
+      "file": "s16-availability-pricing-light-mobile.webp",
+      "status": "success",
+      "durationMs": 740
+    },
+    {
+      "file": "s16-availability-pricing-system-desktop.webp",
+      "status": "success",
+      "durationMs": 789
+    },
+    {
+      "file": "s16-availability-pricing-system-mobile.webp",
+      "status": "success",
+      "durationMs": 731
+    },
+    {
+      "file": "s17-product-photo-lightbox-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 1589
+    },
+    {
+      "file": "s17-product-photo-lightbox-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 1628
+    },
+    {
+      "file": "s17-product-photo-lightbox-light-desktop.webp",
+      "status": "success",
+      "durationMs": 1600
+    },
+    {
+      "file": "s17-product-photo-lightbox-light-mobile.webp",
+      "status": "success",
+      "durationMs": 1504
+    },
+    {
+      "file": "s17-product-photo-lightbox-system-desktop.webp",
+      "status": "success",
+      "durationMs": 1668
+    },
+    {
+      "file": "s17-product-photo-lightbox-system-mobile.webp",
+      "status": "success",
+      "durationMs": 1473
+    },
+    {
+      "file": "s18-mobile-responsive-admin-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 885
+    },
+    {
+      "file": "s18-mobile-responsive-admin-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 837
+    },
+    {
+      "file": "s18-mobile-responsive-admin-light-desktop.webp",
+      "status": "success",
+      "durationMs": 890
+    },
+    {
+      "file": "s18-mobile-responsive-admin-light-mobile.webp",
+      "status": "success",
+      "durationMs": 839
+    },
+    {
+      "file": "s18-mobile-responsive-admin-system-desktop.webp",
+      "status": "success",
+      "durationMs": 890
+    },
+    {
+      "file": "s18-mobile-responsive-admin-system-mobile.webp",
+      "status": "success",
+      "durationMs": 822
+    },
+    {
+      "file": "s18-mobile-responsive-cabinet-dark-desktop-cabinet.webp",
+      "status": "success",
+      "durationMs": 894
+    },
+    {
+      "file": "s18-mobile-responsive-cabinet-dark-mobile-cabinet.webp",
+      "status": "success",
+      "durationMs": 751
+    },
+    {
+      "file": "s18-mobile-responsive-cabinet-light-desktop-cabinet.webp",
+      "status": "success",
+      "durationMs": 895
+    },
+    {
+      "file": "s18-mobile-responsive-cabinet-light-mobile-cabinet.webp",
+      "status": "success",
+      "durationMs": 794
+    },
+    {
+      "file": "s18-mobile-responsive-cabinet-system-desktop-cabinet.webp",
+      "status": "success",
+      "durationMs": 894
+    },
+    {
+      "file": "s18-mobile-responsive-cabinet-system-mobile-cabinet.webp",
+      "status": "success",
+      "durationMs": 735
+    },
+    {
+      "file": "s19-theme-appearance-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 794
+    },
+    {
+      "file": "s19-theme-appearance-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 710
+    },
+    {
+      "file": "s19-theme-appearance-light-desktop.webp",
+      "status": "success",
+      "durationMs": 770
+    },
+    {
+      "file": "s19-theme-appearance-light-mobile.webp",
+      "status": "success",
+      "durationMs": 709
+    },
+    {
+      "file": "s19-theme-appearance-system-desktop.webp",
+      "status": "success",
+      "durationMs": 767
+    },
+    {
+      "file": "s19-theme-appearance-system-mobile.webp",
+      "status": "success",
+      "durationMs": 711
+    },
+    {
+      "file": "s20-toasts-notifications-dark-desktop.webp",
+      "status": "success",
+      "durationMs": 2326
+    },
+    {
+      "file": "s20-toasts-notifications-dark-mobile.webp",
+      "status": "success",
+      "durationMs": 2224
+    },
+    {
+      "file": "s20-toasts-notifications-light-desktop.webp",
+      "status": "success",
+      "durationMs": 2386
+    },
+    {
+      "file": "s20-toasts-notifications-light-mobile.webp",
+      "status": "success",
+      "durationMs": 2241
+    },
+    {
+      "file": "s20-toasts-notifications-system-desktop.webp",
+      "status": "success",
+      "durationMs": 2269
+    },
+    {
+      "file": "s20-toasts-notifications-system-mobile.webp",
+      "status": "success",
+      "durationMs": 2229
+    }
+  ]
+}
