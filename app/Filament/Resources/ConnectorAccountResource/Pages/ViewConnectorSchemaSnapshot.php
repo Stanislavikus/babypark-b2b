@@ -117,18 +117,18 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
                     ->sortable(),
                 TextColumn::make('is_required')
                     ->label(__('connectors.ui.snapshot.fields.columns.required'))
-                    ->formatStateUsing(fn (?bool $state): string => ConnectorSchemaFieldPresenter::booleanLabel($state)),
+                    ->getStateUsing(fn (ConnectorSchemaSnapshotField $record): string => ConnectorSchemaFieldPresenter::booleanLabel($record->is_required)),
                 TextColumn::make('external_scope')
                     ->label(__('connectors.ui.snapshot.fields.columns.scope'))
-                    ->formatStateUsing(fn (?string $state): string => ConnectorSchemaFieldPresenter::externalScopeLabel($state))
+                    ->getStateUsing(fn (ConnectorSchemaSnapshotField $record): string => ConnectorSchemaFieldPresenter::externalScopeLabel($record->external_scope))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('is_multi_value')
                     ->label(__('connectors.ui.snapshot.fields.columns.multi_value'))
-                    ->formatStateUsing(fn (?bool $state): string => ConnectorSchemaFieldPresenter::booleanLabel($state))
+                    ->getStateUsing(fn (ConnectorSchemaSnapshotField $record): string => ConnectorSchemaFieldPresenter::booleanLabel($record->is_multi_value))
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('is_localizable')
                     ->label(__('connectors.ui.snapshot.fields.columns.localizable'))
-                    ->formatStateUsing(fn (?bool $state): string => ConnectorSchemaFieldPresenter::booleanLabel($state))
+                    ->getStateUsing(fn (ConnectorSchemaSnapshotField $record): string => ConnectorSchemaFieldPresenter::booleanLabel($record->is_localizable))
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
@@ -206,13 +206,13 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
                     ->formatStateUsing(fn (?string $state): string => ConnectorSchemaFieldPresenter::normalizedDataTypeLabel($state)),
                 TextEntry::make('is_required')
                     ->label(__('connectors.ui.snapshot.fields.detail.required'))
-                    ->formatStateUsing(fn (?bool $state): string => ConnectorSchemaFieldPresenter::booleanLabel($state)),
+                    ->getStateUsing(fn (ConnectorSchemaSnapshotField $record): string => ConnectorSchemaFieldPresenter::booleanLabel($record->is_required)),
                 TextEntry::make('is_multi_value')
                     ->label(__('connectors.ui.snapshot.fields.detail.multi_value'))
-                    ->formatStateUsing(fn (?bool $state): string => ConnectorSchemaFieldPresenter::booleanLabel($state)),
+                    ->getStateUsing(fn (ConnectorSchemaSnapshotField $record): string => ConnectorSchemaFieldPresenter::booleanLabel($record->is_multi_value)),
                 TextEntry::make('is_localizable')
                     ->label(__('connectors.ui.snapshot.fields.detail.localizable'))
-                    ->formatStateUsing(fn (?bool $state): string => ConnectorSchemaFieldPresenter::booleanLabel($state)),
+                    ->getStateUsing(fn (ConnectorSchemaSnapshotField $record): string => ConnectorSchemaFieldPresenter::booleanLabel($record->is_localizable)),
                 TextEntry::make('external_scope')
                     ->label(__('connectors.ui.snapshot.fields.detail.scope'))
                     ->formatStateUsing(fn (?string $state): string => ConnectorSchemaFieldPresenter::externalScopeLabel($state)),
