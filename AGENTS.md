@@ -1,7 +1,7 @@
 You are building a B2B wholesale cabinet for babypark.ua.
 
 Project: b2b.babypark.ua
-Stack: Laravel 11, Filament 3, Livewire 3, MySQL 8, Redis
+Stack: Laravel 13, Filament 5, Livewire 4, Tailwind 4, Vite 6, Node 22, MySQL 8, Redis
 
 ## GOAL
 Build a B2B cabinet for wholesale buyers with:

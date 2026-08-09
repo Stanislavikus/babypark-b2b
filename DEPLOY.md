@@ -96,11 +96,11 @@ Livewire 4 serves update/upload endpoints under a hashed prefix derived from
 
 Ensure the `pcntl` PHP extension is installed (`php -m | grep -i '^pcntl$'`).
 
-### Verified current pilot state (2026-08-08, GAP-024 PR1)
+### Verified current pilot state (post-GAP-024 PR4, 2026-08-09)
 
-Read-only verification on the pilot host before the GAP-024 migration programme
-began. These facts are recorded here so repository tooling and CI assumptions
-align with the live deployment baseline.
+Read-only verification on the pilot host after the GAP-024 framework migration
+programme (PR1–PR4). These facts are recorded here so repository tooling and CI
+assumptions align with the live deployment baseline.
 
 | Runtime | Verified value |
 |---------|----------------|
@@ -115,7 +115,7 @@ The main Supervisor queue worker (`babypark-queue`) was confirmed running.
 `babypark-connector-queue` remains intentionally deferred per the table above.
 
 A separate smoke checkout exists at `/var/www/babypark-b2b-smoke`, synchronized
-to merged `develop` at `b45e01385778a9fd69b7051389452f447ad9a85d`, with PHPUnit
+to merged `develop` at `41dbb97094df13df93e72e3eaab3a4c46976fc34`, with PHPUnit
 dev tooling and `pdo_sqlite` / `sqlite3` available for CLI smoke runs.
 
 ### Verified current pilot state (2026-07-31)
@@ -129,7 +129,7 @@ on the pilot host.
 - `stores.database.connection`: `null` (→ default DB connection)
 - `stores.database.lock_connection`: `null` (→ same DB connection, per
   `Illuminate\Cache\CacheManager::createDatabaseDriver` in installed
-  `laravel/framework` v11.54.0: `$config['lock_connection'] ?? $config['connection'] ?? null`)
+  `laravel/framework` v13.24.0: `$config['lock_connection'] ?? $config['connection'] ?? null`)
 - `stores.database.lock_table`: `null` (→ falls back to `cache_locks`, per the same
   source: `$config['lock_table'] ?? 'cache_locks'`)
 
