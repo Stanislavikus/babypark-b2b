@@ -99,12 +99,7 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
             ->paginated([20, 50, 100])
             ->defaultPaginationPageOption(20)
             ->defaultSort(function (Builder $query): Builder {
-                if (filled($this->tableSort)) {
-                    return $query;
-                }
-
                 return $query
-                    ->reorder()
                     ->orderByRaw('CASE WHEN sort_order IS NULL THEN 1 ELSE 0 END')
                     ->orderBy('sort_order')
                     ->orderBy('external_field_key');
