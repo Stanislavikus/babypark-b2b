@@ -94,6 +94,50 @@ class ConnectorAccountPolicyTest extends TestCase
     }
 
     #[Test]
+    #[DataProvider('viewRunDiscoveryAllowedProvider')]
+    public function view_run_discovery_allows_authorized_roles_in_same_workspace(UserRole $role, bool $withPermission, bool $expected): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        $user = $this->createStaffUser($role);
+
+        if ($withPermission) {
+            $user->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
+        }
+
+        $this->assertSame(
+            $expected,
+            Gate::forUser($user)->allows('viewRunDiscovery', $account),
+        );
+    }
+
+    #[Test]
+    public function view_run_discovery_allows_eligible_roles_for_disabled_account(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace, ['is_enabled' => false]);
+
+        foreach ([UserRole::Admin, UserRole::Director, UserRole::Merchandiser] as $role) {
+            $user = $this->createStaffUser($role);
+            $this->assertTrue(Gate::forUser($user)->allows('viewRunDiscovery', $account));
+        }
+
+        $manager = $this->createStaffUser(UserRole::Manager);
+        $manager->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
+        $this->assertTrue(Gate::forUser($manager)->allows('viewRunDiscovery', $account));
+    }
+
+    #[Test]
+    public function view_run_discovery_denies_same_roles_in_different_workspace(): void
+    {
+        $otherWorkspace = Workspace::query()->create(['name' => 'Other', 'is_default' => false]);
+        $account = $this->createConnectorAccount($otherWorkspace);
+        $admin = $this->createStaffUser(UserRole::Admin);
+
+        $this->assertFalse(Gate::forUser($admin)->allows('viewRunDiscovery', $account));
+    }
+
+    #[Test]
     #[DataProvider('runDiscoveryAllowedProvider')]
     public function run_discovery_allows_authorized_roles_in_same_workspace(UserRole $role, bool $withPermission, bool $expected): void
     {
@@ -200,6 +244,14 @@ class ConnectorAccountPolicyTest extends TestCase
             'programmer without permission denied' => [UserRole::Programmer, false, false],
             'programmer with permission allowed' => [UserRole::Programmer, true, true],
         ];
+    }
+
+    /**
+     * @return array<string, array{0: UserRole, 1: bool, 2: bool}>
+     */
+    public static function viewRunDiscoveryAllowedProvider(): array
+    {
+        return self::runDiscoveryAllowedProvider();
     }
 
     /**

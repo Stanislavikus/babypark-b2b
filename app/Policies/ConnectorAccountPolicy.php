@@ -35,25 +35,18 @@ class ConnectorAccountPolicy
         return $this->allowsManagementAbility($user, $connectorAccount);
     }
 
+    public function viewRunDiscovery(User $user, ConnectorAccount $connectorAccount): bool
+    {
+        return $this->allowsDiscoveryControlEligibility($user, $connectorAccount);
+    }
+
     public function runDiscovery(User $user, ConnectorAccount $connectorAccount): bool
     {
-        if (! $this->workspaceMembership->belongs($user, $connectorAccount->workspace)) {
+        if (! $this->allowsDiscoveryControlEligibility($user, $connectorAccount)) {
             return false;
         }
 
-        if (! $connectorAccount->is_enabled) {
-            return false;
-        }
-
-        if (in_array($user->role, [UserRole::Admin, UserRole::Director], true)) {
-            return true;
-        }
-
-        if ($user->role === UserRole::Merchandiser) {
-            return true;
-        }
-
-        return $user->can(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
+        return $connectorAccount->is_enabled;
     }
 
     public function create(User $user, Workspace $workspace): bool
@@ -118,6 +111,23 @@ class ConnectorAccountPolicy
         }
 
         if (in_array($user->role, [UserRole::Admin, UserRole::Director], true)) {
+            return true;
+        }
+
+        return $user->can(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
+    }
+
+    private function allowsDiscoveryControlEligibility(User $user, ConnectorAccount $connectorAccount): bool
+    {
+        if (! $this->workspaceMembership->belongs($user, $connectorAccount->workspace)) {
+            return false;
+        }
+
+        if (in_array($user->role, [UserRole::Admin, UserRole::Director], true)) {
+            return true;
+        }
+
+        if ($user->role === UserRole::Merchandiser) {
             return true;
         }
 

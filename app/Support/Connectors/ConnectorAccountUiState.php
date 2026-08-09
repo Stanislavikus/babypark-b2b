@@ -5,9 +5,15 @@ namespace App\Support\Connectors;
 use App\Enums\ConnectorAccountConnectionStatus;
 use App\Enums\ConnectorCapability;
 use App\Enums\ConnectorConnectionCheckStatus;
+use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Enums\ConnectorProfileAvailability;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorConnectionCheck;
+use App\Models\ConnectorDiscoveryRun;
+use App\Models\ConnectorSchemaSnapshot;
+use App\Models\ConnectorSchemaSource;
+use App\Services\Connectors\ConnectorDiscoverySourceResolver;
+use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceResolutionException;
 use App\Support\Connectors\Exceptions\ConnectorProfileNotFoundException;
 
 final class ConnectorAccountUiState
@@ -15,6 +21,7 @@ final class ConnectorAccountUiState
     public function __construct(
         private readonly ConnectorProfileRegistry $profileRegistry,
         private readonly ConnectorSafeMessagePresenter $safeMessagePresenter,
+        private readonly ConnectorDiscoverySourceResolver $discoverySourceResolver,
     ) {}
 
     public function activeConnectionCheck(ConnectorAccount $account): ?ConnectorConnectionCheck
@@ -115,8 +122,10 @@ final class ConnectorAccountUiState
 
     public function profileAvailabilityState(ConnectorAccount $account): ConnectorProfileAvailability
     {
+        $profileCode = $this->resolveAuthProfileCode($account);
+
         try {
-            $definition = $this->profileRegistry->profileDefinition($account->auth_profile);
+            $definition = $this->profileRegistry->profileDefinition($profileCode);
         } catch (ConnectorProfileNotFoundException) {
             return ConnectorProfileAvailability::ProfileNotFound;
         }
@@ -179,13 +188,212 @@ final class ConnectorAccountUiState
 
     public function initiatorLabel(?ConnectorConnectionCheck $check): string
     {
-        if ($check === null) {
+        return $this->initiatorLabelForUserRelation($check);
+    }
+
+    public function discoveryInitiatorLabel(?ConnectorDiscoveryRun $run): string
+    {
+        return $this->initiatorLabelForUserRelation($run);
+    }
+
+    public function activeDiscoveryRun(ConnectorAccount $account): ?ConnectorDiscoveryRun
+    {
+        if (! $account->relationLoaded('discoveryRuns')) {
+            return $account->discoveryRuns()
+                ->whereIn('status', [
+                    ConnectorDiscoveryRunStatus::Queued,
+                    ConnectorDiscoveryRunStatus::Running,
+                ])
+                ->first();
+        }
+
+        return $account->discoveryRuns
+            ->first(fn (ConnectorDiscoveryRun $run): bool => in_array($run->status, [
+                ConnectorDiscoveryRunStatus::Queued,
+                ConnectorDiscoveryRunStatus::Running,
+            ], true));
+    }
+
+    public function hasActiveDiscoveryRun(ConnectorAccount $account): bool
+    {
+        return $this->activeDiscoveryRun($account) !== null;
+    }
+
+    public function discoveryRuntimeStatusLabel(?ConnectorDiscoveryRun $activeRun): ?string
+    {
+        if ($activeRun === null) {
+            return null;
+        }
+
+        return match ($activeRun->status) {
+            ConnectorDiscoveryRunStatus::Queued => __('connectors.ui.runtime.discovery_waiting'),
+            ConnectorDiscoveryRunStatus::Running => __('connectors.ui.runtime.discovery_running'),
+            default => null,
+        };
+    }
+
+    public function discoveryRuntimeStatusColor(?ConnectorDiscoveryRun $activeRun): ?string
+    {
+        if ($activeRun === null) {
+            return null;
+        }
+
+        return match ($activeRun->status) {
+            ConnectorDiscoveryRunStatus::Queued,
+            ConnectorDiscoveryRunStatus::Running => 'info',
+            default => null,
+        };
+    }
+
+    public function discoveryStatusLabel(ConnectorDiscoveryRunStatus $status): string
+    {
+        return __($status->label());
+    }
+
+    public function discoveryStatusColor(ConnectorDiscoveryRunStatus $status): string
+    {
+        return match ($status) {
+            ConnectorDiscoveryRunStatus::Succeeded => 'success',
+            ConnectorDiscoveryRunStatus::Failed => 'danger',
+            ConnectorDiscoveryRunStatus::Cancelled => 'gray',
+            ConnectorDiscoveryRunStatus::Queued,
+            ConnectorDiscoveryRunStatus::Running => 'info',
+        };
+    }
+
+    public function discoveryErrorMessage(?ConnectorDiscoveryRun $run): ?string
+    {
+        if ($run === null || $run->status !== ConnectorDiscoveryRunStatus::Failed) {
+            return null;
+        }
+
+        return $this->safeMessagePresenter->present($run->user_message_key);
+    }
+
+    public function profileSchemaDiscoveryAvailabilityState(ConnectorAccount $account): ConnectorProfileAvailability
+    {
+        $profileCode = $this->resolveAuthProfileCode($account);
+
+        try {
+            $definition = $this->profileRegistry->profileDefinition($profileCode);
+        } catch (ConnectorProfileNotFoundException) {
+            return ConnectorProfileAvailability::ProfileNotFound;
+        }
+
+        if (! $definition->enabled) {
+            return ConnectorProfileAvailability::ProfileDisabled;
+        }
+
+        if (! $definition->supports(ConnectorCapability::SchemaDiscovery)) {
+            return ConnectorProfileAvailability::CapabilityUnsupported;
+        }
+
+        return ConnectorProfileAvailability::Available;
+    }
+
+    public function isDiscoverySourceAvailable(ConnectorAccount $account): bool
+    {
+        try {
+            $this->discoverySourceResolver->resolve($account);
+
+            return true;
+        } catch (ConnectorDiscoverySourceResolutionException) {
+            return false;
+        }
+    }
+
+    /**
+     * @return array{enabled: bool, label: string, disabled_reason: ?string}
+     */
+    public function manualDiscoveryActionState(ConnectorAccount $account): array
+    {
+        $label = __('connectors.ui.actions.run_discovery');
+
+        if (! $account->is_enabled) {
+            return [
+                'enabled' => false,
+                'label' => $label,
+                'disabled_reason' => __('connectors.ui.disabled_reasons.account_disabled'),
+            ];
+        }
+
+        $profileAvailability = $this->profileSchemaDiscoveryAvailabilityState($account);
+
+        if ($profileAvailability !== ConnectorProfileAvailability::Available) {
+            $reasonKey = match ($profileAvailability) {
+                ConnectorProfileAvailability::CapabilityUnsupported => 'connectors.ui.disabled_reasons.discovery_capability_unsupported',
+                default => $profileAvailability->disabledReasonKey(),
+            };
+
+            return [
+                'enabled' => false,
+                'label' => $label,
+                'disabled_reason' => $reasonKey !== null ? __($reasonKey) : null,
+            ];
+        }
+
+        if ($this->hasActiveDiscoveryRun($account)) {
+            return [
+                'enabled' => false,
+                'label' => __('connectors.ui.actions.discovery_already_active'),
+                'disabled_reason' => __('connectors.ui.disabled_reasons.discovery_already_active'),
+            ];
+        }
+
+        if (! $this->isDiscoverySourceAvailable($account)) {
+            return [
+                'enabled' => false,
+                'label' => $label,
+                'disabled_reason' => __('connectors.ui.disabled_reasons.discovery_source_unavailable'),
+            ];
+        }
+
+        return [
+            'enabled' => true,
+            'label' => $label,
+            'disabled_reason' => null,
+        ];
+    }
+
+    public function schemaSourceLabel(?ConnectorSchemaSource $source): string
+    {
+        if ($source === null || ! filled($source->label)) {
+            return __('connectors.ui.common.dash');
+        }
+
+        return $source->label;
+    }
+
+    public function snapshotStateLabel(ConnectorSchemaSnapshot $snapshot): ?string
+    {
+        if ($snapshot->previous_snapshot_id === null) {
+            return __('connectors.ui.snapshot.first_snapshot');
+        }
+
+        $previous = $snapshot->relationLoaded('previousSnapshot')
+            ? $snapshot->previousSnapshot
+            : $snapshot->previousSnapshot()->first(['id', 'canonical_hash']);
+
+        if ($previous === null) {
+            return null;
+        }
+
+        if ($snapshot->canonical_hash === $previous->canonical_hash) {
+            return __('connectors.ui.snapshot.no_change');
+        }
+
+        return null;
+    }
+
+    private function initiatorLabelForUserRelation(?object $record): string
+    {
+        if ($record === null) {
             return __('connectors.ui.initiator.system');
         }
 
-        $user = $check->relationLoaded('initiatedByUser')
-            ? $check->initiatedByUser
-            : $check->initiatedByUser()->first();
+        $user = $record->relationLoaded('initiatedByUser')
+            ? $record->initiatedByUser
+            : $record->initiatedByUser()->first();
 
         if ($user === null) {
             return __('connectors.ui.initiator.system');
@@ -200,5 +408,18 @@ final class ConnectorAccountUiState
         }
 
         return __('connectors.ui.initiator.system');
+    }
+
+    private function resolveAuthProfileCode(ConnectorAccount $account): string
+    {
+        if (filled($account->auth_profile)) {
+            return $account->auth_profile;
+        }
+
+        $profileCode = ConnectorAccount::query()
+            ->whereKey($account->getKey())
+            ->value('auth_profile');
+
+        return filled($profileCode) ? $profileCode : '';
     }
 }

@@ -3,9 +3,12 @@
 namespace App\Filament\Resources;
 
 use App\Enums\ConnectorConnectionCheckStatus;
+use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ListConnectorAccounts;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
+use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorSchemaSnapshot;
 use App\Models\ConnectorAccount;
+use App\Models\ConnectorDiscoveryRun;
 use App\Models\User;
 use App\Support\Connectors\ConnectorAccountMerchandiserPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
@@ -74,7 +77,66 @@ class ConnectorAccountResource extends Resource
                     ]);
             }
 
+            $relations['discoveryRuns'] = fn ($query) => $query
+                ->select(['id', 'connector_account_id', 'status'])
+                ->whereIn('status', [
+                    ConnectorDiscoveryRunStatus::Queued,
+                    ConnectorDiscoveryRunStatus::Running,
+                ]);
+
             $record->loadMissing($relations);
+
+            $uiState = app(ConnectorAccountUiState::class);
+
+            if ($record->last_discovery_at !== null || $uiState->hasActiveDiscoveryRun($record)) {
+                $latestRun = ConnectorDiscoveryRun::query()
+                    ->where('connector_account_id', $record->getKey())
+                    ->with([
+                        'schemaSource:id,label',
+                        'snapshot' => fn ($snapshotQuery) => $snapshotQuery->select([
+                            'id',
+                            'connector_account_id',
+                            'connector_schema_source_id',
+                            'field_count',
+                            'captured_at',
+                            'previous_snapshot_id',
+                            'canonical_hash',
+                        ]),
+                        'snapshot.schemaSource:id,label',
+                        'snapshot.previousSnapshot:id,canonical_hash',
+                    ])
+                    ->latest('created_at')
+                    ->first();
+
+                if ($latestRun !== null) {
+                    $latestRun->makeHidden([
+                        'error_code',
+                        'technical_summary',
+                        'added_count',
+                        'changed_count',
+                        'removed_count',
+                        'unchanged_count',
+                    ]);
+
+                    if ($latestRun->schemaSource !== null) {
+                        $latestRun->schemaSource->makeHidden(['endpoint_path']);
+                    }
+
+                    if ($latestRun->snapshot !== null) {
+                        $latestRun->snapshot->makeHidden(['canonical_hash']);
+
+                        if ($latestRun->snapshot->schemaSource !== null) {
+                            $latestRun->snapshot->schemaSource->makeHidden(['endpoint_path']);
+                        }
+
+                        if ($latestRun->snapshot->previousSnapshot !== null) {
+                            $latestRun->snapshot->previousSnapshot->makeHidden(['canonical_hash']);
+                        }
+                    }
+
+                    $record->setRelation('latestPresentationDiscoveryRun', $latestRun);
+                }
+            }
         }
 
         return $record;
@@ -122,6 +184,19 @@ class ConnectorAccountResource extends Resource
                             ->visible(fn (ConnectorAccount $record): bool => $uiState->attentionMessage($record) !== null),
                     ])
                     ->columns(2),
+                Section::make(__('connectors.ui.sections.discovery'))
+                    ->schema([
+                        ViewEntry::make('discovery_state')
+                            ->label('')
+                            ->view('filament.connector-accounts.discovery-state')
+                            ->viewData(fn (ConnectorAccount $record): array => [
+                                'record' => $record,
+                                'uiState' => $uiState,
+                                'latestRun' => $record->relationLoaded('latestPresentationDiscoveryRun')
+                                    ? $record->getRelation('latestPresentationDiscoveryRun')
+                                    : null,
+                            ]),
+                    ]),
             ]);
     }
 
@@ -204,6 +279,12 @@ class ConnectorAccountResource extends Resource
                     ->placeholder(__('connectors.ui.common.dash'))
                     ->sortable()
                     ->toggleable(),
+                TextColumn::make('last_successful_discovery_at')
+                    ->label(__('connectors.ui.columns.last_successful_discovery'))
+                    ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
+                    ->placeholder(__('connectors.ui.common.dash'))
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('last_error_message_key')
                     ->label(__('connectors.ui.columns.attention'))
                     ->formatStateUsing(fn ($state, ConnectorAccount $record): ?string => $uiState->attentionMessage($record))
@@ -227,6 +308,7 @@ class ConnectorAccountResource extends Resource
         return [
             'index' => ListConnectorAccounts::route('/'),
             'view' => ViewConnectorAccount::route('/{record}'),
+            'view-snapshot' => ViewConnectorSchemaSnapshot::route('/{record}/snapshots/{snapshot}'),
         ];
     }
 
@@ -242,6 +324,13 @@ class ConnectorAccountResource extends Resource
                     ConnectorConnectionCheckStatus::Running,
                 ]);
         }
+
+        $with['discoveryRuns'] = fn ($discoveryRunsQuery) => $discoveryRunsQuery
+            ->select(['id', 'connector_account_id', 'status'])
+            ->whereIn('status', [
+                ConnectorDiscoveryRunStatus::Queued,
+                ConnectorDiscoveryRunStatus::Running,
+            ]);
 
         return $query->with($with);
     }
