@@ -135,14 +135,29 @@ class ConnectorAccountDocumentationTest extends TestCase
     }
 
     #[Test]
-    public function implementation_gaps_task_4b2b_includes_discovery_overview_ui(): void
+    public function implementation_gaps_task_4b2b_discovery_overview_ui_is_complete(): void
     {
         $gap006 = $this->gap006Section();
 
         $this->assertMatchesRegularExpression(
-            '/\*\*4B-2b\*\*.*Discovery Overview UI/s',
+            '/\*\*4B-2b\*\*.*Discovery Overview UI.*Done/s',
             $gap006
         );
+        $this->assertStringNotContainsString('Discovery Overview UI — Pending', $gap006);
+    }
+
+    #[Test]
+    public function implementation_gaps_next_connector_scope_is_task_4b2c(): void
+    {
+        $gap006 = $this->gap006Section();
+
+        $this->assertStringContainsString('Next task: Task 4B-2c', $gap006);
+        $this->assertMatchesRegularExpression(
+            '/discovered schema fields.*change inspection|change inspection.*discovered schema fields/si',
+            $gap006
+        );
+        $this->assertStringContainsString('`ConnectorSchemaDiff`', $gap006);
+        $this->assertStringContainsString('no write path', $gap006);
     }
 
     #[Test]
