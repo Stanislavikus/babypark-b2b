@@ -143,13 +143,16 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
             'last_successful_discovery_at' => now(),
         ]);
         $hash = hash('sha256', 'same-hash');
+        // Distinct created_at avoids MySQL second-precision ties on latest('created_at').
         $previousRun = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded, [
+            'created_at' => now()->subHour(),
             'finished_at' => now()->subHour(),
         ]);
         $previousSnapshot = $this->createSnapshotForRun($previousRun, [
             'canonical_hash' => $hash,
         ]);
         $run = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded, [
+            'created_at' => now(),
             'finished_at' => now(),
         ]);
         $snapshot = $this->createSnapshotForRun($run, [
