@@ -204,7 +204,6 @@
     "connectors.ui.snapshot.fields.detail.scope": "Scope",
     "connectors.ui.snapshot.fields.detail.sort_order": "Sort order",
     "connectors.ui.integrations.navigation_label": "Integrations",
-    "connectors.ui.integrations.navigation_group": "Catalog & sync",
     "connectors.ui.integrations.title": "Integrations",
     "connectors.ui.integrations.empty": "No platforms are available to connect.",
     "connectors.ui.integrations.status.not_connected": "Not connected yet",
