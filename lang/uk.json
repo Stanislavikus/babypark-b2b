@@ -231,7 +231,6 @@
     "connectors.ui.integrations.actions.open": "Відкрити",
     "connectors.ui.integrations.actions.cancel": "Скасувати",
     "connectors.ui.integrations.actions.ask_admin": "Для підключення зверніться до адміністратора",
-    "connectors.ui.integrations.actions.setup_unavailable": "Підключення цієї платформи незабаром буде доступне",
     "connectors.ui.integrations.platform_connections.title": "Підключення",
     "connectors.ui.integrations.connect.title": "Підключити :platform",
     "connectors.ui.integrations.connect.section_connection": "Підключення",

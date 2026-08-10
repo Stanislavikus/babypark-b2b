@@ -31,7 +31,13 @@ class ConnectorProfileRegistryTest extends TestCase
         $this->assertInstanceOf(ConnectorProfileDefinition::class, $definition);
         $this->assertSame('adobe_commerce_paas_oauth1_integration', $definition->profileCode);
         $this->assertTrue($definition->enabled);
-        $this->assertSame([ConnectorCapability::ConnectionCheck, ConnectorCapability::SchemaDiscovery], $definition->capabilities);
+        $this->assertSame('adobe_commerce', $definition->connectorDefinitionCode);
+        $this->assertSame([
+            ConnectorCapability::ConnectionCheck,
+            ConnectorCapability::SchemaDiscovery,
+            ConnectorCapability::AccountSetup,
+        ], $definition->capabilities);
+        $this->assertTrue($definition->supports(ConnectorCapability::AccountSetup));
 
         $adapter = $registry->resolveAdapter('adobe_commerce_paas_oauth1_integration');
 
@@ -55,6 +61,7 @@ class ConnectorProfileRegistryTest extends TestCase
         $registry = $this->registryWithProfiles([
             'disabled_profile' => [
                 'enabled' => false,
+                'connector_definition_code' => 'test_platform',
                 'adapter' => TestConnectorAdapter::class,
                 'account_schema' => TestConnectorAccountSchema::class,
                 'capabilities' => [],
@@ -148,6 +155,7 @@ class ConnectorProfileRegistryTest extends TestCase
         $this->registryWithProfiles([
             'broken_profile' => [
                 'enabled' => true,
+                'connector_definition_code' => 'test_platform',
                 'account_schema' => TestConnectorAccountSchema::class,
                 'capabilities' => [],
             ],
@@ -257,10 +265,90 @@ class ConnectorProfileRegistryTest extends TestCase
         $this->registryWithProfiles([
             'broken_profile' => [
                 'enabled' => true,
+                'connector_definition_code' => 'test_platform',
                 'adapter' => TestConnectorAdapter::class,
                 'capabilities' => [],
             ],
         ]);
+    }
+
+    #[Test]
+    public function throws_invalid_configuration_for_missing_connector_definition_code(): void
+    {
+        $this->expectException(InvalidConnectorProfileConfiguration::class);
+        $this->expectExceptionMessage(
+            'Connector profile [broken_profile] is missing required key [connector_definition_code].',
+        );
+
+        $this->registryWithProfiles([
+            'broken_profile' => [
+                'enabled' => true,
+                'adapter' => TestConnectorAdapter::class,
+                'account_schema' => TestConnectorAccountSchema::class,
+                'capabilities' => [],
+            ],
+        ]);
+    }
+
+    #[Test]
+    public function resolves_single_enabled_account_setup_profile_for_definition_code(): void
+    {
+        $registry = $this->registryWithProfiles([
+            'setup_profile' => $this->validProfile([
+                'connector_definition_code' => 'adobe_commerce',
+                'capabilities' => ['account_setup', 'connection_check'],
+            ]),
+            'other_platform' => $this->validProfile([
+                'connector_definition_code' => 'shopify',
+                'capabilities' => ['account_setup'],
+            ]),
+            'same_platform_without_setup' => $this->validProfile([
+                'connector_definition_code' => 'adobe_commerce',
+                'capabilities' => ['connection_check'],
+            ]),
+        ]);
+
+        $profile = $registry->resolveAccountSetupProfile('adobe_commerce');
+
+        $this->assertNotNull($profile);
+        $this->assertSame('setup_profile', $profile->profileCode);
+        $this->assertNull($registry->resolveAccountSetupProfile('google_merchant'));
+    }
+
+    #[Test]
+    public function ignores_disabled_account_setup_profiles_when_resolving(): void
+    {
+        $registry = $this->registryWithProfiles([
+            'disabled_setup' => $this->validProfile([
+                'enabled' => false,
+                'connector_definition_code' => 'adobe_commerce',
+                'capabilities' => ['account_setup'],
+            ]),
+        ]);
+
+        $this->assertNull($registry->resolveAccountSetupProfile('adobe_commerce'));
+    }
+
+    #[Test]
+    public function throws_for_ambiguous_account_setup_profiles(): void
+    {
+        $registry = $this->registryWithProfiles([
+            'setup_a' => $this->validProfile([
+                'connector_definition_code' => 'adobe_commerce',
+                'capabilities' => ['account_setup'],
+            ]),
+            'setup_b' => $this->validProfile([
+                'connector_definition_code' => 'adobe_commerce',
+                'capabilities' => ['account_setup'],
+            ]),
+        ]);
+
+        $this->expectException(InvalidConnectorProfileConfiguration::class);
+        $this->expectExceptionMessage(
+            'Connector definition [adobe_commerce] has ambiguous AccountSetup profiles: [setup_a, setup_b]. Exactly one enabled AccountSetup profile is required.',
+        );
+
+        $registry->resolveAccountSetupProfile('adobe_commerce');
     }
 
     #[Test]
@@ -307,6 +395,7 @@ class ConnectorProfileRegistryTest extends TestCase
     {
         return array_merge([
             'enabled' => true,
+            'connector_definition_code' => 'test_platform',
             'adapter' => TestConnectorAdapter::class,
             'account_schema' => TestConnectorAccountSchema::class,
             'capabilities' => [],

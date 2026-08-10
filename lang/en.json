@@ -231,7 +231,6 @@
     "connectors.ui.integrations.actions.open": "Open",
     "connectors.ui.integrations.actions.cancel": "Cancel",
     "connectors.ui.integrations.actions.ask_admin": "Ask an administrator to connect this platform",
-    "connectors.ui.integrations.actions.setup_unavailable": "Connecting this platform will be available soon",
     "connectors.ui.integrations.platform_connections.title": "Connections",
     "connectors.ui.integrations.connect.title": "Connect :platform",
     "connectors.ui.integrations.connect.section_connection": "Connection",

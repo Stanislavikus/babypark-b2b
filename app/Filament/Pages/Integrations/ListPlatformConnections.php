@@ -9,7 +9,7 @@ use App\Models\ConnectorAccount;
 use App\Models\ConnectorDefinition;
 use App\Models\User;
 use App\Support\Connectors\ConnectorAccountUiState;
-use App\Support\Connectors\Integrations\ConnectorSetupProfileResolver;
+use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\Integrations\EligibleConnectorPlatformCatalog;
 use App\Support\Connectors\Integrations\IntegrationsStatusVocabulary;
 use App\Support\Workspace\WorkspaceContext;
@@ -68,7 +68,7 @@ class ListPlatformConnections extends Page
         WorkspaceContext $workspaceContext,
         ConnectorAccountUiState $uiState,
         IntegrationsStatusVocabulary $vocabulary,
-        ConnectorSetupProfileResolver $setupProfileResolver,
+        ConnectorProfileRegistry $profileRegistry,
     ): void {
         $user = Auth::user();
         abort_unless($user instanceof User, 403);
@@ -80,7 +80,7 @@ class ListPlatformConnections extends Page
             $workspaceContext,
             $uiState,
             $vocabulary,
-            $setupProfileResolver,
+            $profileRegistry,
             requireMultiAccount: true,
         );
     }
@@ -90,7 +90,7 @@ class ListPlatformConnections extends Page
         WorkspaceContext $workspaceContext,
         ConnectorAccountUiState $uiState,
         IntegrationsStatusVocabulary $vocabulary,
-        ConnectorSetupProfileResolver $setupProfileResolver,
+        ConnectorProfileRegistry $profileRegistry,
     ): void {
         $user = Auth::user();
         abort_unless($user instanceof User, 403);
@@ -101,7 +101,7 @@ class ListPlatformConnections extends Page
             $workspaceContext,
             $uiState,
             $vocabulary,
-            $setupProfileResolver,
+            $profileRegistry,
             requireMultiAccount: false,
         );
     }
@@ -125,7 +125,7 @@ class ListPlatformConnections extends Page
         WorkspaceContext $workspaceContext,
         ConnectorAccountUiState $uiState,
         IntegrationsStatusVocabulary $vocabulary,
-        ConnectorSetupProfileResolver $setupProfileResolver,
+        ConnectorProfileRegistry $profileRegistry,
         bool $requireMultiAccount,
     ): void {
         $workspace = $workspaceContext->current();
@@ -163,8 +163,6 @@ class ListPlatformConnections extends Page
         $this->rows = $accounts->map(function (ConnectorAccount $account) use ($uiState, $vocabulary): array {
             $activeCheck = $uiState->activeConnectionCheck($account);
             $runtimeLabel = $uiState->runtimeStatusLabel($activeCheck);
-            // Stable label from UiState split (architecture reuse); page vocabulary for merchant label.
-            $uiState->stableStatusLabel($account->connection_status);
 
             return [
                 'id' => $account->id,
@@ -177,8 +175,8 @@ class ListPlatformConnections extends Page
         })->all();
 
         $canCreate = Gate::forUser($user)->allows('create', [ConnectorAccount::class, $workspace]);
-        $setupAvailable = $setupProfileResolver->resolve($this->platform) !== null
-            && $definition->status === ConnectorDefinitionStatus::Active;
+        $setupAvailable = $definition->status === ConnectorDefinitionStatus::Active
+            && $profileRegistry->resolveAccountSetupProfile($this->platform) !== null;
 
         if (! $canCreate) {
             $this->canConnectAnother = false;

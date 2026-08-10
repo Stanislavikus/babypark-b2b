@@ -62,6 +62,63 @@ class ConnectorProfileRegistry
         }
     }
 
+    /**
+     * Resolve the single enabled AccountSetup profile for a connector definition code.
+     *
+     * Zero matches → null (merchant setup unavailable).
+     * Exactly one → that profile.
+     * More than one → invalid/ambiguous configuration (never pick by ordering).
+     */
+    public function resolveAccountSetupProfile(string $connectorDefinitionCode): ?ConnectorProfileDefinition
+    {
+        if ($connectorDefinitionCode === '') {
+            throw new InvalidConnectorProfileConfiguration(
+                'Connector definition code must be a non-empty string when resolving AccountSetup.',
+            );
+        }
+
+        $matches = [];
+
+        foreach ($this->profiles as $definition) {
+            if (! $definition->enabled) {
+                continue;
+            }
+
+            if ($definition->connectorDefinitionCode !== $connectorDefinitionCode) {
+                continue;
+            }
+
+            if (! $definition->supports(ConnectorCapability::AccountSetup)) {
+                continue;
+            }
+
+            $matches[] = $definition;
+        }
+
+        $count = count($matches);
+
+        if ($count === 0) {
+            return null;
+        }
+
+        if ($count > 1) {
+            $profileCodes = array_map(
+                fn (ConnectorProfileDefinition $definition): string => $definition->profileCode,
+                $matches,
+            );
+
+            throw new InvalidConnectorProfileConfiguration(
+                sprintf(
+                    'Connector definition [%s] has ambiguous AccountSetup profiles: [%s]. Exactly one enabled AccountSetup profile is required.',
+                    $connectorDefinitionCode,
+                    implode(', ', $profileCodes),
+                ),
+            );
+        }
+
+        return $matches[0];
+    }
+
     private function enabledProfileDefinition(string $profileCode): ConnectorProfileDefinition
     {
         $definition = $this->profileDefinition($profileCode);
@@ -114,6 +171,21 @@ class ConnectorProfileRegistry
         if (! is_bool($profileConfig['enabled'])) {
             throw new InvalidConnectorProfileConfiguration(
                 sprintf('Connector profile [%s] key [enabled] must be a boolean.', $profileCode),
+            );
+        }
+
+        if (! array_key_exists('connector_definition_code', $profileConfig)) {
+            throw new InvalidConnectorProfileConfiguration(
+                sprintf('Connector profile [%s] is missing required key [connector_definition_code].', $profileCode),
+            );
+        }
+
+        if (! is_string($profileConfig['connector_definition_code']) || $profileConfig['connector_definition_code'] === '') {
+            throw new InvalidConnectorProfileConfiguration(
+                sprintf(
+                    'Connector profile [%s] key [connector_definition_code] must be a non-empty string.',
+                    $profileCode,
+                ),
             );
         }
 
@@ -225,6 +297,7 @@ class ConnectorProfileRegistry
         return new ConnectorProfileDefinition(
             profileCode: $profileCode,
             enabled: $profileConfig['enabled'],
+            connectorDefinitionCode: $profileConfig['connector_definition_code'],
             adapterClass: $adapterClass,
             accountSchemaClass: $accountSchemaClass,
             capabilities: $capabilities,

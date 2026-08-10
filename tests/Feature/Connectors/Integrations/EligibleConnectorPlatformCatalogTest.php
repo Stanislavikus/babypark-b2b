@@ -32,7 +32,7 @@ class EligibleConnectorPlatformCatalogTest extends TestCase
     }
 
     #[Test]
-    public function active_platforms_are_visible_and_drafts_are_not(): void
+    public function adobe_active_with_account_setup_is_visible_without_accounts(): void
     {
         $user = $this->createStaffUser(UserRole::Merchandiser);
         $platforms = app(EligibleConnectorPlatformCatalog::class)
@@ -41,16 +41,27 @@ class EligibleConnectorPlatformCatalogTest extends TestCase
         $codes = $platforms->map->code->all();
 
         $this->assertContains('adobe_commerce', $codes);
-        $this->assertContains('shopify', $codes);
-        $this->assertContains('google_merchant', $codes);
+        $this->assertNotContains('shopify', $codes);
+        $this->assertNotContains('google_merchant', $codes);
         $this->assertNotContains('bigcommerce', $codes);
         $this->assertNotContains('csv', $codes);
-        $this->assertTrue($platforms->every(
-            fn ($platform): bool => in_array($platform->status, [
-                ConnectorDefinitionStatus::Active,
-                ConnectorDefinitionStatus::Deprecated,
-            ], true),
-        ));
+    }
+
+    #[Test]
+    public function active_platform_with_existing_account_remains_visible_without_account_setup(): void
+    {
+        $shopify = ConnectorDefinition::query()->where('code', 'shopify')->firstOrFail();
+        $this->createConnectorAccount($this->defaultWorkspace(), [
+            'connector_definition_id' => $shopify->id,
+            'name' => 'Shopify store',
+        ]);
+
+        $user = $this->createStaffUser(UserRole::Admin);
+        $platforms = app(EligibleConnectorPlatformCatalog::class)
+            ->forWorkspace($user, $this->defaultWorkspace());
+
+        $this->assertTrue($platforms->contains(fn ($p): bool => $p->code === 'shopify'));
+        $this->assertFalse($platforms->contains(fn ($p): bool => $p->code === 'google_merchant'));
     }
 
     #[Test]
@@ -84,6 +95,17 @@ class EligibleConnectorPlatformCatalogTest extends TestCase
     }
 
     #[Test]
+    public function draft_platforms_never_appear(): void
+    {
+        $user = $this->createStaffUser(UserRole::Admin);
+        $platforms = app(EligibleConnectorPlatformCatalog::class)
+            ->forWorkspace($user, $this->defaultWorkspace());
+
+        $this->assertFalse($platforms->contains(fn ($p): bool => $p->code === 'bigcommerce'));
+        $this->assertFalse($platforms->contains(fn ($p): bool => $p->status === ConnectorDefinitionStatus::Draft));
+    }
+
+    #[Test]
     public function catalog_does_not_require_platform_admin_authorization(): void
     {
         $user = $this->createStaffUser(UserRole::Merchandiser);
@@ -93,7 +115,7 @@ class EligibleConnectorPlatformCatalogTest extends TestCase
         $platforms = app(EligibleConnectorPlatformCatalog::class)
             ->forWorkspace($user, $this->defaultWorkspace());
 
-        $this->assertNotEmpty($platforms);
+        $this->assertTrue($platforms->contains(fn ($p): bool => $p->code === 'adobe_commerce'));
     }
 
     #[Test]

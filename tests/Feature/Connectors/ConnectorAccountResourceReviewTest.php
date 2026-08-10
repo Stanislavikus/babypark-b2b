@@ -95,7 +95,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     }
 
     #[Test]
-    public function authorized_user_sees_connector_accounts_navigation_label(): void
+    public function authorized_user_sees_integrations_navigation_label_not_legacy_connections_entry(): void
     {
         $admin = $this->createStaffUser(UserRole::Admin);
 
@@ -103,7 +103,8 @@ class ConnectorAccountResourceReviewTest extends TestCase
 
         $this->actingAs($admin)
             ->get('/admin')
-            ->assertSee(__('connectors.ui.resource.navigation_label', locale: 'uk'));
+            ->assertSee(__('connectors.ui.integrations.navigation_label', locale: 'uk'))
+            ->assertDontSee(__('connectors.ui.resource.navigation_label', locale: 'uk'));
     }
 
     #[Test]
@@ -632,6 +633,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
             'connectors.profiles' => array_merge(config('connectors.profiles'), [
                 $code => [
                     'enabled' => $enabled,
+                    'connector_definition_code' => 'adobe_commerce',
                     'adapter' => AdobePaaSConnectorAdapter::class,
                     'account_schema' => AdobePaaSAccountSchema::class,
                     'capabilities' => $capabilities,

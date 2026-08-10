@@ -148,6 +148,9 @@ class AdobePaaSConnectionCheckServiceTest extends TestCase
     #[Test]
     public function adobe_profile_advertises_connection_check_capability(): void
     {
-        $this->assertSame(['connection_check', 'schema_discovery'], config('connectors.profiles.adobe_commerce_paas_oauth1_integration.capabilities'));
+        $this->assertSame(
+            ['connection_check', 'schema_discovery', 'account_setup'],
+            config('connectors.profiles.adobe_commerce_paas_oauth1_integration.capabilities'),
+        );
     }
 }

@@ -466,6 +466,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
         $registry = new ConnectorProfileRegistry(app(), [
             'adobe_commerce_paas_oauth1_integration' => [
                 'enabled' => false,
+                'connector_definition_code' => 'adobe_commerce',
                 'adapter' => AdobePaaSConnectorAdapter::class,
                 'account_schema' => AdobePaaSAccountSchema::class,
                 'capabilities' => [],

@@ -7,7 +7,9 @@ use App\Models\ConnectorAccount;
 use Illuminate\Support\Collection;
 
 /**
- * Exact §5 rollup: disabled accounts excluded from health evaluation.
+ * Exact §5 rollup: disabled accounts (is_enabled=false) excluded from health
+ * evaluation. Defensive: is_enabled=true + connection_status=Disabled must
+ * never silently fall through to Connected.
  */
 final class PlatformConnectionHealthRollup
 {
@@ -52,6 +54,9 @@ final class PlatformConnectionHealthRollup
         $connectedCount = $enabled->filter(
             fn (ConnectorAccount $account): bool => $account->connection_status === ConnectorAccountConnectionStatus::Connected,
         )->count();
+        $inconsistentDisabledStatusCount = $enabled->filter(
+            fn (ConnectorAccount $account): bool => $account->connection_status === ConnectorAccountConnectionStatus::Disabled,
+        )->count();
 
         if ($enabled->isEmpty()) {
             return new PlatformConnectionHealth(
@@ -67,8 +72,12 @@ final class PlatformConnectionHealthRollup
             );
         }
 
+        // Defensive invariant: is_enabled=true + connection_status=Disabled is
+        // currently unreachable in the write path, but must never roll up as
+        // Connected/"Працює". Treat as AttentionRequired (needs action).
         $status = match (true) {
-            $attentionRequiredCount > 0 => ConnectorAccountConnectionStatus::AttentionRequired,
+            $attentionRequiredCount > 0,
+            $inconsistentDisabledStatusCount > 0 => ConnectorAccountConnectionStatus::AttentionRequired,
             $temporarilyUnavailableCount > 0 => ConnectorAccountConnectionStatus::TemporarilyUnavailable,
             $untestedCount > 0 => ConnectorAccountConnectionStatus::Untested,
             default => ConnectorAccountConnectionStatus::Connected,
@@ -78,7 +87,7 @@ final class PlatformConnectionHealthRollup
             accountCount: $accounts->count(),
             enabledCount: $enabled->count(),
             disabledCount: $disabled->count(),
-            attentionRequiredCount: $attentionRequiredCount,
+            attentionRequiredCount: $attentionRequiredCount + $inconsistentDisabledStatusCount,
             temporarilyUnavailableCount: $temporarilyUnavailableCount,
             untestedCount: $untestedCount,
             connectedCount: $connectedCount,

@@ -9,11 +9,11 @@ use App\Models\ConnectorDefinition;
 use App\Models\User;
 use App\Services\Connectors\ConnectorAccountSettingsService;
 use App\Services\Connectors\CreateConnectorAccountInput;
+use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\CredentialMutation;
 use App\Support\Connectors\Exceptions\ConnectorAccountNameConflict;
 use App\Support\Connectors\Exceptions\ConnectorAccountSettingsValidationException;
 use App\Support\Connectors\Integrations\ConnectorAccountDefaultNameGenerator;
-use App\Support\Connectors\Integrations\ConnectorSetupProfileResolver;
 use App\Support\Connectors\Integrations\EligibleConnectorPlatformCatalog;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
 use App\Support\Workspace\WorkspaceContext;
@@ -73,7 +73,7 @@ class ConnectPlatformIntegration extends Page implements HasForms
         string $platform,
         EligibleConnectorPlatformCatalog $catalog,
         WorkspaceContext $workspaceContext,
-        ConnectorSetupProfileResolver $setupProfileResolver,
+        ConnectorProfileRegistry $profileRegistry,
         ConnectorAccountDefaultNameGenerator $nameGenerator,
     ): void {
         $user = Auth::user();
@@ -92,7 +92,7 @@ class ConnectPlatformIntegration extends Page implements HasForms
 
         abort_if($platformProjection === null, 404);
         abort_unless($platformProjection->allowsNewConnections(), 404);
-        abort_if($setupProfileResolver->resolve($platform) === null, 404);
+        abort_if($profileRegistry->resolveAccountSetupProfile($platform) === null, 404);
 
         $definition = ConnectorDefinition::query()
             ->where('code', $platform)
@@ -167,12 +167,17 @@ class ConnectPlatformIntegration extends Page implements HasForms
     public function connect(
         ConnectorAccountSettingsService $settingsService,
         WorkspaceContext $workspaceContext,
-        ConnectorSetupProfileResolver $setupProfileResolver,
+        ConnectorProfileRegistry $profileRegistry,
     ): void {
         $user = Auth::user();
         abort_unless($user instanceof User, 403);
 
         $workspace = $workspaceContext->current();
+        abort_unless(
+            Gate::forUser($user)->allows('create', [ConnectorAccount::class, $workspace]),
+            403,
+        );
+
         $data = $this->form->getState();
 
         $definition = ConnectorDefinition::query()
@@ -180,7 +185,7 @@ class ConnectPlatformIntegration extends Page implements HasForms
             ->where('status', ConnectorDefinitionStatus::Active)
             ->firstOrFail();
 
-        $profile = $setupProfileResolver->resolve($this->platform);
+        $profile = $profileRegistry->resolveAccountSetupProfile($this->platform);
         abort_if($profile === null, 404);
 
         try {

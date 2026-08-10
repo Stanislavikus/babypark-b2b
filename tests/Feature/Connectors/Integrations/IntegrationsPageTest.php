@@ -8,6 +8,7 @@ use App\Enums\ConnectorConnectionCheckTrigger;
 use App\Enums\ConnectorDefinitionStatus;
 use App\Enums\ConnectorDirection;
 use App\Enums\UserRole;
+use App\Filament\Pages\Integrations\ConnectPlatformIntegration;
 use App\Filament\Pages\Integrations\Integrations;
 use App\Filament\Pages\Integrations\ListPlatformConnections;
 use App\Filament\Resources\ConnectorAccountResource;
@@ -89,8 +90,39 @@ class IntegrationsPageTest extends TestCase
         Livewire::actingAs($user)
             ->test(Integrations::class)
             ->assertSuccessful()
+            ->assertSee('Adobe Commerce')
             ->assertSee('Підключити')
-            ->assertDontSee('Для підключення зверніться до адміністратора');
+            ->assertDontSee('Shopify')
+            ->assertDontSee('Google Merchant Center')
+            ->assertDontSee('Для підключення зверніться до адміністратора')
+            ->assertDontSee('незабаром буде доступне')
+            ->assertDontSee('coming soon');
+    }
+
+    #[Test]
+    public function active_platform_without_account_setup_is_absent_until_an_account_exists(): void
+    {
+        $shopify = ConnectorDefinition::query()->where('code', 'shopify')->firstOrFail();
+        $user = $this->createStaffUser(UserRole::Admin);
+
+        Livewire::actingAs($user)
+            ->test(Integrations::class)
+            ->assertSuccessful()
+            ->assertDontSee('Shopify');
+
+        $this->createConnectorAccount($this->defaultWorkspace(), [
+            'connector_definition_id' => $shopify->id,
+            'name' => 'Shopify Main',
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+            'last_checked_at' => now(),
+        ]);
+
+        Livewire::actingAs($user)
+            ->test(Integrations::class)
+            ->assertSuccessful()
+            ->assertSee('Shopify')
+            ->assertSee('Працює')
+            ->assertDontSee('незабаром буде доступне');
     }
 
     #[Test]
@@ -236,6 +268,22 @@ class IntegrationsPageTest extends TestCase
 
         $this->actingAs($user);
         $this->assertTrue(Integrations::canAccess());
+    }
+
+    #[Test]
+    public function connector_setup_profile_resolver_hardcoded_map_is_removed(): void
+    {
+        $this->assertFalse(class_exists('App\\Support\\Connectors\\Integrations\\ConnectorSetupProfileResolver'));
+        $this->assertFileDoesNotExist(app_path('Support/Connectors/Integrations/ConnectorSetupProfileResolver.php'));
+    }
+
+    #[Test]
+    public function merchandiser_cannot_access_connect_route(): void
+    {
+        $user = $this->createStaffUser(UserRole::Merchandiser);
+
+        $this->actingAs($user);
+        $this->assertFalse(ConnectPlatformIntegration::canAccess());
     }
 
     #[Test]

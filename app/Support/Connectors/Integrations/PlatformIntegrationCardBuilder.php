@@ -11,6 +11,7 @@ use App\Models\ConnectorAccount;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Connectors\ConnectorAccountUiState;
+use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\ConnectorUiFormatter;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -23,7 +24,7 @@ final class PlatformIntegrationCardBuilder
         private readonly PlatformConnectionHealthRollup $rollup,
         private readonly IntegrationsStatusVocabulary $vocabulary,
         private readonly ConnectorAccountUiState $uiState,
-        private readonly ConnectorSetupProfileResolver $setupProfileResolver,
+        private readonly ConnectorProfileRegistry $profileRegistry,
     ) {}
 
     /**
@@ -57,8 +58,8 @@ final class PlatformIntegrationCardBuilder
             /** @var Collection<int, ConnectorAccount> $accounts */
             $accounts = $accountsByDefinition->get($platform->id, Collection::make())->values();
             $health = $this->rollup->rollup($accounts);
-            $setupAvailable = $this->setupProfileResolver->resolve($platform->code) !== null
-                && $platform->allowsNewConnections();
+            $setupAvailable = $platform->allowsNewConnections()
+                && $this->profileRegistry->resolveAccountSetupProfile($platform->code) !== null;
 
             return $this->buildCard(
                 platform: $platform,
@@ -88,11 +89,10 @@ final class PlatformIntegrationCardBuilder
         $runtimeOverlayLabel = null;
 
         if ($singleAccount !== null) {
-            // §3 — reuse UiState runtime/stable split; do not invent aggregate overlay for N.
+            // §3 — reuse UiState for active-check overlay only. Page-specific
+            // IntegrationsStatusVocabulary owns stable landing labels/colors.
             $activeCheck = $this->uiState->activeConnectionCheck($singleAccount);
             $runtimeOverlayLabel = $this->uiState->runtimeStatusLabel($activeCheck);
-            // Touch stableStatusLabel so the overlay architecture is exercised exactly.
-            $this->uiState->stableStatusLabel($singleAccount->connection_status);
         }
 
         $status = $health->connectionStatus;
@@ -268,12 +268,14 @@ final class PlatformIntegrationCardBuilder
                 ];
             }
 
+            // Catalog eligibility already requires AccountSetup for 0-account
+            // Active platforms. Do not invent Coming Soon UX here.
             if (! $setupAvailable) {
                 return [
                     PlatformIntegrationCard::ACTION_NONE,
                     null,
                     null,
-                    __('connectors.ui.integrations.actions.setup_unavailable'),
+                    null,
                 ];
             }
 

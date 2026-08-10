@@ -96,6 +96,20 @@ class PlatformConnectionHealthRollupTest extends TestCase
         $this->assertSame(ConnectorAccountConnectionStatus::Untested, $health->connectionStatus);
     }
 
+    #[Test]
+    public function enabled_account_with_disabled_status_never_rolls_up_to_connected(): void
+    {
+        $accounts = [
+            $this->account(true, ConnectorAccountConnectionStatus::Disabled),
+            $this->account(true, ConnectorAccountConnectionStatus::Connected),
+        ];
+
+        $health = app(PlatformConnectionHealthRollup::class)->rollup($accounts);
+
+        $this->assertSame(ConnectorAccountConnectionStatus::AttentionRequired, $health->connectionStatus);
+        $this->assertNotSame(ConnectorAccountConnectionStatus::Connected, $health->connectionStatus);
+    }
+
     private function account(bool $enabled, ConnectorAccountConnectionStatus $status): ConnectorAccount
     {
         $account = new ConnectorAccount;

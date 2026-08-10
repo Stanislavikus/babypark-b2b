@@ -51,7 +51,7 @@ Replaces `Платформи та джерела` as the merchant's entry point.
 
 **Confirmed directly from the schema:** the real unique constraint on `connector_accounts` is `(workspace_id, connector_definition_id, active_name_uniqueness_key)` — a workspace can have **more than one** account for the same platform (e.g. two separate Magento stores), distinguished by name. This contract does not assume a singleton connection per platform.
 
-**Settled by page-specific contract:** the 0/1/N card composition, adaptive destinations, health rollup, merchant-safe platform catalog, and related acceptance criteria for this landing page are defined in `docs/CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md` (platform-first cards; 0 → setup, 1 → account Overview, N → platform account list).
+**Settled by page-specific contract:** the 0/1/N card composition, adaptive destinations, health rollup, merchant-safe platform catalog, and related acceptance criteria for this landing page are defined in `docs/CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md` (platform-first cards; 0 → setup, 1 → account Overview, N → platform account list). Active-but-not-connectable definitions (no enabled `AccountSetup` profile) are excluded from the 0-account landing set — `Інтеграції` is not a roadmap catalog.
 
 For the single-connection case, the composition follows the account-connection pattern (status + identity + single action — no connector internals):
 

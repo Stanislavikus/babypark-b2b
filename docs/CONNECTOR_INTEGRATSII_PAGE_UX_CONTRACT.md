@@ -21,14 +21,29 @@ one Magento card, not five.
 **Eligible platforms for `Інтеграції`** (this exact definition is
 authoritative for both this section and §9's merchant-safe projection):
 
-- every `ConnectorDefinition` with `status = Active`;
-- plus a `Deprecated` `ConnectorDefinition`, but **only** when this
-  workspace already has an existing **non-deleted** `ConnectorAccount`
-  for it (§14) — `ConnectorAccount` has soft-delete semantics
-  (`deleted_at`); a query must respect the default soft-delete scope,
-  never `withTrashed()`, or a platform whose last account was deleted
-  long ago would incorrectly resurface;
+- `Active` + existing **non-deleted** `ConnectorAccount` → visible
+  (even when no merchant AccountSetup profile exists for that
+  definition — existing connections must not disappear);
+- `Active` + zero accounts → visible **only** when
+  `ConnectorProfileRegistry` exposes exactly one enabled profile that
+  advertises `ConnectorCapability::AccountSetup` for that definition's
+  `code` (via required profile config key `connector_definition_code`).
+  `ConnectorDefinitionStatus::Active` alone does **not** imply merchant
+  setup exists — Layer D catalog status and merchant-connectable status
+  are distinct. Unconnected Active definitions without AccountSetup
+  (e.g. Shopify / Google Merchant today) must **not** render a card and
+  must **not** invent Coming Soon / setup-unavailable UX on this page;
+- `Deprecated` + existing **non-deleted** `ConnectorAccount` → visible
+  (§14) — soft-delete scope must be respected (`deleted_at`); never
+  `withTrashed()`, or a platform whose last account was deleted long ago
+  would incorrectly resurface;
+- `Deprecated` + zero accounts → never visible;
 - `Draft` never appears, under any condition.
+
+**Amendment (PR #118 stop-and-amend):** merchant setup availability is
+sourced only from the connector profile registry
+(`connector_definition_code` + `AccountSetup` capability) — never from a
+UI-local code→profile map and never from Active status alone.
 
 **The card's primary action destination is adaptive to account count,
 not fixed:**
@@ -99,8 +114,12 @@ vocabulary maps close to 1:1, not collapsed into four states:
 `runtimeStatusLabel()` (transient, derived from a live
 `ConnectorConnectionCheck` row's own `Queued`/`Running` status) from
 `stableStatusLabel()` (the persisted `ConnectorAccountConnectionStatus`).
-This is not a new pattern to design — it is the existing architecture,
-and `Інтеграції` must reuse it exactly, not reimplement it.
+`Інтеграції` reuses `activeConnectionCheck()` + `runtimeStatusLabel()`
+for the active-check overlay on single-account cards and per-connection
+rows. Page-specific stable labels/colors come from
+`IntegrationsStatusVocabulary` (including the deliberately calmer
+`TemporarilyUnavailable` presentation) — not from a discarded
+`stableStatusLabel()` call.
 
 **Rule:** An active check is always presented as an overlay on the
 last-known stable state, never as a state substitution:
@@ -433,10 +452,18 @@ unchanged; this is presentation vocabulary only.
    including disabled-account exclusion, with a test proving a mixed
    healthy+disabled account set does not render "Вимкнено."
 3. Active-check overlay (§3) reuses `ConnectorAccountUiState`'s
-   existing `runtimeStatusLabel()`/`stableStatusLabel()` split for
-   single-account and per-connection-row presentation — no parallel
-   implementation, and no new aggregate runtime-check indicator
-   invented for N-account platform cards.
+   `activeConnectionCheck()` + `runtimeStatusLabel()` for
+   single-account and per-connection-row presentation. Stable landing
+   labels/colors use `IntegrationsStatusVocabulary`. No parallel
+   runtime-check implementation, and no new aggregate runtime-check
+   indicator invented for N-account platform cards.
+9. Merchant setup availability is resolved only via
+   `ConnectorProfileRegistry::resolveAccountSetupProfile()` gated on
+   `ConnectorCapability::AccountSetup` — no UI-local profile map, no
+   Coming Soon cards for Active-but-not-connectable definitions.
+10. Rollup must never treat `is_enabled=true` +
+    `connection_status=Disabled` as Connected / "Працює" (defensive
+    invariant; no enable/disable write path added — §8 Option B).
 4. No Discovery-derived data appears on the landing card (§6) —
    verified by a rendered-content test.
 5. No freshness/staleness threshold is introduced for `Connected`

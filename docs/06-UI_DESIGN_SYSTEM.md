@@ -1694,7 +1694,7 @@ The landing page shows **one card per eligible platform** (never one card per ac
 
 ### Capability-driven surfaces
 
-Optional connector UI sections gate on `ConnectorCapability::supports()` for the connected profile (`ConnectionCheck`, `SchemaDiscovery` today). No parallel UI-only capability flags. Future capabilities (sync directions, scheduling, mapping, dry-run) require a new `ConnectorCapability` case before UI ships.
+Optional connector UI sections gate on `ConnectorCapability::supports()` for the connected profile (`ConnectionCheck`, `SchemaDiscovery`, `AccountSetup` today). No parallel UI-only capability flags. Merchant connectability on `Інтеграції` requires an enabled profile advertising `AccountSetup` for that definition code — `ConnectorDefinitionStatus::Active` alone is not enough. Future capabilities (sync directions, scheduling, mapping, dry-run) require a new `ConnectorCapability` case before UI ships.
 
 ### Connection / setup journey (when implemented)
 

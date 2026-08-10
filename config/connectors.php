@@ -14,9 +14,14 @@ return [
     'profiles' => [
         'adobe_commerce_paas_oauth1_integration' => [
             'enabled' => true,
+            'connector_definition_code' => 'adobe_commerce',
             'adapter' => AdobePaaSConnectorAdapter::class,
             'account_schema' => AdobePaaSAccountSchema::class,
-            'capabilities' => ['connection_check', 'schema_discovery'],
+            'capabilities' => [
+                'connection_check',
+                'schema_discovery',
+                'account_setup',
+            ],
         ],
     ],
 ];

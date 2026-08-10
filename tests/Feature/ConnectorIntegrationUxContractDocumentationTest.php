@@ -53,6 +53,10 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
         $this->assertStringContainsString('corrected worst-wins', $content);
         $this->assertStringContainsString('merchant-safe projection', $content);
         $this->assertStringContainsString('Option B', $content);
+        $this->assertStringContainsString('AccountSetup', $content);
+        $this->assertStringContainsString('connector_definition_code', $content);
+        $this->assertStringContainsString('IntegrationsStatusVocabulary', $content);
+        $this->assertStringContainsString('must **not** invent Coming Soon', $content);
     }
 
     #[Test]

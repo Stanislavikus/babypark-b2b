@@ -7,6 +7,7 @@ use App\Models\ConnectorAccount;
 use App\Models\ConnectorDefinition;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Workspace\WorkspaceMembership;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
@@ -17,11 +18,17 @@ use Illuminate\Support\Facades\Gate;
  *
  * Not PlatformAdminAuthorization (Layer D CRUD) and not inferred from
  * ConnectorAccountPolicy alone (which only covers existing accounts).
+ *
+ * Active alone is insufficient: an Active definition with zero accounts is
+ * visible only when ConnectorProfileRegistry exposes an enabled AccountSetup
+ * profile for that definition code. Інтеграції is not a roadmap/catalog of
+ * future platforms.
  */
 final class EligibleConnectorPlatformCatalog
 {
     public function __construct(
         private readonly WorkspaceMembership $workspaceMembership,
+        private readonly ConnectorProfileRegistry $profileRegistry,
     ) {}
 
     /**
@@ -60,6 +67,23 @@ final class EligibleConnectorPlatformCatalog
             })
             ->orderBy('name')
             ->get()
+            ->filter(function (ConnectorDefinition $definition) use ($definitionIdsWithAccounts): bool {
+                $hasAccount = $definitionIdsWithAccounts->contains($definition->id);
+
+                if ($definition->status === ConnectorDefinitionStatus::Deprecated) {
+                    return $hasAccount;
+                }
+
+                if ($definition->status !== ConnectorDefinitionStatus::Active) {
+                    return false;
+                }
+
+                if ($hasAccount) {
+                    return true;
+                }
+
+                return $this->profileRegistry->resolveAccountSetupProfile($definition->code) !== null;
+            })
             ->map(fn (ConnectorDefinition $definition): EligibleConnectorPlatform => new EligibleConnectorPlatform(
                 id: $definition->id,
                 code: $definition->code,
