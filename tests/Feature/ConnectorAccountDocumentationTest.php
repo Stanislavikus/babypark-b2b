@@ -319,34 +319,14 @@ class ConnectorAccountDocumentationTest extends TestCase
     }
 
     #[Test]
-    public function ui_design_system_documents_discovery_overview_snapshot_link_scope(): void
+    public function ui_design_system_documents_connector_ux_contract_migration_not_legacy_discovery_norm(): void
     {
         $content = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
 
-        $this->assertStringContainsString(
-            'link to current snapshot',
-            $content
-        );
-        $this->assertStringContainsString(
-            'minimal read-only',
-            $content
-        );
-        $this->assertStringContainsString(
-            'snapshot detail page',
-            $content
-        );
-        $this->assertStringContainsString(
-            'first-snapshot / no-change label only',
-            $content
-        );
-        $this->assertStringContainsString(
-            'no canonical hash',
-            $content
-        );
-        $this->assertStringContainsString(
-            'Task 4B-2c extends that same page',
-            $content
-        );
+        $this->assertStringContainsString('## Connector Integration UX (Resolved — 2026-08-10)', $content);
+        $this->assertStringContainsString('Discovery Overview and Field Browser remain merchant-reachable with snapshot-oriented copy', $content);
+        $this->assertStringContainsString('Shipped Task 4B implementation (pre-contract — historical reference)', $content);
+        $this->assertStringNotContainsString('## Operational Connection Pattern (reusable)', $content);
     }
 
     #[Test]

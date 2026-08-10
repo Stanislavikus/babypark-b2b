@@ -100,7 +100,8 @@ All UI work must remain aligned with:
 - `02-ATTRIBUTE_DICTIONARY.md`;
 - `03-DOMAIN_MODEL.md`;
 - `04-ARCHITECTURE_PRINCIPLES.md`;
-- `05-AI_WORKING_AGREEMENT.md`.
+- `05-AI_WORKING_AGREEMENT.md`;
+- `CONNECTOR_INTEGRATION_UX_CONTRACT.md` — approved normative connector UX (four layers, merchant entry, capability gating, forbidden vocabulary, acceptance criteria).
 
 UI convenience must never create a duplicate domain model.
 
@@ -1668,9 +1669,99 @@ Rules:
 
 Detailed import/mapping flows should be described in a future dedicated import-flow document. This design-system document defines only the approved UI pattern and boundaries.
 
-## Data Model & Connectors (admin section, Task 4A scope)
+## Connector Integration UX (Resolved — 2026-08-10)
 
-Three screens under "Модель даних і коннектори":
+**Normative authority:** `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md` (approved 2026-08-10). This section summarizes presentation and interaction rules; the contract is the full reference.
+
+### Four UX layers
+
+| Layer | Audience | Merchant entry |
+|---|---|---|
+| **A — Щоденна робота** | Merchant roles (Admin, Director, Merchandiser, …) | Integration Overview: status, last sync, attention count, one primary action |
+| **B — Налаштування даних** | Merchant roles, when authorized | Sync directions, schedule, mapping, per-domain control questions, available-fields reference |
+| **C — Діагностика** | Platform support/operator only — **not** workspace Admin | Discovery runs, snapshot identifiers, technical summaries, redacted diagnostics |
+| **D — Каталог конекторів** | Platform operator / developer | `ConnectorDefinition`, schema sources, endpoints, auth profiles |
+
+**Layer is a visibility ceiling, not an authorization grant.** Existing `ConnectorAccountPolicy` and role permissions remain authoritative inside Layers A/B. Merchandiser Layer B eligibility does not imply credential management, destructive actions, or connection setup unless explicitly granted by policy.
+
+**Layer C:** requires a distinct platform-support identity. If that model does not exist yet, Layer C is unavailable — it does not fall back to workspace Admin. Layer C never lifts secret-redaction, credential-encryption, or workspace-isolation rules.
+
+### Merchant entry: `Інтеграції`
+
+`Інтеграції` replaces `Платформи та джерела` as the merchant connector entry point. A workspace may have **0, 1, or N** `ConnectorAccount` rows per platform (unique on `(workspace_id, connector_definition_id, active_name_uniqueness_key)` — see `03-DOMAIN_MODEL.md`). Platform identity is not equivalent to one connection.
+
+The landing page shows platform display name, connection status, one honest status line, and one action — never `ConnectorDefinition` internals (`code`, `source_kind`, `endpoint_path`, `verification_status`, …).
+
+### Capability-driven surfaces
+
+Optional connector UI sections gate on `ConnectorCapability::supports()` for the connected profile (`ConnectionCheck`, `SchemaDiscovery` today). No parallel UI-only capability flags. Future capabilities (sync directions, scheduling, mapping, dry-run) require a new `ConnectorCapability` case before UI ships.
+
+### Connection / setup journey (when implemented)
+
+Three steps: (1) human-facing connection inputs only; (2) per-data-type direction toggles for supported capabilities, phrased directionally — never bare Import/Export; (3) categorized dry-run/preview before first real sync. Scheduling defaults off until the merchant enables it and step 3 has succeeded manually once.
+
+### Layer A — Integration Overview
+
+Answers: *is everything okay right now?* Shows last sync, next scheduled run (when scheduling exists), sync summary counts, categorized issue summary, and **Синхронізувати зараз**. Consequential sync failures (price/stock misrepresentation risk) stay visible on this screen — progressive disclosure must not hide them.
+
+### Layer B — synchronization setup, mapping, issues, history
+
+- **Synchronization setup:** per-data-type directions, schedule, per-domain control questions in plain language (e.g. "Де ви хочете керувати цінами?") — no global silent ownership default; no merchant-facing "ownership" / "source of truth" wording.
+- **Mapping:** field-mapping matrix with catalog fields as rows; primary Layer B surface for data structure.
+- **Available fields / Field Browser:** architecture retained (`ViewConnectorSchemaSnapshot`, `ConnectorSchemaFieldPresenter`); reachable only as a supporting action from mapping (e.g. `Переглянути всі доступні поля Magento`), never a top-level nav destination. Merchant copy must not use snapshot/discovery vocabulary (§13 of contract).
+- **Issues:** summary on Overview; full filterable list with bulk actions when a category exceeds the implementation threshold.
+- **History:** sync-run history in business language — distinct from Layer C discovery diagnostics.
+
+### Merchant error vocabulary (Layer A/B)
+
+Every surfaced error maps to exactly one category before reaching merchants: **Потрібно виправити товар**, **Потрібно зіставити значення**, **Потрібно перевірити підключення**, **Тимчасова проблема**. Raw backend codes, HTTP status codes, and technical identifiers never render in Layer A/B.
+
+### Forbidden merchant-facing vocabulary (Layer A/B)
+
+Never render in merchant UI text: `schema source` / `джерело схеми`, `snapshot` / `знімок`, `canonical hash`, `discovery run`, raw `acquisition_mode` / `schema_scope` labels, `endpoint path`, `auth profile`, raw error-code strings. Internal code and Layer C/D surfaces may keep domain terms.
+
+### Merchant copy rules
+
+States follow: **what happened → how many affected → what to do next.** Nullable booleans render three states (`так` / `ні` / `невідомо`). All merchant copy through `lang/{en,uk,ru}.json`.
+
+### Connector UI acceptance criteria (presentation)
+
+Before merge, connector UI must satisfy contract §15: capability gating tests; separate vocabulary (§13) and layer-specific sensitive-data (§12) canary tests; layer-boundary authorization tests; categorized errors; bulk actions or documented exception; no silent consequential defaults; non-skippable first dry-run; tri-state nullable fields.
+
+### Existing-vs-future UX boundary
+
+The contract defines required behavior **when implemented** for: sync execution, dry-run/preview, per-data-type directions, scheduling, ownership persistence, issue aggregation, bulk resolution, sync-run history. None of these are implied to exist today beyond Discovery runtime and connection check. Each requires its own architectural pass before UI.
+
+### Known implementation mismatch (not architectural regression)
+
+Current shipped UI has **not** been fully migrated to this contract:
+
+- `Платформи та джерела` and `Модель даних і коннектори` admin surfaces still exist for platform-operator work (Layer D) and pre-contract merchant paths.
+- Discovery Overview and Field Browser remain merchant-reachable with snapshot-oriented copy (`connectors.ui.snapshot.*` in `lang/uk.json`).
+- The `Інтеграції` landing surface does **not** exist yet.
+
+Tracked as **known UX migration work** in `docs/IMPLEMENTATION_GAPS.md` (GAP-025). Do not document current UI as contract-compliant until migrated.
+
+### Shipped Task 4B implementation (pre-contract — historical reference)
+
+The following describes what was built before this contract; it is **not** the target merchant UX. Retained for implementation history and Layer C/D operator context.
+
+**Operational Connection Pattern (Task 4B-0 through 4B-2b):**
+
+1. Connection list — platform, account name, status, last check/discovery, attention, primary action.
+2. Connection settings — credentials, **Перевірити з'єднання**, **Зберегти**; 401 → replace credentials; 403 → update scopes.
+3. Connection check result — cause-specific copy, one next step.
+4. Discovery overview — run status, field count, snapshot link (Layer C vocabulary; merchant migration required).
+5. Discovery field list — Data List Search & Filter Pattern.
+6. Activity history — connection checks and discovery runs.
+
+**Connector runtime state presentation (Resolved):** five-state account projection; active checks show `Очікує перевірки` / `Перевірка виконується` separately; no queue/job terminology in merchant text.
+
+Fixture-backed prototype: `docs/prototypes/task-4b0-connector-account/`.
+
+## Data Model & Connectors (admin section, Task 4A scope — Layer D)
+
+Three screens under **"Модель даних і коннектори"** (platform operator / Layer D — **not** the merchant `Інтеграції` entry):
 
 1. **Матриця полів** — read-only. Rows: canonical fields. Columns: up to 6
    channel/version comparison columns at a time, each identified by
@@ -1706,12 +1797,13 @@ Three screens under "Модель даних і коннектори":
    mapping/applicability/transformation/sources/DEC/GAP detail. No
    Approve/Reject actions here.
 
-2. **Платформи та джерела** — CRUD for `connector_definitions` +
-   `connector_schema_sources`. An administrator can add a platform (as
-   `draft`, promoted to `active` when ready), add multiple sources per
-   platform (each with its own `schema_scope`, `source_kind`,
-   `acquisition_mode`), edit URLs/versions, and mark verification status.
-   No "Run discovery" action here — that is Task 4B.
+2. **Платформи та джерела** — Layer D only. CRUD for `connector_definitions` +
+   `connector_schema_sources` for platform operators. Workspace merchant roles
+   must not use this as their connector entry — merchants use `Інтеграції`
+   (contract §3). An operator can add a platform (as `draft`, promoted to
+   `active` when ready), add multiple sources per platform (each with its own
+   `schema_scope`, `source_kind`, `acquisition_mode`), edit URLs/versions, and
+   mark verification status. No "Run discovery" action here — that is Task 4B.
 
 3. **Governance** — read-only. DEC/GAP required document-type filter using
    the shared Data List toolbar; list and detail via
@@ -1719,80 +1811,8 @@ Three screens under "Модель даних і коннектори":
    sources from `canonical_product_field_sources.csv`.
 
 Editing/decision workflows belong to Task 4C's single-connector-focused
-Mapping Review screen, not to the Field Matrix.
-
-## Operational Connection Pattern (reusable)
-
-Applies to workspace-owned external connections (ERP, commerce platforms, feeds)
-— not only Adobe.
-
-### Surfaces
-
-1. **Connection list** — platform, account name, store/base context, connection
-   status, last successful check, last successful field discovery, attention
-   message, primary action. Do not show internal model names (`ConnectorAccount`,
-   auth profile codes, encrypted credentials).
-2. **Connection settings** — name, deployment type (when vendor has variants),
-   address/tenant context, store view where applicable, credential fields per
-   auth profile, masked saved secrets, explicit replace/remove semantics (blank
-   secret input does not erase saved value), **Перевірити з’єднання**, **Зберегти**.
-3. **Connection check result** — success shows duration and next action (run
-   discovery); errors use cause-specific copy with one next step. **401** →
-   replace credentials; **403** → update integration role/scopes — never a
-   generic “Connection failed” when cause is known.
-4. **Discovery overview** — run status, source display name (not a technical
-   identifier), captured time, field count, first-snapshot / «Без змін» status
-   label, and a **link to current snapshot** that opens a minimal read-only
-   snapshot detail page (Task 4B-2b-1): source display name, captured time,
-   field count, and first-snapshot / no-change label only — no field list, no
-   filters, no diff surface, and **no canonical hash** (technical identifier with
-   no operational meaning to Merchandiser). Task 4B-2c extends that same page
-   with diff summary, field list, and filters.
-5. **Discovery field list** — Data List Search & Filter Pattern (search visible,
-   filters in right-side slide-over, badge semantics, mobile single overflow).
-   Hundreds of fields → list + detail drawer/page, not accordion.
-6. **Activity history** — connection checks and discovery runs with time, status,
-   cause/actionability, initiator, duration, snapshot link, safe support reference.
-
-### Current state vs history
-
-Overview/list reads **current projection** on the account row. History is a
-separate tab/section with search/filter when volume warrants it.
-
-### Error microcopy
-
-Use `user_message_key`-driven Ukrainian business language: explain situation +
-one action; no `Error:` prefix, stack traces, or raw vendor messages. Support
-may see `vendor_request_id` when safe.
-
-### States to design explicitly
-
-`Не перевірено`, `Підключено`, `Потребує уваги`, `Тимчасово недоступно`,
-`Вимкнено`; discovery: first snapshot, no-change, partial/failure after prior
-success.
-
-Fixture-backed non-runtime prototype for Task 4B-0:
-`docs/prototypes/task-4b0-connector-account/`.
-
-#### Connector runtime polling (Resolved)
-
-Connection check and discovery are asynchronous operator workflows. UI shows
-human states (queued/waiting, running, succeeded, failed) without queue/job
-terminology. Task 4B-2a ships connection surfaces together with check runtime;
-Task 4B-2b ships Discovery Overview together with discovery runtime.
-
-### Connector runtime state presentation
-
-- The connector account projection remains the stable five-state result.
-- An active connection check is displayed separately:
-  - queued runtime state → localized "Очікує перевірки";
-  - running runtime state → localized "Перевірка виконується".
-- While a check is active, the previous stable account projection remains
-  visible as "Останній результат: …".
-- User-facing text must not expose queue, job, worker, retry, execution
-  attempt, or transport terminology.
-- The runtime state disappears after the check reaches a terminal outcome.
-- Runtime and connection-check history surfaces refresh asynchronously.
+Mapping Review screen (`Інтеграції → <integration> → Зіставлення полів`), not
+to the Field Matrix.
 
 ## Empty States and Onboarding Rules
 
