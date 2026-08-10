@@ -49,7 +49,9 @@
 
 Replaces `Платформи та джерела` as the merchant's entry point. The platform is the entry point; the exact card composition must correctly represent however many `ConnectorAccount` rows actually exist for that platform in the workspace.
 
-**Confirmed directly from the schema:** the real unique constraint on `connector_accounts` is `(workspace_id, connector_definition_id, active_name_uniqueness_key)` — a workspace can have **more than one** account for the same platform (e.g. two separate Magento stores), distinguished by name. This contract does not assume a singleton connection per platform. The exact 0/1/N card composition (one platform card that expands to a list when N>1, versus one card per account regardless of platform, or another approach) is not decided by this document — it is determined during the `Інтеграції` page's own rebaseline pass, informed by this confirmed cardinality.
+**Confirmed directly from the schema:** the real unique constraint on `connector_accounts` is `(workspace_id, connector_definition_id, active_name_uniqueness_key)` — a workspace can have **more than one** account for the same platform (e.g. two separate Magento stores), distinguished by name. This contract does not assume a singleton connection per platform.
+
+**Settled by page-specific contract:** the 0/1/N card composition, adaptive destinations, health rollup, merchant-safe platform catalog, and related acceptance criteria for this landing page are defined in `docs/CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md` (platform-first cards; 0 → setup, 1 → account Overview, N → platform account list).
 
 For the single-connection case, the composition follows the account-connection pattern (status + identity + single action — no connector internals):
 

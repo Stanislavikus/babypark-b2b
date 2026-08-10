@@ -33,6 +33,12 @@ class ConnectorAccountResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
+    /**
+     * Merchant entry is Інтеграції (platform-first landing). This resource remains
+     * the account Overview destination for adaptive 1-account / list-row opens.
+     */
+    protected static bool $shouldRegisterNavigation = false;
+
     public static function getNavigationGroup(): ?string
     {
         return __('connectors.ui.resource.navigation_group');

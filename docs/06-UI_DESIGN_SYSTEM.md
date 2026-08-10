@@ -1690,7 +1690,7 @@ Detailed import/mapping flows should be described in a future dedicated import-f
 
 `Інтеграції` replaces `Платформи та джерела` as the merchant connector entry point. A workspace may have **0, 1, or N** `ConnectorAccount` rows per platform (unique on `(workspace_id, connector_definition_id, active_name_uniqueness_key)` — see `03-DOMAIN_MODEL.md`). Platform identity is not equivalent to one connection.
 
-The landing page shows platform display name, connection status, one honest status line, and one action — never `ConnectorDefinition` internals (`code`, `source_kind`, `endpoint_path`, `verification_status`, …).
+The landing page shows **one card per eligible platform** (never one card per account): platform display name, connection status, one honest status line, and one action — never `ConnectorDefinition` internals (`code`, `source_kind`, `endpoint_path`, `verification_status`, …). Adaptive destinations: 0 accounts → `Підключити` into setup; 1 account → `Відкрити` straight into that account's Overview; N > 1 → that platform's own connection list. Full page rules: `docs/CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md`.
 
 ### Capability-driven surfaces
 
@@ -1738,9 +1738,9 @@ Current shipped UI has **not** been fully migrated to this contract:
 
 - `Платформи та джерела` and `Модель даних і коннектори` admin surfaces still exist for platform-operator work (Layer D) and pre-contract merchant paths.
 - Discovery Overview and Field Browser remain merchant-reachable with snapshot-oriented copy (`connectors.ui.snapshot.*` in `lang/uk.json`).
-- The `Інтеграції` landing surface does **not** exist yet.
+- The `Інтеграції` landing surface exists as the merchant entry (`/admin/integrations`) per `docs/CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md`. Remaining GAP-025 work covers Field Browser copy, Discovery Overview merchant reachability, and Layer C gating.
 
-Tracked as **known UX migration work** in `docs/IMPLEMENTATION_GAPS.md` (GAP-025). Do not document current UI as contract-compliant until migrated.
+Tracked as **known UX migration work** in `docs/IMPLEMENTATION_GAPS.md` (GAP-025). Do not document current UI as contract-compliant until migrated. Remaining Field Browser / Discovery / Layer C surfaces still fail that bar even though the `Інтеграції` landing now exists.
 
 ### Shipped Task 4B implementation (pre-contract — historical reference)
 

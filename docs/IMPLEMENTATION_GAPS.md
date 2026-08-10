@@ -906,23 +906,28 @@ Remaining connector gaps are tracked separately under GAP-006.
 **Approved docs:**
 - `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md` — approved normative connector UX
   contract (2026-08-10).
+- `docs/CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md` — approved page-specific
+  contract for the `Інтеграції` landing (platform-first cards, adaptive
+  destinations, rollup, merchant-safe catalog).
 - `docs/06-UI_DESIGN_SYSTEM.md` — Connector Integration UX summary and known
   mismatch section.
 - `docs/03-DOMAIN_MODEL.md` — `ConnectorCapability` UI source of truth,
   0/1/N account cardinality, Layer C audience, ownership future decision.
 
-**Current code (verified on `develop`):**
-- Merchant connector entry still uses pre-contract surfaces (`Модель даних і
-  коннектори`, `ConnectorAccountResource` / Discovery Overview), not the
-  target `Інтеграції` landing page.
+**Current code:**
+- `Інтеграції` merchant landing ships at `/admin/integrations` (platform-first
+  cards, adaptive 0/1/N destinations, §5 health rollup, merchant-safe
+  `EligibleConnectorPlatformCatalog`). `ConnectorAccountResource` remains the
+  account Overview destination but is no longer a top-level nav entry.
 - Field Browser (`ViewConnectorSchemaSnapshot`) remains merchant-reachable with
   snapshot-oriented copy in `lang/uk.json` (e.g. `connectors.ui.snapshot.title`
   = "Зведення знімка").
-- Discovery-related surfaces remain reachable through current merchant UI paths.
+- Discovery-related surfaces remain reachable through current account Overview
+  paths.
 - Runtime architecture (`ConnectorCapability`, Discovery execution, snapshot
   persistence, `ConnectorAccountPolicy`, Field Browser read model) is shipped
-  and is **not** a regression — only navigation, labeling, gating, and copy
-  remain to migrate.
+  and is **not** a regression — remaining work is labeling, Layer C gating, and
+  deeper Layer A/B surfaces.
 
 **Not implied to exist (UX contract existing-vs-future boundary):**
 - sync execution runtime for merchant "Синхронізувати зараз";
@@ -942,11 +947,13 @@ Each requires its own architectural pass before UI implementation.
   Layer C/diagnostic vocabulary on a pre-migration merchant path.
 - Do not widen workspace Admin to Layer C as a workaround.
 
-**Next task:** Connector UX migration — `Інтеграції` entry, Layer A/B surfaces,
-Field Browser copy/navigation, Layer C gating when platform-support identity
-exists. Backend mechanisms above remain separate scoped tasks.
+**Next task:** Remaining Connector UX migration — Field Browser copy/navigation,
+Layer A Overview / Layer B setup surfaces beyond connection create, Layer C
+gating when platform-support identity exists. Backend mechanisms above remain
+separate scoped tasks.
 
-**Status:** Open — known UX migration work.
+**Status:** Open — partial (`Інтеграції` landing shipped); remaining UX migration
+work.
 
 ---
 
