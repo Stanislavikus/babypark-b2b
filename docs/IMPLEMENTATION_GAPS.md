@@ -901,6 +901,55 @@ Remaining connector gaps are tracked separately under GAP-006.
 
 ---
 
+## GAP-025 — Connector Integration UX contract not yet migrated in shipped UI
+
+**Approved docs:**
+- `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md` — approved normative connector UX
+  contract (2026-08-10).
+- `docs/06-UI_DESIGN_SYSTEM.md` — Connector Integration UX summary and known
+  mismatch section.
+- `docs/03-DOMAIN_MODEL.md` — `ConnectorCapability` UI source of truth,
+  0/1/N account cardinality, Layer C audience, ownership future decision.
+
+**Current code (verified on `develop`):**
+- Merchant connector entry still uses pre-contract surfaces (`Модель даних і
+  коннектори`, `ConnectorAccountResource` / Discovery Overview), not the
+  target `Інтеграції` landing page.
+- Field Browser (`ViewConnectorSchemaSnapshot`) remains merchant-reachable with
+  snapshot-oriented copy in `lang/uk.json` (e.g. `connectors.ui.snapshot.title`
+  = "Зведення знімка").
+- Discovery-related surfaces remain reachable through current merchant UI paths.
+- Runtime architecture (`ConnectorCapability`, Discovery execution, snapshot
+  persistence, `ConnectorAccountPolicy`, Field Browser read model) is shipped
+  and is **not** a regression — only navigation, labeling, gating, and copy
+  remain to migrate.
+
+**Not implied to exist (UX contract existing-vs-future boundary):**
+- sync execution runtime for merchant "Синхронізувати зараз";
+- dry-run/preview before first sync;
+- per-data-type sync direction persistence;
+- scheduling beyond Discovery;
+- ownership persistence/enforcement;
+- issue aggregation and bulk resolution;
+- sync-run history as a merchant Layer B surface.
+
+Each requires its own architectural pass before UI implementation.
+
+**Impact:**
+- Do not document current connector merchant UI as compliant with
+  `CONNECTOR_INTEGRATION_UX_CONTRACT.md`.
+- Do not treat Discovery Overview as the long-term merchant destination — it is
+  Layer C/diagnostic vocabulary on a pre-migration merchant path.
+- Do not widen workspace Admin to Layer C as a workaround.
+
+**Next task:** Connector UX migration — `Інтеграції` entry, Layer A/B surfaces,
+Field Browser copy/navigation, Layer C gating when platform-support identity
+exists. Backend mechanisms above remain separate scoped tasks.
+
+**Status:** Open — known UX migration work.
+
+---
+
 ## GAP-021 — Workspace import alias infrastructure incomplete
 
 **Approved docs:**

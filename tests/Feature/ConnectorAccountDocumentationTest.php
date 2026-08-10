@@ -84,7 +84,8 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $content = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
 
-        $this->assertStringContainsString('## Operational Connection Pattern (reusable)', $content);
+        $this->assertStringContainsString('## Connector Integration UX (Resolved — 2026-08-10)', $content);
+        $this->assertStringContainsString('Shipped Task 4B implementation (pre-contract — historical reference)', $content);
         $this->assertStringContainsString('Потребує уваги', $content);
         $this->assertStringContainsString('401', $content);
         $this->assertStringContainsString('403', $content);
@@ -95,9 +96,9 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $content = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
 
-        $this->assertStringContainsString('### Current state vs history', $content);
         $this->assertStringContainsString('current projection', $content);
         $this->assertStringContainsString('Activity history', $content);
+        $this->assertStringContainsString('Overview/list reads **current projection** on the account row', $content);
     }
 
     #[Test]
@@ -319,34 +320,14 @@ class ConnectorAccountDocumentationTest extends TestCase
     }
 
     #[Test]
-    public function ui_design_system_documents_discovery_overview_snapshot_link_scope(): void
+    public function ui_design_system_documents_connector_ux_contract_migration_not_legacy_discovery_norm(): void
     {
         $content = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
 
-        $this->assertStringContainsString(
-            'link to current snapshot',
-            $content
-        );
-        $this->assertStringContainsString(
-            'minimal read-only',
-            $content
-        );
-        $this->assertStringContainsString(
-            'snapshot detail page',
-            $content
-        );
-        $this->assertStringContainsString(
-            'first-snapshot / no-change label only',
-            $content
-        );
-        $this->assertStringContainsString(
-            'no canonical hash',
-            $content
-        );
-        $this->assertStringContainsString(
-            'Task 4B-2c extends that same page',
-            $content
-        );
+        $this->assertStringContainsString('## Connector Integration UX (Resolved — 2026-08-10)', $content);
+        $this->assertStringContainsString('Discovery Overview and Field Browser remain merchant-reachable with snapshot-oriented copy', $content);
+        $this->assertStringContainsString('Shipped Task 4B implementation (pre-contract — historical reference)', $content);
+        $this->assertStringNotContainsString('## Operational Connection Pattern (reusable)', $content);
     }
 
     #[Test]
@@ -630,7 +611,7 @@ class ConnectorAccountDocumentationTest extends TestCase
             $aiAgreement
         );
 
-        $this->assertStringContainsString('#### Connector runtime polling (Resolved)', $uiDesign);
+        $this->assertStringContainsString('**Connector runtime state presentation (Resolved):**', $uiDesign);
 
         $connectorRuntime = $this->techStackConnectorRuntimeSection($techStack);
         $this->assertStringContainsString('### Connector profile registry', $connectorRuntime);
@@ -1356,7 +1337,7 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
-        if (! preg_match('/## GAP-024 —.*?(?=\n## GAP-021 —)/s', $content, $matches)) {
+        if (! preg_match('/## GAP-024 —.*?(?=\n## GAP-025 —)/s', $content, $matches)) {
             $this->fail('Could not locate GAP-024 section in IMPLEMENTATION_GAPS.md');
         }
 

@@ -1802,7 +1802,9 @@ are append-only after terminal state (`running → succeeded | failed | cancelle
 | `created_at` / `updated_at` | timestamps | |
 
 **Uniqueness (Resolved):** `(workspace_id, connector_definition_id, name)` among
-non-deleted rows.
+non-deleted rows. A workspace may hold **multiple accounts** for the same
+`connector_definition_id` when `name` differs (e.g. two Magento stores). This is
+not a one-connection-per-platform model.
 
 Implement this as a DB-level constraint via a driver-conditional generated column
 `active_name_uniqueness_key`, using the same technique already established by
@@ -2809,6 +2811,69 @@ Minimum read capabilities through Task 4B-2c:
 - `schema_discovery` — paginated fetch and normalization of external product-attribute metadata
 
 Write/import/export and FieldMapping are out of scope until Task 4C+.
+
+#### ConnectorCapability as UI source of truth (Resolved — UX contract 2026-08-10)
+
+**Normative UX reference:** `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md`.
+
+`App\Enums\ConnectorCapability` is the single domain source of truth for
+which optional connector abilities exist today (`ConnectionCheck`,
+`SchemaDiscovery`). Each profile declares its supported set in
+`config/connectors.php`; `ConnectorProfileDefinition::supports()` and
+`ConnectorProfileRegistry::requireCapability()` are the callable checks.
+
+**Rules:**
+- UI must gate optional connector surfaces on `supports()` for the real enum
+  case — no parallel UI-only capability flags.
+- A new optional connector ability requires a new `ConnectorCapability` case
+  in its own scoping pass **before** UI ships; UI must not invent interim
+  flags.
+- Sections appear only when `supports()` is true — never present-by-default
+  with per-connector hiding.
+
+Future capabilities implied by the UX contract but **not** enum cases today
+(sync execution, dry-run/preview, per-data-type directions, scheduling, mapping
+UI, issue aggregation, bulk resolution, sync-run history) require both domain
+design and enum extension before implementation. The UX contract defines
+required behavior when those capabilities exist; it does not assert they exist
+now.
+
+#### ConnectorAccount cardinality (Resolved — UX contract 2026-08-10)
+
+A workspace may have **zero, one, or many** `ConnectorAccount` rows for the same
+`ConnectorDefinition`, distinguished by `name`. Uniqueness is
+`(workspace_id, connector_definition_id, active_name_uniqueness_key)` among
+non-deleted rows — not one-connection-per-platform. Platform identity in
+merchant UI (`Інтеграції`) is not equivalent to a single account.
+
+#### Field/data-domain write ownership (future — UX contract 2026-08-10)
+
+Per-data-domain control ("Де ви хочете керувати цінами?") is a required merchant
+question in Layer B when bidirectional sync is enabled. **No global silent
+ownership default** and no hardcoded platform-side default.
+
+The storage and enforcement mechanism (field-level write ownership vs
+last-write-wins) is an **open domain decision** requiring its own architectural
+pass. This documentation records the merchant question only.
+
+**Safe non-destructive defaults remain allowed:** automation/scheduling off
+until explicitly enabled; a connector supporting only one data-changing
+behavior does not present a fake choice for consistency.
+
+#### Layer C diagnostics audience (Resolved — UX contract 2026-08-10)
+
+`ConnectorDiscoveryRun`, schema snapshots, canonical hashes, technical summaries,
+and raw error codes belong to **Layer C** (platform support/operator) — not to
+workspace Admin, Director, or Merchandiser merchant roles.
+
+If no platform-support identity model exists at implementation time, Layer C
+surfaces are unavailable rather than defaulting to workspace Admin. Layer
+assignment is a visibility ceiling; existing `ConnectorAccountPolicy` permissions
+remain authoritative inside Layers A/B.
+
+Discovery runtime, snapshot persistence, and Field Browser read architecture
+are shipped and retained. Merchant-facing copy and navigation migration to the
+UX contract is tracked under GAP-025 — not an architectural regression.
 
 #### Credential and settings classification (Resolved)
 
