@@ -36,11 +36,6 @@ class Integrations extends Page
         return __('connectors.ui.integrations.title');
     }
 
-    public static function getNavigationGroup(): ?string
-    {
-        return __('connectors.ui.integrations.navigation_group');
-    }
-
     public static function canAccess(): bool
     {
         $user = Auth::user();

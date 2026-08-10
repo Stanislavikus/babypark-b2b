@@ -47,6 +47,8 @@
 
 ## 3. `Інтеграції` — universal landing surface
 
+`Інтеграції` is the workspace/merchant surface for connecting and managing external systems. It is not the merchant surface for catalog work or for configuring/executing synchronization. The future merchant workflow for selection → direction → mapping → preview → schedule → run → results/errors will be defined separately by the Sync UX rebaseline. `Каталог і синхронізація` must not currently be represented as an established navigation group merely because it appears in the future roadmap; the current standalone top-level placement of `Інтеграції` is an intentional interim use of standard Filament ungrouped navigation behavior, not the final navigation IA.
+
 Replaces `Платформи та джерела` as the merchant's entry point. The platform is the entry point; the exact card composition must correctly represent however many `ConnectorAccount` rows actually exist for that platform in the workspace.
 
 **Confirmed directly from the schema:** the real unique constraint on `connector_accounts` is `(workspace_id, connector_definition_id, active_name_uniqueness_key)` — a workspace can have **more than one** account for the same platform (e.g. two separate Magento stores), distinguished by name. This contract does not assume a singleton connection per platform.

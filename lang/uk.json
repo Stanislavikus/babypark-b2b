@@ -204,7 +204,6 @@
     "connectors.ui.snapshot.fields.detail.scope": "Область",
     "connectors.ui.snapshot.fields.detail.sort_order": "Порядок сортування",
     "connectors.ui.integrations.navigation_label": "Інтеграції",
-    "connectors.ui.integrations.navigation_group": "Каталог і синхронізація",
     "connectors.ui.integrations.title": "Інтеграції",
     "connectors.ui.integrations.empty": "Немає доступних платформ для підключення.",
     "connectors.ui.integrations.status.not_connected": "Ще не підключено",

@@ -1688,7 +1688,11 @@ Detailed import/mapping flows should be described in a future dedicated import-f
 
 ### Merchant entry: `Інтеграції`
 
+`Інтеграції` is the workspace/merchant surface for connecting and managing external systems. It is not the merchant surface for catalog work or for configuring/executing synchronization. The future merchant workflow for selection → direction → mapping → preview → schedule → run → results/errors will be defined separately by the Sync UX rebaseline.
+
 `Інтеграції` replaces `Платформи та джерела` as the merchant connector entry point. A workspace may have **0, 1, or N** `ConnectorAccount` rows per platform (unique on `(workspace_id, connector_definition_id, active_name_uniqueness_key)` — see `03-DOMAIN_MODEL.md`). Platform identity is not equivalent to one connection.
+
+**Navigation (interim):** `Інтеграції` is a standalone top-level merchant navigation item (ungrouped). Filament renders ungrouped items before navigation groups; this top-of-sidebar placement is an intentional interim use of standard Filament navigation behavior, not the final navigation IA. `Каталог і синхронізація` must not currently be represented as an established navigation group merely because it appears in the future roadmap.
 
 The landing page shows **one card per eligible platform** (never one card per account): platform display name, connection status, one honest status line, and one action — never `ConnectorDefinition` internals (`code`, `source_kind`, `endpoint_path`, `verification_status`, …). Adaptive destinations: 0 accounts → `Підключити` into setup; 1 account → `Відкрити` straight into that account's Overview; N > 1 → that platform's own connection list. Full page rules: `docs/CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md`.
 

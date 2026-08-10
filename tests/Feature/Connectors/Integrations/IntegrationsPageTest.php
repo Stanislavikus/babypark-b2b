@@ -12,6 +12,7 @@ use App\Filament\Pages\Integrations\ConnectPlatformIntegration;
 use App\Filament\Pages\Integrations\Integrations;
 use App\Filament\Pages\Integrations\ListPlatformConnections;
 use App\Filament\Resources\ConnectorAccountResource;
+use App\Filament\Resources\ConnectorDefinitionResource;
 use App\Models\ConnectorConnectionCheck;
 use App\Models\ConnectorDefinition;
 use App\Support\Platform\PlatformAdminAuthorization;
@@ -20,6 +21,7 @@ use Database\Seeders\WorkspacePermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Lang;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
@@ -268,6 +270,34 @@ class IntegrationsPageTest extends TestCase
 
         $this->actingAs($user);
         $this->assertTrue(Integrations::canAccess());
+    }
+
+    #[Test]
+    public function integrations_is_registered_as_ungrouped_merchant_navigation(): void
+    {
+        $user = $this->createStaffUser(UserRole::Admin);
+        $this->actingAs($user);
+
+        $this->assertTrue(Integrations::shouldRegisterNavigation());
+        $this->assertNull(Integrations::getNavigationGroup());
+        $this->assertSame(__('connectors.ui.integrations.navigation_label'), Integrations::getNavigationLabel());
+    }
+
+    #[Test]
+    public function integrations_navigation_group_translation_key_is_removed(): void
+    {
+        foreach (['uk', 'ru', 'en'] as $locale) {
+            app()->setLocale($locale);
+
+            $this->assertFalse(Lang::has('connectors.ui.integrations.navigation_group'));
+        }
+    }
+
+    #[Test]
+    public function connector_definition_resource_navigation_is_unchanged(): void
+    {
+        $this->assertSame('Платформи та джерела', ConnectorDefinitionResource::getNavigationLabel());
+        $this->assertSame('Модель даних і коннектори', ConnectorDefinitionResource::getNavigationGroup());
     }
 
     #[Test]

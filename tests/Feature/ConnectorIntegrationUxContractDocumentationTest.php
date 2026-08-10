@@ -16,6 +16,8 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
         $this->assertStringContainsString('**Status:** Approved normative connector UX contract', $content);
         $this->assertStringContainsString('**Approval date:** 2026-08-10', $content);
         $this->assertStringNotContainsString('Proposed contract, not yet approved', $content);
+        $this->assertStringContainsString('workspace/merchant surface for connecting and managing external systems', $content);
+        $this->assertStringContainsString('`Каталог і синхронізація` must not currently be represented as an established navigation group', $content);
     }
 
     #[Test]
@@ -41,6 +43,11 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
         $this->assertStringContainsString('0, 1, or N', $content);
         $this->assertStringContainsString('CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md', $content);
         $this->assertStringContainsString('The `Інтеграції` landing surface exists as the merchant entry', $content);
+        $this->assertStringContainsString('workspace/merchant surface for connecting and managing external systems', $content);
+        $this->assertStringContainsString('not the merchant surface for catalog work or for configuring/executing synchronization', $content);
+        $this->assertStringContainsString('Sync UX rebaseline', $content);
+        $this->assertStringContainsString('`Каталог і синхронізація` must not currently be represented as an established navigation group', $content);
+        $this->assertStringContainsString('intentional interim use of standard Filament navigation behavior', $content);
     }
 
     #[Test]
