@@ -1748,12 +1748,17 @@ The following describes what was built before this contract; it is **not** the t
 
 **Operational Connection Pattern (Task 4B-0 through 4B-2b):**
 
+Overview/list reads **current projection** on the account row. History is a
+separate tab/section with search/filter when volume warrants it.
+
 1. Connection list — platform, account name, status, last check/discovery, attention, primary action.
 2. Connection settings — credentials, **Перевірити з'єднання**, **Зберегти**; 401 → replace credentials; 403 → update scopes.
-3. Connection check result — cause-specific copy, one next step.
+3. Connection check result — cause-specific copy, one next step; **401** → replace credentials; **403** → update scopes.
 4. Discovery overview — run status, field count, snapshot link (Layer C vocabulary; merchant migration required).
 5. Discovery field list — Data List Search & Filter Pattern.
 6. Activity history — connection checks and discovery runs.
+
+Explicit states: `Не перевірено`, `Підключено`, `Потребує уваги`, `Тимчасово недоступно`, `Вимкнено`.
 
 **Connector runtime state presentation (Resolved):** five-state account projection; active checks show `Очікує перевірки` / `Перевірка виконується` separately; no queue/job terminology in merchant text.
 

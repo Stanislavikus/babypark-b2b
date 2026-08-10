@@ -84,7 +84,8 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $content = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
 
-        $this->assertStringContainsString('## Operational Connection Pattern (reusable)', $content);
+        $this->assertStringContainsString('## Connector Integration UX (Resolved — 2026-08-10)', $content);
+        $this->assertStringContainsString('Shipped Task 4B implementation (pre-contract — historical reference)', $content);
         $this->assertStringContainsString('Потребує уваги', $content);
         $this->assertStringContainsString('401', $content);
         $this->assertStringContainsString('403', $content);
@@ -95,9 +96,9 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $content = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
 
-        $this->assertStringContainsString('### Current state vs history', $content);
         $this->assertStringContainsString('current projection', $content);
         $this->assertStringContainsString('Activity history', $content);
+        $this->assertStringContainsString('Overview/list reads **current projection** on the account row', $content);
     }
 
     #[Test]
@@ -610,7 +611,7 @@ class ConnectorAccountDocumentationTest extends TestCase
             $aiAgreement
         );
 
-        $this->assertStringContainsString('#### Connector runtime polling (Resolved)', $uiDesign);
+        $this->assertStringContainsString('**Connector runtime state presentation (Resolved):**', $uiDesign);
 
         $connectorRuntime = $this->techStackConnectorRuntimeSection($techStack);
         $this->assertStringContainsString('### Connector profile registry', $connectorRuntime);
@@ -1336,7 +1337,7 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
-        if (! preg_match('/## GAP-024 —.*?(?=\n## GAP-021 —)/s', $content, $matches)) {
+        if (! preg_match('/## GAP-024 —.*?(?=\n## GAP-025 —)/s', $content, $matches)) {
             $this->fail('Could not locate GAP-024 section in IMPLEMENTATION_GAPS.md');
         }
 
