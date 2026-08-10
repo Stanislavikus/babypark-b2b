@@ -14,6 +14,7 @@ final readonly class ConnectorProfileDefinition
     public function __construct(
         public string $profileCode,
         public bool $enabled,
+        public string $connectorDefinitionCode,
         public string $adapterClass,
         public string $accountSchemaClass,
         public array $capabilities,

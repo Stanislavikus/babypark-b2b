@@ -39,7 +39,24 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
 
         $this->assertStringContainsString('`Інтеграції` replaces `Платформи та джерела` as the merchant connector entry point', $content);
         $this->assertStringContainsString('0, 1, or N', $content);
-        $this->assertStringContainsString('The `Інтеграції` landing surface does **not** exist yet', $content);
+        $this->assertStringContainsString('CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md', $content);
+        $this->assertStringContainsString('The `Інтеграції` landing surface exists as the merchant entry', $content);
+    }
+
+    #[Test]
+    public function integratsii_page_ux_contract_is_approved(): void
+    {
+        $content = File::get(base_path('docs/CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md'));
+
+        $this->assertStringContainsString('**Status:** Approved page-specific contract', $content);
+        $this->assertStringContainsString('platform-first, adaptive destination', $content);
+        $this->assertStringContainsString('corrected worst-wins', $content);
+        $this->assertStringContainsString('merchant-safe projection', $content);
+        $this->assertStringContainsString('Option B', $content);
+        $this->assertStringContainsString('AccountSetup', $content);
+        $this->assertStringContainsString('connector_definition_code', $content);
+        $this->assertStringContainsString('IntegrationsStatusVocabulary', $content);
+        $this->assertStringContainsString('must **not** invent Coming Soon', $content);
     }
 
     #[Test]
@@ -137,7 +154,8 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
 
         $this->assertStringContainsString('## GAP-025 — Connector Integration UX contract not yet migrated in shipped UI', $content);
         $this->assertStringContainsString('CONNECTOR_INTEGRATION_UX_CONTRACT.md', $content);
+        $this->assertStringContainsString('CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md', $content);
         $this->assertStringContainsString('Зведення знімка', $content);
-        $this->assertStringContainsString('**Status:** Open — known UX migration work', $content);
+        $this->assertStringContainsString('**Status:** Open — partial (`Інтеграції` landing shipped); remaining UX migration', $content);
     }
 }
