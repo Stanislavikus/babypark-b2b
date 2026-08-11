@@ -782,13 +782,18 @@ The AI must isolate connector logic through:
 
 - ConnectorDefinition;
 - ConnectorAccount;
-- FieldMapping;
-- ImportJob;
-- ExportJob;
-- SyncJob;
-- adapter services;
-- transformation rules;
-- Attribute Dictionary mappings.
+- SyncConfiguration;
+- FieldMapping (semantic correspondence only; not an execution plan);
+- SyncRun / SyncRunItem;
+- ExternalRecordLink (account-scoped);
+- adapter / runtime-contract services;
+- operation-aware transformation rules where required;
+- Field Foundation / Attribute Dictionary mappings.
+
+Do not reintroduce superseded primary sync entities (`ImportJob` /
+`ExportJob` / `SyncJob`) or invent speculative sync entities (`MappingSet`,
+persistent `SyncIssue`, `ExternalFieldIdentity`, readiness enums, edition/
+deployment-model fields) without an approved documentation patch.
 
 Import header matching must use:
 

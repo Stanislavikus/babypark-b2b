@@ -250,8 +250,12 @@ yet), but should be scheduled before any payment gateway integration work starts
   define the core product model."
 - `01-PRODUCT_VISION.md`, Babypark Pilot Scope: explicitly lists "ERP / 1C data
   input" and "Google Sheets output" as valid, expected pilot requirements.
-- `03-DOMAIN_MODEL.md`, MVP Domain Scope: `ConnectorDefinition`, `ConnectorAccount`,
-  `FieldMapping`, `ImportJob` are explicit MVP-scope entities.
+- `03-DOMAIN_MODEL.md`, MVP Domain Scope + Sync Domain Rebaseline:
+  `ConnectorDefinition`, `ConnectorAccount`, `SyncConfiguration`,
+  `FieldMapping`, `SyncRun` / `SyncRunItem`, and `ExternalRecordLink` are
+  explicit MVP-scope sync entities. Earlier draft name `ImportJob` /
+  `ExportJob` / `SyncJob` is superseded and is not the current normative sync
+  model.
 
 **Current code:**
 - `ConnectorDefinition` and `ConnectorSchemaSource` exist from Task 4A.
@@ -292,8 +296,13 @@ yet), but should be scheduled before any payment gateway integration work starts
   current connector-account list/detail/discovery surface remain absent.
 - Successful discovery persists `ConnectorSchemaSnapshot` and
   `ConnectorSchemaSnapshotField`; `ConnectorSchemaDiff` /
-  `ConnectorSchemaDiffItem` remain model/schema scaffolding without a write path.
-- `FieldMapping` remains Task 4C.
+  `ConnectorSchemaDiffItem` remain model/schema scaffolding without a write
+  path or consumer (dormant — do not infer a working schema-diff runtime).
+- Sync Domain entities from the Sync UX / Domain Rebaseline
+  (`SyncConfiguration`, `FieldMapping`, `SyncRun` / `SyncRunItem`,
+  `ExternalRecordLink`) are **not implemented** yet. Mapping/confirmation
+  remains Task 4C; sync execution/preview/schedule/results remain later
+  implementation slices after domain docs (now settled).
 
 **Task sequence (GAP-006 remains Open until implementation lands):**
 
@@ -353,8 +362,22 @@ Implemented role matrix (confirmed against `App\Enums\UserRole`):
 | Disabled account | Per role matrix (unaffected by disabled state) | No | Per role matrix |
 
 **GAP-006 overall remains Open.** Remaining scope: Task 4B-2c (discovered
-schema fields / change inspection), retention/pruning (4B-2d), FieldMapping/import
-(4C+), connector-account creation and credential-management/settings UI.
+schema fields / change inspection), retention/pruning (4B-2d), Sync Domain /
+FieldMapping / sync execution (4C+), connector-account creation and
+credential-management/settings UI.
+
+### Classification after Sync UX / Domain Rebaseline (documentation pass)
+
+Distinguish carefully — do not treat every future possibility as an active GAP:
+
+| Class | Item | Blocks Sync domain work now? |
+|---|---|---|
+| **A. Architecture blockers** | None identified against current `origin/develop` for the approved Sync Domain Rebaseline | No |
+| **B. Implementation gaps** | SyncConfiguration / FieldMapping / SyncRun / SyncRunItem / ExternalRecordLink persistence + runtime; preview/live execution; merchant sync UX beyond connection management; ConnectorSchemaDiff write path/consumer; connector-account create/settings UI; Field Browser copy / Layer C gating (GAP-025) | Yes for shipping sync; docs are settled |
+| **C. Connector-specific future verification (deferred Variant #2 / profile)** | What external contract `adobe_commerce_paas_oauth1_integration` intentionally covers; PaaS-only vs broader Magento REST-family; post-bootstrap runtime-contract/version/capability verification; Magento Open Source setup/auth compatibility; whether AccountSetup and final runtime contract must later split; whether exactly-one AccountSetup-profile invariant must ever change | **No** — deferred; not a blocker for generic Sync domain rebaseline |
+
+Do not add generic `edition` / `deployment_model` / `api_family` fields to
+generic sync entities for symmetry while Class C remains unresolved.
 
 **Task 4A note (added 2026-07-16):** Task 4A implements the first concrete
 schema for `ConnectorDefinition` and introduces `ConnectorSchemaSource`, plus
@@ -929,16 +952,21 @@ Remaining connector gaps are tracked separately under GAP-006.
   and is **not** a regression — remaining work is labeling, Layer C gating, and
   deeper Layer A/B surfaces.
 
-**Not implied to exist (UX contract existing-vs-future boundary):**
+**Not implied to exist in code (docs settled; runtime absent):**
+- Sync Domain persistence/runtime (`SyncConfiguration`, `FieldMapping`,
+  `SyncRun` / `SyncRunItem`, `ExternalRecordLink`) — normative shape is in
+  `03-DOMAIN_MODEL.md`, implementation is not;
 - sync execution runtime for merchant "Синхронізувати зараз";
-- dry-run/preview before first sync;
-- per-data-type sync direction persistence;
+- Preview before first live sync;
+- per-domain enabled semantic-operation persistence;
 - scheduling beyond Discovery;
 - ownership persistence/enforcement;
 - issue aggregation and bulk resolution;
 - sync-run history as a merchant Layer B surface.
 
-Each requires its own architectural pass before UI implementation.
+Each remains an implementation gap. Sync domain architecture is settled; do
+not reopen it as an open research task unless current repository truth
+contradicts an approved invariant.
 
 **Impact:**
 - Do not document current connector merchant UI as compliant with

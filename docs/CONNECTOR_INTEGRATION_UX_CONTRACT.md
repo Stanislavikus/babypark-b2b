@@ -10,7 +10,7 @@
 
 **Non-goal:** This contract does not itself authorize new backend work. Every rule below is satisfiable with what already exists (`ConnectorCapability`, Discovery runtime, workspace isolation, authorization) plus UI wiring, or is explicitly flagged as a future decision requiring its own scoping pass.
 
-**Existing-vs-future boundary:** This contract defines the *required UX* for synchronization, preview/dry-run, scheduling, mapping, issues, history, and bulk resolution *when those capabilities are implemented*. It does not assert that their backend/runtime contracts exist today beyond what has been directly confirmed elsewhere in this document (the `ConnectorCapability` enum, the Discovery/snapshot/field read path, the account-cardinality constraint). Any missing domain capability, persistence mechanism, or execution runtime — including, but not limited to, dry-run/preview computation, sync scheduling beyond what already exists for Discovery, issue aggregation, and bulk resolution — requires its own scoped architectural pass before the corresponding UI is implemented. A reader must not conclude from this document alone that any of these backend mechanisms already exist.
+**Existing-vs-future boundary:** This contract defines the *required UX* for synchronization, preview/dry-run, scheduling, mapping, issues, history, and bulk resolution *when those capabilities are implemented*. Normative sync domain shape is now settled in `docs/03-DOMAIN_MODEL.md` (Sync Domain Rebaseline: `SyncConfiguration` → `FieldMapping` + `SyncRun` → `SyncRunItem`, account-scoped `ExternalRecordLink`). This contract does **not** assert that those entities or their runtime already exist in code beyond what has been directly confirmed elsewhere in this document (the `ConnectorCapability` enum, the Discovery/snapshot/field read path, the account-cardinality constraint). Any missing persistence mechanism or execution runtime — including dry-run/preview computation, sync scheduling beyond Discovery, issue aggregation, and bulk resolution — remains an implementation gap and requires its own scoped implementation pass before the corresponding UI ships. A reader must not conclude from this document alone that any of these backend mechanisms already exist.
 
 ---
 
@@ -47,7 +47,9 @@
 
 ## 3. `Інтеграції` — universal landing surface
 
-`Інтеграції` is the workspace/merchant surface for connecting and managing external systems. It is not the merchant surface for catalog work or for configuring/executing synchronization. The future merchant workflow for selection → direction → mapping → preview → schedule → run → results/errors will be defined separately by the Sync UX rebaseline. `Каталог і синхронізація` must not currently be represented as an established navigation group merely because it appears in the future roadmap; the current standalone top-level placement of `Інтеграції` is an intentional interim use of standard Filament ungrouped navigation behavior, not the final navigation IA.
+`Інтеграції` is the workspace/merchant surface for connecting and managing external systems. It answers conceptually: *is this external system connected?* It is not the merchant surface for catalog work and must not become the technical sync builder.
+
+Sync configuration, mapping, preview, first manual live run, schedule, results, and remediation belong to merchant sync/data-management surfaces. Normative sync domain model and merchant journey are defined by the Sync UX / Domain Rebaseline in `docs/03-DOMAIN_MODEL.md` (and summarized in `docs/06-UI_DESIGN_SYSTEM.md`). `Каталог і синхронізація` must not currently be represented as an established navigation group merely because it appears in the future roadmap; the current standalone top-level placement of `Інтеграції` is an intentional interim use of standard Filament ungrouped navigation behavior, not the final navigation IA.
 
 Replaces `Платформи та джерела` as the merchant's entry point. The platform is the entry point; the exact card composition must correctly represent however many `ConnectorAccount` rows actually exist for that platform in the workspace.
 
@@ -72,18 +74,24 @@ Magento                          Google Sheets
 
 ## 4. Connection / setup journey
 
-Three steps, each ending in a plain confirmation, not a form dump.
+Connection onboarding remains human-friendly and ends in plain confirmation, not a form dump. Sync configuration steps below are merchant sync concerns; they must not collapse `Інтеграції` into a technical sync builder.
 
-1. **Підключення** — ask only the human-facing connection inputs required by that specific connector (a URL + token for Magento; OAuth + resource selection for Google Sheets; an API key for another connector type; file selection for yet another) — never schema source, auth profile, or endpoint path regardless of connector type. The exact input set is connector-specific by nature; what's constant is that it is always phrased in terms a human filling in a form understands, never internal connector configuration.
-2. **Що синхронізувати** — per data type (Товари, Ціни, Залишки, ...), only for data types the connected profile's capabilities actually support (§2), phrased as directional sentences, never bare "Import/Export":
+1. **Підключення** — ask only the human-facing connection inputs required by that specific connector (a URL + token for Magento; OAuth + resource selection for Google Sheets; an API key for another connector type; file selection for yet another) — never schema source, auth profile, or endpoint path regardless of connector type. The exact input set is connector-specific by nature; what's constant is that it is always phrased in terms a human filling in a form understands, never internal connector configuration. Connection verification is part of this onboarding.
+2. **Що синхронізувати** — per data domain (Товари, Ціни, Залишки, ...), only for domains the connected runtime contract actually supports, phrased as directional sentences, never bare "Import/Export":
    ```
    Товари
    ☑ Отримувати товари з Magento
    ☑ Передавати зміни товарів у Magento
    ```
-3. **Перша перевірка** — a categorized dry-run count before any real sync (`✓ готові · ⚠ потребує уваги · ⛔ неможливо`), never a silent first sync and never a bare "Sync? Yes/No."
+   These two checkboxes are **enabled semantic operations** on one
+   domain/context `SyncConfiguration`. They must **not** be translated into
+   two hidden SyncConfiguration records merely because import/export can be
+   enabled independently. Semantic field correspondence may remain shared
+   across the enabled operations. `ConnectorDefinition.direction` remains
+   coarse platform metadata and is not configuration capability truth.
+3. **Перша перевірка** — a categorized Preview / dry-run before any real sync (`✓ готові · ⚠ потребує уваги · ⛔ неможливо`), never a silent first sync and never a bare "Sync? Yes/No." Preview language must remain distinct from completed synchronization and must never imply an external write occurred.
 
-**Rule:** Scheduling/automation is not offered until step 3 has succeeded at least once manually.
+**Rule:** Scheduling/automation is not offered until a successful Preview has been followed by at least one successful first manual live run path.
 
 ---
 
@@ -106,22 +114,24 @@ Magento          🟢 Підключено
 
 ## 6. Synchronization setup — Layer B
 
-Contains, only for capabilities the connector supports (§2):
+Contains, only for capabilities the connected runtime contract supports (§2 and Sync Domain capability-truth boundary in `03-DOMAIN_MODEL.md`):
 
-- Per-data-type direction toggles (§4.2), editable after initial setup.
-- Schedule (frequency, next-run time).
-- **Per-data-domain ownership**, asked in plain language, never as a global default and never using the term "ownership" or "source of truth" in merchant-facing copy:
+- Data/domain + independently enabled semantic operations (§4.2), editable after initial setup. One domain/context SyncConfiguration may enable import, export, or both; UI checkboxes are not a reason to duplicate SyncConfiguration rows.
+- Selection scope for the synchronization.
+- Schedule (simple merchant-appropriate controls; exact presets are a Product Owner decision).
+- `external_context` exposure (e.g. Magento website/store view) remains an open Product Owner MVP choice — architecture recognizes the concept; this contract does not silently settle one-default vs multi-context merchant UX.
+- **Per-data-domain ownership**, asked in plain language only when bidirectional sync ships, never as a global silent default and never using the term "ownership" or "source of truth" in merchant-facing copy:
   ```
   Де ви хочете керувати цінами?
   ○ У нашій платформі      ○ У Magento
   ```
-  Repeated per data domain (Ціни, Описи, Залишки, ...) that is bidirectionally enabled. No connector ships a hardcoded default answer — this is a per-merchant, per-domain decision made explicit during setup, not inferred silently. (The underlying mechanism this answer configures — field-level write ownership rather than timestamp-based last-write-wins — is a backend decision requiring its own scoping pass before implementation; this contract fixes the *question asked to the merchant*, not yet the storage/enforcement design.)
+  Repeated per data domain (Ціни, Описи, Залишки, ...) that is bidirectionally enabled. No connector ships a hardcoded default answer — this is a per-merchant, per-domain product decision, not inferred silently. Do not introduce mandatory per-field authority before that product need exists. (Storage/enforcement mechanism remains a backend decision requiring its own scoping pass; this contract fixes the *question asked to the merchant*, not yet the storage/enforcement design.)
 
 ---
 
 ## 7. Mapping — Layer B
 
-The field-mapping matrix is the primary Layer B surface for data structure, built around the merchant's own catalog fields as rows:
+The field-mapping matrix is the primary Layer B surface for data structure. It is **concept-first**, built around the merchant's own catalog/domain concepts as rows — not around “map every discovered external field”:
 
 ```
 Дані у вашому каталозі   Magento         Стан
@@ -130,6 +140,16 @@ The field-mapping matrix is the primary Layer B surface for data structure, buil
 EAN / штрихкод             —               ⚠ Потрібно зіставити
 Колір                     Color           ✓
 ```
+
+Mapping flow:
+
+1. merchant chooses which internal product/domain concepts matter;
+2. platform prefills high-confidence mappings from platform-global canonical knowledge where available;
+3. platform validates them against actual account discovery;
+4. platform may suggest additional discovered matches;
+5. merchant resolves only mappings that matter to the selected synchronization and remain uncertain/unresolved.
+
+The canonical registry is sparse platform knowledge; live discovery is account reality. Neither is exposed as raw connector schema internals on Layer A/B.
 
 **Rule:** The already-shipped Field Browser's persistence, query, security, and read-model architecture (`ViewConnectorSchemaSnapshot`, `ConnectorSchemaFieldPresenter`, the workspace/account/snapshot ownership chain) is retained entirely — no backend rework required by this contract. **Confirmed directly: its current merchant-facing copy does not yet satisfy §13** — `lang/uk.json` currently ships `connectors.ui.snapshot.title` = "Зведення знімка" and similar snapshot-worded strings on what is today a merchant-reachable page. This contract requires that copy to change (title, section labels, empty states — translation-file edits, not architecture) before this page qualifies as a compliant Layer B surface; it does not pretend the existing copy already complies. Layer C, if it ever gets its own distinct surface, may keep diagnostic snapshot terminology freely.
 
@@ -162,6 +182,8 @@ A count and category summary lives on the Overview (§5). The full list, filtera
 ```
 
 Row click opens the run's own detail: affected items, per-item problem, per-item action. No separate "Discovery history" concept merges into this — this is sync-run history, a Layer B/merchant concept, distinct from Layer C `ConnectorDiscoveryRun` diagnostics even though they may share underlying data.
+
+**Preview vs completed synchronization:** Preview runs may be retained for audit/reproducibility, but must not automatically appear as completed synchronizations. Whether Preview runs are visible in normal merchant history is a Product Owner decision. Transport attempts/batches/HTTP diagnostics remain Layer C and must not become the merchant's primary history model.
 
 ---
 

@@ -227,10 +227,20 @@ This document describes:
 
 ### Connectors and Mappings Context
 
-- ConnectorDefinition (global platform connector type);
+- ConnectorDefinition (global platform connector type; `direction` is coarse
+  platform envelope only);
 - ConnectorAccount (workspace-specific connected account);
-- FieldMapping (external field → platform attribute mapping);
-- ImportJob / ExportJob / SyncJob.
+- SyncConfiguration (account + data_domain + external_context; owns enabled
+  semantic operations, selection, schedule state, mappings, revision);
+- FieldMapping (direction-neutral semantic correspondence owned by
+  SyncConfiguration);
+- SyncRun / SyncRunItem (preview/live execution evidence; SyncRunItem =
+  business-record outcome);
+- ExternalRecordLink (account-scoped internal ↔ external record identity).
+
+Historical note: earlier drafts listed `ImportJob` / `ExportJob` / `SyncJob`
+as primary sync entities; superseded by the Sync Domain Rebaseline in
+`03-DOMAIN_MODEL.md`.
 
 ### Billing Context
 
