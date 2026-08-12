@@ -44,8 +44,9 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
         $this->assertStringContainsString('CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md', $content);
         $this->assertStringContainsString('The `Інтеграції` landing surface exists as the merchant entry', $content);
         $this->assertStringContainsString('workspace/merchant surface for connecting and managing external systems', $content);
-        $this->assertStringContainsString('not the merchant surface for catalog work or for configuring/executing synchronization', $content);
-        $this->assertStringContainsString('Sync UX rebaseline', $content);
+        $this->assertStringContainsString('It is not the merchant surface for catalog work and must not become the technical sync builder.', $content);
+        $this->assertStringContainsString('Sync configuration, mapping, preview, results, and remediation belong to merchant sync/data-management surfaces', $content);
+        $this->assertStringContainsString('`docs/03-DOMAIN_MODEL.md` → Sync Domain Rebaseline', $content);
         $this->assertStringContainsString('`Каталог і синхронізація` must not currently be represented as an established navigation group', $content);
         $this->assertStringContainsString('intentional interim use of standard Filament navigation behavior', $content);
     }
@@ -72,7 +73,11 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
         $content = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
 
         $this->assertStringContainsString('ConnectorCapability::supports()', $content);
-        $this->assertStringContainsString('No parallel UI-only capability flags', $content);
+        $this->assertStringContainsString('No parallel UI-only connector-capability flags', $content);
+        $this->assertStringContainsString(
+            'Platform-owned sync UX/orchestration concerns — including sync execution workflow, Preview, scheduling, mapping UI, issue aggregation, bulk resolution, and sync-run history — do **not** become connector capabilities merely because they are optional or not yet implemented.',
+            $content,
+        );
     }
 
     #[Test]
@@ -112,7 +117,14 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
 
         $this->assertStringContainsString('#### ConnectorCapability as UI source of truth (Resolved — UX contract 2026-08-10)', $content);
         $this->assertStringContainsString('App\\Enums\\ConnectorCapability', $content);
-        $this->assertStringContainsString('no parallel UI-only capability flags', $content);
+        $this->assertStringContainsString('no parallel UI-only connector-capability flags', $content);
+        $this->assertStringContainsString(
+            'Platform-owned functionality must **not** become a connector capability merely',
+            $content,
+        );
+        $this->assertStringContainsString('because it is optional, future, configurable, UI-driven, or not yet', $content);
+        $this->assertStringContainsString('dry-run/preview orchestration', $content);
+        $this->assertStringContainsString('sync-run history, and similar platform workflow/UI/orchestration capabilities', $content);
     }
 
     #[Test]
