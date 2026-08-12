@@ -6,6 +6,7 @@ use App\Enums\AttributeDataType;
 use App\Enums\AttributeScope;
 use App\Enums\AttributeStatus;
 use App\Enums\FieldObjectType;
+use App\Support\Sync\Exceptions\FieldDefinitionReferencedByFieldMappingException;
 use App\Support\Workspace\BelongsToWorkspaceOrGlobal;
 use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -29,6 +30,21 @@ class FieldDefinition extends Model
         'is_multi_value',
         'status',
     ];
+
+    protected static function booted(): void
+    {
+        static::deleting(function (FieldDefinition $definition): void {
+            $bindingIds = $definition->fieldBindings()->pluck('id');
+
+            if ($bindingIds->isEmpty()) {
+                return;
+            }
+
+            if (FieldMapping::withoutWorkspaceScope()->whereIn('field_binding_id', $bindingIds)->exists()) {
+                throw FieldDefinitionReferencedByFieldMappingException::forDefinition($definition->id);
+            }
+        });
+    }
 
     protected function casts(): array
     {

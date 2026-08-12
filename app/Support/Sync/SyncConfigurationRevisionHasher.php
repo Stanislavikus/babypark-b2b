@@ -6,19 +6,57 @@ use App\Enums\SyncConfigurationOperationalState;
 
 final class SyncConfigurationRevisionHasher
 {
-    private const PREFIX = 'babypark.sync-configuration-revision.v1';
+    private const PREFIX = 'babypark.sync-configuration-revision.v2';
 
+    /**
+     * @param  list<FieldMappingRevisionEntry|array{field_binding_id: string, external_field_key: string}>  $fieldMappings
+     */
     public function hash(
         SyncOperationSet $enabledOperations,
         SyncConfigurationOperationalState $operationalState,
+        array $fieldMappings = [],
     ): string {
         $payload = new \stdClass;
         $payload->enabled_operations = $enabledOperations->values();
         $payload->operational_state = $operationalState->value;
+        $payload->field_mappings = $this->canonicalizeFieldMappings($fieldMappings);
 
         $json = $this->encodeCanonicalJson($this->sortObjectKeysRecursively($payload));
 
         return hash('sha256', self::PREFIX."\n".$json);
+    }
+
+    /**
+     * @param  list<FieldMappingRevisionEntry|array{field_binding_id: string, external_field_key: string}>  $fieldMappings
+     * @return list<array{field_binding_id: string, external_field_key: string}>
+     */
+    private function canonicalizeFieldMappings(array $fieldMappings): array
+    {
+        $normalized = array_map(function (FieldMappingRevisionEntry|array $entry): array {
+            if ($entry instanceof FieldMappingRevisionEntry) {
+                return $entry->toRevisionArray();
+            }
+
+            return [
+                'field_binding_id' => $entry['field_binding_id'],
+                'external_field_key' => $entry['external_field_key'],
+            ];
+        }, $fieldMappings);
+
+        usort(
+            $normalized,
+            static function (array $left, array $right): int {
+                $bindingCompare = strcmp($left['field_binding_id'], $right['field_binding_id']);
+
+                if ($bindingCompare !== 0) {
+                    return $bindingCompare;
+                }
+
+                return strcmp($left['external_field_key'], $right['external_field_key']);
+            },
+        );
+
+        return $normalized;
     }
 
     private function encodeCanonicalJson(mixed $value): string

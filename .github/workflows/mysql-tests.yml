@@ -99,6 +99,9 @@ jobs:
       - name: SyncConfiguration foundation tests (MySQL)
         run: php artisan test --filter=SyncConfigurationFoundationTest
 
+      - name: FieldMapping persistence tests (MySQL)
+        run: php artisan test --filter=FieldMapping
+
       - name: Customer rename migration tests (MySQL)
         run: php artisan test --filter=CustomerRenameMigrationTest
 

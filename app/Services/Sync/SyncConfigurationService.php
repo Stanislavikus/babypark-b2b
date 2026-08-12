@@ -20,6 +20,7 @@ final class SyncConfigurationService
     public function __construct(
         private readonly ConnectorSyncSupportResolver $syncSupportResolver,
         private readonly SyncConfigurationRevisionHasher $revisionHasher,
+        private readonly SyncConfigurationMutationCoordinator $mutationCoordinator,
         private readonly SyncConfigurationConstraintViolationClassifier $constraintViolationClassifier,
     ) {}
 
@@ -31,10 +32,8 @@ final class SyncConfigurationService
 
         $this->assertOperationsSupported($account, $input->dataDomain, $operationSet);
 
-        $revision = $this->revisionHasher->hash($operationSet, $input->operationalState);
-
         try {
-            return DB::transaction(function () use ($account, $input, $operationSet, $revision): SyncConfiguration {
+            return DB::transaction(function () use ($account, $input, $operationSet): SyncConfiguration {
                 return SyncConfiguration::withoutWorkspaceScope()->create([
                     'id' => (string) Str::uuid(),
                     'workspace_id' => $account->workspace_id,
@@ -43,7 +42,11 @@ final class SyncConfigurationService
                     'external_context' => $input->externalContext->payload(),
                     'enabled_operations' => $operationSet->values(),
                     'operational_state' => $input->operationalState,
-                    'configuration_revision' => $revision,
+                    'configuration_revision' => $this->revisionHasher->hash(
+                        $operationSet,
+                        $input->operationalState,
+                        [],
+                    ),
                 ]);
             });
         } catch (QueryException $exception) {
@@ -76,26 +79,20 @@ final class SyncConfigurationService
             return $configuration->refresh();
         }
 
-        $currentOperationSet = $configuration->enabledOperationSet();
-        $nextOperationSet = $input->resolvedOperationSet($currentOperationSet);
-        $nextOperationalState = $input->resolvedOperationalState($configuration->operational_state);
+        return $this->mutationCoordinator->mutateLocked(
+            $account,
+            $syncConfigurationId,
+            function (SyncConfiguration $lockedConfiguration) use ($account, $input): void {
+                $currentOperationSet = $lockedConfiguration->enabledOperationSet();
+                $nextOperationSet = $input->resolvedOperationSet($currentOperationSet);
+                $nextOperationalState = $input->resolvedOperationalState($lockedConfiguration->operational_state);
 
-        $this->assertOperationsSupported($account, $configuration->data_domain, $nextOperationSet);
+                $this->assertOperationsSupported($account, $lockedConfiguration->data_domain, $nextOperationSet);
 
-        $nextRevision = $this->revisionHasher->hash($nextOperationSet, $nextOperationalState);
-
-        if ($nextRevision === $configuration->configuration_revision) {
-            $configuration->touch();
-
-            return $configuration->refresh();
-        }
-
-        $configuration->enabled_operations = $nextOperationSet->operations();
-        $configuration->operational_state = $nextOperationalState;
-        $configuration->configuration_revision = $nextRevision;
-        $configuration->save();
-
-        return $configuration->refresh();
+                $lockedConfiguration->enabled_operations = $nextOperationSet->operations();
+                $lockedConfiguration->operational_state = $nextOperationalState;
+            },
+        );
     }
 
     private function assertOperationsSupported(

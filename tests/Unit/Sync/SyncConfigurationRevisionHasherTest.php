@@ -27,6 +27,7 @@ class SyncConfigurationRevisionHasherTest extends TestCase
         $revision = $this->hasher->hash(
             SyncOperationSet::fromOperations([SyncSemanticOperation::Import]),
             SyncConfigurationOperationalState::Enabled,
+            [],
         );
 
         $this->assertSame(64, strlen($revision));
@@ -36,8 +37,26 @@ class SyncConfigurationRevisionHasherTest extends TestCase
             $this->hasher->hash(
                 SyncOperationSet::fromOperations([SyncSemanticOperation::Import]),
                 SyncConfigurationOperationalState::Enabled,
+                [],
             ),
         );
+    }
+
+    #[Test]
+    public function empty_field_mappings_are_canonical_in_revision_payload(): void
+    {
+        $withDefault = $this->hasher->hash(
+            SyncOperationSet::fromOperations([SyncSemanticOperation::Import]),
+            SyncConfigurationOperationalState::Enabled,
+        );
+
+        $withExplicitEmpty = $this->hasher->hash(
+            SyncOperationSet::fromOperations([SyncSemanticOperation::Import]),
+            SyncConfigurationOperationalState::Enabled,
+            [],
+        );
+
+        $this->assertSame($withDefault, $withExplicitEmpty);
     }
 
     #[Test]
@@ -49,6 +68,7 @@ class SyncConfigurationRevisionHasherTest extends TestCase
                 SyncSemanticOperation::Export,
             ]),
             SyncConfigurationOperationalState::Enabled,
+            [],
         );
 
         $exportImport = $this->hasher->hash(
@@ -57,6 +77,7 @@ class SyncConfigurationRevisionHasherTest extends TestCase
                 SyncSemanticOperation::Import,
             ]),
             SyncConfigurationOperationalState::Enabled,
+            [],
         );
 
         $this->assertSame($importExport, $exportImport);

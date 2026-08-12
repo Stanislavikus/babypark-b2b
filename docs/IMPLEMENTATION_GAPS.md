@@ -328,7 +328,7 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4B-2d** | Activity history, retention/pruning service, recovery states, and operational polish |
 | **4C-0** | `SyncConfiguration` foundation + authoritative `(data_domain, semantic_operation)` runtime support boundary — Done |
 | **4C-1a** | FieldMapping persistence contract (docs-only Stop-and-Amend) — Done |
-| **4C-1b** | `field_mappings` persistence + manual confirmation service + authoritative-discovery validation + revision v2 + graceful fail-closed handling when mapped `FieldBinding` or parent `FieldDefinition` physical deletion is attempted (archive remains valid lifecycle path; no raw FK errors) — Next / Not implemented |
+| **4C-1b** | `field_mappings` persistence + manual confirmation service + authoritative-discovery validation + revision v2 + graceful fail-closed handling when mapped `FieldBinding` or parent `FieldDefinition` physical deletion is attempted (archive remains valid lifecycle path; no raw FK errors) — Done |
 | **4C-1c** | Canonical suggestion provider + confidence + registry read-model + UI prefill — Deferred / after 4C-1b |
 | **4C** | Remaining sync domain: `SyncRun` / `SyncRunItem`, `ExternalRecordLink`, preview/live execution, scheduling, sync history/issues, merchant sync UX |
 
@@ -347,8 +347,8 @@ Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
 Task 4C-1a settled the FieldMapping first persistence contract (docs only).
 `field_mappings` persistence, confirmation service, revision v2 integration,
 and graceful fail-closed handling for mapped binding / parent definition
-physical-delete attempts (archive remains valid)
-remain Task 4C-1b (not implemented). Canonical suggestion/read-model work is
+physical-delete attempts (archive remains valid) are implemented (Task 4C-1b).
+Canonical suggestion/read-model work is
 Task 4C-1c (deferred until after persistence). `SyncRun` / execution, preview,
 schedule, history, and `ExternalRecordLink` remain unimplemented.
 Connector-account creation and credential-management/settings UI remain absent.
@@ -397,7 +397,7 @@ Distinguish carefully — do not treat every future possibility as an active GAP
 | Class | Item | Blocks Sync domain work now? |
 |---|---|---|
 | **A. Architecture blockers** | None identified against current `origin/develop` for the approved Sync Domain Rebaseline | No |
-| **B. Implementation gaps** | FieldMapping persistence (`field_mappings` table, confirmation service, revision v2 — contract settled in 4C-1a, implementation 4C-1b); canonical suggestion/read-model (4C-1c); `SyncRun` / `SyncRunItem` / `ExternalRecordLink` persistence + runtime; preview/live execution; merchant sync UX beyond connection management; ConnectorSchemaDiff write path/consumer; connector-account create/settings UI; Field Browser copy / Layer C gating (GAP-025) | Yes for shipping sync; docs are settled |
+| **B. Implementation gaps** | Canonical suggestion/read-model (4C-1c); `SyncRun` / `SyncRunItem` / `ExternalRecordLink` persistence + runtime; preview/live execution; merchant sync UX beyond connection management; ConnectorSchemaDiff write path/consumer; connector-account create/settings UI; Field Browser copy / Layer C gating (GAP-025) | Yes for shipping sync; docs are settled |
 | **C. Connector-specific future verification (deferred Variant #2 / profile)** | What external contract `adobe_commerce_paas_oauth1_integration` intentionally covers; PaaS-only vs broader Magento REST-family; post-bootstrap runtime-contract/version/capability verification; Magento Open Source setup/auth compatibility; whether AccountSetup and final runtime contract must later split; whether exactly-one AccountSetup-profile invariant must ever change | **No** — deferred; not a blocker for generic Sync domain rebaseline |
 
 Do not add generic `edition` / `deployment_model` / `api_family` fields to

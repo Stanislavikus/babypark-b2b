@@ -128,7 +128,7 @@ class FieldMappingDocumentationContractTest extends TestCase
     }
 
     #[Test]
-    public function implementation_gaps_records_task_4c_1a_done_and_4c_1b_next(): void
+    public function implementation_gaps_records_task_4c_1a_done_and_4c_1b_done(): void
     {
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
@@ -137,6 +137,8 @@ class FieldMappingDocumentationContractTest extends TestCase
         $this->assertStringContainsString('**4C-1c**', $content);
         $this->assertStringContainsString('Task 4C-1a settled the FieldMapping first persistence contract', $content);
         $this->assertStringContainsString('graceful fail-closed handling when mapped `FieldBinding`', $content);
+        $this->assertMatchesRegularExpression('/\*\*4C-1b\*\*.*— Done/', $content);
+        $this->assertStringNotContainsString('4C-1b (not implemented)', $content);
     }
 
     /**
