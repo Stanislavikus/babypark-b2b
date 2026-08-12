@@ -16,7 +16,9 @@ use App\Models\FieldDefinition;
 use App\Models\FieldMapping;
 use App\Models\SyncConfiguration;
 use App\Models\Workspace;
+use App\Services\Connectors\AuthoritativeConnectorSchemaSnapshotResolver;
 use App\Services\Sync\CreateSyncConfigurationInput;
+use App\Services\Sync\FieldMappingBindingValidator;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\SyncConfigurationMutationCoordinator;
 use App\Services\Sync\SyncConfigurationService;
@@ -549,6 +551,46 @@ class FieldMappingPersistenceTest extends TestCase
         );
 
         $this->assertTrue(FieldMapping::withoutWorkspaceScope()->where('external_field_key', 'valid_key')->exists());
+    }
+
+    #[Test]
+    public function external_field_key_lookup_is_bound_to_supplied_snapshot_id(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $snapshotS1 = $this->publishAuthoritativeSnapshot($account, ['key_a'], now()->subHour());
+        $snapshotS2 = $this->publishAuthoritativeSnapshot($account, ['other_key'], now());
+
+        $resolver = app(AuthoritativeConnectorSchemaSnapshotResolver::class);
+
+        $this->assertTrue($resolver->externalFieldKeyExists($snapshotS1, 'key_a'));
+        $this->assertFalse($resolver->externalFieldKeyExists($snapshotS2, 'key_a'));
+    }
+
+    #[Test]
+    public function authoritative_discovery_validation_resolves_discovery_source_and_snapshot_once(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $this->publishAuthoritativeSnapshot($account, ['once_key']);
+
+        $sourceQueries = 0;
+        $snapshotQueries = 0;
+        DB::listen(function ($query) use (&$sourceQueries, &$snapshotQueries): void {
+            if (str_contains($query->sql, 'connector_schema_sources')) {
+                $sourceQueries++;
+            }
+
+            if (str_contains(strtolower($query->sql), 'connector_schema_snapshots')) {
+                $snapshotQueries++;
+            }
+        });
+
+        app(FieldMappingBindingValidator::class)->assertExternalFieldKeyInAuthoritativeSnapshot(
+            $account,
+            'once_key',
+        );
+
+        $this->assertSame(1, $sourceQueries);
+        $this->assertSame(1, $snapshotQueries);
     }
 
     #[Test]

@@ -69,15 +69,9 @@ final class FieldMappingBindingValidator
         ConnectorAccount $account,
         string $externalFieldKey,
     ): void {
-        $this->authoritativeSnapshotResolver->assertResolvableDiscoverySource($account);
+        $snapshot = $this->authoritativeSnapshotResolver->resolveRequiredSnapshot($account);
 
-        $snapshot = $this->authoritativeSnapshotResolver->resolveSnapshot($account);
-
-        if ($snapshot === null) {
-            throw AuthoritativeDiscoveryValidationException::noAuthoritativeSnapshot();
-        }
-
-        if (! $this->authoritativeSnapshotResolver->externalFieldKeyExists($account, $externalFieldKey)) {
+        if (! $this->authoritativeSnapshotResolver->externalFieldKeyExists($snapshot, $externalFieldKey)) {
             throw AuthoritativeDiscoveryValidationException::externalFieldKeyAbsent($externalFieldKey);
         }
     }

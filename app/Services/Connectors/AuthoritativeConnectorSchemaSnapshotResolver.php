@@ -6,6 +6,7 @@ use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorSchemaSnapshot;
 use App\Models\ConnectorSchemaSnapshotField;
+use App\Models\ConnectorSchemaSource;
 use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceResolutionException;
 use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceResolutionReason;
 use App\Support\Sync\Exceptions\AuthoritativeDiscoveryValidationException;
@@ -20,10 +21,56 @@ final class AuthoritativeConnectorSchemaSnapshotResolver
     {
         try {
             $source = $this->discoverySourceResolver->resolve($account);
-        } catch (ConnectorDiscoverySourceResolutionException $exception) {
+        } catch (ConnectorDiscoverySourceResolutionException) {
             return null;
         }
 
+        return $this->findLatestAuthoritativeSnapshot($account, $source);
+    }
+
+    public function resolveRequiredSnapshot(ConnectorAccount $account): ConnectorSchemaSnapshot
+    {
+        $source = $this->resolveDiscoverySource($account);
+        $snapshot = $this->findLatestAuthoritativeSnapshot($account, $source);
+
+        if ($snapshot === null) {
+            throw AuthoritativeDiscoveryValidationException::noAuthoritativeSnapshot();
+        }
+
+        return $snapshot;
+    }
+
+    public function assertResolvableDiscoverySource(ConnectorAccount $account): void
+    {
+        $this->resolveDiscoverySource($account);
+    }
+
+    public function externalFieldKeyExists(ConnectorSchemaSnapshot $snapshot, string $externalFieldKey): bool
+    {
+        return ConnectorSchemaSnapshotField::withoutWorkspaceScope()
+            ->where('snapshot_id', $snapshot->id)
+            ->where('external_field_key', $externalFieldKey)
+            ->exists();
+    }
+
+    private function resolveDiscoverySource(ConnectorAccount $account): ConnectorSchemaSource
+    {
+        try {
+            return $this->discoverySourceResolver->resolve($account);
+        } catch (ConnectorDiscoverySourceResolutionException $exception) {
+            $reason = match ($exception->reason) {
+                ConnectorDiscoverySourceResolutionReason::Missing => 'missing primary discovery source',
+                ConnectorDiscoverySourceResolutionReason::Ambiguous => 'ambiguous primary discovery source',
+            };
+
+            throw AuthoritativeDiscoveryValidationException::discoverySourceUnavailable($reason);
+        }
+    }
+
+    private function findLatestAuthoritativeSnapshot(
+        ConnectorAccount $account,
+        ConnectorSchemaSource $source,
+    ): ?ConnectorSchemaSnapshot {
         return ConnectorSchemaSnapshot::withoutWorkspaceScope()
             ->where('workspace_id', $account->workspace_id)
             ->where('connector_account_id', $account->id)
@@ -36,33 +83,5 @@ final class AuthoritativeConnectorSchemaSnapshotResolver
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->first();
-    }
-
-    public function assertResolvableDiscoverySource(ConnectorAccount $account): void
-    {
-        try {
-            $this->discoverySourceResolver->resolve($account);
-        } catch (ConnectorDiscoverySourceResolutionException $exception) {
-            $reason = match ($exception->reason) {
-                ConnectorDiscoverySourceResolutionReason::Missing => 'missing primary discovery source',
-                ConnectorDiscoverySourceResolutionReason::Ambiguous => 'ambiguous primary discovery source',
-            };
-
-            throw AuthoritativeDiscoveryValidationException::discoverySourceUnavailable($reason);
-        }
-    }
-
-    public function externalFieldKeyExists(ConnectorAccount $account, string $externalFieldKey): bool
-    {
-        $snapshot = $this->resolveSnapshot($account);
-
-        if ($snapshot === null) {
-            return false;
-        }
-
-        return ConnectorSchemaSnapshotField::withoutWorkspaceScope()
-            ->where('snapshot_id', $snapshot->id)
-            ->where('external_field_key', $externalFieldKey)
-            ->exists();
     }
 }
