@@ -233,7 +233,8 @@ This document describes:
 - SyncConfiguration (account + data_domain + external_context; owns enabled
   semantic operations, selection, schedule state, mappings, revision);
 - FieldMapping (direction-neutral semantic correspondence owned by
-  SyncConfiguration);
+  SyncConfiguration; first persistence contract resolved — Task 4C-1a, 2026-08-12;
+  `field_binding_id` + `external_field_key` minimum slice for `products` domain);
 - SyncRun / SyncRunItem (preview/live execution evidence; SyncRunItem =
   business-record outcome);
 - ExternalRecordLink (account-scoped internal ↔ external record identity).
