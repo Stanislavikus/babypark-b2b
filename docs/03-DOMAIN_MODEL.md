@@ -3748,14 +3748,27 @@ For the first canonical provider:
 - an **exact equality** between `ConnectorDefinition.code` and registry
   `channel` permits lookup of registry knowledge for that account;
 - this is an **optional exact match**, not an assertion that the two namespaces
-  are identical sets (registry channels such as `schema_org` and `rozetka` have no
-  matching `ConnectorDefinition.code` on current `develop`; connector definition
-  codes such as `1c`, `csv`, and `google_sheets` have no matching registry
-  channel rows);
+  are identical sets;
 - no matching registry channel → **no canonical suggestion**, not an error;
 - do **not** add `registry_channel` to `ConnectorAccount`, `ConnectorDefinition`,
   or `ConnectorProfileDefinition` in this slice;
 - do **not** hardcode `adobe_commerce` inside the generic provider.
+
+**Normative rule:** registry `channel` namespace ≠ `ConnectorDefinition.code`
+namespace. Equality is evaluated per connected account only when codes happen to
+match; neither namespace is defined by the other.
+
+**Non-normative current-baseline evidence only** (may change as connectors are
+added; do not treat as permanent `[Resolved]` invariants):
+
+- registry channels observed in `canonical_product_field_mappings.csv` on current
+  `develop` include `adobe_commerce`, `google_merchant`, `rozetka`, `schema_org`,
+  `shopify`;
+- `ConnectorDefinition.code` values on current `develop` also include codes
+  without matching registry channel rows (e.g. `1c`, `csv`, `google_sheets`,
+  `bigcommerce`);
+- registry channels without a matching `ConnectorDefinition.code` on current
+  `develop` include `schema_org` and `rozetka`.
 
 ##### D. Runtime/schema version
 
@@ -3828,37 +3841,138 @@ A richer confidence taxonomy requires its own demonstrated need.
 
 ##### G. High-confidence qualification
 
-A candidate qualifies only when **all** of these are true:
+A candidate qualifies only when **all** per-candidate conditions (below), the
+canonical internal-target resolution chain (§G.1), and the projection-level
+suggestion-set 1:1 invariant (§G.2) are satisfied.
+
+**Per-candidate conditions:**
 
 1. parent `SyncConfiguration.data_domain` = `products`;
-2. internal target resolves to an actual eligible `FieldBinding`;
+2. internal target is a `FieldBinding` produced by the §G.1 resolution chain;
 3. binding is global or same-workspace;
 4. binding is `active`;
 5. parent `FieldDefinition` is `active`;
-6. object type is `product` or `product_variant`;
-7. canonical registry internal code corresponds deterministically to that
-   binding/definition;
-8. registry `channel` exactly matches this connector definition `code`;
-9. canonical mapping evidence has `verification_status = verified`;
-10. candidate `external_field` exactly exists as `external_field_key` in one
-    already-resolved authoritative snapshot;
-11. there is **exactly one** resulting semantic candidate for the internal target;
-12. candidate does **not** violate existing per-configuration 1:1 mappings:
+6. binding `object_type` is `product` or `product_variant`;
+7. registry `channel` exactly matches this connector definition `code`;
+8. canonical **mapping** evidence has `verification_status = verified`;
+9. candidate `external_field` exactly exists as `external_field_key` in the
+   authoritative snapshot resolved for this projection (§H);
+10. for this internal `field_binding_id`, there is **exactly one** resulting
+    semantic candidate after §G.1–§G.2;
+11. candidate does **not** violate existing per-configuration 1:1 mappings:
     - internal target already mapped → effective mapping wins;
     - external key already consumed by another effective mapping → do not suggest
       it.
 
-Fail closed to “no suggestion” on ambiguity.
+Fail closed to “no suggestion” on ambiguity. Do **not** invent fallback to
+labels, aliases, or fuzzy matching.
+
+###### G.1 Canonical internal target resolution (first slice)
+
+For a canonical mapping row with `internal_code = X`, high-confidence
+`FieldBinding` qualification requires this deterministic chain:
+
+1. **Load canonical field row** — read the corresponding
+   `canonical_product_fields.csv` row for `X`.
+2. **`field_definition_eligibility = yes`** — rows with `no` (pricing-domain,
+   availability-domain, media-domain, relation, connector-only, computed
+   projection, etc.) **cannot** be projected to a `FieldBinding` merely because
+   an identically named `FieldDefinition` happens to exist in the workspace.
+3. **Canonical field active + verified** — canonical field `status = active` and
+   `verification_status = verified`.
+4. **Canonical scope** — canonical field `scope` must describe a
+   `FieldDefinition`-backed **global** canonical field (`system` or
+   `platform_library`).
+5. **Resolve `FieldDefinition`** — exactly one row where:
+   - `workspace_id IS NULL`;
+   - `code = X` (canonical `internal_code`);
+   - actual definition `scope` equals canonical registry `scope`;
+   - definition `status = active`.
+6. **Workspace-custom same-code exclusion** — workspace-scoped definitions that
+   merely reuse the same `code` are **not** canonical suggestion targets in this
+   first slice.
+7. **Resolve `FieldBinding`** — active binding on that definition whose
+   `object_type` matches canonical `binding_strategy`:
+   - `product` → `product` binding;
+   - `product_variant` → `product_variant` binding;
+   - `product_and_variant_two_bindings` → each matching `product` / `product_variant`
+     binding may be evaluated separately as its own internal target.
+8. **Uniqueness** — fail closed if the canonical-field → definition → binding
+   chain is not unique for the internal target under evaluation.
+
+Do **not** resolve targets by label, alias, fuzzy name match, or workspace import
+memory.
+
+###### G.2 Suggestion-set 1:1 invariant (projection level)
+
+After generating deterministic candidates for the **whole**
+`SyncConfiguration` projection:
+
+```text
+one field_binding_id     → at most one suggested external_field_key
+one external_field_key   → at most one suggested field_binding_id
+```
+
+**Reservation order:**
+
+1. existing effective `FieldMapping` rows reserve their `field_binding_id` and
+   `external_field_key` first and **always win**;
+2. only **unconsumed** bindings and external keys may receive suggestions.
+
+**Collision rule:** if the same unconsumed `external_field_key` would be
+suggested for two or more different internal bindings, or the same unconsumed
+`field_binding_id` would receive two or more different external keys:
+
+```text
+collision among suggestions → no high-confidence suggestion for any colliding candidate
+```
+
+Do **not** choose first row, lexical sort winner, global-over-workspace winner,
+or any other arbitrary priority.
+
+This projection-level check is required even when each internal binding
+individually has exactly one candidate.
 
 ##### H. One authoritative discovery view per projection
 
-A suggestion/read-model build must resolve the authoritative snapshot **once**
-and use that same immutable snapshot for all candidate validation within that
-projection.
+Distinguish **mutation validation** (4C-1b, unchanged) from **read-model
+construction** (4C-1c-1).
 
-Do **not** repeatedly call `resolveRequiredSnapshot()` per field.
+**4C-1b (mutation) — unchanged:**
+
+- confirm/replace with no authoritative discovery → **reject**.
+
+**4C-1c-1 (read-model projection) — renderable without discovery:**
+
+The projection must remain buildable when:
+
+- primary discovery source is missing or ambiguous; or
+- no successful authoritative snapshot exists.
+
+**One resolution attempt per projection:**
+
+1. make **at most one** authoritative discovery resolution attempt per
+   projection;
+2. if a snapshot is resolved, use that **same** immutable snapshot for every
+   candidate validation within the projection;
+3. if not resolved, build the read-model in the discovery-unavailable state;
+4. do **not** call `resolveRequiredSnapshot()` per row or per field.
 
 This extends the already-corrected 4C-1b temporal-consistency principle.
+
+**Discovery-unavailable first-slice behavior:**
+
+| State | Behavior |
+|---|---|
+| No usable authoritative snapshot | no canonical suggestions; no discovered external choices |
+| Existing effective `FieldMapping` rows | retain and project unchanged |
+| Current discovery validity | cannot be proven → derived needs-attention / discovery-unavailable presentation state |
+| Persistence | **no** persistence changes |
+
+Do **not** delete or replace an existing `FieldMapping` merely because discovery
+is unavailable. Do **not** expose raw resolver exceptions, schema-source
+terminology, or other Layer C/D vocabulary to merchant UI. Do **not** introduce a
+persisted availability/status column or new DB enum in this slice.
 
 ##### I. Suggestions are side-effect free
 
@@ -3893,8 +4007,16 @@ It may combine:
 - eligible internal `FieldBinding` / `FieldDefinition`;
 - existing effective `FieldMapping`;
 - high-confidence suggestion, if any;
-- authoritative discovered field presentation metadata;
-- derived mapped / suggested / unresolved / needs-attention presentation state.
+- authoritative discovered field presentation metadata (when discovery resolved);
+- derived mapped / suggested / unresolved / needs-attention / discovery-unavailable
+  presentation state.
+
+When discovery is unavailable (§H), the read-model still renders:
+
+- existing effective mappings remain visible;
+- no canonical suggestions;
+- no discovered external field choices;
+- derived discovery-unavailable / needs-attention state only.
 
 It must **not** become a new persistence entity.
 

@@ -219,10 +219,84 @@ class FieldMappingDocumentationContractTest extends TestCase
     {
         $section = $this->fieldMappingSuggestionContractSection();
 
+        $this->assertStringContainsString('registry `channel` namespace ≠ `ConnectorDefinition.code`', $section);
         $this->assertStringContainsString('not an assertion that the two namespaces', $section);
         $this->assertStringContainsString('are identical sets', $section);
-        $this->assertStringContainsString('`schema_org`', $section);
+        $this->assertStringContainsString('Non-normative current-baseline evidence only', $section);
+        $this->assertStringContainsString('do not treat as permanent `[Resolved]` invariants', $section);
         $this->assertStringContainsString('no matching registry channel → **no canonical suggestion**', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_freezes_canonical_internal_target_resolution(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('G.1 Canonical internal target resolution', $section);
+        $this->assertStringContainsString('`field_definition_eligibility = yes`', $section);
+        $this->assertStringContainsString('canonical field `status = active`', $section);
+        $this->assertStringContainsString('`verification_status = verified`', $section);
+        $this->assertStringContainsString('canonical field `scope` must describe', $section);
+        $this->assertStringContainsString('`system` or', $section);
+        $this->assertStringContainsString('`platform_library`', $section);
+        $this->assertStringContainsString('`workspace_id IS NULL`', $section);
+        $this->assertStringContainsString('`code = X`', $section);
+        $this->assertStringContainsString('actual definition `scope` equals canonical registry `scope`', $section);
+        $this->assertStringContainsString('Workspace-custom same-code exclusion', $section);
+        $this->assertStringContainsString('`binding_strategy`', $section);
+        $this->assertStringContainsString('`product_and_variant_two_bindings`', $section);
+        $this->assertStringContainsString('fail closed if the canonical-field → definition → binding', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_excludes_ineligible_canonical_fields_from_field_binding_projection(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('rows with `no`', $section);
+        $this->assertStringContainsString('**cannot** be projected to a `FieldBinding`', $section);
+        $this->assertStringContainsString('pricing-domain', $section);
+        $this->assertStringContainsString('connector-only', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_enforces_projection_level_suggestion_one_to_one_invariant(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('G.2 Suggestion-set 1:1 invariant', $section);
+        $this->assertStringContainsString('one field_binding_id     → at most one suggested external_field_key', $section);
+        $this->assertStringContainsString('one external_field_key   → at most one suggested field_binding_id', $section);
+        $this->assertStringContainsString('collision among suggestions → no high-confidence suggestion for any colliding candidate', $section);
+        $this->assertStringContainsString('Do **not** choose first row', $section);
+        $this->assertMatchesRegularExpression('/even when each internal binding\s+individually has exactly one candidate/', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_allows_read_model_without_authoritative_discovery(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('Distinguish **mutation validation**', $section);
+        $this->assertStringContainsString('confirm/replace with no authoritative discovery → **reject**', $section);
+        $this->assertStringContainsString('renderable without discovery', $section);
+        $this->assertStringContainsString('at most one** authoritative discovery resolution attempt', $section);
+        $this->assertStringContainsString('discovery-unavailable state', $section);
+        $this->assertStringContainsString('do **not** call `resolveRequiredSnapshot()` per row', $section);
+        $this->assertStringContainsString('Do **not** delete or replace an existing `FieldMapping` merely because discovery', $section);
+        $this->assertMatchesRegularExpression('/Do \*\*not\*\* introduce a\s+persisted availability\/status column/', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_projects_existing_mappings_when_discovery_unavailable(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('No usable authoritative snapshot', $section);
+        $this->assertStringContainsString('no canonical suggestions', $section);
+        $this->assertStringContainsString('retain and project unchanged', $section);
+        $this->assertStringContainsString('discovery-unavailable / needs-attention state only', $section);
+        $this->assertStringContainsString('existing effective mappings remain visible', $section);
     }
 
     #[Test]
@@ -231,7 +305,7 @@ class FieldMappingDocumentationContractTest extends TestCase
         $section = $this->fieldMappingSuggestionContractSection();
 
         $this->assertStringContainsString('ambiguous** → **no**', $section);
-        $this->assertStringContainsString('exactly one** resulting semantic candidate', $section);
+        $this->assertMatchesRegularExpression('/\*\*exactly one\*\* resulting\s+semantic candidate/', $section);
         $this->assertStringContainsString('Fail closed to “no suggestion” on ambiguity', $section);
         $this->assertStringContainsString('No arbitrary “latest”', $section);
     }
