@@ -205,15 +205,18 @@ class SyncConfigurationFoundationTest extends TestCase
     public function canonically_equivalent_external_contexts_cannot_create_duplicate_identities(): void
     {
         $account = $this->createSyncSupportAccount();
-        $derivedKey = SyncExternalContext::fromPayload(['region' => 'eu', 'channel' => 'retail'])->uniquenessKey();
+        $expectedContext = SyncExternalContext::fromPayload(['region' => 'eu', 'channel' => 'retail']);
 
         $first = $this->createSyncConfigurationViaEloquent($account, [
             'external_context' => ['region' => 'eu', 'channel' => 'retail'],
             'configuration_revision' => hash('sha256', 'canonical-a'),
         ]);
 
-        $this->assertSame($derivedKey, $first->external_context_key);
-        $this->assertSame(['channel' => 'retail', 'region' => 'eu'], $first->external_context);
+        $expectedContext = SyncExternalContext::fromPayload(['region' => 'eu', 'channel' => 'retail']);
+        $persistedContext = SyncExternalContext::fromPayload($first->external_context);
+
+        $this->assertTrue($expectedContext->equals($persistedContext));
+        $this->assertSame($expectedContext->uniquenessKey(), $first->external_context_key);
 
         $this->expectException(QueryException::class);
 
@@ -320,11 +323,11 @@ class SyncConfigurationFoundationTest extends TestCase
             'configuration_revision' => hash('sha256', 'valid-associative'),
         ]);
 
-        $this->assertSame(['channel' => 'retail', 'region' => 'eu'], $configuration->external_context);
-        $this->assertSame(
-            SyncExternalContext::fromPayload(['region' => 'eu', 'channel' => 'retail'])->uniquenessKey(),
-            $configuration->external_context_key,
-        );
+        $expectedContext = SyncExternalContext::fromPayload(['channel' => 'retail', 'region' => 'eu']);
+        $persistedContext = SyncExternalContext::fromPayload($configuration->external_context);
+
+        $this->assertTrue($expectedContext->equals($persistedContext));
+        $this->assertSame($expectedContext->uniquenessKey(), $configuration->external_context_key);
     }
 
     #[Test]
