@@ -20,6 +20,13 @@ final class FieldMappingValidationException extends RuntimeException
         );
     }
 
+    public static function foreignWorkspaceDefinition(string $fieldDefinitionId): self
+    {
+        return new self(
+            "Field definition {$fieldDefinitionId} is not eligible for this workspace.",
+        );
+    }
+
     public static function archivedBinding(string $fieldBindingId): self
     {
         return new self(

@@ -110,52 +110,45 @@ class FieldMappingPersistenceTest extends TestCase
     }
 
     #[Test]
-    public function mapped_field_binding_delete_is_blocked_at_database_and_model_layer(): void
+    public function mapped_field_binding_model_delete_raises_domain_exception(): void
     {
-        $account = $this->createSyncSupportAccount();
-        $configuration = $this->createProductsSyncConfiguration($account);
-        $binding = $this->productBinding();
-        $this->publishAuthoritativeSnapshot($account, ['name']);
-
-        app(FieldMappingMutationService::class)->confirm(
-            $account,
-            $configuration->id,
-            $binding->id,
-            'name',
-        );
+        $fixture = $this->createMappedFieldBindingFixture('model_delete_key');
 
         $this->expectException(FieldBindingReferencedByFieldMappingException::class);
-        $binding->delete();
-
-        $this->expectException(QueryException::class);
-        DB::table('field_bindings')->where('id', $binding->id)->delete();
+        $fixture['binding']->delete();
     }
 
     #[Test]
-    public function mapped_descendant_blocks_parent_field_definition_delete(): void
+    public function mapped_field_binding_raw_delete_is_restricted_by_database(): void
     {
-        $account = $this->createSyncSupportAccount();
-        $configuration = $this->createProductsSyncConfiguration($account);
-        $binding = $this->productBinding();
-        $definition = $binding->fieldDefinition;
-        $this->publishAuthoritativeSnapshot($account, ['name']);
+        $fixture = $this->createMappedFieldBindingFixture('raw_delete_key');
 
-        app(FieldMappingMutationService::class)->confirm(
-            $account,
-            $configuration->id,
-            $binding->id,
-            'name',
-        );
+        $this->expectException(QueryException::class);
+        DB::table('field_bindings')->where('id', $fixture['binding']->id)->delete();
+    }
+
+    #[Test]
+    public function mapped_field_definition_model_delete_raises_domain_exception(): void
+    {
+        $fixture = $this->createMappedFieldBindingFixture('definition_model_delete_key');
+        $definition = $fixture['binding']->fieldDefinition;
 
         $this->expectException(FieldDefinitionReferencedByFieldMappingException::class);
         $definition->delete();
+    }
+
+    #[Test]
+    public function mapped_field_definition_raw_delete_is_restricted_transitively(): void
+    {
+        $fixture = $this->createMappedFieldBindingFixture('definition_raw_delete_key');
+        $definition = $fixture['binding']->fieldDefinition;
 
         $this->expectException(QueryException::class);
         DB::table('field_definitions')->where('id', $definition->id)->delete();
     }
 
     #[Test]
-    public function cross_workspace_mapped_descendant_blocks_global_field_definition_delete(): void
+    public function cross_workspace_field_definition_model_delete_raises_domain_exception(): void
     {
         $workspaceA = $this->defaultWorkspace();
         $workspaceB = Workspace::query()->create(['name' => 'Cross-workspace B', 'is_default' => false]);
@@ -193,8 +186,7 @@ class FieldMappingPersistenceTest extends TestCase
 
         $context = app(WorkspaceContext::class);
         $context->reset();
-        $currentProperty = new \ReflectionProperty(WorkspaceContext::class, 'current');
-        $currentProperty->setValue($context, $workspaceB);
+        $this->setWorkspaceContext($workspaceB);
 
         $this->publishAuthoritativeSnapshot($accountB, ['cross_ws_key']);
 
@@ -205,7 +197,7 @@ class FieldMappingPersistenceTest extends TestCase
             'cross_ws_key',
         );
 
-        $currentProperty->setValue($context, $workspaceA);
+        $this->setWorkspaceContext($workspaceA);
 
         $this->assertFalse(
             $definition->fieldBindings()->whereKey($bindingB->id)->exists(),
@@ -214,6 +206,56 @@ class FieldMappingPersistenceTest extends TestCase
 
         $this->expectException(FieldDefinitionReferencedByFieldMappingException::class);
         $definition->delete();
+    }
+
+    #[Test]
+    public function cross_workspace_field_definition_raw_delete_is_restricted_transitively(): void
+    {
+        $workspaceA = $this->defaultWorkspace();
+        $workspaceB = Workspace::query()->create(['name' => 'Cross-workspace B raw', 'is_default' => false]);
+
+        $definition = FieldDefinition::withoutWorkspaceScope()->create([
+            'workspace_id' => null,
+            'code' => 'global_cross_ws_raw_'.Str::random(6),
+            'data_type' => AttributeDataType::Text,
+            'scope' => AttributeScope::PlatformLibrary,
+            'localized_labels' => ['uk' => 'Глобальне поле'],
+            'description' => null,
+            'validation_rules' => null,
+            'is_localizable' => false,
+            'is_multi_value' => false,
+            'status' => AttributeStatus::Active,
+        ]);
+
+        $bindingB = FieldBinding::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspaceB->id,
+            'field_definition_id' => $definition->id,
+            'object_type' => FieldObjectType::Product,
+            'storage_type' => AttributeStorageType::Dynamic,
+            'storage_path' => null,
+            'field_group' => 'characteristics',
+            'is_required' => false,
+            'is_filterable' => false,
+            'is_sortable' => false,
+            'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+            'sort_order' => 999,
+            'status' => AttributeStatus::Active,
+        ]);
+
+        $accountB = $this->createSyncSupportAccountForWorkspace($workspaceB);
+        $configuration = $this->createProductsSyncConfiguration($accountB);
+
+        $this->setWorkspaceContext($workspaceB);
+        $this->publishAuthoritativeSnapshot($accountB, ['cross_ws_raw_key']);
+
+        app(FieldMappingMutationService::class)->confirm(
+            $accountB,
+            $configuration->id,
+            $bindingB->id,
+            'cross_ws_raw_key',
+        );
+
+        $this->setWorkspaceContext($workspaceA);
 
         $this->expectException(QueryException::class);
         DB::table('field_definitions')->where('id', $definition->id)->delete();
@@ -267,6 +309,59 @@ class FieldMappingPersistenceTest extends TestCase
 
         $this->assertSame(1, FieldMapping::withoutWorkspaceScope()->count());
         $this->assertSame($first->configuration_revision, $second->configuration_revision);
+    }
+
+    #[Test]
+    public function migration_revision_roundtrip_restores_v1_and_reapplies_v2(): void
+    {
+        $this->rollbackThrough('2026_08_12_110000_field_mappings');
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+
+        $cases = [
+            [['import'], SyncConfigurationOperationalState::Enabled->value],
+            [['export'], SyncConfigurationOperationalState::Enabled->value],
+            [['export', 'import'], SyncConfigurationOperationalState::Enabled->value],
+            [['import'], SyncConfigurationOperationalState::Paused->value],
+        ];
+
+        foreach ($cases as [$operations, $state]) {
+            $v1Revision = $this->migrationHashV1($operations, $state);
+            $expectedV2 = $this->migrationHashV2($operations, $state);
+
+            DB::table('sync_configurations')->where('id', $configuration->id)->update([
+                'enabled_operations' => json_encode($operations, JSON_THROW_ON_ERROR),
+                'operational_state' => $state,
+                'configuration_revision' => $v1Revision,
+            ]);
+
+            $migration = $this->fieldMappingsMigration();
+            $migration->up();
+
+            $this->assertSame(
+                $expectedV2,
+                DB::table('sync_configurations')->where('id', $configuration->id)->value('configuration_revision'),
+            );
+
+            $migration->down();
+
+            $this->assertSame(
+                $v1Revision,
+                DB::table('sync_configurations')->where('id', $configuration->id)->value('configuration_revision'),
+            );
+
+            $migration->up();
+
+            $this->assertSame(
+                $expectedV2,
+                DB::table('sync_configurations')->where('id', $configuration->id)->value('configuration_revision'),
+            );
+
+            $migration->down();
+        }
+
+        $this->artisan('migrate')->assertExitCode(0);
     }
 
     #[Test]
@@ -348,43 +443,250 @@ class FieldMappingPersistenceTest extends TestCase
     }
 
     #[Test]
-    public function customer_binding_and_archived_targets_are_rejected(): void
+    public function customer_binding_is_rejected_for_products_mapping(): void
     {
         $account = $this->createSyncSupportAccount();
         $configuration = $this->createProductsSyncConfiguration($account);
-        $service = app(FieldMappingMutationService::class);
-        $this->publishAuthoritativeSnapshot($account, ['customer_key', 'archived_key']);
-
-        $customerBinding = $this->customerBinding();
+        $this->publishAuthoritativeSnapshot($account, ['customer_key']);
 
         $this->expectException(FieldMappingValidationException::class);
-        $service->confirm($account, $configuration->id, $customerBinding->id, 'customer_key');
+
+        app(FieldMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $this->customerBinding()->id,
+            'customer_key',
+        );
+    }
+
+    #[Test]
+    public function archived_binding_is_rejected_for_products_mapping(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $this->publishAuthoritativeSnapshot($account, ['archived_binding_key']);
 
         $archivedBinding = $this->productBinding('description');
         $archivedBinding->update(['status' => AttributeStatus::Archived]);
 
         $this->expectException(FieldMappingValidationException::class);
-        $service->confirm($account, $configuration->id, $archivedBinding->id, 'archived_key');
+
+        app(FieldMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $archivedBinding->id,
+            'archived_binding_key',
+        );
     }
 
     #[Test]
-    public function discovery_validation_accepts_valid_key_and_rejects_absent_or_missing_snapshot(): void
+    public function archived_definition_is_rejected_for_products_mapping(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $binding = $this->productBinding('description');
+        $binding->fieldDefinition->update(['status' => AttributeStatus::Archived]);
+        $this->publishAuthoritativeSnapshot($account, ['archived_definition_key']);
+
+        $this->expectException(FieldMappingValidationException::class);
+
+        app(FieldMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $binding->id,
+            'archived_definition_key',
+        );
+    }
+
+    #[Test]
+    public function discovery_validation_rejects_when_no_authoritative_snapshot(): void
     {
         $account = $this->createSyncSupportAccount();
         $configuration = $this->createProductsSyncConfiguration($account);
         $binding = $this->productBinding();
-        $service = app(FieldMappingMutationService::class);
 
         $this->expectException(AuthoritativeDiscoveryValidationException::class);
-        $service->confirm($account, $configuration->id, $binding->id, 'missing_snapshot_key');
 
+        app(FieldMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $binding->id,
+            'missing_snapshot_key',
+        );
+    }
+
+    #[Test]
+    public function discovery_validation_rejects_absent_external_field_key(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $binding = $this->productBinding();
+        $this->publishAuthoritativeSnapshot($account, ['present_key']);
+
+        $this->expectException(AuthoritativeDiscoveryValidationException::class);
+
+        app(FieldMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $binding->id,
+            'absent_key',
+        );
+    }
+
+    #[Test]
+    public function discovery_validation_accepts_valid_external_field_key(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $binding = $this->productBinding();
         $this->publishAuthoritativeSnapshot($account, ['valid_key']);
 
-        $this->expectException(AuthoritativeDiscoveryValidationException::class);
-        $service->confirm($account, $configuration->id, $binding->id, 'absent_key');
+        app(FieldMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $binding->id,
+            'valid_key',
+        );
 
-        $service->confirm($account, $configuration->id, $binding->id, 'valid_key');
         $this->assertTrue(FieldMapping::withoutWorkspaceScope()->where('external_field_key', 'valid_key')->exists());
+    }
+
+    #[Test]
+    public function workspace_b_definition_accepted_with_ambient_workspace_a_context(): void
+    {
+        $workspaceA = $this->defaultWorkspace();
+        $workspaceB = Workspace::query()->create(['name' => 'Validator workspace B', 'is_default' => false]);
+
+        $definition = FieldDefinition::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspaceB->id,
+            'code' => 'ws_b_def_'.Str::random(6),
+            'data_type' => AttributeDataType::Text,
+            'scope' => AttributeScope::WorkspaceCustom,
+            'localized_labels' => ['uk' => 'Поле B'],
+            'description' => null,
+            'validation_rules' => null,
+            'is_localizable' => false,
+            'is_multi_value' => false,
+            'status' => AttributeStatus::Active,
+        ]);
+
+        $bindingB = FieldBinding::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspaceB->id,
+            'field_definition_id' => $definition->id,
+            'object_type' => FieldObjectType::Product,
+            'storage_type' => AttributeStorageType::Dynamic,
+            'storage_path' => null,
+            'field_group' => 'characteristics',
+            'is_required' => false,
+            'is_filterable' => false,
+            'is_sortable' => false,
+            'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+            'sort_order' => 999,
+            'status' => AttributeStatus::Active,
+        ]);
+
+        $accountB = $this->createSyncSupportAccountForWorkspace($workspaceB);
+        $configuration = $this->createProductsSyncConfiguration($accountB);
+
+        $this->setWorkspaceContext($workspaceA);
+        $this->setWorkspaceContext($workspaceB);
+        $this->publishAuthoritativeSnapshot($accountB, ['ws_b_key']);
+        $this->setWorkspaceContext($workspaceA);
+
+        app(FieldMappingMutationService::class)->confirm(
+            $accountB,
+            $configuration->id,
+            $bindingB->id,
+            'ws_b_key',
+        );
+
+        $this->assertTrue(
+            FieldMapping::withoutWorkspaceScope()
+                ->where('sync_configuration_id', $configuration->id)
+                ->where('field_binding_id', $bindingB->id)
+                ->exists(),
+        );
+    }
+
+    #[Test]
+    public function global_binding_with_foreign_workspace_definition_is_rejected(): void
+    {
+        $workspaceA = $this->defaultWorkspace();
+        $workspaceB = Workspace::query()->create(['name' => 'Validator foreign B', 'is_default' => false]);
+
+        $foreignDefinition = FieldDefinition::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspaceB->id,
+            'code' => 'ws_b_foreign_'.Str::random(6),
+            'data_type' => AttributeDataType::Text,
+            'scope' => AttributeScope::WorkspaceCustom,
+            'localized_labels' => ['uk' => 'Поле B foreign'],
+            'description' => null,
+            'validation_rules' => null,
+            'is_localizable' => false,
+            'is_multi_value' => false,
+            'status' => AttributeStatus::Active,
+        ]);
+
+        $globalBinding = FieldBinding::withoutWorkspaceScope()->create([
+            'workspace_id' => null,
+            'field_definition_id' => $foreignDefinition->id,
+            'object_type' => FieldObjectType::Product,
+            'storage_type' => AttributeStorageType::Dynamic,
+            'storage_path' => null,
+            'field_group' => 'characteristics',
+            'is_required' => false,
+            'is_filterable' => false,
+            'is_sortable' => false,
+            'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+            'sort_order' => 999,
+            'status' => AttributeStatus::Active,
+        ]);
+
+        $accountA = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($accountA);
+        $this->publishAuthoritativeSnapshot($accountA, ['foreign_def_key']);
+
+        $this->setWorkspaceContext($workspaceA);
+
+        $this->expectException(FieldMappingValidationException::class);
+
+        app(FieldMappingMutationService::class)->confirm(
+            $accountA,
+            $configuration->id,
+            $globalBinding->id,
+            'foreign_def_key',
+        );
+    }
+
+    #[Test]
+    public function duplicate_internal_target_in_same_configuration_is_rejected(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $binding = $this->productBinding('name');
+        $this->publishAuthoritativeSnapshot($account, ['key_a', 'key_b']);
+
+        app(FieldMappingMutationService::class)->confirm($account, $configuration->id, $binding->id, 'key_a');
+
+        $this->expectException(FieldMappingConflictException::class);
+
+        app(FieldMappingMutationService::class)->confirm($account, $configuration->id, $binding->id, 'key_b');
+    }
+
+    #[Test]
+    public function duplicate_external_key_in_same_configuration_is_rejected(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $bindingA = $this->productBinding('name');
+        $bindingB = $this->productBinding('description');
+        $this->publishAuthoritativeSnapshot($account, ['shared_key']);
+
+        app(FieldMappingMutationService::class)->confirm($account, $configuration->id, $bindingA->id, 'shared_key');
+
+        $this->expectException(FieldMappingConflictException::class);
+
+        app(FieldMappingMutationService::class)->confirm($account, $configuration->id, $bindingB->id, 'shared_key');
     }
 
     #[Test]
@@ -402,11 +704,27 @@ class FieldMappingPersistenceTest extends TestCase
 
         $service->confirm($account, $configuration->id, $binding->id, 'fresh_key');
         $this->assertTrue(FieldMapping::withoutWorkspaceScope()->where('external_field_key', 'fresh_key')->exists());
+        $this->assertSame($newerSnapshot->id, $newerSnapshot->refresh()->id);
+    }
+
+    #[Test]
+    public function stale_external_key_from_older_snapshot_is_rejected(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $service = app(FieldMappingMutationService::class);
+
+        $this->publishAuthoritativeSnapshot($account, ['stale_key'], now()->subHour());
+        $this->publishAuthoritativeSnapshot($account, ['fresh_key'], now());
 
         $this->expectException(AuthoritativeDiscoveryValidationException::class);
-        $service->confirm($account, $configuration->id, $this->productVariantBinding('sku')->id, 'stale_key');
 
-        $this->assertSame($newerSnapshot->id, $newerSnapshot->refresh()->id);
+        $service->confirm(
+            $account,
+            $configuration->id,
+            $this->productVariantBinding('sku')->id,
+            'stale_key',
+        );
     }
 
     #[Test]
@@ -432,27 +750,7 @@ class FieldMappingPersistenceTest extends TestCase
     }
 
     #[Test]
-    public function cardinality_conflicts_are_detected_for_internal_and_external_duplicates(): void
-    {
-        $account = $this->createSyncSupportAccount();
-        $configuration = $this->createProductsSyncConfiguration($account);
-        $service = app(FieldMappingMutationService::class);
-        $bindingA = $this->productBinding('name');
-        $bindingB = $this->productBinding('description');
-
-        $this->publishAuthoritativeSnapshot($account, ['key_a', 'key_b']);
-
-        $service->confirm($account, $configuration->id, $bindingA->id, 'key_a');
-
-        $this->expectException(FieldMappingConflictException::class);
-        $service->confirm($account, $configuration->id, $bindingA->id, 'key_b');
-
-        $this->expectException(FieldMappingConflictException::class);
-        $service->confirm($account, $configuration->id, $bindingB->id, 'key_a');
-    }
-
-    #[Test]
-    public function same_binding_and_key_allowed_in_another_configuration(): void
+    public function same_external_key_is_allowed_across_different_configurations(): void
     {
         $account = $this->createSyncSupportAccount();
         $configurationA = $this->createProductsSyncConfiguration($account);
@@ -669,5 +967,76 @@ class FieldMappingPersistenceTest extends TestCase
         }
 
         return false;
+    }
+
+    /**
+     * @return array{account: ConnectorAccount, configuration: SyncConfiguration, binding: FieldBinding}
+     */
+    private function createMappedFieldBindingFixture(string $externalKey): array
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $binding = $this->productBinding();
+        $this->publishAuthoritativeSnapshot($account, [$externalKey]);
+
+        app(FieldMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $binding->id,
+            $externalKey,
+        );
+
+        return [
+            'account' => $account,
+            'configuration' => $configuration,
+            'binding' => $binding,
+        ];
+    }
+
+    private function setWorkspaceContext(Workspace $workspace): void
+    {
+        $context = app(WorkspaceContext::class);
+        $reflection = new \ReflectionProperty(WorkspaceContext::class, 'current');
+        $reflection->setAccessible(true);
+        $reflection->setValue($context, $workspace);
+    }
+
+    /**
+     * @param  list<string>  $operations
+     */
+    private function migrationHashV1(array $operations, string $operationalState): string
+    {
+        $migration = $this->fieldMappingsMigration();
+        $reflection = new \ReflectionClass($migration);
+        $canonicalMethod = $reflection->getMethod('canonicalizePersistedOperations');
+        $canonicalMethod->setAccessible(true);
+        $hashMethod = $reflection->getMethod('hashRevisionV1');
+        $hashMethod->setAccessible(true);
+
+        $canonical = $canonicalMethod->invoke($migration, $operations);
+
+        return $hashMethod->invoke($migration, $canonical, $operationalState);
+    }
+
+    /**
+     * @param  list<string>  $operations
+     */
+    private function migrationHashV2(array $operations, string $operationalState): string
+    {
+        $migration = $this->fieldMappingsMigration();
+        $reflection = new \ReflectionClass($migration);
+        $canonicalMethod = $reflection->getMethod('canonicalizePersistedOperations');
+        $canonicalMethod->setAccessible(true);
+        $hashMethod = $reflection->getMethod('hashRevisionV2EmptyMappings');
+        $hashMethod->setAccessible(true);
+
+        $canonical = $canonicalMethod->invoke($migration, $operations);
+
+        return $hashMethod->invoke($migration, $canonical, $operationalState);
+    }
+
+    private function fieldMappingsMigration(): object
+    {
+        return require database_path('migrations/2026_08_12_110000_field_mappings.php');
     }
 }

@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    private const REVISION_V1_PREFIX = 'babypark.sync-configuration-revision.v1';
+
     private const REVISION_V2_PREFIX = 'babypark.sync-configuration-revision.v2';
 
     public function up(): void
@@ -55,6 +57,33 @@ return new class extends Migration
         }
 
         Schema::dropIfExists('field_mappings');
+
+        $this->rebaselineConfigurationRevisionsToV1();
+    }
+
+    private function rebaselineConfigurationRevisionsToV1(): void
+    {
+        $rows = DB::table('sync_configurations')
+            ->orderBy('id')
+            ->get(['id', 'enabled_operations', 'operational_state']);
+
+        foreach ($rows as $row) {
+            /** @var list<string>|null $operationValues */
+            $operationValues = json_decode((string) $row->enabled_operations, true);
+
+            if (! is_array($operationValues)) {
+                $operationValues = [];
+            }
+
+            $revision = $this->hashRevisionV1(
+                $this->canonicalizePersistedOperations($operationValues),
+                (string) ($row->operational_state ?? 'enabled'),
+            );
+
+            DB::table('sync_configurations')
+                ->where('id', $row->id)
+                ->update(['configuration_revision' => $revision]);
+        }
     }
 
     private function rebaselineConfigurationRevisionsToV2(): void
@@ -106,6 +135,20 @@ return new class extends Migration
         sort($canonical, SORT_STRING);
 
         return $canonical;
+    }
+
+    /**
+     * @param  list<string>  $enabledOperations
+     */
+    private function hashRevisionV1(array $enabledOperations, string $operationalState): string
+    {
+        $payload = new stdClass;
+        $payload->enabled_operations = $enabledOperations;
+        $payload->operational_state = $operationalState;
+
+        $json = $this->encodeCanonicalJson($this->sortObjectKeysRecursively($payload));
+
+        return hash('sha256', self::REVISION_V1_PREFIX."\n".$json);
     }
 
     /**

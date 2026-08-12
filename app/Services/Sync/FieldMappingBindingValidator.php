@@ -7,6 +7,7 @@ use App\Enums\FieldObjectType;
 use App\Enums\SyncDataDomain;
 use App\Models\ConnectorAccount;
 use App\Models\FieldBinding;
+use App\Models\FieldDefinition;
 use App\Models\SyncConfiguration;
 use App\Services\Connectors\AuthoritativeConnectorSchemaSnapshotResolver;
 use App\Support\Sync\Exceptions\AuthoritativeDiscoveryValidationException;
@@ -29,9 +30,7 @@ final class FieldMappingBindingValidator
         SyncConfiguration $configuration,
         string $fieldBindingId,
     ): FieldBinding {
-        $binding = FieldBinding::withoutWorkspaceScope()
-            ->with('fieldDefinition')
-            ->find($fieldBindingId);
+        $binding = FieldBinding::withoutWorkspaceScope()->find($fieldBindingId);
 
         if ($binding === null) {
             throw FieldMappingValidationException::foreignWorkspaceBinding($fieldBindingId);
@@ -45,10 +44,18 @@ final class FieldMappingBindingValidator
             throw FieldMappingValidationException::archivedBinding($fieldBindingId);
         }
 
-        $definition = $binding->fieldDefinition;
+        $definition = FieldDefinition::withoutWorkspaceScope()->find($binding->field_definition_id);
 
-        if ($definition === null || $definition->status !== AttributeStatus::Active) {
+        if ($definition === null) {
             throw FieldMappingValidationException::archivedDefinition($binding->field_definition_id);
+        }
+
+        if ($definition->workspace_id !== null && $definition->workspace_id !== $configuration->workspace_id) {
+            throw FieldMappingValidationException::foreignWorkspaceDefinition($definition->id);
+        }
+
+        if ($definition->status !== AttributeStatus::Active) {
+            throw FieldMappingValidationException::archivedDefinition($definition->id);
         }
 
         if (! in_array($binding->object_type, [FieldObjectType::Product, FieldObjectType::ProductVariant], true)) {
