@@ -1,16 +1,14 @@
 <?php
 
-use App\Enums\SyncConfigurationOperationalState;
-use App\Enums\SyncSemanticOperation;
-use App\Models\SyncConfiguration;
-use App\Support\Sync\SyncConfigurationRevisionHasher;
-use App\Support\Sync\SyncOperationSet;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    private const REVISION_V2_PREFIX = 'babypark.sync-configuration-revision.v2';
+
     public function up(): void
     {
         Schema::create('field_mappings', function (Blueprint $table) {
@@ -61,23 +59,100 @@ return new class extends Migration
 
     private function rebaselineConfigurationRevisionsToV2(): void
     {
-        $hasher = new SyncConfigurationRevisionHasher;
-
-        SyncConfiguration::withoutWorkspaceScope()
+        $rows = DB::table('sync_configurations')
             ->orderBy('id')
-            ->each(function (SyncConfiguration $configuration) use ($hasher): void {
-                $operationValues = $configuration->enabled_operations ?? [];
-                $operations = array_map(
-                    static fn (string $operation): SyncSemanticOperation => SyncSemanticOperation::from($operation),
-                    $operationValues,
-                );
+            ->get(['id', 'enabled_operations', 'operational_state']);
 
-                $configuration->configuration_revision = $hasher->hash(
-                    SyncOperationSet::fromOperations($operations),
-                    $configuration->operational_state ?? SyncConfigurationOperationalState::Enabled,
-                    [],
-                );
-                $configuration->save();
-            });
+        foreach ($rows as $row) {
+            /** @var list<string>|null $operationValues */
+            $operationValues = json_decode((string) $row->enabled_operations, true);
+
+            if (! is_array($operationValues)) {
+                $operationValues = [];
+            }
+
+            $revision = $this->hashRevisionV2EmptyMappings(
+                $this->canonicalizePersistedOperations($operationValues),
+                (string) ($row->operational_state ?? 'enabled'),
+            );
+
+            DB::table('sync_configurations')
+                ->where('id', $row->id)
+                ->update(['configuration_revision' => $revision]);
+        }
+    }
+
+    /**
+     * @param  list<string>  $operations
+     * @return list<string>
+     */
+    private function canonicalizePersistedOperations(array $operations): array
+    {
+        if (! array_is_list($operations)) {
+            return [];
+        }
+
+        $unique = [];
+
+        foreach ($operations as $operation) {
+            if (! is_string($operation)) {
+                continue;
+            }
+
+            $unique[$operation] = true;
+        }
+
+        $canonical = array_keys($unique);
+        sort($canonical, SORT_STRING);
+
+        return $canonical;
+    }
+
+    /**
+     * @param  list<string>  $enabledOperations
+     */
+    private function hashRevisionV2EmptyMappings(array $enabledOperations, string $operationalState): string
+    {
+        $payload = new stdClass;
+        $payload->enabled_operations = $enabledOperations;
+        $payload->operational_state = $operationalState;
+        $payload->field_mappings = [];
+
+        $json = $this->encodeCanonicalJson($this->sortObjectKeysRecursively($payload));
+
+        return hash('sha256', self::REVISION_V2_PREFIX."\n".$json);
+    }
+
+    private function encodeCanonicalJson(mixed $value): string
+    {
+        return json_encode(
+            $value,
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+        );
+    }
+
+    private function sortObjectKeysRecursively(mixed $value): mixed
+    {
+        if ($value instanceof stdClass) {
+            $array = (array) $value;
+            ksort($array, SORT_STRING);
+
+            $result = new stdClass;
+
+            foreach ($array as $key => $nested) {
+                $result->{$key} = $this->sortObjectKeysRecursively($nested);
+            }
+
+            return $result;
+        }
+
+        if (is_array($value)) {
+            return array_map(
+                fn (mixed $item): mixed => $this->sortObjectKeysRecursively($item),
+                $value,
+            );
+        }
+
+        return $value;
     }
 };

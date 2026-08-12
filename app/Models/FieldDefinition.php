@@ -34,7 +34,9 @@ class FieldDefinition extends Model
     protected static function booted(): void
     {
         static::deleting(function (FieldDefinition $definition): void {
-            $bindingIds = $definition->fieldBindings()->pluck('id');
+            $bindingIds = FieldBinding::withoutWorkspaceScope()
+                ->where('field_definition_id', $definition->id)
+                ->pluck('id');
 
             if ($bindingIds->isEmpty()) {
                 return;

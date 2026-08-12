@@ -28,8 +28,10 @@ final class AuthoritativeConnectorSchemaSnapshotResolver
             ->where('workspace_id', $account->workspace_id)
             ->where('connector_account_id', $account->id)
             ->where('connector_schema_source_id', $source->id)
-            ->whereHas('discoveryRun', function ($query): void {
-                $query->where('status', ConnectorDiscoveryRunStatus::Succeeded);
+            ->whereHas('discoveryRun', function ($query) use ($account): void {
+                $query->withoutGlobalScopes()
+                    ->where('workspace_id', $account->workspace_id)
+                    ->where('status', ConnectorDiscoveryRunStatus::Succeeded);
             })
             ->orderByDesc('created_at')
             ->orderByDesc('id')

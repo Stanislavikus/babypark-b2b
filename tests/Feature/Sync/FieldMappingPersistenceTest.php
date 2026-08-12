@@ -2,13 +2,20 @@
 
 namespace Tests\Feature\Sync;
 
+use App\Enums\AttributeDataType;
+use App\Enums\AttributeScope;
 use App\Enums\AttributeStatus;
+use App\Enums\AttributeStorageType;
+use App\Enums\FieldObjectType;
 use App\Enums\SyncConfigurationOperationalState;
 use App\Enums\SyncDataDomain;
 use App\Enums\SyncSemanticOperation;
 use App\Models\ConnectorAccount;
+use App\Models\FieldBinding;
+use App\Models\FieldDefinition;
 use App\Models\FieldMapping;
 use App\Models\SyncConfiguration;
+use App\Models\Workspace;
 use App\Services\Sync\CreateSyncConfigurationInput;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\SyncConfigurationMutationCoordinator;
@@ -22,12 +29,15 @@ use App\Support\Sync\Exceptions\FieldMappingValidationException;
 use App\Support\Sync\FieldMappingRevisionEntry;
 use App\Support\Sync\SyncConfigurationRevisionHasher;
 use App\Support\Sync\SyncExternalContext;
+use App\Support\Sync\SyncOperationSet;
+use App\Support\Workspace\WorkspaceContext;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\ConfiguresSyncSupportProfiles;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
@@ -142,6 +152,161 @@ class FieldMappingPersistenceTest extends TestCase
 
         $this->expectException(QueryException::class);
         DB::table('field_definitions')->where('id', $definition->id)->delete();
+    }
+
+    #[Test]
+    public function cross_workspace_mapped_descendant_blocks_global_field_definition_delete(): void
+    {
+        $workspaceA = $this->defaultWorkspace();
+        $workspaceB = Workspace::query()->create(['name' => 'Cross-workspace B', 'is_default' => false]);
+
+        $definition = FieldDefinition::withoutWorkspaceScope()->create([
+            'workspace_id' => null,
+            'code' => 'global_cross_ws_'.Str::random(6),
+            'data_type' => AttributeDataType::Text,
+            'scope' => AttributeScope::PlatformLibrary,
+            'localized_labels' => ['uk' => 'Глобальне поле'],
+            'description' => null,
+            'validation_rules' => null,
+            'is_localizable' => false,
+            'is_multi_value' => false,
+            'status' => AttributeStatus::Active,
+        ]);
+
+        $bindingB = FieldBinding::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspaceB->id,
+            'field_definition_id' => $definition->id,
+            'object_type' => FieldObjectType::Product,
+            'storage_type' => AttributeStorageType::Dynamic,
+            'storage_path' => null,
+            'field_group' => 'characteristics',
+            'is_required' => false,
+            'is_filterable' => false,
+            'is_sortable' => false,
+            'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+            'sort_order' => 999,
+            'status' => AttributeStatus::Active,
+        ]);
+
+        $accountB = $this->createSyncSupportAccountForWorkspace($workspaceB);
+        $configuration = $this->createProductsSyncConfiguration($accountB);
+
+        $context = app(WorkspaceContext::class);
+        $context->reset();
+        $currentProperty = new \ReflectionProperty(WorkspaceContext::class, 'current');
+        $currentProperty->setValue($context, $workspaceB);
+
+        $this->publishAuthoritativeSnapshot($accountB, ['cross_ws_key']);
+
+        app(FieldMappingMutationService::class)->confirm(
+            $accountB,
+            $configuration->id,
+            $bindingB->id,
+            'cross_ws_key',
+        );
+
+        $currentProperty->setValue($context, $workspaceA);
+
+        $this->assertFalse(
+            $definition->fieldBindings()->whereKey($bindingB->id)->exists(),
+            'Workspace B binding must be hidden from workspace A scoped reads.',
+        );
+
+        $this->expectException(FieldDefinitionReferencedByFieldMappingException::class);
+        $definition->delete();
+
+        $this->expectException(QueryException::class);
+        DB::table('field_definitions')->where('id', $definition->id)->delete();
+    }
+
+    #[Test]
+    public function confirm_rechecks_exact_pair_inside_locked_mutation_coordinator(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $binding = $this->productBinding();
+        $this->publishAuthoritativeSnapshot($account, ['reconfirm_key']);
+
+        $service = app(FieldMappingMutationService::class);
+        $service->confirm($account, $configuration->id, $binding->id, 'reconfirm_key');
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $beforeRevision = SyncConfiguration::withoutWorkspaceScope()
+            ->findOrFail($configuration->id)
+            ->configuration_revision;
+
+        $result = app(FieldMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $binding->id,
+            'reconfirm_key',
+        );
+
+        $queries = collect(DB::getQueryLog())->pluck('query');
+        $this->assertTrue(
+            $queries->contains(fn (string $query): bool => str_contains(strtolower($query), 'sync_configurations')),
+            'Reconfirm must enter the locked parent mutation path instead of an unlocked early return.',
+        );
+        $this->assertSame($beforeRevision, $result->configuration_revision);
+        $this->assertSame(1, FieldMapping::withoutWorkspaceScope()->count());
+    }
+
+    #[Test]
+    public function duplicate_confirms_converge_without_false_conflicts(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $binding = $this->productBinding();
+        $this->publishAuthoritativeSnapshot($account, ['converge_key']);
+        $service = app(FieldMappingMutationService::class);
+
+        $first = $service->confirm($account, $configuration->id, $binding->id, 'converge_key');
+        $second = $service->confirm($account, $configuration->id, $binding->id, 'converge_key');
+
+        $this->assertSame(1, FieldMapping::withoutWorkspaceScope()->count());
+        $this->assertSame($first->configuration_revision, $second->configuration_revision);
+    }
+
+    #[Test]
+    public function migration_v2_rebaseline_matches_runtime_hasher_for_empty_mappings(): void
+    {
+        $migration = require database_path('migrations/2026_08_12_110000_field_mappings.php');
+        $reflection = new \ReflectionClass($migration);
+        $hashMethod = $reflection->getMethod('hashRevisionV2EmptyMappings');
+        $hashMethod->setAccessible(true);
+        $canonicalMethod = $reflection->getMethod('canonicalizePersistedOperations');
+        $canonicalMethod->setAccessible(true);
+
+        $hasher = new SyncConfigurationRevisionHasher;
+        $cases = [
+            [['import'], SyncConfigurationOperationalState::Enabled],
+            [['export', 'import'], SyncConfigurationOperationalState::Paused],
+            [['import', 'import'], SyncConfigurationOperationalState::Enabled],
+            [['export', 'import', 'export'], SyncConfigurationOperationalState::Enabled],
+        ];
+
+        foreach ($cases as [$operations, $state]) {
+            $canonical = $canonicalMethod->invoke($migration, $operations);
+            $migrationHash = $hashMethod->invoke($migration, $canonical, $state->value);
+            $runtimeHash = $hasher->hash(
+                SyncOperationSet::fromOperations(
+                    array_map(
+                        static fn (string $operation): SyncSemanticOperation => SyncSemanticOperation::from($operation),
+                        $canonical,
+                    ),
+                ),
+                $state,
+                [],
+            );
+
+            $this->assertSame(
+                $runtimeHash,
+                $migrationHash,
+                'Revision mismatch for operations ['.implode(',', $operations).'] state '.$state->value,
+            );
+        }
     }
 
     #[Test]
@@ -452,6 +617,11 @@ class FieldMappingPersistenceTest extends TestCase
     private function createSyncSupportAccount(): ConnectorAccount
     {
         return $this->createConnectorAccount(null, ['auth_profile' => 'test_sync_support']);
+    }
+
+    private function createSyncSupportAccountForWorkspace(Workspace $workspace): ConnectorAccount
+    {
+        return $this->createConnectorAccount($workspace, ['auth_profile' => 'test_sync_support']);
     }
 
     private function rollbackThrough(string $targetMigration): void

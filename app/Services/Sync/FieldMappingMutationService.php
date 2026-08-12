@@ -24,24 +24,14 @@ final class FieldMappingMutationService
         string $fieldBindingId,
         string $externalFieldKey,
     ): SyncConfiguration {
-        $existing = FieldMapping::withoutWorkspaceScope()
-            ->where('sync_configuration_id', $syncConfigurationId)
-            ->where('field_binding_id', $fieldBindingId)
-            ->where('external_field_key', $externalFieldKey)
-            ->first();
-
-        if ($existing !== null) {
-            return SyncConfiguration::withoutWorkspaceScope()
-                ->where('workspace_id', $account->workspace_id)
-                ->where('connector_account_id', $account->id)
-                ->where('id', $syncConfigurationId)
-                ->firstOrFail();
-        }
-
         return $this->mutationCoordinator->mutateLocked(
             $account,
             $syncConfigurationId,
             function (SyncConfiguration $configuration) use ($account, $fieldBindingId, $externalFieldKey): void {
+                if ($this->exactMappingExists($configuration, $fieldBindingId, $externalFieldKey)) {
+                    return;
+                }
+
                 $this->bindingValidator->assertProductsConfiguration($configuration);
                 $this->bindingValidator->assertEligibleBinding($configuration, $fieldBindingId);
                 $this->bindingValidator->assertExternalFieldKeyInAuthoritativeSnapshot($account, $externalFieldKey);
@@ -138,6 +128,18 @@ final class FieldMappingMutationService
                 $mapping->delete();
             },
         );
+    }
+
+    private function exactMappingExists(
+        SyncConfiguration $configuration,
+        string $fieldBindingId,
+        string $externalFieldKey,
+    ): bool {
+        return FieldMapping::withoutWorkspaceScope()
+            ->where('sync_configuration_id', $configuration->id)
+            ->where('field_binding_id', $fieldBindingId)
+            ->where('external_field_key', $externalFieldKey)
+            ->exists();
     }
 
     private function assertNoConflictingMappings(
