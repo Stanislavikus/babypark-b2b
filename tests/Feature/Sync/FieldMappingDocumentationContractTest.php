@@ -109,6 +109,25 @@ class FieldMappingDocumentationContractTest extends TestCase
     }
 
     #[Test]
+    public function contract_documents_transitive_delete_protection_and_4c_1b_graceful_handling(): void
+    {
+        $section = $this->fieldMappingPersistenceContractSection();
+
+        $this->assertStringContainsString(
+            '`field_mappings.field_binding_id → field_bindings.id` remains',
+            $section,
+        );
+        $this->assertStringContainsString('`ON DELETE RESTRICT`', $section);
+        $this->assertStringContainsString('Direct binding delete blocked', $section);
+        $this->assertStringContainsString('Parent definition delete transitively blocked', $section);
+        $this->assertStringContainsString('No silent mapping loss', $section);
+        $this->assertStringContainsString('Do **not** change', $section);
+        $this->assertStringContainsString('`CASCADE` or `nullOnDelete()`', $section);
+        $this->assertStringContainsString('Task 4C-1b obligation', $section);
+        $this->assertStringContainsString('graceful handling', $section);
+    }
+
+    #[Test]
     public function implementation_gaps_records_task_4c_1a_done_and_4c_1b_next(): void
     {
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
@@ -117,6 +136,7 @@ class FieldMappingDocumentationContractTest extends TestCase
         $this->assertStringContainsString('**4C-1b**', $content);
         $this->assertStringContainsString('**4C-1c**', $content);
         $this->assertStringContainsString('Task 4C-1a settled the FieldMapping first persistence contract', $content);
+        $this->assertStringContainsString('graceful fail-closed handling when mapped `FieldBinding`', $content);
     }
 
     /**

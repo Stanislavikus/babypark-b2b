@@ -328,7 +328,7 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4B-2d** | Activity history, retention/pruning service, recovery states, and operational polish |
 | **4C-0** | `SyncConfiguration` foundation + authoritative `(data_domain, semantic_operation)` runtime support boundary — Done |
 | **4C-1a** | FieldMapping persistence contract (docs-only Stop-and-Amend) — Done |
-| **4C-1b** | `field_mappings` persistence + manual confirmation service + authoritative-discovery validation + revision v2 — Next / Not implemented |
+| **4C-1b** | `field_mappings` persistence + manual confirmation service + authoritative-discovery validation + revision v2 + graceful fail-closed handling when mapped `FieldBinding` or parent `FieldDefinition` physical deletion is attempted (archive remains valid lifecycle path; no raw FK errors) — Next / Not implemented |
 | **4C-1c** | Canonical suggestion provider + confidence + registry read-model + UI prefill — Deferred / after 4C-1b |
 | **4C** | Remaining sync domain: `SyncRun` / `SyncRunItem`, `ExternalRecordLink`, preview/live execution, scheduling, sync history/issues, merchant sync UX |
 
@@ -345,7 +345,9 @@ Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
 #98–#102, correction PR #105, Discovery Overview UI PR #114). Task 4C-0 landed
 `SyncConfiguration` foundation and the fail-closed runtime sync-support boundary.
 Task 4C-1a settled the FieldMapping first persistence contract (docs only).
-`field_mappings` persistence, confirmation service, and revision v2 integration
+`field_mappings` persistence, confirmation service, revision v2 integration,
+and graceful fail-closed handling for mapped binding / parent definition
+physical-delete attempts (archive remains valid)
 remain Task 4C-1b (not implemented). Canonical suggestion/read-model work is
 Task 4C-1c (deferred until after persistence). `SyncRun` / execution, preview,
 schedule, history, and `ExternalRecordLink` remain unimplemented.

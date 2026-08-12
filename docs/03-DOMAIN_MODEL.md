@@ -3442,6 +3442,37 @@ cleanup, not merchant-confirmed connector mappings. `RESTRICT` on
 blocked while effective mappings exist; archival/deprecation is the preferred
 governance path (see lifecycle below).
 
+**Transitive definition deletion (intentional fail-closed):** after Task 4C-1b,
+`field_mappings.field_binding_id → field_bindings.id` remains
+`ON DELETE RESTRICT`. Therefore:
+
+1. **Direct binding delete blocked** — physical deletion of a referenced
+   `FieldBinding` is rejected by the database while effective `field_mappings`
+   rows exist.
+2. **Parent definition delete transitively blocked** — because
+   `field_bindings.field_definition_id → field_definitions.id` currently uses
+   `ON DELETE CASCADE`, physical deletion of a `FieldDefinition` attempts to
+   cascade-delete its descendant `FieldBinding` rows. When any cascaded binding
+   is referenced by an effective FieldMapping, that cascade is blocked by
+   `RESTRICT` on `field_mappings.field_binding_id`, so the parent
+   `FieldDefinition` delete fails transitively at the database level.
+3. **No silent mapping loss** — definition/binding deletion must **not**
+   silently remove confirmed connector mappings. Do **not** change
+   `field_mappings.field_binding_id` to `CASCADE` or `nullOnDelete()` merely to
+   preserve pre-mapping physical-delete behavior.
+
+**Preferred lifecycle:** archive/deprecate (`FieldDefinition.status` /
+`FieldBinding.status` = `archived`) rather than physical delete.
+
+**When physical delete is genuinely required:** effective mappings must be
+explicitly removed or remapped first through the controlled FieldMapping
+mutation path (Task 4C-1b).
+
+**Task 4C-1b obligation:** application-level graceful handling of this
+constraint (domain exception / user-facing error) — merchants must not see raw
+FK `QueryException` failures from attempted definition or binding deletion while
+mappings exist.
+
 Do **not** reference `connector_schema_snapshot_fields.id` as persistent mapping
 identity. Mappings survive immutable snapshot replacement via stable
 `external_field_key`.
@@ -3593,7 +3624,11 @@ If a mapped binding (or its definition) is later **archived**:
 - no silent delete.
 
 Physical deletion of a referenced `FieldBinding` remains blocked by
-`ON DELETE RESTRICT` while mappings exist.
+`ON DELETE RESTRICT` while mappings exist. Physical deletion of a parent
+`FieldDefinition` is transitively blocked when any cascaded descendant
+`FieldBinding` is referenced by an effective FieldMapping (see transitive
+definition deletion invariant above). Archive/deprecate remains the preferred
+lifecycle path; Task 4C-1b must surface blocked deletes gracefully.
 
 ##### `configuration_revision` must include effective FieldMappings
 
