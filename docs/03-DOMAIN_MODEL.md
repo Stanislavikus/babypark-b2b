@@ -3382,6 +3382,326 @@ Do **not** state the false blanket rule “raw external vocabulary is never
 persisted.” `external_field_key` itself is intentionally connector-local
 external logical identity and may be persisted.
 
+#### FieldMapping first persistence contract
+[Resolved — Task 4C-1a, 2026-08-12]
+
+This section freezes the **minimum physical and lifecycle contract** for the
+first FieldMapping implementation slice (Task 4C-1b). It does **not** authorize
+migrations, models, services, or UI — documentation only.
+
+##### First-slice scope
+
+| Dimension | First slice (4C-1b) | Explicitly deferred |
+|---|---|---|
+| `data_domain` | `products` only | pricing, availability/inventory, media, categories, customer, connector-only technical concepts |
+| Internal target | `FieldBinding` only (`field_binding_id`) | `target_type` / `target_id` / `target_kind` polymorphic targets; pricing-domain, availability-domain, media-relation, or category-relation targets |
+| `FieldObjectType` | `product`, `product_variant` | `customer` and any future object types |
+| Persistence | Effective **confirmed** workspace mappings only | Suggestion candidates, confidence, `suggestion_source`, ephemeral prefill state |
+
+Do not add polymorphic target columns “for future universality” in this slice.
+Domain-owned non-`FieldBinding` targets require a separate internal domain-target
+boundary (already acknowledged above) before their FieldMapping representation
+is finalized.
+
+##### Minimum physical schema — `field_mappings`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID NOT NULL | Workspace-owned row |
+| `sync_configuration_id` | UUID NOT NULL | Owned child of `SyncConfiguration` |
+| `field_binding_id` | UUID NOT NULL | Internal semantic target |
+| `external_field_key` | string NOT NULL | Stable external **logical** identity |
+| `created_at` / `updated_at` | timestamps | |
+
+**Not in the minimum table** (unless a separate, already-Resolved invariant
+requires otherwise): `direction`, `operation`, `import_enabled`, `export_enabled`,
+`authority`, `confidence`, `suggestion_source`, `suggestion_status`, `snapshot_id`,
+`snapshot_field_id`, `schema_source_id`, `endpoint`, `external_path`, `json_path`,
+`transformation`, `connector_capability`, `is_valid`, `stale`.
+
+FieldMapping remains **direction-neutral semantic correspondence**
+(`internal target` ↔ `external logical identity`). It is not an execution plan,
+transport schema, or connector runtime operation descriptor.
+
+##### Ownership and FK contract
+
+`field_mappings` is an owned child of `SyncConfiguration`.
+
+| FK edge | Behavior | Rationale |
+|---|---|---|
+| `(workspace_id, sync_configuration_id)` → `sync_configurations(workspace_id, id)` | `ON DELETE CASCADE` | Mapping has no standalone meaning after its parent configuration is removed. Task 4C-0 already established the workspace-aware parent key `(workspace_id, id)` on `sync_configurations`. |
+| `field_binding_id` → `field_bindings.id` | `ON DELETE RESTRICT` | Prevent silent disappearance of confirmed mappings when an internal target row is physically deleted. |
+
+**Field Foundation governance precedent:** within the same subsystem,
+`field_bindings.field_definition_id` uses `cascadeOnDelete()` against
+`field_definitions` (`FieldFoundationMigrator` / migration
+`2026_07_12_150000_field_foundation.php`). That cascade governs definition→binding
+cleanup, not merchant-confirmed connector mappings. `RESTRICT` on
+`field_mapping.field_binding_id` is compatible: physical binding deletion is
+blocked while effective mappings exist; archival/deprecation is the preferred
+governance path (see lifecycle below).
+
+**Transitive definition deletion (intentional fail-closed):** after Task 4C-1b,
+`field_mappings.field_binding_id → field_bindings.id` remains
+`ON DELETE RESTRICT`. Therefore:
+
+1. **Direct binding delete blocked** — physical deletion of a referenced
+   `FieldBinding` is rejected by the database while effective `field_mappings`
+   rows exist.
+2. **Parent definition delete transitively blocked** — because
+   `field_bindings.field_definition_id → field_definitions.id` currently uses
+   `ON DELETE CASCADE`, physical deletion of a `FieldDefinition` attempts to
+   cascade-delete its descendant `FieldBinding` rows. When any cascaded binding
+   is referenced by an effective FieldMapping, that cascade is blocked by
+   `RESTRICT` on `field_mappings.field_binding_id`, so the parent
+   `FieldDefinition` delete fails transitively at the database level.
+3. **No silent mapping loss** — definition/binding deletion must **not**
+   silently remove confirmed connector mappings. Do **not** change
+   `field_mappings.field_binding_id` to `CASCADE` or `nullOnDelete()` merely to
+   preserve pre-mapping physical-delete behavior.
+
+**Preferred lifecycle:** archive/deprecate (`FieldDefinition.status` /
+`FieldBinding.status` = `archived`) rather than physical delete.
+
+**When physical delete is genuinely required:** effective mappings must be
+explicitly removed or remapped first through the controlled FieldMapping
+mutation path (Task 4C-1b).
+
+**Task 4C-1b obligation:** application-level graceful handling of this
+constraint (domain exception / user-facing error) — merchants must not see raw
+FK `QueryException` failures from attempted definition or binding deletion while
+mappings exist.
+
+Do **not** reference `connector_schema_snapshot_fields.id` as persistent mapping
+identity. Mappings survive immutable snapshot replacement via stable
+`external_field_key`.
+
+##### Workspace / global `FieldBinding` eligibility
+
+`FieldBinding` (via `BelongsToWorkspaceOrGlobal` / `WorkspaceOrGlobalScope`)
+may be **global** (`workspace_id IS NULL` — system/platform-library bindings)
+or **workspace-scoped** (`workspace_id` = current workspace).
+
+A composite FK `(workspace_id, field_binding_id)` cannot express global bindings.
+Enforce at write time (fail closed):
+
+```text
+binding.workspace_id IS NULL
+OR
+binding.workspace_id = sync_configuration.workspace_id
+```
+
+Foreign-workspace bindings must be rejected. Global bindings are allowed when
+otherwise eligible.
+
+Additionally, first-slice write paths must accept only bindings whose
+`object_type` is `product` or `product_variant` and reject `customer`.
+
+##### Cardinality — first-slice MVP (1:1 inside one SyncConfiguration)
+
+Within one `SyncConfiguration`:
+
+```text
+UNIQUE(sync_configuration_id, field_binding_id)
+UNIQUE(sync_configuration_id, external_field_key)
+```
+
+Meaning:
+
+- one internal semantic concept → at most one external logical field;
+- one external logical field → at most one internal semantic target;
+- import and export may share one direction-neutral correspondence — do not
+  split mappings merely because both operations are enabled on the same
+  configuration.
+
+**Adversarial check (reverified against `origin/develop` baseline
+`12b5b9de5cfaeff482c0d6a267cef5f4168ab72e`):** no confirmed repository case
+was found where the first `products` + `FieldBinding` slice requires
+1 internal → N external or N internal → 1 external **semantic** FieldMapping
+cardinality inside one `SyncConfiguration`.
+
+- Canonical registry rows such as
+  `custom_attributes[attribute_code=description].value` describe **connector
+  transport representation** for adapter/runtime interpretation — not a second
+  external logical identity in account discovery (`external_field_key` =
+  `description` in normalized snapshots).
+- `price`, `availability`, `image`, and `category` Adobe rows point at
+  pricing/availability/media/category domain targets — explicitly **outside**
+  this first slice.
+- The same internal code may appear in multiple **channel** registry rows
+  (Google, Shopify, Adobe, …), but each maps to a different connected account /
+  `SyncConfiguration` — not a violation of per-configuration 1:1.
+- `workspace_import_aliases` is file/header import memory — a separate concern
+  (see boundary below).
+
+Fan-out, merge, and split semantics remain deferred until a verified product
+requirement demonstrates the need.
+
+##### Suggestions are not effective FieldMappings
+
+Preserve three layers (unchanged):
+
+1. **Platform-global canonical knowledge** — e.g.
+   `docs/data/canonical_product_field_mappings.csv` (documentation/knowledge
+   artifact; **not** runtime production dependency in 4C-1a/4C-1b).
+2. **Account discovery reality** — authoritative successful discovery snapshot
+   fields for this `ConnectorAccount`.
+3. **Workspace effective FieldMapping** — merchant-**confirmed** semantic
+   correspondence rows in `field_mappings`.
+
+High-confidence canonical or discovery suggestions may **prefill** UI but must
+**not** auto-persist as effective mappings. No `confidence`, `suggestion_source`,
+or `candidate_state` columns in the minimum table. Prefill = presentation /
+suggestion state; confirmed `field_mappings` row = effective configuration state.
+
+**Implementation sequencing:**
+
+| Slice | Scope |
+|---|---|
+| **4C-1a** (this contract) | Docs-only Stop-and-Amend — Done |
+| **4C-1b** | `field_mappings` persistence + manual/explicit confirmation mutation service + authoritative-discovery validation + revision v2 integration |
+| **4C-1c** | Canonical suggestion provider, confidence, registry projection/read-model, account-discovery validation, UI prefill |
+
+Do not build a production CSV loader, second canonical registry, or suggestion
+engine in 4C-1a/4C-1b.
+
+##### Authoritative discovery validation
+
+On create/replace of a confirmed mapping, `external_field_key` must exist in the
+**current authoritative discovery state** for the `ConnectorAccount` that owns
+the parent `SyncConfiguration`.
+
+**Current authoritative discovery** (deterministic resolver — no ambiguity found
+in repository baseline):
+
+1. Resolve the account's primary discovery source using the same contract as
+   `ConnectorDiscoverySourceResolver`: exactly one `ConnectorSchemaSource` with
+   `schema_scope = Account`, `source_kind = AccountApi`,
+   `acquisition_mode = LiveFetch`, `is_primary = true` (fail closed on zero or
+   multiple).
+2. Select the **latest successful snapshot** for
+   `(connector_account_id, connector_schema_source_id)` as the row with the
+   greatest `(created_at, id)` pair (`created_at DESC, id DESC`) — per
+   **Deterministic latest-snapshot ordering (Resolved)** above. This is the
+   authoritative `ConnectorSchemaSnapshot`.
+3. Valid external keys = `ConnectorSchemaSnapshotField.external_field_key` rows
+   for that snapshot (`UNIQUE(snapshot_id, external_field_key)` already enforced).
+
+Do **not** use `ConnectorAccount.last_successful_discovery_at` alone as proof
+that a specific `external_field_key` exists. Do **not** add
+`current_snapshot_id` to `connector_accounts` without a separate demonstrated
+need.
+
+**Lifecycle when discovery changes:**
+
+| Event | Behavior |
+|---|---|
+| Confirm against missing / failed discovery | Reject |
+| Confirm against key absent from authoritative snapshot | Reject |
+| New immutable snapshot published; previously mapped key still present | Mapping remains valid (reconciled by stable `external_field_key`) |
+| Previously mapped `external_field_key` disappears from new authoritative discovery | Row **retained**; readiness becomes unresolved / remediation-required; **no** automatic silent delete or remapping |
+
+Validity against current discovery is **derived** at evaluation time — no
+persisted `is_valid` / `stale` column in the minimum schema unless a later task
+proves otherwise.
+
+##### `FieldBinding` target lifecycle
+
+Write-time requirements for create/update of confirmed mappings:
+
+| Check | Rule |
+|---|---|
+| `FieldBinding.status` | Must be `active` |
+| `FieldBinding.object_type` | Must be `product` or `product_variant` for this slice |
+| Associated `FieldDefinition.status` | Must be `active` |
+| Workspace eligibility | Global or same-workspace binding only (see above) |
+
+If a mapped binding (or its definition) is later **archived**:
+
+- existing `field_mappings` row is **retained**;
+- readiness becomes unresolved / remediation-required;
+- no silent delete.
+
+Physical deletion of a referenced `FieldBinding` remains blocked by
+`ON DELETE RESTRICT` while mappings exist. Physical deletion of a parent
+`FieldDefinition` is transitively blocked when any cascaded descendant
+`FieldBinding` is referenced by an effective FieldMapping (see transitive
+definition deletion invariant above). Archive/deprecate remains the preferred
+lifecycle path; Task 4C-1b must surface blocked deletes gracefully.
+
+##### `configuration_revision` must include effective FieldMappings
+
+Task 4C-0 revision hash (`babypark.sync-configuration-revision.v1`) covers only
+`enabled_operations` and `operational_state`. That is insufficient once
+effective mappings exist — `SyncConfiguration` conceptually owns them, and future
+`SyncRun` rows must record the revision of the configuration actually executed.
+
+**Invariant:** any semantic add/change/delete of an effective FieldMapping must
+atomically advance `SyncConfiguration.configuration_revision`. Reconfirming the
+same semantic pair (`field_binding_id` + `external_field_key`) is a **no-op** and
+must **not** change revision.
+
+**Revision v2 (canonical payload):** `babypark.sync-configuration-revision.v2`
+with minimum payload:
+
+```json
+{
+  "enabled_operations": ["..."],
+  "operational_state": "enabled",
+  "field_mappings": [
+    {"field_binding_id": "...", "external_field_key": "..."}
+  ]
+}
+```
+
+`field_mappings` entries are canonicalized and sorted (e.g. by
+`field_binding_id`, then `external_field_key`) independently of DB insertion
+order.
+
+Because `SyncRun` persistence does not yet exist on `develop`, Task 4C-1b may
+safely rebaseline/recalculate existing `SyncConfiguration.configuration_revision`
+values to v2 when mappings land — no historical SyncRun comparison constraint.
+
+##### Concurrency / mutation boundary (4C-1b implementation protocol)
+
+All semantic mutations that affect configuration revision — including
+`SyncConfigurationService` operation/state updates **and** FieldMapping
+add/change/delete — must serialize on the same `SyncConfiguration` row inside
+one DB transaction:
+
+```text
+BEGIN
+SELECT sync_configurations ... FOR UPDATE  (workspace-scoped)
+validate target + discovery + slice rules
+mutate field_mappings (if applicable)
+mutate enabled_operations / operational_state (if applicable)
+recalculate full revision v2 from persisted effective state
+save configuration_revision
+COMMIT
+```
+
+This prevents: mapping changed but revision unchanged; or operation update
+racing mapping mutation and overwriting revision. Document only in 4C-1a;
+implement in 4C-1b.
+
+##### `workspace_import_aliases` boundary
+
+`workspace_import_aliases` maps **file/header import** column names to
+`field_binding_id` per workspace. It is tenant-isolated import memory — not
+connector `external_field_key` mapping.
+
+Aliases may inform future **suggestions** but must not automatically become
+effective connector FieldMappings without explicit confirmation through the
+4C-1b mutation path. Do not merge or delete the existing alias architecture.
+
+##### Transformation boundary (unchanged)
+
+Generic transformation DSL is **not** part of minimum FieldMapping persistence.
+Canonical registry `transformation` values describe connector-adapter/runtime
+interpretation — not mandatory generic persisted transformation on the
+correspondence row.
+
 ### Canonical mapping registry role
 
 `docs/data/canonical_product_field_mappings.csv` is **platform-global
