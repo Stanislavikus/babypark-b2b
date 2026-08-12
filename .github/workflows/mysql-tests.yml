@@ -96,6 +96,9 @@ jobs:
       - name: ConnectorAccount foundation tests (MySQL)
         run: php artisan test --filter=ConnectorAccountFoundationTest
 
+      - name: SyncConfiguration foundation tests (MySQL)
+        run: php artisan test --filter=SyncConfigurationFoundationTest
+
       - name: Customer rename migration tests (MySQL)
         run: php artisan test --filter=CustomerRenameMigrationTest
 

@@ -92,4 +92,9 @@ class ConnectorAccount extends Model
     {
         return $this->hasMany(ConnectorSchemaDiff::class);
     }
+
+    public function syncConfigurations(): HasMany
+    {
+        return $this->hasMany(SyncConfiguration::class);
+    }
 }

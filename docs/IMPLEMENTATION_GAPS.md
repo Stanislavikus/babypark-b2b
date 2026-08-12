@@ -298,11 +298,21 @@ yet), but should be scheduled before any payment gateway integration work starts
   `ConnectorSchemaSnapshotField`; `ConnectorSchemaDiff` /
   `ConnectorSchemaDiffItem` remain model/schema scaffolding without a write
   path or consumer (dormant — do not infer a working schema-diff runtime).
-- Sync Domain entities from the Sync UX / Domain Rebaseline
-  (`SyncConfiguration`, `FieldMapping`, `SyncRun` / `SyncRunItem`,
-  `ExternalRecordLink`) are **not implemented** yet. Mapping/confirmation
-  remains Task 4C; sync execution/preview/schedule/results remain later
-  implementation slices after domain docs (now settled).
+- Sync Domain foundation (Task 4C-0): `SyncConfiguration` persistence and
+  domain write path (`sync_configurations` table, workspace/account composite
+  integrity, canonical operation-set semantics, opaque `external_context` with
+  deterministic default-context uniqueness, semantic `configuration_revision`
+  hashing, enabled/paused operational state) plus the authoritative runtime
+  `(data_domain, semantic_operation)` support boundary
+  (`ConnectorSyncOperationSupport` / `ConnectorSyncSupportResolver`, fail-closed
+  when a profile adapter does not declare support). Vocabulary implemented:
+  `products` + `import`/`export`. Adobe Commerce production profile remains
+  fail-closed for executable sync pairs.
+- Sync Domain entities still absent: `FieldMapping`, `SyncRun` / `SyncRunItem`,
+  `ExternalRecordLink`, preview/live execution, scheduling, sync history/issues,
+  and merchant sync UX beyond connector connection management.
+  FieldMapping/confirmation remains Task 4C; sync execution/preview/schedule/results
+  remain later implementation slices after domain docs (now settled).
 
 **Task sequence (GAP-006 remains Open until implementation lands):**
 
@@ -315,6 +325,7 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4B-2b** | Discovery backend runtime plus Discovery Overview UI — Done, PRs #96, #98–#102, #105, #114 |
 | **4B-2c** | Discovered schema fields and change inspection: field list, filters, and field inspection from persisted snapshots; `ConnectorSchemaDiff` computation (models exist, no write path yet) |
 | **4B-2d** | Activity history, retention/pruning service, recovery states, and operational polish |
+| **4C-0** | `SyncConfiguration` foundation + authoritative `(data_domain, semantic_operation)` runtime support boundary — Done |
 | **4C** | `FieldMapping` suggestions, confidence, confirmation and manual resolution |
 
 Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
@@ -327,10 +338,12 @@ Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
   captured during connector import design — see GAP-018 cross-reference.
 
 **Status:** Open. Task 4B-2a is complete. Task 4B-2b is complete (PRs #96,
-#98–#102, correction PR #105, Discovery Overview UI PR #114). Connector-account
-creation and credential-management/settings UI remain absent. Task 4B-2c
-(discovered schema fields / change inspection), retention jobs, broader operational
-UI, and FieldMapping remain unimplemented.
+#98–#102, correction PR #105, Discovery Overview UI PR #114). Task 4C-0 landed
+`SyncConfiguration` foundation and the fail-closed runtime sync-support boundary;
+`FieldMapping`, `SyncRun` / execution, preview, schedule, history, and
+`ExternalRecordLink` remain unimplemented. Connector-account creation and
+credential-management/settings UI remain absent. Task 4B-2c (discovered schema
+fields / change inspection) and retention jobs remain unimplemented.
 
 **ConnectorAccount authorization/rendered-view sub-gap (closed, PR #102 /
 Task 4B-2b-1e+1f):** `ConnectorAccountPolicy` grants Merchandiser
@@ -362,9 +375,9 @@ Implemented role matrix (confirmed against `App\Enums\UserRole`):
 | Disabled account | Per role matrix (unaffected by disabled state) | No | Per role matrix |
 
 **GAP-006 overall remains Open.** Remaining scope: Task 4B-2c (discovered
-schema fields / change inspection), retention/pruning (4B-2d), Sync Domain /
-FieldMapping / sync execution (4C+), connector-account creation and
-credential-management/settings UI.
+schema fields / change inspection), retention/pruning (4B-2d), FieldMapping
+(4C), sync execution/preview/schedule/history (`SyncRun`, issues, merchant sync
+UX), `ExternalRecordLink`, connector-account creation and credential-management/settings UI.
 
 ### Classification after Sync UX / Domain Rebaseline (documentation pass)
 
@@ -373,7 +386,7 @@ Distinguish carefully — do not treat every future possibility as an active GAP
 | Class | Item | Blocks Sync domain work now? |
 |---|---|---|
 | **A. Architecture blockers** | None identified against current `origin/develop` for the approved Sync Domain Rebaseline | No |
-| **B. Implementation gaps** | SyncConfiguration / FieldMapping / SyncRun / SyncRunItem / ExternalRecordLink persistence + runtime; preview/live execution; merchant sync UX beyond connection management; ConnectorSchemaDiff write path/consumer; connector-account create/settings UI; Field Browser copy / Layer C gating (GAP-025) | Yes for shipping sync; docs are settled |
+| **B. Implementation gaps** | FieldMapping / SyncRun / SyncRunItem / ExternalRecordLink persistence + runtime; preview/live execution; merchant sync UX beyond connection management; ConnectorSchemaDiff write path/consumer; connector-account create/settings UI; Field Browser copy / Layer C gating (GAP-025) | Yes for shipping sync; docs are settled |
 | **C. Connector-specific future verification (deferred Variant #2 / profile)** | What external contract `adobe_commerce_paas_oauth1_integration` intentionally covers; PaaS-only vs broader Magento REST-family; post-bootstrap runtime-contract/version/capability verification; Magento Open Source setup/auth compatibility; whether AccountSetup and final runtime contract must later split; whether exactly-one AccountSetup-profile invariant must ever change | **No** — deferred; not a blocker for generic Sync domain rebaseline |
 
 Do not add generic `edition` / `deployment_model` / `api_family` fields to
