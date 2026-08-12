@@ -134,11 +134,178 @@ class FieldMappingDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('**4C-1a** | FieldMapping persistence contract', $content);
         $this->assertStringContainsString('**4C-1b**', $content);
-        $this->assertStringContainsString('**4C-1c**', $content);
+        $this->assertStringContainsString('**4C-1c-0**', $content);
+        $this->assertStringContainsString('**4C-1c-1**', $content);
+        $this->assertStringContainsString('**4C-1c-2**', $content);
         $this->assertStringContainsString('Task 4C-1a settled the FieldMapping first persistence contract', $content);
         $this->assertStringContainsString('graceful fail-closed handling when mapped `FieldBinding`', $content);
         $this->assertMatchesRegularExpression('/\*\*4C-1b\*\*.*— Done/', $content);
+        $this->assertMatchesRegularExpression('/\*\*4C-1c-0\*\*.*— Done/', $content);
         $this->assertStringNotContainsString('4C-1b (not implemented)', $content);
+    }
+
+    #[Test]
+    public function domain_model_documents_canonical_field_mapping_suggestion_contract(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString(
+            '#### Canonical FieldMapping suggestion/read-model contract',
+            $content,
+        );
+        $this->assertStringContainsString('[Resolved — Task 4C-1c-0, 2026-08-12]', $content);
+    }
+
+    #[Test]
+    public function suggestion_contract_preserves_three_layer_boundary(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('canonical platform knowledge', $section);
+        $this->assertStringContainsString('account authoritative discovery', $section);
+        $this->assertStringContainsString('merchant-confirmed FieldMapping', $section);
+        $this->assertStringContainsString('FieldMappingMutationService', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_never_auto_persists_suggestions(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('Suggestions are side-effect free', $section);
+        $this->assertStringContainsString('insert/update/delete `field_mappings`', $section);
+        $this->assertStringContainsString('write suggestion/confidence state anywhere', $section);
+        $this->assertStringContainsString('Only explicit confirmation calls the existing `FieldMappingMutationService`', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_uses_transient_non_numeric_confidence(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('qualification gate', $section);
+        $this->assertStringContainsString('not a numeric score', $section);
+        $this->assertStringContainsString('percentage confidence', $section);
+        $this->assertStringContainsString('Do **not** introduce', $section);
+        $this->assertStringContainsString('anything else → **no** prefill suggestion', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_requires_exact_external_field_key_match(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('**exactly equals** an `external_field_key`', $section);
+        $this->assertStringContainsString('`sku` | `sku` | eligible evidence', $section);
+        $this->assertStringContainsString(
+            '`custom_attributes[attribute_code=description].value` | `description` | **not** an automatic high-confidence suggestion',
+            $section,
+        );
+    }
+
+    #[Test]
+    public function suggestion_contract_forbids_generic_transport_path_parsing(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('must not** parse connector transport syntax', $section);
+        $this->assertStringContainsString('Do **not** strip wrappers', $section);
+        $this->assertStringContainsString('Magento custom-attribute paths', $section);
+        $this->assertStringContainsString('connector-specific parsing inside generic Sync code', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_documents_registry_and_connector_namespace_non_equivalence(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('not an assertion that the two namespaces', $section);
+        $this->assertStringContainsString('are identical sets', $section);
+        $this->assertStringContainsString('`schema_org`', $section);
+        $this->assertStringContainsString('no matching registry channel → **no canonical suggestion**', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_ambiguity_produces_no_high_confidence_suggestion(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('ambiguous** → **no**', $section);
+        $this->assertStringContainsString('exactly one** resulting semantic candidate', $section);
+        $this->assertStringContainsString('Fail closed to “no suggestion” on ambiguity', $section);
+        $this->assertStringContainsString('No arbitrary “latest”', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_forbids_runtime_version_guessing(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('Do not guess or persist a connected store\'s runtime version', $section);
+        $this->assertStringContainsString('Do **not** hardcode `2.4.9-admin-rest`', $section);
+        $this->assertStringContainsString('knowledge evidence only', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_existing_mapping_wins_over_suggestion(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('Existing mappings beat suggestions', $section);
+        $this->assertStringContainsString('effective mapping wins', $section);
+        $this->assertStringContainsString('never**', $section);
+        $this->assertStringContainsString('replace/prefill over it', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_documents_4c_1c_sequencing_slices(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('**4C-1c-0**', $section);
+        $this->assertStringContainsString('**4C-1c-1**', $section);
+        $this->assertStringContainsString('**4C-1c-2**', $section);
+        $this->assertStringContainsString('no DB/migration scope', $section);
+        $this->assertStringContainsString('Layer B mapping UI', $section);
+        $this->assertStringContainsString('explicit confirmation through 4C-1b service', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_places_mapping_ui_in_layer_b(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('Mapping is **Layer B**', $section);
+        $this->assertStringContainsString('concept-first matrix', $section);
+        $this->assertStringContainsString('merchant confirmation is still **explicit**', $section);
+        $this->assertStringContainsString('do **not** embed mapping controls into the current **Інтеграції**', $section);
+    }
+
+    #[Test]
+    public function suggestion_contract_uses_canonical_registry_reader_only(): void
+    {
+        $section = $this->fieldMappingSuggestionContractSection();
+
+        $this->assertStringContainsString('`CanonicalRegistryReader` is the existing read-only CSV access path', $section);
+        $this->assertStringContainsString('Do **not** create a second registry/loader', $section);
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function fieldMappingSuggestionContractSection(): string
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        if (! preg_match(
+            '/#### Canonical FieldMapping suggestion\/read-model contract\n\[Resolved — Task 4C-1c-0, 2026-08-12\]\n\n(.*?)(?=\n### Canonical mapping registry role)/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate Canonical FieldMapping suggestion/read-model contract section in 03-DOMAIN_MODEL.md');
+        }
+
+        return $matches[1];
     }
 
     /**
@@ -149,7 +316,7 @@ class FieldMappingDocumentationContractTest extends TestCase
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
 
         if (! preg_match(
-            '/#### FieldMapping first persistence contract\n\[Resolved — Task 4C-1a, 2026-08-12\]\n\n(.*?)(?=\n### Canonical mapping registry role)/s',
+            '/#### FieldMapping first persistence contract\n\[Resolved — Task 4C-1a, 2026-08-12\]\n\n(.*?)(?=\n#### Canonical FieldMapping suggestion\/read-model contract)/s',
             $content,
             $matches,
         )) {

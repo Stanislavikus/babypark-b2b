@@ -3560,11 +3560,13 @@ suggestion state; confirmed `field_mappings` row = effective configuration state
 | Slice | Scope |
 |---|---|
 | **4C-1a** (this contract) | Docs-only Stop-and-Amend — Done |
-| **4C-1b** | `field_mappings` persistence + manual/explicit confirmation mutation service + authoritative-discovery validation + revision v2 integration |
-| **4C-1c** | Canonical suggestion provider, confidence, registry projection/read-model, account-discovery validation, UI prefill |
+| **4C-1b** | `field_mappings` persistence + manual/explicit confirmation mutation service + authoritative-discovery validation + revision v2 integration — Done |
+| **4C-1c-0** | Docs-only suggestion/read-model Stop-and-Amend — see [Resolved — Task 4C-1c-0] below |
+| **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (no DB/migration scope) |
+| **4C-1c-2** | Layer B mapping UI: high-confidence prefill + manual choice + explicit confirmation through 4C-1b service |
 
 Do not build a production CSV loader, second canonical registry, or suggestion
-engine in 4C-1a/4C-1b.
+engine in 4C-1a/4C-1b/4C-1c-0.
 
 ##### Authoritative discovery validation
 
@@ -3701,6 +3703,257 @@ Generic transformation DSL is **not** part of minimum FieldMapping persistence.
 Canonical registry `transformation` values describe connector-adapter/runtime
 interpretation — not mandatory generic persisted transformation on the
 correspondence row.
+
+#### Canonical FieldMapping suggestion/read-model contract
+[Resolved — Task 4C-1c-0, 2026-08-12]
+
+This section freezes the **smallest deterministic contract** for Task 4C-1c
+before application implementation: canonical suggestion qualification,
+confidence semantics, registry→discovery projection boundary, transient mapping
+read-model, and implementation sequencing. It does **not** authorize migrations,
+models, services, UI, or CSV changes — documentation only.
+
+##### A. Three-layer boundary (unchanged)
+
+Keep distinct:
+
+```text
+canonical platform knowledge
+        ↓ suggestion only
+account authoritative discovery
+        ↓ validation
+merchant-confirmed FieldMapping
+```
+
+No suggestion becomes effective configuration without explicit confirmation
+through the existing 4C-1b mutation service (`FieldMappingMutationService`).
+
+##### B. First 4C-1c suggestion source
+
+The first implementation slice is **canonical deterministic suggestions only**.
+
+Explicitly **deferred** (may be separately scoped later):
+
+- fuzzy-name matching;
+- AI/LLM suggestions;
+- Levenshtein/scored similarity;
+- `workspace_import_aliases` as connector suggestion evidence;
+- automatic learning from prior merchant confirmations;
+- additional discovery-only guessing.
+
+##### C. Registry channel matching
+
+For the first canonical provider:
+
+- an **exact equality** between `ConnectorDefinition.code` and registry
+  `channel` permits lookup of registry knowledge for that account;
+- this is an **optional exact match**, not an assertion that the two namespaces
+  are identical sets (registry channels such as `schema_org` and `rozetka` have no
+  matching `ConnectorDefinition.code` on current `develop`; connector definition
+  codes such as `1c`, `csv`, and `google_sheets` have no matching registry
+  channel rows);
+- no matching registry channel → **no canonical suggestion**, not an error;
+- do **not** add `registry_channel` to `ConnectorAccount`, `ConnectorDefinition`,
+  or `ConnectorProfileDefinition` in this slice;
+- do **not** hardcode `adobe_commerce` inside the generic provider.
+
+##### D. Runtime/schema version
+
+Do not guess or persist a connected store's runtime version merely to select
+suggestions.
+
+Do **not** hardcode `2.4.9-admin-rest` as “the account's runtime version.”
+
+For the first provider, version/applicability rows are **knowledge evidence
+only**.
+
+If multiple eligible verified canonical rows could imply different suggestions
+for the same internal target, the result is **ambiguous** → **no**
+high-confidence prefill.
+
+No arbitrary “latest”, lexical max, first-row, or config-order selection.
+
+Exact runtime contract/version identification remains deferred before a second
+real runtime variant (see **Connector profile / runtime-contract variance**
+below).
+
+##### E. Logical external-key projection — conservative first slice
+
+The first generic provider **must not** parse connector transport syntax.
+
+A canonical registry row may yield an external logical-key candidate only when
+its `external_field` **exactly equals** an `external_field_key` present in the
+single authoritative account snapshot.
+
+Therefore:
+
+| Registry `external_field` | Snapshot `external_field_key` | First-slice result |
+|---|---|---|
+| `sku` | `sku` | eligible evidence |
+| `custom_attributes[attribute_code=description].value` | `description` | **not** an automatic high-confidence suggestion |
+
+Reverified Adobe example in `canonical_product_field_mappings.csv`: `description`
+→ `custom_attributes[attribute_code=description].value` describes connector
+**transport representation**; normalized account discovery uses logical
+`external_field_key = description`.
+
+Do **not** strip wrappers, parse Magento custom-attribute paths, interpret Shopify
+nested paths, or introduce connector-specific parsing inside generic Sync code.
+
+This conservative false-negative is intentional: manual confirmation is
+preferable to a false-positive mapping.
+
+A later connector-owned projection mechanism may be scoped if real product value
+justifies it.
+
+##### F. Confidence semantics
+
+For the first slice, confidence is a **qualification gate**, not a numeric score.
+
+Do **not** introduce:
+
+- percentage confidence;
+- arbitrary threshold;
+- high / medium / low persisted states;
+- DB columns;
+- fuzzy score.
+
+Semantics:
+
+- candidate satisfies **every** deterministic high-confidence condition → provider
+  may return it as a prefill suggestion;
+- anything else → **no** prefill suggestion.
+
+A richer confidence taxonomy requires its own demonstrated need.
+
+##### G. High-confidence qualification
+
+A candidate qualifies only when **all** of these are true:
+
+1. parent `SyncConfiguration.data_domain` = `products`;
+2. internal target resolves to an actual eligible `FieldBinding`;
+3. binding is global or same-workspace;
+4. binding is `active`;
+5. parent `FieldDefinition` is `active`;
+6. object type is `product` or `product_variant`;
+7. canonical registry internal code corresponds deterministically to that
+   binding/definition;
+8. registry `channel` exactly matches this connector definition `code`;
+9. canonical mapping evidence has `verification_status = verified`;
+10. candidate `external_field` exactly exists as `external_field_key` in one
+    already-resolved authoritative snapshot;
+11. there is **exactly one** resulting semantic candidate for the internal target;
+12. candidate does **not** violate existing per-configuration 1:1 mappings:
+    - internal target already mapped → effective mapping wins;
+    - external key already consumed by another effective mapping → do not suggest
+      it.
+
+Fail closed to “no suggestion” on ambiguity.
+
+##### H. One authoritative discovery view per projection
+
+A suggestion/read-model build must resolve the authoritative snapshot **once**
+and use that same immutable snapshot for all candidate validation within that
+projection.
+
+Do **not** repeatedly call `resolveRequiredSnapshot()` per field.
+
+This extends the already-corrected 4C-1b temporal-consistency principle.
+
+##### I. Suggestions are side-effect free
+
+Building suggestions/read-model **must not**:
+
+- insert/update/delete `field_mappings`;
+- update `configuration_revision`;
+- mutate `SyncConfiguration`;
+- update discovery state;
+- write suggestion/confidence state anywhere.
+
+Only explicit confirmation calls the existing `FieldMappingMutationService`.
+
+##### J. Existing mappings beat suggestions
+
+For every internal row:
+
+- effective confirmed mapping exists → show effective mapping; **never**
+  replace/prefill over it;
+- if its binding/definition becomes archived or its `external_field_key`
+  disappears from current discovery:
+  - retain effective `FieldMapping`;
+  - derived remediation-required/readiness problem;
+  - **no** automatic replacement/remap.
+
+##### K. Read-model boundary
+
+4C-1c read-model is **transient/presentation-oriented**.
+
+It may combine:
+
+- eligible internal `FieldBinding` / `FieldDefinition`;
+- existing effective `FieldMapping`;
+- high-confidence suggestion, if any;
+- authoritative discovered field presentation metadata;
+- derived mapped / suggested / unresolved / needs-attention presentation state.
+
+It must **not** become a new persistence entity.
+
+Do **not** expose raw canonical-registry rows, transport paths, snapshot IDs,
+schema-source terminology, or other Layer C/D data to merchant UI.
+
+##### L. Existing Field Browser
+
+Retain existing:
+
+- `ViewConnectorSchemaSnapshot`;
+- `ConnectorSchemaFieldPresenter`;
+- workspace/account/snapshot ownership chain.
+
+No backend rewrite.
+
+When the actual mapping UI ships, Field Browser becomes a supporting action such
+as:
+
+> Переглянути всі доступні поля Magento
+
+after merchant copy is made Layer-B compliant.
+
+##### M. 4C-1c implementation slicing
+
+| Slice | Scope |
+|---|---|
+| **4C-1c-0** | Docs-only suggestion/read-model Stop-and-Amend — this contract |
+| **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (**no** DB/migration scope) |
+| **4C-1c-2** | Layer B mapping UI: high-confidence prefill + manual choice + explicit confirmation through 4C-1b service |
+
+Do **not** create `SyncRun`, Preview, scheduling, selection persistence,
+`ExternalRecordLink`, or full synchronization setup in these slices.
+
+##### UI placement (4C-1c-2)
+
+Mapping is **Layer B** (`CONNECTOR_INTEGRATION_UX_CONTRACT.md`, Layer B —
+Налаштування даних).
+
+- do **not** embed mapping controls into the current **Інтеграції** /
+  Connector Account Overview merely because that page exists;
+- do **not** establish a new top-level navigation IA in this task;
+- 4C-1c-2 must use the approved **concept-first matrix**:
+  merchant-facing row is **internal concept first**, **external system field
+  second**, **simple state third**;
+- raw snapshot, discovery, schema source, canonical registry internals and
+  transport paths are **forbidden** in merchant UI;
+- high-confidence suggestion may be visually prefilled, but merchant confirmation
+  is still **explicit**.
+
+Do **not** widen Merchandiser or any other role's mutation permissions in this
+docs task. Existing policy remains authoritative; exact mapping-mutation
+authorization must be verified/scoped before 4C-1c-2 if current policies do not
+already settle it.
+
+##### Registry access path
+
+`CanonicalRegistryReader` is the existing read-only CSV access path. Do **not**
+create a second registry/loader in 4C-1c.
 
 ### Canonical mapping registry role
 
