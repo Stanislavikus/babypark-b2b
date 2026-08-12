@@ -308,12 +308,14 @@ yet), but should be scheduled before any payment gateway integration work starts
   when a profile adapter does not declare support). Vocabulary implemented:
   `products` + `import`/`export`. Adobe Commerce production profile remains
   fail-closed for executable sync pairs.
-- Sync Domain entities still absent: `FieldMapping`, `SyncRun` / `SyncRunItem`,
+- Sync Domain entities still absent: `SyncRun` / `SyncRunItem`,
   `ExternalRecordLink`, preview/live execution, scheduling, sync history/issues,
   and merchant sync UX beyond connector connection management.
-  FieldMapping persistence/confirmation contract is settled (Task 4C-1a);
-  implementation remains Task 4C-1b/4C-1c. Sync execution/preview/schedule/results
-  remain later implementation slices after domain docs (now settled).
+  `FieldMapping` persistence/manual confirmation and authoritative-discovery
+  validation are implemented (Task 4C-1b, Done). Canonical
+  suggestion/read-model and UI-prefill work remains Task 4C-1c.
+  Sync execution/preview/schedule/results remain later implementation slices
+  after domain docs (now settled).
 
 **Task sequence (GAP-006 remains Open until implementation lands):**
 
@@ -385,10 +387,10 @@ Implemented role matrix (confirmed against `App\Enums\UserRole`):
 | Disabled account | Per role matrix (unaffected by disabled state) | No | Per role matrix |
 
 **GAP-006 overall remains Open.** Remaining scope: Task 4B-2c (discovered
-schema fields / change inspection), retention/pruning (4B-2d), FieldMapping
-persistence/confirmation implementation (4C-1b), suggestion/read-model (4C-1c),
-sync execution/preview/schedule/history (`SyncRun`, issues, merchant sync
-UX), `ExternalRecordLink`, connector-account creation and credential-management/settings UI.
+schema fields / change inspection), retention/pruning (4B-2d),
+suggestion/read-model (4C-1c), sync execution/preview/schedule/history
+(`SyncRun`, issues, merchant sync UX), `ExternalRecordLink`,
+connector-account creation and credential-management/settings UI.
 
 ### Classification after Sync UX / Domain Rebaseline (documentation pass)
 
