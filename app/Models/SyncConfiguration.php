@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\SyncConfigurationOperationalState;
 use App\Enums\SyncDataDomain;
 use App\Enums\SyncSemanticOperation;
+use App\Support\Sync\SyncExternalContext;
 use App\Support\Sync\SyncOperationSet;
 use App\Support\Workspace\BelongsToWorkspace;
 use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids;
@@ -23,11 +24,26 @@ class SyncConfiguration extends Model
         'connector_account_id',
         'data_domain',
         'external_context',
-        'external_context_key',
         'enabled_operations',
         'operational_state',
         'configuration_revision',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (SyncConfiguration $configuration): void {
+            $payload = $configuration->getAttribute('external_context');
+
+            if (! is_array($payload)) {
+                $payload = [];
+            }
+
+            $context = SyncExternalContext::fromPayload($payload);
+
+            $configuration->setAttribute('external_context', $context->payload());
+            $configuration->setAttribute('external_context_key', $context->uniquenessKey());
+        });
+    }
 
     protected function casts(): array
     {

@@ -41,7 +41,6 @@ final class SyncConfigurationService
                     'connector_account_id' => $account->id,
                     'data_domain' => $input->dataDomain,
                     'external_context' => $input->externalContext->payload(),
-                    'external_context_key' => $input->externalContext->uniquenessKey(),
                     'enabled_operations' => $operationSet->values(),
                     'operational_state' => $input->operationalState,
                     'configuration_revision' => $revision,

@@ -146,33 +146,149 @@ class SyncConfigurationFoundationTest extends TestCase
         ]);
 
         $account = $this->createSyncSupportAccount();
-        $defaultKey = SyncExternalContext::default()->uniquenessKey();
 
-        SyncConfiguration::withoutWorkspaceScope()->create([
-            'id' => (string) Str::uuid(),
-            'workspace_id' => $account->workspace_id,
-            'connector_account_id' => $account->id,
-            'data_domain' => SyncDataDomain::Products,
+        $this->createSyncConfigurationViaEloquent($account, [
             'external_context' => [],
-            'external_context_key' => $defaultKey,
-            'enabled_operations' => ['import'],
-            'operational_state' => SyncConfigurationOperationalState::Enabled,
             'configuration_revision' => hash('sha256', 'seed'),
         ]);
 
         $this->expectException(QueryException::class);
 
-        SyncConfiguration::withoutWorkspaceScope()->create([
+        $this->createSyncConfigurationViaEloquent($account, [
+            'external_context' => [],
+            'configuration_revision' => hash('sha256', 'seed-2'),
+        ]);
+    }
+
+    #[Test]
+    public function caller_supplied_external_context_key_is_not_trusted_and_duplicate_identity_is_rejected(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $context = ['region' => 'eu'];
+        $derivedKey = SyncExternalContext::fromPayload($context)->uniquenessKey();
+        $mismatchedKey = str_repeat('a', 64);
+
+        $configuration = (new SyncConfiguration)->forceFill([
             'id' => (string) Str::uuid(),
             'workspace_id' => $account->workspace_id,
             'connector_account_id' => $account->id,
             'data_domain' => SyncDataDomain::Products,
-            'external_context' => [],
-            'external_context_key' => $defaultKey,
+            'external_context' => $context,
+            'external_context_key' => $mismatchedKey,
             'enabled_operations' => ['import'],
             'operational_state' => SyncConfigurationOperationalState::Enabled,
-            'configuration_revision' => hash('sha256', 'seed-2'),
+            'configuration_revision' => hash('sha256', 'mismatch-probe'),
         ]);
+        $configuration->save();
+        $configuration->refresh();
+
+        $this->assertSame($derivedKey, $configuration->external_context_key);
+        $this->assertNotSame($mismatchedKey, $configuration->external_context_key);
+
+        $this->expectException(QueryException::class);
+
+        (new SyncConfiguration)->forceFill([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'data_domain' => SyncDataDomain::Products,
+            'external_context' => $context,
+            'external_context_key' => str_repeat('b', 64),
+            'enabled_operations' => ['import'],
+            'operational_state' => SyncConfigurationOperationalState::Enabled,
+            'configuration_revision' => hash('sha256', 'mismatch-probe-2'),
+        ])->save();
+    }
+
+    #[Test]
+    public function canonically_equivalent_external_contexts_cannot_create_duplicate_identities(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $derivedKey = SyncExternalContext::fromPayload(['region' => 'eu', 'channel' => 'retail'])->uniquenessKey();
+
+        $first = $this->createSyncConfigurationViaEloquent($account, [
+            'external_context' => ['region' => 'eu', 'channel' => 'retail'],
+            'configuration_revision' => hash('sha256', 'canonical-a'),
+        ]);
+
+        $this->assertSame($derivedKey, $first->external_context_key);
+        $this->assertSame(['channel' => 'retail', 'region' => 'eu'], $first->external_context);
+
+        $this->expectException(QueryException::class);
+
+        $this->createSyncConfigurationViaEloquent($account, [
+            'external_context' => ['channel' => 'retail', 'region' => 'eu'],
+            'configuration_revision' => hash('sha256', 'canonical-b'),
+        ]);
+    }
+
+    #[Test]
+    public function different_external_contexts_remain_independently_persistable_with_distinct_keys(): void
+    {
+        $account = $this->createSyncSupportAccount();
+
+        $first = $this->createSyncConfigurationViaEloquent($account, [
+            'external_context' => ['region' => 'eu'],
+            'configuration_revision' => hash('sha256', 'context-a'),
+        ]);
+
+        $second = $this->createSyncConfigurationViaEloquent($account, [
+            'external_context' => ['region' => 'us'],
+            'configuration_revision' => hash('sha256', 'context-b'),
+        ]);
+
+        $this->assertNotSame($first->external_context_key, $second->external_context_key);
+        $this->assertSame(['region' => 'eu'], $first->external_context);
+        $this->assertSame(['region' => 'us'], $second->external_context);
+    }
+
+    #[Test]
+    public function external_context_key_is_rederived_when_external_context_changes_on_save(): void
+    {
+        $account = $this->createSyncSupportAccount();
+
+        $configuration = $this->createSyncConfigurationViaEloquent($account, [
+            'external_context' => ['region' => 'eu'],
+            'configuration_revision' => hash('sha256', 'update-a'),
+        ]);
+
+        $originalKey = $configuration->external_context_key;
+
+        $configuration->external_context = ['region' => 'us'];
+        $configuration->save();
+        $configuration->refresh();
+
+        $expectedKey = SyncExternalContext::fromPayload(['region' => 'us'])->uniquenessKey();
+
+        $this->assertNotSame($originalKey, $configuration->external_context_key);
+        $this->assertSame($expectedKey, $configuration->external_context_key);
+        $this->assertSame(['region' => 'us'], $configuration->external_context);
+    }
+
+    #[Test]
+    public function force_fill_with_mismatched_external_context_key_is_overwritten_on_save(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $context = ['lane' => 'import'];
+
+        $configuration = (new SyncConfiguration)->forceFill([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'data_domain' => SyncDataDomain::Products,
+            'external_context' => $context,
+            'external_context_key' => str_repeat('c', 64),
+            'enabled_operations' => ['import'],
+            'operational_state' => SyncConfigurationOperationalState::Enabled,
+            'configuration_revision' => hash('sha256', 'force-fill'),
+        ]);
+        $configuration->save();
+        $configuration->refresh();
+
+        $this->assertSame(
+            SyncExternalContext::fromPayload($context)->uniquenessKey(),
+            $configuration->external_context_key,
+        );
     }
 
     #[Test]
@@ -427,6 +543,25 @@ class SyncConfigurationFoundationTest extends TestCase
     private function syncService(): SyncConfigurationService
     {
         return app(SyncConfigurationService::class);
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     */
+    private function createSyncConfigurationViaEloquent(ConnectorAccount $account, array $overrides = []): SyncConfiguration
+    {
+        $configuration = SyncConfiguration::withoutWorkspaceScope()->create(array_merge([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'data_domain' => SyncDataDomain::Products,
+            'external_context' => [],
+            'enabled_operations' => ['import'],
+            'operational_state' => SyncConfigurationOperationalState::Enabled,
+            'configuration_revision' => hash('sha256', 'eloquent-fixture'),
+        ], $overrides));
+
+        return $configuration->refresh();
     }
 
     /**
