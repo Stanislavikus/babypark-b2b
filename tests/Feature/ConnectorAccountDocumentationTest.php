@@ -35,7 +35,10 @@ class ConnectorAccountDocumentationTest extends TestCase
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
 
         $this->assertStringContainsString('### ConnectorSchemaSnapshot (Resolved)', $content);
-        $this->assertStringContainsString('### ConnectorSchemaDiff / ConnectorSchemaDiffItem (Resolved)', $content);
+        $this->assertStringContainsString(
+            '### ConnectorSchemaDiff / ConnectorSchemaDiffItem (Resolved schema; dormant runtime)',
+            $content,
+        );
         $this->assertStringContainsString('**No** `previous_value` / `current_value`', $content);
     }
 
@@ -1271,7 +1274,7 @@ class ConnectorAccountDocumentationTest extends TestCase
         if (! preg_match(
             '/### Connector schema canonical hashing \(Resolved\)\n\n'
             .'(.*?)'
-            .'(?=\n### ConnectorSchemaDiff \/ ConnectorSchemaDiffItem \(Resolved\))/s',
+            .'(?=\n### ConnectorSchemaDiff \/ ConnectorSchemaDiffItem \(Resolved schema; dormant runtime\))/s',
             $content,
             $matches,
         )) {

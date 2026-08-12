@@ -206,9 +206,17 @@ The solution MUST preserve the separation between:
 
 - ConnectorAccount;
 
+- SyncConfiguration;
+
 - FieldMapping;
 
-- ImportJob / ExportJob / SyncJob.
+- SyncRun / SyncRunItem;
+
+- ExternalRecordLink.
+
+Historical note: earlier drafts listed `ImportJob` / `ExportJob` / `SyncJob`
+as primary sync entities. Those names are superseded by the Sync Domain
+Rebaseline in `03-DOMAIN_MODEL.md`.
 
 ### Layer 5: UI Simplicity Verification
 

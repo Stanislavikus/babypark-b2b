@@ -1621,10 +1621,18 @@ Table `connector_definitions`:
 - id (UUID)
 - code (string, unique, immutable after creation)
 - name (string)
-- direction (enum: import | export | both)
+- direction (enum: import | export | both) — **coarse platform-level envelope only**
 - status (enum: draft | active | deprecated)
 - notes (text, nullable)
 - created_at / updated_at
+
+`ConnectorDefinition.direction` describes the platform catalog envelope for a
+connector type (import-capable, export-capable, or both). It is **not**
+authoritative runtime capability truth for whether a specific connected
+`ConnectorAccount` may activate a given `(data_domain, semantic operation)`
+pair. That truth belongs at the connection / profile / runtime-contract
+boundary (see Sync Domain Rebaseline below). Do not reuse this enum/type as
+`SyncConfiguration` capability state.
 
 Rules:
 - `code` is immutable once set.
@@ -2596,11 +2604,17 @@ and requires no migration. Any future change to the preimage or normalization
 rules requires an explicit documentation-level decision and a rebaseline plan;
 the algorithm must never change silently.
 
-### ConnectorSchemaDiff / ConnectorSchemaDiffItem (Resolved)
+### ConnectorSchemaDiff / ConnectorSchemaDiffItem (Resolved schema; dormant runtime)
 
 `connector_schema_diffs` compares `from_snapshot_id` → `to_snapshot_id` with
 aggregate counts. **First snapshot:** UI label `Перший знімок` — baseline, not
 misleading “додано N” without explanation.
+
+**Current repository status (reverified):** models, migrations, factories, and
+relationships exist, but there is **no write path and no consumer** that
+computes or persists diffs yet. Readers must not infer a working schema-diff
+runtime from the presence of these entities. Diff computation remains Task
+4B-2c scope.
 
 #### Physical schema — `connector_schema_diffs` (Resolved)
 
@@ -2687,12 +2701,12 @@ Example keys: `connectors.errors.invalid_credentials`,
 | **4B-0** (this PR) | Stop-and-Amend docs + visual contract only |
 | **4B-1** | Migrations/domain foundation for `ConnectorAccount` + history tables |
 | **4B-2** | Adobe live discovery, snapshots, diffs, operational UI |
-| **4C** | `FieldMapping` suggestions, confidence, confirmation, manual resolution |
+| **4C** | Sync Domain mapping slice: `FieldMapping` suggestions, confidence, confirmation, manual resolution against discovered `external_field_key` identity (owned by `SyncConfiguration` per Sync Domain Rebaseline) |
 
 Task 4B snapshots are **input** to Task 4C. Discovery must **not** auto-create
-`FieldMapping` rows. Six Task 3 golden Adobe mappings (`sku`, `name`,
-`description`, `short_description`, `category`, `status` in
-`docs/data/canonical_product_field_mappings.csv`) are acceptance evidence only.
+`FieldMapping` rows. Canonical Adobe mapping rows in
+`docs/data/canonical_product_field_mappings.csv` are platform-global suggestion/
+evidence knowledge only — not account schema and not workspace mapping state.
 
 ### Retention (Resolved initial policy)
 
@@ -2818,25 +2832,45 @@ Write/import/export and FieldMapping are out of scope until Task 4C+.
 
 `App\Enums\ConnectorCapability` is the single domain source of truth for
 which optional connector abilities exist today (`ConnectionCheck`,
-`SchemaDiscovery`). Each profile declares its supported set in
+`SchemaDiscovery`, `AccountSetup`). Each profile declares its supported set in
 `config/connectors.php`; `ConnectorProfileDefinition::supports()` and
 `ConnectorProfileRegistry::requireCapability()` are the callable checks.
 
 **Rules:**
-- UI must gate optional connector surfaces on `supports()` for the real enum
-  case — no parallel UI-only capability flags.
-- A new optional connector ability requires a new `ConnectorCapability` case
-  in its own scoping pass **before** UI ships; UI must not invent interim
-  flags.
-- Sections appear only when `supports()` is true — never present-by-default
-  with per-connector hiding.
+- UI must gate **connector-capability-dependent** surfaces on `supports()` for
+  the real enum case — no parallel UI-only connector-capability flags.
+- A new **connector-specific/runtime** ability requires a new
+  `ConnectorCapability` case in its own scoping pass **before** UI that depends
+  on that ability ships; UI must not invent interim connector-capability flags.
+- Connector-capability-gated sections appear only when `supports()` is true —
+  never present-by-default with per-connector hiding.
 
-Future capabilities implied by the UX contract but **not** enum cases today
-(sync execution, dry-run/preview, per-data-type directions, scheduling, mapping
-UI, issue aggregation, bulk resolution, sync-run history) require both domain
-design and enum extension before implementation. The UX contract defines
-required behavior when those capabilities exist; it does not assert they exist
-now.
+**Governing invariant:** a feature must become a `ConnectorCapability` only
+when its availability or semantics genuinely vary by connector/runtime support.
+Platform-owned functionality must **not** become a connector capability merely
+because it is optional, future, configurable, UI-driven, or not yet
+implemented. Examples of platform-owned concerns include scheduling, mapping
+UI, dry-run/preview orchestration, issue aggregation, bulk resolution,
+sync-run history, and similar platform workflow/UI/orchestration capabilities.
+Those require their own platform/domain/runtime design and implementation
+passes; they do **not** require `ConnectorCapability` enum extension merely to
+exist. Genuinely new connector/runtime semantics (for example, whether a
+connected profile can support a given `(data_domain, semantic operation)`) may
+still require domain design and capability-contract evolution.
+
+The UX contract defines required merchant behavior for sync surfaces when those
+platform or connector concerns are implemented; it does not assert they exist
+in code today.
+
+**Sync capability truth boundary (Resolved — Sync UX / Domain Rebaseline):**
+a `SyncConfiguration` is valid/activatable only when the connected runtime
+contract authoritatively supports the requested `(data_domain, semantic
+operation)`. That connection / profile / runtime-contract boundary is the
+single source of truth for the combination. `ConnectorDefinition.direction`
+remains only a coarse platform envelope and must not be treated as execution
+capability truth. Do not invent a large future capability taxonomy or DSL in
+this documentation pass — the first real sync implementation slice must derive
+the minimum concrete vocabulary required by the runtime.
 
 #### ConnectorAccount cardinality (Resolved — UX contract 2026-08-10)
 
@@ -2850,11 +2884,15 @@ merchant UI (`Інтеграції`) is not equivalent to a single account.
 
 Per-data-domain control ("Де ви хочете керувати цінами?") is a required merchant
 question in Layer B when bidirectional sync is enabled. **No global silent
-ownership default** and no hardcoded platform-side default.
+ownership default** and no hardcoded platform-side default. The product default
+itself remains an open Product Owner question (Sync Domain Rebaseline PO-3).
+Do **not** introduce mandatory per-field authority before that product need
+exists.
 
-The storage and enforcement mechanism (field-level write ownership vs
-last-write-wins) is an **open domain decision** requiring its own architectural
-pass. This documentation records the merchant question only.
+The storage and enforcement mechanism (domain-level ownership policy vs
+last-write-wins vs later per-field rules) is an **open domain decision**
+requiring its own architectural pass when bidirectional ships. This
+documentation records the merchant question only.
 
 **Safe non-destructive defaults remain allowed:** automation/scheduling off
 until explicitly enabled; a connector supporting only one data-changing
@@ -3117,90 +3155,562 @@ Every table above includes `workspace_id` from the first migration, uses
 rows are workspace-scoped, policies on read/write, and tests for direct model,
 service, and relation cross-workspace rejection.
 
-### FieldMapping
+## Sync Domain Rebaseline (Resolved — normative)
 
+**Status:** Approved normative Sync UX / Domain model. Supersedes earlier
+proposed `ImportJob` / `ExportJob` / `SyncJob` framing as the primary sync
+execution model. Those names may remain only as historical design context;
+they are **not** current normative sync entities.
 
-A FieldMapping maps external fields to platform attributes.
+**Non-goals of this rebaseline:** no migrations, no runtime implementation,
+no final DB column inventory, no transport DSL, no capability taxonomy freeze,
+and no Product Owner decisions for open merchant-product choices listed below.
 
-It may contain:
+### Minimum conceptual relationship
 
-- workspace;
+```text
+ConnectorAccount
+    └─1:N─ SyncConfiguration
+             ├─1:N─ FieldMapping
+             └─1:N─ SyncRun
+                      └─1:N─ SyncRunItem
+```
 
-- connector account;
+- `SyncRun` belongs to `SyncConfiguration`.
+- `SyncRun` is **not** a child of `FieldMapping`.
+- `FieldMapping` and `SyncRun` are siblings owned by `SyncConfiguration`.
+- `ExternalRecordLink` remains a separate **account-scoped** external-identity
+  concept (not SyncConfiguration-scoped).
 
-- source field;
+Do **not** introduce speculative entities merely for symmetry. Unless current
+repository evidence creates a real requirement, the following remain out of
+scope for this rebaseline:
 
-- canonical mapping target.
+- `MappingSet`;
+- persistent `SyncIssue` lifecycle;
+- `ExternalFieldIdentity` entity;
+- transport-operation entity/DSL;
+- readiness-state entity/enum;
+- generic edition/deployment-model entities.
 
-  For Field Foundation-backed targets, the mapping references
-  `canonical_field_binding_id`, not a bare FieldDefinition reference (see
-  Field Foundation rename, GAP-016). Named "canonical", not "target",
-  because ConnectorDefinition.direction can be import, export, or both: on
-  import the canonical binding is the destination; on export it is the
-  source. "Target" would be directionally wrong for export connectors.
+### SyncConfiguration — identity and responsibility
 
-  Domain-owned targets such as pricing, availability, media, or other
-  service-resolved concepts are NOT represented by
-  `canonical_field_binding_id` — they require a registered domain
-  target/handler whose physical FieldMapping representation is not decided
-  by this Stop-and-Amend and must be finalized before Task 4C. Task 4A does
-  not create any `field_mappings` rows, so no representation is invented
-  here.
+Normative conceptual identity / ownership boundary:
 
-- target level;
+```text
+ConnectorAccount
++ data_domain
++ external_context
+```
 
-- transformation rule;
+`external_context` is deliberately **direction-neutral**. The same external
+Magento website/store/store-view context can be a source during import and a
+destination during export. Do **not** call this generic concept
+`target_context` in normative architecture. Exact DB/property names are not
+normative in this documentation pass.
 
-- direction;
+`external_context` represents connector-specific external business context that
+changes the meaning/scope of synchronization. Magento website/store/store-view
+behavior provides verified examples of such dimensions. Do **not** hard-code
+Magento-specific scope vocabulary into the generic SyncConfiguration domain
+model, and do **not** prescribe the physical DB representation yet.
 
-- confidence;
+How `external_context` is exposed in MVP is a Product Owner decision (see
+open product questions below). Normative domain docs recognize the concept
+without choosing whether MVP uses one implicit/default context or allows
+merchants to configure multiple websites/store views independently.
 
-- confirmed by user;
+#### Semantic operations
 
-- status.
+Direction/import/export is **not** part of SyncConfiguration identity.
 
-Field mappings must reference Attribute Dictionary definitions.
+A SyncConfiguration may enable one or more semantic operations supported by
+the connected runtime contract:
 
-They must not map directly to random code fields unless those fields are documented as system attributes.
+- import;
+- export.
 
-This is critical for import/export consistency.
+One domain/context configuration may therefore conceptually enable import
+only, export only, or both. Merchant UI may expose two operation checkboxes;
+that must **not** be translated into two persisted SyncConfiguration rows
+merely because import and export can be independently enabled. Semantic field
+correspondence may remain shared across the enabled operations.
 
-### ImportJob and ExportJob
+`ConnectorDefinition.direction` remains a separate coarse platform envelope
+(`Import | Export | Both`). It is not the same domain concept/type as enabled
+operations on SyncConfiguration, and must not be reused as SyncConfiguration
+capability truth.
 
+#### SyncConfiguration owns conceptually
 
-Imports and exports should be represented as jobs.
+- `data_domain`;
+- `external_context`;
+- independently enabled semantic operations supported by runtime-contract
+  capability truth;
+- selection scope;
+- effective FieldMappings;
+- schedule state/policy;
+- enabled / paused operational state;
+- stable comparable configuration revision.
 
-Possible entities:
+Exact database columns are not prescribed unless current repository
+conventions make a representation unavoidable.
 
-- ImportJob
+#### MVP operational constraint
 
-- ExportJob
+For MVP, one domain/context SyncConfiguration **may** share one selection
+policy and one scheduling policy across its enabled import/export operations.
 
-- SyncJob
+Treat that as an MVP **product constraint**, not a permanent architectural
+invariant. Independent per-operation selection, schedules, mappings, or other
+independently-owned configuration must be introduced only when a verified
+product requirement demonstrates the need. Do not split import/export
+configurations merely for hypothetical flexibility.
 
-A job may contain:
+### FieldMapping — semantic correspondence only
 
-- workspace;
+Minimum normative FieldMapping responsibility:
 
-- connector account;
+```text
+internal target
+    ↔
+external logical identity
+```
 
-- status;
+FieldMapping represents **semantic correspondence**. It is not an execution
+plan. The correspondence itself is direction-neutral.
 
-- source file;
+#### Not mandatory FieldMapping persistence
 
-- started at;
+The minimum FieldMapping does **not** require:
 
-- completed at;
+- external JSON/payload access paths;
+- REST/GraphQL endpoint names;
+- immutable `ConnectorSchemaSnapshotField` IDs as long-lived mapping identity;
+- schema-source namespace/source FK merely as future insurance;
+- per-field authority/ownership;
+- one generic persisted transformation assumed valid for both import/export;
+- connector transport/cardinality mechanics.
 
-- created by;
+#### Transformation semantics
 
-- summary;
+Do **not** prescribe one direction-neutral `transformation` property as
+mandatory FieldMapping state. Import parsing/normalization and export
+formatting/transformation may differ, be asymmetric, or be non-reversible. If
+mapping-specific transformation behavior is required, it must be explicitly
+aware of the semantic operation/direction for which it applies. Persistence/API
+shape of such transformation behavior is not decided by this rebaseline.
 
-- error log.
+#### Internal vs external handler boundaries
 
-The MVP may implement only the minimum needed for spreadsheet import.
+Internal domain target resolution and external connector transport are
+orthogonal responsibilities. Keep conceptually distinct:
 
-However, the domain model should support future scheduled sync.
+A. **Internal platform/domain target** — e.g. canonical field binding, pricing
+   domain, availability/inventory domain, media/domain-owned concepts.
+
+B. **External connector transport** — how the external system actually
+   reads/writes/executes the semantic intent.
+
+Do **not** create one universal `handler` abstraction that spans both
+boundaries. Descriptive names such as DomainTarget / DomainTargetHandler or
+external transport/access/planning concepts may be used in design discussion;
+exact implementation class/interface names are not normative here.
+
+For Field Foundation-backed internal targets, mappings reference a field
+binding identity (`field_binding_id` / approved equivalent), not a bare
+FieldDefinition code. Domain-owned targets such as pricing, availability, or
+media are not represented solely by `field_binding_id` and require an internal
+domain-target boundary whose physical FieldMapping representation is finalized
+before Task 4C persistence.
+
+### External logical identity and discovery
+
+For the **current** implemented Magento discovery contract,
+`external_field_key` is sufficient logical external identity in the existing
+account/domain context.
+
+Reverified repository facts:
+
+- `ConnectorDiscoverySourceResolver` selects exactly one source matching all of
+  `schema_scope = Account`, `source_kind = AccountApi`,
+  `acquisition_mode = LiveFetch`, `is_primary = true`, and fails on zero or
+  multiple matches.
+- The Adobe `admin_rest_api` global/RemoteStatic source does not participate in
+  this account discovery contract.
+- `ConnectorSchemaSnapshotField` uniqueness is `(snapshot_id, external_field_key)`.
+
+Therefore: do **not** add schema-source/namespace persistence to FieldMapping
+merely as hypothetical future insurance.
+
+#### Discovery responsibility
+
+Discovery answers:
+
+- what logical external fields actually exist for **this** connected account now;
+- what normalized schema metadata describes them
+  (including the already-established normalized data-type/scope vocabulary).
+
+Mappings must survive immutable snapshot replacement by reconciling their
+stable logical identity against the current authoritative discovery state.
+An immutable snapshot row ID must **not** be the long-lived mapping identity.
+
+#### Normalization precedent
+
+Preserve the already-implemented architectural precedent:
+
+```text
+connector-specific schema interpretation
+    ↓
+connector normalizer
+    ↓
+platform-usable normalized schema semantics
+    ↓
+persistence
+```
+
+`AdobePaaSAttributeNormalizer` currently maps Adobe list attributes into
+canonical fields (`external_field_key`, normalized type/scope metadata,
+normalized payload whitelist). Document the principle as strongly as current
+code supports it:
+
+> Persist stable logical identity and normalized semantic metadata required by
+> the platform. Keep connector-specific transport interpretation/mechanics
+> inside the connector boundary.
+
+Do **not** state the false blanket rule “raw external vocabulary is never
+persisted.” `external_field_key` itself is intentionally connector-local
+external logical identity and may be persisted.
+
+### Canonical mapping registry role
+
+`docs/data/canonical_product_field_mappings.csv` is **platform-global
+knowledge**. It is not workspace mapping state.
+
+Its role may include, as supported by current repository contract:
+
+- high-confidence suggestions;
+- requirement/evidence knowledge;
+- known mapping recommendations;
+- known transformation recommendations where applicable.
+
+It is **not**:
+
+- an account schema;
+- a complete external field catalog;
+- a substitute for live account discovery;
+- merchant-confirmed workspace mapping;
+- a reason to pre-author one row for every account-specific custom attribute.
+
+Preserve three distinct layers:
+
+1. **Platform-global canonical knowledge** — what the SaaS generally
+   knows/recommends about a channel/platform.
+2. **Account discovery reality** — what logical fields actually exist in this
+   particular connected account.
+3. **Workspace effective FieldMapping** — what semantic correspondence this
+   merchant/configuration has confirmed.
+
+Do not merge these concepts. Do not create a second competing global
+default-mapping registry.
+
+Verification aid only (reverified against current `origin/develop` HEAD; counts
+may grow without changing the architectural conclusion):
+
+- `canonical_product_field_mappings.csv`: 35 rows total
+  (`adobe_commerce` 6, `google_merchant` 13, `rozetka` 1, `schema_org` 10,
+  `shopify` 5). Of the 6 `adobe_commerce` rows, 5 have
+  `requirement_level = undecided`.
+- Current Magento discovery fixture: 106 received attributes / 102 normalized
+  snapshot fields.
+
+Conclusion: the canonical registry is sparse platform knowledge, not a complete
+external schema.
+
+### Connector transport boundary
+
+FieldMapping is not an execution plan. Generic sync core must **not** prescribe
+a universal execution loop such as “for each record / for each mapping /
+writeField(...)”.
+
+The connector/runtime boundary owns two complementary responsibilities:
+
+1. **Plan** — semantic sync intent → connector-specific external operations.
+2. **Interpret** — connector-specific external operation results → normalized
+   semantic/business outcomes understood by the generic core.
+
+Generic sync core must permit connector-planned operations whose execution
+scope, request structure, and cardinality are not constrained to one business
+record or one mapped field. Verified Magento/Adobe examples include inline
+record mutation, separate resource operations, and cross-record batch
+operations. These are examples only — not a closed taxonomy, required enum,
+required three-method interface, or transport DSL to freeze now.
+
+Even sibling operations inside one external business domain may differ in
+supported operations, request shape, response shape, and batching semantics
+(first-party Adobe pricing APIs demonstrate this). Generic sync core must not
+infer external CRUD symmetry or success/failure semantics from generic response
+shapes. Connector/runtime interpretation owns those external-contract
+semantics.
+
+### SyncRun, revision, and outcome cardinality
+
+`SyncRun` belongs directly to `SyncConfiguration`.
+
+Each SyncRun records the stable comparable SyncConfiguration revision against
+which that run was evaluated/executed. This applies to preview runs and live
+runs.
+
+#### Configuration revision invariant
+
+Normative invariant:
+
+> SyncRun records the SyncConfiguration revision it executed against.
+
+This is required so readiness can be **derived** rather than persisted.
+
+Example:
+
+- current configuration revision = 12, last relevant successful preview
+  revision = 11 → current configuration has not been successfully previewed
+  after its latest change;
+- both = 12 → preview corresponds to the current configuration state.
+
+Do not prescribe integer/hash/revision storage implementation here. Require
+only: stable comparable configuration revision + revision recorded on each
+SyncRun.
+
+#### Three cardinalities remain distinct
+
+A. **Transport operation** — one connector/external operation/request.
+B. **Semantic operation unit** — one intended external semantic mutation/read
+   unit, possibly finer-grained than a product/business record.
+C. **Business-record outcome** — merchant/business execution result represented
+   by `SyncRunItem`.
+
+`SyncRunItem` represents business-record outcome. It must never be defined as
+one HTTP request, one connector batch, or one transport attempt.
+
+#### Result semantics
+
+A business record may conceptually end in states including: succeeded; known
+failure; known partial application/result; ambiguous/unknown applied state;
+skipped/not attempted where applicable.
+
+Do not freeze the exact persisted enum yet. Unknown applied state is **not**
+equivalent to known failure. A mutating transport failure can occur after the
+external server may have applied some/all effects. Blind retry of an ambiguous
+mutation is safe only when the **specific** external operation has proven
+appropriate idempotency/retry semantics. Retry/idempotency safety is
+operation-specific, not connector-wide.
+
+### Preview vs Live
+
+Preview and Live are distinct result semantics.
+
+**Preview:**
+
+- performs no consequential external mutation;
+- predicts/readies what would happen;
+- may produce blockers/warnings/exclusions/predicted outcomes;
+- cannot be “partially applied”;
+- cannot have “unknown applied state”;
+- must never imply that an external write actually occurred.
+
+**Live:**
+
+- performs actual external execution;
+- records what actually happened;
+- may contain success, known failure, partial application,
+  unknown/ambiguous applied state, or skipped/not-attempted where applicable.
+
+Do not define one flat semantic outcome vocabulary pretending preview/live are
+the same. They may share technical run infrastructure where appropriate. Exact
+persistence representation is not prescribed here. If preview runs are
+persisted for reproducibility/audit, they must **not** automatically appear to
+merchants as completed synchronizations. Whether preview runs are visible in
+merchant history is a Product Owner decision.
+
+### Run selection semantics
+
+Distinguish explicitly:
+
+A. **Outside run selection** — record does not belong to this run's
+   query/filter/selection scope → no SyncRunItem is required merely to say it
+   was unselected.
+B. **Inside run scope, intentionally not executed** → skipped / not_attempted
+   semantics may apply.
+C. **Inside run scope and evaluated/executed** → predicted outcome for Preview;
+   actual outcome for Live.
+
+Do not classify every unselected catalog record as skipped. Do not create huge
+result histories merely for records that never belonged to the run scope.
+
+### Historical issues vs current issues
+
+Historical execution outcome and current unresolved merchant problem are
+different concepts. SyncRun / SyncRunItem history is immutable historical
+evidence.
+
+Do **not** claim:
+
+- current issues = non-success rows from the latest live run
+  (incremental/delta runs may not reevaluate every selected record);
+- stable issue identity alone is sufficient to derive current issue state.
+
+#### Stable normalized issue identity
+
+Minimum historical issue semantics require a stable normalized identity based
+conceptually on:
+
+```text
+stable issue kind/code
++ semantic subject
+```
+
+within the relevant business-record + configuration context.
+
+`category + subject` is insufficient: one GTIN subject may independently have
+missing value, invalid format, duplicate, or external rejection. Category is
+presentation/classification and must not be the sole stable discriminator.
+Final code enums/DB fields are not prescribed here.
+
+#### Evaluation coverage
+
+Historical outcomes must preserve enough evaluation-coverage semantics to
+distinguish:
+
+A. issue absent because reevaluated and clean;
+B. issue absent because that subject was not evaluated in this run.
+
+Do not prescribe the persistence shape now. Do not claim a final current-issue
+derivation algorithm until full-vs-delta run semantics and evaluation coverage
+are defined.
+
+#### Persistent SyncIssue
+
+Persistent `SyncIssue` remains **deferred**. Do not introduce it merely to
+mirror historical error rows. Reconsider persistent current-issue projection
+only when a real requirement appears (acknowledge, snooze, assignment, durable
+workflow state, manual issue management), or when run/evaluation semantics prove
+a persistent projection materially simpler and safer than derivation.
+
+### ExternalRecordLink
+
+`ExternalRecordLink` remains **account-scoped**, not SyncConfiguration-scoped.
+
+Conceptually:
+
+```text
+one internal business record
+    ↔
+its corresponding external record
+```
+
+within workspace + ConnectorAccount + external object/domain context as
+required.
+
+Do not bind external identity to one particular SyncConfiguration. Multiple
+sync operations/config concerns against the same connected external account
+must not create divergent identities for the same external object.
+
+Initial matching policy (SKU, GTIN, explicit/manual, other) is separate from
+the persisted identity link. Do not conflate how a match is initially found
+with the identity relationship persisted after matching.
+
+### Readiness state — derive, do not persist stale flags
+
+Do not persist a readiness chain such as `mapping_incomplete`, `preview_ok`,
+`schedule_eligible`, `ready_for_sync` when the value can become stale
+immediately after mapping, selection, operation, external-context, or other
+configuration revision.
+
+Prefer deriving readiness from:
+
+- current SyncConfiguration state;
+- validation state;
+- current configuration revision;
+- relevant Preview/Live run state;
+- configuration revision recorded on that run.
+
+Persist only state that cannot be reliably reconstructed. The
+`SyncRun.configuration_revision` invariant above is required for this
+derivation.
+
+### Connector profile / runtime-contract variance
+
+Current repository baseline (reverified):
+
+- `ConnectorProfile` is the existing extension point and currently couples
+  account setup + runtime adapter 1:1
+  (example: `adobe_commerce_paas_oauth1_integration` →
+  `AdobePaaSAccountSchema` → `AdobePaaSConnectorAdapter`).
+- `ConnectorProfileRegistry::resolveAccountSetupProfile()` requires exactly one
+  enabled AccountSetup-capable profile per ConnectorDefinition and fails on
+  ambiguity.
+
+Do not change that invariant in this documentation pass.
+
+External runtime-contract variance belongs at the connection / profile /
+runtime-contract boundary. It must not leak into FieldMapping,
+SyncConfiguration semantic mapping, mapping suggestion identity, snapshot field
+identity, or generic SyncRun semantics. Generic sync operates against an
+already-valid ConnectorAccount and asks the connector boundary to execute
+supported semantic operations. It must not contain Magento-specific logic such
+as “is this PaaS / on-prem / Open Source?”
+
+Deferred connector-specific verification before a second real runtime variant
+(not a blocker for this Sync domain rebaseline):
+
+- what external contract the existing AdobePaaS profile actually intends to
+  cover according to current repo docs/config/tests;
+- whether it is intentionally PaaS-only or represents a broader traditional
+  Adobe/Magento REST-family implementation;
+- exact authoritative post-bootstrap mechanism for verifying supported runtime
+  contract/version/capabilities;
+- Magento Open Source setup/auth compatibility;
+- whether AccountSetup and final runtime contract remain one profile or later
+  require separate resolution/binding;
+- whether existing exactly-one AccountSetup-profile invariant must ever change.
+
+Do not add generic fields for symmetry such as `edition`, `deployment_model`,
+or `api_family` to generic sync domain entities. Do not make optional external
+preflight metadata (e.g. `/magento_version`) a mandatory bootstrap dependency,
+and do not invent an authoritative REST/GraphQL metadata endpoint.
+
+### Superseded concepts
+
+| Earlier concept | Current normative status |
+|---|---|
+| `ImportJob` / `ExportJob` / `SyncJob` as primary sync entities | Superseded by `SyncConfiguration` → `SyncRun` → `SyncRunItem` |
+| FieldMapping as directional execution plan with mandatory bidirectional transformation | Superseded: semantic correspondence only; transformation operation-aware if needed |
+| FieldMapping.direction / per-field authority as mandatory minimum sync state | Superseded for the minimum model; domain-level ownership default remains a Product Owner question if bidirectional ships |
+| Persisted readiness flags (`preview_ok`, `schedule_eligible`, …) | Superseded by derived readiness from configuration revision + run revision |
+| Persistent `SyncIssue` as default current-issue store | Deferred |
+
+Spreadsheet/file import may still use a specialized import flow later; it must
+not redefine the connector sync domain relationship above.
+
+### Open Product Owner questions (maximum 5)
+
+Technical architecture that repository evidence can determine is not listed
+here.
+
+1. **MVP data domains** — products only; products + prices; products +
+   inventory; or another first slice?
+2. **External-context exposure in MVP** — for systems with multiple external
+   contexts (e.g. Magento websites/store views): one implicit/default context,
+   or merchant-configurable independent contexts?
+3. **Ownership/authority default if bidirectional ships** — at
+   domain/configuration level, what product default should apply (example
+   merchant wording: “Де ви хочете керувати цінами?”)? Do not introduce
+   mandatory per-field authority before this product need exists.
+4. **Preview history visibility** — are Preview runs visible in merchant
+   history, or technically retained for audit while hidden from normal
+   “completed synchronizations” history?
+5. **Simple schedule UX** — what schedule controls are appropriate for a
+   non-technical SMB merchant (prefer simple presets unless an existing
+   approved product rule already settles this)?
 
 ## Billing Context
 
@@ -3413,9 +3923,19 @@ Order Item owns historical line snapshots.
 
 Payment owns payment attempt or transaction.
 
-Connector owns external system configuration.
+Connector owns external system configuration / connection.
 
-Field Mapping owns external-to-platform field translation.
+SyncConfiguration owns domain/context sync intent, enabled semantic
+operations, selection, schedule state, effective FieldMappings, and
+configuration revision.
+
+FieldMapping owns semantic correspondence between an internal domain target
+and an external logical identity for a SyncConfiguration.
+
+SyncRun / SyncRunItem own historical preview/live execution evidence for a
+SyncConfiguration revision.
+
+ExternalRecordLink owns account-scoped internal↔external record identity.
 
 Billing owns SaaS subscription logic.
 
@@ -3482,9 +4002,17 @@ The MVP domain model should include:
 
 - ConnectorAccount;
 
+- SyncConfiguration;
+
 - FieldMapping;
 
-- ImportJob.
+- SyncRun / SyncRunItem;
+
+- ExternalRecordLink.
+
+Historical note: earlier drafts listed `ImportJob` / `ExportJob` / `SyncJob`
+here. Those names are superseded by the Sync Domain Rebaseline above and are
+not current MVP sync entities.
 
 The MVP should not include:
 
@@ -4312,28 +4840,46 @@ registry.
   platform's own architectural choice (for value-table type-safety in
   Postgres/Laravel), not a literal copy of Shopify's implementation.
 - HubSpot's Properties UI (one page, object selector) and Data Sync field
-  mappings (`direction`, "Always use X" conflict rule) confirm the general
-  shape of `FieldMapping.direction`/`authority` below — but HubSpot's public
-  documentation does **not** confirm a persistent, record+field-level
-  `FieldSyncOverride`. That entity is this platform's own design choice for a
-  manual-first SaaS (users create records by hand before connecting an ERP),
-  not an externally-validated pattern.
+  mappings (`direction`, "Always use X" conflict rule) are useful product UX
+  evidence for bidirectional ownership questions — but they do **not** force
+  mandatory per-field `direction`/`authority` persistence onto this platform's
+  minimum FieldMapping model. Persistent per-record/field override workflow
+  (earlier draft name `FieldSyncOverride`) remains deferred until a verified
+  product requirement exists; it is not an externally mandated entity.
 
 **Sync ownership is explicitly out of scope for the field registry itself** —
 `FieldDefinition`/`FieldBinding` must never know about 1C, Odoo, CSV, or any
 other external system, per Mandate 7 (Connector Independence). Synchronization
-concerns are modeled as separate future entities, sequenced with Connector
-Foundation (GAP-006). There is no separate "Sync Policy" entity — direction and
-conflict authority live directly on `FieldMapping`, below:
+concerns are modeled by the Sync Domain Rebaseline (above) and sequenced with
+Connector Foundation (GAP-006).
 
-- `FieldMapping` — external field ↔ internal `field_binding_id`, with
-  `direction` (`external_to_saas` / `saas_to_external` / `bidirectional`) and
-  `authority` (`external_system` / `saas` / `manual_review`).
-- `ExternalRecordLink` — external record id ↔ internal Product/Customer/
-  PriceList id, used for safe upsert instead of fuzzy/name-based matching.
-- `FieldSyncOverride` — a per-record, per-field manual exception so a user who
-  created records manually before connecting an ERP is never silently
-  overwritten.
+Current normative sync entities (minimum):
+
+- `SyncConfiguration` — account + data_domain + external_context; owns enabled
+  semantic operations, selection, schedule state, effective mappings, and
+  stable configuration revision.
+- `FieldMapping` — direction-neutral semantic correspondence
+  (`internal target` ↔ `external logical identity`) owned by
+  SyncConfiguration. For Field Foundation-backed targets, reference
+  `field_binding_id` (not a bare field code). Minimum FieldMapping does **not**
+  require mandatory `direction`, per-field `authority`, snapshot-field FK
+  identity, schema-source namespace, or one bidirectional transformation.
+- `SyncRun` / `SyncRunItem` — historical preview/live execution evidence for a
+  SyncConfiguration revision; SyncRunItem is business-record outcome, not a
+  transport attempt.
+- `ExternalRecordLink` — account-scoped external record id ↔ internal
+  Product/Customer/PriceList id, used for safe upsert instead of fuzzy/
+  name-based matching. Not SyncConfiguration-scoped.
+
+Historical / deferred (not minimum sync domain):
+
+- Earlier draft placed mandatory `FieldMapping.direction` /
+  `FieldMapping.authority` and a `FieldSyncOverride` entity here. Per-field
+  authority and per-record/field override workflow remain **deferred** until a
+  verified product requirement exists. Domain-level ownership wording for
+  bidirectional sync remains a Product Owner question (see Sync Domain
+  Rebaseline open questions). Do not treat those earlier draft fields as
+  current mandatory persistence.
 
 **UI direction (Resolved as part of the same decision):** a single settings
 area, not one sidebar item per entity type:
@@ -4343,12 +4889,14 @@ area, not one sidebar item per entity type:
 ```
 
 New tabs (Orders, Suppliers, ...) are added only when a real feature for that
-entity type exists — not preemptively. Connector-specific field mapping lives
-in a separate area (`Інтеграції → <integration> → Зіставлення полів`) and must
-not be merged into the field registry UI. The `scope` column's UI label changes
-from "Джерело" to **"Походження поля"** (values: "Системне" / "З бібліотеки" /
-"Власне поле") so it does not collide with the future, distinct concept of
-sync source (Вручну / Odoo / 1С / CSV / Google Sheets / API).
+entity type exists — not preemptively. Connector/sync field mapping lives on
+merchant sync/data-management surfaces (not inside the field registry UI). Exact
+navigation/IA may remain transitional; `Інтеграції` remains the connection-
+management entry and must not become the technical sync builder. The `scope`
+column's UI label changes from "Джерело" to **"Походження поля"** (values:
+"Системне" / "З бібліотеки" / "Власне поле") so it does not collide with the
+distinct concept of sync source (Вручну / Odoo / 1С / CSV / Google Sheets /
+API).
 
 **Sequencing (Resolved):**
 
@@ -4358,9 +4906,10 @@ sync source (Вручну / Odoo / 1С / CSV / Google Sheets / API).
 2. Field Foundation migration itself (`FieldDefinition`/`FieldBinding`, three
    value tables, `workspace_import_aliases.field_binding_id` — see GAP-016).
 3. Customer Fields UI (`Налаштування → Поля → [Клієнти]`).
-4. Connector Foundation (GAP-006) — `FieldMapping` built against
-   `field_binding_id` from the start, not against the old
-   `attribute_definition_id` shape.
+4. Connector Foundation (GAP-006) — Sync Domain (`SyncConfiguration`,
+   `FieldMapping`, `SyncRun` / `SyncRunItem`, `ExternalRecordLink`) built
+   against `field_binding_id` for Field Foundation-backed internal targets
+   from the start, not against the old `attribute_definition_id` shape.
 
 **Workspace isolation note:** the full workspace-isolation coverage audit
 tracked under GAP-004 is a **separate task and does not block** steps 1–4
@@ -4394,11 +4943,12 @@ the repository by this docs-only Stop-and-Amend task. Existing Adobe-oriented
 schema and prototype work are supporting technical context, not the source of
 approval by themselves.
 
-Connector work must use `FieldMapping` and the Field Foundation registry
-(`FieldDefinition` / `FieldBinding`) from the beginning — see "Field Foundation
-(cross-object fields)" above and GAP-006. `FieldMapping` must reference
-`field_binding_id`, not a bare field code, since the same external column name
-can be ambiguous across entity types (e.g. Product vs Customer).
+Connector sync work must use the Sync Domain Rebaseline and the Field
+Foundation registry (`FieldDefinition` / `FieldBinding`) from the beginning —
+see "Sync Domain Rebaseline", "Field Foundation (cross-object fields)" above,
+and GAP-006. For Field Foundation-backed internal targets, `FieldMapping` must
+reference `field_binding_id`, not a bare field code, since the same external
+column name can be ambiguous across entity types (e.g. Product vs Customer).
 
 ### Billing scope
 
