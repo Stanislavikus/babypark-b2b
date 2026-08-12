@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\SyncConfigurationOperationalState;
 use App\Enums\SyncDataDomain;
 use App\Enums\SyncSemanticOperation;
+use App\Support\Sync\Exceptions\SyncExternalContextValidationException;
 use App\Support\Sync\SyncExternalContext;
 use App\Support\Sync\SyncOperationSet;
 use App\Support\Workspace\BelongsToWorkspace;
@@ -35,7 +36,9 @@ class SyncConfiguration extends Model
             $payload = $configuration->getAttribute('external_context');
 
             if (! is_array($payload)) {
-                $payload = [];
+                throw SyncExternalContextValidationException::invalidPayload(
+                    'External context must be a JSON object.',
+                );
             }
 
             $context = SyncExternalContext::fromPayload($payload);

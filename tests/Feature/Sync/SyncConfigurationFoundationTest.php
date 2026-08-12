@@ -15,6 +15,7 @@ use App\Services\Sync\SyncConfigurationService;
 use App\Services\Sync\UpdateSyncConfigurationInput;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
 use App\Support\Sync\Exceptions\SyncConfigurationConflictException;
+use App\Support\Sync\Exceptions\SyncExternalContextValidationException;
 use App\Support\Sync\Exceptions\UnsupportedSyncOperationException;
 use App\Support\Sync\SyncExternalContext;
 use App\Support\Sync\SyncOperationSet;
@@ -292,6 +293,117 @@ class SyncConfigurationFoundationTest extends TestCase
     }
 
     #[Test]
+    public function explicit_default_external_context_persists_successfully(): void
+    {
+        $account = $this->createSyncSupportAccount();
+
+        $configuration = $this->createSyncConfigurationViaEloquent($account, [
+            'external_context' => [],
+            'configuration_revision' => hash('sha256', 'explicit-default'),
+        ]);
+
+        $this->assertSame([], $configuration->external_context);
+        $this->assertSame(
+            SyncExternalContext::default()->uniquenessKey(),
+            $configuration->external_context_key,
+        );
+        $this->assertDatabaseCount('sync_configurations', 1);
+    }
+
+    #[Test]
+    public function valid_associative_external_context_persists_and_canonicalizes_on_save(): void
+    {
+        $account = $this->createSyncSupportAccount();
+
+        $configuration = $this->createSyncConfigurationViaEloquent($account, [
+            'external_context' => ['channel' => 'retail', 'region' => 'eu'],
+            'configuration_revision' => hash('sha256', 'valid-associative'),
+        ]);
+
+        $this->assertSame(['channel' => 'retail', 'region' => 'eu'], $configuration->external_context);
+        $this->assertSame(
+            SyncExternalContext::fromPayload(['region' => 'eu', 'channel' => 'retail'])->uniquenessKey(),
+            $configuration->external_context_key,
+        );
+    }
+
+    #[Test]
+    public function string_external_context_is_rejected_on_save(): void
+    {
+        $account = $this->createSyncSupportAccount();
+
+        $this->expectException(SyncExternalContextValidationException::class);
+        $this->expectExceptionMessage('External context must be a JSON object.');
+
+        $this->attemptInvalidExternalContextSave($account, 'this-is-not-a-json-object');
+
+        $this->assertDatabaseCount('sync_configurations', 0);
+    }
+
+    #[Test]
+    public function null_external_context_is_rejected_on_save(): void
+    {
+        $account = $this->createSyncSupportAccount();
+
+        $this->expectException(SyncExternalContextValidationException::class);
+        $this->expectExceptionMessage('External context must be a JSON object.');
+
+        $this->attemptInvalidExternalContextSave($account, null);
+
+        $this->assertDatabaseCount('sync_configurations', 0);
+    }
+
+    #[Test]
+    public function scalar_non_array_external_context_is_rejected_on_save(): void
+    {
+        $account = $this->createSyncSupportAccount();
+
+        $this->expectException(SyncExternalContextValidationException::class);
+        $this->expectExceptionMessage('External context must be a JSON object.');
+
+        $this->attemptInvalidExternalContextSave($account, 42);
+
+        $this->assertDatabaseCount('sync_configurations', 0);
+    }
+
+    #[Test]
+    public function list_shaped_external_context_is_rejected_on_save(): void
+    {
+        $account = $this->createSyncSupportAccount();
+
+        $this->expectException(SyncExternalContextValidationException::class);
+        $this->expectExceptionMessage('External context payload must be a JSON object.');
+
+        $this->attemptInvalidExternalContextSave($account, ['a']);
+
+        $this->assertDatabaseCount('sync_configurations', 0);
+    }
+
+    #[Test]
+    public function invalid_external_context_cannot_silently_collide_with_existing_default_context_identity(): void
+    {
+        $account = $this->createSyncSupportAccount();
+
+        $this->createSyncConfigurationViaEloquent($account, [
+            'external_context' => [],
+            'configuration_revision' => hash('sha256', 'existing-default'),
+        ]);
+
+        try {
+            $this->attemptInvalidExternalContextSave($account, null);
+            $this->fail('Expected SyncExternalContextValidationException was not thrown.');
+        } catch (SyncExternalContextValidationException) {
+            // expected
+        }
+
+        $this->assertDatabaseCount('sync_configurations', 1);
+        $this->assertSame(
+            SyncExternalContext::default()->uniquenessKey(),
+            SyncConfiguration::withoutWorkspaceScope()->sole()->external_context_key,
+        );
+    }
+
+    #[Test]
     public function same_domain_and_default_context_on_another_account_is_allowed(): void
     {
         $this->configureSyncSupportProfile([
@@ -562,6 +674,20 @@ class SyncConfigurationFoundationTest extends TestCase
         ], $overrides));
 
         return $configuration->refresh();
+    }
+
+    private function attemptInvalidExternalContextSave(ConnectorAccount $account, mixed $externalContext): void
+    {
+        (new SyncConfiguration)->forceFill([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'data_domain' => SyncDataDomain::Products,
+            'external_context' => $externalContext,
+            'enabled_operations' => ['import'],
+            'operational_state' => SyncConfigurationOperationalState::Enabled,
+            'configuration_revision' => hash('sha256', 'invalid-context'),
+        ])->save();
     }
 
     /**
