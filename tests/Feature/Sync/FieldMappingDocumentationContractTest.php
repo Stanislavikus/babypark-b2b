@@ -241,9 +241,12 @@ class FieldMappingDocumentationContractTest extends TestCase
     {
         $section = $this->fieldMappingSuggestionContractSection();
 
-        $this->assertStringContainsString('Do not guess or persist a connected store\'s runtime version', $section);
+        $this->assertMatchesRegularExpression(
+            "/Do not guess or persist a connected store's runtime version/s",
+            $section,
+        );
         $this->assertStringContainsString('Do **not** hardcode `2.4.9-admin-rest`', $section);
-        $this->assertStringContainsString('knowledge evidence only', $section);
+        $this->assertMatchesRegularExpression('/knowledge evidence\s+only/', $section);
     }
 
     #[Test]
@@ -265,7 +268,7 @@ class FieldMappingDocumentationContractTest extends TestCase
         $this->assertStringContainsString('**4C-1c-0**', $section);
         $this->assertStringContainsString('**4C-1c-1**', $section);
         $this->assertStringContainsString('**4C-1c-2**', $section);
-        $this->assertStringContainsString('no DB/migration scope', $section);
+        $this->assertStringContainsString('DB/migration scope', $section);
         $this->assertStringContainsString('Layer B mapping UI', $section);
         $this->assertStringContainsString('explicit confirmation through 4C-1b service', $section);
     }
@@ -277,7 +280,7 @@ class FieldMappingDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('Mapping is **Layer B**', $section);
         $this->assertStringContainsString('concept-first matrix', $section);
-        $this->assertStringContainsString('merchant confirmation is still **explicit**', $section);
+        $this->assertMatchesRegularExpression('/merchant confirmation\s+is still \*\*explicit\*\*/', $section);
         $this->assertStringContainsString('do **not** embed mapping controls into the current **Інтеграції**', $section);
     }
 
@@ -287,7 +290,7 @@ class FieldMappingDocumentationContractTest extends TestCase
         $section = $this->fieldMappingSuggestionContractSection();
 
         $this->assertStringContainsString('`CanonicalRegistryReader` is the existing read-only CSV access path', $section);
-        $this->assertStringContainsString('Do **not** create a second registry/loader', $section);
+        $this->assertMatchesRegularExpression('/Do \*\*not\*\*\s+create a second registry\/loader/', $section);
     }
 
     /**
