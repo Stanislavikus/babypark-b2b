@@ -314,7 +314,7 @@ yet), but should be scheduled before any payment gateway integration work starts
   `FieldMapping` persistence/manual confirmation and authoritative-discovery
   validation are implemented (Task 4C-1b, Done). Canonical
   suggestion/read-model and UI-prefill work is Task 4C-1c (4C-1c-0 docs contract
-  frozen; 4C-1c-1 provider/read-model and 4C-1c-2 Layer B UI remain unimplemented).
+  frozen; 4C-1c-1 provider/read-model Done; 4C-1c-2 Layer B UI remains unimplemented).
   Sync execution/preview/schedule/results remain later implementation slices
   after domain docs (now settled).
 
@@ -333,7 +333,7 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4C-1a** | FieldMapping persistence contract (docs-only Stop-and-Amend) — Done |
 | **4C-1b** | `field_mappings` persistence + manual confirmation service + authoritative-discovery validation + revision v2 + graceful fail-closed handling when mapped `FieldBinding` or parent `FieldDefinition` physical deletion is attempted (archive remains valid lifecycle path; no raw FK errors) — Done |
 | **4C-1c-0** | Docs-only suggestion/read-model Stop-and-Amend — canonical qualification, confidence semantics, registry→discovery boundary — Done |
-| **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (no DB/migration scope) |
+| **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (no DB/migration scope) — Done |
 | **4C-1c-2** | Layer B mapping UI: high-confidence prefill + manual choice + explicit confirmation through 4C-1b service |
 | **4C** | Remaining sync domain: `SyncRun` / `SyncRunItem`, `ExternalRecordLink`, preview/live execution, scheduling, sync history/issues, merchant sync UX beyond mapping |
 
@@ -354,8 +354,8 @@ Task 4C-1a settled the FieldMapping first persistence contract (docs only).
 and graceful fail-closed handling for mapped binding / parent definition
 physical-delete attempts (archive remains valid) are implemented (Task 4C-1b).
 Canonical suggestion/read-model contract is frozen (Task 4C-1c-0, docs only).
-Provider/read-model (4C-1c-1) and Layer B mapping UI (4C-1c-2) remain
-unimplemented. `SyncRun` / execution, preview,
+Canonical deterministic suggestion provider/read-model (4C-1c-1) is implemented.
+Layer B mapping UI (4C-1c-2) remains unimplemented. `SyncRun` / execution, preview,
 schedule, history, and `ExternalRecordLink` remain unimplemented.
 Connector-account creation and credential-management/settings UI remain absent.
 Task 4B-2c (discovered schema fields / change inspection) and retention jobs
@@ -392,7 +392,7 @@ Implemented role matrix (confirmed against `App\Enums\UserRole`):
 
 **GAP-006 overall remains Open.** Remaining scope: Task 4B-2c (discovered
 schema fields / change inspection), retention/pruning (4B-2d),
-canonical suggestion provider/read-model (4C-1c-1), Layer B mapping UI (4C-1c-2),
+Layer B mapping UI (4C-1c-2),
 sync execution/preview/schedule/history
 (`SyncRun`, issues, merchant sync UX), `ExternalRecordLink`,
 connector-account creation and credential-management/settings UI.
@@ -404,7 +404,7 @@ Distinguish carefully — do not treat every future possibility as an active GAP
 | Class | Item | Blocks Sync domain work now? |
 |---|---|---|
 | **A. Architecture blockers** | None identified against current `origin/develop` for the approved Sync Domain Rebaseline | No |
-| **B. Implementation gaps** | Canonical suggestion provider/read-model (4C-1c-1); Layer B mapping UI (4C-1c-2); `SyncRun` / `SyncRunItem` / `ExternalRecordLink` persistence + runtime; preview/live execution; merchant sync UX beyond connection management; ConnectorSchemaDiff write path/consumer; connector-account create/settings UI; Field Browser copy / Layer C gating (GAP-025) | Yes for shipping sync; docs are settled |
+| **B. Implementation gaps** | Layer B mapping UI (4C-1c-2); `SyncRun` / `SyncRunItem` / `ExternalRecordLink` persistence + runtime; preview/live execution; merchant sync UX beyond connection management; ConnectorSchemaDiff write path/consumer; connector-account create/settings UI; Field Browser copy / Layer C gating (GAP-025) | Yes for shipping sync; docs are settled |
 | **C. Connector-specific future verification (deferred Variant #2 / profile)** | What external contract `adobe_commerce_paas_oauth1_integration` intentionally covers; PaaS-only vs broader Magento REST-family; post-bootstrap runtime-contract/version/capability verification; Magento Open Source setup/auth compatibility; whether AccountSetup and final runtime contract must later split; whether exactly-one AccountSetup-profile invariant must ever change | **No** — deferred; not a blocker for generic Sync domain rebaseline |
 
 Do not add generic `edition` / `deployment_model` / `api_family` fields to

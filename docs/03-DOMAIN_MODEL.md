@@ -3562,7 +3562,7 @@ suggestion state; confirmed `field_mappings` row = effective configuration state
 | **4C-1a** (this contract) | Docs-only Stop-and-Amend — Done |
 | **4C-1b** | `field_mappings` persistence + manual/explicit confirmation mutation service + authoritative-discovery validation + revision v2 integration — Done |
 | **4C-1c-0** | Docs-only suggestion/read-model Stop-and-Amend — see [Resolved — Task 4C-1c-0] below |
-| **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (no DB/migration scope) |
+| **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (no DB/migration scope) — Done |
 | **4C-1c-2** | Layer B mapping UI: high-confidence prefill + manual choice + explicit confirmation through 4C-1b service |
 
 Do not build a production CSV loader, second canonical registry, or suggestion
@@ -4045,7 +4045,7 @@ after merchant copy is made Layer-B compliant.
 | Slice | Scope |
 |---|---|
 | **4C-1c-0** | Docs-only suggestion/read-model Stop-and-Amend — this contract |
-| **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (**no** DB/migration scope) |
+| **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (**no** DB/migration scope) — Done |
 | **4C-1c-2** | Layer B mapping UI: high-confidence prefill + manual choice + explicit confirmation through 4C-1b service |
 
 Do **not** create `SyncRun`, Preview, scheduling, selection persistence,
