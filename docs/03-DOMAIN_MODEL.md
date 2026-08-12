@@ -2837,20 +2837,30 @@ which optional connector abilities exist today (`ConnectionCheck`,
 `ConnectorProfileRegistry::requireCapability()` are the callable checks.
 
 **Rules:**
-- UI must gate optional connector surfaces on `supports()` for the real enum
-  case — no parallel UI-only capability flags.
-- A new optional connector ability requires a new `ConnectorCapability` case
-  in its own scoping pass **before** UI ships; UI must not invent interim
-  flags.
-- Sections appear only when `supports()` is true — never present-by-default
-  with per-connector hiding.
+- UI must gate **connector-capability-dependent** surfaces on `supports()` for
+  the real enum case — no parallel UI-only connector-capability flags.
+- A new **connector-specific/runtime** ability requires a new
+  `ConnectorCapability` case in its own scoping pass **before** UI that depends
+  on that ability ships; UI must not invent interim connector-capability flags.
+- Connector-capability-gated sections appear only when `supports()` is true —
+  never present-by-default with per-connector hiding.
 
-Future capabilities implied by the UX contract but **not** enum cases today
-(sync execution, dry-run/preview, per-data-type directions, scheduling, mapping
-UI, issue aggregation, bulk resolution, sync-run history) require both domain
-design and enum extension before implementation. The UX contract defines
-required behavior when those capabilities exist; it does not assert they exist
-now.
+**Governing invariant:** a feature must become a `ConnectorCapability` only
+when its availability or semantics genuinely vary by connector/runtime support.
+Platform-owned functionality must **not** become a connector capability merely
+because it is optional, future, configurable, UI-driven, or not yet
+implemented. Examples of platform-owned concerns include scheduling, mapping
+UI, dry-run/preview orchestration, issue aggregation, bulk resolution,
+sync-run history, and similar platform workflow/UI/orchestration capabilities.
+Those require their own platform/domain/runtime design and implementation
+passes; they do **not** require `ConnectorCapability` enum extension merely to
+exist. Genuinely new connector/runtime semantics (for example, whether a
+connected profile can support a given `(data_domain, semantic operation)`) may
+still require domain design and capability-contract evolution.
+
+The UX contract defines required merchant behavior for sync surfaces when those
+platform or connector concerns are implemented; it does not assert they exist
+in code today.
 
 **Sync capability truth boundary (Resolved — Sync UX / Domain Rebaseline):**
 a `SyncConfiguration` is valid/activatable only when the connected runtime

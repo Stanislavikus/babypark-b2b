@@ -1748,7 +1748,11 @@ Rules:
 
 ### Capability-driven surfaces
 
-Optional connector UI sections gate on `ConnectorCapability::supports()` for the connected profile (`ConnectionCheck`, `SchemaDiscovery`, `AccountSetup` today). No parallel UI-only capability flags. Merchant connectability on `Інтеграції` requires an enabled profile advertising `AccountSetup` for that definition code — `ConnectorDefinitionStatus::Active` alone is not enough. Future capabilities (sync execution, preview, scheduling, mapping) require a new `ConnectorCapability` case before UI ships. `ConnectorDefinition.direction` is coarse platform metadata only — not runtime sync capability truth.
+Surfaces whose availability genuinely depends on connector/runtime support gate on `ConnectorCapability::supports()` for the connected profile (`ConnectionCheck`, `SchemaDiscovery`, `AccountSetup` today). No parallel UI-only connector-capability flags. Merchant connectability on `Інтеграції` requires an enabled profile advertising `AccountSetup` for that definition code — `ConnectorDefinitionStatus::Active` alone is not enough.
+
+`ConnectorCapability` expresses real connector-specific/runtime support boundaries. Platform-owned sync UX/orchestration concerns — including sync execution workflow, Preview, scheduling, mapping UI, issue aggregation, bulk resolution, and sync-run history — do **not** become connector capabilities merely because they are optional or not yet implemented. Those concerns follow the Sync Domain / platform contracts (`03-DOMAIN_MODEL.md`) and their own implementation passes. A new `ConnectorCapability` case is required only when availability or semantics genuinely vary by connector/runtime support.
+
+`ConnectorDefinition.direction` is coarse platform metadata only — not runtime sync capability truth.
 
 ### Connection / setup journey (when implemented)
 
@@ -1780,7 +1784,7 @@ States follow: **what happened → how many affected → what to do next.** Null
 
 ### Connector UI acceptance criteria (presentation)
 
-Before merge, connector UI must satisfy contract §15: capability gating tests; separate vocabulary (§13) and layer-specific sensitive-data (§12) canary tests; layer-boundary authorization tests; categorized errors; bulk actions or documented exception; no silent consequential defaults; non-skippable first dry-run; tri-state nullable fields.
+Before merge, connector UI must satisfy contract §15: connector-capability gating tests where availability is genuinely connector-dependent; separate vocabulary (§13) and layer-specific sensitive-data (§12) canary tests; layer-boundary authorization tests; categorized errors; bulk actions or documented exception; no silent consequential defaults; non-skippable first dry-run; tri-state nullable fields. Platform-owned optional sync sections are not forced through `ConnectorCapability` solely because they are optional.
 
 ### Existing-vs-future UX boundary
 
