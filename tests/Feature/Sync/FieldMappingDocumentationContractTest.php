@@ -136,7 +136,8 @@ class FieldMappingDocumentationContractTest extends TestCase
         $this->assertStringContainsString('**4C-1b**', $content);
         $this->assertStringContainsString('**4C-1c-0**', $content);
         $this->assertStringContainsString('**4C-1c-1**', $content);
-        $this->assertStringContainsString('**4C-1c-2**', $content);
+        $this->assertStringContainsString('**4C-1c-2a**', $content);
+        $this->assertStringContainsString('**4C-1c-2b**', $content);
         $this->assertStringContainsString('Task 4C-1a settled the FieldMapping first persistence contract', $content);
         $this->assertStringContainsString('graceful fail-closed handling when mapped `FieldBinding`', $content);
         $this->assertMatchesRegularExpression('/\*\*4C-1b\*\*.*— Done/', $content);
@@ -342,7 +343,8 @@ class FieldMappingDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('**4C-1c-0**', $section);
         $this->assertStringContainsString('**4C-1c-1**', $section);
-        $this->assertStringContainsString('**4C-1c-2**', $section);
+        $this->assertStringContainsString('**4C-1c-2a**', $section);
+        $this->assertStringContainsString('**4C-1c-2b**', $section);
         $this->assertStringContainsString('DB/migration scope', $section);
         $this->assertStringContainsString('Layer B mapping UI', $section);
         $this->assertStringContainsString('explicit confirmation through 4C-1b service', $section);
@@ -366,6 +368,202 @@ class FieldMappingDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('`CanonicalRegistryReader` is the existing read-only CSV access path', $section);
         $this->assertMatchesRegularExpression('/Do \*\*not\*\*\s+create a second registry\/loader/', $section);
+    }
+
+    #[Test]
+    public function authorization_contract_documents_workspace_access_model_resolved_decision(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString(
+            '### Workspace access model and authorization (Resolved — Task 4C-1c-2a, 2026-08-13)',
+            $content,
+        );
+    }
+
+    #[Test]
+    public function authorization_contract_uses_atomic_permissions_not_job_titles(): void
+    {
+        $section = $this->workspaceAccessAuthorizationSection();
+
+        $this->assertStringContainsString('Atomic permissions', $section);
+        $this->assertStringContainsString('authorization source of truth', $section);
+        $this->assertStringContainsString('Job-title / role names', $section);
+        $this->assertStringContainsString('have **no authorization semantics**', $section);
+        $this->assertStringContainsString(
+            'must **not** grant a capability merely because',
+            $section,
+        );
+        $this->assertStringContainsString('User.role === Merchandiser|Admin|Director', $section);
+    }
+
+    #[Test]
+    public function authorization_contract_documents_workspace_scoped_roles_and_multiple_assignments(): void
+    {
+        $section = $this->workspaceAccessAuthorizationSection();
+
+        $this->assertStringContainsString('workspace-owned, merchant-configurable', $section);
+        $this->assertStringContainsString('named bundle of atomic permissions', $section);
+        $this->assertStringContainsString('User × Workspace', $section);
+        $this->assertStringContainsString('never globally for the', $section);
+        $this->assertStringContainsString('User alone', $section);
+        $this->assertStringContainsString('multiple roles', $section);
+        $this->assertStringContainsString('`WorkspaceUser` / workspace membership', $section);
+        $this->assertStringContainsString('Cross-workspace permission leakage', $section);
+    }
+
+    #[Test]
+    public function authorization_contract_documents_composition_model_verbatim(): void
+    {
+        $section = $this->workspaceAccessAuthorizationSection();
+
+        $this->assertStringContainsString('**Access-model composition:**', $section);
+        $this->assertStringContainsString(
+            'Workspace roles/access profiles are merchant-owned named bundles of those atomic permissions.',
+            $section,
+        );
+        $this->assertStringContainsString(
+            'Platform-provided role names are onboarding templates only and have no authorization semantics.',
+            $section,
+        );
+        $this->assertStringContainsString(
+            'Effective permissions in the first implementation are additive: union(all assigned workspace-role permissions).',
+            $section,
+        );
+        $this->assertStringContainsString('Absence of a permission means deny.', $section);
+        $this->assertStringContainsString(
+            'There is no explicit deny/mute precedence in the first RBAC foundation.',
+            $section,
+        );
+    }
+
+    #[Test]
+    public function authorization_contract_defers_direct_user_overrides_and_muting(): void
+    {
+        $section = $this->workspaceAccessAuthorizationSection();
+
+        $this->assertStringContainsString('**Direct per-user permission overrides** are **deferred**', $section);
+        $this->assertStringContainsString('**Deferred**', $section);
+        $this->assertStringContainsString('negative permissions, or permission muting', $section);
+        $this->assertStringContainsString('Salesforce Permission Set Group muting', $section);
+        $this->assertStringContainsString('Exact allow/deny precedence is **NOT** resolved now', $section);
+        $this->assertStringNotContainsString(
+            'negative permissions, or permission muting. Exact allow/deny precedence is **NOT** resolved now and must receive its own security/authorization decision before implementation.
+
+**Mapping permissions',
+            $section,
+        );
+    }
+
+    #[Test]
+    public function authorization_contract_freezes_mapping_permissions_separate_from_credentials(): void
+    {
+        $section = $this->workspaceAccessAuthorizationSection();
+
+        $this->assertStringContainsString('`view_sync_mappings`', $section);
+        $this->assertStringContainsString('`manage_sync_mappings`', $section);
+        $this->assertStringContainsString('independent** from `manage_connector_accounts`', $section);
+        $this->assertStringContainsString(
+            'Possessing mapping permissions **never** grants credential',
+            $section,
+        );
+        $this->assertStringContainsString(
+            'Possessing `manage_connector_accounts` **never** automatically grants mapping',
+            $section,
+        );
+        $this->assertStringContainsString(
+            'No particular named role**, including Merchandiser, is normatively entitled',
+            $section,
+        );
+    }
+
+    #[Test]
+    public function authorization_contract_documents_merchant_roles_ux_without_spatie_terminology(): void
+    {
+        $section = $this->workspaceAccessAuthorizationSection();
+
+        $this->assertStringContainsString('**Merchant UX (Roles / Access profiles)**', $section);
+        $this->assertStringContainsString('Roles / Access profiles', $section);
+        $this->assertStringContainsString('business-owned labels', $section);
+        $this->assertStringContainsString('assigning an **additional', $section);
+        $this->assertStringContainsString('role**', $section);
+        $this->assertStringContainsString('Do **not** expose technical Spatie terminology', $section);
+        $this->assertStringContainsString('**Platform-provided roles** are onboarding / default **templates only**', $section);
+    }
+
+    #[Test]
+    public function authorization_contract_documents_verified_code_mismatch_and_gap_026(): void
+    {
+        $section = $this->workspaceAccessAuthorizationSection();
+
+        $this->assertStringContainsString('Verified current-code mismatch', $section);
+        $this->assertStringContainsString('fixed `User.role` checks', $section);
+        $this->assertStringContainsString('`WorkspaceUser` membership is not implemented', $section);
+        $this->assertStringContainsString("'teams' => false", $section);
+        $this->assertStringContainsString('does **not** yet satisfy this contract', $section);
+        $this->assertStringContainsString('see GAP-026', $section);
+    }
+
+    #[Test]
+    public function ui_placement_preserves_layer_b_mapping_decisions_for_4c_1c_2b(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString('##### UI placement (4C-1c-2b)', $content);
+        $this->assertStringContainsString('mapping belongs to a specific **`SyncConfiguration`**', $content);
+        $this->assertStringContainsString('no arbitrary "first', $content);
+        $this->assertStringContainsString('configuration" selection', $content);
+        $this->assertStringContainsString('no-discovery state remains renderable and read-only', $content);
+        $this->assertStringContainsString('do **not** embed mapping controls into the current **Інтеграції**', $content);
+    }
+
+    #[Test]
+    public function implementation_gaps_records_gap_026_workspace_rbac_mismatch(): void
+    {
+        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        $this->assertStringContainsString('## GAP-026 — Workspace-scoped RBAC foundation not implemented', $content);
+        $this->assertStringContainsString('`User.role` (`App\\Enums\\UserRole`) still participates directly', $content);
+        $this->assertStringContainsString('WorkspaceUser` membership is **not implemented**', $content);
+        $this->assertStringContainsString('Spatie Teams is **disabled**', $content);
+        $this->assertStringContainsString('Cross-reference **GAP-004**', $content);
+        $this->assertStringContainsString('Do not falsely declare', $content);
+        $this->assertStringContainsString('general workspace isolation solved', $content);
+    }
+
+    #[Test]
+    public function implementation_gaps_corrects_gap_025_sync_domain_implementation_truth(): void
+    {
+        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        $this->assertStringContainsString('**Implemented sync-domain backend (verified on `develop`; not a GAP-025 UX claim):**', $content);
+        $this->assertStringContainsString('`SyncConfiguration` persistence and domain write path (Task 4C-0).', $content);
+        $this->assertStringContainsString('`FieldMapping` persistence, manual confirmation', $content);
+        $this->assertStringContainsString('Canonical deterministic suggestion/read-model provider (Task 4C-1c-1).', $content);
+        $this->assertStringContainsString('Layer B mapping UI (Task 4C-1c-2b)', $content);
+        $this->assertStringContainsString('`SyncRun` / `SyncRunItem` persistence and execution runtime', $content);
+        $this->assertStringNotContainsString(
+            'Sync Domain persistence/runtime (`SyncConfiguration`, `FieldMapping`,',
+            $content,
+        );
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function workspaceAccessAuthorizationSection(): string
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        if (! preg_match(
+            '/### Workspace access model and authorization \(Resolved — Task 4C-1c-2a, 2026-08-13\)\n\n(.*?)(?=\nHistorical MVP wording below|\n## Product Catalogue Context)/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate Workspace access model and authorization section in 03-DOMAIN_MODEL.md');
+        }
+
+        return $matches[1];
     }
 
     /**

@@ -307,33 +307,109 @@ Core entities:
 
 - Permission
 
-For MVP, permissions may be simple.
+### Workspace access model and authorization (Resolved — Task 4C-1c-2a, 2026-08-13)
 
-Initial roles may include:
+This decision freezes the workspace-scoped authorization contract required before
+the Layer-B FieldMapping UI (Task 4C-1c-2b). It does **not** choose Spatie Teams
+migration mechanics, UUID team columns, a custom Role model, or the final
+`WorkspaceUser` schema — those remain separate implementation decisions.
 
-- owner;
+**Authorization source of truth**
 
-- manager;
+- **Atomic permissions** are the authorization source of truth.
+- **Job-title / role names** (`User.role`, `UserRole` enum values such as
+  Merchandiser, Admin, Director, Manager, …) have **no authorization semantics**
+  in the target model.
+- Policies, gates, and services must **not** grant a capability merely because
+  `User.role === Merchandiser|Admin|Director|…`.
+- Authorization is evaluated for **User × Workspace**, never globally for the
+  User alone.
+- Cross-workspace permission leakage is a **critical failure**.
+- Future **`WorkspaceUser` / workspace membership** is the ownership boundary
+  for role and permission assignments inside a workspace.
 
-- viewer.
+**Workspace roles / access profiles**
 
-Future roles may include:
+- A workspace **role / access profile** is a workspace-owned, merchant-configurable
+  **named bundle of atomic permissions**.
+- Workspace administrators may **name roles freely** (business-owned labels).
+- **Platform-provided roles** are onboarding / default **templates only** — they
+  are not job taxonomy and carry no authorization semantics by name alone.
+- One workspace membership may receive **multiple roles**, with **additive**
+  effective permissions.
+- **Direct per-user permission overrides** are **deferred** in the first
+  implementation slice. Unique access is expressed through custom and/or multiple
+  workspace roles instead.
 
-- product manager;
+**Access-model composition:**
 
-- sales manager;
+- Atomic permissions are the authorization source of truth.
+- Workspace roles/access profiles are merchant-owned named bundles of those atomic permissions.
+- The underlying authorization model is component-based; merchant-facing default templates are persona/task-oriented for usability.
+- Platform-provided role names are onboarding templates only and have no authorization semantics.
+- A workspace may rename templates, create custom roles, and assign multiple roles to one membership.
+- Effective permissions in the first implementation are additive: union(all assigned workspace-role permissions).
+- Absence of a permission means deny.
+- There is no explicit deny/mute precedence in the first RBAC foundation.
 
-- accountant;
+**Deferred**
 
-- warehouse user;
+Known deferred access-model extension: The first workspace RBAC foundation
+intentionally does **not** implement direct per-user permission overrides,
+negative permissions, or permission muting. Industry precedent (for example
+Salesforce Permission Set Group muting) shows that an exception mechanism can
+reduce proliferation of nearly-identical role bundles when organizations
+repeatedly need "bundle X minus permission Y". This is an accepted MVP tradeoff,
+not an overlooked requirement. If real customer usage shows workspace-role
+proliferation or repeated "role minus one permission" support cases, evaluate a
+narrow assignment/group exception mechanism before adding unrestricted
+per-user overrides. Exact allow/deny precedence is **NOT** resolved now and must
+receive its own security/authorization decision before implementation.
 
-- integration manager;
+**Mapping permissions (frozen for Layer B)**
 
-- admin.
+These atomic permissions are independent from connector credential/settings
+management:
 
-The MVP should not overbuild role-based access control.
+| Permission | Meaning |
+|---|---|
+| `view_sync_mappings` | Read the mapping surface for a `SyncConfiguration` (effective mappings, suggestions, discovery-unavailable read-only state). |
+| `manage_sync_mappings` | Mutate confirmed mappings through the approved mutation service. Inherently includes the same mapping read surface as `view_sync_mappings`. |
 
-However, the model should not block future permissions.
+Rules:
+
+- `manage_sync_mappings` grants mutation authority and inherently permits the
+  same mapping read surface.
+- Mapping permissions are **independent** from `manage_connector_accounts`.
+- Possessing mapping permissions **never** grants credential, settings, base URL,
+  or auth-profile access.
+- Possessing `manage_connector_accounts` **never** automatically grants mapping
+  permission unless the workspace role bundle contains both permissions.
+- **No particular named role**, including Merchandiser, is normatively entitled to
+  either mapping permission.
+
+**Merchant UX (Roles / Access profiles)**
+
+- Company admin manages **Roles / Access profiles** and their granular
+  permissions inside the workspace.
+- Users/logins receive **one or more roles** for that workspace.
+- Role names are **business-owned labels**, not predefined job taxonomy.
+- Absence or temporary replacement is handled by assigning an **additional
+  role**, not by changing application code or hardcoding job-title exceptions.
+- Do **not** expose technical Spatie terminology (`Permission`, `Role` model
+  names, pivot tables, team resolver, etc.) to merchants.
+
+**Verified current-code mismatch (docs-only note — see GAP-026)**
+
+The repository baseline on `develop` still mixes fixed `User.role` checks with a
+small global Spatie permission set; `WorkspaceUser` membership is not implemented;
+`config/permission.php` has `'teams' => false`. The global Spatie configuration
+does **not** yet satisfy this contract. Workspace-scoped authorization foundation
+is an implementation prerequisite before mutable Layer-B mapping UI.
+
+Historical MVP wording below (owner/manager/viewer examples) describes early
+product direction only — it is **not** authorization semantics under this
+decision.
 
 ## Product Catalogue Context
 
@@ -3563,7 +3639,8 @@ suggestion state; confirmed `field_mappings` row = effective configuration state
 | **4C-1b** | `field_mappings` persistence + manual/explicit confirmation mutation service + authoritative-discovery validation + revision v2 integration — Done |
 | **4C-1c-0** | Docs-only suggestion/read-model Stop-and-Amend — see [Resolved — Task 4C-1c-0] below |
 | **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (no DB/migration scope) — Done |
-| **4C-1c-2** | Layer B mapping UI: high-confidence prefill + manual choice + explicit confirmation through 4C-1b service |
+| **4C-1c-2a** | Workspace access / authorization contract — docs-only Stop-and-Amend (this decision) — Done |
+| **4C-1c-2b** | Layer B mapping UI after workspace-scoped authorization foundation exists |
 
 Do not build a production CSV loader, second canonical registry, or suggestion
 engine in 4C-1a/4C-1b/4C-1c-0.
@@ -4046,12 +4123,13 @@ after merchant copy is made Layer-B compliant.
 |---|---|
 | **4C-1c-0** | Docs-only suggestion/read-model Stop-and-Amend — this contract |
 | **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (**no** DB/migration scope) — Done |
-| **4C-1c-2** | Layer B mapping UI: high-confidence prefill + manual choice + explicit confirmation through 4C-1b service |
+| **4C-1c-2a** | Workspace access / authorization contract — docs-only Stop-and-Amend — Done |
+| **4C-1c-2b** | Layer B mapping UI: high-confidence prefill + manual choice + explicit confirmation through 4C-1b service — after workspace-scoped authorization foundation |
 
 Do **not** create `SyncRun`, Preview, scheduling, selection persistence,
 `ExternalRecordLink`, or full synchronization setup in these slices.
 
-##### UI placement (4C-1c-2)
+##### UI placement (4C-1c-2b)
 
 Mapping is **Layer B** (`CONNECTOR_INTEGRATION_UX_CONTRACT.md`, Layer B —
 Налаштування даних).
@@ -4059,18 +4137,24 @@ Mapping is **Layer B** (`CONNECTOR_INTEGRATION_UX_CONTRACT.md`, Layer B —
 - do **not** embed mapping controls into the current **Інтеграції** /
   Connector Account Overview merely because that page exists;
 - do **not** establish a new top-level navigation IA in this task;
-- 4C-1c-2 must use the approved **concept-first matrix**:
+- mapping belongs to a specific **`SyncConfiguration`** — no arbitrary "first
+  configuration" selection;
+- 4C-1c-2b must use the approved **concept-first matrix**:
   merchant-facing row is **internal concept first**, **external system field
   second**, **simple state third**;
 - raw snapshot, discovery, schema source, canonical registry internals and
   transport paths are **forbidden** in merchant UI;
 - high-confidence suggestion may be visually prefilled, but merchant confirmation
-  is still **explicit**.
+  is still **explicit**;
+- no-discovery state remains renderable and read-only as already resolved in the
+  suggestion/read-model contract.
 
-Do **not** widen Merchandiser or any other role's mutation permissions in this
-docs task. Existing policy remains authoritative; exact mapping-mutation
-authorization must be verified/scoped before 4C-1c-2 if current policies do not
-already settle it.
+Mapping mutation authorization is frozen by **Workspace access model and
+authorization (Resolved — Task 4C-1c-2a)** — `view_sync_mappings` /
+`manage_sync_mappings`, independent from `manage_connector_accounts`, with no
+normative entitlement for Merchandiser or any other job-title role. Layer B UI
+(4C-1c-2b) ships only after workspace-scoped authorization foundation implements
+that contract; do not widen fixed `User.role` checks as a workaround.
 
 ##### Registry access path
 

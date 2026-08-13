@@ -44,4 +44,30 @@ class ImplementationGapsTest extends TestCase
         $this->assertStringContainsString('to the subsequent FieldMapping workflow (Task 4C), not to', $content);
         $this->assertStringContainsString('ConnectorDefinition metadata.', $content);
     }
+
+    #[Test]
+    public function gap_025_records_correct_sync_backend_truth_not_unimplemented_configuration(): void
+    {
+        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        $this->assertStringContainsString('SyncConfiguration,', $content);
+        $this->assertStringContainsString('FieldMapping persistence, and canonical suggestion read-model implemented in', $content);
+        $this->assertStringContainsString('Layer B mapping UI still missing', $content);
+        $this->assertStringNotContainsString(
+            'Sync Domain persistence/runtime (`SyncConfiguration`, `FieldMapping`,',
+            $content,
+        );
+    }
+
+    #[Test]
+    public function gap_026_records_workspace_scoped_rbac_mismatch(): void
+    {
+        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        $this->assertStringContainsString('## GAP-026 — Workspace-scoped RBAC foundation not implemented', $content);
+        $this->assertStringContainsString('`view_sync_mappings` / `manage_sync_mappings`', $content);
+        $this->assertStringContainsString('WorkspaceUser` membership is **not implemented**', $content);
+        $this->assertStringContainsString("'teams' => false", $content);
+        $this->assertStringContainsString('prerequisite before 4C-1c-2b', $content);
+    }
 }

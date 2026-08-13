@@ -175,6 +175,21 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
         $this->assertStringContainsString('CONNECTOR_INTEGRATION_UX_CONTRACT.md', $content);
         $this->assertStringContainsString('CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md', $content);
         $this->assertStringContainsString('Зведення знімка', $content);
-        $this->assertStringContainsString('**Status:** Open — partial (`Інтеграції` landing shipped); remaining UX migration', $content);
+        $this->assertStringContainsString('**Status:** Open — partial (`Інтеграції` landing shipped; SyncConfiguration,', $content);
+        $this->assertStringContainsString('Layer B mapping UI still missing', $content);
+    }
+
+    #[Test]
+    public function domain_model_documents_workspace_access_authorization_contract(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString(
+            '### Workspace access model and authorization (Resolved — Task 4C-1c-2a, 2026-08-13)',
+            $content,
+        );
+        $this->assertStringContainsString('`view_sync_mappings`', $content);
+        $this->assertStringContainsString('Absence of a permission means deny.', $content);
+        $this->assertStringContainsString('permission muting', $content);
     }
 }
