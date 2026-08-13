@@ -1082,8 +1082,8 @@ explicit read-only `WorkspaceAuthorization` service with regression tests.
 | Slice | Scope |
 |---|---|
 | **GAP-026A-1 — Schema, catalogue & explicit read authorization** | **Done.** Five custom RBAC tables; seven-permission global `workspace_permissions` catalogue (`WorkspaceRbacPermissionSeeder`); models/relationships without `BelongsToWorkspace`; composite workspace guards/RESTRICT; explicit `WorkspaceAuthorization` read boundary (`allows`, `effectivePermissions`, `activeMembership`); SQLite + MySQL foundation/authorization regression tests. Legacy Spatie `WorkspacePermissionSeeder` unchanged. No RBAC membership/role assignments seeded. **Explicitly not in 026A-1:** legacy preflight/backfill machinery; anti-lockout coordinator; production legacy assignment; policy/gate cutover. |
-| **GAP-026A-2 — Preflight/backfill machinery & anti-lockout coordinator** | Legacy-state preflight service; deterministic/idempotent backfill service; template-role construction logic; `WorkspaceAccessMutationCoordinator`; MySQL concurrency proof for anti-lockout. Machinery + tests only — not production execution. |
-| **GAP-026A (overall)** | Open / partial — 026A-1 complete; 026A-2 still required before 026A foundation slice is fully closed per original staging. |
+| **GAP-026A-2 — Preflight/backfill machinery & anti-lockout coordinator** | **Done.** `WorkspaceRbacLegacyPreflight` / result DTO; deterministic/idempotent `WorkspaceRbacLegacyBackfill`; frozen legacy template keys and bundles; `WorkspaceAccessMutationCoordinator` with fresh anti-lockout query; SQLite + MySQL regression tests including real MySQL 8 concurrent-process proof. Machinery + tests only — not production execution. |
+| **GAP-026A (overall)** | **Done** — 026A-1 and 026A-2 foundation slices complete per original staging. |
 | **GAP-026B — Narrow workspace-authorization cutover** | **Pre-cutover gate (frozen order):** Spatie assignment preflight → legacy workspace/Admin preflight → deterministic/idempotent legacy backfill from **current** legacy state → fresh anti-lockout validation → workspace-permission authorization becomes authoritative (failure at any step = STOP, no partial cutover). Then: `ConnectorAccount` authorization; workspace tax-settings authorization; Mapping authorization seam; Access / Roles management UI + mutations; authoritative anti-lockout routing; `User` lifecycle protection (`is_active`, hard-delete, multi-workspace locking) **no later than** assignment/cutover activation. At 026B completion, 4C-1c-2b Mapping UI becomes unblocked. `User::canAccessPanel()` and unrelated admin resources may still use legacy role semantics until GAP-027. **Unimplemented.** |
 
 **Legacy membership / role backfill matrix (026B production execution):**
@@ -1175,11 +1175,9 @@ GAP-026 workspace RBAC.
 - Cross-reference **GAP-004** for workspace data isolation — GAP-004 tracks
   table/query coverage audit, not permission semantics.
 
-**Next task:** GAP-026A-2 — legacy preflight/backfill machinery, anti-lockout
-mutation coordinator, and MySQL concurrency proof (prerequisite before 026B and
-4C-1c-2b).
+**Next task:** GAP-026B — narrow workspace-authorization cutover (prerequisite before 4C-1c-2b).
 
-**Status:** Open / partial — physical architecture frozen (GAP-026-0); GAP-026A-1 (schema, catalogue, explicit read authorization) **Done**; GAP-026A-2 and GAP-026B remain unimplemented. Closure requires 026A-2 foundation machinery + 026B narrow cutover per staging above. 4C-1c-2b remains blocked until GAP-026B cutover completes.
+**Status:** Open / partial — physical architecture frozen (GAP-026-0); GAP-026A foundation (**026A-1** schema/catalogue/read authorization + **026A-2** preflight/backfill machinery and anti-lockout coordinator) **Done**; GAP-026B remains unimplemented. Closure requires 026B narrow cutover per staging above. 4C-1c-2b remains blocked until GAP-026B cutover completes.
 
 ---
 

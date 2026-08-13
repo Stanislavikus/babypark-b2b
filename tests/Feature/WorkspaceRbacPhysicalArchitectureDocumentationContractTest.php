@@ -404,7 +404,8 @@ class WorkspaceRbacPhysicalArchitectureDocumentationContractTest extends TestCas
         $this->assertStringContainsString('4C-1c-2b Mapping UI becomes unblocked', $content);
         $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
         $this->assertStringContainsString('Open / partial', $content);
-        $this->assertStringContainsString('026A-2 and GAP-026B remain unimplemented', $content);
+        $this->assertStringContainsString('GAP-026A (overall)** | **Done**', $content);
+        $this->assertStringContainsString('GAP-026B remains unimplemented', $content);
     }
 
     #[Test]

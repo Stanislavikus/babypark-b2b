@@ -270,11 +270,12 @@ class WorkspaceAuthorizationDocumentationContractTest extends TestCase
         $this->assertStringContainsString('anti-lockout', $content);
         $this->assertStringContainsString('WorkspaceRbacPermissionSeeder', $content);
         $this->assertStringContainsString('WorkspaceAuthorization', $content);
-        $this->assertStringContainsString('prerequisite before 026B and', $content);
+        $this->assertStringContainsString('**Done.** `WorkspaceRbacLegacyPreflight`', $content);
+        $this->assertStringContainsString('GAP-026A (overall)** | **Done**', $content);
         $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
         $this->assertStringContainsString('Open / partial', $content);
-        $this->assertStringContainsString('GAP-026A-1 (schema, catalogue, explicit read', $content);
-        $this->assertStringContainsString('026A-2 and GAP-026B remain unimplemented', $content);
+        $this->assertStringContainsString('GAP-026A foundation', $content);
+        $this->assertStringContainsString('GAP-026B remains unimplemented', $content);
         $this->assertStringContainsString('Production backfill runs in **026B** (not 026A)', $content);
         $this->assertStringContainsString('not production execution', $content);
         $this->assertStringContainsString('failure at any step = STOP, no partial cutover', $content);

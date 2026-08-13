@@ -108,6 +108,9 @@ jobs:
       - name: Workspace authorization tests (MySQL)
         run: php artisan test --filter=WorkspaceAuthorization
 
+      - name: Workspace access mutation concurrency test (MySQL)
+        run: php artisan test --filter=WorkspaceAccessMutationConcurrency
+
       - name: Customer rename migration tests (MySQL)
         run: php artisan test --filter=CustomerRenameMigrationTest
 
