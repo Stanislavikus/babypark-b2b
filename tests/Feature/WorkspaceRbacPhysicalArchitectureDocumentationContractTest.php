@@ -407,7 +407,8 @@ class WorkspaceRbacPhysicalArchitectureDocumentationContractTest extends TestCas
         $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
         $this->assertStringContainsString('Open / partial', $content);
         $this->assertStringContainsString('GAP-026A (overall)** | **Done**', $content);
-        $this->assertStringContainsString('026B-1 / GAP-026B-2 runtime **unimplemented**', $content);
+        $this->assertStringContainsString('GAP-026B-1 Part 1 runtime core **partially implemented**', $content);
+        $this->assertStringContainsString('workspace-rbac:cutover-check', $content);
     }
 
     #[Test]

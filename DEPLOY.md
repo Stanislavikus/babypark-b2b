@@ -217,7 +217,7 @@ never fall back to legacy roles.
    runtime while traffic is already blocked;
 4. run pending migrations;
 5. seed canonical `workspace_permissions` catalogue (`WorkspaceRbacPermissionSeeder`);
-6. run guarded RBAC cutover **CHECK-ONLY** (B-1 machinery; no assignments);
+6. run guarded RBAC cutover **CHECK-ONLY** via `php artisan workspace-rbac:cutover-check` (diagnostic/read-only; no assignments);
 7. if safe: **EXECUTE** deterministic legacy backfill (B-2 only);
 8. fresh anti-lockout validation;
 9. focused authorization/cutover smoke checks;
@@ -232,8 +232,9 @@ traffic remains blocked — not via authority fallback.
 
 Implementation must provide a guarded one-time command/service with:
 
-- **CHECK-ONLY (B-1)** — diagnostics only; no RBAC assignments; may run before
-  maintenance; may ship in a B-1-only release.
+- **CHECK-ONLY (B-1)** — `php artisan workspace-rbac:cutover-check`; diagnostic/read-only;
+  no RBAC assignments/materialization; may run before maintenance; may ship in a
+  B-1-only release. EXECUTE remains unavailable until GAP-026B-2.
 - **EXECUTE (B-2)** — must not exist as executable production mode without B-2
   authority code; requires maintenance/quiesced merchant writes; re-runs preflight;
   runs backfill; post-backfill anti-lockout; fails non-zero on unsafe state.
@@ -241,8 +242,11 @@ Implementation must provide a guarded one-time command/service with:
 Do **not** introduce persistent activation flags, marker tables, legacy/new authority
 selectors, or dual-authority policy modes to enforce this boundary.
 
-Exact Artisan command name is implementation-level. Migrations/seeders/service-provider
-boot must **not** automatically execute production legacy backfill.
+Implemented CHECK-ONLY command: `php artisan workspace-rbac:cutover-check`. This command
+wraps `WorkspaceRbacLegacyPreflight::evaluate()` only; it never invokes
+`WorkspaceRbacLegacyBackfill::execute()`. EXECUTE remains structurally absent until
+GAP-026B-2. Migrations/seeders/service-provider boot must **not** automatically execute
+production legacy backfill.
 
 **Queue worker quiescence**
 
