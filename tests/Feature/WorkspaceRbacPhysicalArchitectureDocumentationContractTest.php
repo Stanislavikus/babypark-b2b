@@ -399,12 +399,12 @@ class WorkspaceRbacPhysicalArchitectureDocumentationContractTest extends TestCas
     {
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
-        $this->assertStringContainsString('GAP-026A — Physical RBAC Foundation', $content);
+        $this->assertStringContainsString('GAP-026A-1 — Schema, catalogue & explicit read authorization', $content);
         $this->assertStringContainsString('GAP-026B — Narrow workspace-authorization cutover', $content);
         $this->assertStringContainsString('4C-1c-2b Mapping UI becomes unblocked', $content);
         $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
-        $this->assertStringContainsString('implementation not', $content);
-        $this->assertStringContainsString('started. Closure requires 026A foundation', $content);
+        $this->assertStringContainsString('Open / partial', $content);
+        $this->assertStringContainsString('026A-2 and GAP-026B remain unimplemented', $content);
     }
 
     #[Test]

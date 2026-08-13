@@ -102,6 +102,12 @@ jobs:
       - name: FieldMapping persistence tests (MySQL)
         run: php artisan test --filter=FieldMapping
 
+      - name: Workspace RBAC foundation tests (MySQL)
+        run: php artisan test --filter=WorkspaceRbacFoundation
+
+      - name: Workspace authorization tests (MySQL)
+        run: php artisan test --filter=WorkspaceAuthorization
+
       - name: Customer rename migration tests (MySQL)
         run: php artisan test --filter=CustomerRenameMigrationTest
 

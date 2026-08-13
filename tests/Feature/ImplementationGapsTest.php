@@ -113,12 +113,12 @@ class ImplementationGapsTest extends TestCase
     }
 
     #[Test]
-    public function gap_026_records_workspace_scoped_rbac_mismatch(): void
+    public function gap_026_records_workspace_scoped_rbac_status(): void
     {
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString('## GAP-026 — Workspace-scoped RBAC foundation not implemented', $content);
-        $this->assertStringContainsString('**Frozen minimum permission vocabulary (docs contract — not yet implemented):**', $content);
+        $this->assertStringContainsString('**Frozen minimum permission vocabulary (implemented in GAP-026A-1):**', $content);
         $this->assertStringContainsString('`view_connector_accounts`', $content);
         $this->assertStringContainsString('`run_connector_discovery`', $content);
         $this->assertStringContainsString('`manage_connector_accounts`', $content);
@@ -127,31 +127,23 @@ class ImplementationGapsTest extends TestCase
         $this->assertStringContainsString('`manage_workspace_access`', $content);
         $this->assertStringContainsString('`manage_workspace_tax_settings`', $content);
         $this->assertStringContainsString('Physical persistence is **resolved** in GAP-026-0', $content);
-        $this->assertStringContainsString('GAP-026A — Physical RBAC Foundation', $content);
+        $this->assertStringContainsString('GAP-026A-1 — Schema, catalogue & explicit read authorization', $content);
+        $this->assertStringContainsString('GAP-026A-2 — Preflight/backfill machinery & anti-lockout coordinator', $content);
         $this->assertStringContainsString('GAP-026B — Narrow workspace-authorization cutover', $content);
         $this->assertStringContainsString('anti-lockout', $content);
-        $this->assertStringContainsString('WorkspaceUser` membership is **not implemented**', $content);
+        $this->assertStringContainsString('WorkspaceRbacPermissionSeeder', $content);
+        $this->assertStringContainsString('WorkspaceAuthorization', $content);
         $this->assertStringContainsString("'teams' => false", $content);
-        $this->assertStringContainsString('prerequisite before 026B and', $content);
+        $this->assertStringContainsString('GAP-026A-2', $content);
         $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
-        $this->assertStringContainsString('implementation not', $content);
-        $this->assertStringContainsString('started. Closure requires 026A foundation', $content);
-        $this->assertStringContainsString('seedable in 026A — no assignment authority', $content);
-        $this->assertStringContainsString('service implementation + tests', $content);
+        $this->assertStringContainsString('Open / partial', $content);
+        $this->assertStringContainsString('GAP-026A-1 (schema, catalogue, explicit read', $content);
+        $this->assertStringContainsString('**Done**', $content);
+        $this->assertStringContainsString('026A-2 and GAP-026B remain unimplemented', $content);
+        $this->assertStringContainsString('Production backfill runs in **026B** (not 026A)', $content);
         $this->assertStringContainsString('not production execution', $content);
-        $this->assertStringContainsString(
-            '**Explicitly not in 026A:** production legacy `WorkspaceUser`',
-            $content,
-        );
-        $this->assertStringContainsString('must not claim workspace RBAC is populated or authoritative', $content);
-        $this->assertStringContainsString('Pre-cutover gate (frozen order):', $content);
-        $this->assertStringContainsString('Spatie assignment preflight', $content);
-        $this->assertStringContainsString('legacy workspace/Admin preflight', $content);
-        $this->assertStringContainsString('deterministic/idempotent legacy backfill from **current** legacy state', $content);
-        $this->assertStringContainsString('fresh anti-lockout validation', $content);
         $this->assertStringContainsString('failure at any step = STOP, no partial cutover', $content);
         $this->assertStringContainsString('Legacy membership / role backfill matrix (026B production execution)', $content);
-        $this->assertStringContainsString('Production backfill runs in **026B** (not 026A)', $content);
         $this->assertStringContainsString('Spatie preflight must complete before legacy backfill', $content);
         $this->assertStringContainsString('Failure halts authorization cutover — no partial RBAC', $content);
         $this->assertStringContainsString('Legacy User lifecycle (026B cutover compatibility)', $content);
@@ -164,6 +156,7 @@ class ImplementationGapsTest extends TestCase
             'Layer B mapping UI (4C-1c-2b) must **not** ship until GAP-026B cutover completes',
             $content,
         );
+        $this->assertStringContainsString('4C-1c-2b remains blocked', $content);
     }
 
     #[Test]

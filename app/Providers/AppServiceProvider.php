@@ -6,6 +6,7 @@ use App\Services\Connectors\ConnectorAccountPersistencePort;
 use App\Services\Connectors\ConnectorAccountSettingsService;
 use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
 use App\Services\Connectors\ConnectorDiscoveryRunDispatchService;
+use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapabilityImpl;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapability;
@@ -28,6 +29,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(WorkspaceContext::class);
         $this->app->singleton(ConnectorProfileRegistry::class);
         $this->app->singleton(WorkspaceMembership::class);
+        $this->app->singleton(WorkspaceAuthorization::class);
 
         $this->app->bind(
             AdobePaaSConnectionCheckCapability::class,

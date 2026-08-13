@@ -1060,7 +1060,7 @@ backend — Layer B mapping UI still missing); remaining UX migration work.
   isolation (cross-reference **GAP-004** — broad isolation exists, but this gap
   is **not** a claim that general workspace isolation is fully solved).
 
-**Frozen minimum permission vocabulary (docs contract — not yet implemented):**
+**Frozen minimum permission vocabulary (implemented in GAP-026A-1):**
 
 - `view_connector_accounts`
 - `run_connector_discovery`
@@ -1073,14 +1073,18 @@ backend — Layer B mapping UI still missing); remaining UX migration work.
 Physical persistence is **resolved** in GAP-026-0 (custom WorkspaceUser-centric
 RBAC, not Spatie Teams): five tables; `UNIQUE (workspace_id, template_key)` on
 `workspace_roles`; parent FKs to `workspaces`/`users` with ON DELETE RESTRICT.
-Implementation remains open.
+**GAP-026A-1** implemented the five-table foundation, global `workspace_permissions`
+catalogue seeder, models/relationships, composite workspace guards/RESTRICT, and
+explicit read-only `WorkspaceAuthorization` service with regression tests.
 
 **Implementation staging:**
 
 | Slice | Scope |
 |---|---|
-| **GAP-026A — Physical RBAC Foundation** | Five custom RBAC tables; seven-permission **global** `workspace_permissions` catalogue (seedable in 026A — no assignment authority); models/relationships; composite workspace guards/RESTRICT; explicit `WorkspaceAuthorization`; legacy preflight/backfill **service implementation + tests** (not production execution); anti-lockout coordinator implementation/tests; MySQL constraint/concurrency verification. **Explicitly not in 026A:** production legacy `WorkspaceUser` / `WorkspaceRole` / `WorkspaceUserRole` materialization for existing `Users`; `ConnectorAccountPolicy` cutover; `WorkspaceTaxSettingsAuthorization` cutover; Mapping authorization policy; Access/Roles merchant UI; authoritative `WorkspaceMembership` switch; general `WorkspaceContext` rewrite; `canAccessPanel()` changes; `strictAuthorization()`; Spatie removal; full admin Resource RBAC. 026A is foundation-only — must not claim workspace RBAC is populated or authoritative. |
-| **GAP-026B — Narrow workspace-authorization cutover** | **Pre-cutover gate (frozen order):** Spatie assignment preflight → legacy workspace/Admin preflight → deterministic/idempotent legacy backfill from **current** legacy state → fresh anti-lockout validation → workspace-permission authorization becomes authoritative (failure at any step = STOP, no partial cutover). Then: `ConnectorAccount` authorization; workspace tax-settings authorization; Mapping authorization seam; Access / Roles management UI + mutations; authoritative anti-lockout routing; `User` lifecycle protection (`is_active`, hard-delete, multi-workspace locking) **no later than** assignment/cutover activation. At 026B completion, 4C-1c-2b Mapping UI becomes unblocked. `User::canAccessPanel()` and unrelated admin resources may still use legacy role semantics until GAP-027. |
+| **GAP-026A-1 — Schema, catalogue & explicit read authorization** | **Done.** Five custom RBAC tables; seven-permission global `workspace_permissions` catalogue (`WorkspaceRbacPermissionSeeder`); models/relationships without `BelongsToWorkspace`; composite workspace guards/RESTRICT; explicit `WorkspaceAuthorization` read boundary (`allows`, `effectivePermissions`, `activeMembership`); SQLite + MySQL foundation/authorization regression tests. Legacy Spatie `WorkspacePermissionSeeder` unchanged. No RBAC membership/role assignments seeded. **Explicitly not in 026A-1:** legacy preflight/backfill machinery; anti-lockout coordinator; production legacy assignment; policy/gate cutover. |
+| **GAP-026A-2 — Preflight/backfill machinery & anti-lockout coordinator** | Legacy-state preflight service; deterministic/idempotent backfill service; template-role construction logic; `WorkspaceAccessMutationCoordinator`; MySQL concurrency proof for anti-lockout. Machinery + tests only — not production execution. |
+| **GAP-026A (overall)** | Open / partial — 026A-1 complete; 026A-2 still required before 026A foundation slice is fully closed per original staging. |
+| **GAP-026B — Narrow workspace-authorization cutover** | **Pre-cutover gate (frozen order):** Spatie assignment preflight → legacy workspace/Admin preflight → deterministic/idempotent legacy backfill from **current** legacy state → fresh anti-lockout validation → workspace-permission authorization becomes authoritative (failure at any step = STOP, no partial cutover). Then: `ConnectorAccount` authorization; workspace tax-settings authorization; Mapping authorization seam; Access / Roles management UI + mutations; authoritative anti-lockout routing; `User` lifecycle protection (`is_active`, hard-delete, multi-workspace locking) **no later than** assignment/cutover activation. At 026B completion, 4C-1c-2b Mapping UI becomes unblocked. `User::canAccessPanel()` and unrelated admin resources may still use legacy role semantics until GAP-027. **Unimplemented.** |
 
 **Legacy membership / role backfill matrix (026B production execution):**
 
@@ -1138,25 +1142,25 @@ not alone make every legacy User mutation anti-lockout-safe.
 `PlatformAdminAuthorization` and `/cabinet` (`Customer` principal) remain outside
 GAP-026 workspace RBAC.
 
-**Verified current-code mismatch (re-verified against `develop`):**
-- `User.role` (`App\Enums\UserRole`) still participates directly in
-  authorization — e.g. `ConnectorAccountPolicy` grants or denies abilities when
-  `$user->role === UserRole::Merchandiser|Admin|Director` instead of evaluating
-  workspace-scoped permission bundles only.
-- `WorkspaceUser` membership is **not implemented** — `WorkspaceMembership` uses
-  an MVP default-workspace shortcut (`// MVP: staff users belong to the default
-  workspace until WorkspaceUser (GAP-004).`).
-- Spatie Teams is **disabled** — `config/permission.php` → `'teams' => false`;
-  the permission migration has no workspace/team foreign keys on role/permission
-  pivot tables.
-- `WorkspacePermissionSeeder` seeds only global `web`-guard permissions
-  (`manage_workspace_tax_settings`, `manage_connector_accounts`) with no
-  workspace-scoped assignment model.
-- Connector permissions `view_connector_accounts` and `run_connector_discovery`
-  are documented but **not** seeded or enforced in code.
-- Mapping permissions (`view_sync_mappings`, `manage_sync_mappings`) and
-  `manage_workspace_access` are documented but **not** seeded or enforced in
-  code.
+**Verified current-code state (post GAP-026A-1):**
+- `App\Services\Workspace\WorkspaceAuthorization` implements explicit read-only
+  workspace permission evaluation (`allows`, `effectivePermissions`, `activeMembership`)
+  without `WorkspaceContext`, `WorkspaceMembership`, `User.role`, or Spatie.
+- Five RBAC tables exist with composite workspace guards and RESTRICT semantics;
+  `WorkspaceUser`, `WorkspaceRole`, `WorkspacePermission` models do **not** use
+  `BelongsToWorkspace`.
+- `WorkspaceRbacPermissionSeeder` idempotently seeds all seven atomic permissions
+  into `workspace_permissions`. Legacy `WorkspacePermissionSeeder` still seeds
+  Spatie `web`-guard permissions for transitional production authorization.
+- No production RBAC membership/role assignments are seeded by `DatabaseSeeder`.
+- **Still transitional (026B cutover required):** `User.role` participates directly
+  in authorization — e.g. `ConnectorAccountPolicy` and
+  `WorkspaceTaxSettingsAuthorization` still use legacy role/Spatie checks.
+- `WorkspaceMembership` still uses the MVP default-workspace shortcut; authoritative
+  membership for policies is **not** switched to `WorkspaceUser` until 026B.
+- Spatie Teams remains **disabled** — `config/permission.php` → `'teams' => false`.
+- Connector/mapping/tax **policy cutover** to `WorkspaceAuthorization` is **not**
+  done; workspace RBAC is not yet authoritative for merchant authorization.
 
 **Impact:**
 - Do not treat the current global Spatie configuration as satisfying the
@@ -1171,11 +1175,11 @@ GAP-026 workspace RBAC.
 - Cross-reference **GAP-004** for workspace data isolation — GAP-004 tracks
   table/query coverage audit, not permission semantics.
 
-**Next task:** GAP-026A — Physical RBAC Foundation (prerequisite before 026B and
+**Next task:** GAP-026A-2 — legacy preflight/backfill machinery, anti-lockout
+mutation coordinator, and MySQL concurrency proof (prerequisite before 026B and
 4C-1c-2b).
 
-**Status:** Open — physical architecture frozen (GAP-026-0); implementation not
-started. Closure requires 026A foundation + 026B narrow cutover per staging above.
+**Status:** Open / partial — physical architecture frozen (GAP-026-0); GAP-026A-1 (schema, catalogue, explicit read authorization) **Done**; GAP-026A-2 and GAP-026B remain unimplemented. Closure requires 026A-2 foundation machinery + 026B narrow cutover per staging above. 4C-1c-2b remains blocked until GAP-026B cutover completes.
 
 ---
 

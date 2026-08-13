@@ -11,6 +11,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             WorkspaceSeeder::class,
             WorkspacePermissionSeeder::class,
+            WorkspaceRbacPermissionSeeder::class,
             FieldDefinitionSeeder::class,
             ConnectorFoundationSeeder::class,
             B2BSeeder::class,
