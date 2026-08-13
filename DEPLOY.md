@@ -180,7 +180,8 @@ Use `/usr/bin/php` explicitly in the `command=` line. Then run
 ### GAP-026B one-time Workspace RBAC cutover
 
 **Ordinary recurring deployment** (`./deploy.sh`) is **not** sufficient for the one-time
-GAP-026B workspace RBAC authority cutover.
+GAP-026B workspace RBAC authority cutover and must **not** be used to expose GAP-026B-2
+authority-switching code to merchant traffic before cutover completion.
 
 Current `deploy.sh` only pulls, builds assets, clears cache, and restarts the queue.
 It does **not** run migrations, RBAC catalogue seeding, legacy backfill, anti-lockout
@@ -193,31 +194,52 @@ Activation requires the controlled one-time sequence documented in
 `docs/03-DOMAIN_MODEL.md` → **Workspace RBAC authority cutover (Resolved —
 GAP-026B-0, 2026-08-13)**.
 
+**Slice ownership (frozen)**
+
+- **CHECK-ONLY** — available from GAP-026B-1 (diagnostics only; no RBAC
+  assignment/materialization).
+- **EXECUTE** — ships only with GAP-026B-2 together with authority-switching runtime.
+  Production legacy backfill is structurally unavailable in a B-1-only release.
+
+**First B-2 production deployment = maintenance-window cutover**
+
+The first production deployment containing GAP-026B-2 authority-switching code must be
+this maintenance-window cutover deployment — not an ordinary `./deploy.sh` followed by
+later EXECUTE. Merchant traffic remains blocked from B-2 deployment through successful
+EXECUTE + anti-lockout validation + smoke verification. Pre-EXECUTE B-2 authority must
+never fall back to legacy roles.
+
 **One-time maintenance-window sequence (summary)**
 
 1. verified DB backup / snapshot;
 2. maintenance mode / block merchant writes;
-3. deploy exact approved 026B code while traffic is blocked;
+3. deploy the **complete** approved GAP-026B-1 + GAP-026B-2 authority-changing cutover
+   runtime while traffic is already blocked;
 4. run pending migrations;
 5. seed canonical `workspace_permissions` catalogue (`WorkspaceRbacPermissionSeeder`);
-6. run guarded RBAC cutover **CHECK-ONLY**;
-7. if safe: **EXECUTE** deterministic legacy backfill;
+6. run guarded RBAC cutover **CHECK-ONLY** (B-1 machinery; no assignments);
+7. if safe: **EXECUTE** deterministic legacy backfill (B-2 only);
 8. fresh anti-lockout validation;
 9. focused authorization/cutover smoke checks;
 10. clear/reload application state; restart queue workers;
 11. resume traffic.
 
 Failure at any preflight/smoke step: remain blocked for merchant writes; no partial
-authority fallback; no role-based Connector/Tax/Mapping fallback; reconcile before
-traffic resumes.
+authority fallback; no role-based Connector/Tax/Mapping fallback; reconcile while
+traffic remains blocked — not via authority fallback.
 
 **Cutover command contract**
 
 Implementation must provide a guarded one-time command/service with:
 
-- **CHECK-ONLY** — diagnostics only; no RBAC assignments; may run before maintenance;
-- **EXECUTE** — requires maintenance/quiesced merchant writes; re-runs preflight;
+- **CHECK-ONLY (B-1)** — diagnostics only; no RBAC assignments; may run before
+  maintenance; may ship in a B-1-only release.
+- **EXECUTE (B-2)** — must not exist as executable production mode without B-2
+  authority code; requires maintenance/quiesced merchant writes; re-runs preflight;
   runs backfill; post-backfill anti-lockout; fails non-zero on unsafe state.
+
+Do **not** introduce persistent activation flags, marker tables, legacy/new authority
+selectors, or dual-authority policy modes to enforce this boundary.
 
 Exact Artisan command name is implementation-level. Migrations/seeders/service-provider
 boot must **not** automatically execute production legacy backfill.

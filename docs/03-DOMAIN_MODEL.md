@@ -1215,16 +1215,30 @@ window. Do **not** use a permanent dual-authority mode or role fallback. Do **no
 add a persistent legacy/new RBAC feature flag unless a later verified implementation
 blocker forces a new Stop-and-Amend.
 
+**First B-2 production deployment = maintenance-window cutover (frozen)**
+
+The **first production deployment** that contains GAP-026B-2 authority-switching
+code must **itself** be the one-time maintenance-window cutover deployment.
+
+- GAP-026B-2 must **not** be delivered through ordinary recurring deployment and then
+  exposed to merchant traffic pending a later EXECUTE.
+- Merchant traffic remains blocked from B-2 deployment through successful EXECUTE →
+  fresh anti-lockout validation → smoke verification.
+- Pre-EXECUTE B-2 authority must **never** fall back to legacy roles.
+- Recovery is reconciliation/completion of the cutover while traffic remains blocked,
+  not authority fallback.
+
 **Required one-time sequence (frozen ordering)**
 
 1. verified DB backup / snapshot;
 2. put application into maintenance / block merchant writes;
-3. deploy the exact approved 026B code while traffic is blocked;
+3. deploy the **complete** approved GAP-026B-1 + GAP-026B-2 authority-changing
+   cutover runtime while traffic is already blocked;
 4. run all pending migrations;
 5. ensure the canonical `workspace_permissions` catalogue via the approved target
    seeder;
 6. run guarded RBAC cutover in **CHECK-ONLY** mode;
-7. if safe: execute current-state deterministic legacy backfill;
+7. if safe: run **EXECUTE** (current-state deterministic legacy backfill);
 8. run fresh anti-lockout validation;
 9. run focused authorization/cutover smoke checks;
 10. clear/reload application state and restart relevant queue workers;
@@ -1242,18 +1256,48 @@ Existing resolved cutover order must remain:
 Spatie preflight → legacy workspace/Admin preflight → current-state backfill → fresh
 anti-lockout validation → new authority becomes usable.
 
-**Cutover command contract (CHECK-ONLY / EXECUTE)**
+**Cutover command contract (CHECK-ONLY / EXECUTE — slice ownership frozen)**
 
-Freeze a guarded one-time application command/service contract with two modes:
+Freeze a guarded one-time application command/service contract with two modes, split
+across GAP-026B-1 and GAP-026B-2:
 
-- **CHECK-ONLY** — performs no RBAC assignments; reports structured A-2 preflight
-  state; may run before maintenance for advance diagnostics.
-- **EXECUTE** — requires application maintenance mode / explicitly quiesced
-  merchant-write environment; refuses to proceed otherwise; re-runs fresh preflight
-  itself; invokes existing transactional backfill machinery; performs fresh
-  post-backfill anti-lockout validation; fails non-zero on any unsafe state.
+**CHECK-ONLY (GAP-026B-1)**
 
-Exact Artisan command name is implementation-level.
+- May exist and run in a B-1-only release.
+- Performs no RBAC assignments or production legacy membership/role materialization.
+- Reports structured A-2 preflight state.
+- May run before maintenance for advance diagnostics.
+
+**EXECUTE (GAP-026B-2 only)**
+
+- Must **not** exist as an executable production mode in a release that does not also
+  contain GAP-026B-2 authority-switching runtime code.
+- B-1-only EXECUTE is **forbidden by slice placement**, not by operator confirmation.
+- Requires application maintenance mode / explicitly quiesced merchant-write
+  environment; refuses to proceed otherwise; re-runs fresh preflight itself; invokes
+  existing transactional backfill machinery; performs fresh post-backfill anti-lockout
+  validation; fails non-zero on any unsafe state.
+- Production legacy assignment materialization is structurally unavailable until the
+  release also carries GAP-026B-2 authority code.
+
+Do **not** introduce `--confirm-maintenance-window`, persistent environment activation
+state, marker tables, legacy/new authority selectors, or dual-authority policy switches
+merely to enforce this boundary.
+
+**Why B-1 cannot materialize production RBAC early**
+
+GAP-026A intentionally did not materialize production `WorkspaceUser` / role
+assignments early because legacy `User.role`, `is_active`, and hard-delete could
+continue changing while the new graph remained non-authoritative — allowing a shadow
+graph to drift before cutover.
+
+Early materialization while legacy authorization is still live would create a
+non-authoritative shadow RBAC graph. Because `User.role` changes after cutover are
+explicitly forbidden from synchronizing `WorkspaceRole` assignments, a legacy
+role/lifecycle mutation between premature backfill and B-2 activation could leave
+stale grants that later become authoritative.
+
+Exact Artisan command/class name is implementation-level.
 
 Do **not** make migration/seeder/service-provider boot automatically execute
 production legacy backfill.
@@ -1265,8 +1309,8 @@ cutover**.
 
 | Slice | Future runtime scope |
 |---|---|
-| **GAP-026B-1 — Access & Cutover Machinery** | guarded check/execute cutover command; Access/Roles application write services; existing-membership role assignment/removal; membership activate/deactivate; role create/rename/permission edit/safe unused-role delete; merchant Access/Roles UI; global `User` deactivation integrity service; hard-delete guard; cutover/runbook tests. **Explicitly no** connector/tax policy authority switch yet. No production backfill automatically executes merely because B-1 is merged. |
-| **GAP-026B-2 — Authority & Presentation Cutover** | `ConnectorAccountPolicy` migration; remove legacy `WorkspaceMembership` from connector authority paths; permission-based safe Connector presentation; merchant Integrations/catalog gating migration; tax authorization migration + write-time reauthorization; Mapping authorization seam; cross-workspace + safe-state + Livewire serialization regressions. After B-2 implementation is merged and verified, repository development of **4C-1c-2b** may begin. An environment must still execute the GAP-026B one-time cutover before serving the new authority code / Mapping UI to merchant traffic. |
+| **GAP-026B-1 — Access & Cutover Machinery** | Guarded cutover command/service: **CHECK-ONLY mode only** (diagnostics; no RBAC assignment/materialization). Access/Roles application write services; existing-membership role assignment/removal; membership activate/deactivate; role create/rename/permission edit/safe unused-role delete; merchant Access/Roles UI; global `User` deactivation integrity service; hard-delete guard; CHECK-ONLY cutover/runbook tests. **Explicitly no** connector/tax policy authority switch. **B-1-only release must not ship an executable production EXECUTE mode** — no production legacy membership/role backfill in a B-1-only deployment. |
+| **GAP-026B-2 — Authority & Presentation Cutover** | **EXECUTE mode** of the guarded cutover command/service (production legacy assignment materialization). `ConnectorAccountPolicy` migration; remove legacy `WorkspaceMembership` from connector authority paths; permission-based safe Connector presentation; merchant Integrations/catalog gating migration; tax authorization migration + write-time reauthorization; Mapping authorization seam; cross-workspace + safe-state + Livewire serialization regressions; EXECUTE cutover/runbook tests. First production deployment containing B-2 must be the maintenance-window cutover deployment; merchant traffic stays blocked until EXECUTE + anti-lockout + smoke succeed. After B-2 implementation is merged and verified, repository development of **4C-1c-2b** may begin. An environment must execute EXECUTE during that cutover before serving new authority / Mapping UI to merchant traffic. |
 
 This separates repository implementation readiness from environment production
 activation.

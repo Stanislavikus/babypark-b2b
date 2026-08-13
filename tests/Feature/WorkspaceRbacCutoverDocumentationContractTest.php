@@ -190,13 +190,16 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
     {
         $section = $this->cutoverSection();
         $deploy = File::get(base_path('DEPLOY.md'));
+        $b2Row = $this->cutoverB2SliceRow();
 
         $this->assertStringContainsString('CHECK-ONLY', $section);
-        $this->assertStringContainsString('EXECUTE', $section);
+        $this->assertStringContainsString('EXECUTE', $b2Row);
         $this->assertStringContainsString('maintenance mode / explicitly quiesced', $section);
         $this->assertStringContainsString('no partial authority fallback', $section);
         $this->assertStringContainsString('Merging 026B code into `develop` is **not** itself production cutover', $section);
         $this->assertStringContainsString('Do **not** use a permanent dual-authority mode', $section);
+        $this->assertStringContainsString('First B-2 production deployment', $section);
+        $this->assertStringContainsString('maintenance-window cutover deployment', $section);
 
         $this->assertStringContainsString('### GAP-026B one-time Workspace RBAC cutover', $deploy);
         $this->assertStringContainsString('Ordinary recurring deployment', $deploy);
@@ -204,23 +207,76 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
         $this->assertStringContainsString('Repository merge ≠ production cutover', $deploy);
         $this->assertStringContainsString('CHECK-ONLY', $deploy);
         $this->assertStringContainsString('EXECUTE', $deploy);
+        $this->assertStringContainsString('GAP-026B-1 + GAP-026B-2', $deploy);
+        $this->assertStringContainsString('First B-2 production deployment', $deploy);
+        $this->assertStringContainsString('Do **not** introduce persistent activation flags', $deploy);
+    }
+
+    #[Test]
+    public function gap_026b_1_slice_owns_check_only_only_not_execute_or_production_backfill(): void
+    {
+        $domainB1 = $this->cutoverB1SliceRow();
+        $gapsB1 = $this->gap026b1SliceRow();
+
+        $this->assertStringContainsString('CHECK-ONLY', $domainB1);
+        $this->assertStringContainsString('no RBAC assignment/materialization', $domainB1);
+        $this->assertStringContainsString('Explicitly no** connector/tax policy authority switch', $domainB1);
+        $this->assertStringContainsString('B-1-only release must not ship an executable production EXECUTE mode', $domainB1);
+        $this->assertStringNotContainsString('**EXECUTE mode** of the guarded', $domainB1);
+
+        $this->assertStringContainsString('CHECK-ONLY only', $gapsB1);
+        $this->assertStringContainsString('no RBAC assignment/materialization', $gapsB1);
+        $this->assertStringContainsString('No executable production EXECUTE mode in a B-1-only release', $gapsB1);
+        $this->assertStringContainsString('Explicitly no** connector/tax policy authority switch', $gapsB1);
+        $this->assertStringNotContainsString('**EXECUTE mode** of guarded cutover', $gapsB1);
+    }
+
+    #[Test]
+    public function gap_026b_2_slice_owns_execute_with_authority_cutover(): void
+    {
+        $domainB2 = $this->cutoverB2SliceRow();
+        $gapsB2 = $this->gap026b2SliceRow();
+
+        $this->assertStringContainsString('EXECUTE mode', $domainB2);
+        $this->assertStringContainsString('ConnectorAccountPolicy', $domainB2);
+        $this->assertStringContainsString('permission-based safe Connector presentation', $domainB2);
+        $this->assertStringContainsString('maintenance-window cutover deployment', $domainB2);
+        $this->assertStringContainsString('EXECUTE + anti-lockout + smoke succeed', $domainB2);
+
+        $this->assertStringContainsString('EXECUTE mode', $gapsB2);
+        $this->assertStringContainsString('production legacy backfill/materialization', $gapsB2);
+        $this->assertStringContainsString('ConnectorAccountPolicy', $gapsB2);
+        $this->assertStringContainsString('maintenance-window cutover deployment', $gapsB2);
+        $this->assertStringContainsString('EXECUTE + anti-lockout + smoke succeed', $gapsB2);
+    }
+
+    #[Test]
+    public function cutover_contract_forbids_b1_only_execute_and_dual_authority_activation(): void
+    {
+        $section = $this->cutoverSection();
+
+        $this->assertStringContainsString('B-1-only EXECUTE is **forbidden by slice placement**', $section);
+        $this->assertStringContainsString('non-authoritative shadow RBAC graph', $section);
+        $this->assertStringContainsString('stale grants that later become authoritative', $section);
+        $this->assertStringContainsString('Do **not** introduce `--confirm-maintenance-window`', $section);
+        $this->assertStringContainsString('persistent environment activation', $section);
+        $this->assertStringContainsString('marker tables', $section);
+        $this->assertStringContainsString('dual-authority policy switches', $section);
+        $this->assertStringContainsString('never** fall back to legacy roles', $section);
     }
 
     #[Test]
     public function staging_splits_026b_1_and_026b_2_and_blocks_4c_1c_2b(): void
     {
-        $section = $this->cutoverSection();
         $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
-        $this->assertStringContainsString('GAP-026B-1 — Access & Cutover Machinery', $section);
-        $this->assertStringContainsString('GAP-026B-2 — Authority & Presentation Cutover', $section);
-        $this->assertStringContainsString('Explicitly no** connector/tax policy authority switch', $section);
-        $this->assertStringContainsString('4C-1c-2b** may begin', $section);
-        $this->assertStringContainsString('GAP-026B one-time cutover before serving', $section);
+        $this->assertStringContainsString('CHECK-ONLY mode only', $this->cutoverB1SliceRow());
+        $this->assertStringContainsString('EXECUTE mode', $this->cutoverB2SliceRow());
+        $this->assertStringContainsString('4C-1c-2b** may begin', $this->cutoverB2SliceRow());
 
         $this->assertStringContainsString('GAP-026B-0 — Workspace RBAC authority cutover contract', $gaps);
-        $this->assertStringContainsString('GAP-026B-1 — Access & Cutover Machinery', $gaps);
-        $this->assertStringContainsString('GAP-026B-2 — Authority & Presentation Cutover', $gaps);
+        $this->assertStringContainsString('CHECK-ONLY (B-1)', $gaps);
+        $this->assertStringContainsString('EXECUTE at cutover — B-2 only', $gaps);
         $this->assertStringContainsString('GAP-026A (overall)** | **Done**', $gaps);
         $this->assertStringContainsString('026B-1 / GAP-026B-2 runtime **unimplemented**', $gaps);
         $this->assertStringContainsString('4C-1c-2b remains blocked until GAP-026B-2', $gaps);
@@ -272,6 +328,78 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
             $matches,
         )) {
             $this->fail('Could not locate Workspace RBAC authority cutover section in 03-DOMAIN_MODEL.md');
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function cutoverB1SliceRow(): string
+    {
+        $section = $this->cutoverSection();
+
+        if (! preg_match(
+            '/\| \*\*GAP-026B-1 — Access & Cutover Machinery\*\* \| (.*?) \|/s',
+            $section,
+            $matches,
+        )) {
+            $this->fail('Could not locate GAP-026B-1 slice row in 03-DOMAIN_MODEL.md cutover section');
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function cutoverB2SliceRow(): string
+    {
+        $section = $this->cutoverSection();
+
+        if (! preg_match(
+            '/\| \*\*GAP-026B-2 — Authority & Presentation Cutover\*\* \| (.*?) \|/s',
+            $section,
+            $matches,
+        )) {
+            $this->fail('Could not locate GAP-026B-2 slice row in 03-DOMAIN_MODEL.md cutover section');
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function gap026b1SliceRow(): string
+    {
+        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        if (! preg_match(
+            '/\| \*\*GAP-026B-1 — Access & Cutover Machinery\*\* \| (.*?) \|/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate GAP-026B-1 slice row in IMPLEMENTATION_GAPS.md');
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function gap026b2SliceRow(): string
+    {
+        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        if (! preg_match(
+            '/\| \*\*GAP-026B-2 — Authority & Presentation Cutover\*\* \| (.*?) \|/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate GAP-026B-2 slice row in IMPLEMENTATION_GAPS.md');
         }
 
         return $matches[1];
