@@ -15,6 +15,7 @@ use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
@@ -206,13 +207,41 @@ class WorkspaceAuthorizationTest extends TestCase
     }
 
     #[Test]
-    public function unknown_permission_denies(): void
+    public function rogue_assigned_database_permission_does_not_expand_authority(): void
     {
         [$user, $workspace] = $this->makeUserAndWorkspace();
-        $this->assignPermission($workspace, $user, WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS);
+        $membership = $this->membershipFor($workspace, $user);
+
+        $role = WorkspaceRole::query()->create([
+            'workspace_id' => $workspace->id,
+            'name' => 'Rogue Role',
+        ]);
+
+        $this->attachRole($membership, $role);
+        $this->attachPermission($role, WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS);
+
+        $roguePermissionId = (string) Str::uuid();
+
+        DB::table('workspace_permissions')->insert([
+            'id' => $roguePermissionId,
+            'code' => 'rogue_unseeded_permission',
+        ]);
+
+        DB::table('workspace_role_permissions')->insert([
+            'workspace_id' => $workspace->id,
+            'workspace_role_id' => $role->id,
+            'workspace_permission_id' => $roguePermissionId,
+        ]);
 
         $this->assertFalse(
-            $this->authorization->allows($user, $workspace, 'not_a_real_permission'),
+            $this->authorization->allows($user, $workspace, 'rogue_unseeded_permission'),
+        );
+        $this->assertNotContains(
+            'rogue_unseeded_permission',
+            $this->authorization->effectivePermissions($user, $workspace),
+        );
+        $this->assertTrue(
+            $this->authorization->allows($user, $workspace, WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS),
         );
     }
 

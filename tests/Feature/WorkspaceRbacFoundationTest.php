@@ -138,7 +138,7 @@ class WorkspaceRbacFoundationTest extends TestCase
     }
 
     #[Test]
-    public function cross_workspace_user_and_role_assignment_is_rejected(): void
+    public function cross_workspace_user_and_role_assignment_is_rejected_when_pivot_workspace_is_role_workspace(): void
     {
         $workspaceA = Workspace::query()->where('is_default', true)->sole();
         $workspaceB = Workspace::query()->create(['name' => 'Other', 'is_default' => false]);
@@ -161,6 +161,48 @@ class WorkspaceRbacFoundationTest extends TestCase
             'workspace_id' => $workspaceB->id,
             'workspace_user_id' => $workspaceUserA->id,
             'workspace_role_id' => $roleB->id,
+        ]);
+    }
+
+    #[Test]
+    public function cross_workspace_user_and_role_assignment_is_rejected_when_pivot_workspace_is_user_workspace(): void
+    {
+        $workspaceA = Workspace::query()->where('is_default', true)->sole();
+        $workspaceB = Workspace::query()->create(['name' => 'Other', 'is_default' => false]);
+        $user = User::factory()->create();
+
+        $workspaceUserA = WorkspaceUser::query()->create([
+            'workspace_id' => $workspaceA->id,
+            'user_id' => $user->id,
+            'is_active' => true,
+        ]);
+
+        $roleB = WorkspaceRole::query()->create([
+            'workspace_id' => $workspaceB->id,
+            'name' => 'Role B',
+        ]);
+
+        $this->expectException(QueryException::class);
+
+        DB::table('workspace_user_roles')->insert([
+            'workspace_id' => $workspaceA->id,
+            'workspace_user_id' => $workspaceUserA->id,
+            'workspace_role_id' => $roleB->id,
+        ]);
+    }
+
+    #[Test]
+    public function parent_workspace_foreign_key_rejects_orphan_workspace_role(): void
+    {
+        $this->expectException(QueryException::class);
+
+        DB::table('workspace_roles')->insert([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => (string) Str::uuid(),
+            'name' => 'Orphan Role',
+            'template_key' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 

@@ -5,12 +5,17 @@ namespace App\Services\Workspace;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceUser;
+use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Support\Facades\DB;
 
 final class WorkspaceAuthorization
 {
     public function allows(User $user, Workspace $workspace, string $permission): bool
     {
+        if (! in_array($permission, WorkspacePermissions::catalogue(), true)) {
+            return false;
+        }
+
         return in_array($permission, $this->effectivePermissions($user, $workspace), true);
     }
 
@@ -41,6 +46,7 @@ final class WorkspaceAuthorization
             ->where('workspace_user_roles.workspace_user_id', $membership->id)
             ->where('workspace_user_roles.workspace_id', $workspace->id)
             ->where('workspace_role_permissions.workspace_id', $workspace->id)
+            ->whereIn('workspace_permissions.code', WorkspacePermissions::catalogue())
             ->distinct()
             ->orderBy('workspace_permissions.code')
             ->pluck('workspace_permissions.code')
