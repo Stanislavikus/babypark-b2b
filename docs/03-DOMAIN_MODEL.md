@@ -1151,13 +1151,25 @@ The following mutations must route through `WorkspaceAccessMutationCoordinator`:
 
 The coordinator remains an integrity boundary, **not** actor authorization.
 
-Sequence remains:
+Authoritative sequence:
 
-1. authorize actor for `manage_workspace_access`;
-2. coordinator locks `Workspace` row;
-3. perform mutation;
+1. optional preliminary authorization for early rejection only (non-authoritative fast-fail/UX);
+2. `WorkspaceAccessMutationCoordinator` acquires the explicit `Workspace` row mutex;
+3. inside the locked transaction:
+   - freshly reload the requesting `User` from persistence by stable ID;
+   - fresh actor authorization against the locked explicit `Workspace` using the reloaded `User`;
+   - freshly resolve/revalidate mutable membership/role targets against the locked `Workspace`;
+   - perform the mutation;
 4. fresh effective-holder query;
 5. reject/rollback if zero holders.
+
+Normative requirements:
+
+- post-lock actor authorization is **mandatory**;
+- any pre-lock authorization is optional fast-fail only and is **not** authoritative for mutation execution;
+- do not reuse a pre-lock hydrated `User` as authorization truth — `WorkspaceAuthorization` reads `users.is_active` from the passed model instance;
+- membership/role identity and mutable target state relevant to the mutation must be freshly resolved/revalidated after the `Workspace` lock;
+- this applies the same TOCTOU principle already frozen for consequential Tax writes to Access/Roles mutations.
 
 Do **not** merge actor authorization into `WorkspaceAccessMutationCoordinator`.
 
