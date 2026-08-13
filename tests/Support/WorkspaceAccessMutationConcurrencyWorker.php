@@ -94,7 +94,7 @@ function runTransactionB(string $workspaceId, string $holderBId, string $ipcDir)
     $coordinator = app(WorkspaceAccessMutationCoordinator::class);
 
     try {
-        $coordinator->mutateLocked($workspace, function (): void {
+        $coordinator->mutateLocked($workspace, function () use ($holderBId): void {
             WorkspaceUser::query()
                 ->whereKey($holderBId)
                 ->update(['is_active' => false]);
