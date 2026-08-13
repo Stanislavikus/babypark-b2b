@@ -19,21 +19,134 @@ final class WorkspaceRbacLegacyBackfill
 
     public function execute(WorkspaceRbacLegacyTemplateDisplayNames $displayNames): void
     {
-        $preflightResult = $this->preflight->assertSafe();
+        DB::transaction(function () use ($displayNames): void {
+            $preflightResult = $this->preflight->assertSafe();
 
-        $workspaceId = $preflightResult->defaultWorkspaceId;
-        if ($workspaceId === null) {
-            throw new WorkspaceRbacLegacyBackfillConflictException('Default workspace is not uniquely resolvable.');
-        }
+            $workspaceId = $preflightResult->defaultWorkspaceId;
+            if ($workspaceId === null) {
+                throw new WorkspaceRbacLegacyBackfillConflictException('Default workspace is not uniquely resolvable.');
+            }
 
-        $this->materializeTemplateRoles($workspaceId, $displayNames);
+            $this->validateExistingTargetState($workspaceId);
 
-        $staffUsers = User::query()
-            ->whereNull('customer_id')
+            $this->materializeTemplateRoles($workspaceId, $displayNames);
+
+            $staffUsers = User::query()
+                ->whereNull('customer_id')
+                ->get();
+
+            foreach ($staffUsers as $user) {
+                $this->materializeStaffUser($workspaceId, $user);
+            }
+        });
+    }
+
+    private function validateExistingTargetState(string $workspaceId): void
+    {
+        $roles = WorkspaceRole::query()
+            ->where('workspace_id', $workspaceId)
             ->get();
 
-        foreach ($staffUsers as $user) {
-            $this->materializeStaffUser($workspaceId, $user);
+        foreach ($roles as $role) {
+            if ($role->template_key === null || ! in_array($role->template_key, WorkspaceRbacLegacyTemplateKeys::bootstrapKeys(), true)) {
+                throw new WorkspaceRbacLegacyBackfillConflictException(
+                    'Unknown or custom workspace role detected: '.$role->id,
+                );
+            }
+
+            $expectedCodes = WorkspaceRbacLegacyTemplateKeys::permissionsForKey($role->template_key);
+            $actualCodes = $this->permissionCodesForRole($workspaceId, $role->id);
+            $unexpected = array_diff($actualCodes, $expectedCodes);
+
+            if ($unexpected !== []) {
+                throw new WorkspaceRbacLegacyBackfillConflictException(
+                    'Bootstrap role has unexpected permission assignments: '.implode(', ', $unexpected),
+                );
+            }
+        }
+
+        $memberships = WorkspaceUser::query()
+            ->where('workspace_id', $workspaceId)
+            ->get();
+
+        foreach ($memberships as $membership) {
+            $user = User::query()->find($membership->user_id);
+
+            if ($user === null) {
+                throw new WorkspaceRbacLegacyBackfillConflictException(
+                    "Workspace membership {$membership->id} references a missing user.",
+                );
+            }
+
+            if ($user->customer_id !== null) {
+                throw new WorkspaceRbacLegacyBackfillConflictException(
+                    "Customer-linked user {$user->id} has an existing workspace membership.",
+                );
+            }
+
+            $this->assertRecognizedMembershipAssignments($workspaceId, $membership, $user);
+        }
+
+        $unknownAssignments = DB::table('workspace_user_roles')
+            ->join(
+                'workspace_roles',
+                'workspace_roles.id',
+                '=',
+                'workspace_user_roles.workspace_role_id',
+            )
+            ->where('workspace_user_roles.workspace_id', $workspaceId)
+            ->where(function ($query): void {
+                $query
+                    ->whereNull('workspace_roles.template_key')
+                    ->orWhereNotIn('workspace_roles.template_key', WorkspaceRbacLegacyTemplateKeys::bootstrapKeys());
+            })
+            ->count();
+
+        if ($unknownAssignments > 0) {
+            throw new WorkspaceRbacLegacyBackfillConflictException(
+                'Unknown role assignment detected in target workspace.',
+            );
+        }
+    }
+
+    private function assertRecognizedMembershipAssignments(
+        string $workspaceId,
+        WorkspaceUser $membership,
+        User $user,
+    ): void {
+        $assignedBootstrapRoleIds = $this->assignedBootstrapRoleIds($workspaceId, $membership->id);
+        $expectedTemplateKey = $this->expectedTemplateKeyForRole($user->role);
+
+        if ($expectedTemplateKey === null) {
+            if ($assignedBootstrapRoleIds !== []) {
+                throw new WorkspaceRbacLegacyBackfillConflictException(
+                    "Staff user {$user->id} has unexpected bootstrap role assignments.",
+                );
+            }
+
+            return;
+        }
+
+        $expectedRoleId = WorkspaceRole::query()
+            ->where('workspace_id', $workspaceId)
+            ->where('template_key', $expectedTemplateKey)
+            ->value('id');
+
+        if ($expectedRoleId === null && $assignedBootstrapRoleIds === []) {
+            return;
+        }
+
+        if ($expectedRoleId === null) {
+            throw new WorkspaceRbacLegacyBackfillConflictException(
+                "Staff user {$user->id} has bootstrap role assignments but expected template {$expectedTemplateKey} is missing.",
+            );
+        }
+
+        $unexpectedAssignments = array_diff($assignedBootstrapRoleIds, [(string) $expectedRoleId]);
+        if ($unexpectedAssignments !== []) {
+            throw new WorkspaceRbacLegacyBackfillConflictException(
+                "Staff user {$user->id} has unexpected bootstrap role assignments.",
+            );
         }
     }
 
@@ -81,19 +194,9 @@ final class WorkspaceRbacLegacyBackfill
             }
         }
 
-        $actualCodes = DB::table('workspace_role_permissions')
-            ->join(
-                'workspace_permissions',
-                'workspace_permissions.id',
-                '=',
-                'workspace_role_permissions.workspace_permission_id',
-            )
-            ->where('workspace_role_permissions.workspace_id', $workspaceId)
-            ->where('workspace_role_permissions.workspace_role_id', $roleId)
-            ->pluck('workspace_permissions.code')
-            ->all();
-
+        $actualCodes = $this->permissionCodesForRole($workspaceId, $roleId);
         $unexpected = array_diff($actualCodes, $expectedCodes);
+
         if ($unexpected !== []) {
             throw new WorkspaceRbacLegacyBackfillConflictException(
                 'Template role has unexpected permission assignments: '.implode(', ', $unexpected),
@@ -117,6 +220,25 @@ final class WorkspaceRbacLegacyBackfill
                 ]);
             }
         }
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function permissionCodesForRole(string $workspaceId, string $roleId): array
+    {
+        return DB::table('workspace_role_permissions')
+            ->join(
+                'workspace_permissions',
+                'workspace_permissions.id',
+                '=',
+                'workspace_role_permissions.workspace_permission_id',
+            )
+            ->where('workspace_role_permissions.workspace_id', $workspaceId)
+            ->where('workspace_role_permissions.workspace_role_id', $roleId)
+            ->pluck('workspace_permissions.code')
+            ->map(static fn ($code): string => (string) $code)
+            ->all();
     }
 
     private function materializeStaffUser(string $workspaceId, User $user): void

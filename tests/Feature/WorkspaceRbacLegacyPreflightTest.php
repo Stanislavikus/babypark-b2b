@@ -49,6 +49,10 @@ class WorkspaceRbacLegacyPreflightTest extends TestCase
         $this->assertTrue($result->isSafe);
         $this->assertSame([], $result->failureReasonCodes());
         $this->assertNotNull($result->defaultWorkspaceId);
+        $this->assertSame(1, $result->totalWorkspacesCount);
+        $this->assertSame(1, $result->defaultWorkspacesCount);
+        $this->assertSame(1, $result->activeStaffAdminDirectorCount);
+        $this->assertSame(0, $result->inactiveStaffAdminDirectorCount);
         $this->assertSame(0, $result->rolesCount);
         $this->assertSame(0, $result->modelHasRolesCount);
         $this->assertSame(0, $result->modelHasPermissionsCount);
@@ -63,6 +67,7 @@ class WorkspaceRbacLegacyPreflightTest extends TestCase
         $result = $this->preflight->evaluate();
 
         $this->assertFalse($result->isSafe);
+        $this->assertSame(2, $result->totalWorkspacesCount);
         $this->assertContains(
             WorkspaceRbacLegacyPreflightFailureReason::MultipleWorkspaces->value,
             $result->failureReasonCodes(),
@@ -77,6 +82,8 @@ class WorkspaceRbacLegacyPreflightTest extends TestCase
         $result = $this->preflight->evaluate();
 
         $this->assertFalse($result->isSafe);
+        $this->assertSame(1, $result->totalWorkspacesCount);
+        $this->assertSame(0, $result->defaultWorkspacesCount);
         $this->assertContains(
             WorkspaceRbacLegacyPreflightFailureReason::ZeroDefaultWorkspaces->value,
             $result->failureReasonCodes(),
@@ -91,6 +98,8 @@ class WorkspaceRbacLegacyPreflightTest extends TestCase
         $result = $this->preflight->evaluate();
 
         $this->assertFalse($result->isSafe);
+        $this->assertSame(2, $result->totalWorkspacesCount);
+        $this->assertSame(2, $result->defaultWorkspacesCount);
         $this->assertContains(
             WorkspaceRbacLegacyPreflightFailureReason::MultipleDefaultWorkspaces->value,
             $result->failureReasonCodes(),
@@ -103,6 +112,8 @@ class WorkspaceRbacLegacyPreflightTest extends TestCase
         $result = $this->preflight->evaluate();
 
         $this->assertFalse($result->isSafe);
+        $this->assertSame(0, $result->activeStaffAdminDirectorCount);
+        $this->assertSame(0, $result->inactiveStaffAdminDirectorCount);
         $this->assertContains(
             WorkspaceRbacLegacyPreflightFailureReason::NoActiveStaffAdminOrDirector->value,
             $result->failureReasonCodes(),
@@ -121,6 +132,8 @@ class WorkspaceRbacLegacyPreflightTest extends TestCase
         $result = $this->preflight->evaluate();
 
         $this->assertFalse($result->isSafe);
+        $this->assertSame(0, $result->activeStaffAdminDirectorCount);
+        $this->assertSame(1, $result->inactiveStaffAdminDirectorCount);
         $this->assertContains(
             WorkspaceRbacLegacyPreflightFailureReason::OnlyInactiveStaffAdminOrDirector->value,
             $result->failureReasonCodes(),

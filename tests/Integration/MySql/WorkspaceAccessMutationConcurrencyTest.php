@@ -55,11 +55,11 @@ class WorkspaceAccessMutationConcurrencyTest extends TestCase
         $processA->start();
 
         $deadline = time() + 60;
-        while (! file_exists($ipcDir.'/a_holding_lock') && time() < $deadline) {
+        while (! file_exists($ipcDir.'/a_lock_acquired') && time() < $deadline) {
             usleep(50_000);
         }
 
-        $this->assertFileExists($ipcDir.'/a_holding_lock', 'Process A did not acquire workspace lock.');
+        $this->assertFileExists($ipcDir.'/a_lock_acquired', 'Process A did not acquire coordinator workspace lock.');
 
         $processB = new Process([
             $phpBinary,
@@ -72,6 +72,16 @@ class WorkspaceAccessMutationConcurrencyTest extends TestCase
         $processB->setTimeout(120);
         $processB->start();
 
+        $deadline = time() + 60;
+        while (! file_exists($ipcDir.'/b_before_coordinator') && time() < $deadline) {
+            usleep(50_000);
+        }
+
+        $this->assertFileExists($ipcDir.'/b_before_coordinator', 'Process B did not signal before coordinator.');
+        $this->assertFileDoesNotExist($ipcDir.'/b_mutator_executed', 'Process B mutator executed while A held the lock.');
+
+        touch($ipcDir.'/parent_release_a');
+
         $processA->wait();
         $processB->wait();
 
@@ -79,7 +89,7 @@ class WorkspaceAccessMutationConcurrencyTest extends TestCase
         $this->assertFileDoesNotExist($ipcDir.'/a_failed');
         $this->assertSame(0, $processA->getExitCode(), $processA->getErrorOutput());
 
-        $this->assertFileExists($ipcDir.'/b_entered', 'Process B did not enter coordinator.');
+        $this->assertFileExists($ipcDir.'/b_mutator_executed', 'Process B mutator did not execute after A released.');
         $this->assertSame('lockout', file_get_contents($ipcDir.'/b_result'));
         $this->assertSame(0, $processB->getExitCode(), $processB->getErrorOutput());
 

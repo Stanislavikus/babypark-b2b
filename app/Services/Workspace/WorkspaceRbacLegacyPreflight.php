@@ -98,6 +98,10 @@ final class WorkspaceRbacLegacyPreflight
             modelHasPermissionsCount: $modelHasPermissionsCount,
             modelHasPermissionsModelTypeCounts: $modelHasPermissionsModelTypeCounts,
             roleHasPermissionsCount: $roleHasPermissionsCount,
+            totalWorkspacesCount: $totalWorkspaces,
+            defaultWorkspacesCount: $defaultWorkspaces,
+            activeStaffAdminDirectorCount: $activeStaffAdminDirectorCount,
+            inactiveStaffAdminDirectorCount: $inactiveStaffAdminDirectorCount,
             defaultWorkspaceId: $defaultWorkspaceId !== null ? (string) $defaultWorkspaceId : null,
             missingCanonicalPermissionCodes: $missingCanonicalPermissionCodes,
         );

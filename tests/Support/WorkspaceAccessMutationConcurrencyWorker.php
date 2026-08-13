@@ -10,11 +10,9 @@
 
 use App\Models\Workspace;
 use App\Models\WorkspaceUser;
-use App\Services\Workspace\WorkspaceAccessEffectiveHolderQuery;
 use App\Services\Workspace\WorkspaceAccessMutationCoordinator;
 use App\Support\Workspace\Rbac\Exceptions\WorkspaceAccessLockoutException;
 use Illuminate\Contracts\Console\Kernel;
-use Illuminate\Support\Facades\DB;
 
 $basePath = dirname(__DIR__, 2);
 
@@ -46,41 +44,39 @@ match ($mode) {
 
 function runTransactionA(string $workspaceId, string $holderAId, string $ipcDir): void
 {
-    DB::beginTransaction();
+    $workspace = Workspace::query()->findOrFail($workspaceId);
+    $coordinator = app(WorkspaceAccessMutationCoordinator::class);
 
     try {
-        Workspace::query()
-            ->whereKey($workspaceId)
-            ->lockForUpdate()
-            ->firstOrFail();
+        $coordinator->mutateLocked($workspace, function () use ($ipcDir, $holderAId): void {
+            touch($ipcDir.'/a_lock_acquired');
 
-        WorkspaceUser::query()
-            ->whereKey($holderAId)
-            ->update(['is_active' => false]);
+            $deadline = time() + 60;
+            while (! file_exists($ipcDir.'/b_before_coordinator') && time() < $deadline) {
+                usleep(50_000);
+            }
 
-        touch($ipcDir.'/a_holding_lock');
+            if (! file_exists($ipcDir.'/b_before_coordinator')) {
+                throw new RuntimeException('Timed out waiting for process B to signal before coordinator.');
+            }
 
-        $deadline = time() + 60;
-        while (! file_exists($ipcDir.'/b_entered') && time() < $deadline) {
-            usleep(50_000);
-        }
+            $deadline = time() + 60;
+            while (! file_exists($ipcDir.'/parent_release_a') && time() < $deadline) {
+                usleep(50_000);
+            }
 
-        if (! file_exists($ipcDir.'/b_entered')) {
-            throw new RuntimeException('Timed out waiting for concurrent process B to enter coordinator.');
-        }
+            if (! file_exists($ipcDir.'/parent_release_a')) {
+                throw new RuntimeException('Timed out waiting for parent to release process A.');
+            }
 
-        usleep(200_000);
+            WorkspaceUser::query()
+                ->whereKey($holderAId)
+                ->update(['is_active' => false]);
+        });
 
-        $effectiveHolderQuery = app(WorkspaceAccessEffectiveHolderQuery::class);
-        if (! $effectiveHolderQuery->hasEffectiveHolder($workspaceId)) {
-            throw new WorkspaceAccessLockoutException;
-        }
-
-        DB::commit();
         touch($ipcDir.'/a_committed');
         exit(0);
     } catch (Throwable $exception) {
-        DB::rollBack();
         file_put_contents($ipcDir.'/a_failed', $exception->getMessage());
         exit(1);
     }
@@ -88,13 +84,25 @@ function runTransactionA(string $workspaceId, string $holderAId, string $ipcDir)
 
 function runTransactionB(string $workspaceId, string $holderBId, string $ipcDir): void
 {
-    touch($ipcDir.'/b_entered');
+    $deadline = time() + 60;
+    while (! file_exists($ipcDir.'/a_lock_acquired') && time() < $deadline) {
+        usleep(50_000);
+    }
+
+    if (! file_exists($ipcDir.'/a_lock_acquired')) {
+        file_put_contents($ipcDir.'/b_result', 'error:Timed out waiting for process A lock.');
+        exit(1);
+    }
+
+    touch($ipcDir.'/b_before_coordinator');
 
     $workspace = Workspace::query()->findOrFail($workspaceId);
     $coordinator = app(WorkspaceAccessMutationCoordinator::class);
 
     try {
-        $coordinator->mutateLocked($workspace, function () use ($holderBId): void {
+        $coordinator->mutateLocked($workspace, function () use ($ipcDir, $holderBId): void {
+            touch($ipcDir.'/b_mutator_executed');
+
             WorkspaceUser::query()
                 ->whereKey($holderBId)
                 ->update(['is_active' => false]);

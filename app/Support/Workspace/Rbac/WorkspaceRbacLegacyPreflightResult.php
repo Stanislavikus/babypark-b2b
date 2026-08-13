@@ -19,6 +19,10 @@ final readonly class WorkspaceRbacLegacyPreflightResult
         public int $modelHasPermissionsCount,
         public array $modelHasPermissionsModelTypeCounts,
         public int $roleHasPermissionsCount,
+        public int $totalWorkspacesCount,
+        public int $defaultWorkspacesCount,
+        public int $activeStaffAdminDirectorCount,
+        public int $inactiveStaffAdminDirectorCount,
         public ?string $defaultWorkspaceId,
         public array $missingCanonicalPermissionCodes,
     ) {}

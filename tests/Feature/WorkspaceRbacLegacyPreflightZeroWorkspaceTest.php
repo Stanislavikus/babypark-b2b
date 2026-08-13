@@ -41,6 +41,8 @@ class WorkspaceRbacLegacyPreflightZeroWorkspaceTest extends TestCase
         $result = app(WorkspaceRbacLegacyPreflight::class)->evaluate();
 
         $this->assertFalse($result->isSafe);
+        $this->assertSame(0, $result->totalWorkspacesCount);
+        $this->assertSame(0, $result->defaultWorkspacesCount);
         $this->assertContains(
             WorkspaceRbacLegacyPreflightFailureReason::ZeroWorkspaces->value,
             $result->failureReasonCodes(),
