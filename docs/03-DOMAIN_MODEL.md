@@ -369,35 +369,62 @@ receive its own security/authorization decision before implementation.
 **Mapping permissions (frozen for Layer B)**
 
 These atomic permissions are independent from connector credential/settings
-management:
+management. They are part of the frozen minimum permission vocabulary below.
 
-| Permission | Meaning |
+**Frozen permission vocabulary (minimum workspace RBAC slice)**
+
+| Permission | Authority |
 |---|---|
+| `view_connector_accounts` | Safe Layer A/B `ConnectorAccount` read only; no decrypted credentials/settings secrets. |
+| `run_connector_discovery` | Manual discovery and the safe read surface necessary to follow its progress/result. |
+| `manage_connector_accounts` | Create/manage account settings and credentials, disable/archive where supported, run connection check; also permits safe account read and manual discovery. |
 | `view_sync_mappings` | Read the mapping surface for a `SyncConfiguration` (effective mappings, suggestions, discovery-unavailable read-only state). |
 | `manage_sync_mappings` | Mutate confirmed mappings through the approved mutation service. Inherently includes the same mapping read surface as `view_sync_mappings`. |
+| `manage_workspace_access` | Manage workspace Roles / Access profiles and role assignments for memberships. |
 
-Rules:
+**Permission independence (frozen):**
+
+- `manage_connector_accounts` **does not** imply `view_sync_mappings` or
+  `manage_sync_mappings`.
+- `view_sync_mappings` / `manage_sync_mappings` **do not** imply connector
+  settings/credentials management.
+- `manage_workspace_access` **does not** automatically imply connector, mapping,
+  product, price, order, or other business permissions.
+- No job-title name may substitute for any permission above.
+
+Mapping-specific rules:
 
 - `manage_sync_mappings` grants mutation authority and inherently permits the
   same mapping read surface.
-- Mapping permissions are **independent** from `manage_connector_accounts`.
 - Possessing mapping permissions **never** grants credential, settings, base URL,
   or auth-profile access.
-- Possessing `manage_connector_accounts` **never** automatically grants mapping
-  permission unless the workspace role bundle contains both permissions.
 - **No particular named role**, including Merchandiser, is normatively entitled to
-  either mapping permission.
+  any permission in this vocabulary.
 
-**Merchant UX (Roles / Access profiles)**
+**Workspace access administration (capability-based)**
 
-- Company admin manages **Roles / Access profiles** and their granular
-  permissions inside the workspace.
+- A workspace membership with effective **`manage_workspace_access`** may manage
+  workspace **Roles / Access profiles** and their membership assignments.
 - Users/logins receive **one or more roles** for that workspace.
 - Role names are **business-owned labels**, not predefined job taxonomy.
 - Absence or temporary replacement is handled by assigning an **additional
   role**, not by changing application code or hardcoding job-title exceptions.
 - Do **not** expose technical Spatie terminology (`Permission`, `Role` model
   names, pivot tables, team resolver, etc.) to merchants.
+
+**Anti-lockout invariant (Resolved — security)**
+
+- Every active workspace must have at least one active membership with effective
+  `manage_workspace_access`.
+- Initial workspace creation/bootstrap must establish at least one such membership.
+- Changing, deleting, deactivating memberships, role assignments, or role
+  definitions must be rejected if the resulting state would leave zero active
+  memberships with effective `manage_workspace_access`.
+- This invariant must be enforced transactionally in the future write service.
+- Exact physical representation (`WorkspaceUser` schema, Spatie team mechanics,
+  `owner_user_id`, protected role IDs, etc.) is **not** resolved in 4C-1c-2a.
+- Platform-support/recovery mechanics are a separate future operational/security
+  decision and must **not** silently bypass tenant authorization.
 
 **Verified current-code mismatch (docs-only note — see GAP-026)**
 
@@ -406,10 +433,6 @@ small global Spatie permission set; `WorkspaceUser` membership is not implemente
 `config/permission.php` has `'teams' => false`. The global Spatie configuration
 does **not** yet satisfy this contract. Workspace-scoped authorization foundation
 is an implementation prerequisite before mutable Layer-B mapping UI.
-
-Historical MVP wording below (owner/manager/viewer examples) describes early
-product direction only — it is **not** authorization semantics under this
-decision.
 
 ## Product Catalogue Context
 
@@ -2974,16 +2997,22 @@ documentation records the merchant question only.
 until explicitly enabled; a connector supporting only one data-changing
 behavior does not present a fake choice for consistency.
 
-#### Layer C diagnostics audience (Resolved — UX contract 2026-08-10)
+#### Layer C diagnostics audience (Resolved — UX contract 2026-08-10; authorization rebaselined 4C-1c-2a)
 
 `ConnectorDiscoveryRun`, schema snapshots, canonical hashes, technical summaries,
 and raw error codes belong to **Layer C** (platform support/operator) — not to
-workspace Admin, Director, or Merchandiser merchant roles.
+workspace merchant users regardless of their business-owned role/access profile
+names.
+
+Layer C is unavailable to **all** workspace merchant role/access profiles unless
+a separate platform-support identity exists. Job-title names (Admin, Director,
+Merchandiser, …) do **not** grant Layer C access.
 
 If no platform-support identity model exists at implementation time, Layer C
-surfaces are unavailable rather than defaulting to workspace Admin. Layer
-assignment is a visibility ceiling; existing `ConnectorAccountPolicy` permissions
-remain authoritative inside Layers A/B.
+surfaces are unavailable rather than defaulting to any workspace merchant
+membership. Layer assignment is a visibility ceiling; workspace-scoped atomic
+permissions defined in **Workspace access model and authorization (Resolved —
+Task 4C-1c-2a)** remain authoritative inside Layers A/B.
 
 Discovery runtime, snapshot persistence, and Field Browser read architecture
 are shipped and retained. Merchant-facing copy and navigation migration to the
@@ -3006,31 +3035,50 @@ Adobe SaaS profile field placement remains documented in the runtime proposal
 until IMS discovery parity is confirmed; reusing `store_code` for the `Store`
 header value is the preferred convention pending approval.
 
-### ConnectorAccount authorization (Resolved)
+### ConnectorAccount authorization (Resolved — rebaselined Task 4C-1c-2a, 2026-08-13)
 
-Connector operations require `ConnectorAccountPolicy` checks on every read and
-mutating action. Credential view/edit is limited to Admin, Director, and users
-with `manage_connector_accounts`.
+Rebased under **Workspace access model and authorization (Resolved — Task
+4C-1c-2a)**. Job-title / role names carry **no** authorization semantics.
+Connector operations require workspace-scoped permission evaluation through
+`ConnectorAccountPolicy` checks (or successor) on every read and mutating action.
 
-Merchandiser may run **manual** discovery for an active `ConnectorAccount` in
-their own workspace, and may view its progress, result, safe error messages,
-and discovered data. Merchandiser may **not**: view decrypted credentials;
-create, edit, remove, or replace credentials; change `base_url`, `store_code`,
-or `auth_profile`; or disable/archive a connection. Discovery dispatch goes
-through policy and an application service, never a direct Filament/Eloquent
-action; it records `initiated_by_user_id`, trigger, and a history row, and
-respects the same account-level lock/overlap/rate-limit rules as any other
-trigger. When Merchandiser needs a configuration or credential change, the UI
-shows a safe recommendation to contact Admin/Director — it does not expose the
-underlying restriction as a raw permission error.
+**Normative permission vocabulary:** see the frozen minimum permission vocabulary
+in **Workspace access model and authorization (Resolved — Task 4C-1c-2a)** —
+especially `view_connector_accounts`, `run_connector_discovery`, and
+`manage_connector_accounts`.
 
-Scheduled discovery remains a system-initiated operation; configuring it
-(enabling/disabling, changing schedule) is an administrative-role action only.
-This authorization decision does not implicitly extend any other Merchandiser
-permission.
+**ConnectorAccount capability evaluation (frozen):**
 
-Decrypted credentials must never appear in API resources, logs, events, queue
-payloads, or exception reports.
+| Capability | Effective when membership has |
+|---|---|
+| Safe `ConnectorAccount` view (Layer A/B read; no decrypted credentials/settings secrets) | `view_connector_accounts` **OR** `run_connector_discovery` **OR** `manage_connector_accounts` |
+| Manual discovery trigger + safe progress/result read surface | `run_connector_discovery` **OR** `manage_connector_accounts` |
+| Connection check | `manage_connector_accounts` |
+| Create / settings / credential mutation / disable / archive | `manage_connector_accounts` |
+
+**Security boundaries (unchanged):**
+
+- Decrypted credentials must never appear in API resources, logs, events, queue
+  payloads, or exception reports.
+- Discovery dispatch goes through policy and an application service, never a direct
+  Filament/Eloquent action; it records `initiated_by_user_id`, trigger, and a
+  history row, and respects the same account-level lock/overlap/rate-limit rules
+  as any other trigger.
+- When a user lacks credential/settings mutation permission, the UI shows a safe
+  recommendation to contact a colleague with access-management authority — it does
+  not expose the underlying restriction as a raw permission error.
+- Scheduled discovery remains a system-initiated operation; configuring it
+  (enabling/disabling, changing schedule) is outside the manual-discovery
+  permission slice and requires its own future workspace-permission decision when
+  scheduling ships.
+
+**Transitional current code (GAP-026 — not normative):**
+
+The shipped `ConnectorAccountPolicy` on `develop` still grants some connector
+abilities via fixed `User.role` checks (for example Merchandiser read/discovery,
+Admin/Director management bypass). That behavior is documented under **GAP-026**
+as transitional implementation mismatch only — it is **not** the target
+authorization contract and must not be extended.
 
 ### Connection-check capability and error mapping (Resolved)
 

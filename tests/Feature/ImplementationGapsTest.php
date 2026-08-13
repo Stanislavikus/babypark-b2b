@@ -65,9 +65,19 @@ class ImplementationGapsTest extends TestCase
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString('## GAP-026 — Workspace-scoped RBAC foundation not implemented', $content);
-        $this->assertStringContainsString('`view_sync_mappings` / `manage_sync_mappings`', $content);
+        $this->assertStringContainsString('**Frozen minimum permission vocabulary (docs contract — not yet implemented):**', $content);
+        $this->assertStringContainsString('`view_connector_accounts`', $content);
+        $this->assertStringContainsString('`run_connector_discovery`', $content);
+        $this->assertStringContainsString('`manage_connector_accounts`', $content);
+        $this->assertStringContainsString('`view_sync_mappings`', $content);
+        $this->assertStringContainsString('`manage_sync_mappings`', $content);
+        $this->assertStringContainsString('`manage_workspace_access`', $content);
+        $this->assertStringContainsString('Physical persistence/scoping mechanics', $content);
+        $this->assertStringContainsString('remain **unresolved** in 4C-1c-2a', $content);
+        $this->assertStringContainsString('anti-lockout invariant', $content);
         $this->assertStringContainsString('WorkspaceUser` membership is **not implemented**', $content);
         $this->assertStringContainsString("'teams' => false", $content);
         $this->assertStringContainsString('prerequisite before 4C-1c-2b', $content);
+        $this->assertStringContainsString('**Status:** Open — docs contract frozen (4C-1c-2a); code not started.', $content);
     }
 }

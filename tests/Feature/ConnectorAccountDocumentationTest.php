@@ -598,8 +598,12 @@ class ConnectorAccountDocumentationTest extends TestCase
             '/reusing `store_code` for the `Store`\s+header value is the preferred convention pending approval/',
             $domainModel
         );
-        $this->assertStringContainsString('### ConnectorAccount authorization (Resolved)', $domainModel);
-        $this->assertStringContainsString('Merchandiser may run **manual** discovery', $domainModel);
+        $this->assertStringContainsString(
+            '### ConnectorAccount authorization (Resolved — rebaselined Task 4C-1c-2a, 2026-08-13)',
+            $domainModel,
+        );
+        $this->assertStringContainsString('ConnectorAccount capability evaluation (frozen):', $domainModel);
+        $this->assertStringContainsString('Transitional current code (GAP-026 — not normative):', $domainModel);
         $this->assertStringContainsString('### Connection-check capability and error mapping (Resolved)', $domainModel);
         $this->assertStringContainsString('### Connection-check enqueue state (Resolved)', $domainModel);
         $this->assertStringContainsString('`ConnectorConnectionCheckStatus` includes `Queued`', $domainModel);

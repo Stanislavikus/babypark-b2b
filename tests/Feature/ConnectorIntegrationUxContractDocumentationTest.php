@@ -152,9 +152,19 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
     {
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
 
-        $this->assertStringContainsString('#### Layer C diagnostics audience (Resolved — UX contract 2026-08-10)', $content);
-        $this->assertStringContainsString('workspace Admin, Director, or Merchandiser merchant roles', $content);
-        $this->assertStringContainsString('unavailable rather than defaulting to workspace Admin', $content);
+        $this->assertStringContainsString(
+            '#### Layer C diagnostics audience (Resolved — UX contract 2026-08-10; authorization rebaselined 4C-1c-2a)',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'unavailable to **all** workspace merchant role/access profiles unless',
+            $content,
+        );
+        $this->assertStringContainsString('a separate platform-support identity exists', $content);
+        $this->assertStringContainsString(
+            'unavailable rather than defaulting to any workspace merchant',
+            $content,
+        );
     }
 
     #[Test]

@@ -1677,14 +1677,14 @@ Detailed import/mapping flows should be described in a future dedicated import-f
 
 | Layer | Audience | Merchant entry |
 |---|---|---|
-| **A — Щоденна робота** | Merchant roles (Admin, Director, Merchandiser, …) | Integration Overview: status, last sync, attention count, one primary action |
-| **B — Налаштування даних** | Merchant roles, when authorized | Sync directions, schedule, mapping, per-domain control questions, available-fields reference |
-| **C — Діагностика** | Platform support/operator only — **not** workspace Admin | Discovery runs, snapshot identifiers, technical summaries, redacted diagnostics |
+| **A — Щоденна робота** | Workspace merchant users when authorized by workspace permissions | Integration Overview: status, last sync, attention count, one primary action |
+| **B — Налаштування даних** | Workspace merchant users when authorized by workspace permissions | Sync directions, schedule, mapping, per-domain control questions, available-fields reference |
+| **C — Діагностика** | Platform support/operator only — separate identity from workspace merchant memberships | Discovery runs, snapshot identifiers, technical summaries, redacted diagnostics |
 | **D — Каталог конекторів** | Platform operator / developer | `ConnectorDefinition`, schema sources, endpoints, auth profiles |
 
-**Layer is a visibility ceiling, not an authorization grant.** Existing `ConnectorAccountPolicy` and role permissions remain authoritative inside Layers A/B. Merchandiser Layer B eligibility does not imply credential management, destructive actions, or connection setup unless explicitly granted by policy.
+**Layer is a visibility ceiling, not an authorization grant.** Layers A/B are reachable only by workspace merchant users whose membership has the required workspace-scoped atomic permissions (see `03-DOMAIN_MODEL.md` → **Workspace access model and authorization (Resolved — Task 4C-1c-2a)**). Business-owned role/access profile names (Admin, Director, Merchandiser, …) do **not** authorize anything by themselves. The shipped `ConnectorAccountPolicy` still contains transitional fixed `User.role` checks — documented under **GAP-026** only; it is not the normative contract.
 
-**Layer C:** requires a distinct platform-support identity. If that model does not exist yet, Layer C is unavailable — it does not fall back to workspace Admin. Layer C never lifts secret-redaction, credential-encryption, or workspace-isolation rules.
+**Layer C:** requires a distinct platform-support identity. If that model does not exist yet, Layer C is unavailable to **all** workspace merchant role/access profiles — it does not fall back to workspace Admin or any other business-owned role name. Layer C never lifts secret-redaction, credential-encryption, or workspace-isolation rules.
 
 ### Merchant entry: `Інтеграції`
 

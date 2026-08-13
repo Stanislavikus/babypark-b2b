@@ -1035,11 +1035,37 @@ backend — Layer B mapping UI still missing); remaining UX migration work.
 - `docs/03-DOMAIN_MODEL.md` — **Workspace access model and authorization
   (Resolved — Task 4C-1c-2a, 2026-08-13)** — atomic permissions as source of
   truth; workspace-owned role/access profiles; User × Workspace evaluation;
-  `view_sync_mappings` / `manage_sync_mappings` independent from
-  `manage_connector_accounts`; no job-title authorization semantics.
+  frozen minimum permission vocabulary; permission independence rules;
+  anti-lockout invariant; no job-title authorization semantics.
+- `docs/03-DOMAIN_MODEL.md` — **ConnectorAccount authorization (Resolved —
+  rebaselined Task 4C-1c-2a, 2026-08-13)** — capability/permission evaluation
+  table for connector operations.
 - `docs/04-ARCHITECTURE_PRINCIPLES.md` — authorization through policies/gates;
   workspace isolation (cross-reference **GAP-004** — broad isolation exists,
   but this gap is **not** a claim that general workspace isolation is fully solved).
+
+**Frozen minimum permission vocabulary (docs contract — not yet implemented):**
+
+- `view_connector_accounts`
+- `run_connector_discovery`
+- `manage_connector_accounts`
+- `view_sync_mappings`
+- `manage_sync_mappings`
+- `manage_workspace_access`
+
+Physical persistence/scoping mechanics (Spatie Teams vs custom pivot vs
+`WorkspaceUser` schema, team foreign keys, owner columns, protected role IDs)
+remain **unresolved** in 4C-1c-2a.
+
+**Implementation obligations (frozen, not yet built):**
+
+- Evaluate authorization for User × Workspace using the permission vocabulary above.
+- Enforce the anti-lockout invariant: every active workspace must retain at least
+  one active membership with effective `manage_workspace_access`; bootstrap must
+  establish one; membership/role mutations that would leave zero such memberships
+  must be rejected transactionally.
+- Platform-support/recovery mechanics that bypass tenant authorization remain a
+  separate future operational/security decision.
 
 **Verified current-code mismatch (re-verified against `develop`):**
 - `User.role` (`App\Enums\UserRole`) still participates directly in
@@ -1055,8 +1081,11 @@ backend — Layer B mapping UI still missing); remaining UX migration work.
 - `WorkspacePermissionSeeder` seeds only global `web`-guard permissions
   (`manage_workspace_tax_settings`, `manage_connector_accounts`) with no
   workspace-scoped assignment model.
-- Mapping permissions (`view_sync_mappings`, `manage_sync_mappings`) are
-  documented but **not** seeded or enforced in code (docs-only in 4C-1c-2a).
+- Connector permissions `view_connector_accounts` and `run_connector_discovery`
+  are documented but **not** seeded or enforced in code.
+- Mapping permissions (`view_sync_mappings`, `manage_sync_mappings`) and
+  `manage_workspace_access` are documented but **not** seeded or enforced in
+  code (docs-only in 4C-1c-2a).
 
 **Impact:**
 - Do not treat the current global Spatie configuration as satisfying the
