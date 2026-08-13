@@ -60,6 +60,46 @@ class ImplementationGapsTest extends TestCase
     }
 
     #[Test]
+    public function gap_025_marks_connector_account_authorization_as_transitional_under_gap_026(): void
+    {
+        $content = $this->gap025Section();
+
+        $this->assertStringContainsString('**Shipped but transitional authorization:**', $content);
+        $this->assertStringContainsString(
+            'fixed `User.role` authorization behavior is transitional',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'under **GAP-026** — not normative target authorization',
+            $content,
+        );
+        $this->assertStringNotContainsString(
+            'remaining work is labeling, Layer C gating, and deeper Layer A/B surfaces',
+            $content,
+        );
+        $this->assertStringContainsString(
+            '**GAP-026** backend/security work and remains prerequisite for mutable Layer-B',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'not merely labeling/navigation/gating UI work',
+            $content,
+        );
+        $this->assertStringNotContainsString(
+            'Do not widen workspace Admin to Layer C as a workaround',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'Do not widen any workspace merchant membership / role-access profile to Layer C',
+            $content,
+        );
+        $this->assertMatchesRegularExpression(
+            '/Layer C requires the separately resolved platform-support\s+identity/',
+            $content,
+        );
+    }
+
+    #[Test]
     public function gap_006_role_matrix_is_labeled_historical_transitional_not_normative(): void
     {
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
@@ -92,5 +132,23 @@ class ImplementationGapsTest extends TestCase
         $this->assertStringContainsString("'teams' => false", $content);
         $this->assertStringContainsString('prerequisite before 4C-1c-2b', $content);
         $this->assertStringContainsString('**Status:** Open — docs contract frozen (4C-1c-2a); code not started.', $content);
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function gap025Section(): string
+    {
+        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        if (! preg_match(
+            '/## GAP-025 — Connector Integration UX contract not yet migrated in shipped UI\n\n(.*?)(?=\n---\n\n## GAP-026 —)/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate GAP-025 section in IMPLEMENTATION_GAPS.md');
+        }
+
+        return $matches[1];
     }
 }

@@ -4150,13 +4150,18 @@ schema-source terminology, or other Layer C/D data to merchant UI.
 
 ##### L. Existing Field Browser
 
-Retain existing:
+Retain/reuse existing read architecture:
 
-- `ViewConnectorSchemaSnapshot`;
-- `ConnectorSchemaFieldPresenter`;
-- workspace/account/snapshot ownership chain.
+- snapshot persistence remains reusable;
+- workspace/account/snapshot ownership-chain validation remains reusable;
+- existing field query/read-model/presenter architecture may be reused
+  (`ViewConnectorSchemaSnapshot`, `ConnectorSchemaFieldPresenter`).
 
-No backend rewrite.
+This does **not** freeze current merchant authorization/navigation gating.
+Authorization/navigation migration follows **GAP-025** / **GAP-026** and
+**Workspace access model and authorization (Resolved — Task 4C-1c-2a)**. There
+is no requirement to redesign the Field Browser data/read architecture merely to
+implement that gating.
 
 When the actual mapping UI ships, Field Browser becomes a supporting action such
 as:

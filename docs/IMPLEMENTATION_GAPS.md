@@ -986,10 +986,17 @@ Remaining connector gaps are tracked separately under GAP-006.
   = "Зведення знімка").
 - Discovery-related surfaces remain reachable through current account Overview
   paths.
-- Runtime architecture (`ConnectorCapability`, Discovery execution, snapshot
-  persistence, `ConnectorAccountPolicy`, Field Browser read model) is shipped
-  and is **not** a regression — remaining work is labeling, Layer C gating, and
-  deeper Layer A/B surfaces.
+- **Shipped runtime/read architecture (not a regression):** `ConnectorCapability`,
+  Discovery execution, snapshot persistence, and Field Browser read-model
+  architecture are shipped.
+- **Shipped but transitional authorization:** current `ConnectorAccountPolicy` is
+  also shipped, but its fixed `User.role` authorization behavior is transitional
+  under **GAP-026** — not normative target authorization.
+- **Remaining GAP-025 UX work:** copy/navigation/Layer-C gating/deeper Layer A/B
+  surfaces.
+- **Separate prerequisite:** workspace-scoped authorization foundation is
+  **GAP-026** backend/security work and remains prerequisite for mutable Layer-B
+  mapping — it is not merely labeling/navigation/gating UI work.
 
 **Implemented sync-domain backend (verified on `develop`; not a GAP-025 UX claim):**
 - `SyncConfiguration` persistence and domain write path (Task 4C-0).
@@ -1018,7 +1025,9 @@ contradicts an approved invariant.
   `CONNECTOR_INTEGRATION_UX_CONTRACT.md`.
 - Do not treat Discovery Overview as the long-term merchant destination — it is
   Layer C/diagnostic vocabulary on a pre-migration merchant path.
-- Do not widen workspace Admin to Layer C as a workaround.
+- Do not widen any workspace merchant membership / role-access profile to Layer C
+  as a workaround — Layer C requires the separately resolved platform-support
+  identity.
 
 **Next task:** Remaining Connector UX migration — Field Browser copy/navigation,
 Layer A Overview / Layer B setup surfaces beyond connection create, Layer C

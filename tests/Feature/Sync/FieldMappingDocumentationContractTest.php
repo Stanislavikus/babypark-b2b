@@ -371,6 +371,32 @@ class FieldMappingDocumentationContractTest extends TestCase
     }
 
     #[Test]
+    public function suggestion_contract_field_browser_splits_persistence_from_authorization_gating(): void
+    {
+        $section = $this->fieldBrowserSubsection();
+
+        $this->assertStringNotContainsString('No backend rewrite.', $section);
+        $this->assertStringContainsString('snapshot persistence remains reusable', $section);
+        $this->assertStringContainsString(
+            'workspace/account/snapshot ownership-chain validation remains reusable',
+            $section,
+        );
+        $this->assertStringContainsString(
+            'field query/read-model/presenter architecture may be reused',
+            $section,
+        );
+        $this->assertStringContainsString(
+            'does **not** freeze current merchant authorization/navigation gating',
+            $section,
+        );
+        $this->assertStringContainsString('**GAP-025** / **GAP-026**', $section);
+        $this->assertStringContainsString(
+            'Workspace access model and authorization (Resolved — Task 4C-1c-2a)',
+            $section,
+        );
+    }
+
+    #[Test]
     public function ui_placement_preserves_layer_b_mapping_decisions_for_4c_1c_2b(): void
     {
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
@@ -381,6 +407,24 @@ class FieldMappingDocumentationContractTest extends TestCase
         $this->assertStringContainsString('configuration" selection', $content);
         $this->assertStringContainsString('no-discovery state remains renderable and read-only', $content);
         $this->assertStringContainsString('do **not** embed mapping controls into the current **Інтеграції**', $content);
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function fieldBrowserSubsection(): string
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        if (! preg_match(
+            '/##### L\. Existing Field Browser\n\n(.*?)(?=\n##### M\. 4C-1c implementation slicing)/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate Existing Field Browser subsection in 03-DOMAIN_MODEL.md');
+        }
+
+        return $matches[1];
     }
 
     /**
