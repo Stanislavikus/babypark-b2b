@@ -10,16 +10,20 @@
  *   php tests/Support/WorkspaceAccessMutationConcurrencyWorker.php auth-race-b <workspaceId> <actorUserId> <membershipId> <roleId> <ipcDir>
  *   php tests/Support/WorkspaceAccessMutationConcurrencyWorker.php delete-role-a <workspaceId> <membershipId> <roleId> <ipcDir>
  *   php tests/Support/WorkspaceAccessMutationConcurrencyWorker.php delete-role-b <workspaceId> <actorUserId> <roleId> <ipcDir>
+ *   php tests/Support/WorkspaceAccessMutationConcurrencyWorker.php delete-role-b-legacy-prelock <workspaceId> <actorUserId> <roleId> <ipcDir>
  */
 
 use App\Models\User;
 use App\Models\Workspace;
+use App\Models\WorkspaceRole;
 use App\Models\WorkspaceUser;
 use App\Services\Workspace\WorkspaceAccessMutationCoordinator;
 use App\Services\Workspace\WorkspaceAccessMutationService;
+use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Workspace\Rbac\Exceptions\WorkspaceAccessLockoutException;
 use App\Support\Workspace\Rbac\Exceptions\WorkspaceAccessMutationRejectedException;
 use App\Support\Workspace\Rbac\Exceptions\WorkspaceAccessUnauthorizedException;
+use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 
@@ -39,6 +43,7 @@ match ($mode) {
     'auth-race-b' => runAuthRaceB($argv[2] ?? '', $argv[3] ?? '', $argv[4] ?? '', $argv[5] ?? '', $argv[6] ?? ''),
     'delete-role-a' => runDeleteRoleA($argv[2] ?? '', $argv[3] ?? '', $argv[4] ?? '', $argv[5] ?? ''),
     'delete-role-b' => runDeleteRoleB($argv[2] ?? '', $argv[3] ?? '', $argv[4] ?? '', $argv[5] ?? ''),
+    'delete-role-b-legacy-prelock' => runDeleteRoleBLegacyPrelock($argv[2] ?? '', $argv[3] ?? '', $argv[4] ?? '', $argv[5] ?? ''),
     default => throw new InvalidArgumentException("Unknown worker mode: {$mode}"),
 };
 
@@ -186,7 +191,7 @@ function runDeleteRoleA(string $workspaceId, string $membershipId, string $roleI
         $coordinator->mutateLocked($workspace, function () use ($ipcDir, $workspace, $membershipId, $roleId): void {
             touch($ipcDir.'/a_lock_acquired');
 
-            waitForFile($ipcDir.'/b_before_service');
+            waitForFile($ipcDir.'/b_waiting_on_workspace_lock');
             waitForFile($ipcDir.'/parent_release_a');
 
             DB::table('workspace_user_roles')->insert([
@@ -210,9 +215,16 @@ function runDeleteRoleB(string $workspaceId, string $actorUserId, string $roleId
 
     $actor = User::query()->findOrFail($actorUserId);
     $workspace = Workspace::query()->findOrFail($workspaceId);
+    $authorization = app(WorkspaceAuthorization::class);
 
     waitForFile($ipcDir.'/a_lock_acquired');
-    touch($ipcDir.'/b_before_service');
+
+    if (! $authorization->allows($actor, $workspace, WorkspacePermissions::MANAGE_WORKSPACE_ACCESS)) {
+        file_put_contents($ipcDir.'/b_result', 'unauthorized');
+        exit(0);
+    }
+
+    touch($ipcDir.'/b_prelock_complete');
 
     try {
         app(WorkspaceAccessMutationService::class)->deleteRole(
@@ -229,5 +241,61 @@ function runDeleteRoleB(string $workspaceId, string $actorUserId, string $roleId
     } catch (Throwable $exception) {
         file_put_contents($ipcDir.'/b_result', 'error:'.$exception->getMessage());
         exit(1);
+    }
+}
+
+function runDeleteRoleBLegacyPrelock(string $workspaceId, string $actorUserId, string $roleId, string $ipcDir): void
+{
+    assertIpcDir($ipcDir);
+
+    $actor = User::query()->findOrFail($actorUserId);
+    $workspace = Workspace::query()->findOrFail($workspaceId);
+    $authorization = app(WorkspaceAuthorization::class);
+    $coordinator = app(WorkspaceAccessMutationCoordinator::class);
+
+    waitForFile($ipcDir.'/a_lock_acquired');
+
+    if (! $authorization->allows($actor, $workspace, WorkspacePermissions::MANAGE_WORKSPACE_ACCESS)) {
+        file_put_contents($ipcDir.'/b_result', 'unauthorized');
+        exit(0);
+    }
+
+    $role = WorkspaceRole::query()->find($roleId);
+
+    if ($role === null || $role->workspace_id !== $workspace->id) {
+        file_put_contents($ipcDir.'/b_result', 'error:foreign_role');
+        exit(1);
+    }
+
+    $assigned = DB::table('workspace_user_roles')
+        ->where('workspace_id', $workspace->id)
+        ->where('workspace_role_id', $role->id)
+        ->exists();
+
+    if ($assigned) {
+        file_put_contents($ipcDir.'/b_result', 'role_still_assigned');
+        exit(0);
+    }
+
+    touch($ipcDir.'/b_prelock_complete');
+
+    try {
+        $coordinator->mutateLocked($workspace, function () use ($workspace, $role): void {
+            DB::table('workspace_role_permissions')
+                ->where('workspace_id', $workspace->id)
+                ->where('workspace_role_id', $role->id)
+                ->delete();
+
+            $role->delete();
+        });
+
+        file_put_contents($ipcDir.'/b_result', 'committed');
+        exit(0);
+    } catch (WorkspaceAccessMutationRejectedException) {
+        file_put_contents($ipcDir.'/b_result', 'role_still_assigned');
+        exit(0);
+    } catch (Throwable $exception) {
+        file_put_contents($ipcDir.'/b_result', 'error:'.$exception->getMessage());
+        exit(0);
     }
 }

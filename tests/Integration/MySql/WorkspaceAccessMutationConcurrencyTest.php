@@ -4,6 +4,8 @@ namespace Tests\Integration\MySql;
 
 use App\Models\User;
 use App\Models\Workspace;
+use App\Models\WorkspaceRole;
+use App\Models\WorkspaceUser;
 use App\Services\Workspace\WorkspaceAccessEffectiveHolderQuery;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -13,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\Process\Process;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
+use Tests\Support\MySqlWorkspaceRowLockWaitProbe;
 use Tests\TestCase;
 
 class WorkspaceAccessMutationConcurrencyTest extends TestCase
@@ -209,41 +212,26 @@ class WorkspaceAccessMutationConcurrencyTest extends TestCase
             [WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS],
         );
 
-        $ipcDir = sys_get_temp_dir().'/workspace-access-delete-role-'.uniqid('', true);
-        if (! mkdir($ipcDir) && ! is_dir($ipcDir)) {
-            $this->fail('Could not create IPC directory.');
-        }
-
-        $phpBinary = PHP_BINARY;
-        $workerScript = base_path('tests/Support/WorkspaceAccessMutationConcurrencyWorker.php');
-
-        $processA = new Process([
-            $phpBinary,
-            $workerScript,
-            'delete-role-a',
-            $workspace->id,
-            $targetMembership->id,
-            $targetRole->id,
-            $ipcDir,
-        ], base_path());
-        $processA->setTimeout(120);
-        $processA->start();
-
+        $ipcDir = $this->createIpcDirectory('workspace-access-delete-role');
+        $processA = $this->startDeleteRoleAssignerProcess($workspace, $targetMembership, $targetRole, $ipcDir);
         $this->waitForIpcFile($ipcDir.'/a_lock_acquired');
 
-        $processB = new Process([
-            $phpBinary,
-            $workerScript,
-            'delete-role-b',
-            $workspace->id,
-            $actor->id,
-            $targetRole->id,
-            $ipcDir,
-        ], base_path());
-        $processB->setTimeout(120);
-        $processB->start();
+        $processB = $this->startDeleteRoleDeleterProcess('delete-role-b', $workspace, $actor, $targetRole, $ipcDir);
+        $this->waitForIpcFile($ipcDir.'/b_prelock_complete');
 
-        $this->waitForIpcFile($ipcDir.'/b_before_service');
+        $this->assertFalse(
+            DB::table('workspace_user_roles')
+                ->where('workspace_user_id', $targetMembership->id)
+                ->where('workspace_role_id', $targetRole->id)
+                ->exists(),
+            'Role assignment must not exist before A commits while B is blocked on the workspace lock.',
+        );
+
+        $lockWait = MySqlWorkspaceRowLockWaitProbe::waitForForeignWorkspaceForUpdateWait($workspace->id);
+        $this->assertStringContainsString('for update', strtolower($lockWait['info']));
+        $this->assertStringContainsString($workspace->id, $lockWait['info']);
+
+        touch($ipcDir.'/b_waiting_on_workspace_lock');
         touch($ipcDir.'/parent_release_a');
 
         $processA->wait();
@@ -261,6 +249,127 @@ class WorkspaceAccessMutationConcurrencyTest extends TestCase
             'workspace_user_id' => $targetMembership->id,
             'workspace_role_id' => $targetRole->id,
         ]);
+    }
+
+    #[Test]
+    public function legacy_prelock_delete_role_algorithm_does_not_reject_fresh_assignment_after_lock_wait(): void
+    {
+        if (DB::connection()->getDriverName() !== 'mysql') {
+            $this->markTestSkipped('MySQL-only concurrency proof.');
+        }
+
+        Artisan::call('migrate:fresh');
+        $this->seed(WorkspaceSeeder::class);
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
+
+        $workspace = $this->defaultWorkspace();
+        $actor = User::factory()->create(['is_active' => true]);
+        $this->grantManageWorkspaceAccess($workspace, $actor);
+        $this->makeEffectiveHolder($workspace, User::factory()->create(), 'Backup Holder');
+
+        $targetMembership = $this->makeWorkspaceMembership($workspace);
+        $targetRole = $this->createRoleWithPermissions(
+            $workspace->id,
+            'Legacy Delete Target Role',
+            [WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS],
+        );
+
+        $ipcDir = $this->createIpcDirectory('workspace-access-delete-role-legacy');
+        $processA = $this->startDeleteRoleAssignerProcess($workspace, $targetMembership, $targetRole, $ipcDir);
+        $this->waitForIpcFile($ipcDir.'/a_lock_acquired');
+
+        $processB = $this->startDeleteRoleDeleterProcess(
+            'delete-role-b-legacy-prelock',
+            $workspace,
+            $actor,
+            $targetRole,
+            $ipcDir,
+        );
+        $this->waitForIpcFile($ipcDir.'/b_prelock_complete');
+
+        $this->assertDatabaseMissing('workspace_user_roles', [
+            'workspace_user_id' => $targetMembership->id,
+            'workspace_role_id' => $targetRole->id,
+        ]);
+
+        $lockWait = MySqlWorkspaceRowLockWaitProbe::waitForForeignWorkspaceForUpdateWait($workspace->id);
+        $this->assertStringContainsString('for update', strtolower($lockWait['info']));
+
+        touch($ipcDir.'/b_waiting_on_workspace_lock');
+        touch($ipcDir.'/parent_release_a');
+
+        $processA->wait();
+        $processB->wait();
+
+        $this->assertFileExists($ipcDir.'/a_committed');
+        $this->assertSame(0, $processA->getExitCode(), $processA->getErrorOutput());
+
+        $legacyResult = (string) file_get_contents($ipcDir.'/b_result');
+        $this->assertNotSame(
+            'role_still_assigned',
+            $legacyResult,
+            '30784482783a6764156fb2735b412c4c268e2243 pre-lock assigned check cannot observe A\'s in-lock assignment.',
+        );
+        $this->assertStringStartsWith('error:', $legacyResult);
+
+        $this->assertDatabaseHas('workspace_roles', ['id' => $targetRole->id]);
+        $this->assertDatabaseHas('workspace_user_roles', [
+            'workspace_user_id' => $targetMembership->id,
+            'workspace_role_id' => $targetRole->id,
+        ]);
+    }
+
+    private function createIpcDirectory(string $prefix): string
+    {
+        $ipcDir = sys_get_temp_dir().'/'.$prefix.'-'.uniqid('', true);
+        if (! mkdir($ipcDir) && ! is_dir($ipcDir)) {
+            $this->fail('Could not create IPC directory.');
+        }
+
+        return $ipcDir;
+    }
+
+    private function startDeleteRoleAssignerProcess(
+        Workspace $workspace,
+        WorkspaceUser $targetMembership,
+        WorkspaceRole $targetRole,
+        string $ipcDir,
+    ): Process {
+        $process = new Process([
+            PHP_BINARY,
+            base_path('tests/Support/WorkspaceAccessMutationConcurrencyWorker.php'),
+            'delete-role-a',
+            $workspace->id,
+            $targetMembership->id,
+            $targetRole->id,
+            $ipcDir,
+        ], base_path());
+        $process->setTimeout(120);
+        $process->start();
+
+        return $process;
+    }
+
+    private function startDeleteRoleDeleterProcess(
+        string $mode,
+        Workspace $workspace,
+        User $actor,
+        WorkspaceRole $targetRole,
+        string $ipcDir,
+    ): Process {
+        $process = new Process([
+            PHP_BINARY,
+            base_path('tests/Support/WorkspaceAccessMutationConcurrencyWorker.php'),
+            $mode,
+            $workspace->id,
+            $actor->id,
+            $targetRole->id,
+            $ipcDir,
+        ], base_path());
+        $process->setTimeout(120);
+        $process->start();
+
+        return $process;
     }
 
     private function waitForIpcFile(string $path, int $seconds = 60): void
