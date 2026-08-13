@@ -22,6 +22,7 @@ final class CanonicalFieldMappingSuggestionProvider
      * @return array<string, string> field_binding_id => external_field_key
      */
     public function suggest(
+        string $workspaceId,
         string $connectorDefinitionCode,
         array $snapshotExternalFieldKeys,
         array $reservedBindingIds,
@@ -41,7 +42,7 @@ final class CanonicalFieldMappingSuggestionProvider
         $definitionsByCode = $this->loadGlobalActiveDefinitions(
             $this->collectInternalCodes($channelMappings, $fieldsByCode),
         );
-        $bindingsByDefinitionId = $this->loadActiveProductBindings($definitionsByCode);
+        $bindingsByDefinitionId = $this->loadActiveProductBindings($workspaceId, $definitionsByCode);
 
         /** @var list<array{binding_id: string, external_key: string}> $rawCandidates */
         $rawCandidates = [];
@@ -170,7 +171,7 @@ final class CanonicalFieldMappingSuggestionProvider
      * @param  array<string, FieldDefinition>  $definitionsByCode
      * @return array<string, list<FieldBinding>>
      */
-    private function loadActiveProductBindings(array $definitionsByCode): array
+    private function loadActiveProductBindings(string $workspaceId, array $definitionsByCode): array
     {
         $definitionIds = array_map(
             fn (FieldDefinition $definition): string => $definition->id,
@@ -186,6 +187,10 @@ final class CanonicalFieldMappingSuggestionProvider
         foreach (
             FieldBinding::withoutWorkspaceScope()
                 ->whereIn('field_definition_id', $definitionIds)
+                ->where(function ($query) use ($workspaceId): void {
+                    $query->whereNull('workspace_id')
+                        ->orWhere('workspace_id', $workspaceId);
+                })
                 ->where('status', AttributeStatus::Active)
                 ->whereIn('object_type', [FieldObjectType::Product, FieldObjectType::ProductVariant])
                 ->get() as $binding

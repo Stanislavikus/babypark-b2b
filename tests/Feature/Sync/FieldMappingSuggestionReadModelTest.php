@@ -28,6 +28,7 @@ use App\Services\Sync\CanonicalFieldMappingSuggestionProvider;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\FieldMappingReadModelProjector;
 use App\Support\CanonicalRegistry\CanonicalRegistryReader;
+use App\Support\Sync\Exceptions\FieldMappingProjectionInvariantException;
 use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
 use App\Support\Sync\FieldMappingReadModel\FieldMappingInternalRow;
 use App\Support\Sync\FieldMappingReadModel\FieldMappingReadModel;
@@ -260,6 +261,7 @@ class FieldMappingSuggestionReadModelTest extends TestCase
         $binding->update(['status' => AttributeStatus::Archived]);
 
         $archivedBindingSuggestions = app(CanonicalFieldMappingSuggestionProvider::class)->suggest(
+            $account->workspace_id,
             'adobe_commerce',
             array_fill_keys(['sku'], true),
             [],
@@ -272,6 +274,7 @@ class FieldMappingSuggestionReadModelTest extends TestCase
         $binding->fieldDefinition->update(['status' => AttributeStatus::Archived]);
 
         $archivedDefinitionSuggestions = app(CanonicalFieldMappingSuggestionProvider::class)->suggest(
+            $account->workspace_id,
             'adobe_commerce',
             array_fill_keys(['sku'], true),
             [],
@@ -367,6 +370,168 @@ class FieldMappingSuggestionReadModelTest extends TestCase
         }
 
         $this->assertSame('name', $nameRow->suggestedExternalFieldKey);
+    }
+
+    #[Test]
+    public function foreign_workspace_canonical_candidate_is_discarded_before_collision_analysis(): void
+    {
+        $workspaceA = $this->defaultWorkspace();
+        $workspaceB = Workspace::query()->create(['name' => 'Foreign WS '.Str::random(4), 'is_default' => false]);
+
+        $globalDefinition = FieldDefinition::withoutWorkspaceScope()->create([
+            'workspace_id' => null,
+            'code' => 'canon_global',
+            'data_type' => AttributeDataType::Text,
+            'scope' => AttributeScope::System,
+            'localized_labels' => ['uk' => 'Глобальне поле'],
+            'description' => null,
+            'validation_rules' => null,
+            'is_localizable' => false,
+            'is_multi_value' => false,
+            'status' => AttributeStatus::Active,
+        ]);
+
+        $globalBinding = FieldBinding::withoutWorkspaceScope()->create([
+            'workspace_id' => null,
+            'field_definition_id' => $globalDefinition->id,
+            'object_type' => FieldObjectType::Product,
+            'storage_type' => AttributeStorageType::Dynamic,
+            'storage_path' => null,
+            'field_group' => 'basic_information',
+            'is_required' => false,
+            'is_filterable' => false,
+            'is_sortable' => false,
+            'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+            'sort_order' => 10,
+            'status' => AttributeStatus::Active,
+        ]);
+
+        $foreignDefinition = FieldDefinition::withoutWorkspaceScope()->create([
+            'workspace_id' => null,
+            'code' => 'canon_foreign',
+            'data_type' => AttributeDataType::Text,
+            'scope' => AttributeScope::System,
+            'localized_labels' => ['uk' => 'Інше поле'],
+            'description' => null,
+            'validation_rules' => null,
+            'is_localizable' => false,
+            'is_multi_value' => false,
+            'status' => AttributeStatus::Active,
+        ]);
+
+        $foreignBinding = FieldBinding::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspaceB->id,
+            'field_definition_id' => $foreignDefinition->id,
+            'object_type' => FieldObjectType::Product,
+            'storage_type' => AttributeStorageType::Dynamic,
+            'storage_path' => null,
+            'field_group' => 'basic_information',
+            'is_required' => false,
+            'is_filterable' => false,
+            'is_sortable' => false,
+            'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+            'sort_order' => 20,
+            'status' => AttributeStatus::Active,
+        ]);
+
+        $this->bindCustomRegistry($this->minimalRegistryWithMapping(
+            fields: [
+                $this->fieldRow('canon_global', 'yes', 'product', 'system'),
+                $this->fieldRow('canon_foreign', 'yes', 'product', 'system'),
+            ],
+            mappings: [
+                $this->mappingRow('canon_global', 'adobe_commerce', 'shared_key'),
+                $this->mappingRow('canon_foreign', 'adobe_commerce', 'shared_key'),
+            ],
+        ));
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $this->publishAuthoritativeSnapshot($account, ['shared_key']);
+
+        $suggestions = app(CanonicalFieldMappingSuggestionProvider::class)->suggest(
+            $workspaceA->id,
+            'adobe_commerce',
+            array_fill_keys(['shared_key'], true),
+            [],
+            [],
+        );
+
+        $this->assertArrayNotHasKey($foreignBinding->id, $suggestions);
+        $this->assertSame('shared_key', $suggestions[$globalBinding->id]);
+
+        $model = $this->project($account, $configuration);
+
+        $this->assertSame(
+            'shared_key',
+            $this->rowForBindingId($model, $globalBinding->id)->suggestedExternalFieldKey,
+        );
+        $this->assertFalse(
+            collect($model->internalRows)->contains(
+                fn ($row) => $row->fieldBindingId === $foreignBinding->id,
+            ),
+        );
+    }
+
+    #[Test]
+    public function forged_foreign_persisted_mapping_fails_projection_closed(): void
+    {
+        $workspaceA = Workspace::query()->create(['name' => 'Workspace A '.Str::random(4), 'is_default' => false]);
+        $workspaceB = Workspace::query()->create(['name' => 'Workspace B '.Str::random(4), 'is_default' => false]);
+
+        $definitionA = FieldDefinition::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspaceA->id,
+            'code' => 'ws_a_secret_field',
+            'data_type' => AttributeDataType::Text,
+            'scope' => AttributeScope::WorkspaceCustom,
+            'localized_labels' => ['uk' => 'SECRET_WS_A_LABEL'],
+            'description' => null,
+            'validation_rules' => null,
+            'is_localizable' => false,
+            'is_multi_value' => false,
+            'status' => AttributeStatus::Active,
+        ]);
+
+        $bindingA = FieldBinding::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspaceA->id,
+            'field_definition_id' => $definitionA->id,
+            'object_type' => FieldObjectType::Product,
+            'storage_type' => AttributeStorageType::Dynamic,
+            'storage_path' => null,
+            'field_group' => 'characteristics',
+            'is_required' => false,
+            'is_filterable' => false,
+            'is_sortable' => false,
+            'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+            'sort_order' => 999,
+            'status' => AttributeStatus::Active,
+        ]);
+
+        $accountB = $this->createSyncSupportAccountForWorkspace($workspaceB);
+        $configurationB = $this->createProductsSyncConfiguration($accountB);
+
+        FieldMapping::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $workspaceB->id,
+            'sync_configuration_id' => $configurationB->id,
+            'field_binding_id' => $bindingA->id,
+            'external_field_key' => 'forged_key',
+        ]);
+
+        $this->assertTrue(
+            FieldMapping::withoutWorkspaceScope()
+                ->where('sync_configuration_id', $configurationB->id)
+                ->where('field_binding_id', $bindingA->id)
+                ->exists(),
+        );
+
+        try {
+            $this->project($accountB, $configurationB);
+            $this->fail('Projection should fail for forged foreign-workspace persisted mapping.');
+        } catch (FieldMappingProjectionInvariantException $exception) {
+            $this->assertStringNotContainsString('SECRET_WS_A_LABEL', $exception->getMessage());
+            $this->assertStringNotContainsString('ws_a_secret_field', $exception->getMessage());
+        }
     }
 
     #[Test]
