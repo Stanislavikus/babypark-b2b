@@ -483,6 +483,11 @@ Constraints:
 - `UNIQUE (workspace_id, user_id)`
 - `UNIQUE (id, workspace_id)`
 
+Parent FK (RESTRICT):
+
+- `workspace_users.workspace_id` → `workspaces.id` ON DELETE RESTRICT
+- `workspace_users.user_id` → `users.id` ON DELETE RESTRICT
+
 Do **not** add in first slice: `deleted_at`, `invited_at`, `activated_at`,
 `deactivated_at`. Invitation/deactivation history/soft-delete lifecycle is not
 currently resolved and remains future additive scope.
@@ -518,14 +523,25 @@ row participates in anti-lockout. Do not add `workspaces.is_active` in GAP-026.
 Constraints:
 
 - `UNIQUE (workspace_id, name)`
+- `UNIQUE (workspace_id, template_key)`
 - `UNIQUE (id, workspace_id)`
+
+Parent FK (RESTRICT):
+
+- `workspace_roles.workspace_id` → `workspaces.id` ON DELETE RESTRICT
 
 `template_key`:
 
 - carries no authorization semantics;
+- non-null `template_key` is the stable template/bootstrap identity inside one
+  workspace;
 - exists only for stable platform-template/bootstrap provenance and idempotency;
 - custom merchant-created roles may have NULL;
-- role name remains merchant-owned and freely renameable.
+- multiple NULL values remain valid;
+- merchant rename of `name` never changes `template_key`;
+- bootstrap/idempotency must resolve platform template roles by stable key, not
+  mutable display name;
+- role `name` remains merchant-owned and freely renameable.
 
 If implementation research shows `template_key` is unnecessary for
 deterministic/idempotent bootstrap, implementation must STOP and report before
@@ -576,6 +592,13 @@ Constraints:
 
 Supporting indexes required for MySQL composite FKs must be documented in
 implementation migrations (composite FK child columns indexed per MySQL 8 rules).
+
+**Parent workspace integrity**
+
+Every `WorkspaceUser` and `WorkspaceRole` must have a real `workspaces` parent
+through the parent FKs above. Workspace deletion lifecycle remains outside
+GAP-026. GAP-026 must not silently CASCADE workspace deletion through
+access-control state.
 
 **Delete behavior — RESTRICT, not silent CASCADE**
 
@@ -662,6 +685,35 @@ implied by Admin/Director legacy status.
 
 **Legacy-data backfill (026A migration/backfill)**
 
+**Automatic backfill deployment preflight (fail-closed)**
+
+Before automatic 026A legacy membership/role backfill, require fail-closed
+verification of:
+
+1. exactly one row exists in `workspaces`;
+2. that same row is the exactly-one row with `is_default = true`;
+3. at least one active legacy staff `User` exists with:
+   - `customer_id IS NULL`
+   - AND `users.is_active = true`
+   - AND `role IN (Admin, Director)`
+
+Reason:
+
+- historical application has no membership data from which multiple existing
+  workspaces can be assigned safely;
+- assigning all staff to additional workspaces would be privilege escalation;
+- leaving another workspace without an effective `manage_workspace_access` holder
+  violates anti-lockout;
+- inactive Admin/Director does not satisfy active-membership semantics.
+
+If any precondition fails: STOP → report actual counts/state → do not infer
+memberships → do not auto-promote a different legacy role → do not reactivate a
+`User` → do not assign all users to every workspace. Require explicit
+reconciliation before retrying deployment.
+
+Once preflight succeeds, preserve `workspace_users.is_active = true` for the
+legacy membership row itself regardless of `users.is_active` (see below).
+
 026A migration/backfill must resolve the current default workspace by
 `is_default = true`. Never hardcode the UUID.
 
@@ -689,6 +741,18 @@ behavior and do **not** grant new Mapping capability:
 `manage_workspace_access` is the one bootstrap capability required to satisfy the
 already-Resolved anti-lockout invariant. Do not describe it as a generic "Admin
 gets all permissions" role.
+
+**Backfill materialization — roles, not direct user permissions**
+
+The target schema intentionally has no direct membership-permission table.
+Permissions in the legacy matrix above are materialized through deterministic
+seeded/bootstrap `WorkspaceRole` bundle(s). Those role(s) are assigned to the
+relevant `WorkspaceUser`. No direct `User` / `WorkspaceUser` permission grant is
+created.
+
+Merchant-facing role `name` is not authorization identity; stable non-null
+`template_key` is the bootstrap identity for platform template roles. Do not invent
+per-user overrides.
 
 **Spatie assignment deployment preflight**
 

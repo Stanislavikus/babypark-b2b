@@ -162,6 +162,75 @@ class WorkspaceRbacPhysicalArchitectureDocumentationContractTest extends TestCas
     }
 
     #[Test]
+    public function contract_freezes_workspace_roles_template_key_uniqueness_and_nullable_custom_roles(): void
+    {
+        $section = $this->physicalArchitectureSection();
+
+        $this->assertStringContainsString('UNIQUE (workspace_id, template_key)', $section);
+        $this->assertStringContainsString('non-null `template_key` is the stable template/bootstrap identity', $section);
+        $this->assertStringContainsString('custom merchant-created roles may have NULL', $section);
+        $this->assertStringContainsString('multiple NULL values remain valid', $section);
+        $this->assertStringContainsString('merchant rename of `name` never changes `template_key`', $section);
+        $this->assertStringContainsString('resolve platform template roles by stable key, not', $section);
+        $this->assertStringContainsString('carries no authorization semantics', $section);
+    }
+
+    #[Test]
+    public function contract_freezes_parent_foreign_keys_with_restrict_on_delete(): void
+    {
+        $section = $this->physicalArchitectureSection();
+
+        $this->assertStringContainsString(
+            '`workspace_users.workspace_id` → `workspaces.id` ON DELETE RESTRICT',
+            $section,
+        );
+        $this->assertStringContainsString(
+            '`workspace_users.user_id` → `users.id` ON DELETE RESTRICT',
+            $section,
+        );
+        $this->assertStringContainsString(
+            '`workspace_roles.workspace_id` → `workspaces.id` ON DELETE RESTRICT',
+            $section,
+        );
+        $this->assertStringContainsString('must not silently CASCADE workspace deletion', $section);
+        $this->assertStringContainsString('Workspace deletion lifecycle remains outside', $section);
+    }
+
+    #[Test]
+    public function contract_requires_fail_closed_legacy_backfill_preflight(): void
+    {
+        $section = $this->physicalArchitectureSection();
+
+        $this->assertStringContainsString('Automatic backfill deployment preflight (fail-closed)', $section);
+        $this->assertStringContainsString('exactly one row exists in `workspaces`', $section);
+        $this->assertStringContainsString('exactly-one row with `is_default = true`', $section);
+        $this->assertStringContainsString('`role IN (Admin, Director)`', $section);
+        $this->assertStringContainsString('inactive Admin/Director does not satisfy active-membership semantics', $section);
+        $this->assertStringContainsString('privilege escalation', $section);
+        $this->assertStringContainsString('do not infer', $section);
+        $this->assertStringContainsString('memberships', $section);
+        $this->assertStringContainsString('do not auto-promote a different legacy role', $section);
+        $this->assertStringContainsString('do not reactivate', $section);
+        $this->assertStringContainsString('do not assign all users to every workspace', $section);
+    }
+
+    #[Test]
+    public function contract_materializes_backfill_through_workspace_roles_not_direct_user_permissions(): void
+    {
+        $section = $this->physicalArchitectureSection();
+
+        $this->assertStringContainsString('no direct membership-permission table', $section);
+        $this->assertStringContainsString('seeded/bootstrap `WorkspaceRole` bundle(s)', $section);
+        $this->assertStringContainsString('assigned to the', $section);
+        $this->assertStringContainsString('relevant `WorkspaceUser`', $section);
+        $this->assertStringContainsString('No direct `User` / `WorkspaceUser` permission grant', $section);
+        $this->assertStringContainsString('Merchant-facing role `name` is not authorization identity', $section);
+        $this->assertStringContainsString('`template_key` is the bootstrap identity', $section);
+        $this->assertStringContainsString('Do not invent', $section);
+        $this->assertStringContainsString('per-user overrides', $section);
+    }
+
+    #[Test]
     public function contract_documents_composite_fk_same_workspace_guards_and_restrict_deletes(): void
     {
         $section = $this->physicalArchitectureSection();

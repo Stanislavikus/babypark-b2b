@@ -1071,7 +1071,9 @@ backend — Layer B mapping UI still missing); remaining UX migration work.
 - `manage_workspace_tax_settings`
 
 Physical persistence is **resolved** in GAP-026-0 (custom WorkspaceUser-centric
-RBAC, not Spatie Teams). Implementation remains open.
+RBAC, not Spatie Teams): five tables; `UNIQUE (workspace_id, template_key)` on
+`workspace_roles`; parent FKs to `workspaces`/`users` with ON DELETE RESTRICT.
+Implementation remains open.
 
 **Implementation staging:**
 
@@ -1082,11 +1084,20 @@ RBAC, not Spatie Teams). Implementation remains open.
 
 **Legacy membership / role backfill matrix (026A):**
 
+Before automatic backfill: fail-closed preflight requires exactly one `workspaces`
+row, that row alone has `is_default = true`, and at least one active staff
+Admin/Director (`customer_id IS NULL`, `users.is_active = true`). Multi-workspace
+legacy state, zero active Admin/Director, or failed counts → STOP; no inference,
+auto-promotion, reactivation, or assign-all-users-to-all-workspaces.
+
 Resolve default workspace by `is_default = true` (never hardcode UUID). Create
 `WorkspaceUser` for each staff `User` (`customer_id IS NULL`) with
-`workspace_users.is_active = true` regardless of `users.is_active`.
+`workspace_users.is_active = true` regardless of `users.is_active`. Backfilled
+capabilities flow through deterministic bootstrap `WorkspaceRole` bundle(s) and
+`WorkspaceUserRole` assignment — not direct membership permission grants.
+Stable non-null `template_key` is bootstrap role identity; merchant `name` is not.
 
-| Legacy role | Backfilled permissions |
+| Legacy role | Backfilled permissions (via bootstrap roles) |
 |---|---|
 | Admin / Director | `view_connector_accounts`, `run_connector_discovery`, `manage_connector_accounts`, `manage_workspace_tax_settings`, `manage_workspace_access` |
 | Merchandiser | `view_connector_accounts`, `run_connector_discovery` |
