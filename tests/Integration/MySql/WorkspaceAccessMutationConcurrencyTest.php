@@ -76,7 +76,7 @@ class WorkspaceAccessMutationConcurrencyTest extends TestCase
         $processB->wait();
 
         $this->assertFileExists($ipcDir.'/a_committed', 'Process A did not commit successfully.');
-        $this->assertFileNotExists($ipcDir.'/a_failed');
+        $this->assertFileDoesNotExist($ipcDir.'/a_failed');
         $this->assertSame(0, $processA->getExitCode(), $processA->getErrorOutput());
 
         $this->assertFileExists($ipcDir.'/b_entered', 'Process B did not enter coordinator.');
