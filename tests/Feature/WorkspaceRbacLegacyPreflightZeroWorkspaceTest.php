@@ -20,12 +20,16 @@ class WorkspaceRbacLegacyPreflightZeroWorkspaceTest extends TestCase
 
         if (DB::connection()->getDriverName() === 'sqlite') {
             DB::statement('PRAGMA foreign_keys = OFF');
+        } else {
+            DB::statement('SET FOREIGN_KEY_CHECKS=0');
         }
 
         DB::table('workspaces')->delete();
 
         if (DB::connection()->getDriverName() === 'sqlite') {
             DB::statement('PRAGMA foreign_keys = ON');
+        } else {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
         }
 
         $result = app(WorkspaceRbacLegacyPreflight::class)->evaluate();
