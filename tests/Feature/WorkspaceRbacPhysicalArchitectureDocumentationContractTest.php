@@ -400,12 +400,14 @@ class WorkspaceRbacPhysicalArchitectureDocumentationContractTest extends TestCas
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString('GAP-026A-1 — Schema, catalogue & explicit read authorization', $content);
-        $this->assertStringContainsString('GAP-026B — Narrow workspace-authorization cutover', $content);
-        $this->assertStringContainsString('4C-1c-2b Mapping UI becomes unblocked', $content);
+        $this->assertStringContainsString('GAP-026B-0 — Workspace RBAC authority cutover contract', $content);
+        $this->assertStringContainsString('GAP-026B-1 — Access & Cutover Machinery', $content);
+        $this->assertStringContainsString('GAP-026B-2 — Authority & Presentation Cutover', $content);
+        $this->assertStringContainsString('4C-1c-2b remains blocked until GAP-026B-2', $content);
         $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
         $this->assertStringContainsString('Open / partial', $content);
         $this->assertStringContainsString('GAP-026A (overall)** | **Done**', $content);
-        $this->assertStringContainsString('GAP-026B remains unimplemented', $content);
+        $this->assertStringContainsString('026B-1 / GAP-026B-2 runtime **unimplemented**', $content);
     }
 
     #[Test]
@@ -430,6 +432,7 @@ class WorkspaceRbacPhysicalArchitectureDocumentationContractTest extends TestCas
         $this->assertStringContainsString('Користувачі', $content);
         $this->assertStringContainsString('Профілі доступу', $content);
         $this->assertStringContainsString('Never expose Spatie', $content);
+        $this->assertStringContainsString('026B Access / Roles scope (Resolved — GAP-026B-0', $content);
     }
 
     #[Test]
@@ -440,6 +443,8 @@ class WorkspaceRbacPhysicalArchitectureDocumentationContractTest extends TestCas
         $this->assertStringContainsString('Workspace RBAC physical model', $content);
         $this->assertStringContainsString('WorkspaceUser-centric custom RBAC', $content);
         $this->assertStringContainsString('anti-lockout serialized on `Workspace` row', $content);
+        $this->assertStringContainsString('Workspace RBAC authority cutover (GAP-026B-0)', $content);
+        $this->assertStringContainsString('existing-memberships-only Access management', $content);
     }
 
     /**

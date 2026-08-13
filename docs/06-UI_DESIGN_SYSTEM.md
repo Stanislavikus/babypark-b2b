@@ -1811,14 +1811,60 @@ changes begin affecting production authorization.
 
 Merchant terminology (Ukrainian examples):
 
-- `Користувачі`
 - `Доступ`
+- `Користувачі`
 - `Ролі` / `Профілі доступу`
 
 Never expose Spatie, pivot tables, team resolver, or RBAC internals to merchants.
 
-Detailed Access screen design is **not** part of GAP-026-0 — layout, workflows, and
-field-level UX for membership/role administration ship with GAP-026B implementation.
+**026B Access / Roles scope (Resolved — GAP-026B-0, 2026-08-13)**
+
+Normative detail: `docs/03-DOMAIN_MODEL.md` → **Workspace RBAC authority cutover
+(Resolved — GAP-026B-0, 2026-08-13)**.
+
+**Supported in 026B (existing `WorkspaceUser` memberships only)**
+
+Users:
+
+- list existing members;
+- show active/inactive membership state;
+- show assigned roles/profiles;
+- assign/remove role assignments;
+- deactivate/reactivate membership.
+
+Roles:
+
+- list roles;
+- create merchant custom role;
+- rename role;
+- edit the canonical seven-permission bundle;
+- show assignment count;
+- delete unused role when integrity rules pass.
+
+All Access/Roles mutations require `manage_workspace_access` and route through
+`WorkspaceAccessMutationCoordinator`. Read access to the Access management surface in
+the first 026B slice also requires `manage_workspace_access` — no separate
+`view_workspace_access` permission.
+
+**Explicitly not in 026B**
+
+- invite / add user;
+- attach existing `User` to workspace;
+- create new `WorkspaceUser` membership;
+- membership hard-delete;
+- multi-workspace onboarding;
+- direct per-user permission overrides, deny, or mute.
+
+The Access screen must **not** expose a functional Add/Invite user action. Near that
+expected affordance, show concise informational copy equivalent to:
+
+> Adding new users will be available in the next access-management stage. For now,
+> access can be managed for existing company users.
+
+Do not expose GAP numbers in merchant copy. New membership onboarding is owned by
+**GAP-027**.
+
+Detailed layout/workflows beyond this scope ship with GAP-026B implementation.
 
 ### Shipped Task 4B implementation (pre-contract — historical reference)
 

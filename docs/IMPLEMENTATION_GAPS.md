@@ -1084,11 +1084,15 @@ explicit read-only `WorkspaceAuthorization` service with regression tests.
 | **GAP-026A-1 — Schema, catalogue & explicit read authorization** | **Done.** Five custom RBAC tables; seven-permission global `workspace_permissions` catalogue (`WorkspaceRbacPermissionSeeder`); models/relationships without `BelongsToWorkspace`; composite workspace guards/RESTRICT; explicit `WorkspaceAuthorization` read boundary (`allows`, `effectivePermissions`, `activeMembership`); SQLite + MySQL foundation/authorization regression tests. Legacy Spatie `WorkspacePermissionSeeder` unchanged. No RBAC membership/role assignments seeded. **Explicitly not in 026A-1:** legacy preflight/backfill machinery; anti-lockout coordinator; production legacy assignment; policy/gate cutover. |
 | **GAP-026A-2 — Preflight/backfill machinery & anti-lockout coordinator** | **Done.** `WorkspaceRbacLegacyPreflight` / result DTO; deterministic/idempotent `WorkspaceRbacLegacyBackfill`; frozen legacy template keys and bundles; `WorkspaceAccessMutationCoordinator` with fresh anti-lockout query; SQLite + MySQL regression tests including real MySQL 8 concurrent-process proof. Machinery + tests only — not production execution. |
 | **GAP-026A (overall)** | **Done** — 026A-1 and 026A-2 foundation slices complete per original staging. |
-| **GAP-026B — Narrow workspace-authorization cutover** | **Pre-cutover gate (frozen order):** Spatie assignment preflight → legacy workspace/Admin preflight → deterministic/idempotent legacy backfill from **current** legacy state → fresh anti-lockout validation → workspace-permission authorization becomes authoritative (failure at any step = STOP, no partial cutover). Then: `ConnectorAccount` authorization; workspace tax-settings authorization; Mapping authorization seam; Access / Roles management UI + mutations; authoritative anti-lockout routing; `User` lifecycle protection (`is_active`, hard-delete, multi-workspace locking) **no later than** assignment/cutover activation. At 026B completion, 4C-1c-2b Mapping UI becomes unblocked. `User::canAccessPanel()` and unrelated admin resources may still use legacy role semantics until GAP-027. **Unimplemented.** |
+| **GAP-026B-0 — Workspace RBAC authority cutover contract** | **Done (docs/tests).** Frozen cutover boundaries for Connector/Tax/Mapping/Access; capability-based connector presentation; existing-memberships-only Access; User lifecycle transition rules; one-time maintenance cutover sequence; CHECK-ONLY (B-1) / EXECUTE (B-2) slice ownership; 026B-1/026B-2 split. See `03-DOMAIN_MODEL.md` → Workspace RBAC authority cutover (Resolved — GAP-026B-0). |
+| **GAP-026B-1 — Access & Cutover Machinery** | **Unimplemented.** Guarded cutover command/service: **CHECK-ONLY only** (diagnostics; no RBAC assignment/materialization). Access/Roles application write services; existing-membership role assignment/removal; membership activate/deactivate; role create/rename/permission edit/safe unused-role delete; merchant Access/Roles UI; global `User` deactivation integrity service; hard-delete guard; CHECK-ONLY cutover/runbook tests. **Explicitly no** connector/tax policy authority switch. **No executable production EXECUTE mode in a B-1-only release** — production legacy membership/role backfill must not run until B-2 ships. |
+| **GAP-026B-2 — Authority & Presentation Cutover** | **Unimplemented.** **EXECUTE mode** of guarded cutover command/service (production legacy backfill/materialization). `ConnectorAccountPolicy` migration; remove legacy `WorkspaceMembership` from connector authority paths; permission-based safe Connector presentation; merchant Integrations/catalog gating migration; tax authorization migration + write-time reauthorization; Mapping authorization seam; cross-workspace + safe-state + Livewire serialization regressions; EXECUTE cutover/runbook tests. First production deployment containing B-2 must be the maintenance-window cutover deployment; merchant traffic blocked until EXECUTE + anti-lockout + smoke succeed. After B-2 is merged and verified, 4C-1c-2b repo work may begin; environment must execute EXECUTE during that cutover before merchant traffic uses new authority. |
+| **GAP-026B (overall)** | **Pre-cutover gate (frozen order):** Spatie assignment preflight → legacy workspace/Admin preflight → deterministic/idempotent legacy backfill from **current** legacy state (EXECUTE at cutover — B-2 only) → fresh anti-lockout validation → workspace-permission authorization becomes authoritative (failure at any step = STOP, no partial cutover). Narrow cutover domains: Connector, tax, Mapping seam, Access (existing memberships only). CHECK-ONLY machinery may ship in B-1; EXECUTE and production materialization ship only with B-2. `User::canAccessPanel()` and unrelated admin resources may still use legacy role semantics until GAP-027. **Unimplemented** (026B-0 contract Done; runtime B-1/B-2 pending). |
 
-**Legacy membership / role backfill matrix (026B production execution):**
+**Legacy membership / role backfill matrix (026B production execution — GAP-026B-2 EXECUTE only):**
 
-Production backfill runs in **026B** (not 026A), only after Spatie preflight and
+Production backfill runs at **EXECUTE** during the maintenance-window cutover (GAP-026B-2
+release — not 026A, not a B-1-only release), only after Spatie preflight and
 legacy workspace/Admin preflight succeed, and only from **current** legacy state
 at cutover time.
 
@@ -1175,9 +1179,9 @@ GAP-026 workspace RBAC.
 - Cross-reference **GAP-004** for workspace data isolation — GAP-004 tracks
   table/query coverage audit, not permission semantics.
 
-**Next task:** GAP-026B — narrow workspace-authorization cutover (prerequisite before 4C-1c-2b).
+**Next task:** GAP-026B-1 — Access & Cutover Machinery (then GAP-026B-2).
 
-**Status:** Open / partial — physical architecture frozen (GAP-026-0); GAP-026A foundation (**026A-1** schema/catalogue/read authorization + **026A-2** preflight/backfill machinery and anti-lockout coordinator) **Done**; GAP-026B remains unimplemented. Closure requires 026B narrow cutover per staging above. 4C-1c-2b remains blocked until GAP-026B cutover completes.
+**Status:** Open / partial — physical architecture frozen (GAP-026-0); GAP-026A foundation (**026A-1** schema/catalogue/read authorization + **026A-2** preflight/backfill machinery and anti-lockout coordinator) **Done**; GAP-026B-0 cutover contract **Done**; GAP-026B-1 / GAP-026B-2 runtime **unimplemented**. Closure requires 026B narrow cutover per staging above. 4C-1c-2b remains blocked until GAP-026B-2 implementation completes and environment executes one-time cutover.
 
 ---
 
@@ -1204,7 +1208,21 @@ semantics for all catalogue/order/customer/user/pricing/etc admin Resources.
 - authorization-coverage CI guard;
 - `strictAuthorization()` decision/enablement;
 - membership-based `/admin` admission;
-- complete removal of `User.role` from workspace authorization semantics.
+- complete removal of `User.role` from workspace authorization semantics;
+- **new staff membership onboarding** — creating/attaching `WorkspaceUser` rows,
+  invitations, attaching an existing `User` to a `Workspace`, future multi-workspace
+  membership onboarding;
+- **concurrency/locking contract** required when the membership set itself may grow;
+- **removal of the temporary existing-memberships-only limitation** introduced by
+  GAP-026B (Access UI must not expose Add/Invite until this ships).
+
+**Transitional state after GAP-026B cutover (until GAP-027 onboarding):**
+
+A new staff `User` created through transitional legacy `UserResource` after the 026B
+cutover receives **no** `WorkspaceUser` automatically. Connector/tax/mapping/access
+surfaces fail closed for that `User` until onboarding is implemented. This does **not**
+authorize adding a role-based fallback. Current `canAccessPanel()` may still admit such
+a `User` to unrelated legacy areas — transitional, not completed RBAC.
 
 **Until GAP-027:**
 

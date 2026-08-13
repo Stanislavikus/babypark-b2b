@@ -909,6 +909,447 @@ populate or authorize workspace RBAC in production.
   workspace staff `User`. Do not mix customer/cabinet authorization into workspace
   staff RBAC.
 
+### Workspace RBAC authority cutover [Resolved — GAP-026B-0, 2026-08-13]
+
+GAP-026B changes workspace authorization **only for explicitly cut-over domains**
+from the transitional combination of:
+
+- `User.role`
+- `WorkspaceMembership`
+- global Spatie permissions
+
+to the authoritative evaluation path:
+
+```text
+User
+  × explicit Workspace
+  × active WorkspaceUser
+  × WorkspaceRole(s)
+  × canonical WorkspacePermission(s)
+```
+
+Outside Connector / Tax / Mapping / Workspace Access scopes cut over by GAP-026B,
+legacy authorization remains transitional until **GAP-027**. GAP-026B does **not**
+complete platform-wide RBAC and does **not** claim whole-admin panel admission,
+`canAccessPanel()`, unrelated Filament Resources, `/cabinet`, or platform-global
+governance are already RBAC-complete.
+
+**Cut-over domains (026B only)**
+
+| Domain | Authoritative after cutover |
+|---|---|
+| `ConnectorAccount` read / discovery / management | workspace permissions via `WorkspaceAuthorization` |
+| Connector safe presentation / merchant Integrations gating | effective workspace permissions (not `User.role`) |
+| Workspace tax settings | `manage_workspace_tax_settings` on explicit `Workspace` |
+| Mapping read / mutation seam | `view_sync_mappings` / `manage_sync_mappings` |
+| Merchant Access / Roles (existing memberships only) | `manage_workspace_access` |
+
+**ConnectorAccount permission matrix (exclusive authority after cutover)**
+
+Safe `ConnectorAccount` read — allowed when effective workspace permissions
+contain **at least one** of:
+
+- `view_connector_accounts`
+- `run_connector_discovery`
+- `manage_connector_accounts`
+
+Reason: `run_connector_discovery` necessarily includes the safe read required to
+observe its progress/result; `manage_connector_accounts` includes safe read and
+discovery. Role names do **not** contribute.
+
+Discovery control — visible/eligible when:
+
+- `run_connector_discovery` **OR** `manage_connector_accounts`
+
+Actual manual execution additionally requires existing account runtime eligibility
+(for example `is_enabled`).
+
+Management — **only** `manage_connector_accounts` for:
+
+- create account;
+- settings changes;
+- credential replace/remove;
+- connection check;
+- disable/archive where supported.
+
+After 026B authority cutover, legacy labels Admin, Director, Merchandiser, Manager,
+Programmer, Warehouse, and legacy Spatie grants have **no** connector authorization
+semantics by themselves.
+
+**026B migration seam (current code — not target):** shipped `ConnectorAccountPolicy`
+still uses legacy `User.role` / membership logic. GAP-026B-2 must migrate policy and
+merchant entry paths to the matrix above. Do not extend legacy role branches.
+
+**Connector presentation invariant (capability-based, not job-title-based)**
+
+Connector presentation is **capability-based**, never job-title-based.
+
+A user who has safe read/discovery but does **not** have `manage_connector_accounts`
+must receive the restricted safe projection regardless of legacy `User.role`.
+
+The safe-only projection must continue excluding at least the existing
+sensitive/configuration attributes:
+
+- `credentials`
+- `settings`
+- `base_url`
+- `store_code`
+- `tenant_context`
+- `auth_profile`
+
+and management-only connection-check state/relations where currently protected.
+
+The restriction must happen **before** sensitive state becomes part of merchant-facing
+Livewire/Filament record state — not merely through visual hiding.
+
+- A legacy Admin label must **not** widen presentation if effective workspace
+  permissions are read-only.
+- A legacy Merchandiser label must **not** restrict presentation if the membership
+  legitimately has `manage_connector_accounts`.
+
+**026B migration seam:** current `ConnectorAccountMerchandiserPresentation` uses
+`User.role === Merchandiser` for safe DB projection, hidden attributes, connection-check
+relation loading, and field visibility. This is transitional and must not survive the
+026B authority cutover.
+
+**WorkspaceMembership is not an additional Connector authority gate**
+
+After cutover, `WorkspaceMembership` is **not** an additional authorization gate for
+`ConnectorAccount` operations. Explicit `WorkspaceAuthorization(User, Workspace,
+permission)` already incorporates active `WorkspaceUser` membership and permission
+evaluation.
+
+GAP-026B implementation must migrate all relevant connector entry/write paths that
+currently perform a separate legacy membership check before Gate/permission evaluation.
+
+Known example: `ConnectorAccountSettingsService` currently calls
+`WorkspaceMembership::belongs()` before Gate authorization.
+
+Also require inspection/migration of merchant Integrations landing/catalog paths that
+still use legacy membership logic.
+
+Do **not** globally rewrite or delete `WorkspaceMembership` as part of GAP-026B;
+unrelated legacy use remains GAP-004 / GAP-027 territory.
+
+**Workspace tax-settings authority**
+
+Target authority:
+
+```php
+WorkspaceAuthorization::allows(
+    User $user,
+    Workspace $workspace,
+    'manage_workspace_tax_settings',
+);
+```
+
+No Admin/Director special case. No legacy Spatie permission authority.
+
+`WorkspaceContext` may resolve the current UI target `Workspace`, but authorization
+must receive that resolved `Workspace` explicitly.
+
+**TOCTOU protection (frozen):** every consequential tax-settings write must
+re-authorize against the current explicit `Workspace` immediately before persistence —
+including normal save and confirmation action after VAT-rate warning.
+
+**026B migration seam:** current page authorizes only page admission; later writes do
+not yet re-authorize at persistence time.
+
+**Mapping authorization seam**
+
+GAP-026B introduces authorization for Mapping, but **not** Mapping UI.
+
+| Operation | Required permission |
+|---|---|
+| Mapping read | `view_sync_mappings` **OR** `manage_sync_mappings` |
+| Mapping mutation | `manage_sync_mappings` |
+
+- `manage_connector_accounts` does **not** imply either Mapping permission.
+- Mapping permissions do **not** imply Connector settings/credential access.
+
+Keep existing `FieldMapping` domain mutation/read machinery free of `User`/role policy
+logic. Authorization belongs at an outer application/policy seam receiving `User` +
+explicit `Workspace` / workspace-owned `SyncConfiguration` before invoking the
+existing projector/mutation service.
+
+Do **not** rewrite `FieldMappingMutationService` into an actor-aware RBAC service
+merely for GAP-026B. Task **4C-1c-2b** remains the first merchant Mapping UI.
+
+**Merchant Access / Roles scope (026B)**
+
+026B introduces a minimal merchant-facing workspace access area using ordinary
+business vocabulary:
+
+- **Доступ**
+  - **Користувачі**
+  - **Ролі** / **Профілі доступу**
+
+No Spatie/RBAC/pivot/team terminology in merchant UI.
+
+**Users / memberships — 026B supports (existing `WorkspaceUser` only)**
+
+- list existing members;
+- display active/inactive membership state;
+- display assigned access roles/profiles;
+- assign one or more existing roles;
+- remove role assignments;
+- deactivate membership;
+- reactivate membership.
+
+**Roles — 026B supports**
+
+- list roles;
+- create merchant custom role;
+- rename role;
+- edit role's canonical seven-permission bundle;
+- show number of assigned memberships;
+- delete a role only when unused and when the operation passes all integrity rules.
+
+All authoritative writes that can affect `manage_workspace_access` must route through
+`WorkspaceAccessMutationCoordinator`. `manage_workspace_access` is required for every
+Access/Roles mutation.
+
+Read access to the Access management surface in the first 026B slice also requires
+`manage_workspace_access`; do **not** invent a separate `view_workspace_access`
+permission.
+
+**Explicit temporary limitation — existing memberships only (user-approved)**
+
+GAP-026B does **NOT** create or attach new `WorkspaceUser` memberships.
+
+026B does **not** implement:
+
+- invite employee;
+- attach an existing `User` to another `Workspace`;
+- create a `Workspace` membership;
+- membership hard-delete;
+- multi-workspace onboarding.
+
+The Access screen must **not** present a functional Add user / Invite user action.
+
+Near the place where a merchant would naturally expect such an action, show concise
+informational copy equivalent to:
+
+> Adding new users will be available in the next access-management stage. For now,
+> access can be managed for existing company users.
+
+Exact localization/copy may follow project conventions; do **not** expose GAP numbers
+to merchants. This is an intentional transitional limitation, not final product
+behavior. Removal is owned by **GAP-027**.
+
+**Anti-lockout routing for Access mutations (026B applicability)**
+
+The following mutations must route through `WorkspaceAccessMutationCoordinator`:
+
+- assign role to membership;
+- remove role assignment;
+- activate membership;
+- deactivate membership;
+- create role if its permission state participates in authoritative access;
+- edit role permission bundle;
+- delete role.
+
+The coordinator remains an integrity boundary, **not** actor authorization.
+
+Sequence remains:
+
+1. authorize actor for `manage_workspace_access`;
+2. coordinator locks `Workspace` row;
+3. perform mutation;
+4. fresh effective-holder query;
+5. reject/rollback if zero holders.
+
+Do **not** merge actor authorization into `WorkspaceAccessMutationCoordinator`.
+
+**User lifecycle during transition**
+
+`User.role` — after backfill/cutover:
+
+- changing `User.role` **MUST NOT** synchronize, create, delete, or replace
+  `WorkspaceRole` assignments;
+- it may remain used by unrelated legacy/GAP-027/platform surfaces temporarily;
+- for domains cut over by 026B, `User.role` has **zero** authorization effect.
+
+`customer_id` — not Workspace RBAC authority. Changing it must not implicitly create/
+delete `WorkspaceUser` membership or rewrite role assignments in GAP-026B.
+
+**Reactivation** (`users.is_active`: false → true):
+
+- does not recreate/reset roles or membership state;
+- existing `WorkspaceUser` membership state remains as stored.
+
+**Global deactivation** (`users.is_active`: true → false):
+
+- must use a guarded lifecycle service;
+- because 026B forbids membership creation, the set of existing memberships is stable
+  enough for the already-Resolved algorithm:
+  - discover all existing `WorkspaceUser` memberships for the `User`;
+  - acquire corresponding `Workspace` row locks in deterministic `workspace_id` order;
+  - update global `User` active state in the guarded transaction;
+  - run fresh anti-lockout validation for every affected workspace;
+  - rollback if any workspace would have zero effective `manage_workspace_access`
+    holders.
+- Workspace access mutations already serialize on their `Workspace` row, so role/
+  permission/membership activation changes serialize against this deactivation path.
+- Do **not** introduce a new `User`-row mutex in GAP-026B while membership creation
+  is forbidden.
+
+**Hard delete (first cutover behavior)**
+
+- `User` with ≥1 `WorkspaceUser` membership → hard delete **denied** → deactivate
+  instead.
+- Do **not** weaken `users` → `workspace_users` ON DELETE RESTRICT.
+- A `User` with no `WorkspaceUser` membership may retain current legacy hard-delete
+  behavior unless another existing invariant forbids it.
+- Do **not** introduce destructive membership cleanup in 026B.
+
+Current `UserResource` exposes `is_active`, `role` mutation, and hard `DeleteAction` —
+these are real migration seams.
+
+**Production authority activation boundary (one-time cutover)**
+
+Merging 026B code into `develop` is **not** itself production cutover execution.
+
+The 026B authority-changing release must be activated in a controlled maintenance
+window. Do **not** use a permanent dual-authority mode or role fallback. Do **not**
+add a persistent legacy/new RBAC feature flag unless a later verified implementation
+blocker forces a new Stop-and-Amend.
+
+**First B-2 production deployment = maintenance-window cutover (frozen)**
+
+The **first production deployment** that contains GAP-026B-2 authority-switching
+code must **itself** be the one-time maintenance-window cutover deployment.
+
+- GAP-026B-2 must **not** be delivered through ordinary recurring deployment and then
+  exposed to merchant traffic pending a later EXECUTE.
+- Merchant traffic remains blocked from B-2 deployment through successful EXECUTE →
+  fresh anti-lockout validation → smoke verification.
+- Pre-EXECUTE B-2 authority must **never** fall back to legacy roles.
+- Recovery is reconciliation/completion of the cutover while traffic remains blocked,
+  not authority fallback.
+
+**Required one-time sequence (frozen ordering)**
+
+1. verified DB backup / snapshot;
+2. put application into maintenance / block merchant writes;
+3. deploy the **complete** approved GAP-026B-1 + GAP-026B-2 authority-changing
+   cutover runtime while traffic is already blocked;
+4. run all pending migrations;
+5. ensure the canonical `workspace_permissions` catalogue via the approved target
+   seeder;
+6. run guarded RBAC cutover in **CHECK-ONLY** mode;
+7. if safe: run **EXECUTE** (current-state deterministic legacy backfill);
+8. run fresh anti-lockout validation;
+9. run focused authorization/cutover smoke checks;
+10. clear/reload application state and restart relevant queue workers;
+11. resume traffic.
+
+If any step from preflight through smoke verification fails:
+
+- application remains unavailable for merchant writes;
+- no partial authority fallback;
+- no role-based Connector/Tax/Mapping fallback;
+- investigate/reconcile before traffic resumes.
+
+Existing resolved cutover order must remain:
+
+Spatie preflight → legacy workspace/Admin preflight → current-state backfill → fresh
+anti-lockout validation → new authority becomes usable.
+
+**Cutover command contract (CHECK-ONLY / EXECUTE — slice ownership frozen)**
+
+Freeze a guarded one-time application command/service contract with two modes, split
+across GAP-026B-1 and GAP-026B-2:
+
+**CHECK-ONLY (GAP-026B-1)**
+
+- May exist and run in a B-1-only release.
+- Performs no RBAC assignments or production legacy membership/role materialization.
+- Reports structured A-2 preflight state.
+- May run before maintenance for advance diagnostics.
+
+**EXECUTE (GAP-026B-2 only)**
+
+- Must **not** exist as an executable production mode in a release that does not also
+  contain GAP-026B-2 authority-switching runtime code.
+- B-1-only EXECUTE is **forbidden by slice placement**, not by operator confirmation.
+- Requires application maintenance mode / explicitly quiesced merchant-write
+  environment; refuses to proceed otherwise; re-runs fresh preflight itself; invokes
+  existing transactional backfill machinery; performs fresh post-backfill anti-lockout
+  validation; fails non-zero on any unsafe state.
+- Production legacy assignment materialization is structurally unavailable until the
+  release also carries GAP-026B-2 authority code.
+
+Do **not** introduce `--confirm-maintenance-window`, persistent environment activation
+state, marker tables, legacy/new authority selectors, or dual-authority policy switches
+merely to enforce this boundary.
+
+**Why B-1 cannot materialize production RBAC early**
+
+GAP-026A intentionally did not materialize production `WorkspaceUser` / role
+assignments early because legacy `User.role`, `is_active`, and hard-delete could
+continue changing while the new graph remained non-authoritative — allowing a shadow
+graph to drift before cutover.
+
+Early materialization while legacy authorization is still live would create a
+non-authoritative shadow RBAC graph. Because `User.role` changes after cutover are
+explicitly forbidden from synchronizing `WorkspaceRole` assignments, a legacy
+role/lifecycle mutation between premature backfill and B-2 activation could leave
+stale grants that later become authoritative.
+
+Exact Artisan command/class name is implementation-level.
+
+Do **not** make migration/seeder/service-provider boot automatically execute
+production legacy backfill.
+
+Operational runbook detail: `DEPLOY.md` → **GAP-026B one-time Workspace RBAC
+cutover**.
+
+**GAP-026B implementation split (frozen)**
+
+| Slice | Future runtime scope |
+|---|---|
+| **GAP-026B-1 — Access & Cutover Machinery** | Guarded cutover command/service: **CHECK-ONLY mode only** (diagnostics; no RBAC assignment/materialization). Access/Roles application write services; existing-membership role assignment/removal; membership activate/deactivate; role create/rename/permission edit/safe unused-role delete; merchant Access/Roles UI; global `User` deactivation integrity service; hard-delete guard; CHECK-ONLY cutover/runbook tests. **Explicitly no** connector/tax policy authority switch. **B-1-only release must not ship an executable production EXECUTE mode** — no production legacy membership/role backfill in a B-1-only deployment. |
+| **GAP-026B-2 — Authority & Presentation Cutover** | **EXECUTE mode** of the guarded cutover command/service (production legacy assignment materialization). `ConnectorAccountPolicy` migration; remove legacy `WorkspaceMembership` from connector authority paths; permission-based safe Connector presentation; merchant Integrations/catalog gating migration; tax authorization migration + write-time reauthorization; Mapping authorization seam; cross-workspace + safe-state + Livewire serialization regressions; EXECUTE cutover/runbook tests. First production deployment containing B-2 must be the maintenance-window cutover deployment; merchant traffic stays blocked until EXECUTE + anti-lockout + smoke succeed. After B-2 implementation is merged and verified, repository development of **4C-1c-2b** may begin. An environment must execute EXECUTE during that cutover before serving new authority / Mapping UI to merchant traffic. |
+
+This separates repository implementation readiness from environment production
+activation.
+
+**Explicit non-goals (026B-0 and later 026B runtime)**
+
+Do **not** silently absorb into GAP-026B:
+
+- new `WorkspaceUser` creation/onboarding;
+- invitations;
+- membership hard-delete;
+- multi-workspace selector UX;
+- whole-admin permission vocabulary;
+- whole-admin policies;
+- `canAccessPanel` rewrite;
+- `strictAuthorization`;
+- `PlatformAdminAuthorization` redesign;
+- `/cabinet` authorization;
+- Spatie package/table removal;
+- direct per-user permission overrides;
+- deny/muting;
+- workspace suspension;
+- Field Browser Layer-C redesign;
+- Mapping UI itself;
+- sync execution/scheduling authorization.
+
+These remain in GAP-025 / GAP-027 / later explicitly resolved work.
+
+**GAP-027 transitional state (new staff after 026B cutover)**
+
+A new staff `User` created through transitional legacy `UserResource` after the 026B
+cutover receives **no** `WorkspaceUser` automatically. Connector/tax/mapping/access
+surfaces fail closed for that new `User` until onboarding is implemented in GAP-027.
+This does **not** authorize adding a role-based fallback.
+
+Current panel admission may still admit such a `User` to unrelated legacy areas until
+GAP-027; this is transitional and must not be represented as completed RBAC. Current
+`canAccessPanel()` remains legacy-role-based today.
+
 ## Product Catalogue Context
 
 
@@ -3554,6 +3995,11 @@ abilities via fixed `User.role` checks (for example Merchandiser read/discovery,
 Admin/Director management bypass). That behavior is documented under **GAP-026**
 as transitional implementation mismatch only — it is **not** the target
 authorization contract and must not be extended.
+
+After GAP-026B authority cutover, normative connector authorization and safe
+presentation follow **Workspace RBAC authority cutover (Resolved — GAP-026B-0,
+2026-08-13)** — permission matrix, capability-based presentation invariant, and
+removal of `WorkspaceMembership` as an additional connector gate.
 
 ### Connection-check capability and error mapping (Resolved)
 

@@ -163,6 +163,10 @@ This document describes:
 - Workspace RBAC physical architecture (Resolved — GAP-026-0): WorkspaceUser-centric
   custom RBAC; explicit `Workspace` authorization; five physical tables; seven atomic
   permissions; anti-lockout on `Workspace` row lock — see `03-DOMAIN_MODEL.md`.
+- Workspace RBAC authority cutover (Resolved — GAP-026B-0): narrow Connector/Tax/
+  Mapping/Access permission cutover; capability-based connector presentation;
+  existing-memberships-only Access; one-time maintenance cutover — see
+  `03-DOMAIN_MODEL.md`.
 
 ### Product Catalogue Context
 
@@ -654,6 +658,7 @@ The following decisions are formally closed and must not be reopened.
 | Pilot versus SaaS MVP | Babypark may influence connector priority, but all work must remain reusable; no Babypark-specific hardcoding |
 | Company vs Workspace naming | Database: workspaces; code: Workspace; UI: Company / My Company; tenant remains technical-only terminology |
 | Workspace RBAC physical model | WorkspaceUser-centric custom RBAC; explicit `Workspace` authorization; DB-enforced same-workspace role assignment; additive workspace roles; anti-lockout serialized on `Workspace` row — see `03-DOMAIN_MODEL.md` → Workspace RBAC physical architecture (Resolved — GAP-026-0) |
+| Workspace RBAC authority cutover (GAP-026B-0) | Permission-authoritative Connector/Tax/Mapping/Access scopes; capability-based safe connector presentation; existing-memberships-only Access management; guarded User lifecycle; one-time maintenance cutover; new-membership onboarding deferred to GAP-027 — see `03-DOMAIN_MODEL.md` → Workspace RBAC authority cutover (Resolved — GAP-026B-0) |
 
 ---
 

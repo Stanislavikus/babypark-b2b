@@ -131,7 +131,9 @@ class ImplementationGapsTest extends TestCase
         $this->assertStringContainsString('GAP-026A-2 — Preflight/backfill machinery & anti-lockout coordinator', $content);
         $this->assertStringContainsString('**Done.** `WorkspaceRbacLegacyPreflight`', $content);
         $this->assertStringContainsString('GAP-026A (overall)** | **Done**', $content);
-        $this->assertStringContainsString('GAP-026B — Narrow workspace-authorization cutover', $content);
+        $this->assertStringContainsString('GAP-026B-0 — Workspace RBAC authority cutover contract', $content);
+        $this->assertStringContainsString('GAP-026B-1 — Access & Cutover Machinery', $content);
+        $this->assertStringContainsString('GAP-026B-2 — Authority & Presentation Cutover', $content);
         $this->assertStringContainsString('anti-lockout', $content);
         $this->assertStringContainsString('WorkspaceRbacPermissionSeeder', $content);
         $this->assertStringContainsString('WorkspaceAuthorization', $content);
@@ -139,26 +141,57 @@ class ImplementationGapsTest extends TestCase
         $this->assertStringContainsString('GAP-026A-2', $content);
         $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
         $this->assertStringContainsString('Open / partial', $content);
-        $this->assertStringContainsString('GAP-026A foundation', $content);
-        $this->assertStringContainsString('**Done**', $content);
-        $this->assertStringContainsString('GAP-026B remains unimplemented', $content);
-        $this->assertStringContainsString('Production backfill runs in **026B** (not 026A)', $content);
-        $this->assertStringContainsString('not production execution', $content);
+        $this->assertStringContainsString('GAP-026B-0 cutover contract **Done**', $content);
+        $this->assertStringContainsString('026B-1 / GAP-026B-2 runtime **unimplemented**', $content);
+        $this->assertStringContainsString('Production backfill runs at **EXECUTE** during the maintenance-window cutover', $content);
         $this->assertStringContainsString('failure at any step = STOP, no partial cutover', $content);
-        $this->assertStringContainsString('Legacy membership / role backfill matrix (026B production execution)', $content);
+        $this->assertStringContainsString('Legacy membership / role backfill matrix (026B production execution — GAP-026B-2 EXECUTE only)', $content);
         $this->assertStringContainsString('Spatie preflight must complete before legacy backfill', $content);
         $this->assertStringContainsString('Failure halts authorization cutover — no partial RBAC', $content);
         $this->assertStringContainsString('Legacy User lifecycle (026B cutover compatibility)', $content);
         $this->assertStringContainsString('Do not weaken RESTRICT FKs', $content);
-        $this->assertStringContainsString(
-            '**no later than** assignment/cutover activation',
+        $this->assertStringContainsString('4C-1c-2b remains blocked until GAP-026B-2', $content);
+    }
+
+    #[Test]
+    public function gap_026b_slice_placement_separates_check_only_and_execute(): void
+    {
+        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        if (! preg_match(
+            '/\| \*\*GAP-026B-1 — Access & Cutover Machinery\*\* \| (.*?) \|/s',
             $content,
-        );
-        $this->assertStringContainsString(
-            'Layer B mapping UI (4C-1c-2b) must **not** ship until GAP-026B cutover completes',
+            $b1Matches,
+        )) {
+            $this->fail('Could not locate GAP-026B-1 slice row in IMPLEMENTATION_GAPS.md');
+        }
+
+        if (! preg_match(
+            '/\| \*\*GAP-026B-2 — Authority & Presentation Cutover\*\* \| (.*?) \|/s',
             $content,
-        );
-        $this->assertStringContainsString('4C-1c-2b remains blocked', $content);
+            $b2Matches,
+        )) {
+            $this->fail('Could not locate GAP-026B-2 slice row in IMPLEMENTATION_GAPS.md');
+        }
+
+        $b1 = $b1Matches[1];
+        $b2 = $b2Matches[1];
+
+        $this->assertStringContainsString('CHECK-ONLY only', $b1);
+        $this->assertStringContainsString('no RBAC assignment/materialization', $b1);
+        $this->assertStringContainsString('No executable production EXECUTE mode in a B-1-only release', $b1);
+        $this->assertStringContainsString('Explicitly no** connector/tax policy authority switch', $b1);
+        $this->assertStringNotContainsString('**EXECUTE mode** of guarded cutover', $b1);
+
+        $this->assertStringContainsString('EXECUTE mode', $b2);
+        $this->assertStringContainsString('production legacy backfill/materialization', $b2);
+        $this->assertStringContainsString('ConnectorAccountPolicy', $b2);
+        $this->assertStringContainsString('maintenance-window cutover deployment', $b2);
+        $this->assertStringContainsString('EXECUTE + anti-lockout + smoke succeed', $b2);
+
+        $this->assertStringContainsString('CHECK-ONLY (B-1)', $content);
+        $this->assertStringContainsString('EXECUTE at cutover — B-2 only', $content);
+        $this->assertStringContainsString('GAP-026B-2 EXECUTE only', $content);
     }
 
     #[Test]
@@ -167,6 +200,8 @@ class ImplementationGapsTest extends TestCase
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString('## GAP-027 — Platform-wide admin Resource RBAC', $content);
+        $this->assertStringContainsString('new staff membership onboarding', $content);
+        $this->assertStringContainsString('existing-memberships-only limitation', $content);
         $this->assertStringContainsString('authorization-coverage CI guard', $content);
         $this->assertStringContainsString('do not enable global Filament strict authorization prematurely', $content);
     }
