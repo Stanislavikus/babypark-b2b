@@ -314,7 +314,8 @@ yet), but should be scheduled before any payment gateway integration work starts
   `FieldMapping` persistence/manual confirmation and authoritative-discovery
   validation are implemented (Task 4C-1b, Done). Canonical
   suggestion/read-model and UI-prefill work is Task 4C-1c (4C-1c-0 docs contract
-  frozen; 4C-1c-1 provider/read-model Done; 4C-1c-2 Layer B UI remains unimplemented).
+  frozen; 4C-1c-1 provider/read-model Done; 4C-1c-2a authorization contract Done;
+  4C-1c-2b Layer B UI remains unimplemented).
   Sync execution/preview/schedule/results remain later implementation slices
   after domain docs (now settled).
 
@@ -334,7 +335,9 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4C-1b** | `field_mappings` persistence + manual confirmation service + authoritative-discovery validation + revision v2 + graceful fail-closed handling when mapped `FieldBinding` or parent `FieldDefinition` physical deletion is attempted (archive remains valid lifecycle path; no raw FK errors) — Done |
 | **4C-1c-0** | Docs-only suggestion/read-model Stop-and-Amend — canonical qualification, confidence semantics, registry→discovery boundary — Done |
 | **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (no DB/migration scope) — Done |
-| **4C-1c-2** | Layer B mapping UI: high-confidence prefill + manual choice + explicit confirmation through 4C-1b service |
+| **4C-1c-2a** | Workspace access / authorization contract (docs-only Stop-and-Amend) |
+| **Workspace-scoped authorization foundation** | Implementation prerequisite before mutable Layer B mapping UI |
+| **4C-1c-2b** | Layer B mapping UI: high-confidence prefill + manual choice + explicit confirmation through 4C-1b service |
 | **4C** | Remaining sync domain: `SyncRun` / `SyncRunItem`, `ExternalRecordLink`, preview/live execution, scheduling, sync history/issues, merchant sync UX beyond mapping |
 
 Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
@@ -355,7 +358,7 @@ and graceful fail-closed handling for mapped binding / parent definition
 physical-delete attempts (archive remains valid) are implemented (Task 4C-1b).
 Canonical suggestion/read-model contract is frozen (Task 4C-1c-0, docs only).
 Canonical deterministic suggestion provider/read-model (4C-1c-1) is implemented.
-Layer B mapping UI (4C-1c-2) remains unimplemented. `SyncRun` / execution, preview,
+Layer B mapping UI (4C-1c-2b) remains unimplemented. `SyncRun` / execution, preview,
 schedule, history, and `ExternalRecordLink` remain unimplemented.
 Connector-account creation and credential-management/settings UI remain absent.
 Task 4B-2c (discovered schema fields / change inspection) and retention jobs
@@ -392,7 +395,7 @@ Implemented role matrix (confirmed against `App\Enums\UserRole`):
 
 **GAP-006 overall remains Open.** Remaining scope: Task 4B-2c (discovered
 schema fields / change inspection), retention/pruning (4B-2d),
-Layer B mapping UI (4C-1c-2),
+Layer B mapping UI (4C-1c-2b),
 sync execution/preview/schedule/history
 (`SyncRun`, issues, merchant sync UX), `ExternalRecordLink`,
 connector-account creation and credential-management/settings UI.
@@ -404,7 +407,7 @@ Distinguish carefully — do not treat every future possibility as an active GAP
 | Class | Item | Blocks Sync domain work now? |
 |---|---|---|
 | **A. Architecture blockers** | None identified against current `origin/develop` for the approved Sync Domain Rebaseline | No |
-| **B. Implementation gaps** | Layer B mapping UI (4C-1c-2); `SyncRun` / `SyncRunItem` / `ExternalRecordLink` persistence + runtime; preview/live execution; merchant sync UX beyond connection management; ConnectorSchemaDiff write path/consumer; connector-account create/settings UI; Field Browser copy / Layer C gating (GAP-025) | Yes for shipping sync; docs are settled |
+| **B. Implementation gaps** | Layer B mapping UI (4C-1c-2b); workspace-scoped authorization foundation (GAP-026); `SyncRun` / `SyncRunItem` / `ExternalRecordLink` persistence + runtime; preview/live execution; merchant sync UX beyond connection management; ConnectorSchemaDiff write path/consumer; connector-account create/settings UI; Field Browser copy / Layer C gating (GAP-025) | Yes for shipping sync; docs are settled |
 | **C. Connector-specific future verification (deferred Variant #2 / profile)** | What external contract `adobe_commerce_paas_oauth1_integration` intentionally covers; PaaS-only vs broader Magento REST-family; post-bootstrap runtime-contract/version/capability verification; Magento Open Source setup/auth compatibility; whether AccountSetup and final runtime contract must later split; whether exactly-one AccountSetup-profile invariant must ever change | **No** — deferred; not a blocker for generic Sync domain rebaseline |
 
 Do not add generic `edition` / `deployment_model` / `api_family` fields to
@@ -983,21 +986,29 @@ Remaining connector gaps are tracked separately under GAP-006.
   and is **not** a regression — remaining work is labeling, Layer C gating, and
   deeper Layer A/B surfaces.
 
-**Not implied to exist in code (docs settled; runtime absent):**
-- Sync Domain persistence/runtime (`SyncConfiguration`, `FieldMapping`,
-  `SyncRun` / `SyncRunItem`, `ExternalRecordLink`) — normative shape is in
-  `03-DOMAIN_MODEL.md`, implementation is not;
+**Implemented sync-domain persistence (do not describe as absent):**
+- `SyncConfiguration` persistence and domain write path — **implemented** (Task
+  4C-0).
+- `FieldMapping` persistence, manual confirmation, authoritative-discovery
+  validation, revision v2 — **implemented** (Task 4C-1b).
+- Canonical suggestion/read-model provider — **implemented** (Task 4C-1c-1).
+
+**Still absent (runtime / UX — not persistence):**
+- **Layer B mapping UI** (Task 4C-1c-2b) — high-confidence prefill + manual
+  choice + explicit confirmation surface;
+- `SyncRun` / `SyncRunItem` execution evidence persistence and runtime;
+- Preview / dry-run orchestration for merchant sync;
+- Scheduling beyond Discovery;
+- `ExternalRecordLink` persistence and runtime;
 - sync execution runtime for merchant "Синхронізувати зараз";
-- Preview before first live sync;
-- per-domain enabled semantic-operation persistence;
-- scheduling beyond Discovery;
+- per-domain enabled semantic-operation merchant UX beyond persistence;
 - ownership persistence/enforcement;
 - issue aggregation and bulk resolution;
 - sync-run history as a merchant Layer B surface.
 
-Each remains an implementation gap. Sync domain architecture is settled; do
-not reopen it as an open research task unless current repository truth
-contradicts an approved invariant.
+Each absent item remains an implementation gap. Sync domain architecture is
+settled; do not reopen it as an open research task unless current repository
+truth contradicts an approved invariant.
 
 **Impact:**
 - Do not document current connector merchant UI as compliant with
@@ -1005,14 +1016,71 @@ contradicts an approved invariant.
 - Do not treat Discovery Overview as the long-term merchant destination — it is
   Layer C/diagnostic vocabulary on a pre-migration merchant path.
 - Do not widen workspace Admin to Layer C as a workaround.
+- Do not claim `SyncConfiguration` or `FieldMapping` are unimplemented — that
+  is stale; Layer B mapping **UI** and sync **execution** remain the open gaps.
 
 **Next task:** Remaining Connector UX migration — Field Browser copy/navigation,
 Layer A Overview / Layer B setup surfaces beyond connection create, Layer C
-gating when platform-support identity exists. Backend mechanisms above remain
+gating when platform-support identity exists, Layer B mapping UI (4C-1c-2b after
+GAP-026 authorization foundation). Backend execution mechanisms above remain
 separate scoped tasks.
 
-**Status:** Open — partial (`Інтеграції` landing shipped); remaining UX migration
+**Status:** Open — partial (`Інтеграції` landing shipped; sync configuration and
+field-mapping persistence implemented); remaining UX migration and execution
 work.
+
+---
+
+## GAP-026 — Workspace-scoped RBAC foundation not implemented
+
+**Approved docs:**
+- `03-DOMAIN_MODEL.md` — **Workspace access model and authorization (Resolved —
+  Task 4C-1c-2a)**; **Sync mapping permissions (Resolved — Task 4C-1c-2a)**.
+- `04-ARCHITECTURE_PRINCIPLES.md` — Mandate 1 (workspace isolation) and
+  Architecture Review Checklist item 3 (authorization through policies/gates).
+- `CONNECTOR_INTEGRATION_UX_CONTRACT.md` — Layer is a visibility ceiling, not an
+  authorization grant.
+
+**Current code (verified against `develop`):**
+- `User.role` (`App\Enums\UserRole`) still participates in authorization. Example:
+  `ConnectorAccountPolicy` grants Merchandiser read/discovery and Admin/Director
+  management through fixed `$user->role === UserRole::…` checks mixed with
+  `manage_connector_accounts` permission checks.
+- `WorkspaceUser` membership is **not** implemented. `WorkspaceMembership` is an
+  MVP stub: staff users belong only when `$workspace->is_default` (see GAP-004).
+- Spatie Laravel Permission **teams** feature is disabled (`config/permission.php`:
+  `'teams' => false`). The permission migration creates global `roles` /
+  `model_has_roles` / `model_has_permissions` tables **without** `team_id`.
+- `WorkspacePermissionSeeder` seeds only `manage_workspace_tax_settings` and
+  `manage_connector_accounts` — not `view_sync_mappings` or
+  `manage_sync_mappings` (frozen in docs only until this foundation lands).
+- Current permission assignments are therefore **not** a complete
+  workspace-scoped RBAC implementation. Do **not** treat global Spatie
+  configuration as satisfying the 4C-1c-2a contract.
+
+**Cross-reference:** **GAP-004** — broad workspace data isolation is partially
+implemented, but a sampling audit of `workspace_id` scoping is **not** the same
+as workspace-scoped authorization. GAP-004 must not be read as "general workspace
+isolation solved" for RBAC purposes.
+
+**Impact:**
+- Layer B mapping UI (4C-1c-2b) is blocked until workspace-scoped role bundles,
+  `WorkspaceUser` membership, and policy refactor away from `User.role` checks
+  land.
+- `view_sync_mappings` / `manage_sync_mappings` cannot be enforced correctly
+  until workspace-scoped permission assignment exists.
+- Cross-workspace permission leakage via global role assignment remains a
+  critical failure mode until resolved.
+
+**Next task:** Workspace-scoped authorization foundation — `WorkspaceUser`
+membership, workspace-owned role/access-profile bundles, additive multi-role
+assignment per membership, seed `view_sync_mappings` / `manage_sync_mappings`,
+refactor policies (including `ConnectorAccountPolicy`) to permission-only
+checks scoped to User × Workspace. Exact Spatie Teams / UUID team columns /
+custom Role model mechanics require a separate implementation decision — not
+resolved in Task 4C-1c-2a (docs-only).
+
+**Status:** Open — blocks 4C-1c-2b mapping UI.
 
 ---
 

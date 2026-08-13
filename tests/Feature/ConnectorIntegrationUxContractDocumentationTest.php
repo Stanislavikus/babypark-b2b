@@ -175,6 +175,15 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
         $this->assertStringContainsString('CONNECTOR_INTEGRATION_UX_CONTRACT.md', $content);
         $this->assertStringContainsString('CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md', $content);
         $this->assertStringContainsString('Зведення знімка', $content);
-        $this->assertStringContainsString('**Status:** Open — partial (`Інтеграції` landing shipped); remaining UX migration', $content);
+        $this->assertMatchesRegularExpression('/\*\*Status:\*\* Open — partial \(`Інтеграції` landing shipped; sync configuration and\s+field-mapping persistence implemented\); remaining UX migration and execution\s+work\./', $content);
+    }
+
+    #[Test]
+    public function implementation_gaps_records_workspace_rbac_gap_026(): void
+    {
+        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        $this->assertStringContainsString('## GAP-026 — Workspace-scoped RBAC foundation not implemented', $content);
+        $this->assertMatchesRegularExpression('/Do \*\*not\*\* treat global Spatie\s+configuration as satisfying the 4C-1c-2a contract/', $content);
     }
 }
