@@ -250,6 +250,16 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
     }
 
     #[Test]
+    public function ux_contract_documents_gap_026b_0_capability_based_connector_presentation(): void
+    {
+        $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
+
+        $this->assertStringContainsString('connector safe presentation — Resolved — GAP-026B-0', $content);
+        $this->assertStringContainsString('capability-based**, never job-title-based', $content);
+        $this->assertStringContainsString('Workspace RBAC authority cutover (Resolved — GAP-026B-0', $content);
+    }
+
+    #[Test]
     public function domain_model_documents_workspace_access_authorization_contract(): void
     {
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));

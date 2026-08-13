@@ -177,6 +177,59 @@ php artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=
 Use `/usr/bin/php` explicitly in the `command=` line. Then run
 `supervisorctl reread`, `supervisorctl update`, and `supervisorctl status`.
 
+### GAP-026B one-time Workspace RBAC cutover
+
+**Ordinary recurring deployment** (`./deploy.sh`) is **not** sufficient for the one-time
+GAP-026B workspace RBAC authority cutover.
+
+Current `deploy.sh` only pulls, builds assets, clears cache, and restarts the queue.
+It does **not** run migrations, RBAC catalogue seeding, legacy backfill, anti-lockout
+validation, or cutover smoke checks. Do **not** silently turn every future deploy into
+a backfill attempt.
+
+**Repository merge ≠ production cutover.** Merging GAP-026B implementation into
+`develop` does not by itself activate workspace-permission authority in production.
+Activation requires the controlled one-time sequence documented in
+`docs/03-DOMAIN_MODEL.md` → **Workspace RBAC authority cutover (Resolved —
+GAP-026B-0, 2026-08-13)**.
+
+**One-time maintenance-window sequence (summary)**
+
+1. verified DB backup / snapshot;
+2. maintenance mode / block merchant writes;
+3. deploy exact approved 026B code while traffic is blocked;
+4. run pending migrations;
+5. seed canonical `workspace_permissions` catalogue (`WorkspaceRbacPermissionSeeder`);
+6. run guarded RBAC cutover **CHECK-ONLY**;
+7. if safe: **EXECUTE** deterministic legacy backfill;
+8. fresh anti-lockout validation;
+9. focused authorization/cutover smoke checks;
+10. clear/reload application state; restart queue workers;
+11. resume traffic.
+
+Failure at any preflight/smoke step: remain blocked for merchant writes; no partial
+authority fallback; no role-based Connector/Tax/Mapping fallback; reconcile before
+traffic resumes.
+
+**Cutover command contract**
+
+Implementation must provide a guarded one-time command/service with:
+
+- **CHECK-ONLY** — diagnostics only; no RBAC assignments; may run before maintenance;
+- **EXECUTE** — requires maintenance/quiesced merchant writes; re-runs preflight;
+  runs backfill; post-backfill anti-lockout; fails non-zero on unsafe state.
+
+Exact Artisan command name is implementation-level. Migrations/seeders/service-provider
+boot must **not** automatically execute production legacy backfill.
+
+**Queue worker quiescence**
+
+Because queue workers are long-running, verify no concurrent affected mutation during
+cutover. Maintenance mode plus worker quiescence/restart must be verified against the
+actual pilot Supervisor configuration (`babypark-queue` today). After cutover steps
+complete, ensure `php artisan queue:restart` (or Supervisor restart) so workers reload
+authorization state.
+
 ---
 
 ## Docker Compose reference deployment
