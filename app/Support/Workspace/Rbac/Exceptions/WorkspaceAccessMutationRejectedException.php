@@ -26,6 +26,11 @@ final class WorkspaceAccessMutationRejectedException extends RuntimeException
         return new self('Unknown workspace permission codes: '.implode(', ', $codes));
     }
 
+    public static function missingCanonicalPermissionRows(array $codes): self
+    {
+        return new self('Missing canonical workspace permission catalogue rows: '.implode(', ', $codes));
+    }
+
     public static function forgedTemplateKey(): self
     {
         return new self('Merchant-created roles must not set template_key.');

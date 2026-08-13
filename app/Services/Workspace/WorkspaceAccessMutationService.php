@@ -21,14 +21,16 @@ final class WorkspaceAccessMutationService
 
     public function assignRole(User $actor, Workspace $workspace, string $membershipId, string $roleId): void
     {
-        $this->authorize($actor, $workspace);
+        $this->authorizePreLock($actor, $workspace);
 
-        $membership = $this->resolveMembership($workspace, $membershipId);
-        $role = $this->resolveRole($workspace, $roleId);
+        $this->coordinator->mutateLocked($workspace, function (Workspace $lockedWorkspace) use ($actor, $membershipId, $roleId): void {
+            $this->authorizeFreshActor($actor->id, $lockedWorkspace);
 
-        $this->coordinator->mutateLocked($workspace, function () use ($workspace, $membership, $role): void {
+            $membership = $this->resolveMembership($lockedWorkspace, $membershipId);
+            $role = $this->resolveRole($lockedWorkspace, $roleId);
+
             $exists = DB::table('workspace_user_roles')
-                ->where('workspace_id', $workspace->id)
+                ->where('workspace_id', $lockedWorkspace->id)
                 ->where('workspace_user_id', $membership->id)
                 ->where('workspace_role_id', $role->id)
                 ->exists();
@@ -38,7 +40,7 @@ final class WorkspaceAccessMutationService
             }
 
             DB::table('workspace_user_roles')->insert([
-                'workspace_id' => $workspace->id,
+                'workspace_id' => $lockedWorkspace->id,
                 'workspace_user_id' => $membership->id,
                 'workspace_role_id' => $role->id,
             ]);
@@ -47,14 +49,16 @@ final class WorkspaceAccessMutationService
 
     public function removeRole(User $actor, Workspace $workspace, string $membershipId, string $roleId): void
     {
-        $this->authorize($actor, $workspace);
+        $this->authorizePreLock($actor, $workspace);
 
-        $membership = $this->resolveMembership($workspace, $membershipId);
-        $role = $this->resolveRole($workspace, $roleId);
+        $this->coordinator->mutateLocked($workspace, function (Workspace $lockedWorkspace) use ($actor, $membershipId, $roleId): void {
+            $this->authorizeFreshActor($actor->id, $lockedWorkspace);
 
-        $this->coordinator->mutateLocked($workspace, function () use ($workspace, $membership, $role): void {
+            $membership = $this->resolveMembership($lockedWorkspace, $membershipId);
+            $role = $this->resolveRole($lockedWorkspace, $roleId);
+
             DB::table('workspace_user_roles')
-                ->where('workspace_id', $workspace->id)
+                ->where('workspace_id', $lockedWorkspace->id)
                 ->where('workspace_user_id', $membership->id)
                 ->where('workspace_role_id', $role->id)
                 ->delete();
@@ -63,11 +67,13 @@ final class WorkspaceAccessMutationService
 
     public function activateMembership(User $actor, Workspace $workspace, string $membershipId): void
     {
-        $this->authorize($actor, $workspace);
+        $this->authorizePreLock($actor, $workspace);
 
-        $membership = $this->resolveMembership($workspace, $membershipId);
+        $this->coordinator->mutateLocked($workspace, function (Workspace $lockedWorkspace) use ($actor, $membershipId): void {
+            $this->authorizeFreshActor($actor->id, $lockedWorkspace);
 
-        $this->coordinator->mutateLocked($workspace, function () use ($membership): void {
+            $membership = $this->resolveMembership($lockedWorkspace, $membershipId);
+
             if ($membership->is_active) {
                 return;
             }
@@ -78,11 +84,13 @@ final class WorkspaceAccessMutationService
 
     public function deactivateMembership(User $actor, Workspace $workspace, string $membershipId): void
     {
-        $this->authorize($actor, $workspace);
+        $this->authorizePreLock($actor, $workspace);
 
-        $membership = $this->resolveMembership($workspace, $membershipId);
+        $this->coordinator->mutateLocked($workspace, function (Workspace $lockedWorkspace) use ($actor, $membershipId): void {
+            $this->authorizeFreshActor($actor->id, $lockedWorkspace);
 
-        $this->coordinator->mutateLocked($workspace, function () use ($membership): void {
+            $membership = $this->resolveMembership($lockedWorkspace, $membershipId);
+
             if (! $membership->is_active) {
                 return;
             }
@@ -96,18 +104,20 @@ final class WorkspaceAccessMutationService
      */
     public function createRole(User $actor, Workspace $workspace, string $name, array $permissionCodes): WorkspaceRole
     {
-        $this->authorize($actor, $workspace);
+        $this->authorizePreLock($actor, $workspace);
 
-        $permissionIds = $this->resolveCanonicalPermissionIds($permissionCodes);
+        return $this->coordinator->mutateLocked($workspace, function (Workspace $lockedWorkspace) use ($actor, $name, $permissionCodes): WorkspaceRole {
+            $this->authorizeFreshActor($actor->id, $lockedWorkspace);
 
-        return $this->coordinator->mutateLocked($workspace, function () use ($workspace, $name, $permissionIds): WorkspaceRole {
+            $permissionIds = $this->resolveCanonicalPermissionIds($permissionCodes);
+
             $role = WorkspaceRole::query()->create([
-                'workspace_id' => $workspace->id,
+                'workspace_id' => $lockedWorkspace->id,
                 'name' => $name,
                 'template_key' => null,
             ]);
 
-            $this->syncRolePermissions($workspace->id, $role->id, $permissionIds);
+            $this->syncRolePermissions($lockedWorkspace->id, $role->id, $permissionIds);
 
             return $role->refresh();
         });
@@ -115,11 +125,12 @@ final class WorkspaceAccessMutationService
 
     public function renameRole(User $actor, Workspace $workspace, string $roleId, string $name): WorkspaceRole
     {
-        $this->authorize($actor, $workspace);
+        $this->authorizePreLock($actor, $workspace);
 
-        $role = $this->resolveRole($workspace, $roleId);
+        return $this->coordinator->mutateLocked($workspace, function (Workspace $lockedWorkspace) use ($actor, $roleId, $name): WorkspaceRole {
+            $this->authorizeFreshActor($actor->id, $lockedWorkspace);
 
-        return $this->coordinator->mutateLocked($workspace, function () use ($role, $name): WorkspaceRole {
+            $role = $this->resolveRole($lockedWorkspace, $roleId);
             $role->update(['name' => $name]);
 
             return $role->refresh();
@@ -131,13 +142,14 @@ final class WorkspaceAccessMutationService
      */
     public function updateRolePermissions(User $actor, Workspace $workspace, string $roleId, array $permissionCodes): WorkspaceRole
     {
-        $this->authorize($actor, $workspace);
+        $this->authorizePreLock($actor, $workspace);
 
-        $role = $this->resolveRole($workspace, $roleId);
-        $permissionIds = $this->resolveCanonicalPermissionIds($permissionCodes);
+        return $this->coordinator->mutateLocked($workspace, function (Workspace $lockedWorkspace) use ($actor, $roleId, $permissionCodes): WorkspaceRole {
+            $this->authorizeFreshActor($actor->id, $lockedWorkspace);
 
-        return $this->coordinator->mutateLocked($workspace, function () use ($workspace, $role, $permissionIds): WorkspaceRole {
-            $this->syncRolePermissions($workspace->id, $role->id, $permissionIds);
+            $role = $this->resolveRole($lockedWorkspace, $roleId);
+            $permissionIds = $this->resolveCanonicalPermissionIds($permissionCodes);
+            $this->syncRolePermissions($lockedWorkspace->id, $role->id, $permissionIds);
 
             return $role->refresh();
         });
@@ -145,22 +157,24 @@ final class WorkspaceAccessMutationService
 
     public function deleteRole(User $actor, Workspace $workspace, string $roleId): void
     {
-        $this->authorize($actor, $workspace);
+        $this->authorizePreLock($actor, $workspace);
 
-        $role = $this->resolveRole($workspace, $roleId);
+        $this->coordinator->mutateLocked($workspace, function (Workspace $lockedWorkspace) use ($actor, $roleId): void {
+            $this->authorizeFreshActor($actor->id, $lockedWorkspace);
 
-        $assigned = DB::table('workspace_user_roles')
-            ->where('workspace_id', $workspace->id)
-            ->where('workspace_role_id', $role->id)
-            ->exists();
+            $role = $this->resolveRole($lockedWorkspace, $roleId);
 
-        if ($assigned) {
-            throw WorkspaceAccessMutationRejectedException::roleStillAssigned($role->id);
-        }
+            $assigned = DB::table('workspace_user_roles')
+                ->where('workspace_id', $lockedWorkspace->id)
+                ->where('workspace_role_id', $role->id)
+                ->exists();
 
-        $this->coordinator->mutateLocked($workspace, function () use ($workspace, $role): void {
+            if ($assigned) {
+                throw WorkspaceAccessMutationRejectedException::roleStillAssigned($role->id);
+            }
+
             DB::table('workspace_role_permissions')
-                ->where('workspace_id', $workspace->id)
+                ->where('workspace_id', $lockedWorkspace->id)
                 ->where('workspace_role_id', $role->id)
                 ->delete();
 
@@ -168,11 +182,29 @@ final class WorkspaceAccessMutationService
         });
     }
 
-    private function authorize(User $actor, Workspace $workspace): void
+    private function authorizePreLock(User $actor, Workspace $workspace): void
+    {
+        $this->authorizeActor($actor, $workspace);
+    }
+
+    private function authorizeActor(User $actor, Workspace $workspace): void
     {
         if (! $this->authorization->allows($actor, $workspace, WorkspacePermissions::MANAGE_WORKSPACE_ACCESS)) {
             throw new WorkspaceAccessUnauthorizedException;
         }
+    }
+
+    private function authorizeFreshActor(string $actorUserId, Workspace $workspace): User
+    {
+        $freshActor = User::query()->find($actorUserId);
+
+        if ($freshActor === null) {
+            throw new WorkspaceAccessUnauthorizedException;
+        }
+
+        $this->authorizeActor($freshActor, $workspace);
+
+        return $freshActor;
     }
 
     private function resolveMembership(Workspace $workspace, string $membershipId): WorkspaceUser
@@ -210,11 +242,23 @@ final class WorkspaceAccessMutationService
             throw WorkspaceAccessMutationRejectedException::unknownPermissionCodes($unknown);
         }
 
-        return WorkspacePermission::query()
+        if ($normalized === []) {
+            return [];
+        }
+
+        $rows = WorkspacePermission::query()
             ->whereIn('code', $normalized)
             ->orderBy('code')
-            ->pluck('id')
-            ->all();
+            ->get(['id', 'code']);
+
+        $foundCodes = $rows->pluck('code')->all();
+        $missing = array_values(array_diff($normalized, $foundCodes));
+
+        if ($missing !== []) {
+            throw WorkspaceAccessMutationRejectedException::missingCanonicalPermissionRows($missing);
+        }
+
+        return $rows->pluck('id')->all();
     }
 
     /**

@@ -466,4 +466,116 @@ class WorkspaceAccessMutationServiceTest extends TestCase
         $this->assertSame($membershipCount, WorkspaceUser::query()->count());
         $this->assertDatabaseHas('workspace_users', ['id' => $target->id]);
     }
+
+    #[Test]
+    public function post_lock_authorization_uses_fresh_user_state_after_global_deactivation(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $actor = User::factory()->create(['is_active' => true]);
+        $this->grantManageWorkspaceAccess($workspace, $actor);
+        $this->makeEffectiveHolder($workspace, User::factory()->create(), 'Backup Holder');
+        $target = $this->makeWorkspaceMembership($workspace);
+        $role = $this->createRoleWithPermissions(
+            $workspace->id,
+            'Assignable Role',
+            [WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS],
+        );
+
+        User::query()->whereKey($actor->id)->update(['is_active' => false]);
+        $this->assertTrue($actor->is_active, 'Pre-lock hydrated actor must remain stale in memory.');
+
+        $this->expectException(WorkspaceAccessUnauthorizedException::class);
+
+        try {
+            $this->service->assignRole($actor, $workspace, $target->id, $role->id);
+        } finally {
+            $this->assertDatabaseMissing('workspace_user_roles', [
+                'workspace_user_id' => $target->id,
+                'workspace_role_id' => $role->id,
+            ]);
+        }
+    }
+
+    #[Test]
+    public function missing_canonical_permission_db_row_fails_closed(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $actor = User::factory()->create();
+        $this->grantManageWorkspaceAccess($workspace, $actor);
+        $this->makeEffectiveHolder($workspace, User::factory()->create(), 'Backup Holder');
+
+        DB::table('workspace_permissions')
+            ->where('code', WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS)
+            ->delete();
+
+        try {
+            $this->service->createRole($actor, $workspace, 'Broken Role', [
+                WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+            ]);
+            $this->fail('Expected WorkspaceAccessMutationRejectedException.');
+        } catch (WorkspaceAccessMutationRejectedException $exception) {
+            $this->assertStringContainsString('view_connector_accounts', $exception->getMessage());
+        }
+
+        $this->assertDatabaseMissing('workspace_roles', ['name' => 'Broken Role']);
+    }
+
+    #[Test]
+    public function failed_missing_catalogue_resolution_does_not_partially_change_role_permissions(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $actor = User::factory()->create();
+        $this->grantManageWorkspaceAccess($workspace, $actor);
+        $this->makeEffectiveHolder($workspace, User::factory()->create(), 'Backup Holder');
+
+        $role = $this->service->createRole($actor, $workspace, 'Existing Role', [
+            WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+        ]);
+
+        $originalPermissionCount = DB::table('workspace_role_permissions')
+            ->where('workspace_role_id', $role->id)
+            ->count();
+
+        DB::table('workspace_permissions')
+            ->where('code', WorkspacePermissions::RUN_CONNECTOR_DISCOVERY)
+            ->delete();
+
+        try {
+            $this->service->updateRolePermissions($actor, $workspace, $role->id, [
+                WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+                WorkspacePermissions::RUN_CONNECTOR_DISCOVERY,
+            ]);
+            $this->fail('Expected WorkspaceAccessMutationRejectedException.');
+        } catch (WorkspaceAccessMutationRejectedException $exception) {
+            $this->assertStringContainsString('run_connector_discovery', $exception->getMessage());
+        }
+
+        $this->assertSame(
+            $originalPermissionCount,
+            DB::table('workspace_role_permissions')->where('workspace_role_id', $role->id)->count(),
+        );
+    }
+
+    #[Test]
+    public function delete_role_rejects_assigned_state_freshly_observed_after_lock(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $actor = User::factory()->create();
+        $this->grantManageWorkspaceAccess($workspace, $actor);
+        $this->makeEffectiveHolder($workspace, User::factory()->create(), 'Backup Holder');
+
+        $role = $this->createRoleWithPermissions(
+            $workspace->id,
+            'Assigned After Pre-check',
+            [WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS],
+        );
+        $target = $this->makeWorkspaceMembership($workspace);
+        $this->assignRoleToMembership($target, $role);
+
+        $this->expectException(WorkspaceAccessMutationRejectedException::class);
+
+        $this->service->deleteRole($actor, $workspace, $role->id);
+
+        $this->assertDatabaseHas('workspace_roles', ['id' => $role->id]);
+    }
 }

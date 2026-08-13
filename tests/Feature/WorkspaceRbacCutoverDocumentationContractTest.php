@@ -213,6 +213,49 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
     }
 
     #[Test]
+    public function access_mutation_contract_requires_post_lock_fresh_authorization_and_target_revalidation(): void
+    {
+        $section = $this->cutoverSection();
+
+        $antiLockoutPos = strpos($section, '**Anti-lockout routing for Access mutations (026B applicability)**');
+        $this->assertNotFalse($antiLockoutPos);
+
+        $accessSection = substr($section, $antiLockoutPos);
+
+        $this->assertStringContainsString('optional preliminary authorization for early rejection only', $accessSection);
+        $this->assertStringContainsString('non-authoritative fast-fail/UX', $accessSection);
+        $this->assertStringContainsString('`WorkspaceAccessMutationCoordinator` acquires the explicit `Workspace` row mutex', $accessSection);
+        $this->assertStringContainsString('freshly reload the requesting `User` from persistence by stable ID', $accessSection);
+        $this->assertStringContainsString('fresh actor authorization against the locked explicit `Workspace`', $accessSection);
+        $this->assertStringContainsString('freshly resolve/revalidate mutable membership/role targets', $accessSection);
+        $this->assertStringContainsString('fresh effective-holder query', $accessSection);
+        $this->assertStringContainsString('reject/rollback if zero holders', $accessSection);
+        $this->assertStringContainsString('The coordinator remains an integrity boundary, **not** actor authorization', $accessSection);
+        $this->assertStringContainsString('Do **not** merge actor authorization into `WorkspaceAccessMutationCoordinator`', $accessSection);
+        $this->assertStringContainsString('same TOCTOU principle already frozen for consequential Tax writes', $accessSection);
+
+        $lockPos = strpos($accessSection, 'acquires the explicit `Workspace` row mutex');
+        $freshAuthPos = strpos($accessSection, 'fresh actor authorization against the locked explicit `Workspace`');
+        $freshTargetPos = strpos($accessSection, 'freshly resolve/revalidate mutable membership/role targets');
+        $mutationPos = strpos($accessSection, 'perform the mutation');
+        $holderQueryPos = strpos($accessSection, 'fresh effective-holder query');
+        $rollbackPos = strpos($accessSection, 'reject/rollback if zero holders');
+
+        $this->assertNotFalse($lockPos);
+        $this->assertNotFalse($freshAuthPos);
+        $this->assertNotFalse($freshTargetPos);
+        $this->assertNotFalse($mutationPos);
+        $this->assertNotFalse($holderQueryPos);
+        $this->assertNotFalse($rollbackPos);
+
+        $this->assertLessThan($freshAuthPos, $lockPos);
+        $this->assertLessThan($freshTargetPos, $freshAuthPos);
+        $this->assertLessThan($mutationPos, $freshTargetPos);
+        $this->assertLessThan($holderQueryPos, $mutationPos);
+        $this->assertLessThan($rollbackPos, $holderQueryPos);
+    }
+
+    #[Test]
     public function gap_026b_1_slice_owns_check_only_only_not_execute_or_production_backfill(): void
     {
         $domainB1 = $this->cutoverB1SliceRow();
