@@ -1079,16 +1079,21 @@ Implementation remains open.
 
 | Slice | Scope |
 |---|---|
-| **GAP-026A — Physical RBAC Foundation** | Five custom RBAC tables; seven-permission catalogue; models/relationships; composite workspace guards; explicit `WorkspaceAuthorization`; idempotent legacy membership/role backfill; Spatie-assignment deployment preflight; anti-lockout coordinator + MySQL constraint/concurrency tests. **Explicitly not in 026A:** `ConnectorAccountPolicy` cutover; `WorkspaceTaxSettingsAuthorization` cutover; Mapping authorization policy; Access/Roles merchant UI; authoritative `WorkspaceMembership` switch; general `WorkspaceContext` rewrite; `canAccessPanel()` changes; `strictAuthorization()`; Spatie removal; full admin Resource RBAC. 026A is foundation-first and must not change current merchant authorization behavior. |
-| **GAP-026B — Narrow workspace-authorization cutover** | ConnectorAccount authorization; workspace tax-settings authorization; Mapping authorization seam; Access / Roles management UI + mutations; authoritative anti-lockout routing; necessary global User deactivation/deletion protection. At 026B completion, 4C-1c-2b Mapping UI becomes unblocked. `User::canAccessPanel()` and unrelated admin resources may still use legacy role semantics until GAP-027. |
+| **GAP-026A — Physical RBAC Foundation** | Five custom RBAC tables; seven-permission **global** `workspace_permissions` catalogue (seedable in 026A — no assignment authority); models/relationships; composite workspace guards/RESTRICT; explicit `WorkspaceAuthorization`; legacy preflight/backfill **service implementation + tests** (not production execution); anti-lockout coordinator implementation/tests; MySQL constraint/concurrency verification. **Explicitly not in 026A:** production legacy `WorkspaceUser` / `WorkspaceRole` / `WorkspaceUserRole` materialization for existing `Users`; `ConnectorAccountPolicy` cutover; `WorkspaceTaxSettingsAuthorization` cutover; Mapping authorization policy; Access/Roles merchant UI; authoritative `WorkspaceMembership` switch; general `WorkspaceContext` rewrite; `canAccessPanel()` changes; `strictAuthorization()`; Spatie removal; full admin Resource RBAC. 026A is foundation-only — must not claim workspace RBAC is populated or authoritative. |
+| **GAP-026B — Narrow workspace-authorization cutover** | **Pre-cutover gate (frozen order):** Spatie assignment preflight → legacy workspace/Admin preflight → deterministic/idempotent legacy backfill from **current** legacy state → fresh anti-lockout validation → workspace-permission authorization becomes authoritative (failure at any step = STOP, no partial cutover). Then: `ConnectorAccount` authorization; workspace tax-settings authorization; Mapping authorization seam; Access / Roles management UI + mutations; authoritative anti-lockout routing; `User` lifecycle protection (`is_active`, hard-delete, multi-workspace locking) **no later than** assignment/cutover activation. At 026B completion, 4C-1c-2b Mapping UI becomes unblocked. `User::canAccessPanel()` and unrelated admin resources may still use legacy role semantics until GAP-027. |
 
-**Legacy membership / role backfill matrix (026A):**
+**Legacy membership / role backfill matrix (026B production execution):**
 
-Before automatic backfill: fail-closed preflight requires exactly one `workspaces`
-row, that row alone has `is_default = true`, and at least one active staff
-Admin/Director (`customer_id IS NULL`, `users.is_active = true`). Multi-workspace
-legacy state, zero active Admin/Director, or failed counts → STOP; no inference,
-auto-promotion, reactivation, or assign-all-users-to-all-workspaces.
+Production backfill runs in **026B** (not 026A), only after Spatie preflight and
+legacy workspace/Admin preflight succeed, and only from **current** legacy state
+at cutover time.
+
+Before automatic backfill (026B step 2): fail-closed preflight requires exactly
+one `workspaces` row, that row alone has `is_default = true`, and at least one
+active staff Admin/Director (`customer_id IS NULL`, `users.is_active = true`).
+Multi-workspace legacy state, zero active Admin/Director, or failed counts → STOP;
+no inference, auto-promotion, reactivation, or assign-all-users-to-all-workspaces.
+Failure halts authorization cutover — no partial RBAC.
 
 Resolve default workspace by `is_default = true` (never hardcode UUID). Create
 `WorkspaceUser` for each staff `User` (`customer_id IS NULL`) with
@@ -1096,6 +1101,14 @@ Resolve default workspace by `is_default = true` (never hardcode UUID). Create
 capabilities flow through deterministic bootstrap `WorkspaceRole` bundle(s) and
 `WorkspaceUserRole` assignment — not direct membership permission grants.
 Stable non-null `template_key` is bootstrap role identity; merchant `name` is not.
+
+**Legacy User lifecycle (026B cutover compatibility):**
+
+Current `UserResource` still allows staff `User` create, legacy `role` / `is_active`
+mutation, and hard-delete. Once `WorkspaceUser` rows exist, `users` →
+`workspace_users` ON DELETE RESTRICT changes delete behavior. 026B must ship
+`User` lifecycle integrity protection in the same cutover as legacy assignment
+materialization and authorization activation. Do not weaken RESTRICT FKs.
 
 | Legacy role | Backfilled permissions (via bootstrap roles) |
 |---|---|
@@ -1105,11 +1118,12 @@ Stable non-null `template_key` is bootstrap role identity; merchant `name` is no
 | `view_sync_mappings` | nobody |
 | `manage_sync_mappings` | nobody |
 
-**Spatie preflight / deferred removal:**
+**Spatie preflight / deferred removal (026B step 1):**
 
 Before production backfill/cutover, audit `roles`, `model_has_roles`,
 `model_has_permissions`, `role_has_permissions`. Unexpected rows → STOP and
-reconcile explicitly. Do not remove Spatie package/tables in 026A or 026B.
+reconcile explicitly. Spatie preflight must complete before legacy backfill.
+Do not remove Spatie package/tables in 026A or 026B.
 
 **Anti-lockout:**
 

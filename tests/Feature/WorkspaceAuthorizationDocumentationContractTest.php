@@ -273,6 +273,13 @@ class WorkspaceAuthorizationDocumentationContractTest extends TestCase
         $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
         $this->assertStringContainsString('implementation not', $content);
         $this->assertStringContainsString('started. Closure requires 026A foundation', $content);
+        $this->assertStringContainsString('Production backfill runs in **026B** (not 026A)', $content);
+        $this->assertStringContainsString('not production execution', $content);
+        $this->assertStringContainsString('failure at any step = STOP, no partial cutover', $content);
+        $this->assertStringContainsString(
+            'Layer B mapping UI (4C-1c-2b) must **not** ship until GAP-026B cutover completes',
+            $content,
+        );
     }
 
     #[Test]

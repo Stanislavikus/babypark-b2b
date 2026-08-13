@@ -136,6 +136,34 @@ class ImplementationGapsTest extends TestCase
         $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
         $this->assertStringContainsString('implementation not', $content);
         $this->assertStringContainsString('started. Closure requires 026A foundation', $content);
+        $this->assertStringContainsString('seedable in 026A — no assignment authority', $content);
+        $this->assertStringContainsString('service implementation + tests', $content);
+        $this->assertStringContainsString('not production execution', $content);
+        $this->assertStringContainsString(
+            '**Explicitly not in 026A:** production legacy `WorkspaceUser`',
+            $content,
+        );
+        $this->assertStringContainsString('must not claim workspace RBAC is populated or authoritative', $content);
+        $this->assertStringContainsString('Pre-cutover gate (frozen order):', $content);
+        $this->assertStringContainsString('Spatie assignment preflight', $content);
+        $this->assertStringContainsString('legacy workspace/Admin preflight', $content);
+        $this->assertStringContainsString('deterministic/idempotent legacy backfill from **current** legacy state', $content);
+        $this->assertStringContainsString('fresh anti-lockout validation', $content);
+        $this->assertStringContainsString('failure at any step = STOP, no partial cutover', $content);
+        $this->assertStringContainsString('Legacy membership / role backfill matrix (026B production execution)', $content);
+        $this->assertStringContainsString('Production backfill runs in **026B** (not 026A)', $content);
+        $this->assertStringContainsString('Spatie preflight must complete before legacy backfill', $content);
+        $this->assertStringContainsString('Failure halts authorization cutover — no partial RBAC', $content);
+        $this->assertStringContainsString('Legacy User lifecycle (026B cutover compatibility)', $content);
+        $this->assertStringContainsString('Do not weaken RESTRICT FKs', $content);
+        $this->assertStringContainsString(
+            '**no later than** assignment/cutover activation',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'Layer B mapping UI (4C-1c-2b) must **not** ship until GAP-026B cutover completes',
+            $content,
+        );
     }
 
     #[Test]

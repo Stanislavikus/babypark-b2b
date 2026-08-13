@@ -683,12 +683,87 @@ in production authorization and the current permission seeder.
 Keep all existing independence rules. No mapping permission is automatically
 implied by Admin/Director legacy status.
 
-**Legacy-data backfill (026A migration/backfill)**
+**026A / 026B staging — legacy backfill execution**
 
-**Automatic backfill deployment preflight (fail-closed)**
+The legacy membership/role backfill **contract** below is frozen. Its **production
+execution** is gated to GAP-026B — not GAP-026A.
 
-Before automatic 026A legacy membership/role backfill, require fail-closed
-verification of:
+**026A foundation scope (no production legacy assignment)**
+
+GAP-026A creates the physical/code foundation only.
+
+It **MUST NOT** materialize `WorkspaceUser` / `WorkspaceRole` /
+`WorkspaceUserRole` legacy production assignments for existing `Users` as part of
+026A activation.
+
+026A may implement and test:
+
+- legacy-state preflight service;
+- deterministic/idempotent backfill service;
+- template-role construction logic;
+- anti-lockout coordinator;
+
+but these services are **not** executed against production legacy users as part of
+026A activation.
+
+The global `workspace_permissions` catalogue may be seeded in 026A because it
+has no `User` / workspace assignment authority by itself.
+
+026A completion must **not** claim target workspace RBAC is already populated or
+authoritative.
+
+Reason 026A does not execute production legacy assignment:
+
+- current `UserResource` still exposes staff `User` hard-delete, legacy `role`, and
+  `is_active` mutation — creating authoritative `WorkspaceUser` rows early would
+  let a non-authoritative shadow membership graph drift before 026B;
+- once `WorkspaceUser` rows exist, frozen `users` → `workspace_users` ON DELETE
+  RESTRICT changes hard-delete behavior while legacy User lifecycle guards are not
+  yet cut over.
+
+**Legacy-data backfill contract (026B production execution)**
+
+**026B authorization cutover gate (frozen ordering)**
+
+Before workspace RBAC becomes authoritative in 026B:
+
+1. run Spatie assignment preflight;
+2. run legacy workspace/Admin preflight (below);
+3. execute deterministic/idempotent legacy backfill from **current** legacy state;
+4. perform fresh anti-lockout validation;
+5. only if all four succeed may workspace-permission authorization become
+   authoritative.
+
+Failure at any step: STOP → no permission-policy cutover → no Access/Roles
+mutation activation → no Mapping authorization activation. Do not silently fall
+back to partial RBAC.
+
+Exact deployment mechanics (migration vs guarded deployment command, maintenance-mode
+sequencing, etc.) are implementation-level and must preserve this ordering.
+
+**Legacy User lifecycle compatibility**
+
+Current `User` lifecycle can still:
+
+- create staff `Users`;
+- change legacy `role`;
+- change `is_active`;
+- hard-delete `Users` (via `UserResource`).
+
+Once `WorkspaceUser` rows exist, frozen `users` → `workspace_users` ON DELETE
+RESTRICT changes hard-delete behavior.
+
+Therefore GAP-026B must bring the necessary `User` lifecycle integrity protection
+(**`is_active`**, hard-delete, deterministic multi-workspace anti-lockout locking)
+**no later than** the same cutover in which legacy `WorkspaceUser` assignments are
+materialized and made authoritative.
+
+Do not weaken or remove the RESTRICT FK.
+
+**Automatic backfill deployment preflight (fail-closed — 026B step 2)**
+
+Before automatic 026B legacy membership/role backfill (step 3 above), require
+fail-closed verification of:
 
 1. exactly one row exists in `workspaces`;
 2. that same row is the exactly-one row with `is_default = true`;
@@ -714,7 +789,7 @@ reconciliation before retrying deployment.
 Once preflight succeeds, preserve `workspace_users.is_active = true` for the
 legacy membership row itself regardless of `users.is_active` (see below).
 
-026A migration/backfill must resolve the current default workspace by
+026B legacy backfill must resolve the current default workspace by
 `is_default = true`. Never hardcode the UUID.
 
 Create a `WorkspaceUser` row for each existing staff `User` where
@@ -754,7 +829,7 @@ Merchant-facing role `name` is not authorization identity; stable non-null
 `template_key` is the bootstrap identity for platform template roles. Do not invent
 per-user overrides.
 
-**Spatie assignment deployment preflight**
+**Spatie assignment deployment preflight (026B step 1)**
 
 Before any production backfill/cutover, inspect existing Spatie assignment tables:
 
@@ -806,15 +881,21 @@ not inferred from SQLite.
 
 Phase timing:
 
-- In 026A, the coordinator/service and invariant may be implemented/tested for the
-  new RBAC domain, but legacy production authorization/write paths are not yet
-  considered cut over.
+- In 026A, physical tables, models, `WorkspaceAuthorization`, preflight/backfill
+  **machinery**, and anti-lockout coordinator may be implemented and tested, but
+  legacy production authorization/write paths are not cut over and production legacy
+  `WorkspaceUser` / role assignments are **not** materialized.
+- 026B begins with fail-closed production preflight → current-state legacy backfill
+  → anti-lockout validation → authorization cutover, then connector/tax/mapping
+  policy cutover, Access/Roles UI, and `User` lifecycle protection in the same
+  cutover window.
 - Before 026B becomes authoritative, it must revalidate anti-lockout against
   current production state; route every newly authoritative access mutation through
   the coordinator; protect global `User.is_active` / hard-delete paths that could
   invalidate effective access.
 
-026A alone does not make every legacy User mutation anti-lockout-safe.
+026A alone does not make every legacy User mutation anti-lockout-safe and does not
+populate or authorize workspace RBAC in production.
 
 **Platform plane and cabinet boundaries**
 

@@ -197,11 +197,124 @@ class WorkspaceRbacPhysicalArchitectureDocumentationContractTest extends TestCas
     }
 
     #[Test]
+    public function contract_documents_026a_does_not_execute_production_legacy_backfill(): void
+    {
+        $section = $this->physicalArchitectureSection();
+
+        $this->assertStringContainsString('026A / 026B staging — legacy backfill execution', $section);
+        $this->assertStringContainsString('production execution', $section);
+        $this->assertStringContainsString('gated to GAP-026B — not GAP-026A', $section);
+        $this->assertStringContainsString('026A foundation scope (no production legacy assignment)', $section);
+        $this->assertStringContainsString(
+            'It **MUST NOT** materialize `WorkspaceUser` / `WorkspaceRole` /',
+            $section,
+        );
+        $this->assertStringContainsString(
+            'legacy production assignments for existing `Users` as part of',
+            $section,
+        );
+        $this->assertStringContainsString('026A activation', $section);
+        $this->assertStringContainsString(
+            'must **not** claim target workspace RBAC is already populated or',
+            $section,
+        );
+        $this->assertStringContainsString('authoritative', $section);
+    }
+
+    #[Test]
+    public function contract_documents_026a_may_implement_backfill_machinery_without_production_execution(): void
+    {
+        $section = $this->physicalArchitectureSection();
+
+        $this->assertStringContainsString('026A may implement and test:', $section);
+        $this->assertStringContainsString('legacy-state preflight service', $section);
+        $this->assertStringContainsString('deterministic/idempotent backfill service', $section);
+        $this->assertStringContainsString('template-role construction logic', $section);
+        $this->assertStringContainsString('anti-lockout coordinator', $section);
+        $this->assertStringContainsString(
+            'not** executed against production legacy users as part of',
+            $section,
+        );
+        $this->assertStringContainsString('preflight/backfill', $section);
+        $this->assertStringContainsString('machinery', $section);
+        $this->assertStringContainsString('production legacy', $section);
+        $this->assertStringContainsString('`WorkspaceUser` / role assignments are **not** materialized', $section);
+    }
+
+    #[Test]
+    public function contract_documents_global_permission_catalogue_may_be_seeded_in_026a(): void
+    {
+        $section = $this->physicalArchitectureSection();
+
+        $this->assertStringContainsString(
+            'The global `workspace_permissions` catalogue may be seeded in 026A because it',
+            $section,
+        );
+        $this->assertStringContainsString('has no `User` / workspace assignment authority by itself', $section);
+    }
+
+    #[Test]
+    public function contract_documents_026b_cutover_gate_frozen_ordering(): void
+    {
+        $section = $this->physicalArchitectureSection();
+
+        $this->assertStringContainsString('026B authorization cutover gate (frozen ordering)', $section);
+        $this->assertStringContainsString('1. run Spatie assignment preflight', $section);
+        $this->assertStringContainsString('2. run legacy workspace/Admin preflight', $section);
+        $this->assertStringContainsString(
+            '3. execute deterministic/idempotent legacy backfill from **current** legacy state',
+            $section,
+        );
+        $this->assertStringContainsString('4. perform fresh anti-lockout validation', $section);
+        $this->assertStringContainsString(
+            '5. only if all four succeed may workspace-permission authorization become',
+            $section,
+        );
+        $this->assertStringContainsString('authoritative', $section);
+        $this->assertStringContainsString('Spatie assignment deployment preflight (026B step 1)', $section);
+        $this->assertStringContainsString('Automatic backfill deployment preflight (fail-closed — 026B step 2)', $section);
+        $this->assertStringContainsString('026B legacy backfill must resolve', $section);
+    }
+
+    #[Test]
+    public function contract_documents_failure_means_no_partial_cutover(): void
+    {
+        $section = $this->physicalArchitectureSection();
+
+        $this->assertStringContainsString('Failure at any step: STOP', $section);
+        $this->assertStringContainsString('no permission-policy cutover', $section);
+        $this->assertStringContainsString('no Access/Roles', $section);
+        $this->assertStringContainsString('mutation activation', $section);
+        $this->assertStringContainsString('no Mapping authorization activation', $section);
+        $this->assertStringContainsString('Do not silently fall', $section);
+        $this->assertStringContainsString('back to partial RBAC', $section);
+    }
+
+    #[Test]
+    public function contract_documents_user_lifecycle_protection_in_same_026b_cutover(): void
+    {
+        $section = $this->physicalArchitectureSection();
+
+        $this->assertStringContainsString('Legacy User lifecycle compatibility', $section);
+        $this->assertStringContainsString('Current `User` lifecycle can still:', $section);
+        $this->assertStringContainsString('hard-delete `Users` (via `UserResource`)', $section);
+        $this->assertStringContainsString(
+            'GAP-026B must bring the necessary `User` lifecycle integrity protection',
+            $section,
+        );
+        $this->assertStringContainsString('**no later than** the same cutover', $section);
+        $this->assertStringContainsString('materialized and made authoritative', $section);
+        $this->assertStringContainsString('Do not weaken or remove the RESTRICT FK', $section);
+        $this->assertStringContainsString('`User` lifecycle protection in the same', $section);
+        $this->assertStringContainsString('cutover window', $section);
+    }
+
+    #[Test]
     public function contract_requires_fail_closed_legacy_backfill_preflight(): void
     {
         $section = $this->physicalArchitectureSection();
 
-        $this->assertStringContainsString('Automatic backfill deployment preflight (fail-closed)', $section);
+        $this->assertStringContainsString('Automatic backfill deployment preflight (fail-closed — 026B step 2)', $section);
         $this->assertStringContainsString('exactly one row exists in `workspaces`', $section);
         $this->assertStringContainsString('exactly-one row with `is_default = true`', $section);
         $this->assertStringContainsString('`role IN (Admin, Director)`', $section);
