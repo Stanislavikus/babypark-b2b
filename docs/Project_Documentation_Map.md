@@ -160,6 +160,9 @@ This document describes:
 - WorkspaceUser;
 - Role;
 - Permission.
+- Workspace RBAC physical architecture (Resolved — GAP-026-0): WorkspaceUser-centric
+  custom RBAC; explicit `Workspace` authorization; five physical tables; seven atomic
+  permissions; anti-lockout on `Workspace` row lock — see `03-DOMAIN_MODEL.md`.
 
 ### Product Catalogue Context
 
@@ -650,6 +653,7 @@ The following decisions are formally closed and must not be reopened.
 | Payment implementation timing | Payment domain is future-ready from the beginning; full payment gateway UI is not required for MVP unless it becomes a commercial priority |
 | Pilot versus SaaS MVP | Babypark may influence connector priority, but all work must remain reusable; no Babypark-specific hardcoding |
 | Company vs Workspace naming | Database: workspaces; code: Workspace; UI: Company / My Company; tenant remains technical-only terminology |
+| Workspace RBAC physical model | WorkspaceUser-centric custom RBAC; explicit `Workspace` authorization; DB-enforced same-workspace role assignment; additive workspace roles; anti-lockout serialized on `Workspace` row — see `03-DOMAIN_MODEL.md` → Workspace RBAC physical architecture (Resolved — GAP-026-0) |
 
 ---
 

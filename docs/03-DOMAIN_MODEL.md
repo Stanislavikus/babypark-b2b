@@ -381,6 +381,7 @@ management. They are part of the frozen minimum permission vocabulary below.
 | `view_sync_mappings` | Read the mapping surface for a `SyncConfiguration` (effective mappings, suggestions, discovery-unavailable read-only state). |
 | `manage_sync_mappings` | Mutate confirmed mappings through the approved mutation service. Inherently includes the same mapping read surface as `view_sync_mappings`. |
 | `manage_workspace_access` | Manage workspace Roles / Access profiles and role assignments for memberships. |
+| `manage_workspace_tax_settings` | Manage workspace tax-settings surfaces governed by workspace tax authorization. |
 
 **Permission independence (frozen):**
 
@@ -433,6 +434,335 @@ small global Spatie permission set; `WorkspaceUser` membership is not implemente
 `config/permission.php` has `'teams' => false`. The global Spatie configuration
 does **not** yet satisfy this contract. Workspace-scoped authorization foundation
 is an implementation prerequisite before mutable Layer-B mapping UI.
+
+### Workspace RBAC physical architecture [Resolved — GAP-026-0, 2026-08-13]
+
+Freeze custom workspace RBAC, not Spatie Teams.
+
+**Assignment principal**
+
+`WorkspaceUser` is the authoritative workspace-membership and role-assignment principal.
+
+A global `User` must never receive a workspace role directly.
+
+Conceptually:
+
+```text
+User
+  └── WorkspaceUser
+        └── WorkspaceUserRole
+              └── WorkspaceRole
+                    └── WorkspaceRolePermission
+                          └── WorkspacePermission
+```
+
+Spatie Teams is not the authoritative tenant-scoping mechanism.
+
+Reason to freeze normatively:
+
+- workspace role assignment must be structurally scoped to a concrete membership;
+- explicit workspace identity is required for authorization;
+- cross-workspace role assignment must be impossible at DB level;
+- target model forbids direct user permission overrides.
+
+**Minimum physical tables (first slice)**
+
+`workspace_users` — minimum schema:
+
+| Column | Type / constraint |
+|---|---|
+| `id` | UUID PK |
+| `workspace_id` | UUID NOT NULL |
+| `user_id` | BIGINT UNSIGNED NOT NULL |
+| `is_active` | BOOLEAN NOT NULL DEFAULT true |
+| `created_at` | timestamp |
+| `updated_at` | timestamp |
+
+Constraints:
+
+- `UNIQUE (workspace_id, user_id)`
+- `UNIQUE (id, workspace_id)`
+
+Do **not** add in first slice: `deleted_at`, `invited_at`, `activated_at`,
+`deactivated_at`. Invitation/deactivation history/soft-delete lifecycle is not
+currently resolved and remains future additive scope.
+
+`workspace_users.is_active` is workspace-level membership availability and is
+independent from global `users.is_active`.
+
+**Active membership**
+
+```text
+active membership :=
+    workspace_users row exists
+    AND workspace_users.is_active = true
+    AND users.is_active = true
+```
+
+`vacation_until` is not authorization state.
+
+There is currently no workspace-suspension lifecycle. Every existing `workspaces`
+row participates in anti-lockout. Do not add `workspaces.is_active` in GAP-026.
+
+`workspace_roles` — minimum schema:
+
+| Column | Type / constraint |
+|---|---|
+| `id` | UUID PK |
+| `workspace_id` | UUID NOT NULL |
+| `name` | string NOT NULL |
+| `template_key` | nullable stable ASCII key, provenance/bootstrap only |
+| `created_at` | timestamp |
+| `updated_at` | timestamp |
+
+Constraints:
+
+- `UNIQUE (workspace_id, name)`
+- `UNIQUE (id, workspace_id)`
+
+`template_key`:
+
+- carries no authorization semantics;
+- exists only for stable platform-template/bootstrap provenance and idempotency;
+- custom merchant-created roles may have NULL;
+- role name remains merchant-owned and freely renameable.
+
+If implementation research shows `template_key` is unnecessary for
+deterministic/idempotent bootstrap, implementation must STOP and report before
+deleting it from the documented model rather than silently changing the contract.
+
+`workspace_permissions` — global platform reference catalogue:
+
+| Column | Type / constraint |
+|---|---|
+| `id` | UUID PK |
+| `code` | string NOT NULL UNIQUE |
+
+Permissions are platform-defined, seeded/version-controlled, not merchant-created,
+immutable by merchants. Role/access-profile composition is merchant configurable;
+atomic permission vocabulary is not. Do not reuse Spatie's `permissions` table as
+the target authoritative catalogue.
+
+`workspace_user_roles`:
+
+| Column | Notes |
+|---|---|
+| `workspace_id` | tenant guard column |
+| `workspace_user_id` | FK to membership |
+| `workspace_role_id` | FK to role |
+
+Constraints:
+
+- `UNIQUE (workspace_user_id, workspace_role_id)`
+- FK `(workspace_user_id, workspace_id)` → `workspace_users(id, workspace_id)`
+- FK `(workspace_role_id, workspace_id)` → `workspace_roles(id, workspace_id)`
+
+Both composite FKs share the same child `workspace_id`. Membership from workspace A
++ role from workspace B is structurally unrepresentable.
+
+`workspace_role_permissions`:
+
+| Column | Notes |
+|---|---|
+| `workspace_id` | deliberately redundant tenant guard |
+| `workspace_role_id` | FK to role |
+| `workspace_permission_id` | FK to permission |
+
+Constraints:
+
+- `UNIQUE (workspace_role_id, workspace_permission_id)`
+- FK `(workspace_role_id, workspace_id)` → `workspace_roles(id, workspace_id)`
+- FK `workspace_permission_id` → `workspace_permissions(id)`
+
+Supporting indexes required for MySQL composite FKs must be documented in
+implementation migrations (composite FK child columns indexed per MySQL 8 rules).
+
+**Delete behavior — RESTRICT, not silent CASCADE**
+
+Access-control children must not disappear through implicit DB cascades that can
+bypass anti-lockout coordination.
+
+Use RESTRICT / equivalent guarded deletion semantics for at least:
+
+- `users` → `workspace_users`
+- `workspace_users` → `workspace_user_roles`
+- `workspace_roles` → `workspace_user_roles`
+- `workspace_roles` → `workspace_role_permissions`
+- `workspace_permissions` → `workspace_role_permissions`
+
+Workspace-parent deletion itself is outside GAP-026 and must not be used to invent
+a tenant-deletion lifecycle.
+
+Reason: a direct hard delete of a User/membership/role must not silently remove
+the last effective `manage_workspace_access` holder without the workspace-access
+mutation coordinator seeing the transition.
+
+Current `User` has no SoftDeletes; membership deletion therefore cannot rely on
+implicit recovery semantics.
+
+DB constraints alone do not implement aggregate anti-lockout.
+
+**Authorization service boundary**
+
+Target conceptual API:
+
+```php
+interface WorkspaceAuthorization
+{
+    public function allows(
+        User $user,
+        Workspace $workspace,
+        string $permission,
+    ): bool;
+
+    public function effectivePermissions(
+        User $user,
+        Workspace $workspace,
+    ): array;
+
+    public function activeMembership(
+        User $user,
+        Workspace $workspace,
+    ): ?WorkspaceUser;
+}
+```
+
+Exact PHP interface/class packaging may follow code conventions later, but the
+security boundary is frozen:
+
+- `Workspace` is a mandatory argument.
+- No authorization API overload may silently derive its `Workspace` from
+  `WorkspaceContext`.
+- `WorkspaceContext` may continue to exist for data/UI scoping, but it is not the
+  authorization authority.
+
+Do not change `WorkspaceContext` implementation in 026A merely because
+multi-workspace context is future work; current helper still explicitly uses the
+single-default-workspace MVP shortcut.
+
+**Seven atomic permissions (frozen minimum catalogue)**
+
+Amend the frozen minimum catalogue from six to seven:
+
+| Permission | Authority |
+|---|---|
+| `view_connector_accounts` | Safe Layer A/B `ConnectorAccount` read only; no decrypted credentials/settings secrets. |
+| `run_connector_discovery` | Manual discovery and the safe read surface necessary to follow its progress/result. |
+| `manage_connector_accounts` | Create/manage account settings and credentials, disable/archive where supported, run connection check; also permits safe account read and manual discovery. |
+| `view_sync_mappings` | Read the mapping surface for a `SyncConfiguration`. |
+| `manage_sync_mappings` | Mutate confirmed mappings through the approved mutation service. |
+| `manage_workspace_access` | Manage workspace Roles / Access profiles and role assignments for memberships. |
+| `manage_workspace_tax_settings` | Manage workspace tax-settings surfaces governed by workspace tax authorization. |
+
+`manage_workspace_tax_settings` is not a new invented capability: it already exists
+in production authorization and the current permission seeder.
+
+Keep all existing independence rules. No mapping permission is automatically
+implied by Admin/Director legacy status.
+
+**Legacy-data backfill (026A migration/backfill)**
+
+026A migration/backfill must resolve the current default workspace by
+`is_default = true`. Never hardcode the UUID.
+
+Create a `WorkspaceUser` row for each existing staff `User` where
+`customer_id IS NULL`, with `workspace_users.is_active = true` for the legacy
+membership itself, regardless of `users.is_active`.
+
+Why: `workspace_users.is_active` is a workspace membership switch;
+`users.is_active` is a global User switch. Effective authorization still requires
+both to be true. This preserves the semantic behavior that globally disabling and
+later re-enabling an existing staff User does not silently destroy or permanently
+disable their workspace membership.
+
+Initial role/permission backfill — preserve current effective connector/tax
+behavior and do **not** grant new Mapping capability:
+
+| Legacy role | Granted permissions |
+|---|---|
+| Admin / Director | `view_connector_accounts`, `run_connector_discovery`, `manage_connector_accounts`, `manage_workspace_tax_settings`, `manage_workspace_access` |
+| Merchandiser | `view_connector_accounts`, `run_connector_discovery` |
+| Manager / Programmer / Warehouse | none of these seven permissions |
+| `view_sync_mappings` | assigned to nobody |
+| `manage_sync_mappings` | assigned to nobody |
+
+`manage_workspace_access` is the one bootstrap capability required to satisfy the
+already-Resolved anti-lockout invariant. Do not describe it as a generic "Admin
+gets all permissions" role.
+
+**Spatie assignment deployment preflight**
+
+Before any production backfill/cutover, inspect existing Spatie assignment tables:
+
+- `roles`
+- `model_has_roles`
+- `model_has_permissions`
+- `role_has_permissions`
+
+Expected application baseline currently has no known role/direct-permission
+assignment write path, but production DB must not be assumed clean from source
+code alone.
+
+If unexpected assignment rows exist: STOP → report exact counts/types → reconcile
+explicitly → do not silently discard or auto-convert them.
+
+Do not remove Spatie package/tables in GAP-026A or GAP-026B as a prerequisite.
+Package/table removal is a later cleanup decision after cutover complete,
+production DB audit complete, and repository usage search proves it inert.
+
+**Anti-lockout algorithm (transaction coordinator)**
+
+Every authoritative workspace-access mutation that can change effective
+`manage_workspace_access` must serialize on one stable mutex:
+
+```sql
+SELECT workspace
+FOR UPDATE
+```
+
+Then:
+
+1. apply proposed membership / role assignment / role-permission mutation;
+2. perform a fresh post-mutation effective-permission query;
+3. require at least one active membership with `manage_workspace_access`;
+4. otherwise reject/rollback.
+
+Lock the `Workspace` row, not merely the touched membership/role rows, because two
+concurrent transactions can otherwise create write skew by each removing a
+different surviving administrator.
+
+For global User deactivation/deletion after authorization cutover:
+
+- determine all affected workspace memberships;
+- lock those workspace rows in deterministic `workspace_id` order;
+- evaluate anti-lockout in every workspace before commit.
+
+`lockForUpdate()` concurrency correctness must ultimately be verified on MySQL 8,
+not inferred from SQLite.
+
+Phase timing:
+
+- In 026A, the coordinator/service and invariant may be implemented/tested for the
+  new RBAC domain, but legacy production authorization/write paths are not yet
+  considered cut over.
+- Before 026B becomes authoritative, it must revalidate anti-lockout against
+  current production state; route every newly authoritative access mutation through
+  the coordinator; protect global `User.is_active` / hard-delete paths that could
+  invalidate effective access.
+
+026A alone does not make every legacy User mutation anti-lockout-safe.
+
+**Platform plane and cabinet boundaries**
+
+- `PlatformAdminAuthorization` remains outside GAP-026 workspace RBAC.
+- Workspace permissions can never grant platform-global authority over connector
+  definitions/canonical registry/platform governance.
+- Current Admin / Programmer `UserRole` checks in that platform plane remain
+  transitional legacy, not a newly approved permanent authorization design. Their
+  eventual replacement requires a separate platform-authorization decision.
+- `/cabinet` is outside GAP-026. Its authenticated principal is `Customer`, not
+  workspace staff `User`. Do not mix customer/cabinet authorization into workspace
+  staff RBAC.
 
 ## Product Catalogue Context
 

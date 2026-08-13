@@ -48,7 +48,7 @@ class WorkspaceAuthorizationDocumentationContractTest extends TestCase
     }
 
     #[Test]
-    public function contract_documents_all_six_frozen_permission_names(): void
+    public function contract_documents_all_seven_frozen_permission_names(): void
     {
         $section = $this->workspaceAccessAuthorizationSection();
 
@@ -59,6 +59,7 @@ class WorkspaceAuthorizationDocumentationContractTest extends TestCase
             'view_sync_mappings',
             'manage_sync_mappings',
             'manage_workspace_access',
+            'manage_workspace_tax_settings',
         ] as $permission) {
             $this->assertStringContainsString('`'.$permission.'`', $section);
         }
@@ -261,10 +262,28 @@ class WorkspaceAuthorizationDocumentationContractTest extends TestCase
         $this->assertStringContainsString('`view_connector_accounts`', $content);
         $this->assertStringContainsString('`run_connector_discovery`', $content);
         $this->assertStringContainsString('`manage_workspace_access`', $content);
-        $this->assertStringContainsString('Physical persistence/scoping mechanics', $content);
-        $this->assertStringContainsString('remain **unresolved** in 4C-1c-2a', $content);
-        $this->assertStringContainsString('anti-lockout invariant', $content);
-        $this->assertStringContainsString('**Status:** Open — docs contract frozen (4C-1c-2a); code not started.', $content);
+        $this->assertStringContainsString('`manage_workspace_tax_settings`', $content);
+        $this->assertStringContainsString('Physical persistence is **resolved** in GAP-026-0', $content);
+        $this->assertStringContainsString('GAP-026A — Physical RBAC Foundation', $content);
+        $this->assertStringContainsString('GAP-026B — Narrow workspace-authorization cutover', $content);
+        $this->assertStringContainsString('anti-lockout', $content);
+        $this->assertStringContainsString('WorkspaceUser` membership is **not implemented**', $content);
+        $this->assertStringContainsString("'teams' => false", $content);
+        $this->assertStringContainsString('prerequisite before 026B and', $content);
+        $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
+        $this->assertStringContainsString('implementation not', $content);
+        $this->assertStringContainsString('started. Closure requires 026A foundation', $content);
+    }
+
+    #[Test]
+    public function gap_027_records_platform_wide_admin_resource_rbac_scope(): void
+    {
+        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        $this->assertStringContainsString('## GAP-027 — Platform-wide admin Resource RBAC', $content);
+        $this->assertStringContainsString('`strictAuthorization()`', $content);
+        $this->assertStringContainsString('membership-based `/admin` admission', $content);
+        $this->assertStringContainsString('do not broaden `canAccessPanel()` as a workaround', $content);
     }
 
     #[Test]

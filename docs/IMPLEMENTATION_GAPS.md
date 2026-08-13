@@ -1046,14 +1046,19 @@ backend — Layer B mapping UI still missing); remaining UX migration work.
 - `docs/03-DOMAIN_MODEL.md` — **Workspace access model and authorization
   (Resolved — Task 4C-1c-2a, 2026-08-13)** — atomic permissions as source of
   truth; workspace-owned role/access profiles; User × Workspace evaluation;
-  frozen minimum permission vocabulary; permission independence rules;
-  anti-lockout invariant; no job-title authorization semantics.
+  additive workspace roles; transactional anti-lockout; no job-title authorization
+  semantics.
+- `docs/03-DOMAIN_MODEL.md` — **Workspace RBAC physical architecture (Resolved —
+  GAP-026-0, 2026-08-13)** — WorkspaceUser-centric custom RBAC; five physical
+  tables; composite workspace guards; explicit `WorkspaceAuthorization`; RESTRICT
+  delete semantics; Spatie preflight; anti-lockout coordinator; 026A/026B split.
 - `docs/03-DOMAIN_MODEL.md` — **ConnectorAccount authorization (Resolved —
   rebaselined Task 4C-1c-2a, 2026-08-13)** — capability/permission evaluation
   table for connector operations.
 - `docs/04-ARCHITECTURE_PRINCIPLES.md` — authorization through policies/gates;
-  workspace isolation (cross-reference **GAP-004** — broad isolation exists,
-  but this gap is **not** a claim that general workspace isolation is fully solved).
+  workspace-scoped authorization must receive explicit `Workspace`; workspace
+  isolation (cross-reference **GAP-004** — broad isolation exists, but this gap
+  is **not** a claim that general workspace isolation is fully solved).
 
 **Frozen minimum permission vocabulary (docs contract — not yet implemented):**
 
@@ -1063,20 +1068,50 @@ backend — Layer B mapping UI still missing); remaining UX migration work.
 - `view_sync_mappings`
 - `manage_sync_mappings`
 - `manage_workspace_access`
+- `manage_workspace_tax_settings`
 
-Physical persistence/scoping mechanics (Spatie Teams vs custom pivot vs
-`WorkspaceUser` schema, team foreign keys, owner columns, protected role IDs)
-remain **unresolved** in 4C-1c-2a.
+Physical persistence is **resolved** in GAP-026-0 (custom WorkspaceUser-centric
+RBAC, not Spatie Teams). Implementation remains open.
 
-**Implementation obligations (frozen, not yet built):**
+**Implementation staging:**
 
-- Evaluate authorization for User × Workspace using the permission vocabulary above.
-- Enforce the anti-lockout invariant: every active workspace must retain at least
-  one active membership with effective `manage_workspace_access`; bootstrap must
-  establish one; membership/role mutations that would leave zero such memberships
-  must be rejected transactionally.
-- Platform-support/recovery mechanics that bypass tenant authorization remain a
-  separate future operational/security decision.
+| Slice | Scope |
+|---|---|
+| **GAP-026A — Physical RBAC Foundation** | Five custom RBAC tables; seven-permission catalogue; models/relationships; composite workspace guards; explicit `WorkspaceAuthorization`; idempotent legacy membership/role backfill; Spatie-assignment deployment preflight; anti-lockout coordinator + MySQL constraint/concurrency tests. **Explicitly not in 026A:** `ConnectorAccountPolicy` cutover; `WorkspaceTaxSettingsAuthorization` cutover; Mapping authorization policy; Access/Roles merchant UI; authoritative `WorkspaceMembership` switch; general `WorkspaceContext` rewrite; `canAccessPanel()` changes; `strictAuthorization()`; Spatie removal; full admin Resource RBAC. 026A is foundation-first and must not change current merchant authorization behavior. |
+| **GAP-026B — Narrow workspace-authorization cutover** | ConnectorAccount authorization; workspace tax-settings authorization; Mapping authorization seam; Access / Roles management UI + mutations; authoritative anti-lockout routing; necessary global User deactivation/deletion protection. At 026B completion, 4C-1c-2b Mapping UI becomes unblocked. `User::canAccessPanel()` and unrelated admin resources may still use legacy role semantics until GAP-027. |
+
+**Legacy membership / role backfill matrix (026A):**
+
+Resolve default workspace by `is_default = true` (never hardcode UUID). Create
+`WorkspaceUser` for each staff `User` (`customer_id IS NULL`) with
+`workspace_users.is_active = true` regardless of `users.is_active`.
+
+| Legacy role | Backfilled permissions |
+|---|---|
+| Admin / Director | `view_connector_accounts`, `run_connector_discovery`, `manage_connector_accounts`, `manage_workspace_tax_settings`, `manage_workspace_access` |
+| Merchandiser | `view_connector_accounts`, `run_connector_discovery` |
+| Manager / Programmer / Warehouse | none of the seven permissions |
+| `view_sync_mappings` | nobody |
+| `manage_sync_mappings` | nobody |
+
+**Spatie preflight / deferred removal:**
+
+Before production backfill/cutover, audit `roles`, `model_has_roles`,
+`model_has_permissions`, `role_has_permissions`. Unexpected rows → STOP and
+reconcile explicitly. Do not remove Spatie package/tables in 026A or 026B.
+
+**Anti-lockout:**
+
+Serialize authoritative access mutations on `SELECT workspace FOR UPDATE`; apply
+mutation; post-mutation recheck for at least one active membership with effective
+`manage_workspace_access`; rollback otherwise. Global User deactivation/deletion
+must lock affected workspaces in deterministic `workspace_id` order. 026A does
+not alone make every legacy User mutation anti-lockout-safe.
+
+**Platform / cabinet boundaries:**
+
+`PlatformAdminAuthorization` and `/cabinet` (`Customer` principal) remain outside
+GAP-026 workspace RBAC.
 
 **Verified current-code mismatch (re-verified against `develop`):**
 - `User.role` (`App\Enums\UserRole`) still participates directly in
@@ -1096,26 +1131,61 @@ remain **unresolved** in 4C-1c-2a.
   are documented but **not** seeded or enforced in code.
 - Mapping permissions (`view_sync_mappings`, `manage_sync_mappings`) and
   `manage_workspace_access` are documented but **not** seeded or enforced in
-  code (docs-only in 4C-1c-2a).
+  code.
 
 **Impact:**
 - Do not treat the current global Spatie configuration as satisfying the
   workspace-scoped RBAC contract.
-- Layer B mapping UI (4C-1c-2b) must **not** ship until this foundation exists.
+- Layer B mapping UI (4C-1c-2b) must **not** ship until GAP-026B cutover completes.
 - Do not add more fixed `User.role` policy branches as a workaround for mapping
   or connector authorization.
+- Target role-name-free authorization remains partially transitional outside scopes
+  cut over in 026B until GAP-027.
 
 **Decision:**
 - Cross-reference **GAP-004** for workspace data isolation — GAP-004 tracks
-  table/query coverage audit, not permission semantics. Do not falsely declare
-  general workspace isolation solved because of GAP-004 partial closure.
-- Implementation mechanics (Spatie Teams vs custom pivot vs `WorkspaceUser`
-  schema) require a separate Strict Alignment task — not decided in 4C-1c-2a.
+  table/query coverage audit, not permission semantics.
 
-**Next task:** Workspace-scoped authorization foundation implementation
-(prerequisite before 4C-1c-2b).
+**Next task:** GAP-026A — Physical RBAC Foundation (prerequisite before 026B and
+4C-1c-2b).
 
-**Status:** Open — docs contract frozen (4C-1c-2a); code not started.
+**Status:** Open — physical architecture frozen (GAP-026-0); implementation not
+started. Closure requires 026A foundation + 026B narrow cutover per staging above.
+
+---
+
+## GAP-027 — Platform-wide admin Resource RBAC
+
+**Approved docs:**
+- `docs/03-DOMAIN_MODEL.md` — Workspace RBAC physical architecture (GAP-026-0) —
+  workspace permissions do not cover platform-global governance or unrelated admin
+  catalogue/order/customer/user/pricing Resources.
+- Current `User::canAccessPanel()` and many Filament Resources still use fixed
+  legacy `UserRole` values.
+
+**Reason:**
+
+Current admin panel admission is still based on fixed legacy `UserRole` values.
+The approved workspace permission vocabulary does not yet define authorization
+semantics for all catalogue/order/customer/user/pricing/etc admin Resources.
+
+**Scope (later — not GAP-026):**
+
+- permission vocabulary for remaining admin domains;
+- policies/gates for remaining Filament Resources / Pages / RelationManagers /
+  actions;
+- authorization-coverage CI guard;
+- `strictAuthorization()` decision/enablement;
+- membership-based `/admin` admission;
+- complete removal of `User.role` from workspace authorization semantics.
+
+**Until GAP-027:**
+
+- do not invent these permissions inside GAP-026;
+- do not broaden `canAccessPanel()` as a workaround;
+- do not enable global Filament strict authorization prematurely.
+
+**Status:** Open — tracked; depends on GAP-026A/026B foundation.
 
 ---
 

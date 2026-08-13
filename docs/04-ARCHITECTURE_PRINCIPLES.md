@@ -470,6 +470,11 @@ Authorization MUST be enforced through dedicated framework mechanisms such as:
 
 Authorization checks MUST NOT be scattered as messy conditional if/else logic across controllers.
 
+Workspace-scoped authorization MUST receive the target `Workspace` explicitly.
+Ambient/default workspace state (`WorkspaceContext`, session defaults, or implicit
+single-workspace MVP shortcuts) MUST NOT be the security authority for permission
+evaluation.
+
 ### PostgreSQL RLS Note
 
 PostgreSQL Row-Level Security may be considered later as a defense-in-depth mechanism to enforce isolation at the database engine level.
@@ -1157,7 +1162,7 @@ Is the workspace_id constraint enforced automatically through global model scope
 
 ## 3. Authorization and RBAC
 
-Are user permissions governed through framework policies, gates, or dedicated authorization services instead of scattered conditional if/else checks inside controllers?
+Are user permissions governed through framework policies, gates, or dedicated authorization services instead of scattered conditional if/else checks inside controllers? Does workspace-scoped authorization receive the target `Workspace` explicitly, with ambient/default workspace state (`WorkspaceContext` or session defaults) excluded as the security authority?
 
 ## 4. Attribute Dictionary Integrity
 

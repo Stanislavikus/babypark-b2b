@@ -125,13 +125,27 @@ class ImplementationGapsTest extends TestCase
         $this->assertStringContainsString('`view_sync_mappings`', $content);
         $this->assertStringContainsString('`manage_sync_mappings`', $content);
         $this->assertStringContainsString('`manage_workspace_access`', $content);
-        $this->assertStringContainsString('Physical persistence/scoping mechanics', $content);
-        $this->assertStringContainsString('remain **unresolved** in 4C-1c-2a', $content);
-        $this->assertStringContainsString('anti-lockout invariant', $content);
+        $this->assertStringContainsString('`manage_workspace_tax_settings`', $content);
+        $this->assertStringContainsString('Physical persistence is **resolved** in GAP-026-0', $content);
+        $this->assertStringContainsString('GAP-026A — Physical RBAC Foundation', $content);
+        $this->assertStringContainsString('GAP-026B — Narrow workspace-authorization cutover', $content);
+        $this->assertStringContainsString('anti-lockout', $content);
         $this->assertStringContainsString('WorkspaceUser` membership is **not implemented**', $content);
         $this->assertStringContainsString("'teams' => false", $content);
-        $this->assertStringContainsString('prerequisite before 4C-1c-2b', $content);
-        $this->assertStringContainsString('**Status:** Open — docs contract frozen (4C-1c-2a); code not started.', $content);
+        $this->assertStringContainsString('prerequisite before 026B and', $content);
+        $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
+        $this->assertStringContainsString('implementation not', $content);
+        $this->assertStringContainsString('started. Closure requires 026A foundation', $content);
+    }
+
+    #[Test]
+    public function gap_027_records_platform_admin_resource_rbac(): void
+    {
+        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        $this->assertStringContainsString('## GAP-027 — Platform-wide admin Resource RBAC', $content);
+        $this->assertStringContainsString('authorization-coverage CI guard', $content);
+        $this->assertStringContainsString('do not enable global Filament strict authorization prematurely', $content);
     }
 
     /**

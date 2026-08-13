@@ -1800,6 +1800,26 @@ Current shipped UI has **not** been fully migrated to this contract:
 
 Tracked as **known UX migration work** in `docs/IMPLEMENTATION_GAPS.md` (GAP-025). Do not document current UI as contract-compliant until migrated. Remaining Field Browser / Discovery / Layer C surfaces still fail that bar even though the `Інтеграції` landing now exists.
 
+### Workspace access / Roles UI sequencing (Resolved — GAP-026-0, 2026-08-13)
+
+**026A (foundation):** no merchant-facing Access/Roles screen is required. Foundation
+tables, backfill, and authorization services are not yet authoritative merchant-
+operable state.
+
+**026B (cutover):** introduces the merchant-facing Access surface when role/membership
+changes begin affecting production authorization.
+
+Merchant terminology (Ukrainian examples):
+
+- `Користувачі`
+- `Доступ`
+- `Ролі` / `Профілі доступу`
+
+Never expose Spatie, pivot tables, team resolver, or RBAC internals to merchants.
+
+Detailed Access screen design is **not** part of GAP-026-0 — layout, workflows, and
+field-level UX for membership/role administration ship with GAP-026B implementation.
+
 ### Shipped Task 4B implementation (pre-contract — historical reference)
 
 The following describes what was built before this contract; it is **not** the target merchant UX. Retained for implementation history and Layer C/D operator context.
