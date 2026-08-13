@@ -190,6 +190,66 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
     }
 
     #[Test]
+    public function ux_contract_does_not_claim_existing_authorization_plus_ui_wiring_is_sufficient(): void
+    {
+        $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
+
+        $this->assertStringNotContainsString(
+            'Every rule below is satisfiable with what already exists',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'workspace-scoped RBAC foundation (**GAP-026**) is required before mutable Layer-B mapping UI may ship',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'Do **not** claim that current fixed `User.role` authorization already satisfies this UX contract',
+            $content,
+        );
+    }
+
+    #[Test]
+    public function ux_contract_field_browser_splits_persistence_from_authorization_gating(): void
+    {
+        $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
+
+        $this->assertStringContainsString('**snapshot persistence**', $content);
+        $this->assertStringContainsString('**field query/read-model/presenter architecture**', $content);
+        $this->assertStringContainsString('migrated consistently with **GAP-025** and **GAP-026**', $content);
+        $this->assertStringContainsString(
+            'Do **not** interpret this as "security retained entirely" or "no backend rework required" for authorization/gating',
+            $content,
+        );
+        $this->assertStringNotContainsString(
+            'is retained entirely — no backend rework required by this contract',
+            $content,
+        );
+    }
+
+    #[Test]
+    public function ux_contract_relationship_section_rebaselines_authorization_as_historical(): void
+    {
+        $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
+
+        $this->assertStringNotContainsString(
+            'Does not change anything about what is already shipped (`ConnectorAccountResource`, Discovery runtime, the Field Browser, authorization boundaries)',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'Authorization boundaries were subsequently rebaselined by **Task 4C-1c-2a**',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'Current fixed `User.role` authorization is transitional under **GAP-026**',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'Required authorization-foundation work is therefore **not** merely navigation/labeling/gating UI work',
+            $content,
+        );
+    }
+
+    #[Test]
     public function domain_model_documents_workspace_access_authorization_contract(): void
     {
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));

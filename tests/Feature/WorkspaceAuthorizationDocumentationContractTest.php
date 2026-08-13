@@ -163,6 +163,18 @@ class WorkspaceAuthorizationDocumentationContractTest extends TestCase
     }
 
     #[Test]
+    public function contract_documents_manage_workspace_access_for_role_profile_administration(): void
+    {
+        $section = $this->workspaceAccessAuthorizationSection();
+
+        $this->assertStringContainsString(
+            'A workspace membership authorized with effective **`manage_workspace_access`** may create/name/manage workspace **Roles / Access profiles**',
+            $section,
+        );
+        $this->assertStringNotContainsString('Workspace administrators may **name roles freely**', $section);
+    }
+
+    #[Test]
     public function domain_model_has_no_normative_job_title_connector_grants(): void
     {
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));

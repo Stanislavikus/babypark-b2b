@@ -382,7 +382,9 @@ are not rendered to Merchandiser. Tests assert rendered HTML and Livewire
 payload absence, including connection-check management/history surfaces, not
 policy-layer alone.
 
-Implemented role matrix (confirmed against `App\Enums\UserRole`):
+**Historical/transitional shipped role matrix (pre-4C-1c-2a current implementation; not normative target authorization; superseded by the GAP-026 workspace-scoped RBAC contract):**
+
+(confirmed against `App\Enums\UserRole`):
 
 | Role | `viewAny`/`view` (safe fields only) | `runDiscovery` | Management (settings/credentials/disable) |
 |---|---|---|---|

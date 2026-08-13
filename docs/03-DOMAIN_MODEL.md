@@ -332,7 +332,7 @@ migration mechanics, UUID team columns, a custom Role model, or the final
 
 - A workspace **role / access profile** is a workspace-owned, merchant-configurable
   **named bundle of atomic permissions**.
-- Workspace administrators may **name roles freely** (business-owned labels).
+- A workspace membership authorized with effective **`manage_workspace_access`** may create/name/manage workspace **Roles / Access profiles** using business-owned labels.
 - **Platform-provided roles** are onboarding / default **templates only** — they
   are not job taxonomy and carry no authorization semantics by name alone.
 - One workspace membership may receive **multiple roles**, with **additive**

@@ -60,6 +60,19 @@ class ImplementationGapsTest extends TestCase
     }
 
     #[Test]
+    public function gap_006_role_matrix_is_labeled_historical_transitional_not_normative(): void
+    {
+        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        $this->assertStringContainsString(
+            '**Historical/transitional shipped role matrix (pre-4C-1c-2a current implementation; not normative target authorization; superseded by the GAP-026 workspace-scoped RBAC contract):**',
+            $content,
+        );
+        $this->assertStringContainsString('| Admin | Yes | Yes (enabled accounts) | Yes |', $content);
+        $this->assertStringContainsString('| Merchandiser | Yes | Yes (enabled accounts) | No |', $content);
+    }
+
+    #[Test]
     public function gap_026_records_workspace_scoped_rbac_mismatch(): void
     {
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
