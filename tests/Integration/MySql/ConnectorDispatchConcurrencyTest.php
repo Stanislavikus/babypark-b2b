@@ -5,7 +5,6 @@ namespace Tests\Integration\MySql;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Enums\UserRole;
-use App\Enums\UserRole;
 use App\Models\ConnectorConnectionCheck;
 use App\Models\ConnectorDiscoveryRun;
 use App\Models\Workspace;
