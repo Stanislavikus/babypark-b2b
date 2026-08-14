@@ -8,7 +8,6 @@ use App\Models\ConnectorDefinition;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Connectors\ConnectorProfileRegistry;
-use App\Support\Workspace\WorkspaceMembership;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -27,7 +26,6 @@ use Illuminate\Support\Facades\Gate;
 final class EligibleConnectorPlatformCatalog
 {
     public function __construct(
-        private readonly WorkspaceMembership $workspaceMembership,
         private readonly ConnectorProfileRegistry $profileRegistry,
     ) {}
 
@@ -36,12 +34,6 @@ final class EligibleConnectorPlatformCatalog
      */
     public function forWorkspace(User $actor, Workspace $workspace): Collection
     {
-        if (! $this->workspaceMembership->belongs($actor, $workspace)) {
-            throw new AuthorizationException('Actor does not belong to the workspace.');
-        }
-
-        // Reachability ceiling: any role that may view connector accounts may
-        // see the eligible-platform catalog. Catalog rows carry no secrets.
         if (! Gate::forUser($actor)->allows('viewAny', ConnectorAccount::class)) {
             throw new AuthorizationException('Actor cannot view integrations.');
         }

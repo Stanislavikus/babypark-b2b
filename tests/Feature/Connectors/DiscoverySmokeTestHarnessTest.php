@@ -25,6 +25,7 @@ use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
 use App\Services\Connectors\DiscoverySmokeTestAbortedException;
 use App\Services\Connectors\DiscoverySmokeTestHarness;
 use App\Services\Connectors\DiscoverySmokeTestPromptGateway;
+use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Connectors\ConnectorAccountMutationMode;
 use App\Support\Connectors\ConnectorAccountSchema;
 use App\Support\Connectors\ConnectorDiscoveryDispatchDecision;
@@ -33,9 +34,9 @@ use App\Support\Connectors\ConnectorSchemaSourceEndpointPathValidator;
 use App\Support\Connectors\Exceptions\UnsupportedConnectorCapabilityException;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
 use App\Support\Connectors\ValidatedConnectorAccountState;
-use App\Support\Workspace\WorkspaceMembership;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Console\OutputStyle;
@@ -65,6 +66,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspacePermissionSeeder::class);
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->enableSchemaDiscoveryCapability();
 
         $this->workspace = $this->defaultWorkspace();
@@ -147,6 +149,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     public function merchandiser_without_create_permission_cannot_create_account_through_harness(): void
     {
         $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorDiscovery($this->workspace, $merchandiser);
         $definition = $this->adobeConnectorDefinition();
         $prompts = new RecordingDiscoverySmokeTestPromptGateway;
         $validated = app(DiscoverySmokeTestHarness::class)->normalizeAccountSettings(
@@ -180,6 +183,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     public function merchandiser_cannot_replace_credentials_without_replace_permission(): void
     {
         $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorDiscovery($this->workspace, $merchandiser);
         $account = $this->createConnectorAccount($this->workspace);
         $definition = $this->adobeConnectorDefinition();
         $validated = app(DiscoverySmokeTestHarness::class)->normalizeAccountSettings(
@@ -214,7 +218,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     #[Test]
     public function existing_keep_path_does_not_prompt_for_secrets_or_call_settings_service(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $definition = $this->adobeConnectorDefinition();
         $validated = app(DiscoverySmokeTestHarness::class)->normalizeAccountSettings(
             'https://shop.example.com',
@@ -251,6 +255,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     public function merchandiser_with_existing_account_can_dispatch_when_run_discovery_permits(): void
     {
         $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorDiscovery($this->workspace, $merchandiser);
         $account = $this->createConnectorAccount($this->workspace);
 
         $dispatchService = Mockery::mock(ConnectorDiscoveryDispatchPort::class);
@@ -293,7 +298,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
             $registry,
             app(ConnectorAccountPersistencePort::class),
             app(ConnectorDiscoveryDispatchPort::class),
-            app(WorkspaceMembership::class),
+            app(WorkspaceAuthorization::class),
             app(ConnectorSchemaSourceEndpointPathValidator::class),
         );
 
@@ -303,7 +308,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     #[Test]
     public function create_path_delegates_persistence_to_settings_service(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $definition = $this->adobeConnectorDefinition();
         $credentials = new OAuth1Credentials('ck', 'cs', 'at', 'ts');
         $validated = app(DiscoverySmokeTestHarness::class)->normalizeAccountSettings(
@@ -365,7 +370,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     #[Test]
     public function replace_path_delegates_persistence_to_settings_service(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
         $definition = $this->adobeConnectorDefinition();
         $credentials = new OAuth1Credentials('ck2', 'cs2', 'at2', 'ts2');
@@ -432,7 +437,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     #[Test]
     public function replace_credentials_cannot_modify_ordinary_account_with_same_tuple(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $definition = $this->adobeConnectorDefinition();
         $ordinaryAccount = $this->createConnectorAccount($this->workspace, [
             'name' => 'Production Magento Store',
@@ -651,7 +656,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     #[Test]
     public function disabled_matched_smoke_test_account_stops_without_mutation(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $definition = $this->adobeConnectorDefinition();
         $validated = app(DiscoverySmokeTestHarness::class)->normalizeAccountSettings(
             'https://shop.example.com',
@@ -711,7 +716,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     #[Test]
     public function unexpected_persistence_exception_does_not_leak_secrets_to_console(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $sentinels = [
             'sentinel-consumer-key-'.Str::random(6),
             'sentinel-consumer-secret-'.Str::random(6),
@@ -945,7 +950,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     #[Test]
     public function no_secret_value_appears_in_captured_console_output(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $secret = 'super-secret-consumer-key-'.Str::random(8);
         $definition = $this->adobeConnectorDefinition();
 
@@ -1007,14 +1012,17 @@ class DiscoverySmokeTestHarnessTest extends TestCase
 
         $this->assertTrue(config('connectors.discovery.manual_trigger_enabled'));
 
-        $envContents = file_get_contents(base_path('.env')) ?: '';
-        $this->assertStringNotContainsString('CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=true', $envContents);
+        $envPath = base_path('.env');
+        if (file_exists($envPath)) {
+            $envContents = file_get_contents($envPath) ?: '';
+            $this->assertStringNotContainsString('CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=true', $envContents);
+        }
     }
 
     #[Test]
     public function active_existing_run_is_drained_but_not_counted_as_proof_run(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
         $definition = $this->adobeConnectorDefinition();
         $source = ConnectorSchemaSource::query()
@@ -1093,7 +1101,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     {
         Carbon::setTestNow('2026-08-03 12:00:00');
 
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
         $source = ConnectorSchemaSource::query()->where('code', 'live_account_attributes')->firstOrFail();
 

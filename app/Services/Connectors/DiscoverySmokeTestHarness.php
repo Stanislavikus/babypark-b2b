@@ -17,6 +17,7 @@ use App\Models\ConnectorSchemaSnapshotField;
 use App\Models\ConnectorSchemaSource;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Connectors\AdobePaaS\AdobePaaSSettingsInput;
 use App\Support\Connectors\ConnectorAccountMutationMode;
 use App\Support\Connectors\ConnectorDiscoveryDispatchDecision;
@@ -25,7 +26,6 @@ use App\Support\Connectors\ConnectorSchemaSourceEndpointPathValidator;
 use App\Support\Connectors\CredentialMutation;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
 use App\Support\Connectors\ValidatedConnectorAccountState;
-use App\Support\Workspace\WorkspaceMembership;
 use Carbon\CarbonInterface;
 use Illuminate\Console\OutputStyle;
 use Illuminate\Support\Carbon;
@@ -48,7 +48,7 @@ final class DiscoverySmokeTestHarness
         private readonly ConnectorProfileRegistry $profileRegistry,
         private readonly ConnectorAccountPersistencePort $settingsService,
         private readonly ConnectorDiscoveryDispatchPort $dispatchService,
-        private readonly WorkspaceMembership $workspaceMembership,
+        private readonly WorkspaceAuthorization $workspaceAuthorization,
         private readonly ConnectorSchemaSourceEndpointPathValidator $endpointPathValidator,
     ) {}
 
@@ -95,7 +95,7 @@ final class DiscoverySmokeTestHarness
                 );
             }
 
-            if (! $this->workspaceMembership->belongs($actor, $workspace)) {
+            if (! $this->actorBelongsToWorkspace($actor, $workspace)) {
                 throw new DiscoverySmokeTestAbortedException(
                     sprintf('User [%s] does not belong to workspace [%s].', $actor->email, $workspaceId),
                 );
@@ -110,7 +110,7 @@ final class DiscoverySmokeTestHarness
             throw new DiscoverySmokeTestAbortedException('No default workspace is configured.');
         }
 
-        if (! $this->workspaceMembership->belongs($actor, $defaultWorkspace)) {
+        if (! $this->actorBelongsToWorkspace($actor, $defaultWorkspace)) {
             throw new DiscoverySmokeTestAbortedException(
                 sprintf('User [%s] does not belong to the default workspace.', $actor->email),
             );
@@ -747,6 +747,11 @@ final class DiscoverySmokeTestHarness
             'last_discovery_at' => $account->last_discovery_at?->toIso8601String(),
             'last_successful_discovery_at' => $account->last_successful_discovery_at?->toIso8601String(),
         ];
+    }
+
+    private function actorBelongsToWorkspace(User $actor, Workspace $workspace): bool
+    {
+        return $this->workspaceAuthorization->activeMembership($actor, $workspace) !== null;
     }
 
     private function throwFailedRun(ConnectorDiscoveryRun $run): never

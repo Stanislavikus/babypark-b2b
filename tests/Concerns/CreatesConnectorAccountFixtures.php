@@ -10,14 +10,12 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Connectors\AdobePaaS\AdobePaaSCredentialMapper;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
+use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Support\Str;
 
 trait CreatesConnectorAccountFixtures
 {
-    protected function defaultWorkspace(): Workspace
-    {
-        return Workspace::query()->where('is_default', true)->sole();
-    }
+    use InteractsWithWorkspaceRbac;
 
     protected function adobeConnectorDefinition(): ConnectorDefinition
     {
@@ -57,5 +55,53 @@ trait CreatesConnectorAccountFixtures
             ),
             'connection_status' => ConnectorAccountConnectionStatus::Untested,
         ], $overrides));
+    }
+
+    protected function grantConnectorManage(Workspace $workspace, User $user): void
+    {
+        $membership = $this->makeWorkspaceMembership($workspace, $user, true);
+        $role = $this->createRoleWithPermissions(
+            $workspace->id,
+            'Connector Manager '.$user->id,
+            [
+                WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+                WorkspacePermissions::RUN_CONNECTOR_DISCOVERY,
+                WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS,
+            ],
+        );
+        $this->assignRoleToMembership($membership, $role);
+    }
+
+    protected function grantConnectorView(Workspace $workspace, User $user): void
+    {
+        $membership = $this->makeWorkspaceMembership($workspace, $user, true);
+        $role = $this->createRoleWithPermissions(
+            $workspace->id,
+            'Connector Viewer '.$user->id,
+            [WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS],
+        );
+        $this->assignRoleToMembership($membership, $role);
+    }
+
+    protected function grantConnectorDiscovery(Workspace $workspace, User $user): void
+    {
+        $membership = $this->makeWorkspaceMembership($workspace, $user, true);
+        $role = $this->createRoleWithPermissions(
+            $workspace->id,
+            'Connector Discovery '.$user->id,
+            [
+                WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+                WorkspacePermissions::RUN_CONNECTOR_DISCOVERY,
+            ],
+        );
+        $this->assignRoleToMembership($membership, $role);
+    }
+
+    protected function createStaffUserWithConnectorManage(UserRole $role): User
+    {
+        $user = $this->createStaffUser($role);
+        $this->grantConnectorManage($this->defaultWorkspace(), $user);
+
+        return $user;
     }
 }
