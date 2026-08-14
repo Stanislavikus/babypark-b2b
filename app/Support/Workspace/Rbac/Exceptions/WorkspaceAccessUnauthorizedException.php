@@ -10,4 +10,9 @@ final class WorkspaceAccessUnauthorizedException extends RuntimeException
     {
         parent::__construct('Actor is not authorized to mutate workspace access in the target workspace.');
     }
+
+    public function userMessageKey(): string
+    {
+        return 'unauthorized';
+    }
 }

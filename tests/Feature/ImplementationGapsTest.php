@@ -142,7 +142,8 @@ class ImplementationGapsTest extends TestCase
         $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
         $this->assertStringContainsString('Open / partial', $content);
         $this->assertStringContainsString('GAP-026B-0 cutover contract **Done**', $content);
-        $this->assertStringContainsString('GAP-026B-1 Part 1 runtime core **partially implemented**', $content);
+        $this->assertStringContainsString('GAP-026B-1 **Done**', $content);
+        $this->assertStringContainsString('Part 2 merchant Access/Roles UI', $content);
         $this->assertStringContainsString('workspace-rbac:cutover-check', $content);
         $this->assertStringContainsString('Production backfill runs at **EXECUTE** during the maintenance-window cutover', $content);
         $this->assertStringContainsString('failure at any step = STOP, no partial cutover', $content);

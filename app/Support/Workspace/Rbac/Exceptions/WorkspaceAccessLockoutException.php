@@ -10,4 +10,9 @@ final class WorkspaceAccessLockoutException extends RuntimeException
     {
         parent::__construct('Workspace access mutation would remove the last effective manage_workspace_access holder.');
     }
+
+    public function userMessageKey(): string
+    {
+        return 'lockout';
+    }
 }

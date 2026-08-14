@@ -321,7 +321,8 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
         $this->assertStringContainsString('CHECK-ONLY (B-1)', $gaps);
         $this->assertStringContainsString('EXECUTE at cutover — B-2 only', $gaps);
         $this->assertStringContainsString('GAP-026A (overall)** | **Done**', $gaps);
-        $this->assertStringContainsString('GAP-026B-1 Part 1 runtime core **partially implemented**', $gaps);
+        $this->assertStringContainsString('GAP-026B-1 **Done**', $gaps);
+        $this->assertStringContainsString('Part 2 merchant Access/Roles UI', $gaps);
         $this->assertStringContainsString('workspace-rbac:cutover-check', $gaps);
         $this->assertStringContainsString('4C-1c-2b remains blocked until GAP-026B-2', $gaps);
     }
