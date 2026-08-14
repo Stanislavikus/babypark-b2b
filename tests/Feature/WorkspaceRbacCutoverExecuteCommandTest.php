@@ -128,18 +128,41 @@ class WorkspaceRbacCutoverExecuteCommandTest extends TestCase
     #[Test]
     public function execute_command_fails_closed_when_post_backfill_holder_count_is_zero(): void
     {
-        $source = file_get_contents(app_path('Console/Commands/WorkspaceRbacCutoverExecuteCommand.php'));
+        $admin = $this->seedStaffAdminDirector();
+        $this->artisan('down');
 
+        $workspaceId = Workspace::query()->where('is_default', true)->value('id');
+        $deactivatedDuringBackfill = false;
+
+        DB::listen(function ($query) use ($admin, &$deactivatedDuringBackfill): void {
+            if (! $deactivatedDuringBackfill
+                && str_contains(strtolower($query->sql), 'insert')
+                && str_contains(strtolower($query->sql), 'workspace_user_roles')) {
+                User::query()->whereKey($admin->id)->update(['is_active' => false]);
+                $deactivatedDuringBackfill = true;
+            }
+        });
+
+        $exitCode = Artisan::call('workspace-rbac:cutover-execute');
+        $output = Artisan::output();
+
+        $this->assertTrue($deactivatedDuringBackfill);
+        $this->assertSame(1, $exitCode);
+        $this->assertStringContainsString('Backfill completed.', $output);
         $this->assertStringContainsString(
             'zero effective manage_workspace_access holders',
-            $source,
+            $output,
         );
-        $this->assertStringContainsString('countEffectiveHolders', $source);
+        $this->assertGreaterThan(0, WorkspaceRole::query()->count());
+        $this->assertSame(
+            0,
+            app(WorkspaceAccessEffectiveHolderQuery::class)->countEffectiveHolders($workspaceId),
+        );
     }
 
-    private function seedStaffAdminDirector(): void
+    private function seedStaffAdminDirector(): User
     {
-        User::factory()->create([
+        return User::factory()->create([
             'role' => UserRole::Admin,
             'is_active' => true,
             'customer_id' => null,
