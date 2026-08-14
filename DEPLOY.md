@@ -235,18 +235,23 @@ Implementation must provide a guarded one-time command/service with:
 - **CHECK-ONLY (B-1)** — `php artisan workspace-rbac:cutover-check`; diagnostic/read-only;
   no RBAC assignments/materialization; may run before maintenance; may ship in a
   B-1-only release. EXECUTE remains unavailable until GAP-026B-2.
-- **EXECUTE (B-2)** — must not exist as executable production mode without B-2
-  authority code; requires maintenance/quiesced merchant writes; re-runs preflight;
-  runs backfill; post-backfill anti-lockout; fails non-zero on unsafe state.
+- **EXECUTE (B-2)** — `php artisan workspace-rbac:cutover-execute`; requires Laravel
+  maintenance mode; re-runs `WorkspaceRbacLegacyPreflight::assertSafe()`; invokes
+  `WorkspaceRbacLegacyBackfill::execute()` with deterministic merchant-safe bootstrap
+  display names; post-backfill `WorkspaceAccessEffectiveHolderQuery` anti-lockout
+  validation; fails non-zero on unsafe state or zero effective holders.
 
 Do **not** introduce persistent activation flags, marker tables, legacy/new authority
 selectors, or dual-authority policy modes to enforce this boundary.
 
 Implemented CHECK-ONLY command: `php artisan workspace-rbac:cutover-check`. This command
 wraps `WorkspaceRbacLegacyPreflight::evaluate()` only; it never invokes
-`WorkspaceRbacLegacyBackfill::execute()`. EXECUTE remains structurally absent until
-GAP-026B-2. Migrations/seeders/service-provider boot must **not** automatically execute
-production legacy backfill.
+`WorkspaceRbacLegacyBackfill::execute()`.
+
+Implemented EXECUTE command: `php artisan workspace-rbac:cutover-execute`. This command
+refuses outside maintenance mode, runs preflight via `assertSafe()`, invokes backfill,
+then validates effective `manage_workspace_access` holders. It is separate from CHECK
+and exposes no `--apply` flag.
 
 **Queue worker quiescence**
 

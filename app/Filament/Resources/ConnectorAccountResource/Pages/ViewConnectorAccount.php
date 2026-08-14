@@ -7,11 +7,14 @@ use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Filament\Resources\ConnectorAccountResource;
 use App\Filament\Resources\ConnectorAccountResource\RelationManagers\ConnectionChecksRelationManager;
 use App\Filament\Resources\ConnectorAccountResource\RelationManagers\DiscoveryRunsRelationManager;
+use App\Models\ConnectorAccount;
 use App\Models\ConnectorConnectionCheck;
 use App\Models\ConnectorDiscoveryRun;
+use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
 use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
-use App\Support\Connectors\ConnectorAccountMerchandiserPresentation;
+use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorSafeMessagePresenter;
 use App\Support\Connectors\Exceptions\ConnectorAccountDisabledException;
@@ -32,7 +35,22 @@ class ViewConnectorAccount extends ViewRecord
 
     public function getSubheading(): string|Htmlable|null
     {
-        if (ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        $workspace = $this->presentationWorkspace();
+        $presentation = app(ConnectorAccountCapabilityPresentation::class);
+
+        if ($presentation->showActiveConnectionCheck($user, $workspace)) {
+            $disabledReason = app(ConnectorAccountUiState::class)
+                ->manualCheckActionState($this->record)['disabled_reason'];
+
+            return filled($disabledReason) ? $disabledReason : null;
+        }
+
+        if ($presentation->showDiscoveryExecution($user, $workspace)) {
             if (! config('connectors.discovery.manual_trigger_enabled')) {
                 return null;
             }
@@ -43,10 +61,7 @@ class ViewConnectorAccount extends ViewRecord
             return filled($disabledReason) ? $disabledReason : null;
         }
 
-        $disabledReason = app(ConnectorAccountUiState::class)
-            ->manualCheckActionState($this->record)['disabled_reason'];
-
-        return filled($disabledReason) ? $disabledReason : null;
+        return null;
     }
 
     public function refreshConnectionState(): void
@@ -69,7 +84,8 @@ class ViewConnectorAccount extends ViewRecord
             DiscoveryRunsRelationManager::class,
         ];
 
-        if (! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+        $user = auth()->user();
+        if ($user instanceof User && app(ConnectorAccountCapabilityPresentation::class)->showActiveConnectionCheck($user, $this->presentationWorkspace())) {
             array_unshift($managers, ConnectionChecksRelationManager::class);
         }
 
@@ -79,12 +95,20 @@ class ViewConnectorAccount extends ViewRecord
     protected function getHeaderActions(): array
     {
         $actions = [];
+        $user = auth()->user();
 
-        if (! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+        if (! $user instanceof User) {
+            return $actions;
+        }
+
+        $presentation = app(ConnectorAccountCapabilityPresentation::class);
+        $workspace = $this->presentationWorkspace();
+
+        if ($presentation->showActiveConnectionCheck($user, $workspace)) {
             $actions[] = $this->makeRunConnectionCheckAction();
         }
 
-        if (config('connectors.discovery.manual_trigger_enabled')) {
+        if ($presentation->showDiscoveryExecution($user, $workspace) && config('connectors.discovery.manual_trigger_enabled')) {
             $actions[] = $this->makeRunDiscoveryAction();
         }
 
@@ -94,22 +118,34 @@ class ViewConnectorAccount extends ViewRecord
     protected function resolveRecord(int|string $key): Model
     {
         $record = parent::resolveRecord($key);
+        $user = auth()->user();
 
-        $record = ConnectorAccountMerchandiserPresentation::sanitizeRecord(
-            $record,
-            auth()->user(),
-        );
+        if ($user instanceof User) {
+            $workspace = $record->workspace ?? Workspace::query()->findOrFail($record->workspace_id);
+            $presentation = app(ConnectorAccountCapabilityPresentation::class);
 
-        if (! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
-            $record->makeHidden([
-                'credentials',
-                'settings',
-                'base_url',
-                'auth_profile',
-            ]);
+            $record = $presentation->sanitizeRecord($record, $user, $workspace);
+
+            if ($presentation->canManage($user, $workspace)) {
+                $record->makeHidden([
+                    'credentials',
+                    'settings',
+                    'base_url',
+                    'auth_profile',
+                ]);
+            }
         }
 
-        return ConnectorAccountResource::loadAccountPresentationRelations($record, auth()->user());
+        return ConnectorAccountResource::loadAccountPresentationRelations($record, $user);
+    }
+
+    private function presentationWorkspace(): Workspace
+    {
+        if ($this->record instanceof ConnectorAccount) {
+            return $this->record->workspace ?? Workspace::query()->findOrFail($this->record->workspace_id);
+        }
+
+        return app(WorkspaceContext::class)->current();
     }
 
     private function makeRunConnectionCheckAction(): Action

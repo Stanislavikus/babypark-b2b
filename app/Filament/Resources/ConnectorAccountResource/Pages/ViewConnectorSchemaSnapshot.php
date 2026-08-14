@@ -6,7 +6,9 @@ use App\Filament\Resources\ConnectorAccountResource;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorSchemaSnapshot;
 use App\Models\ConnectorSchemaSnapshotField;
-use App\Support\Connectors\ConnectorAccountMerchandiserPresentation;
+use App\Models\User;
+use App\Models\Workspace;
+use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorSchemaFieldPresenter;
 use App\Support\Connectors\ConnectorUiFormatter;
@@ -249,12 +251,15 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
 
         abort_unless(auth()->user()?->can('view', $record), 403);
 
-        $record = ConnectorAccountMerchandiserPresentation::sanitizeRecord(
-            $record,
-            auth()->user(),
-        );
+        $user = auth()->user();
+        abort_unless($user instanceof User, 403);
 
-        if (! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+        $workspace = $record->workspace ?? Workspace::query()->findOrFail($record->workspace_id);
+        $presentation = app(ConnectorAccountCapabilityPresentation::class);
+
+        $record = $presentation->sanitizeRecord($record, $user, $workspace);
+
+        if ($presentation->canManage($user, $workspace)) {
             $record->makeHidden([
                 'credentials',
                 'settings',

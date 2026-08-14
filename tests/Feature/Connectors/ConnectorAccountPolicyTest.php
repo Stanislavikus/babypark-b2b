@@ -4,16 +4,18 @@ namespace Tests\Feature\Connectors;
 
 use App\Enums\UserRole;
 use App\Models\ConnectorAccount;
+use App\Models\User;
 use App\Models\Workspace;
 use App\Policies\ConnectorAccountPolicy;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
+use Spatie\Permission\Models\Permission;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\TestCase;
 
@@ -29,6 +31,7 @@ class ConnectorAccountPolicyTest extends TestCase
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspacePermissionSeeder::class);
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
     }
 
     #[Test]
@@ -38,231 +41,165 @@ class ConnectorAccountPolicyTest extends TestCase
     }
 
     #[Test]
-    #[DataProvider('accountAbilityProvider')]
-    public function account_abilities_allow_authorized_roles_in_same_workspace(string $ability): void
+    public function view_only_permission_allows_safe_read_but_not_discovery_or_manage(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
+        $user = $this->createStaffUser(UserRole::Manager);
+        $this->grantConnectorView($workspace, $user);
 
-        foreach ([UserRole::Admin, UserRole::Director] as $role) {
-            $user = $this->createStaffUser($role);
-            $this->assertTrue(Gate::forUser($user)->allows($ability, $this->policyArguments($ability, $account, $workspace)));
-        }
-
-        $permissionHolder = $this->createStaffUser(UserRole::Manager);
-        $permissionHolder->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
-        $this->assertTrue(Gate::forUser($permissionHolder)->allows($ability, $this->policyArguments($ability, $account, $workspace)));
+        $this->assertTrue(Gate::forUser($user)->allows('view', $account));
+        $this->assertFalse(Gate::forUser($user)->allows('viewRunDiscovery', $account));
+        $this->assertFalse(Gate::forUser($user)->allows('runDiscovery', $account));
+        $this->assertFalse(Gate::forUser($user)->allows('runConnectionCheck', $account));
+        $this->assertFalse(Gate::forUser($user)->allows('create', [ConnectorAccount::class, $workspace]));
     }
 
     #[Test]
-    #[DataProvider('accountAbilityProvider')]
-    public function account_abilities_deny_same_roles_in_different_workspace(string $ability): void
-    {
-        if ($ability === 'viewAny') {
-            $this->markTestSkipped('viewAny is workspace-scoped via current workspace, not a foreign record.');
-        }
-
-        $workspace = $this->defaultWorkspace();
-        $otherWorkspace = Workspace::query()->create(['name' => 'Other', 'is_default' => false]);
-        $account = $this->createConnectorAccount($otherWorkspace);
-        $admin = $this->createStaffUser(UserRole::Admin);
-
-        $this->assertFalse(Gate::forUser($admin)->allows($ability, $this->policyArguments($ability, $account, $otherWorkspace)));
-    }
-
-    #[Test]
-    #[DataProvider('managementAbilityProvider')]
-    public function merchandiser_is_denied_management_abilities_even_with_manage_connector_accounts_permission(string $ability): void
+    public function discovery_permission_allows_safe_read_and_discovery_control(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
-        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
-        $merchandiser->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
+        $user = $this->createStaffUser(UserRole::Manager);
+        $this->grantConnectorDiscovery($workspace, $user);
 
-        $this->assertFalse(Gate::forUser($merchandiser)->allows($ability, $this->policyArguments($ability, $account, $workspace)));
+        $this->assertTrue(Gate::forUser($user)->allows('view', $account));
+        $this->assertTrue(Gate::forUser($user)->allows('viewRunDiscovery', $account));
+        $this->assertTrue(Gate::forUser($user)->allows('runDiscovery', $account));
+        $this->assertFalse(Gate::forUser($user)->allows('runConnectionCheck', $account));
     }
 
     #[Test]
-    #[DataProvider('readAbilityProvider')]
-    public function merchandiser_is_allowed_read_abilities_in_same_workspace(string $ability): void
+    public function manage_permission_allows_full_connector_control_surface(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
-        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Manager);
 
-        $this->assertTrue(Gate::forUser($merchandiser)->allows($ability, $this->policyArguments($ability, $account, $workspace)));
+        $this->assertTrue(Gate::forUser($user)->allows('view', $account));
+        $this->assertTrue(Gate::forUser($user)->allows('viewRunDiscovery', $account));
+        $this->assertTrue(Gate::forUser($user)->allows('runDiscovery', $account));
+        $this->assertTrue(Gate::forUser($user)->allows('runConnectionCheck', $account));
+        $this->assertTrue(Gate::forUser($user)->allows('create', [ConnectorAccount::class, $workspace]));
+        $this->assertTrue(Gate::forUser($user)->allows('updateSettings', $account));
+        $this->assertTrue(Gate::forUser($user)->allows('replaceCredentials', $account));
+        $this->assertTrue(Gate::forUser($user)->allows('removeCredentials', $account));
     }
 
     #[Test]
-    #[DataProvider('viewRunDiscoveryAllowedProvider')]
-    public function view_run_discovery_allows_authorized_roles_in_same_workspace(UserRole $role, bool $withPermission, bool $expected): void
+    public function no_connector_permission_denies_all_abilities(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
-        $user = $this->createStaffUser($role);
+        $user = $this->createStaffUser(UserRole::Manager);
+        $this->makeWorkspaceMembership($workspace, $user, true);
 
-        if ($withPermission) {
-            $user->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
-        }
-
-        $this->assertSame(
-            $expected,
-            Gate::forUser($user)->allows('viewRunDiscovery', $account),
-        );
+        $this->assertFalse(Gate::forUser($user)->allows('view', $account));
+        $this->assertFalse(Gate::forUser($user)->allows('viewRunDiscovery', $account));
+        $this->assertFalse(Gate::forUser($user)->allows('runConnectionCheck', $account));
     }
 
     #[Test]
-    public function view_run_discovery_allows_eligible_roles_for_disabled_account(): void
+    public function legacy_job_title_labels_grant_no_connector_authority(): void
     {
         $workspace = $this->defaultWorkspace();
-        $account = $this->createConnectorAccount($workspace, ['is_enabled' => false]);
+        $account = $this->createConnectorAccount($workspace);
 
         foreach ([UserRole::Admin, UserRole::Director, UserRole::Merchandiser] as $role) {
             $user = $this->createStaffUser($role);
-            $this->assertTrue(Gate::forUser($user)->allows('viewRunDiscovery', $account));
+            $this->makeWorkspaceMembership($workspace, $user, true);
+
+            $this->assertFalse(Gate::forUser($user)->allows('view', $account), $role->value);
+            $this->assertFalse(Gate::forUser($user)->allows('runConnectionCheck', $account), $role->value);
+            $this->assertFalse(Gate::forUser($user)->allows('viewRunDiscovery', $account), $role->value);
         }
-
-        $manager = $this->createStaffUser(UserRole::Manager);
-        $manager->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
-        $this->assertTrue(Gate::forUser($manager)->allows('viewRunDiscovery', $account));
     }
 
     #[Test]
-    public function view_run_discovery_denies_same_roles_in_different_workspace(): void
-    {
-        $otherWorkspace = Workspace::query()->create(['name' => 'Other', 'is_default' => false]);
-        $account = $this->createConnectorAccount($otherWorkspace);
-        $admin = $this->createStaffUser(UserRole::Admin);
-
-        $this->assertFalse(Gate::forUser($admin)->allows('viewRunDiscovery', $account));
-    }
-
-    #[Test]
-    #[DataProvider('runDiscoveryAllowedProvider')]
-    public function run_discovery_allows_authorized_roles_in_same_workspace(UserRole $role, bool $withPermission, bool $expected): void
+    public function global_spatie_grant_alone_grants_no_connector_authority(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
-        $user = $this->createStaffUser($role);
+        $user = $this->createStaffUser(UserRole::Manager);
+        $this->makeWorkspaceMembership($workspace, $user, true);
 
-        if ($withPermission) {
-            $user->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
-        }
+        Permission::findOrCreate(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS, 'web');
+        $user->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
 
-        $this->assertSame(
-            $expected,
-            Gate::forUser($user)->allows('runDiscovery', $account),
-        );
+        $this->assertFalse(Gate::forUser($user)->allows('view', $account));
+        $this->assertFalse(Gate::forUser($user)->allows('runConnectionCheck', $account));
     }
 
     #[Test]
-    public function run_discovery_denies_same_roles_in_different_workspace(): void
+    public function workspace_membership_without_rbac_grants_no_connector_authority(): void
     {
-        $otherWorkspace = Workspace::query()->create(['name' => 'Other', 'is_default' => false]);
-        $account = $this->createConnectorAccount($otherWorkspace);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        $user = User::factory()->create(['role' => UserRole::Admin, 'is_active' => true]);
 
-        $this->assertFalse(Gate::forUser($admin)->allows('runDiscovery', $account));
+        $this->assertFalse(Gate::forUser($user)->allows('view', $account));
     }
 
     #[Test]
-    public function run_discovery_denies_all_roles_for_disabled_account(): void
+    public function inactive_user_is_denied(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        $user = $this->createStaffUser(UserRole::Manager);
+        $this->grantConnectorManage($workspace, $user);
+        $user->update(['is_active' => false]);
+
+        $this->assertFalse(Gate::forUser($user)->allows('view', $account));
+    }
+
+    #[Test]
+    public function inactive_workspace_user_is_denied(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        $user = $this->createStaffUser(UserRole::Manager);
+        $membership = $this->makeWorkspaceMembership($workspace, $user, false);
+        $role = $this->createRoleWithPermissions(
+            $workspace->id,
+            'Inactive membership role',
+            [WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS],
+        );
+        $this->assignRoleToMembership($membership, $role);
+
+        $this->assertFalse(Gate::forUser($user)->allows('view', $account));
+    }
+
+    #[Test]
+    public function permission_in_workspace_a_does_not_authorize_workspace_b(): void
+    {
+        $workspaceA = $this->defaultWorkspace();
+        $workspaceB = Workspace::query()->create(['name' => 'Other', 'is_default' => false]);
+        $accountB = $this->createConnectorAccount($workspaceB);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Manager);
+
+        $this->assertFalse(Gate::forUser($user)->allows('view', $accountB));
+    }
+
+    #[Test]
+    public function run_discovery_denies_disabled_account_even_with_manage_permission(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace, ['is_enabled' => false]);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Manager);
 
-        foreach ([UserRole::Admin, UserRole::Director, UserRole::Merchandiser] as $role) {
-            $user = $this->createStaffUser($role);
-            $this->assertFalse(Gate::forUser($user)->allows('runDiscovery', $account));
-        }
-
-        $manager = $this->createStaffUser(UserRole::Manager);
-        $manager->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
-        $this->assertFalse(Gate::forUser($manager)->allows('runDiscovery', $account));
+        $this->assertTrue(Gate::forUser($user)->allows('viewRunDiscovery', $account));
+        $this->assertFalse(Gate::forUser($user)->allows('runDiscovery', $account));
     }
 
     #[Test]
-    public function create_allows_admin_in_own_workspace_and_denies_other_workspace(): void
+    public function stale_hydrated_active_user_with_db_deactivated_is_denied(): void
     {
         $workspace = $this->defaultWorkspace();
-        $otherWorkspace = Workspace::query()->create(['name' => 'Other', 'is_default' => false]);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $account = $this->createConnectorAccount($workspace);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Manager);
 
-        $this->assertTrue(Gate::forUser($admin)->allows('create', [ConnectorAccount::class, $workspace]));
-        $this->assertFalse(Gate::forUser($admin)->allows('create', [ConnectorAccount::class, $otherWorkspace]));
-    }
+        User::query()->whereKey($user->id)->update(['is_active' => false]);
 
-    /**
-     * @return array<string, array{0: string}>
-     */
-    public static function accountAbilityProvider(): array
-    {
-        return array_merge(
-            self::readAbilityProvider(),
-            self::managementAbilityProvider(),
-        );
-    }
-
-    /**
-     * @return array<string, array{0: string}>
-     */
-    public static function readAbilityProvider(): array
-    {
-        return [
-            'viewAny' => ['viewAny'],
-            'view' => ['view'],
-        ];
-    }
-
-    /**
-     * @return array<string, array{0: string}>
-     */
-    public static function managementAbilityProvider(): array
-    {
-        return [
-            'runConnectionCheck' => ['runConnectionCheck'],
-            'updateSettings' => ['updateSettings'],
-            'replaceCredentials' => ['replaceCredentials'],
-            'removeCredentials' => ['removeCredentials'],
-            'create' => ['create'],
-        ];
-    }
-
-    /**
-     * @return array<string, array{0: UserRole, 1: bool, 2: bool}>
-     */
-    public static function runDiscoveryAllowedProvider(): array
-    {
-        return [
-            'admin allowed' => [UserRole::Admin, false, true],
-            'director allowed' => [UserRole::Director, false, true],
-            'merchandiser allowed' => [UserRole::Merchandiser, false, true],
-            'manager without permission denied' => [UserRole::Manager, false, false],
-            'manager with permission allowed' => [UserRole::Manager, true, true],
-            'warehouse without permission denied' => [UserRole::Warehouse, false, false],
-            'warehouse with permission allowed' => [UserRole::Warehouse, true, true],
-            'programmer without permission denied' => [UserRole::Programmer, false, false],
-            'programmer with permission allowed' => [UserRole::Programmer, true, true],
-        ];
-    }
-
-    /**
-     * @return array<string, array{0: UserRole, 1: bool, 2: bool}>
-     */
-    public static function viewRunDiscoveryAllowedProvider(): array
-    {
-        return self::runDiscoveryAllowedProvider();
-    }
-
-    /**
-     * @return array<int, mixed>
-     */
-    private function policyArguments(string $ability, ConnectorAccount $account, Workspace $workspace): array
-    {
-        return match ($ability) {
-            'create' => [ConnectorAccount::class, $workspace],
-            'viewAny' => [ConnectorAccount::class],
-            default => [$account],
-        };
+        $this->assertFalse(Gate::forUser($user)->allows('view', $account));
     }
 }

@@ -603,7 +603,7 @@ class ConnectorAccountDocumentationTest extends TestCase
             $domainModel,
         );
         $this->assertStringContainsString('ConnectorAccount capability evaluation (frozen):', $domainModel);
-        $this->assertStringContainsString('Transitional current code (GAP-026 — not normative):', $domainModel);
+        $this->assertStringContainsString('Historical pre-B-2 shipped authorization (GAP-026 — not normative):', $domainModel);
         $this->assertStringContainsString('### Connection-check capability and error mapping (Resolved)', $domainModel);
         $this->assertStringContainsString('### Connection-check enqueue state (Resolved)', $domainModel);
         $this->assertStringContainsString('`ConnectorConnectionCheckStatus` includes `Queued`', $domainModel);
@@ -1174,9 +1174,10 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $gap006 = $this->gap006Section();
 
-        $this->assertStringContainsString('ConnectorAccount authorization/rendered-view sub-gap (closed', $gap006);
+        $this->assertStringContainsString('ConnectorAccount authorization/rendered-view sub-gap (closed PR #102', $gap006);
+        $this->assertStringContainsString('historical pre-B-2 — superseded by GAP-026B-2', $gap006);
         $this->assertStringContainsString('ConnectorAccountMerchandiserPresentation', $gap006);
-        $this->assertStringContainsString('`credentials`, `settings`, `base_url`', $gap006);
+        $this->assertStringContainsString('Sensitive fields excluded: `credentials`, `settings`,', $gap006);
         $this->assertStringContainsString('`store_code`, `tenant_context`, `auth_profile`', $gap006);
         $this->assertStringContainsString('**GAP-006 overall remains Open.**', $gap006);
         $this->assertStringContainsString('| Admin | Yes | Yes (enabled accounts) | Yes |', $gap006);

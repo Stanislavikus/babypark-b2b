@@ -15,8 +15,6 @@ use App\Support\Connectors\Exceptions\ConnectorAccountNameConflict;
 use App\Support\Connectors\Exceptions\ConnectorAccountNotFoundException;
 use App\Support\Connectors\Exceptions\ConnectorAccountSettingsValidationException;
 use App\Support\Connectors\Exceptions\ConnectorDefinitionNotFoundException;
-use App\Support\Workspace\WorkspaceMembership;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -25,7 +23,6 @@ use Illuminate\Support\Str;
 final class ConnectorAccountSettingsService implements ConnectorAccountPersistencePort
 {
     public function __construct(
-        private readonly WorkspaceMembership $workspaceMembership,
         private readonly ConnectorProfileRegistry $profileRegistry,
         private readonly ConnectorAccountConstraintViolationClassifier $constraintViolationClassifier,
     ) {}
@@ -35,8 +32,6 @@ final class ConnectorAccountSettingsService implements ConnectorAccountPersisten
         Workspace $workspace,
         CreateConnectorAccountInput $input,
     ): ConnectorAccountSettingsResult {
-        $this->assertActorBelongsToWorkspace($actor, $workspace);
-
         Gate::forUser($actor)->authorize('create', [ConnectorAccount::class, $workspace]);
 
         $connectorDefinition = ConnectorDefinition::query()->find($input->connectorDefinitionId);
@@ -100,8 +95,6 @@ final class ConnectorAccountSettingsService implements ConnectorAccountPersisten
         string $connectorAccountId,
         UpdateConnectorAccountInput $input,
     ): ConnectorAccountSettingsResult {
-        $this->assertActorBelongsToWorkspace($actor, $workspace);
-
         $account = ConnectorAccount::withoutWorkspaceScope()
             ->where('workspace_id', $workspace->id)
             ->where('id', $connectorAccountId)
@@ -147,13 +140,6 @@ final class ConnectorAccountSettingsService implements ConnectorAccountPersisten
         $account->refresh();
 
         return $this->toResult($account);
-    }
-
-    private function assertActorBelongsToWorkspace(User $actor, Workspace $workspace): void
-    {
-        if (! $this->workspaceMembership->belongs($actor, $workspace)) {
-            throw new AuthorizationException('This action is unauthorized.');
-        }
     }
 
     private function authorizeUpdate(User $actor, ConnectorAccount $account, CredentialMutation $credentialMutation): void

@@ -7,6 +7,7 @@ use App\Jobs\Connectors\ConnectorConnectionCheckJob;
 use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -33,6 +34,7 @@ class ConnectorQueueRuntimeAlignmentTest extends TestCase
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspacePermissionSeeder::class);
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->enableConnectionCheckCapability();
     }
 
@@ -74,7 +76,7 @@ class ConnectorQueueRuntimeAlignmentTest extends TestCase
         Queue::fake();
 
         $workspace = $this->defaultWorkspace();
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($workspace);
 
         app(ConnectorConnectionCheckDispatchService::class)->executeManual(

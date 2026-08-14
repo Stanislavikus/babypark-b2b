@@ -10,6 +10,7 @@ use App\Support\Connectors\Integrations\EligibleConnectorPlatformCatalog;
 use App\Support\Platform\PlatformAdminAuthorization;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,12 +30,14 @@ class EligibleConnectorPlatformCatalogTest extends TestCase
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspacePermissionSeeder::class);
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
     }
 
     #[Test]
     public function adobe_active_with_account_setup_is_visible_without_accounts(): void
     {
         $user = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorView($this->defaultWorkspace(), $user);
         $platforms = app(EligibleConnectorPlatformCatalog::class)
             ->forWorkspace($user, $this->defaultWorkspace());
 
@@ -56,7 +59,7 @@ class EligibleConnectorPlatformCatalogTest extends TestCase
             'name' => 'Shopify store',
         ]);
 
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $platforms = app(EligibleConnectorPlatformCatalog::class)
             ->forWorkspace($user, $this->defaultWorkspace());
 
@@ -74,7 +77,7 @@ class EligibleConnectorPlatformCatalogTest extends TestCase
             'status' => ConnectorDefinitionStatus::Deprecated,
         ]);
 
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $catalog = app(EligibleConnectorPlatformCatalog::class);
 
         $withoutAccount = $catalog->forWorkspace($user, $this->defaultWorkspace());
@@ -97,7 +100,7 @@ class EligibleConnectorPlatformCatalogTest extends TestCase
     #[Test]
     public function draft_platforms_never_appear(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $platforms = app(EligibleConnectorPlatformCatalog::class)
             ->forWorkspace($user, $this->defaultWorkspace());
 
@@ -109,6 +112,7 @@ class EligibleConnectorPlatformCatalogTest extends TestCase
     public function catalog_does_not_require_platform_admin_authorization(): void
     {
         $user = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorView($this->defaultWorkspace(), $user);
 
         $this->assertFalse(PlatformAdminAuthorization::canManage($user));
 

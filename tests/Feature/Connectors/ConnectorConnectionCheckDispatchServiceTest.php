@@ -14,9 +14,9 @@ use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\Exceptions\ConnectorAccountDisabledException;
 use App\Support\Connectors\Exceptions\ConnectorAccountNotFoundException;
 use App\Support\Connectors\Exceptions\UnsupportedConnectorCapabilityException;
-use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -43,6 +43,7 @@ class ConnectorConnectionCheckDispatchServiceTest extends TestCase
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspacePermissionSeeder::class);
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
 
         $this->enableConnectionCheckCapability();
         $this->workspace = $this->defaultWorkspace();
@@ -53,7 +54,7 @@ class ConnectorConnectionCheckDispatchServiceTest extends TestCase
     public function execute_manual_creates_row_and_dispatches_job(): void
     {
         Queue::fake();
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
 
         $checkId = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
@@ -73,7 +74,7 @@ class ConnectorConnectionCheckDispatchServiceTest extends TestCase
     public function second_dispatch_returns_same_row_and_does_not_push_second_job(): void
     {
         Queue::fake();
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
 
         $firstId = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
@@ -87,7 +88,7 @@ class ConnectorConnectionCheckDispatchServiceTest extends TestCase
     #[Test]
     public function disabled_account_is_rejected_before_capability_gate(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace, ['is_enabled' => false]);
 
         $this->expectException(ConnectorAccountDisabledException::class);
@@ -101,7 +102,7 @@ class ConnectorConnectionCheckDispatchServiceTest extends TestCase
         $this->app->forgetInstance(ConnectorProfileRegistry::class);
         $this->dispatchService = app(ConnectorConnectionCheckDispatchService::class);
 
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
 
         try {
@@ -118,9 +119,10 @@ class ConnectorConnectionCheckDispatchServiceTest extends TestCase
         Queue::fake();
 
         $allowedActor = $this->createStaffUser(UserRole::Manager);
-        $allowedActor->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
+        $this->grantConnectorManage($this->workspace, $allowedActor);
 
         $deniedActor = $this->createStaffUser(UserRole::Manager);
+        $this->makeWorkspaceMembership($this->workspace, $deniedActor, true);
 
         $account = $this->createConnectorAccount($this->workspace);
 
@@ -135,7 +137,7 @@ class ConnectorConnectionCheckDispatchServiceTest extends TestCase
     #[Test]
     public function unknown_account_throws_not_found(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         $this->expectException(ConnectorAccountNotFoundException::class);
         $this->dispatchService->executeManual($admin, $this->workspace->id, '00000000-0000-4000-8000-000000000001');
@@ -153,7 +155,7 @@ class ConnectorConnectionCheckDispatchServiceTest extends TestCase
     #[Test]
     public function dispatch_failure_compensates_row_to_failed(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
         $row = ConnectorConnectionCheck::withoutWorkspaceScope()->create([
             'workspace_id' => $account->workspace_id,
@@ -181,7 +183,7 @@ class ConnectorConnectionCheckDispatchServiceTest extends TestCase
     public function stale_queued_row_is_recovered_and_new_dispatch_is_allowed(): void
     {
         Queue::fake();
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
 
         $stale = ConnectorConnectionCheck::withoutWorkspaceScope()->create([

@@ -34,6 +34,7 @@ use App\Support\Connectors\OAuth1\OAuth1SigningContext;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -62,6 +63,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspacePermissionSeeder::class);
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
 
         $this->workspace = $this->defaultWorkspace();
         $this->service = app(ConnectorAccountSettingsService::class);
@@ -78,7 +80,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     #[Test]
     public function create_with_keep_results_in_account_without_credentials(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         $result = $this->service->create(
             $admin,
@@ -104,7 +106,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     #[Test]
     public function create_rejects_remove_credential_mutation(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         $this->expectException(InvalidCredentialMutationException::class);
 
@@ -125,7 +127,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     #[Test]
     public function update_keep_leaves_credentials_unchanged_and_remove_clears_them(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
 
         $kept = $this->service->update(
@@ -249,7 +251,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
             return null;
         });
 
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         $result = $this->service->create(
             $admin,
@@ -273,7 +275,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     public function update_with_replace_requires_replace_credentials_ability(): void
     {
         $account = $this->createConnectorAccount($this->workspace);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $originalCredentials = $account->credentials;
 
         Gate::before(function ($user, string $ability): ?bool {
@@ -309,7 +311,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     public function update_with_remove_requires_remove_credentials_ability(): void
     {
         $account = $this->createConnectorAccount($this->workspace);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         Gate::before(function ($user, string $ability): ?bool {
             if ($ability === 'removeCredentials') {
@@ -342,7 +344,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     public function update_with_keep_requires_only_update_settings_ability(): void
     {
         $account = $this->createConnectorAccount($this->workspace);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         Gate::before(function ($user, string $ability): ?bool {
             if ($ability === 'updateSettings') {
@@ -374,7 +376,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     #[Test]
     public function cross_workspace_update_lookup_matches_unknown_account_not_found(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $otherWorkspace = Workspace::query()->create(['name' => 'Other', 'is_default' => false]);
         $foreignAccount = $this->createConnectorAccount($otherWorkspace);
 
@@ -416,7 +418,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     #[Test]
     public function create_rejects_unknown_connector_definition_before_persistence(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         $this->expectException(ConnectorDefinitionNotFoundException::class);
 
@@ -437,7 +439,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     #[Test]
     public function create_rejects_unknown_auth_profile_via_registry_exception(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         $this->expectException(ConnectorProfileNotFoundException::class);
 
@@ -461,7 +463,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     #[Test]
     public function create_rejects_disabled_auth_profile_via_registry_exception(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         $registry = new ConnectorProfileRegistry(app(), [
             'adobe_commerce_paas_oauth1_integration' => [
@@ -493,7 +495,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     #[Test]
     public function create_rejects_invalid_name_before_persistence(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         $this->expectException(ConnectorAccountSettingsValidationException::class);
 
@@ -514,7 +516,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     #[Test]
     public function duplicate_active_name_create_throws_name_conflict_without_partial_state(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $definition = $this->adobeConnectorDefinition();
 
         $this->service->create(
@@ -561,7 +563,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     #[Test]
     public function settings_result_never_exposes_credentials_and_model_hides_them_from_serialization(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         $result = $this->service->create(
             $admin,
@@ -671,7 +673,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     #[Test]
     public function schema_rejects_profile_input_mismatch_through_service_create_path(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         $this->expectException(ConnectorAccountProfileInputMismatchException::class);
 

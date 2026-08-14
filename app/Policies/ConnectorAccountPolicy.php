@@ -2,24 +2,22 @@
 
 namespace App\Policies;
 
-use App\Enums\UserRole;
 use App\Models\ConnectorAccount;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Connectors\ConnectorAuthorization;
 use App\Support\Workspace\WorkspaceContext;
-use App\Support\Workspace\WorkspaceMembership;
-use App\Support\Workspace\WorkspacePermissions;
 
 class ConnectorAccountPolicy
 {
     public function __construct(
-        private readonly WorkspaceMembership $workspaceMembership,
+        private readonly ConnectorAuthorization $connectorAuthorization,
         private readonly WorkspaceContext $workspaceContext,
     ) {}
 
     public function viewAny(User $user): bool
     {
-        return $this->allowsReadAbilityForWorkspace(
+        return $this->connectorAuthorization->canSafeRead(
             $user,
             $this->workspaceContext->current(),
         );
@@ -27,22 +25,22 @@ class ConnectorAccountPolicy
 
     public function view(User $user, ConnectorAccount $connectorAccount): bool
     {
-        return $this->allowsReadAbility($user, $connectorAccount);
+        return $this->connectorAuthorization->canSafeRead($user, $connectorAccount->workspace);
     }
 
     public function runConnectionCheck(User $user, ConnectorAccount $connectorAccount): bool
     {
-        return $this->allowsManagementAbility($user, $connectorAccount);
+        return $this->connectorAuthorization->canManage($user, $connectorAccount->workspace);
     }
 
     public function viewRunDiscovery(User $user, ConnectorAccount $connectorAccount): bool
     {
-        return $this->allowsDiscoveryControlEligibility($user, $connectorAccount);
+        return $this->connectorAuthorization->canDiscoveryControl($user, $connectorAccount->workspace);
     }
 
     public function runDiscovery(User $user, ConnectorAccount $connectorAccount): bool
     {
-        if (! $this->allowsDiscoveryControlEligibility($user, $connectorAccount)) {
+        if (! $this->connectorAuthorization->canDiscoveryControl($user, $connectorAccount->workspace)) {
             return false;
         }
 
@@ -51,86 +49,21 @@ class ConnectorAccountPolicy
 
     public function create(User $user, Workspace $workspace): bool
     {
-        return $this->allowsManagementAbilityForWorkspace($user, $workspace);
+        return $this->connectorAuthorization->canManage($user, $workspace);
     }
 
     public function updateSettings(User $user, ConnectorAccount $connectorAccount): bool
     {
-        return $this->allowsManagementAbility($user, $connectorAccount);
+        return $this->connectorAuthorization->canManage($user, $connectorAccount->workspace);
     }
 
     public function replaceCredentials(User $user, ConnectorAccount $connectorAccount): bool
     {
-        return $this->allowsManagementAbility($user, $connectorAccount);
+        return $this->connectorAuthorization->canManage($user, $connectorAccount->workspace);
     }
 
     public function removeCredentials(User $user, ConnectorAccount $connectorAccount): bool
     {
-        return $this->allowsManagementAbility($user, $connectorAccount);
-    }
-
-    private function allowsReadAbility(User $user, ConnectorAccount $connectorAccount): bool
-    {
-        if (! $this->workspaceMembership->belongs($user, $connectorAccount->workspace)) {
-            return false;
-        }
-
-        return $this->allowsReadAbilityForWorkspace($user, $connectorAccount->workspace);
-    }
-
-    private function allowsReadAbilityForWorkspace(User $user, Workspace $workspace): bool
-    {
-        if (! $this->workspaceMembership->belongs($user, $workspace)) {
-            return false;
-        }
-
-        if ($user->role === UserRole::Merchandiser) {
-            return true;
-        }
-
-        return $this->allowsManagementAbilityForWorkspace($user, $workspace);
-    }
-
-    private function allowsManagementAbility(User $user, ConnectorAccount $connectorAccount): bool
-    {
-        if (! $this->workspaceMembership->belongs($user, $connectorAccount->workspace)) {
-            return false;
-        }
-
-        return $this->allowsManagementAbilityForWorkspace($user, $connectorAccount->workspace);
-    }
-
-    private function allowsManagementAbilityForWorkspace(User $user, Workspace $workspace): bool
-    {
-        if (! $this->workspaceMembership->belongs($user, $workspace)) {
-            return false;
-        }
-
-        if ($user->role === UserRole::Merchandiser) {
-            return false;
-        }
-
-        if (in_array($user->role, [UserRole::Admin, UserRole::Director], true)) {
-            return true;
-        }
-
-        return $user->can(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
-    }
-
-    private function allowsDiscoveryControlEligibility(User $user, ConnectorAccount $connectorAccount): bool
-    {
-        if (! $this->workspaceMembership->belongs($user, $connectorAccount->workspace)) {
-            return false;
-        }
-
-        if (in_array($user->role, [UserRole::Admin, UserRole::Director], true)) {
-            return true;
-        }
-
-        if ($user->role === UserRole::Merchandiser) {
-            return true;
-        }
-
-        return $user->can(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
+        return $this->connectorAuthorization->canManage($user, $connectorAccount->workspace);
     }
 }

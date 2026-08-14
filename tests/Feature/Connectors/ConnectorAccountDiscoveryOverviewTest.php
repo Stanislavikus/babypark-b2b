@@ -24,9 +24,11 @@ use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceResolutionReason;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
@@ -54,9 +56,11 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspacePermissionSeeder::class);
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         Http::preventStrayRequests();
+        App::setLocale('uk');
         $this->enableSchemaDiscoveryCapability();
 
         $this->dispatchStub = new ConnectorDiscoveryDispatchPortStub;
@@ -66,7 +70,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     #[Test]
     public function discovery_summary_shows_never_discovered_empty_state(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
 
         Livewire::actingAs($admin)
@@ -77,7 +81,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     #[Test]
     public function discovery_summary_shows_active_runtime_with_polling(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
         $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Running);
 
@@ -91,7 +95,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     #[Test]
     public function discovery_summary_shows_succeeded_state_with_snapshot_details(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
             'last_discovery_at' => now(),
             'last_successful_discovery_at' => now(),
@@ -116,7 +120,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     #[Test]
     public function discovery_summary_shows_failed_safe_error_only(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
             'last_discovery_at' => now(),
         ]);
@@ -137,7 +141,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     #[Test]
     public function discovery_summary_shows_no_change_snapshot_state(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
             'last_discovery_at' => now(),
             'last_successful_discovery_at' => now(),
@@ -169,7 +173,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     #[Test]
     public function terminal_discovery_state_does_not_poll(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
             'last_discovery_at' => now(),
         ]);
@@ -186,7 +190,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     #[Test]
     public function discovery_history_lists_account_runs_in_newest_first_order(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
         $older = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded, [
             'created_at' => now()->subHours(2),
@@ -213,7 +217,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     #[Test]
     public function discovery_history_excludes_cross_workspace_runs(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
         $foreignWorkspace = Workspace::query()->create(['name' => 'Foreign', 'is_default' => false]);
         $foreignAccount = $this->createConnectorAccount($foreignWorkspace);
@@ -231,6 +235,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     public function merchandiser_can_see_discovery_history_but_not_connection_checks(): void
     {
         $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorDiscovery($this->defaultWorkspace(), $merchandiser);
         $account = $this->createConnectorAccount();
         $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded, [
             'finished_at' => now(),
@@ -257,7 +262,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     #[Test]
     public function snapshot_detail_is_accessible_for_same_workspace_account(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
         $run = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded);
         $snapshot = $this->createSnapshotForRun($run, [
@@ -279,7 +284,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     #[Test]
     public function foreign_account_snapshot_is_not_found(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
         $foreignAccount = $this->createConnectorAccount();
         $run = $this->createDiscoveryRun($foreignAccount, ConnectorDiscoveryRunStatus::Succeeded);
@@ -296,7 +301,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     #[Test]
     public function foreign_workspace_snapshot_is_not_found(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $foreignWorkspace = Workspace::query()->create(['name' => 'Foreign', 'is_default' => false]);
         $foreignAccount = $this->createConnectorAccount($foreignWorkspace);
         $run = $this->createDiscoveryRun($foreignAccount, ConnectorDiscoveryRunStatus::Succeeded);
@@ -314,7 +319,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     public function run_discovery_action_is_hidden_when_manual_trigger_disabled(): void
     {
         Config::set('connectors.discovery.manual_trigger_enabled', false);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
 
         Livewire::actingAs($admin)
@@ -326,7 +331,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     public function run_discovery_action_is_available_when_enabled_and_supported(): void
     {
         Config::set('connectors.discovery.manual_trigger_enabled', true);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
 
         Livewire::actingAs($admin)
@@ -338,7 +343,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     public function run_discovery_action_disabled_when_account_disabled(): void
     {
         Config::set('connectors.discovery.manual_trigger_enabled', true);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: ['is_enabled' => false]);
 
         Livewire::actingAs($admin)
@@ -366,7 +371,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     public function run_discovery_execution_denied_when_account_disabled_before_action(): void
     {
         Config::set('connectors.discovery.manual_trigger_enabled', true);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
 
         $component = Livewire::actingAs($admin)
@@ -399,7 +404,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     {
         Config::set('connectors.discovery.manual_trigger_enabled', true);
         $manager = $this->createStaffUser(UserRole::Manager);
-        $manager->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
+        $this->grantConnectorManage($this->defaultWorkspace(), $manager);
         $account = $this->createConnectorAccount();
 
         $component = Livewire::actingAs($manager)
@@ -407,6 +412,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
             ->assertActionEnabled('runDiscovery');
 
         $manager->revokePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
+        User::query()->whereKey($manager->id)->update(['is_active' => false]);
         $manager->refresh();
 
         $this->assertTrue($account->fresh()->is_enabled);
@@ -430,7 +436,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     public function run_discovery_action_disabled_when_profile_missing(): void
     {
         Config::set('connectors.discovery.manual_trigger_enabled', true);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: ['auth_profile' => 'missing_profile']);
 
         Livewire::actingAs($admin)
@@ -445,7 +451,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
         Config::set('connectors.profiles.adobe_commerce_paas_oauth1_integration.capabilities', [
             'connection_check',
         ]);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
 
         Livewire::actingAs($admin)
@@ -457,7 +463,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     public function run_discovery_action_disabled_when_active_run_exists(): void
     {
         Config::set('connectors.discovery.manual_trigger_enabled', true);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
         $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Running);
 
@@ -471,7 +477,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     public function run_discovery_action_disabled_when_source_unavailable(): void
     {
         Config::set('connectors.discovery.manual_trigger_enabled', true);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
 
         ConnectorSchemaSource::query()
@@ -488,7 +494,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     public function run_discovery_action_executes_through_dispatch_boundary(): void
     {
         Config::set('connectors.discovery.manual_trigger_enabled', true);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
 
         $this->dispatchStub->executeManualCallback = function () use ($account): void {
@@ -507,7 +513,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     public function run_discovery_backend_rejection_shows_safe_notification(): void
     {
         Config::set('connectors.discovery.manual_trigger_enabled', true);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
 
         $this->dispatchStub->executeManualThrowable = new ConnectorDiscoverySourceResolutionException(
@@ -528,6 +534,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     {
         Config::set('connectors.discovery.manual_trigger_enabled', true);
         $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorDiscovery($this->defaultWorkspace(), $merchandiser);
         $account = $this->createConnectorAccount();
 
         Livewire::actingAs($merchandiser)
@@ -538,7 +545,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     #[Test]
     public function list_shows_last_successful_discovery_column(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $discoveredAt = now()->subDay()->startOfMinute();
         $account = $this->createConnectorAccount(overrides: [
             'name' => 'Discovery List Account',

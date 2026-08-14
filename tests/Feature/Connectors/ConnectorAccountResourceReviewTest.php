@@ -22,6 +22,7 @@ use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
@@ -59,9 +60,11 @@ class ConnectorAccountResourceReviewTest extends TestCase
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspacePermissionSeeder::class);
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         Http::preventStrayRequests();
+        App::setLocale('uk');
         $this->dispatchStub = new ConnectorConnectionCheckDispatchServiceStub;
         $this->app->instance(ConnectorConnectionCheckDispatchService::class, $this->dispatchStub);
     }
@@ -70,8 +73,9 @@ class ConnectorAccountResourceReviewTest extends TestCase
     public function denied_user_does_not_see_connector_accounts_in_navigation(): void
     {
         $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorDiscovery($this->defaultWorkspace(), $merchandiser);
         $deniedManager = $this->createStaffUser(UserRole::Manager);
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         App::setLocale('uk');
         $label = __('connectors.ui.resource.navigation_label', locale: 'uk');
@@ -97,7 +101,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     #[Test]
     public function authorized_user_sees_integrations_navigation_label_not_legacy_connections_entry(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         App::setLocale('uk');
 
@@ -110,7 +114,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     #[Test]
     public function search_finds_tenant_context_and_definition_code(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $byTenant = $this->createConnectorAccount(overrides: [
             'name' => 'Tenant Search Account',
             'store_code' => 'default',
@@ -134,7 +138,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     #[Test]
     public function attention_message_is_row_scoped_for_attention_statuses_only(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $message = __('connectors.errors.invalid_credentials', locale: 'uk');
 
         $attentionRequired = $this->createConnectorAccount(overrides: [
@@ -180,7 +184,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
         string $reasonKey,
         ?callable $arrange = null,
     ): void {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: $accountOverrides);
 
         if ($arrange !== null) {
@@ -197,7 +201,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
         $component = Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
             ->assertActionDisabled('runConnectionCheck')
-            ->assertSee($reason);
+            ->assertSee($reason, escape: false);
 
         $component->callAction('runConnectionCheck');
         $this->assertSame(0, $this->dispatchStub->callCount);
@@ -246,7 +250,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     #[Test]
     public function manual_action_notifies_exact_started_copy_for_active_check(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
         $stub = new ConnectorConnectionCheckDispatchServiceStub;
         $stub->executeManualCallback = function () use ($account, $stub): void {
@@ -264,7 +268,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     #[Test]
     public function manual_action_notifies_exact_completed_copy_for_succeeded_race(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
             'connection_status' => ConnectorAccountConnectionStatus::Untested,
         ]);
@@ -286,7 +290,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     #[Test]
     public function manual_action_notifies_exact_cause_specific_failed_copy(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
         $expectedBody = __('connectors.errors.invalid_credentials');
         $stub = new ConnectorConnectionCheckDispatchServiceStub;
@@ -312,7 +316,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     #[Test]
     public function manual_action_notifies_exact_generic_failed_copy_for_lifecycle_failure(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
         $expectedBody = __('connectors.errors.connection_check_failed');
         $stub = new ConnectorConnectionCheckDispatchServiceStub;
@@ -340,7 +344,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     #[Test]
     public function relation_manager_refreshes_immediately_on_event_without_waiting_for_poll(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
 
         $component = Livewire::actingAs($admin)
@@ -360,7 +364,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     #[Test]
     public function manual_action_refreshes_history_immediately_for_active_check(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
         $stub = new ConnectorConnectionCheckDispatchServiceStub;
         $stub->executeManualCallback = function () use ($account, $stub): void {
@@ -379,7 +383,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     #[Test]
     public function manual_action_refreshes_history_and_projection_for_succeeded_race(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
             'connection_status' => ConnectorAccountConnectionStatus::Untested,
         ]);
@@ -409,7 +413,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     #[Test]
     public function manual_action_refreshes_history_for_failed_race(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
         $stub = new ConnectorConnectionCheckDispatchServiceStub;
         $stub->executeManualCallback = function () use ($account, $stub): void {
@@ -442,7 +446,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     #[Test]
     public function detail_page_hides_secrets_from_html_and_livewire_snapshot(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
             'credentials' => AdobePaaSCredentialMapper::toStorageArray(
                 new OAuth1Credentials(
@@ -489,7 +493,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
             $logged[] = $event;
         });
 
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
             'credentials' => AdobePaaSCredentialMapper::toStorageArray(
                 new OAuth1Credentials(self::CREDENTIAL_CANARY, self::CREDENTIAL_CANARY, self::CREDENTIAL_CANARY, self::CREDENTIAL_CANARY),
@@ -522,7 +526,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     {
         App::setLocale($locale);
 
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
 
         $component = Livewire::actingAs($admin)
@@ -558,7 +562,7 @@ class ConnectorAccountResourceReviewTest extends TestCase
     {
         App::setLocale($locale);
 
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
             'last_checked_at' => '2026-07-27 14:30:00',
         ]);

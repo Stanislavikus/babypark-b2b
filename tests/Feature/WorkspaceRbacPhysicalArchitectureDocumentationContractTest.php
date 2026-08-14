@@ -403,9 +403,9 @@ class WorkspaceRbacPhysicalArchitectureDocumentationContractTest extends TestCas
         $this->assertStringContainsString('GAP-026B-0 — Workspace RBAC authority cutover contract', $content);
         $this->assertStringContainsString('GAP-026B-1 — Access & Cutover Machinery', $content);
         $this->assertStringContainsString('GAP-026B-2 — Authority & Presentation Cutover', $content);
-        $this->assertStringContainsString('4C-1c-2b remains blocked until GAP-026B-2', $content);
+        $this->assertStringContainsString('blocked until production cutover completes successfully', $content);
         $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
-        $this->assertStringContainsString('Open / partial', $content);
+        $this->assertStringContainsString('Open / activation pending', $content);
         $this->assertStringContainsString('GAP-026A (overall)** | **Done**', $content);
         $this->assertStringContainsString('GAP-026B-1 **Done**', $content);
         $this->assertStringContainsString('Part 2 merchant Access/Roles UI', $content);

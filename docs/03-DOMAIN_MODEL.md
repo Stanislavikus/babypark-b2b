@@ -976,9 +976,11 @@ After 026B authority cutover, legacy labels Admin, Director, Merchandiser, Manag
 Programmer, Warehouse, and legacy Spatie grants have **no** connector authorization
 semantics by themselves.
 
-**026B migration seam (current code — not target):** shipped `ConnectorAccountPolicy`
-still uses legacy `User.role` / membership logic. GAP-026B-2 must migrate policy and
-merchant entry paths to the matrix above. Do not extend legacy role branches.
+**026B repository status (post-B-2 implementation):** `ConnectorAccountPolicy` and
+`ConnectorAuthorization` evaluate the workspace-RBAC matrix above via
+`WorkspaceAuthorization`. Legacy `User.role` labels have no connector authorization
+semantics in cut-over paths. Production environment activation still requires the
+maintenance-window EXECUTE cutover — repository runtime ≠ production activation.
 
 **Connector dispatch authorization freshness (frozen)**
 
@@ -1071,10 +1073,10 @@ Livewire/Filament record state — not merely through visual hiding.
 - A legacy Merchandiser label must **not** restrict presentation if the membership
   legitimately has `manage_connector_accounts`.
 
-**026B migration seam:** current `ConnectorAccountMerchandiserPresentation` uses
-`User.role === Merchandiser` for safe DB projection, hidden attributes, connection-check
-relation loading, and field visibility. This is transitional and must not survive the
-026B authority cutover.
+**026B repository status (post-B-2):** `ConnectorAccountCapabilityPresentation`
+replaced transitional `ConnectorAccountMerchandiserPresentation` and applies
+capability-based safe projection from effective workspace permissions — not
+`User.role === Merchandiser`.
 
 **WorkspaceMembership is not an additional Connector authority gate**
 
@@ -1083,14 +1085,11 @@ After cutover, `WorkspaceMembership` is **not** an additional authorization gate
 permission)` already incorporates active `WorkspaceUser` membership and permission
 evaluation.
 
-GAP-026B implementation must migrate all relevant connector entry/write paths that
-currently perform a separate legacy membership check before Gate/permission evaluation.
+GAP-026B-2 migrated connector entry/write paths that previously performed a separate
+legacy membership check before Gate/permission evaluation.
 
-Known example: `ConnectorAccountSettingsService` currently calls
-`WorkspaceMembership::belongs()` before Gate authorization.
-
-Also require inspection/migration of merchant Integrations landing/catalog paths that
-still use legacy membership logic.
+`ConnectorAccountSettingsService` no longer calls `WorkspaceMembership::belongs()`
+before Gate authorization in cut-over connector paths.
 
 Do **not** globally rewrite or delete `WorkspaceMembership` as part of GAP-026B;
 unrelated legacy use remains GAP-004 / GAP-027 territory.
@@ -1116,8 +1115,9 @@ must receive that resolved `Workspace` explicitly.
 re-authorize against the current explicit `Workspace` immediately before persistence —
 including normal save and confirmation action after VAT-rate warning.
 
-**026B migration seam:** current page authorizes only page admission; later writes do
-not yet re-authorize at persistence time.
+**026B repository status (post-B-2):** `WorkspaceTaxSettingsAuthorization` and
+`WorkspaceTaxSettings::persist()` perform write-time reauthorization against the
+explicit `Workspace` before persistence.
 
 **Mapping authorization seam**
 
@@ -1232,12 +1232,10 @@ Normative requirements:
 - post-lock actor authorization is **mandatory**;
 - any pre-lock authorization is optional fast-fail only and is **not** authoritative for mutation execution;
 - do not reuse a pre-lock hydrated `User` as authorization truth;
-- **current implementation (pre-B-2):** `WorkspaceAuthorization::activeMembership()` reads
-  `users.is_active` from the passed `User` model instance;
-- **GAP-026B-2 requirement:** authoritative `WorkspaceAuthorization` must remove
-  stale-model dependency — effective-permission evaluation must read all authority inputs
-  from persistence via one database-backed projection/query (including `users.is_active`,
-  not from the supplied Eloquent instance);
+- **post-B-2 repository implementation:** authoritative `WorkspaceAuthorization`
+  evaluates effective permissions from persistence via one database-backed projection
+  (including `users.is_active`, `workspace_users.is_active`, ownership, role assignments,
+  and canonical permission assignments — not from the supplied Eloquent `User` instance);
 - Access post-lock fresh `User` reload by stable ID remains required and must **not** be
   removed merely because the central authorization query becomes DB-backed;
 - membership/role identity and mutable target state relevant to the mutation must be freshly resolved/revalidated after the `Workspace` lock;
@@ -4072,18 +4070,23 @@ especially `view_connector_accounts`, `run_connector_discovery`, and
   permission slice and requires its own future workspace-permission decision when
   scheduling ships.
 
-**Transitional current code (GAP-026 — not normative):**
+**Historical pre-B-2 shipped authorization (GAP-026 — not normative):**
 
-The shipped `ConnectorAccountPolicy` on `develop` still grants some connector
-abilities via fixed `User.role` checks (for example Merchandiser read/discovery,
-Admin/Director management bypass). That behavior is documented under **GAP-026**
-as transitional implementation mismatch only — it is **not** the target
-authorization contract and must not be extended.
+Before **GAP-026B-2**, the repository shipped `ConnectorAccountPolicy` that granted
+some connector abilities via fixed `User.role` checks (for example Merchandiser
+read/discovery, Admin/Director management bypass) and applied safe presentation
+through transitional `ConnectorAccountMerchandiserPresentation`. That pre-B-2
+behavior was transitional implementation mismatch only — it was **not** the target
+authorization contract and must not be extended or reintroduced.
 
-After GAP-026B authority cutover, normative connector authorization and safe
-presentation follow **Workspace RBAC authority cutover (Resolved — GAP-026B-0,
-2026-08-13)** — permission matrix, capability-based presentation invariant, and
-removal of `WorkspaceMembership` as an additional connector gate.
+**026B repository status (post-B-2):** connector authorization and safe presentation
+in the repository now follow **Workspace RBAC authority cutover (Resolved —
+GAP-026B-0, 2026-08-13)** — the frozen workspace-permission matrix via
+`ConnectorAuthorization` / `WorkspaceAuthorization`, capability-based presentation
+through `ConnectorAccountCapabilityPresentation`, and removal of
+`WorkspaceMembership` as an additional connector gate. **Production activation**
+of that authority switch remains pending maintenance-window **EXECUTE** — merging
+B-2 code is not itself production cutover.
 
 ### Connection-check capability and error mapping (Resolved)
 
@@ -4259,8 +4262,9 @@ recovery — lifecycle codes never overwrite it.
 
 #### Authorization and projection
 
-- `ConnectorAccountPolicy::runConnectionCheck()` — dedicated ability (currently
-  delegates to the same workspace/role rules as `view()`); dispatch uses
+- `ConnectorAccountPolicy::runConnectionCheck()` — dedicated ability; **management-only**
+  via `manage_connector_accounts` through `ConnectorAuthorization` /
+  `WorkspaceAuthorization` (not discovery-only or safe-read tiers). Dispatch uses
   `Gate::forUser($actor)->authorize('runConnectionCheck', $account)`.
 - Account projection mapping on terminal **vendor** outcomes:
 

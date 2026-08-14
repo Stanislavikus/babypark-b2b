@@ -280,10 +280,13 @@ yet), but should be scheduled before any payment gateway integration work starts
   publication and persistence, discovery-run received/normalized accounting (106
   received / 102 normalized on the committed Magento pilot regression fixture),
   account projection updates after successful discovery, and Discovery Overview UI.
-- `ConnectorAccountMerchandiserPresentation` plus `ConnectorAccountPolicy`
-  updates (PR #102) close the Merchandiser `viewAny()`/`view()` and rendered
-  management-field security gap — `store_code`, `tenant_context`, credentials,
-  and other management-only connector details are not rendered to Merchandiser.
+- **Historical (PR #102, pre-B-2):** `ConnectorAccountMerchandiserPresentation` plus
+  transitional `ConnectorAccountPolicy` fixed-role updates closed the Merchandiser
+  `viewAny()`/`view()` and rendered management-field security gap — `store_code`,
+  `tenant_context`, credentials, and other management-only connector details were
+  not rendered to Merchandiser under pre-B-2 role semantics. **Superseded in
+  repository runtime by GAP-026B-2** (`ConnectorAccountCapabilityPresentation` +
+  workspace-RBAC matrix).
 - Connector-account **creation** and **credential-management/settings UI** remain
   absent (explicitly out of scope for 4B-2a-3).
 - Task 4B-2b Discovery Overview UI (PR #114) delivers Connector Account list
@@ -358,31 +361,35 @@ physical-delete attempts (archive remains valid) are implemented (Task 4C-1b).
 Canonical suggestion/read-model contract is frozen (Task 4C-1c-0, docs only).
 Canonical deterministic suggestion provider/read-model (4C-1c-1) is implemented.
 Workspace access / authorization contract is frozen (4C-1c-2a, docs only).
-Layer B mapping UI (4C-1c-2b) remains unimplemented and is blocked on
-workspace-scoped authorization foundation (see GAP-026). `SyncRun` / execution,
+Layer B mapping UI (4C-1c-2b) remains unimplemented — repository work may begin
+after verified GAP-026B-2 merge; merchant shipping/traffic under new authority
+remains blocked until successful production maintenance-window EXECUTE (see
+GAP-026). `SyncRun` / execution,
 preview, schedule, history, and `ExternalRecordLink` remain unimplemented.
 Connector-account creation and credential-management/settings UI remain absent.
 Task 4B-2c (discovered schema fields / change inspection) and retention jobs
 remain unimplemented.
 
-**ConnectorAccount authorization/rendered-view sub-gap (closed, PR #102 /
-Task 4B-2b-1e+1f):** `ConnectorAccountPolicy` grants Merchandiser
-`viewAny()`/`view()` (safe fields only) and `runDiscovery()` (enabled
-accounts only). Management abilities remain denied to Merchandiser.
-Field-level restrictions enforced via `ConnectorAccountMerchandiserPresentation`:
-query column selection, hidden attributes on Livewire serialization, and
-Filament table/infolist visibility for `store_code`/`tenant_context`.
-Merchandiser detail pages omit connection-check header actions and relation
-managers; `connectionChecks` presentation relations are not loaded.
-Sensitive fields excluded: `credentials`, `settings`, `base_url`,
-`store_code`, `tenant_context`, `auth_profile`. Current code in
-`ConnectorAccountResource`, `ViewConnectorAccount`, and
-`ConnectorAccountPolicy` confirms management-only fields such as `store_code`
-are not rendered to Merchandiser. Tests assert rendered HTML and Livewire
-payload absence, including connection-check management/history surfaces, not
-policy-layer alone.
+**ConnectorAccount authorization/rendered-view sub-gap (closed PR #102 /
+Task 4B-2b-1e+1f; historical pre-B-2 — superseded by GAP-026B-2 repository
+runtime):** transitional pre-B-2 `ConnectorAccountPolicy` granted Merchandiser
+`viewAny()`/`view()` (safe fields only) and `runDiscovery()` (enabled accounts
+only) via fixed `User.role` checks. Management abilities remained denied to
+Merchandiser. Field-level restrictions were enforced via historical
+`ConnectorAccountMerchandiserPresentation`: query column selection, hidden
+attributes on Livewire serialization, and Filament table/infolist visibility for
+`store_code`/`tenant_context`. Merchandiser detail pages omitted connection-check
+header actions and relation managers; `connectionChecks` presentation relations
+were not loaded. Sensitive fields excluded: `credentials`, `settings`,
+`base_url`, `store_code`, `tenant_context`, `auth_profile`. **026B repository
+status (post-B-2):** `ConnectorAccountCapabilityPresentation` applies
+capability-based safe projection from effective workspace permissions; connection-
+check overlay and management surfaces are management-only (`manage_connector_accounts`).
+Production EXECUTE activation remains pending.
 
-**Historical/transitional shipped role matrix (pre-4C-1c-2a current implementation; not normative target authorization; superseded by the GAP-026 workspace-scoped RBAC contract):**
+**Historical shipped role matrix (pre-4C-1c-2a / pre-B-2 transitional
+implementation; not normative target authorization; superseded by GAP-026B-2
+repository workspace-RBAC matrix):**
 
 (confirmed against `App\Enums\UserRole`):
 
@@ -402,8 +409,9 @@ Layer B mapping UI (4C-1c-2b),
 sync execution/preview/schedule/history
 (`SyncRun`, issues, merchant sync UX), `ExternalRecordLink`,
 connector-account creation and credential-management/settings UI.
-Workspace-scoped authorization foundation (GAP-026) is a prerequisite before
-mutable Layer B mapping UI.
+Workspace-scoped authorization foundation (GAP-026) repository runtime is
+**Implemented** (GAP-026B-2); production EXECUTE activation remains pending before
+mutable Layer B mapping UI may ship to merchant traffic.
 
 ### Classification after Sync UX / Domain Rebaseline (documentation pass)
 
@@ -480,8 +488,9 @@ Next task: Task 4B-2c — discovered schema fields / change inspection.
 
 **Task 4B-2b note (added 2026-08-07):** PR #102 merged queued discovery
 execution (`ConnectorDiscoveryRunJob`), the dispatch/persistence execution
-chain, Adobe discovery execution, account projection updates, and Merchandiser
-authorization/presentation closure (`ConnectorAccountMerchandiserPresentation`).
+chain, Adobe discovery execution, account projection updates, and historical
+pre-B-2 Merchandiser authorization/presentation closure
+(`ConnectorAccountMerchandiserPresentation` — superseded by GAP-026B-2).
 Earlier PRs #98–#101 delivered discovery runtime Stop-and-Amend, normalization,
 error vocabulary, and canonical hashing groundwork; PR #96/#4B-2b-0 added the
 `database_connectors` lane. PR #105 corrected received-vs-normalized discovery
@@ -989,14 +998,16 @@ Remaining connector gaps are tracked separately under GAP-006.
 - **Shipped runtime/read architecture (not a regression):** `ConnectorCapability`,
   Discovery execution, snapshot persistence, and Field Browser read-model
   architecture are shipped.
-- **Shipped but transitional authorization:** current `ConnectorAccountPolicy` is
-  also shipped, but its fixed `User.role` authorization behavior is transitional
-  under **GAP-026** — not normative target authorization.
+- **026B repository authorization (post-B-2):** `ConnectorAccountPolicy` +
+  `ConnectorAuthorization` evaluate the frozen workspace-permission matrix via
+  `WorkspaceAuthorization` — not fixed `User.role` semantics. Historical pre-B-2
+  fixed-role behavior is transitional evidence under **GAP-026** / PR #102 only.
 - **Remaining GAP-025 UX work:** copy/navigation/Layer-C gating/deeper Layer A/B
   surfaces.
-- **Separate prerequisite:** workspace-scoped authorization foundation is
-  **GAP-026** backend/security work and remains prerequisite for mutable Layer-B
-  mapping — it is not merely labeling/navigation/gating UI work.
+- **Separate prerequisite:** mutable Layer-B mapping UI (4C-1c-2b) — repository
+  work may proceed after verified GAP-026B-2 merge; merchant shipping/traffic
+  under new authority remains blocked until successful production maintenance-window
+  EXECUTE (GAP-026).
 
 **Implemented sync-domain backend (verified on `develop`; not a GAP-025 UX claim):**
 - `SyncConfiguration` persistence and domain write path (Task 4C-0).
@@ -1005,8 +1016,8 @@ Remaining connector gaps are tracked separately under GAP-006.
 - Canonical deterministic suggestion/read-model provider (Task 4C-1c-1).
 
 **Still absent in code (docs settled; runtime or UI missing):**
-- Layer B mapping UI (Task 4C-1c-2b) — blocked on workspace-scoped authorization
-  foundation (GAP-026);
+- Layer B mapping UI (Task 4C-1c-2b) — repository work may proceed after
+  verified GAP-026B-2 merge; merchant shipping blocked until production EXECUTE;
 - `SyncRun` / `SyncRunItem` persistence and execution runtime;
 - `ExternalRecordLink`;
 - sync execution runtime for merchant "Синхронізувати зараз";
@@ -1085,9 +1096,9 @@ explicit read-only `WorkspaceAuthorization` service with regression tests.
 | **GAP-026A-2 — Preflight/backfill machinery & anti-lockout coordinator** | **Done.** `WorkspaceRbacLegacyPreflight` / result DTO; deterministic/idempotent `WorkspaceRbacLegacyBackfill`; frozen legacy template keys and bundles; `WorkspaceAccessMutationCoordinator` with fresh anti-lockout query; SQLite + MySQL regression tests including real MySQL 8 concurrent-process proof. Machinery + tests only — not production execution. |
 | **GAP-026A (overall)** | **Done** — 026A-1 and 026A-2 foundation slices complete per original staging. |
 | **GAP-026B-0 — Workspace RBAC authority cutover contract** | **Done (docs/tests).** Frozen cutover boundaries for Connector/Tax/Mapping/Access; capability-based connector presentation; existing-memberships-only Access; User lifecycle transition rules; one-time maintenance cutover sequence; CHECK-ONLY (B-1) / EXECUTE (B-2) slice ownership; 026B-1/026B-2 split. See `03-DOMAIN_MODEL.md` → Workspace RBAC authority cutover (Resolved — GAP-026B-0). |
-| **GAP-026B-1 — Access & Cutover Machinery** | **Done.** Part 1 runtime core: `WorkspaceAccessMutationService` application boundary (existing-membership role assign/remove; membership activate/deactivate; role create/rename/permission edit/safe unused-role delete); `UserLifecycleService` global `User` deactivation integrity + hard-delete guard; Filament `EditUser` single-persistence seam; CHECK-ONLY command `workspace-rbac:cutover-check` (diagnostics only; no RBAC assignment/materialization). Part 2 merchant Access/Roles UI: Filament `WorkspaceAccess` page (`Налаштування` → `Доступ`; `Користувачі` / `Ролі` tabs) with fresh `manage_workspace_access` authorization on every Livewire request; all mutations delegate to Part 1 service; existing-memberships-only informational copy. **GAP-026B-2 remains unimplemented.** B-1 still has CHECK-ONLY only — **No executable production EXECUTE mode in a B-1-only release**; production legacy membership/role backfill must not run until B-2 ships. **Explicitly no** connector/tax policy authority switch in B-1. |
-| **GAP-026B-2 — Authority & Presentation Cutover** | **Unimplemented.** **EXECUTE mode** of guarded cutover command/service (production legacy backfill/materialization). `ConnectorAccountPolicy` migration; remove legacy `WorkspaceMembership` from connector authority paths; permission-based safe Connector presentation; merchant Integrations/catalog gating migration; tax authorization migration + write-time reauthorization; Mapping authorization seam; DB-fresh `WorkspaceAuthorization` effective-permission evaluation (persistence-backed authority inputs, not hydrated `User` state); Connector post-lock dispatch authorization freshness; accepted asynchronous revocation boundary (post-snapshot enqueue is not retroactively cancelled; Connector jobs do not re-authorize initiating `User` at execution time in B-2); explicit no-`Workspace`-row-mutex / no-`User`-row-mutex rule for Connector dispatch; cross-workspace + safe-state + Livewire serialization regressions; EXECUTE cutover/runbook tests. First production deployment containing B-2 must be the maintenance-window cutover deployment; merchant traffic blocked until EXECUTE + anti-lockout + smoke succeed. After B-2 is merged and verified, 4C-1c-2b repo work may begin; environment must execute EXECUTE during that cutover before merchant traffic uses new authority. |
-| **GAP-026B (overall)** | **Pre-cutover gate (frozen order):** Spatie assignment preflight → legacy workspace/Admin preflight → deterministic/idempotent legacy backfill from **current** legacy state (EXECUTE at cutover — B-2 only) → fresh anti-lockout validation → workspace-permission authorization becomes authoritative (failure at any step = STOP, no partial cutover). Narrow cutover domains: Connector, tax, Mapping seam, Access (existing memberships only). CHECK-ONLY machinery shipped in B-1 (`workspace-rbac:cutover-check`); merchant Access/Roles UI shipped in B-1 Part 2; EXECUTE and production materialization ship only with B-2. `User::canAccessPanel()` and unrelated admin resources may still use legacy role semantics until GAP-027. **Partial** (026B-0 contract Done; B-1 Done; B-2 pending). |
+| **GAP-026B-1 — Access & Cutover Machinery** | **Done.** Part 1 runtime core + Part 2 merchant Access/Roles UI; CHECK-ONLY `workspace-rbac:cutover-check`. EXECUTE ships with B-2 (see below). **Explicitly no** connector/tax policy authority switch in B-1-only runtime. |
+| **GAP-026B-2 — Authority & Presentation Cutover** | **Implemented (repository ready for production cutover; production EXECUTE not yet performed).** EXECUTE command `workspace-rbac:cutover-execute`; `ConnectorAccountPolicy` + `ConnectorAuthorization` workspace-RBAC matrix; `ConnectorAccountCapabilityPresentation` three-tier safe projection; Integrations/ListPlatformConnections runtime-overlay gating; `WorkspaceTaxSettingsAuthorization` + write-time reauthorization; `FieldMappingAuthorizationService` outer seam; DB-fresh `WorkspaceAuthorization`; Connector post-lock dispatch authorization freshness; MySQL concurrency proofs for post-lock revocation. Environment activation pending maintenance-window cutover. | First production deployment containing B-2 must be the maintenance-window cutover deployment; merchant traffic blocked until EXECUTE + anti-lockout + smoke succeed. After B-2 is merged and verified, 4C-1c-2b repo work may begin; environment must execute EXECUTE during that cutover before merchant traffic uses new authority. |
+| **GAP-026B (overall)** | **Open / activation pending** — B-0 contract Done; B-1 Done; B-2 repository runtime Implemented (production EXECUTE not yet performed). Closure requires maintenance-window cutover per staging below.
 
 **Legacy membership / role backfill matrix (026B production execution — GAP-026B-2 EXECUTE only):**
 
@@ -1146,25 +1157,28 @@ not alone make every legacy User mutation anti-lockout-safe.
 `PlatformAdminAuthorization` and `/cabinet` (`Customer` principal) remain outside
 GAP-026 workspace RBAC.
 
-**Verified current-code state (post GAP-026A-1):**
-- `App\Services\Workspace\WorkspaceAuthorization` implements explicit read-only
-  workspace permission evaluation (`allows`, `effectivePermissions`, `activeMembership`)
-  without `WorkspaceContext`, `WorkspaceMembership`, `User.role`, or Spatie.
+**Verified current-code state (post GAP-026B-2 repository implementation):**
+- `App\Services\Workspace\WorkspaceAuthorization` implements DB-backed effective-permission
+  projection (`allows`, `effectivePermissions`, `activeMembership`) without trusting
+  hydrated `User` state for authority inputs.
 - Five RBAC tables exist with composite workspace guards and RESTRICT semantics;
   `WorkspaceUser`, `WorkspaceRole`, `WorkspacePermission` models do **not** use
   `BelongsToWorkspace`.
 - `WorkspaceRbacPermissionSeeder` idempotently seeds all seven atomic permissions
   into `workspace_permissions`. Legacy `WorkspacePermissionSeeder` still seeds
-  Spatie `web`-guard permissions for transitional production authorization.
+  Spatie `web`-guard permissions for transitional production authorization outside
+  cut-over domains.
 - No production RBAC membership/role assignments are seeded by `DatabaseSeeder`.
-- **Still transitional (026B cutover required):** `User.role` participates directly
-  in authorization — e.g. `ConnectorAccountPolicy` and
-  `WorkspaceTaxSettingsAuthorization` still use legacy role/Spatie checks.
-- `WorkspaceMembership` still uses the MVP default-workspace shortcut; authoritative
-  membership for policies is **not** switched to `WorkspaceUser` until 026B.
+- **Cut-over domains in repository runtime (B-2):** `ConnectorAccountPolicy` +
+  `ConnectorAuthorization`; `ConnectorAccountCapabilityPresentation`; Integrations and
+  `ListPlatformConnections` runtime-overlay gating; `WorkspaceTaxSettingsAuthorization`
+  + write-time tax reauthorization; `FieldMappingAuthorizationService` outer seam;
+  redundant Connector `WorkspaceMembership` gates removed in B-2 scope.
+- `workspace-rbac:cutover-execute` command implemented; **production EXECUTE not yet
+  performed** — environment activation pending maintenance-window cutover.
+- `User.role` remains transitional for GAP-027 / platform surfaces outside cut-over
+  domains; it has **no** connector/tax/mapping/access authorization effect in B-2 paths.
 - Spatie Teams remains **disabled** — `config/permission.php` → `'teams' => false`.
-- Connector/mapping/tax **policy cutover** to `WorkspaceAuthorization` is **not**
-  done; workspace RBAC is not yet authoritative for merchant authorization.
 
 **Impact:**
 - Do not treat the current global Spatie configuration as satisfying the
@@ -1179,9 +1193,9 @@ GAP-026 workspace RBAC.
 - Cross-reference **GAP-004** for workspace data isolation — GAP-004 tracks
   table/query coverage audit, not permission semantics.
 
-**Next task:** GAP-026B-2 — Authority & Presentation Cutover.
+**Next task:** Production GAP-026B maintenance-window cutover (EXECUTE) after B-2 merge.
 
-**Status:** Open / partial — physical architecture frozen (GAP-026-0); GAP-026A foundation (**026A-1** schema/catalogue/read authorization + **026A-2** preflight/backfill machinery and anti-lockout coordinator) **Done**; GAP-026B-0 cutover contract **Done**; GAP-026B-1 **Done** (Part 1 runtime core + Part 2 merchant Access/Roles UI); GAP-026B-2 runtime **unimplemented**. Closure requires 026B narrow cutover per staging above. 4C-1c-2b remains blocked until GAP-026B-2 implementation completes and environment executes one-time cutover.
+**Status:** Open / activation pending — physical architecture frozen (GAP-026-0); GAP-026A foundation **Done**; GAP-026B-0 cutover contract **Done**; GAP-026B-1 **Done**; GAP-026B-2 repository runtime **Implemented** (production EXECUTE not yet performed). Closure requires environment one-time cutover per staging above. 4C-1c-2b Mapping UI remains blocked until production cutover completes successfully.
 
 ---
 

@@ -10,6 +10,7 @@ use App\Filament\Resources\ConnectorAccountResource;
 use App\Models\ConnectorAccount;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\ConnectorUiFormatter;
@@ -33,19 +34,25 @@ final class PlatformIntegrationCardBuilder
     public function cardsFor(User $actor, Workspace $workspace): Collection
     {
         $platforms = $this->catalog->forWorkspace($actor, $workspace);
+        $canManage = app(ConnectorAccountCapabilityPresentation::class)->canManage($actor, $workspace);
 
-        $accountsByDefinition = ConnectorAccount::query()
+        $accountsQuery = ConnectorAccount::query()
             ->where('workspace_id', $workspace->id)
             ->whereIn('connector_definition_id', $platforms->map->id->all())
-            ->with([
+            ->orderBy('name');
+
+        if ($canManage) {
+            $accountsQuery->with([
                 'connectionChecks' => fn ($query) => $query
                     ->select(['id', 'connector_account_id', 'status'])
                     ->whereIn('status', [
                         ConnectorConnectionCheckStatus::Queued,
                         ConnectorConnectionCheckStatus::Running,
                     ]),
-            ])
-            ->orderBy('name')
+            ]);
+        }
+
+        $accountsByDefinition = $accountsQuery
             ->get()
             ->groupBy('connector_definition_id');
 
@@ -54,6 +61,7 @@ final class PlatformIntegrationCardBuilder
         return $platforms->map(function (EligibleConnectorPlatform $platform) use (
             $accountsByDefinition,
             $canCreate,
+            $canManage,
         ): PlatformIntegrationCard {
             /** @var Collection<int, ConnectorAccount> $accounts */
             $accounts = $accountsByDefinition->get($platform->id, Collection::make())->values();
@@ -67,6 +75,7 @@ final class PlatformIntegrationCardBuilder
                 accounts: $accounts->all(),
                 canCreate: $canCreate,
                 setupAvailable: $setupAvailable,
+                canManage: $canManage,
             );
         });
     }
@@ -80,6 +89,7 @@ final class PlatformIntegrationCardBuilder
         array $accounts,
         bool $canCreate,
         bool $setupAvailable,
+        bool $canManage,
     ): PlatformIntegrationCard {
         if ($health->isNotConnected()) {
             return $this->notConnectedCard($platform, $health, $canCreate, $setupAvailable);
@@ -88,7 +98,7 @@ final class PlatformIntegrationCardBuilder
         $singleAccount = $health->isSingleAccount() ? $accounts[0] : null;
         $runtimeOverlayLabel = null;
 
-        if ($singleAccount !== null) {
+        if ($singleAccount !== null && $canManage) {
             // §3 — reuse UiState for active-check overlay only. Page-specific
             // IntegrationsStatusVocabulary owns stable landing labels/colors.
             $activeCheck = $this->uiState->activeConnectionCheck($singleAccount);

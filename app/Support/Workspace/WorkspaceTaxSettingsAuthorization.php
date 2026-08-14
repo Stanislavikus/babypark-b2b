@@ -2,20 +2,25 @@
 
 namespace App\Support\Workspace;
 
-use App\Enums\UserRole;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Services\Workspace\WorkspaceAuthorization;
 
 final class WorkspaceTaxSettingsAuthorization
 {
-    public static function canManage(User $user): bool
-    {
-        if (! $user->is_active) {
-            return false;
-        }
+    public function __construct(
+        private readonly WorkspaceAuthorization $workspaceAuthorization,
+        private readonly WorkspaceContext $workspaceContext,
+    ) {}
 
-        return in_array($user->role, [
-            UserRole::Admin,
-            UserRole::Director,
-        ], true) || $user->can(WorkspacePermissions::MANAGE_TAX_SETTINGS);
+    public function canManage(User $user, ?Workspace $workspace = null): bool
+    {
+        $workspace ??= $this->workspaceContext->current();
+
+        return $this->workspaceAuthorization->allows(
+            $user,
+            $workspace,
+            WorkspacePermissions::MANAGE_TAX_SETTINGS,
+        );
     }
 }

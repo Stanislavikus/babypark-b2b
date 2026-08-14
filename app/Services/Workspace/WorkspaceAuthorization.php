@@ -24,13 +24,9 @@ final class WorkspaceAuthorization
      */
     public function effectivePermissions(User $user, Workspace $workspace): array
     {
-        $membership = $this->activeMembership($user, $workspace);
-
-        if ($membership === null) {
-            return [];
-        }
-
-        $codes = DB::table('workspace_user_roles')
+        $codes = DB::table('users')
+            ->join('workspace_users', 'workspace_users.user_id', '=', 'users.id')
+            ->join('workspace_user_roles', 'workspace_user_roles.workspace_user_id', '=', 'workspace_users.id')
             ->join(
                 'workspace_role_permissions',
                 'workspace_role_permissions.workspace_role_id',
@@ -43,9 +39,12 @@ final class WorkspaceAuthorization
                 '=',
                 'workspace_role_permissions.workspace_permission_id',
             )
-            ->where('workspace_user_roles.workspace_user_id', $membership->id)
+            ->where('users.id', $user->id)
+            ->where('workspace_users.workspace_id', $workspace->id)
             ->where('workspace_user_roles.workspace_id', $workspace->id)
             ->where('workspace_role_permissions.workspace_id', $workspace->id)
+            ->where('users.is_active', true)
+            ->where('workspace_users.is_active', true)
             ->whereIn('workspace_permissions.code', WorkspacePermissions::catalogue())
             ->distinct()
             ->orderBy('workspace_permissions.code')
@@ -57,14 +56,18 @@ final class WorkspaceAuthorization
 
     public function activeMembership(User $user, Workspace $workspace): ?WorkspaceUser
     {
-        if (! $user->is_active) {
+        $membershipId = DB::table('users')
+            ->join('workspace_users', 'workspace_users.user_id', '=', 'users.id')
+            ->where('users.id', $user->id)
+            ->where('workspace_users.workspace_id', $workspace->id)
+            ->where('users.is_active', true)
+            ->where('workspace_users.is_active', true)
+            ->value('workspace_users.id');
+
+        if ($membershipId === null) {
             return null;
         }
 
-        return WorkspaceUser::query()
-            ->where('workspace_id', $workspace->id)
-            ->where('user_id', $user->id)
-            ->where('is_active', true)
-            ->first();
+        return WorkspaceUser::query()->find($membershipId);
     }
 }

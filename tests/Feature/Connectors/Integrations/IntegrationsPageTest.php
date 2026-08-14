@@ -15,12 +15,15 @@ use App\Filament\Resources\ConnectorAccountResource;
 use App\Filament\Resources\ConnectorDefinitionResource;
 use App\Models\ConnectorConnectionCheck;
 use App\Models\ConnectorDefinition;
+use App\Models\User;
 use App\Support\Platform\PlatformAdminAuthorization;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -39,6 +42,7 @@ class IntegrationsPageTest extends TestCase
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspacePermissionSeeder::class);
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         app()->setLocale('uk');
@@ -48,6 +52,7 @@ class IntegrationsPageTest extends TestCase
     public function merchandiser_sees_platform_cards_and_ask_admin_instead_of_connect(): void
     {
         $user = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorView($this->defaultWorkspace(), $user);
 
         $component = Livewire::actingAs($user)
             ->test(Integrations::class)
@@ -87,7 +92,7 @@ class IntegrationsPageTest extends TestCase
     #[Test]
     public function admin_sees_connect_for_setup_capable_platform(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         Livewire::actingAs($user)
             ->test(Integrations::class)
@@ -105,7 +110,7 @@ class IntegrationsPageTest extends TestCase
     public function active_platform_without_account_setup_is_absent_until_an_account_exists(): void
     {
         $shopify = ConnectorDefinition::query()->where('code', 'shopify')->firstOrFail();
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         Livewire::actingAs($user)
             ->test(Integrations::class)
@@ -130,7 +135,7 @@ class IntegrationsPageTest extends TestCase
     #[Test]
     public function single_account_card_opens_overview_and_shows_connected_vocabulary(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->defaultWorkspace(), [
             'name' => 'Adobe Commerce',
             'connection_status' => ConnectorAccountConnectionStatus::Connected,
@@ -160,7 +165,7 @@ class IntegrationsPageTest extends TestCase
     #[Test]
     public function mixed_healthy_and_disabled_accounts_do_not_render_disabled_platform_status(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $definitionId = $this->adobeConnectorDefinition()->id;
 
         $this->createConnectorAccount($this->defaultWorkspace(), [
@@ -193,7 +198,7 @@ class IntegrationsPageTest extends TestCase
     #[Test]
     public function multi_account_open_goes_to_platform_connection_list(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $definitionId = $this->adobeConnectorDefinition()->id;
 
         $this->createConnectorAccount($this->defaultWorkspace(), [
@@ -219,7 +224,7 @@ class IntegrationsPageTest extends TestCase
     #[Test]
     public function single_account_active_check_reuses_ui_state_runtime_overlay(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->defaultWorkspace(), [
             'name' => 'Adobe Commerce',
             'connection_status' => ConnectorAccountConnectionStatus::Connected,
@@ -251,7 +256,7 @@ class IntegrationsPageTest extends TestCase
             'status' => ConnectorDefinitionStatus::Deprecated,
         ]);
 
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         Livewire::actingAs($user)
             ->test(Integrations::class)
@@ -265,6 +270,7 @@ class IntegrationsPageTest extends TestCase
     public function integrations_access_does_not_widen_platform_admin_gate(): void
     {
         $user = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorView($this->defaultWorkspace(), $user);
 
         $this->assertFalse(PlatformAdminAuthorization::canManage($user));
 
@@ -275,7 +281,7 @@ class IntegrationsPageTest extends TestCase
     #[Test]
     public function integrations_is_registered_as_ungrouped_merchant_navigation(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $this->actingAs($user);
 
         $this->assertTrue(Integrations::shouldRegisterNavigation());
@@ -319,7 +325,7 @@ class IntegrationsPageTest extends TestCase
     #[Test]
     public function multi_account_list_shows_per_row_overlay_not_aggregate_runtime_on_landing(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $definitionId = $this->adobeConnectorDefinition()->id;
 
         $a = $this->createConnectorAccount($this->defaultWorkspace(), [
@@ -354,5 +360,93 @@ class IntegrationsPageTest extends TestCase
             ->assertSee('Store B')
             ->assertSee(__('connectors.ui.runtime.running'))
             ->assertSee('Підключити ще');
+    }
+
+    #[Test]
+    public function view_only_integrations_cards_hide_runtime_overlay_for_active_check(): void
+    {
+        $user = $this->viewOnlyActor();
+        $account = $this->createConnectorAccount($this->defaultWorkspace(), [
+            'name' => 'Adobe Commerce',
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+            'last_checked_at' => now()->subHour(),
+        ]);
+
+        ConnectorConnectionCheck::factory()->create([
+            'workspace_id' => $this->defaultWorkspace()->id,
+            'connector_account_id' => $account->id,
+            'status' => ConnectorConnectionCheckStatus::Running,
+            'trigger' => ConnectorConnectionCheckTrigger::Manual,
+            'started_at' => now(),
+        ]);
+
+        $connectionCheckQueries = [];
+        DB::listen(function ($query) use (&$connectionCheckQueries): void {
+            if (str_contains(strtolower($query->sql), 'connector_connection_checks')) {
+                $connectionCheckQueries[] = $query->sql;
+            }
+        });
+
+        $component = Livewire::actingAs($user)
+            ->test(Integrations::class)
+            ->assertSuccessful();
+
+        $cards = collect($component->get('cards'));
+
+        $this->assertTrue($cards->every(fn (array $card): bool => $card['runtime_overlay_label'] === null));
+        $this->assertSame([], $connectionCheckQueries);
+        $component->assertDontSee(__('connectors.ui.runtime.running'));
+    }
+
+    #[Test]
+    public function view_only_platform_connection_rows_hide_runtime_overlay_for_active_check(): void
+    {
+        $user = $this->viewOnlyActor();
+        $definitionId = $this->adobeConnectorDefinition()->id;
+
+        $account = $this->createConnectorAccount($this->defaultWorkspace(), [
+            'connector_definition_id' => $definitionId,
+            'name' => 'Store A',
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+        ]);
+        $this->createConnectorAccount($this->defaultWorkspace(), [
+            'connector_definition_id' => $definitionId,
+            'name' => 'Store B',
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+        ]);
+
+        ConnectorConnectionCheck::factory()->create([
+            'workspace_id' => $this->defaultWorkspace()->id,
+            'connector_account_id' => $account->id,
+            'status' => ConnectorConnectionCheckStatus::Queued,
+            'trigger' => ConnectorConnectionCheckTrigger::Manual,
+            'started_at' => now(),
+        ]);
+
+        $connectionCheckQueries = [];
+        DB::listen(function ($query) use (&$connectionCheckQueries): void {
+            if (str_contains(strtolower($query->sql), 'connector_connection_checks')) {
+                $connectionCheckQueries[] = $query->sql;
+            }
+        });
+
+        $component = Livewire::actingAs($user)
+            ->test(ListPlatformConnections::class, ['platform' => 'adobe_commerce'])
+            ->assertSuccessful()
+            ->assertSee('Store A');
+
+        $rows = collect($component->get('rows'));
+
+        $this->assertTrue($rows->every(fn (array $row): bool => $row['runtime_overlay_label'] === null));
+        $this->assertSame([], $connectionCheckQueries);
+        $component->assertDontSee(__('connectors.ui.runtime.running'));
+    }
+
+    private function viewOnlyActor(): User
+    {
+        $user = $this->createStaffUser(UserRole::Manager);
+        $this->grantConnectorView($this->defaultWorkspace(), $user);
+
+        return $user;
     }
 }

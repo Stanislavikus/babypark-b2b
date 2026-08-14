@@ -82,12 +82,35 @@ class WorkspaceAuthorizationTest extends TestCase
         [$user, $workspace] = $this->makeUserAndWorkspace();
         $this->assignPermission($workspace, $user, WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS);
 
-        $user->update(['is_active' => false]);
-        $user->refresh();
+        User::query()->whereKey($user->id)->update(['is_active' => false]);
 
         $this->assertFalse(
             $this->authorization->allows($user, $workspace, WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS),
         );
+        $this->assertSame([], $this->authorization->effectivePermissions($user, $workspace));
+    }
+
+    #[Test]
+    public function stale_hydrated_user_with_db_deactivated_yields_empty_effective_permissions(): void
+    {
+        [$user, $workspace] = $this->makeUserAndWorkspace();
+        $this->assignPermission($workspace, $user, WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS);
+
+        User::query()->whereKey($user->id)->update(['is_active' => false]);
+
+        $this->assertSame([], $this->authorization->effectivePermissions($user, $workspace));
+        $this->assertNull($this->authorization->activeMembership($user, $workspace));
+    }
+
+    #[Test]
+    public function active_global_user_with_inactive_membership_yields_empty_permissions(): void
+    {
+        [$user, $workspace] = $this->makeUserAndWorkspace();
+        $membership = $this->membershipFor($workspace, $user);
+        WorkspaceUser::query()->whereKey($membership->id)->update(['is_active' => false]);
+        $this->assignPermission($workspace, $user, WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS);
+
+        $this->assertSame([], $this->authorization->effectivePermissions($user, $workspace));
     }
 
     #[Test]

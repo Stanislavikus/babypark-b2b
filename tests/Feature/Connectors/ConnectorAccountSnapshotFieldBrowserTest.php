@@ -14,6 +14,7 @@ use App\Models\ConnectorSchemaSource;
 use App\Support\Connectors\ConnectorSchemaFieldPresenter;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -43,6 +44,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspacePermissionSeeder::class);
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->enableSchemaDiscoveryCapability();
@@ -51,7 +53,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function snapshot_fields_render_default_columns(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         [$account, $snapshot] = $this->createSnapshotWithFields([
             [
                 'external_field_key' => 'color',
@@ -91,7 +93,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function empty_snapshot_shows_localized_empty_state(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         [$account, $snapshot] = $this->createSnapshotWithFields([]);
 
         Livewire::actingAs($admin)
@@ -106,7 +108,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function search_filters_by_external_field_key(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         [$account, $snapshot] = $this->createSnapshotWithFields([
             ['external_field_key' => 'alpha_key', 'external_label' => 'Alpha'],
             ['external_field_key' => 'beta_key', 'external_label' => 'Beta'],
@@ -134,7 +136,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function search_filters_by_external_label(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         [$account, $snapshot] = $this->createSnapshotWithFields([
             ['external_field_key' => 'field_a', 'external_label' => 'Unique Label One'],
             ['external_field_key' => 'field_b', 'external_label' => 'Another Label'],
@@ -162,7 +164,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function normalized_type_filter_limits_results(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         [$account, $snapshot] = $this->createSnapshotWithFields([
             ['external_field_key' => 'text_field', 'normalized_data_type' => 'text'],
             ['external_field_key' => 'number_field', 'normalized_data_type' => 'number'],
@@ -188,7 +190,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function required_filter_limits_results(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         [$account, $snapshot] = $this->createSnapshotWithFields([
             ['external_field_key' => 'required_field', 'is_required' => true],
             ['external_field_key' => 'optional_field', 'is_required' => false],
@@ -215,7 +217,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function scope_filter_limits_results(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         [$account, $snapshot] = $this->createSnapshotWithFields([
             ['external_field_key' => 'global_field', 'external_scope' => 'global'],
             ['external_field_key' => 'store_field', 'external_scope' => 'store'],
@@ -242,7 +244,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function historical_snapshot_shows_only_its_fields(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
         $olderRun = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded);
         $olderSnapshot = $this->createSnapshotForRun($olderRun, [
@@ -276,7 +278,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function foreign_snapshot_fields_do_not_appear_in_table(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         [$account, $snapshot] = $this->createSnapshotWithFields([
             ['external_field_key' => 'own_field', 'external_label' => 'Own Field'],
         ]);
@@ -301,7 +303,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function table_requests_cannot_broaden_snapshot_boundary(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         [$account, $snapshot] = $this->createSnapshotWithFields([
             ['external_field_key' => 'scoped_field', 'external_label' => 'Scoped Field'],
         ]);
@@ -333,6 +335,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     public function merchandiser_can_browse_snapshot_fields(): void
     {
         $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorDiscovery($this->defaultWorkspace(), $merchandiser);
         [$account, $snapshot] = $this->createSnapshotWithFields([
             [
                 'external_field_key' => 'merch_field',
@@ -365,7 +368,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function sensitive_field_payload_and_hash_do_not_leak(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         [$account, $snapshot] = $this->createSnapshotWithFields([
             [
                 'external_field_key' => 'safe_visible_field',
@@ -394,7 +397,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function page_does_not_expose_diff_vocabulary(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         [$account, $snapshot] = $this->createSnapshotWithFields([
             ['external_field_key' => 'diff_guard_field'],
         ]);
@@ -424,7 +427,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function default_table_ordering_puts_null_sort_order_last_then_orders_by_field_key(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         [$account, $snapshot] = $this->createSnapshotWithFields([
             ['external_field_key' => 'field_zebra', 'sort_order' => 2],
             ['external_field_key' => 'field_alpha', 'sort_order' => null],
@@ -453,7 +456,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function explicit_sort_by_external_field_key_overrides_default_ordering(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         [$account, $snapshot] = $this->createSnapshotWithFields([
             ['external_field_key' => 'field_zebra', 'sort_order' => 2],
             ['external_field_key' => 'field_alpha', 'sort_order' => null],
@@ -478,7 +481,7 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
     #[Test]
     public function explicit_sort_by_normalized_data_type_overrides_default_ordering(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         [$account, $snapshot] = $this->createSnapshotWithFields([
             ['external_field_key' => 'field_text', 'normalized_data_type' => 'text', 'sort_order' => 10],
             ['external_field_key' => 'field_boolean', 'normalized_data_type' => 'boolean', 'sort_order' => 1],

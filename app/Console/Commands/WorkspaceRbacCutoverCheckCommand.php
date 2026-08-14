@@ -25,7 +25,7 @@ final class WorkspaceRbacCutoverCheckCommand extends Command
     {
         $this->info('GAP-026B workspace RBAC cutover CHECK-ONLY diagnostics');
         $this->line('Mode: CHECK-ONLY (read-only; no RBAC assignment/materialization)');
-        $this->line('EXECUTE: unavailable until GAP-026B-2');
+        $this->line('EXECUTE: php artisan workspace-rbac:cutover-execute (maintenance mode only; GAP-026B-2)');
         $this->newLine();
 
         $this->line('Safe for cutover: '.($result->isSafe ? 'yes' : 'no'));
