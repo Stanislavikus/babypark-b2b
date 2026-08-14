@@ -18,6 +18,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Auth;
 
 class WorkspaceTaxSettings extends Page implements HasActions, HasForms
@@ -46,7 +47,7 @@ class WorkspaceTaxSettings extends Page implements HasActions, HasForms
         $user = Auth::user();
 
         return $user instanceof User
-            && WorkspaceTaxSettingsAuthorization::canManage($user);
+            && app(WorkspaceTaxSettingsAuthorization::class)->canManage($user);
     }
 
     public function mount(): void
@@ -133,6 +134,11 @@ class WorkspaceTaxSettings extends Page implements HasActions, HasForms
      */
     private function persist(array $data, Workspace $workspace): void
     {
+        $user = Auth::user();
+        if (! $user instanceof User || ! app(WorkspaceTaxSettingsAuthorization::class)->canManage($user, $workspace)) {
+            throw new AuthorizationException('This action is unauthorized.');
+        }
+
         $workspace->update([
             'default_vat_rate' => $data['default_vat_rate'],
             'default_price_display_mode' => $data['default_price_display_mode'],
