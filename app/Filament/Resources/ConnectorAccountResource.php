@@ -10,9 +10,11 @@ use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorSchemaSna
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorDiscoveryRun;
 use App\Models\User;
-use App\Support\Connectors\ConnectorAccountMerchandiserPresentation;
+use App\Models\Workspace;
+use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorUiFormatter;
+use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\ViewEntry;
@@ -61,10 +63,13 @@ class ConnectorAccountResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = ConnectorAccountMerchandiserPresentation::applySafeQuery(
-            parent::getEloquentQuery(),
-            auth()->user(),
-        );
+        $user = auth()->user();
+        $workspace = app(WorkspaceContext::class)->current();
+        $query = parent::getEloquentQuery();
+
+        if ($user instanceof User) {
+            $query = static::capabilityPresentation()->applyRestrictedQuery($query, $user, $workspace);
+        }
 
         return static::applyPresentationEagerLoads($query);
     }
@@ -73,8 +78,10 @@ class ConnectorAccountResource extends Resource
     {
         if ($record instanceof ConnectorAccount) {
             $relations = ['connectorDefinition'];
+            $actor = $user ?? auth()->user();
+            $workspace = $record->workspace ?? Workspace::query()->findOrFail($record->workspace_id);
 
-            if (! ConnectorAccountMerchandiserPresentation::isMerchandiser($user ?? auth()->user())) {
+            if ($actor instanceof User && static::capabilityPresentation()->showActiveConnectionCheck($actor, $workspace)) {
                 $relations['connectionChecks'] = fn ($query) => $query
                     ->select(['id', 'connector_account_id', 'status'])
                     ->whereIn('status', [
@@ -166,14 +173,14 @@ class ConnectorAccountResource extends Resource
                         TextEntry::make('store_code')
                             ->label(__('connectors.ui.columns.store_context'))
                             ->formatStateUsing(fn ($state, ConnectorAccount $record): string => $uiState->storeContextLabel($record) ?? __('connectors.ui.common.dash'))
-                            ->visible(fn (): bool => ! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())),
+                            ->visible(fn (): bool => static::actorCanManageConnectorAccounts()),
                         ViewEntry::make('runtime_state')
                             ->label(__('connectors.ui.columns.status'))
                             ->view('filament.connector-accounts.runtime-state')
                             ->viewData(fn (ConnectorAccount $record): array => [
                                 'record' => $record,
                                 'uiState' => $uiState,
-                                'showActiveConnectionCheck' => ConnectorAccountMerchandiserPresentation::showActiveConnectionCheck(auth()->user()),
+                                'showActiveConnectionCheck' => static::actorCanManageConnectorAccounts(),
                             ]),
                         TextEntry::make('last_checked_at')
                             ->label(__('connectors.ui.columns.last_check'))
@@ -233,7 +240,7 @@ class ConnectorAccountResource extends Resource
                     ->label(__('connectors.ui.columns.store_context'))
                     ->formatStateUsing(fn ($state, ConnectorAccount $record): string => $uiState->storeContextLabel($record) ?? __('connectors.ui.common.dash'))
                     ->searchable(query: function (Builder $query, string $search): Builder {
-                        if (ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+                        if (! static::actorCanManageConnectorAccounts()) {
                             return $query;
                         }
 
@@ -241,13 +248,13 @@ class ConnectorAccountResource extends Resource
                             ->where('store_code', 'like', "%{$search}%")
                             ->orWhere('tenant_context', 'like', "%{$search}%");
                     })
-                    ->visible(fn (): bool => ! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user()))
+                    ->visible(fn (): bool => static::actorCanManageConnectorAccounts())
                     ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('connection_status')
                     ->label(__('connectors.ui.columns.status'))
                     ->html()
                     ->formatStateUsing(function ($state, ConnectorAccount $record) use ($uiState): string {
-                        $activeCheck = ConnectorAccountMerchandiserPresentation::showActiveConnectionCheck(auth()->user())
+                        $activeCheck = static::actorCanManageConnectorAccounts()
                             ? $uiState->activeConnectionCheck($record)
                             : null;
 
@@ -322,7 +329,7 @@ class ConnectorAccountResource extends Resource
     {
         $with = ['connectorDefinition'];
 
-        if (! ConnectorAccountMerchandiserPresentation::isMerchandiser(auth()->user())) {
+        if (static::actorCanManageConnectorAccounts()) {
             $with['connectionChecks'] = fn ($connectionChecksQuery) => $connectionChecksQuery
                 ->select(['id', 'connector_account_id', 'status'])
                 ->whereIn('status', [
@@ -354,5 +361,21 @@ class ConnectorAccountResource extends Resource
     public static function getDeleteAuthorizationResponse(Model $record): Response
     {
         return Response::deny();
+    }
+
+    private static function capabilityPresentation(): ConnectorAccountCapabilityPresentation
+    {
+        return app(ConnectorAccountCapabilityPresentation::class);
+    }
+
+    private static function actorCanManageConnectorAccounts(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        return static::capabilityPresentation()->canManage($user, app(WorkspaceContext::class)->current());
     }
 }

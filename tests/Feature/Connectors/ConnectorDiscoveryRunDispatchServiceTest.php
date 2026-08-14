@@ -13,9 +13,9 @@ use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\Exceptions\ConnectorAccountNotFoundException;
 use App\Support\Connectors\Exceptions\ConnectorDiscoveryManualTriggerDisabledException;
 use App\Support\Connectors\Exceptions\UnsupportedConnectorCapabilityException;
-use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Bus\Dispatcher;
@@ -43,6 +43,7 @@ class ConnectorDiscoveryRunDispatchServiceTest extends TestCase
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspacePermissionSeeder::class);
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
 
         $this->enableSchemaDiscoveryCapability();
         config(['connectors.discovery.manual_trigger_enabled' => true]);
@@ -55,7 +56,7 @@ class ConnectorDiscoveryRunDispatchServiceTest extends TestCase
     public function execute_manual_creates_row_and_dispatches_job(): void
     {
         Queue::fake();
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
 
         $decision = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
@@ -80,7 +81,7 @@ class ConnectorDiscoveryRunDispatchServiceTest extends TestCase
     public function second_dispatch_returns_same_row_and_does_not_push_second_job(): void
     {
         Queue::fake();
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
 
         $firstDecision = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
@@ -97,7 +98,7 @@ class ConnectorDiscoveryRunDispatchServiceTest extends TestCase
     #[Test]
     public function disabled_account_is_rejected_by_policy_before_dispatch(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace, ['is_enabled' => false]);
 
         $this->expectException(AuthorizationException::class);
@@ -109,7 +110,7 @@ class ConnectorDiscoveryRunDispatchServiceTest extends TestCase
     {
         config(['connectors.discovery.manual_trigger_enabled' => false]);
 
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
 
         try {
@@ -127,7 +128,7 @@ class ConnectorDiscoveryRunDispatchServiceTest extends TestCase
         $this->app->forgetInstance(ConnectorProfileRegistry::class);
         $this->dispatchService = app(ConnectorDiscoveryRunDispatchService::class);
 
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
 
         try {
@@ -144,9 +145,10 @@ class ConnectorDiscoveryRunDispatchServiceTest extends TestCase
         Queue::fake();
 
         $allowedActor = $this->createStaffUser(UserRole::Manager);
-        $allowedActor->givePermissionTo(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS);
+        $this->grantConnectorManage($this->workspace, $allowedActor);
 
         $deniedActor = $this->createStaffUser(UserRole::Manager);
+        $this->makeWorkspaceMembership($this->workspace, $deniedActor, true);
         $account = $this->createConnectorAccount($this->workspace);
 
         $this->actingAs($deniedActor);
@@ -160,7 +162,7 @@ class ConnectorDiscoveryRunDispatchServiceTest extends TestCase
     #[Test]
     public function unknown_account_throws_not_found(): void
     {
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         $this->expectException(ConnectorAccountNotFoundException::class);
         $this->dispatchService->executeManual($admin, $this->workspace->id, '00000000-0000-4000-8000-000000000001');
@@ -184,7 +186,7 @@ class ConnectorDiscoveryRunDispatchServiceTest extends TestCase
                 ->andThrow(new \RuntimeException('queue dispatch failed'));
         });
 
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
 
         $decision = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
@@ -201,7 +203,7 @@ class ConnectorDiscoveryRunDispatchServiceTest extends TestCase
     public function stale_queued_row_is_recovered_and_new_dispatch_is_allowed(): void
     {
         Queue::fake();
-        $admin = $this->createStaffUser(UserRole::Admin);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
         $source = app(ConnectorDiscoverySourceResolver::class)->resolve($account);
 

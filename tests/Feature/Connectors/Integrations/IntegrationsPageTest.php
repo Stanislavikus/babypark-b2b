@@ -18,6 +18,7 @@ use App\Models\ConnectorDefinition;
 use App\Support\Platform\PlatformAdminAuthorization;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -39,6 +40,7 @@ class IntegrationsPageTest extends TestCase
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspacePermissionSeeder::class);
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         app()->setLocale('uk');
@@ -48,6 +50,7 @@ class IntegrationsPageTest extends TestCase
     public function merchandiser_sees_platform_cards_and_ask_admin_instead_of_connect(): void
     {
         $user = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorView($this->defaultWorkspace(), $user);
 
         $component = Livewire::actingAs($user)
             ->test(Integrations::class)
@@ -87,7 +90,7 @@ class IntegrationsPageTest extends TestCase
     #[Test]
     public function admin_sees_connect_for_setup_capable_platform(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         Livewire::actingAs($user)
             ->test(Integrations::class)
@@ -105,7 +108,7 @@ class IntegrationsPageTest extends TestCase
     public function active_platform_without_account_setup_is_absent_until_an_account_exists(): void
     {
         $shopify = ConnectorDefinition::query()->where('code', 'shopify')->firstOrFail();
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         Livewire::actingAs($user)
             ->test(Integrations::class)
@@ -130,7 +133,7 @@ class IntegrationsPageTest extends TestCase
     #[Test]
     public function single_account_card_opens_overview_and_shows_connected_vocabulary(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->defaultWorkspace(), [
             'name' => 'Adobe Commerce',
             'connection_status' => ConnectorAccountConnectionStatus::Connected,
@@ -160,7 +163,7 @@ class IntegrationsPageTest extends TestCase
     #[Test]
     public function mixed_healthy_and_disabled_accounts_do_not_render_disabled_platform_status(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $definitionId = $this->adobeConnectorDefinition()->id;
 
         $this->createConnectorAccount($this->defaultWorkspace(), [
@@ -193,7 +196,7 @@ class IntegrationsPageTest extends TestCase
     #[Test]
     public function multi_account_open_goes_to_platform_connection_list(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $definitionId = $this->adobeConnectorDefinition()->id;
 
         $this->createConnectorAccount($this->defaultWorkspace(), [
@@ -219,7 +222,7 @@ class IntegrationsPageTest extends TestCase
     #[Test]
     public function single_account_active_check_reuses_ui_state_runtime_overlay(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->defaultWorkspace(), [
             'name' => 'Adobe Commerce',
             'connection_status' => ConnectorAccountConnectionStatus::Connected,
@@ -251,7 +254,7 @@ class IntegrationsPageTest extends TestCase
             'status' => ConnectorDefinitionStatus::Deprecated,
         ]);
 
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         Livewire::actingAs($user)
             ->test(Integrations::class)
@@ -265,6 +268,7 @@ class IntegrationsPageTest extends TestCase
     public function integrations_access_does_not_widen_platform_admin_gate(): void
     {
         $user = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorView($this->defaultWorkspace(), $user);
 
         $this->assertFalse(PlatformAdminAuthorization::canManage($user));
 
@@ -275,7 +279,7 @@ class IntegrationsPageTest extends TestCase
     #[Test]
     public function integrations_is_registered_as_ungrouped_merchant_navigation(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $this->actingAs($user);
 
         $this->assertTrue(Integrations::shouldRegisterNavigation());
@@ -319,7 +323,7 @@ class IntegrationsPageTest extends TestCase
     #[Test]
     public function multi_account_list_shows_per_row_overlay_not_aggregate_runtime_on_landing(): void
     {
-        $user = $this->createStaffUser(UserRole::Admin);
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $definitionId = $this->adobeConnectorDefinition()->id;
 
         $a = $this->createConnectorAccount($this->defaultWorkspace(), [

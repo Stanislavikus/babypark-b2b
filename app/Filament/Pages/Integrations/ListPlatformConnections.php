@@ -8,6 +8,7 @@ use App\Filament\Resources\ConnectorAccountResource;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorDefinition;
 use App\Models\User;
+use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\Integrations\EligibleConnectorPlatformCatalog;
@@ -145,14 +146,17 @@ class ListPlatformConnections extends Page
         $accounts = ConnectorAccount::query()
             ->where('workspace_id', $workspace->id)
             ->where('connector_definition_id', $definition->id)
-            ->with([
-                'connectionChecks' => fn ($query) => $query
-                    ->select(['id', 'connector_account_id', 'status'])
-                    ->whereIn('status', [
-                        ConnectorConnectionCheckStatus::Queued,
-                        ConnectorConnectionCheckStatus::Running,
-                    ]),
-            ])
+            ->when(
+                app(ConnectorAccountCapabilityPresentation::class)->canManage($user, $workspace),
+                fn ($query) => $query->with([
+                    'connectionChecks' => fn ($connectionChecksQuery) => $connectionChecksQuery
+                        ->select(['id', 'connector_account_id', 'status'])
+                        ->whereIn('status', [
+                            ConnectorConnectionCheckStatus::Queued,
+                            ConnectorConnectionCheckStatus::Running,
+                        ]),
+                ]),
+            )
             ->orderBy('name')
             ->get();
 
@@ -160,9 +164,10 @@ class ListPlatformConnections extends Page
             abort_if($accounts->count() < 2, 404);
         }
 
-        $this->rows = $accounts->map(function (ConnectorAccount $account) use ($uiState, $vocabulary): array {
-            $activeCheck = $uiState->activeConnectionCheck($account);
-            $runtimeLabel = $uiState->runtimeStatusLabel($activeCheck);
+        $canManage = app(ConnectorAccountCapabilityPresentation::class)->canManage($user, $workspace);
+
+        $this->rows = $accounts->map(function (ConnectorAccount $account) use ($uiState, $vocabulary, $canManage): array {
+            $runtimeLabel = $canManage ? $uiState->runtimeStatusLabel($uiState->activeConnectionCheck($account)) : null;
 
             return [
                 'id' => $account->id,

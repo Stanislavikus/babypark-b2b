@@ -13,11 +13,13 @@ use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
 use App\Filament\Resources\ConnectorAccountResource\RelationManagers\DiscoveryRunsRelationManager;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorConnectionCheck;
+use App\Models\User;
 use App\Support\Connectors\AdobePaaS\AdobePaaSCredentialMapper;
-use App\Support\Connectors\ConnectorAccountMerchandiserPresentation;
+use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,7 +31,7 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\TestCase;
 
-class ConnectorAccountMerchandiserPresentationTest extends TestCase
+class ConnectorAccountCapabilityPresentationTest extends TestCase
 {
     use CreatesConnectorAccountFixtures;
     use RefreshDatabase;
@@ -45,15 +47,24 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspacePermissionSeeder::class);
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         Http::preventStrayRequests();
     }
 
-    #[Test]
-    public function merchandiser_can_reach_list_and_view_enabled_account(): void
+    private function discoveryActor(): User
     {
-        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $user = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorDiscovery($this->defaultWorkspace(), $user);
+
+        return $user;
+    }
+
+    #[Test]
+    public function discovery_actor_can_reach_list_and_view_enabled_account(): void
+    {
+        $merchandiser = $this->discoveryActor();
         $account = $this->createConnectorAccount();
 
         $this->assertTrue($merchandiser->can('viewAny', ConnectorAccount::class));
@@ -72,7 +83,7 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
     #[Test]
     public function merchandiser_list_and_detail_hide_sensitive_fields_from_html_and_livewire_payload(): void
     {
-        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $merchandiser = $this->discoveryActor();
         $account = $this->createConnectorAccount(overrides: [
             'base_url' => 'https://secret-shop.example.com',
             'store_code' => 'secret-store',
@@ -120,11 +131,11 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
     #[Test]
     public function merchandiser_safe_query_limits_selected_columns(): void
     {
-        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $merchandiser = $this->discoveryActor();
         $account = $this->createConnectorAccount();
 
-        $query = ConnectorAccount::query();
-        $query = ConnectorAccountMerchandiserPresentation::applySafeQuery($query, $merchandiser);
+        $presentation = app(ConnectorAccountCapabilityPresentation::class);
+        $query = $presentation->applyRestrictedQuery(ConnectorAccount::query(), $merchandiser, $this->defaultWorkspace());
 
         $record = $query->whereKey($account->id)->firstOrFail();
 
@@ -149,14 +160,15 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
     #[Test]
     public function merchandiser_sanitize_record_hides_sensitive_attributes(): void
     {
-        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $merchandiser = $this->discoveryActor();
         $account = $this->createConnectorAccount(overrides: [
             'settings' => ['secret' => self::SETTINGS_CANARY],
         ])->fresh();
 
-        $sanitized = ConnectorAccountMerchandiserPresentation::sanitizeRecord($account, $merchandiser);
+        $sanitized = app(ConnectorAccountCapabilityPresentation::class)
+            ->sanitizeRecord($account, $merchandiser, $this->defaultWorkspace());
 
-        foreach (ConnectorAccountMerchandiserPresentation::hiddenAttributes() as $attribute) {
+        foreach (ConnectorAccountCapabilityPresentation::hiddenAttributes() as $attribute) {
             $this->assertArrayNotHasKey($attribute, $sanitized->toArray(), "Attribute [{$attribute}] must be hidden.");
         }
     }
@@ -164,7 +176,7 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
     #[Test]
     public function merchandiser_detail_hides_connection_check_management_and_history(): void
     {
-        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $merchandiser = $this->discoveryActor();
         $initiator = $this->createStaffUser(UserRole::Manager);
         $account = $this->createConnectorAccount(overrides: [
             'auth_profile' => 'adobe_commerce_paas_oauth1_integration',
@@ -223,7 +235,7 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
     #[Test]
     public function merchandiser_list_rendering_executes_no_connection_check_queries(): void
     {
-        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $merchandiser = $this->discoveryActor();
         $account = $this->createConnectorAccount(overrides: [
             'connection_status' => ConnectorAccountConnectionStatus::Connected,
         ]);
@@ -249,7 +261,7 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
     #[Test]
     public function merchandiser_detail_rendering_executes_no_connection_check_queries(): void
     {
-        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $merchandiser = $this->discoveryActor();
         $account = $this->createConnectorAccount(overrides: [
             'connection_status' => ConnectorAccountConnectionStatus::Connected,
         ]);
@@ -275,7 +287,7 @@ class ConnectorAccountMerchandiserPresentationTest extends TestCase
     #[Test]
     public function merchandiser_list_and_detail_show_only_stable_connection_status_without_runtime_overlay(): void
     {
-        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $merchandiser = $this->discoveryActor();
         $account = $this->createConnectorAccount(overrides: [
             'connection_status' => ConnectorAccountConnectionStatus::Connected,
         ]);
