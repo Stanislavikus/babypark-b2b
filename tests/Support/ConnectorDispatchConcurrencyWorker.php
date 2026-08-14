@@ -7,11 +7,12 @@
  *   php tests/Support/ConnectorDispatchConcurrencyWorker.php account-lock-a <accountId> <ipcDir>
  *   php tests/Support/ConnectorDispatchConcurrencyWorker.php connection-check-b <workspaceId> <accountId> <actorUserId> <ipcDir>
  *   php tests/Support/ConnectorDispatchConcurrencyWorker.php discovery-b <workspaceId> <accountId> <actorUserId> <ipcDir>
- *   php tests/Support/ConnectorDispatchConcurrencyWorker.php revoke-actor <actorUserId> <ipcDir>
+ *   php tests/Support/ConnectorDispatchConcurrencyWorker.php workspace-lock-a <workspaceId> <ipcDir>
  */
 
 use App\Models\ConnectorAccount;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
 use App\Services\Connectors\ConnectorDiscoveryRunDispatchService;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -32,6 +33,7 @@ match ($mode) {
     'connection-check-b' => runConnectionCheckB($argv[2] ?? '', $argv[3] ?? '', $argv[4] ?? '', $argv[5] ?? ''),
     'discovery-b' => runDiscoveryB($argv[2] ?? '', $argv[3] ?? '', $argv[4] ?? '', $argv[5] ?? ''),
     'revoke-actor' => runRevokeActor($argv[2] ?? '', $argv[3] ?? ''),
+    'workspace-lock-a' => runWorkspaceLockA($argv[2] ?? '', $argv[3] ?? ''),
     default => throw new InvalidArgumentException("Unknown worker mode: {$mode}"),
 };
 
@@ -124,5 +126,20 @@ function runRevokeActor(string $actorUserId, string $ipcDir): void
     });
 
     touch($ipcDir.'/actor_revoked');
+    exit(0);
+}
+
+function runWorkspaceLockA(string $workspaceId, string $ipcDir): void
+{
+    assertIpcDir($ipcDir);
+
+    DB::transaction(function () use ($workspaceId, $ipcDir): void {
+        Workspace::query()->whereKey($workspaceId)->lockForUpdate()->firstOrFail();
+
+        touch($ipcDir.'/workspace_lock_acquired');
+        waitForFile($ipcDir.'/parent_release_workspace');
+    });
+
+    touch($ipcDir.'/workspace_lock_committed');
     exit(0);
 }
