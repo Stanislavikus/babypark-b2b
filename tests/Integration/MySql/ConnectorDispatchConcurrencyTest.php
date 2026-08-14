@@ -7,6 +7,7 @@ use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Enums\UserRole;
 use App\Models\ConnectorConnectionCheck;
 use App\Models\ConnectorDiscoveryRun;
+use App\Models\User;
 use App\Models\Workspace;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -18,6 +19,7 @@ use Symfony\Component\Process\Process;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\Concerns\EnablesConnectorConnectionCheckCapability;
 use Tests\Concerns\EnablesConnectorSchemaDiscoveryCapability;
+use Tests\Support\MySqlConnectorAccountRowLockWaitProbe;
 use Tests\TestCase;
 
 class ConnectorDispatchConcurrencyTest extends TestCase
@@ -67,17 +69,13 @@ class ConnectorDispatchConcurrencyTest extends TestCase
         $processB->setTimeout(120);
         $processB->start();
 
-        $this->waitForIpcFile($ipcDir.'/b_started');
+        $lockWait = MySqlConnectorAccountRowLockWaitProbe::waitForForeignConnectorAccountForUpdateWait($account->id);
+        $this->assertStringContainsString('for update', strtolower($lockWait['info']));
+        $this->assertStringContainsString($account->id, $lockWait['info']);
 
-        $processRevoke = new Process([
-            $phpBinary,
-            $workerScript,
-            'revoke-actor',
-            $actor->id,
-            $ipcDir,
-        ], base_path());
-        $processRevoke->setTimeout(60);
-        $processRevoke->run();
+        DB::transaction(function () use ($actor): void {
+            User::query()->whereKey($actor->id)->update(['is_active' => false]);
+        });
 
         touch($ipcDir.'/parent_release_a');
 
@@ -142,17 +140,13 @@ class ConnectorDispatchConcurrencyTest extends TestCase
         $processB->setTimeout(120);
         $processB->start();
 
-        $this->waitForIpcFile($ipcDir.'/b_started');
+        $lockWait = MySqlConnectorAccountRowLockWaitProbe::waitForForeignConnectorAccountForUpdateWait($account->id);
+        $this->assertStringContainsString('for update', strtolower($lockWait['info']));
+        $this->assertStringContainsString($account->id, $lockWait['info']);
 
-        $processRevoke = new Process([
-            $phpBinary,
-            $workerScript,
-            'revoke-actor',
-            $actor->id,
-            $ipcDir,
-        ], base_path());
-        $processRevoke->setTimeout(60);
-        $processRevoke->run();
+        DB::transaction(function () use ($actor): void {
+            User::query()->whereKey($actor->id)->update(['is_active' => false]);
+        });
 
         touch($ipcDir.'/parent_release_a');
 
@@ -214,7 +208,9 @@ class ConnectorDispatchConcurrencyTest extends TestCase
             $ipcDir,
         ], base_path());
         $processDispatch->setTimeout(120);
-        $processDispatch->run();
+        $processDispatch->start();
+
+        $processDispatch->wait();
 
         touch($ipcDir.'/parent_release_workspace');
         $processWorkspace->wait();

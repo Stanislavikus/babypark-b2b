@@ -17,6 +17,7 @@ use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
 use App\Services\Connectors\ConnectorDiscoveryRunDispatchService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 
 $basePath = dirname(__DIR__, 2);
@@ -32,7 +33,6 @@ match ($mode) {
     'account-lock-a' => runAccountLockA($argv[2] ?? '', $argv[3] ?? ''),
     'connection-check-b' => runConnectionCheckB($argv[2] ?? '', $argv[3] ?? '', $argv[4] ?? '', $argv[5] ?? ''),
     'discovery-b' => runDiscoveryB($argv[2] ?? '', $argv[3] ?? '', $argv[4] ?? '', $argv[5] ?? ''),
-    'revoke-actor' => runRevokeActor($argv[2] ?? '', $argv[3] ?? ''),
     'workspace-lock-a' => runWorkspaceLockA($argv[2] ?? '', $argv[3] ?? ''),
     default => throw new InvalidArgumentException("Unknown worker mode: {$mode}"),
 };
@@ -57,6 +57,17 @@ function waitForFile(string $path, int $seconds = 60): void
     }
 }
 
+function configureConnectorDispatchTestEnvironment(bool $discovery = false): void
+{
+    Config::set('connectors.profiles.adobe_commerce_paas_oauth1_integration.capabilities', $discovery
+        ? ['connection_check', 'schema_discovery']
+        : ['connection_check']);
+
+    if ($discovery) {
+        Config::set('connectors.discovery.manual_trigger_enabled', true);
+    }
+}
+
 function runAccountLockA(string $accountId, string $ipcDir): void
 {
     assertIpcDir($ipcDir);
@@ -78,9 +89,9 @@ function runAccountLockA(string $accountId, string $ipcDir): void
 function runConnectionCheckB(string $workspaceId, string $accountId, string $actorUserId, string $ipcDir): void
 {
     assertIpcDir($ipcDir);
+    configureConnectorDispatchTestEnvironment();
 
     $actor = User::query()->findOrFail($actorUserId);
-    touch($ipcDir.'/b_started');
 
     try {
         app(ConnectorConnectionCheckDispatchService::class)->executeManual($actor, $workspaceId, $accountId);
@@ -98,9 +109,9 @@ function runConnectionCheckB(string $workspaceId, string $accountId, string $act
 function runDiscoveryB(string $workspaceId, string $accountId, string $actorUserId, string $ipcDir): void
 {
     assertIpcDir($ipcDir);
+    configureConnectorDispatchTestEnvironment(discovery: true);
 
     $actor = User::query()->findOrFail($actorUserId);
-    touch($ipcDir.'/b_started');
 
     try {
         app(ConnectorDiscoveryRunDispatchService::class)->executeManual($actor, $workspaceId, $accountId);
@@ -113,20 +124,6 @@ function runDiscoveryB(string $workspaceId, string $accountId, string $actorUser
         file_put_contents($ipcDir.'/b_result', 'error:'.$exception->getMessage());
         exit(1);
     }
-}
-
-function runRevokeActor(string $actorUserId, string $ipcDir): void
-{
-    assertIpcDir($ipcDir);
-
-    waitForFile($ipcDir.'/b_started');
-
-    DB::transaction(function () use ($actorUserId): void {
-        User::query()->whereKey($actorUserId)->update(['is_active' => false]);
-    });
-
-    touch($ipcDir.'/actor_revoked');
-    exit(0);
 }
 
 function runWorkspaceLockA(string $workspaceId, string $ipcDir): void
