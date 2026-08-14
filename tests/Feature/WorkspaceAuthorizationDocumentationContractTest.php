@@ -257,7 +257,14 @@ class WorkspaceAuthorizationDocumentationContractTest extends TestCase
     {
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
-        $this->assertStringContainsString('## GAP-026 — Workspace-scoped RBAC foundation not implemented', $content);
+        $this->assertStringContainsString(
+            '## GAP-026 — Workspace-scoped RBAC foundation partially implemented; authority cutover pending',
+            $content,
+        );
+        $this->assertStringNotContainsString(
+            '## GAP-026 — Workspace-scoped RBAC foundation not implemented',
+            $content,
+        );
         $this->assertStringContainsString('**Frozen minimum permission vocabulary (implemented in GAP-026A-1):**', $content);
         $this->assertStringContainsString('`view_connector_accounts`', $content);
         $this->assertStringContainsString('`run_connector_discovery`', $content);

@@ -275,6 +275,84 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
     }
 
     #[Test]
+    public function connector_dispatch_authorization_freshness_is_frozen(): void
+    {
+        $section = $this->cutoverSection();
+
+        $this->assertStringContainsString('**Connector dispatch authorization freshness (frozen)**', $section);
+        $this->assertStringContainsString('optional preliminary authorization for early rejection', $section);
+        $this->assertStringContainsString('existing `ConnectorAccount` critical-section lock', $section);
+        $this->assertStringContainsString('post-lock check is the **authoritative** dispatch authorization decision', $section);
+        $this->assertStringContainsString('pre-lock hydrated `User` object is **not** authorization truth', $section);
+        $this->assertStringContainsString('global `users.is_active`', $section);
+        $this->assertStringContainsString('`workspace_users.is_active`', $section);
+        $this->assertStringContainsString('current `WorkspaceRole` assignments', $section);
+        $this->assertStringContainsString('current canonical `WorkspacePermission` assignments', $section);
+        $this->assertStringContainsString('GAP-026B-2 implementation **must** evaluate those authority inputs through one', $section);
+        $this->assertStringContainsString('database-backed effective-permission projection/query', $section);
+        $this->assertStringContainsString('rather than trusting', $section);
+        $this->assertStringContainsString('`User.is_active` from the supplied Eloquent instance', $section);
+        $this->assertStringContainsString('`WorkspaceAuthorization::effectivePermissions()` must **not** rely on a', $section);
+        $this->assertStringContainsString('sequence of partially stale hydrated-model checks as equivalent compliance', $section);
+        $this->assertStringContainsString('scoped to the explicit `Workspace`', $section);
+    }
+
+    #[Test]
+    public function connector_dispatch_revocation_boundary_is_frozen(): void
+    {
+        $section = $this->cutoverSection();
+
+        $this->assertStringContainsString('**Connector dispatch revocation boundary (frozen residual)**', $section);
+        $this->assertStringContainsString('point-in-time post-lock authorization snapshot', $section);
+        $this->assertStringContainsString('commits **before** the authoritative post-lock authorization', $section);
+        $this->assertStringContainsString('fail closed', $section);
+        $this->assertStringContainsString('commits **after** that snapshot, GAP-026B-2 does **not** require another', $section);
+        $this->assertStringContainsString('initiating-actor authorization check before the enqueue transaction commits', $section);
+        $this->assertStringContainsString('already-authorized in-flight enqueue transaction may complete', $section);
+        $this->assertStringContainsString('Already queued/running Connector work is **not** retroactively cancelled', $section);
+        $this->assertStringContainsString('do **not** re-authorize the initiating `User` at execution time', $section);
+        $this->assertStringContainsString('live workspace authorization', $section);
+        $this->assertStringContainsString('Do **not** call this “authorized as of transaction commit”', $section);
+        $this->assertStringContainsString('no shared serialization lock', $section);
+        $this->assertStringContainsString('guarantees authority at commit time', $section);
+        $this->assertStringContainsString('Future cancellation-on-revocation remains a new Stop-and-Amend', $section);
+    }
+
+    #[Test]
+    public function connector_dispatch_rejects_workspace_and_user_row_mutex(): void
+    {
+        $section = $this->cutoverSection();
+
+        $this->assertStringContainsString('**Connector dispatch must not acquire Workspace anti-lockout mutex (frozen)**', $section);
+        $this->assertStringContainsString('must **not** acquire the `Workspace` anti-lockout row mutex', $section);
+        $this->assertStringContainsString('Preserve existing per-`ConnectorAccount` dispatch serialization', $section);
+        $this->assertStringContainsString('Do **not** add a `User`-row mutex', $section);
+        $this->assertStringContainsString('Do **not** couple Connector dispatch to Access anti-lockout locking', $section);
+        $this->assertStringContainsString('lock-domain separation and per-account granularity', $section);
+    }
+
+    #[Test]
+    public function workspace_authorization_stale_model_distinction_is_frozen_for_access(): void
+    {
+        $section = $this->cutoverSection();
+
+        $antiLockoutPos = strpos($section, '**Anti-lockout routing for Access mutations (026B applicability)**');
+        $this->assertNotFalse($antiLockoutPos);
+
+        $accessSection = substr($section, $antiLockoutPos);
+
+        $this->assertStringContainsString('**current implementation (pre-B-2):**', $accessSection);
+        $this->assertStringContainsString('`WorkspaceAuthorization::activeMembership()` reads', $accessSection);
+        $this->assertStringContainsString('`users.is_active` from the passed `User` model instance', $accessSection);
+        $this->assertStringContainsString('**GAP-026B-2 requirement:**', $accessSection);
+        $this->assertStringContainsString('stale-model dependency', $accessSection);
+        $this->assertStringContainsString('database-backed projection/query', $accessSection);
+        $this->assertStringContainsString('Access post-lock fresh `User` reload by stable ID remains required', $accessSection);
+        $this->assertStringContainsString('removed merely because the central authorization query becomes DB-backed', $accessSection);
+        $this->assertStringContainsString('`WorkspaceAccessMutationCoordinator` acquires the explicit `Workspace` row mutex', $accessSection);
+    }
+
+    #[Test]
     public function gap_026b_2_slice_owns_execute_with_authority_cutover(): void
     {
         $domainB2 = $this->cutoverB2SliceRow();
@@ -291,6 +369,17 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
         $this->assertStringContainsString('ConnectorAccountPolicy', $gapsB2);
         $this->assertStringContainsString('maintenance-window cutover deployment', $gapsB2);
         $this->assertStringContainsString('EXECUTE + anti-lockout + smoke succeed', $gapsB2);
+
+        foreach ([$domainB2, $gapsB2] as $b2Row) {
+            $this->assertStringContainsString('DB-fresh `WorkspaceAuthorization` effective-permission evaluation', $b2Row);
+            $this->assertStringContainsString('Connector post-lock dispatch authorization freshness', $b2Row);
+            $this->assertStringContainsString('accepted asynchronous revocation boundary', $b2Row);
+            $this->assertStringContainsString('no-`Workspace`-row-mutex', $b2Row);
+            $this->assertStringContainsString('no-`User`-row-mutex', $b2Row);
+        }
+
+        $this->assertStringContainsString('**Unimplemented.**', $gapsB2);
+        $this->assertStringContainsString('do not re-authorize initiating `User` at execution time in B-2', $gapsB2);
     }
 
     #[Test]
