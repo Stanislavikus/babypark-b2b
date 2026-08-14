@@ -1040,7 +1040,7 @@ backend — Layer B mapping UI still missing); remaining UX migration work.
 
 ---
 
-## GAP-026 — Workspace-scoped RBAC foundation not implemented
+## GAP-026 — Workspace-scoped RBAC foundation partially implemented; authority cutover pending
 
 **Approved docs:**
 - `docs/03-DOMAIN_MODEL.md` — **Workspace access model and authorization
