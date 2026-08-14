@@ -980,6 +980,67 @@ semantics by themselves.
 still uses legacy `User.role` / membership logic. GAP-026B-2 must migrate policy and
 merchant entry paths to the matrix above. Do not extend legacy role branches.
 
+**Connector dispatch authorization freshness (frozen)**
+
+Manual connection-check and discovery dispatch may perform an optional preliminary
+authorization for early rejection only.
+
+After acquiring the existing `ConnectorAccount` critical-section lock, authorization
+must be evaluated again before any sensitive operational state is returned or
+consequential dispatch-state mutation is performed.
+
+This post-lock check is the **authoritative** dispatch authorization decision.
+
+A pre-lock hydrated `User` object is **not** authorization truth.
+
+`WorkspaceAuthorization` must evaluate all effective Workspace authority inputs from
+persistence:
+
+- global `users.is_active`;
+- `workspace_users.is_active`;
+- explicit `Workspace` ownership;
+- current `WorkspaceRole` assignments;
+- current canonical `WorkspacePermission` assignments.
+
+GAP-026B-2 implementation should evaluate those authority inputs through one
+database-backed effective-permission projection/query rather than trusting
+`User.is_active` from the supplied Eloquent instance.
+
+Connector authorization remains scoped to the explicit `Workspace` and the existing
+`ConnectorAccount` critical section.
+
+**Connector dispatch revocation boundary (frozen residual)**
+
+Authorization is a point-in-time post-lock authorization snapshot inside the enqueue
+transaction.
+
+- If revocation/deactivation committed **before** that authorization snapshot, dispatch
+  must fail closed.
+- A revocation committed **after** that authorization snapshot does **not**
+  retroactively cancel an already accepted/enqueued Connector operation.
+- Connector jobs do **not** re-authorize the initiating `User` at execution time in
+  GAP-026B-2.
+- Results/side effects remain workspace-owned; later merchant visibility remains governed
+  by live workspace authorization.
+
+If future product requirements demand cancelling queued/running work when the initiating
+actor loses permission, that requires a new Stop-and-Amend.
+
+Do **not** describe this as “authorized as of transaction commit”. There is no shared
+serialization lock guaranteeing that.
+
+**Connector dispatch must not acquire Workspace anti-lockout mutex (frozen)**
+
+Connector dispatch must **not** acquire the `Workspace` anti-lockout row mutex merely
+to serialize against `User` deactivation.
+
+- Preserve existing per-`ConnectorAccount` dispatch serialization.
+- Do **not** add a `User`-row mutex.
+- Do **not** couple Connector dispatch to Access anti-lockout locking in GAP-026B-2.
+
+The architectural reason is lock-domain separation and per-account granularity — not a
+presumed environment-specific lock-wait default.
+
 **Connector presentation invariant (capability-based, not job-title-based)**
 
 Connector presentation is **capability-based**, never job-title-based.
@@ -1167,7 +1228,15 @@ Normative requirements:
 
 - post-lock actor authorization is **mandatory**;
 - any pre-lock authorization is optional fast-fail only and is **not** authoritative for mutation execution;
-- do not reuse a pre-lock hydrated `User` as authorization truth — `WorkspaceAuthorization` reads `users.is_active` from the passed model instance;
+- do not reuse a pre-lock hydrated `User` as authorization truth;
+- **current implementation (pre-B-2):** `WorkspaceAuthorization::activeMembership()` reads
+  `users.is_active` from the passed `User` model instance;
+- **GAP-026B-2 requirement:** authoritative `WorkspaceAuthorization` must remove
+  stale-model dependency — effective-permission evaluation must read all authority inputs
+  from persistence via one database-backed projection/query (including `users.is_active`,
+  not from the supplied Eloquent instance);
+- Access post-lock fresh `User` reload by stable ID remains required and must **not** be
+  removed merely because the central authorization query becomes DB-backed;
 - membership/role identity and mutable target state relevant to the mutation must be freshly resolved/revalidated after the `Workspace` lock;
 - this applies the same TOCTOU principle already frozen for consequential Tax writes to Access/Roles mutations.
 
@@ -1322,7 +1391,7 @@ cutover**.
 | Slice | Future runtime scope |
 |---|---|
 | **GAP-026B-1 — Access & Cutover Machinery** | Guarded cutover command/service: **CHECK-ONLY mode only** (diagnostics; no RBAC assignment/materialization). Access/Roles application write services; existing-membership role assignment/removal; membership activate/deactivate; role create/rename/permission edit/safe unused-role delete; merchant Access/Roles UI; global `User` deactivation integrity service; hard-delete guard; CHECK-ONLY cutover/runbook tests. **Explicitly no** connector/tax policy authority switch. **B-1-only release must not ship an executable production EXECUTE mode** — no production legacy membership/role backfill in a B-1-only deployment. |
-| **GAP-026B-2 — Authority & Presentation Cutover** | **EXECUTE mode** of the guarded cutover command/service (production legacy assignment materialization). `ConnectorAccountPolicy` migration; remove legacy `WorkspaceMembership` from connector authority paths; permission-based safe Connector presentation; merchant Integrations/catalog gating migration; tax authorization migration + write-time reauthorization; Mapping authorization seam; cross-workspace + safe-state + Livewire serialization regressions; EXECUTE cutover/runbook tests. First production deployment containing B-2 must be the maintenance-window cutover deployment; merchant traffic stays blocked until EXECUTE + anti-lockout + smoke succeed. After B-2 implementation is merged and verified, repository development of **4C-1c-2b** may begin. An environment must execute EXECUTE during that cutover before serving new authority / Mapping UI to merchant traffic. |
+| **GAP-026B-2 — Authority & Presentation Cutover** | **EXECUTE mode** of the guarded cutover command/service (production legacy assignment materialization). `ConnectorAccountPolicy` migration; remove legacy `WorkspaceMembership` from connector authority paths; permission-based safe Connector presentation; merchant Integrations/catalog gating migration; tax authorization migration + write-time reauthorization; Mapping authorization seam; DB-fresh `WorkspaceAuthorization` effective-permission evaluation (persistence-backed authority inputs, not hydrated `User` state); Connector post-lock dispatch authorization freshness; accepted asynchronous revocation boundary (post-snapshot enqueue is not retroactively cancelled); explicit no-`Workspace`-row-mutex / no-`User`-row-mutex rule for Connector dispatch; cross-workspace + safe-state + Livewire serialization regressions; EXECUTE cutover/runbook tests. First production deployment containing B-2 must be the maintenance-window cutover deployment; merchant traffic stays blocked until EXECUTE + anti-lockout + smoke succeed. After B-2 implementation is merged and verified, repository development of **4C-1c-2b** may begin. An environment must execute EXECUTE during that cutover before serving new authority / Mapping UI to merchant traffic. |
 
 This separates repository implementation readiness from environment production
 activation.

@@ -200,6 +200,13 @@ class ImplementationGapsTest extends TestCase
         $this->assertStringContainsString('ConnectorAccountPolicy', $b2);
         $this->assertStringContainsString('maintenance-window cutover deployment', $b2);
         $this->assertStringContainsString('EXECUTE + anti-lockout + smoke succeed', $b2);
+        $this->assertStringContainsString('DB-fresh `WorkspaceAuthorization` effective-permission evaluation', $b2);
+        $this->assertStringContainsString('Connector post-lock dispatch authorization freshness', $b2);
+        $this->assertStringContainsString('accepted asynchronous revocation boundary', $b2);
+        $this->assertStringContainsString('no-`Workspace`-row-mutex', $b2);
+        $this->assertStringContainsString('no-`User`-row-mutex', $b2);
+        $this->assertStringContainsString('do not re-authorize initiating `User` at execution time in B-2', $b2);
+        $this->assertStringContainsString('**Unimplemented.**', $b2);
 
         $this->assertStringContainsString('CHECK-ONLY (B-1)', $content);
         $this->assertStringContainsString('EXECUTE at cutover — B-2 only', $content);
