@@ -199,7 +199,11 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
             $content,
         );
         $this->assertStringContainsString(
-            'mutable Layer-B mapping UI may ship only after verified **GAP-026B-2** repository merge',
+            'mutable Layer-B mapping UI authorization prerequisite is satisfied',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'GAP-026B production cutover completed 2026-08-14',
             $content,
         );
         $this->assertStringContainsString(
