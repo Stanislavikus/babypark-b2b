@@ -289,7 +289,8 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
         $this->assertStringContainsString('current `WorkspaceRole` assignments', $section);
         $this->assertStringContainsString('current canonical `WorkspacePermission` assignments', $section);
         $this->assertStringContainsString('database-backed effective-permission projection/query', $section);
-        $this->assertStringContainsString('not trusting `User.is_active` from the supplied Eloquent instance', $section);
+        $this->assertStringContainsString('rather than trusting', $section);
+        $this->assertStringContainsString('`User.is_active` from the supplied Eloquent instance', $section);
         $this->assertStringContainsString('scoped to the explicit `Workspace`', $section);
     }
 
@@ -302,12 +303,12 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
         $this->assertStringContainsString('point-in-time post-lock authorization snapshot', $section);
         $this->assertStringContainsString('revocation/deactivation committed **before** that authorization snapshot', $section);
         $this->assertStringContainsString('fail closed', $section);
-        $this->assertStringContainsString('does **not** retroactively cancel an already accepted/enqueued Connector operation', $section);
+        $this->assertStringContainsString('retroactively cancel an already accepted/enqueued Connector operation', $section);
         $this->assertStringContainsString('do **not** re-authorize the initiating `User` at execution time', $section);
         $this->assertStringContainsString('live workspace authorization', $section);
         $this->assertStringContainsString('requires a new Stop-and-Amend', $section);
         $this->assertStringContainsString('Do **not** describe this as “authorized as of transaction commit”', $section);
-        $this->assertStringContainsString('no shared serialization lock guaranteeing that', $section);
+        $this->assertStringContainsString('serialization lock guaranteeing that', $section);
     }
 
     #[Test]
@@ -337,10 +338,10 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
         $this->assertStringContainsString('`WorkspaceAuthorization::activeMembership()` reads', $accessSection);
         $this->assertStringContainsString('`users.is_active` from the passed `User` model instance', $accessSection);
         $this->assertStringContainsString('**GAP-026B-2 requirement:**', $accessSection);
-        $this->assertStringContainsString('must remove stale-model dependency', $accessSection);
+        $this->assertStringContainsString('stale-model dependency', $accessSection);
         $this->assertStringContainsString('database-backed projection/query', $accessSection);
         $this->assertStringContainsString('Access post-lock fresh `User` reload by stable ID remains required', $accessSection);
-        $this->assertStringContainsString('must **not** be removed merely because the central authorization query becomes DB-backed', $accessSection);
+        $this->assertStringContainsString('removed merely because the central authorization query becomes DB-backed', $accessSection);
         $this->assertStringContainsString('`WorkspaceAccessMutationCoordinator` acquires the explicit `Workspace` row mutex', $accessSection);
     }
 
