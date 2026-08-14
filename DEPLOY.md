@@ -76,7 +76,7 @@ until the dedicated worker is installed and verified.
 | `babypark-connector-queue` | **not installed** (verified absent 2026-08-14; operational gap) | `database_connectors` | `connectors` | *(approved planned command — not active until installed: `php artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600`)* |
 
 Connection-check jobs stay on the **default** lane (45s job timeout, 90s
-`retry_after`). Future discovery jobs use the **connector** lane (900s job
+`retry_after`). Discovery jobs use the **connector** lane (900s job
 timeout, 1200s `retry_after`). Both share the same account-level
 `WithoutOverlapping` lock key via the cache store.
 
@@ -152,13 +152,15 @@ on the pilot host.
 - The live `babypark-queue.conf` currently contains
   `command=php /var/www/babypark-b2b/artisan queue:work ...` (bare `php`, resolved
   via `PATH` at runtime), **not** the absolute path
-- A future connector-worker command (installed in Task 4B-2b-1) should use the
-  verified absolute path `/usr/bin/php` — that is a decision for that later
-  installation, not a claim about what the current config already contains
+- Task 4B-2b discovery runtime exists in application code; production Supervisor
+  `babypark-connector-queue` worker installation remains pending on the pilot
+  host. The approved connector-worker `command=` line should use the verified
+  absolute path `/usr/bin/php` when installed — that is a decision for that
+  pending installation, not a claim about what the current config already contains
 
 **`pcntl`:** installed (`php -m | grep -i '^pcntl$'` confirms `pcntl`)
 
-### Deferred connector-worker installation
+### Connector-worker production activation gap
 
 The second worker (`babypark-connector-queue`) is **not installed** on the Babypark
 pilot host (verified absent 2026-08-14). Discovery job/runtime and the
@@ -166,6 +168,13 @@ pilot host (verified absent 2026-08-14). Discovery job/runtime and the
 is a current operational gap/gate, not deferred because "no discovery job exists".
 Do not claim connector discovery is production-operational until the dedicated
 worker is installed and verified.
+
+**Sequencing (repository vs production):** Task **4C-1c-2b** (Layer B mapping UI)
+is the next repository implementation task. Permanent `babypark-connector-queue`
+Supervisor activation on the pilot host is a separate production operational gate
+and must be completed before connector discovery is called production-operational.
+These are independent tracks — do not treat "next repository task" and "next
+production operation" as contradictory.
 
 When the connector worker is installed, mirror the live `babypark-queue`
 Supervisor block for logging conventions and create

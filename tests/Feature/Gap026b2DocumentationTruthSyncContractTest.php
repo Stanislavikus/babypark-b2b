@@ -85,14 +85,22 @@ class Gap026b2DocumentationTruthSyncContractTest extends TestCase
         $deploy = File::get(base_path('DEPLOY.md'));
         $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
-        $this->assertStringNotContainsString(
+        $staleDeployPhrases = [
+            'Future discovery jobs',
+            'installed in Task 4B-2b-1',
+            'Deferred connector-worker installation',
             'no discovery job exists yet to process',
-            $deploy,
-        );
-        $this->assertStringNotContainsString(
             'deferred until Task 4B-2b-1 introduces a discovery job',
-            $deploy,
-        );
+        ];
+
+        foreach ($staleDeployPhrases as $phrase) {
+            $this->assertStringNotContainsString(
+                $phrase,
+                $deploy,
+                "Stale pre-discovery-worker phrase [{$phrase}] found in DEPLOY.md",
+            );
+        }
+
         $this->assertStringNotContainsString(
             'deferred until Task 4B-2b-1 introduces a discovery job',
             $gaps,
@@ -107,6 +115,22 @@ class Gap026b2DocumentationTruthSyncContractTest extends TestCase
         );
         $this->assertStringContainsString(
             'verified absent 2026-08-14',
+            $deploy,
+        );
+        $this->assertStringContainsString(
+            'Discovery jobs use the **connector** lane',
+            $deploy,
+        );
+        $this->assertStringContainsString(
+            '### Connector-worker production activation gap',
+            $deploy,
+        );
+        $this->assertStringContainsString(
+            '4C-1c-2b',
+            $deploy,
+        );
+        $this->assertStringContainsString(
+            '/usr/bin/php',
             $deploy,
         );
     }

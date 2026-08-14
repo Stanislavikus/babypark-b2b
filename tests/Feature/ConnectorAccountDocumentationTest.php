@@ -340,8 +340,14 @@ class ConnectorAccountDocumentationTest extends TestCase
 
         $this->assertStringContainsString('**Task 4B-2b-0 note (added 2026-07-29):**', $gap006);
         $this->assertStringContainsString('database_connectors', $gap006);
-        $this->assertMatchesRegularExpression(
-            '/Prerequisite for\s+Task 4B-2b-1 discovery execution/',
+        $this->assertStringContainsString('ConnectorDiscoveryRunJob', $gap006);
+        $this->assertStringContainsString('verified absent on 2026-08-14', $gap006);
+        $this->assertStringContainsString(
+            'Do not claim connector discovery is production-operational until the dedicated worker is installed and verified',
+            $gap006
+        );
+        $this->assertStringNotContainsString(
+            'Prerequisite for Task 4B-2b-1 discovery execution',
             $gap006
         );
     }
