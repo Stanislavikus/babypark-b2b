@@ -20,6 +20,7 @@ use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\Concerns\EnablesConnectorConnectionCheckCapability;
 use Tests\Concerns\EnablesConnectorSchemaDiscoveryCapability;
 use Tests\Support\MySqlConnectorAccountRowLockWaitProbe;
+use Tests\Support\MySqlWorkspaceRowLockWaitProbe;
 use Tests\TestCase;
 
 class ConnectorDispatchConcurrencyTest extends TestCase
@@ -210,13 +211,35 @@ class ConnectorDispatchConcurrencyTest extends TestCase
         $processDispatch->setTimeout(120);
         $processDispatch->start();
 
-        $processDispatch->wait();
+        $deadline = time() + 10;
+        while (time() < $deadline) {
+            $workspaceLockWait = MySqlWorkspaceRowLockWaitProbe::findForeignWorkspaceForUpdateWait($workspace->id);
+
+            $this->assertNull(
+                $workspaceLockWait,
+                'Connector dispatch must not acquire the Workspace anti-lockout FOR UPDATE mutex.',
+            );
+
+            if (file_exists($ipcDir.'/b_result')) {
+                break;
+            }
+
+            usleep(50_000);
+        }
 
         touch($ipcDir.'/parent_release_workspace');
+
+        $processDispatch->wait();
         $processWorkspace->wait();
 
         $this->assertSame(0, $processWorkspace->getExitCode());
-        $this->assertSame(0, $processDispatch->getExitCode());
+        $this->assertSame(
+            0,
+            $processDispatch->getExitCode(),
+            file_exists($ipcDir.'/b_result')
+                ? trim((string) file_get_contents($ipcDir.'/b_result'))
+                : $processDispatch->getErrorOutput(),
+        );
         $this->assertSame('dispatched', trim((string) file_get_contents($ipcDir.'/b_result')));
 
         $this->assertGreaterThan(
