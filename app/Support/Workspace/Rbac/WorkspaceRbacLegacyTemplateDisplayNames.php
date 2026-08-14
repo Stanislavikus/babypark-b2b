@@ -17,4 +17,12 @@ final readonly class WorkspaceRbacLegacyTemplateDisplayNames
             default => throw new \InvalidArgumentException("Unknown legacy template key: {$templateKey}"),
         };
     }
+
+    public static function merchantSafeBootstrapDefaults(): self
+    {
+        return new self(
+            accessManagerDisplayName: 'Керування доступом',
+            connectorDiscoveryDisplayName: 'Оператор зневадження конекторів',
+        );
+    }
 }
