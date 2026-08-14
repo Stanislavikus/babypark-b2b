@@ -12,6 +12,7 @@ use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
+use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\Permission\Models\Permission;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
@@ -30,6 +31,79 @@ class WorkspaceAccessPageTest extends TestCase
         $this->seed(WorkspaceRbacPermissionSeeder::class);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
+    }
+
+    #[Test]
+    public function authorized_actor_registers_access_navigation_item(): void
+    {
+        $actor = User::factory()->create();
+        $this->grantManageWorkspaceAccess($this->defaultWorkspace(), $actor);
+
+        $this->actingAs($actor);
+
+        $this->assertTrue(WorkspaceAccess::canAccess());
+        $this->assertTrue(WorkspaceAccess::shouldRegisterNavigation());
+
+        $items = WorkspaceAccess::getNavigationItems();
+
+        $this->assertCount(1, $items);
+        $this->assertSame(__('workspace_access.page.navigation_label'), $items[0]->getLabel());
+        $this->assertStringEndsWith('/workspace-access', (string) $items[0]->getUrl());
+
+        $this->get('/admin')->assertOk();
+        $this->assertTrue($this->navigationContainsWorkspaceAccess());
+    }
+
+    #[Test]
+    public function unauthorized_actor_does_not_register_access_navigation_item(): void
+    {
+        $actor = User::factory()->create();
+
+        $this->actingAs($actor);
+
+        $this->assertFalse(WorkspaceAccess::canAccess());
+
+        $this->get('/admin')
+            ->assertOk();
+
+        $this->assertFalse($this->navigationContainsWorkspaceAccess());
+    }
+
+    #[Test]
+    public function access_navigation_and_title_resolve_for_en_uk_and_ru_locales(): void
+    {
+        $actor = User::factory()->create();
+        $this->grantManageWorkspaceAccess($this->defaultWorkspace(), $actor);
+
+        $expected = [
+            'en' => [
+                'group' => 'Settings',
+                'label' => 'Access',
+                'title' => 'Access',
+            ],
+            'uk' => [
+                'group' => 'Налаштування',
+                'label' => 'Доступ',
+                'title' => 'Доступ',
+            ],
+            'ru' => [
+                'group' => 'Настройки',
+                'label' => 'Доступ',
+                'title' => 'Доступ',
+            ],
+        ];
+
+        foreach ($expected as $locale => $labels) {
+            app()->setLocale($locale);
+
+            $this->actingAs($actor);
+
+            $this->assertSame($labels['group'], WorkspaceAccess::getNavigationGroup());
+            $this->assertSame($labels['label'], WorkspaceAccess::getNavigationLabel());
+
+            $component = Livewire::test(WorkspaceAccess::class);
+            $this->assertSame($labels['title'], $component->instance()->getTitle());
+        }
     }
 
     #[Test]
@@ -162,5 +236,18 @@ class WorkspaceAccessPageTest extends TestCase
 
         $this->assertNotSame($defaultMember->workspace_id, $foreignMember->workspace_id);
         $this->assertSame($otherWorkspace->id, $foreignRole->workspace_id);
+    }
+
+    private function navigationContainsWorkspaceAccess(): bool
+    {
+        foreach (Filament::getNavigation() as $group) {
+            foreach ($group->getItems() as $item) {
+                if (str_ends_with((string) $item->getUrl(), '/workspace-access')) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

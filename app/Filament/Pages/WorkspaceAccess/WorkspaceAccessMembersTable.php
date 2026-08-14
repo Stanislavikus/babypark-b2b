@@ -8,6 +8,7 @@ use App\Models\WorkspaceUser;
 use App\Services\Workspace\WorkspaceAccessMutationService;
 use App\Support\Workspace\Rbac\Concerns\HandlesWorkspaceAccessExceptions;
 use App\Support\Workspace\Rbac\Concerns\RequiresFreshWorkspacePermission;
+use App\Support\Workspace\Rbac\WorkspaceRoleLabelResolver;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
@@ -85,7 +86,10 @@ class WorkspaceAccessMembersTable extends Component implements HasActions, HasSc
                         Select::make('role_id')
                             ->label(__('workspace_access.members.fields.role'))
                             ->options(fn (WorkspaceUser $record): array => $this->assignableRoleOptions($record))
-                            ->getOptionLabelUsing(fn (string $value): ?string => WorkspaceRole::query()->find($value)?->name)
+                            ->getOptionLabelUsing(fn (string $value): ?string => WorkspaceRoleLabelResolver::resolve(
+                                $this->resolveAccessWorkspace()->id,
+                                $value,
+                            ))
                             ->required()
                             ->native(false)
                             ->searchable(),
@@ -109,7 +113,10 @@ class WorkspaceAccessMembersTable extends Component implements HasActions, HasSc
                         Select::make('role_id')
                             ->label(__('workspace_access.members.fields.role'))
                             ->options(fn (WorkspaceUser $record): array => $this->assignedRoleOptions($record))
-                            ->getOptionLabelUsing(fn (string $value): ?string => WorkspaceRole::query()->find($value)?->name)
+                            ->getOptionLabelUsing(fn (string $value): ?string => WorkspaceRoleLabelResolver::resolve(
+                                $this->resolveAccessWorkspace()->id,
+                                $value,
+                            ))
                             ->required()
                             ->native(false)
                             ->searchable(),

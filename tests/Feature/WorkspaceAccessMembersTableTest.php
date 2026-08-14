@@ -161,6 +161,52 @@ class WorkspaceAccessMembersTableTest extends TestCase
     }
 
     #[Test]
+    public function forged_foreign_role_uuid_does_not_resolve_label_through_select_path(): void
+    {
+        $canaryName = 'SECRET_FOREIGN_CANARY_ROLE_B_WORKSPACE';
+        $workspace = $this->defaultWorkspace();
+        $otherWorkspace = Workspace::query()->create(['name' => 'Other', 'is_default' => false]);
+        $actor = User::factory()->create();
+        $this->grantManageWorkspaceAccess($workspace, $actor);
+        $target = $this->makeWorkspaceMembership($workspace);
+        $foreignRole = $this->createRoleWithPermissions(
+            $otherWorkspace->id,
+            $canaryName,
+            [WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS],
+        );
+
+        $component = Livewire::actingAs($actor)
+            ->test(WorkspaceAccessMembersTable::class)
+            ->mountTableAction('assignRole', $target)
+            ->setTableActionData(['role_id' => $foreignRole->id]);
+
+        $this->assertStringNotContainsString($canaryName, $component->html());
+
+        $component
+            ->callMountedTableAction()
+            ->assertHasFormErrors(['role_id']);
+
+        $this->assertDatabaseMissing('workspace_user_roles', [
+            'workspace_user_id' => $target->id,
+            'workspace_role_id' => $foreignRole->id,
+        ]);
+
+        Livewire::actingAs($actor)
+            ->test(WorkspaceAccessMembersTable::class)
+            ->callTableAction(
+                'assignRole',
+                $target,
+                data: ['role_id' => $foreignRole->id],
+            )
+            ->assertHasFormErrors(['role_id']);
+
+        Livewire::actingAs($actor)
+            ->test(WorkspaceAccessMembersTable::class)
+            ->mountTableAction('assignRole', $target)
+            ->assertDontSee($canaryName);
+    }
+
+    #[Test]
     public function foreign_role_id_submitted_through_livewire_is_rejected(): void
     {
         $workspace = $this->defaultWorkspace();
@@ -181,7 +227,7 @@ class WorkspaceAccessMembersTableTest extends TestCase
                 $target,
                 data: ['role_id' => $foreignRole->id],
             )
-            ->assertNotified(__('workspace_access.errors.foreign_target'));
+            ->assertHasFormErrors(['role_id']);
 
         $this->assertDatabaseMissing('workspace_user_roles', [
             'workspace_user_id' => $target->id,
@@ -229,7 +275,7 @@ class WorkspaceAccessMembersTableTest extends TestCase
                 $target,
                 data: ['role_id' => $foreignRole->id],
             )
-            ->assertNotified(__('workspace_access.errors.foreign_target'));
+            ->assertHasFormErrors(['role_id']);
 
         $this->assertDatabaseMissing('workspace_user_roles', [
             'workspace_user_id' => $target->id,

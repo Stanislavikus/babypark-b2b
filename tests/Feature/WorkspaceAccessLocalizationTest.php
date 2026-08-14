@@ -32,6 +32,36 @@ class WorkspaceAccessLocalizationTest extends TestCase
     }
 
     #[Test]
+    public function page_metadata_translation_keys_resolve_for_supported_locales(): void
+    {
+        $expected = [
+            'en' => [
+                'workspace_access.page.navigation_group' => 'Settings',
+                'workspace_access.page.navigation_label' => 'Access',
+                'workspace_access.page.title' => 'Access',
+            ],
+            'uk' => [
+                'workspace_access.page.navigation_group' => 'Налаштування',
+                'workspace_access.page.navigation_label' => 'Доступ',
+                'workspace_access.page.title' => 'Доступ',
+            ],
+            'ru' => [
+                'workspace_access.page.navigation_group' => 'Настройки',
+                'workspace_access.page.navigation_label' => 'Доступ',
+                'workspace_access.page.title' => 'Доступ',
+            ],
+        ];
+
+        foreach ($expected as $locale => $keys) {
+            app()->setLocale($locale);
+
+            foreach ($keys as $key => $value) {
+                $this->assertSame($value, __($key), "Failed asserting {$key} for locale {$locale}");
+            }
+        }
+    }
+
+    #[Test]
     public function workspace_access_translation_keys_have_parity_across_locales(): void
     {
         $en = json_decode(File::get(lang_path('en.json')), true, 512, JSON_THROW_ON_ERROR);

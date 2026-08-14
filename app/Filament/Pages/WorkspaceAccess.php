@@ -8,6 +8,7 @@ use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspacePermissions;
 use Filament\Pages\Page;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Url;
 
@@ -15,11 +16,11 @@ class WorkspaceAccess extends Page
 {
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-key';
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Налаштування';
+    protected static string|\UnitEnum|null $navigationGroup = null;
 
-    protected static ?string $navigationLabel = 'Доступ';
+    protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Доступ';
+    protected static ?string $title = null;
 
     protected static ?int $navigationSort = 2;
 
@@ -43,6 +44,21 @@ class WorkspaceAccess extends Page
             $workspace,
             WorkspacePermissions::MANAGE_WORKSPACE_ACCESS,
         );
+    }
+
+    public static function getNavigationGroup(): ?string
+    {
+        return __('workspace_access.page.navigation_group');
+    }
+
+    public static function getNavigationLabel(): string
+    {
+        return __('workspace_access.page.navigation_label');
+    }
+
+    public function getTitle(): string|Htmlable
+    {
+        return __('workspace_access.page.title');
     }
 
     public function switchTab(string $tab): void
