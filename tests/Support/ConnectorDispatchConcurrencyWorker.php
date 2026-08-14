@@ -19,6 +19,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 $basePath = dirname(__DIR__, 2);
 
@@ -69,6 +70,7 @@ function configureConnectorDispatchTestEnvironment(bool $discovery = false): voi
 
     // Prevent sync-queue inline job execution (HTTP hangs) in child worker processes.
     Config::set('queue.default', 'database');
+    Http::fake();
 }
 
 function runAccountLockA(string $accountId, string $ipcDir): void

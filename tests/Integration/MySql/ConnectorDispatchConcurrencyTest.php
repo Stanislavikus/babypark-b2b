@@ -65,7 +65,7 @@ class ConnectorDispatchConcurrencyTest extends TestCase
             $account->id,
             $actor->id,
             $ipcDir,
-        ], base_path());
+        ], base_path(), $this->connectorWorkerEnvironment());
         $processB->setTimeout(120);
         $processB->start();
 
@@ -136,7 +136,7 @@ class ConnectorDispatchConcurrencyTest extends TestCase
             $account->id,
             $actor->id,
             $ipcDir,
-        ], base_path());
+        ], base_path(), $this->connectorWorkerEnvironment());
         $processB->setTimeout(120);
         $processB->start();
 
@@ -206,7 +206,7 @@ class ConnectorDispatchConcurrencyTest extends TestCase
             $account->id,
             $actor->id,
             $ipcDir,
-        ], base_path());
+        ], base_path(), $this->connectorWorkerEnvironment());
         $processDispatch->setTimeout(120);
         $processDispatch->start();
 
@@ -226,6 +226,14 @@ class ConnectorDispatchConcurrencyTest extends TestCase
                 ->where('status', ConnectorConnectionCheckStatus::Queued)
                 ->count(),
         );
+    }
+
+    private function connectorWorkerEnvironment(): array
+    {
+        return array_merge($_ENV, [
+            'APP_ENV' => 'testing',
+            'QUEUE_CONNECTION' => 'database',
+        ]);
     }
 
     private function bootstrapConnectorEnvironment(): void
