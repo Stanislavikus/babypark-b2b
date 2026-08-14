@@ -361,10 +361,9 @@ physical-delete attempts (archive remains valid) are implemented (Task 4C-1b).
 Canonical suggestion/read-model contract is frozen (Task 4C-1c-0, docs only).
 Canonical deterministic suggestion provider/read-model (4C-1c-1) is implemented.
 Workspace access / authorization contract is frozen (4C-1c-2a, docs only).
-Layer B mapping UI (4C-1c-2b) remains unimplemented — repository work may begin
-after verified GAP-026B-2 merge; merchant shipping/traffic under new authority
-remains blocked until successful production maintenance-window EXECUTE (see
-GAP-026). `SyncRun` / execution,
+Layer B mapping UI (4C-1c-2b) remains unimplemented — the GAP-026B
+authorization prerequisite is now satisfied (Babypark pilot production cutover
+completed 2026-08-14); repository implementation may proceed. `SyncRun` / execution,
 preview, schedule, history, and `ExternalRecordLink` remain unimplemented.
 Connector-account creation and credential-management/settings UI remain absent.
 Task 4B-2c (discovered schema fields / change inspection) and retention jobs
@@ -385,7 +384,7 @@ were not loaded. Sensitive fields excluded: `credentials`, `settings`,
 status (post-B-2):** `ConnectorAccountCapabilityPresentation` applies
 capability-based safe projection from effective workspace permissions; connection-
 check overlay and management surfaces are management-only (`manage_connector_accounts`).
-Production EXECUTE activation remains pending.
+Production EXECUTE activation completed on Babypark pilot 2026-08-14 (see GAP-026B).
 
 **Historical shipped role matrix (pre-4C-1c-2a / pre-B-2 transitional
 implementation; not normative target authorization; superseded by GAP-026B-2
@@ -410,8 +409,9 @@ sync execution/preview/schedule/history
 (`SyncRun`, issues, merchant sync UX), `ExternalRecordLink`,
 connector-account creation and credential-management/settings UI.
 Workspace-scoped authorization foundation (GAP-026) repository runtime is
-**Implemented** (GAP-026B-2); production EXECUTE activation remains pending before
-mutable Layer B mapping UI may ship to merchant traffic.
+**Implemented** (GAP-026B-2) and production-activated on Babypark pilot
+(2026-08-14). The GAP-026B authorization prerequisite for Layer B mapping UI
+(4C-1c-2b) is satisfied; the UI itself remains unimplemented.
 
 ### Classification after Sync UX / Domain Rebaseline (documentation pass)
 
@@ -477,7 +477,7 @@ Verified on 2026-07-31 (pilot host):
 - `lock_connection=null` resolves to the cache store's default DB connection (confirmed directly from the installed `laravel/framework` v11.54.0 source, `Illuminate\Cache\CacheManager::createDatabaseDriver`);
 - `lock_table=null` resolves to `cache_locks` (same source);
 - `cache` and `cache_locks` tables confirmed present with their expected structures (`key`/`value`/`expiration` and `key`/`owner`/`expiration`);
-- dedicated `babypark-connector-queue` remains intentionally uninstalled and is deferred until Task 4B-2b-1 introduces a real discovery job (historical 2026-07-31 snapshot — discovery job now exists in application code via PR #102; permanent production Supervisor activation remains a separate gate).
+- dedicated `babypark-connector-queue` remains intentionally uninstalled on the Babypark pilot host (verified absent 2026-08-14). Discovery job/runtime and `database_connectors` / `connectors` lane exist in application code (PR #102); permanent production Supervisor activation is a current operational gap/gate — not deferred because no discovery job exists.
 
 **Historical (Task 4B-2-0, 2026-07-22):** At promotion time, connector
 production-readiness also depended on **GAP-024** (framework upgrade). GAP-024
@@ -499,7 +499,9 @@ accounting and added the committed Magento pilot payload regression fixture
 snapshot fields) with deterministic canonical hashing coverage in tests.
 Discovery Overview UI merged in PR #114 (Task 4B-2b complete). Permanent
 production `babypark-connector-queue` Supervisor activation remains a separate
-readiness gate — not established by the discovery job alone.
+operational gate — verified absent on Babypark pilot 2026-08-14; do not claim
+connector discovery is production-operational until the dedicated worker is
+installed and verified.
 
 **Task 4B-2b UI note (added 2026-08-09):** PR #114 merged Discovery Overview UI
 on Connector Account — list last-successful-discovery projection, account-detail
@@ -518,15 +520,13 @@ connector worker config (docker-compose + deferred permanent Supervisor
 installation for the pilot host), and `deploy.sh` `queue:restart`. Connection-check lane unchanged.
 B9 host-prerequisite verification completed 2026-07-31 (default worker `RUNNING`,
 `database` cache/lock store confirmed). Dedicated `babypark-connector-queue`
-on the pilot production host remains a separate permanent-activation gate —
-`ConnectorDiscoveryRunJob` now exists in application code (PR #102), but
-permanent Supervisor activation is not yet confirmed. Historical note: at
-2026-07-31 verification, `babypark-connector-queue` remains intentionally
-uninstalled and is deferred until Task 4B-2b-1 introduces a discovery job.
-Prerequisite for Task 4B-2b-1 discovery execution (satisfied in application
-code); permanent production worker activation and Discovery Overview UI remain
-open. **Historical:** GAP-024 was open at 2026-07-31 verification; it is now
-**closed** (see GAP-024).
+on the Babypark pilot production host remains a separate permanent-activation
+gate — `ConnectorDiscoveryRunJob` and the `database_connectors` / `connectors`
+lane exist in application code (PR #102), but `babypark-connector-queue` was
+verified absent on 2026-08-14. Do not defer permanent connector-worker
+installation because "no discovery job exists"; Do not claim connector discovery is production-operational until the dedicated worker is installed and verified.
+Discovery Overview UI is complete. **Historical:** GAP-024 was open at
+2026-07-31 verification; it is now **closed** (see GAP-024).
 
 **Task 4B UI handoff:**
 
@@ -1004,10 +1004,7 @@ Remaining connector gaps are tracked separately under GAP-006.
   fixed-role behavior is transitional evidence under **GAP-026** / PR #102 only.
 - **Remaining GAP-025 UX work:** copy/navigation/Layer-C gating/deeper Layer A/B
   surfaces.
-- **Separate prerequisite:** mutable Layer-B mapping UI (4C-1c-2b) — repository
-  work may proceed after verified GAP-026B-2 merge; merchant shipping/traffic
-  under new authority remains blocked until successful production maintenance-window
-  EXECUTE (GAP-026).
+- **Separate prerequisite (satisfied):** mutable Layer-B mapping UI (4C-1c-2b) — GAP-026B production cutover completed 2026-08-14; authorization prerequisite is satisfied; repository implementation may proceed. The UI itself remains unimplemented.
 
 **Implemented sync-domain backend (verified on `develop`; not a GAP-025 UX claim):**
 - `SyncConfiguration` persistence and domain write path (Task 4C-0).
@@ -1016,8 +1013,8 @@ Remaining connector gaps are tracked separately under GAP-006.
 - Canonical deterministic suggestion/read-model provider (Task 4C-1c-1).
 
 **Still absent in code (docs settled; runtime or UI missing):**
-- Layer B mapping UI (Task 4C-1c-2b) — repository work may proceed after
-  verified GAP-026B-2 merge; merchant shipping blocked until production EXECUTE;
+- Layer B mapping UI (Task 4C-1c-2b) — GAP-026B authorization prerequisite
+  satisfied (production cutover 2026-08-14); UI remains unimplemented;
 - `SyncRun` / `SyncRunItem` persistence and execution runtime;
 - `ExternalRecordLink`;
 - sync execution runtime for merchant "Синхронізувати зараз";
@@ -1051,7 +1048,7 @@ backend — Layer B mapping UI still missing); remaining UX migration work.
 
 ---
 
-## GAP-026 — Workspace-scoped RBAC foundation partially implemented; authority cutover pending
+## GAP-026 — Workspace-scoped RBAC foundation implemented; GAP-026B production cutover complete
 
 **Approved docs:**
 - `docs/03-DOMAIN_MODEL.md` — **Workspace access model and authorization
@@ -1097,8 +1094,8 @@ explicit read-only `WorkspaceAuthorization` service with regression tests.
 | **GAP-026A (overall)** | **Done** — 026A-1 and 026A-2 foundation slices complete per original staging. |
 | **GAP-026B-0 — Workspace RBAC authority cutover contract** | **Done (docs/tests).** Frozen cutover boundaries for Connector/Tax/Mapping/Access; capability-based connector presentation; existing-memberships-only Access; User lifecycle transition rules; one-time maintenance cutover sequence; CHECK-ONLY (B-1) / EXECUTE (B-2) slice ownership; 026B-1/026B-2 split. See `03-DOMAIN_MODEL.md` → Workspace RBAC authority cutover (Resolved — GAP-026B-0). |
 | **GAP-026B-1 — Access & Cutover Machinery** | **Done.** Part 1 runtime core + Part 2 merchant Access/Roles UI; CHECK-ONLY `workspace-rbac:cutover-check`. EXECUTE ships with B-2 (see below). **Explicitly no** connector/tax policy authority switch in B-1-only runtime. |
-| **GAP-026B-2 — Authority & Presentation Cutover** | **Implemented (repository ready for production cutover; production EXECUTE not yet performed).** EXECUTE command `workspace-rbac:cutover-execute`; `ConnectorAccountPolicy` + `ConnectorAuthorization` workspace-RBAC matrix; `ConnectorAccountCapabilityPresentation` three-tier safe projection; Integrations/ListPlatformConnections runtime-overlay gating; `WorkspaceTaxSettingsAuthorization` + write-time reauthorization; `FieldMappingAuthorizationService` outer seam; DB-fresh `WorkspaceAuthorization`; Connector post-lock dispatch authorization freshness; MySQL concurrency proofs for post-lock revocation. Environment activation pending maintenance-window cutover. | First production deployment containing B-2 must be the maintenance-window cutover deployment; merchant traffic blocked until EXECUTE + anti-lockout + smoke succeed. After B-2 is merged and verified, 4C-1c-2b repo work may begin; environment must execute EXECUTE during that cutover before merchant traffic uses new authority. |
-| **GAP-026B (overall)** | **Open / activation pending** — B-0 contract Done; B-1 Done; B-2 repository runtime Implemented (production EXECUTE not yet performed). Closure requires maintenance-window cutover per staging below.
+| **GAP-026B-2 — Authority & Presentation Cutover** | **Done / production-activated (2026-08-14).** Babypark pilot maintenance-window cutover completed successfully against `fb2c5a7a3f8a521a2bfca7583e57d1ae83e95bc9`. EXECUTE command `workspace-rbac:cutover-execute`; `ConnectorAccountPolicy` + `ConnectorAuthorization` workspace-RBAC matrix; `ConnectorAccountCapabilityPresentation` three-tier safe projection; Integrations/ListPlatformConnections runtime-overlay gating; `WorkspaceTaxSettingsAuthorization` + write-time reauthorization; `FieldMappingAuthorizationService` outer seam; DB-fresh `WorkspaceAuthorization`; Connector post-lock dispatch authorization freshness; MySQL concurrency proofs for post-lock revocation. | Historical: first production deployment containing B-2 was the maintenance-window cutover deployment. After B-2 merge and verified production EXECUTE, repository development of **4C-1c-2b** may proceed — authorization prerequisite now satisfied on Babypark pilot. |
+| **GAP-026B (overall)** | **Done** — production cutover completed 2026-08-14 on Babypark pilot. B-0 contract Done; B-1 Done; B-2 production-activated.
 
 **Legacy membership / role backfill matrix (026B production execution — GAP-026B-2 EXECUTE only):**
 
@@ -1157,6 +1154,23 @@ not alone make every legacy User mutation anti-lockout-safe.
 `PlatformAdminAuthorization` and `/cabinet` (`Customer` principal) remain outside
 GAP-026 workspace RBAC.
 
+**Verified production post-cutover state (Babypark pilot, 2026-08-14, commit
+`fb2c5a7a3f8a521a2bfca7583e57d1ae83e95bc9`):**
+- canonical workspace permission catalogue: **7**;
+- default workspace: exactly **1**;
+- effective `manage_workspace_access` holders: **1**;
+- legacy Spatie role/permission assignments: **0**;
+- Admin legacy account received `legacy_workspace_access_manager`;
+- Manager received `WorkspaceUser` membership but no bootstrap `WorkspaceRole`;
+- mapping permissions remained unassigned by legacy backfill;
+- `workspace-rbac:cutover-check` returned safe / exit 0 after EXECUTE;
+- production environment corrected to `APP_ENV=production`, `APP_DEBUG=false`,
+  `APP_URL=https://b2b.babypark.ua`;
+- HTTPS smoke: `/admin/login` → 200; unauthenticated `/admin` → 302 to
+  `/admin/login`; `/cabinet/login` → 200;
+- maintenance mode OFF at completion;
+- `babypark-queue` RUNNING after restart.
+
 **Verified current-code state (post GAP-026B-2 repository implementation):**
 - `App\Services\Workspace\WorkspaceAuthorization` implements DB-backed effective-permission
   projection (`allows`, `effectivePermissions`, `activeMembership`) without trusting
@@ -1174,8 +1188,8 @@ GAP-026 workspace RBAC.
   `ListPlatformConnections` runtime-overlay gating; `WorkspaceTaxSettingsAuthorization`
   + write-time tax reauthorization; `FieldMappingAuthorizationService` outer seam;
   redundant Connector `WorkspaceMembership` gates removed in B-2 scope.
-- `workspace-rbac:cutover-execute` command implemented; **production EXECUTE not yet
-  performed** — environment activation pending maintenance-window cutover.
+- `workspace-rbac:cutover-execute` command implemented; **production EXECUTE
+  performed** on Babypark pilot 2026-08-14.
 - `User.role` remains transitional for GAP-027 / platform surfaces outside cut-over
   domains; it has **no** connector/tax/mapping/access authorization effect in B-2 paths.
 - Spatie Teams remains **disabled** — `config/permission.php` → `'teams' => false`.
@@ -1183,7 +1197,8 @@ GAP-026 workspace RBAC.
 **Impact:**
 - Do not treat the current global Spatie configuration as satisfying the
   workspace-scoped RBAC contract.
-- Layer B mapping UI (4C-1c-2b) must **not** ship until GAP-026B cutover completes.
+- Layer B mapping UI (4C-1c-2b) authorization prerequisite is satisfied
+  (GAP-026B production cutover 2026-08-14); the UI itself remains unimplemented.
 - Do not add more fixed `User.role` policy branches as a workaround for mapping
   or connector authorization.
 - Target role-name-free authorization remains partially transitional outside scopes
@@ -1193,9 +1208,9 @@ GAP-026 workspace RBAC.
 - Cross-reference **GAP-004** for workspace data isolation — GAP-004 tracks
   table/query coverage audit, not permission semantics.
 
-**Next task:** Production GAP-026B maintenance-window cutover (EXECUTE) after B-2 merge.
+**Next task:** Task 4C-1c-2b — Layer B mapping UI (authorization prerequisite satisfied).
 
-**Status:** Open / activation pending — physical architecture frozen (GAP-026-0); GAP-026A foundation **Done**; GAP-026B-0 cutover contract **Done**; GAP-026B-1 **Done**; GAP-026B-2 repository runtime **Implemented** (production EXECUTE not yet performed). Closure requires environment one-time cutover per staging above. 4C-1c-2b Mapping UI remains blocked until production cutover completes successfully.
+**Status:** GAP-026A foundation **Done**; GAP-026B production cutover **Done** (2026-08-14 on Babypark pilot). physical architecture frozen (GAP-026-0). GAP-026B authorization prerequisite is now satisfied for Layer B mapping UI (4C-1c-2b). GAP-026B-0 cutover contract **Done**; GAP-026B-1 **Done**; GAP-026B-2 production-activated. 4C-1c-2b Mapping UI authorization prerequisite is satisfied; UI remains unimplemented. GAP-027 (platform-wide admin RBAC and new-staff onboarding) remains Open — newly created staff without `WorkspaceUser` still fail closed in Connector/Tax/Mapping/Access until GAP-027 ships.
 
 ---
 

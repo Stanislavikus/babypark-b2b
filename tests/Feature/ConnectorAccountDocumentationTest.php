@@ -340,8 +340,14 @@ class ConnectorAccountDocumentationTest extends TestCase
 
         $this->assertStringContainsString('**Task 4B-2b-0 note (added 2026-07-29):**', $gap006);
         $this->assertStringContainsString('database_connectors', $gap006);
-        $this->assertMatchesRegularExpression(
-            '/Prerequisite for\s+Task 4B-2b-1 discovery execution/',
+        $this->assertStringContainsString('ConnectorDiscoveryRunJob', $gap006);
+        $this->assertStringContainsString('verified absent on 2026-08-14', $gap006);
+        $this->assertStringContainsString(
+            'Do not claim connector discovery is production-operational until the dedicated worker is installed and verified',
+            $gap006
+        );
+        $this->assertStringNotContainsString(
+            'Prerequisite for Task 4B-2b-1 discovery execution',
             $gap006
         );
     }
@@ -657,7 +663,7 @@ class ConnectorAccountDocumentationTest extends TestCase
         $this->assertStringContainsString('SaaS `Store`-header vs `store_code` reuse (B3)', $gaps);
         $this->assertStringContainsString('The B9 repository implementation and host-prerequisite verification are', $gaps);
         $this->assertStringContainsString('complete: this PR adds `php artisan queue:restart` to `deploy.sh`', $gaps);
-        $this->assertStringContainsString('babypark-connector-queue` remains intentionally uninstalled and is deferred until Task 4B-2b-1', $gaps);
+        $this->assertStringContainsString('babypark-connector-queue` remains intentionally uninstalled on the Babypark pilot host (verified absent 2026-08-14)', $gaps);
         $this->assertStringContainsString('**GAP-024**', $gaps);
         $this->assertStringContainsString('is now **closed**', $gaps);
     }

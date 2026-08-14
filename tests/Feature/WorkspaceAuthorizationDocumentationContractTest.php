@@ -258,7 +258,7 @@ class WorkspaceAuthorizationDocumentationContractTest extends TestCase
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString(
-            '## GAP-026 — Workspace-scoped RBAC foundation partially implemented; authority cutover pending',
+            '## GAP-026 — Workspace-scoped RBAC foundation implemented; GAP-026B production cutover complete',
             $content,
         );
         $this->assertStringNotContainsString(
@@ -276,9 +276,10 @@ class WorkspaceAuthorizationDocumentationContractTest extends TestCase
         $this->assertStringContainsString('GAP-026B-0 — Workspace RBAC authority cutover contract', $content);
         $this->assertStringContainsString('GAP-026B-1 — Access & Cutover Machinery', $content);
         $this->assertStringContainsString('GAP-026B-2 — Authority & Presentation Cutover', $content);
-        $this->assertStringContainsString('4C-1c-2b Mapping UI remains blocked until production cutover completes successfully', $content);
+        $this->assertStringContainsString('4C-1c-2b Mapping UI authorization prerequisite is satisfied', $content);
         $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
-        $this->assertStringContainsString('Open / activation pending', $content);
+        $this->assertStringContainsString('GAP-026B (overall)** | **Done**', $content);
+        $this->assertStringContainsString('production cutover completed 2026-08-14', $content);
         $this->assertStringContainsString('GAP-026A (overall)** | **Done**', $content);
         $this->assertStringContainsString('GAP-026B-1 **Done**', $content);
         $this->assertStringContainsString('Part 2 merchant Access/Roles UI', $content);

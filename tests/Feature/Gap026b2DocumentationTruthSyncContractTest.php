@@ -7,20 +7,148 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * Guards authoritative Connector docs against stale pre-B-2 "current code"
- * authorization statements coexisting with GAP-026B-2 Implemented repository status.
+ * Guards authoritative Connector/RBAC docs against stale pre-cutover statements
+ * coexisting with GAP-026B production-activated status (2026-08-14).
  */
 class Gap026b2DocumentationTruthSyncContractTest extends TestCase
 {
     #[Test]
-    public function implementation_gaps_records_gap_026b_2_as_implemented_repository_runtime(): void
+    public function implementation_gaps_records_gap_026b_2_as_production_activated(): void
     {
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString(
-            '| **GAP-026B-2 — Authority & Presentation Cutover** | **Implemented (repository ready for production cutover; production EXECUTE not yet performed).**',
+            '| **GAP-026B-2 — Authority & Presentation Cutover** | **Done / production-activated (2026-08-14).**',
             $content,
         );
+        $this->assertStringContainsString(
+            '| **GAP-026B (overall)** | **Done** — production cutover completed 2026-08-14 on Babypark pilot.',
+            $content,
+        );
+    }
+
+    #[Test]
+    public function authoritative_docs_do_not_claim_gap_026b_production_execute_is_still_pending(): void
+    {
+        $files = [
+            'docs/IMPLEMENTATION_GAPS.md',
+            'docs/03-DOMAIN_MODEL.md',
+            'docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md',
+            'DEPLOY.md',
+        ];
+
+        $forbiddenPhrases = [
+            'production EXECUTE not yet performed',
+            'Open / activation pending',
+            'activation remains pending',
+            'blocked until production cutover completes successfully',
+            'blocked until GAP-026B',
+            'merchant shipping blocked until production EXECUTE',
+            'remains blocked until successful production maintenance-window',
+        ];
+
+        foreach ($files as $path) {
+            $content = File::get(base_path($path));
+
+            foreach ($forbiddenPhrases as $phrase) {
+                $this->assertStringNotContainsString(
+                    $phrase,
+                    $content,
+                    "Stale pre-cutover phrase [{$phrase}] found in {$path}",
+                );
+            }
+        }
+    }
+
+    #[Test]
+    public function authoritative_docs_state_4c_1c_2b_authorization_prerequisite_is_satisfied(): void
+    {
+        $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        $this->assertStringContainsString(
+            'GAP-026B authorization prerequisite is now satisfied',
+            $gaps,
+        );
+        $this->assertStringContainsString(
+            '4C-1c-2b Mapping UI authorization prerequisite is satisfied',
+            $gaps,
+        );
+        $this->assertStringNotContainsString(
+            '4C-1c-2b Mapping UI remains blocked until production cutover completes successfully',
+            $gaps,
+        );
+    }
+
+    #[Test]
+    public function deploy_and_gaps_do_not_claim_no_discovery_job_exists_as_current_truth(): void
+    {
+        $deploy = File::get(base_path('DEPLOY.md'));
+        $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        $staleDeployPhrases = [
+            'Future discovery jobs',
+            'installed in Task 4B-2b-1',
+            'Deferred connector-worker installation',
+            'no discovery job exists yet to process',
+            'deferred until Task 4B-2b-1 introduces a discovery job',
+        ];
+
+        foreach ($staleDeployPhrases as $phrase) {
+            $this->assertStringNotContainsString(
+                $phrase,
+                $deploy,
+                "Stale pre-discovery-worker phrase [{$phrase}] found in DEPLOY.md",
+            );
+        }
+
+        $this->assertStringNotContainsString(
+            'deferred until Task 4B-2b-1 introduces a discovery job',
+            $gaps,
+        );
+        $this->assertStringContainsString(
+            'ConnectorDiscoveryRunJob',
+            $gaps,
+        );
+        $this->assertStringContainsString(
+            'Do not claim connector discovery is production-operational until the dedicated worker is installed and verified',
+            $gaps,
+        );
+        $this->assertStringContainsString(
+            'verified absent 2026-08-14',
+            $deploy,
+        );
+        $this->assertStringContainsString(
+            'Discovery jobs use the **connector** lane',
+            $deploy,
+        );
+        $this->assertStringContainsString(
+            '### Connector-worker production activation gap',
+            $deploy,
+        );
+        $this->assertStringContainsString(
+            '4C-1c-2b',
+            $deploy,
+        );
+        $this->assertStringContainsString(
+            '/usr/bin/php',
+            $deploy,
+        );
+    }
+
+    #[Test]
+    public function deploy_records_babypark_pilot_gap_026b_cutover_completion(): void
+    {
+        $deploy = File::get(base_path('DEPLOY.md'));
+
+        $this->assertStringContainsString(
+            'completed successfully on 2026-08-14',
+            $deploy,
+        );
+        $this->assertStringContainsString(
+            'fb2c5a7a3f8a521a2bfca7583e57d1ae83e95bc9',
+            $deploy,
+        );
+        $this->assertStringContainsString('### GAP-026B one-time Workspace RBAC cutover', $deploy);
     }
 
     #[Test]

@@ -358,29 +358,17 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
         $this->assertStringContainsString('EXECUTE mode', $domainB2);
         $this->assertStringContainsString('ConnectorAccountPolicy', $domainB2);
         $this->assertStringContainsString('permission-based safe Connector presentation', $domainB2);
-        $this->assertStringContainsString('maintenance-window cutover deployment', $domainB2);
-        $this->assertStringContainsString('EXECUTE + anti-lockout + smoke succeed', $domainB2);
+        $this->assertStringContainsString('production-activated (2026-08-14)', $domainB2);
+        $this->assertStringContainsString('maintenance-window cutover completed 2026-08-14', $domainB2);
+        $this->assertStringContainsString('4C-1c-2b** may proceed', $domainB2);
 
         $this->assertStringContainsString('EXECUTE command', $gapsB2);
         $this->assertStringContainsString('workspace-rbac:cutover-execute', $gapsB2);
         $this->assertStringContainsString('ConnectorAccountPolicy', $gapsB2);
         $this->assertStringContainsString('maintenance-window cutover', $gapsB2);
+        $this->assertStringContainsString('production-activated (2026-08-14)', $gapsB2);
+        $this->assertStringContainsString('fb2c5a7a3f8a521a2bfca7583e57d1ae83e95bc9', $gapsB2);
 
-        $gapsFile = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
-        $this->assertStringContainsString('EXECUTE + anti-lockout + smoke succeed', $gapsFile);
-
-        foreach ([$domainB2, $gapsB2] as $b2Row) {
-            $this->assertStringContainsString('Connector post-lock dispatch authorization freshness', $b2Row);
-        }
-
-        $this->assertStringContainsString('DB-fresh `WorkspaceAuthorization`', $gapsB2);
-        $this->assertStringContainsString('DB-fresh `WorkspaceAuthorization` effective-permission evaluation', $domainB2);
-        $this->assertStringContainsString('accepted asynchronous revocation boundary', $domainB2);
-        $this->assertStringContainsString('no-`Workspace`-row-mutex', $domainB2);
-        $this->assertStringContainsString('no-`User`-row-mutex', $domainB2);
-
-        $this->assertStringContainsString('repository ready for production cutover', $gapsB2);
-        $this->assertStringContainsString('production EXECUTE not yet performed', $gapsB2);
         $this->assertStringContainsString('do **not** re-authorize the initiating `User` at execution time', $this->cutoverSection());
     }
 
@@ -400,13 +388,13 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
     }
 
     #[Test]
-    public function staging_splits_026b_1_and_026b_2_and_blocks_4c_1c_2b(): void
+    public function staging_splits_026b_1_and_026b_2_and_4c_1c_2b_prerequisite_satisfied(): void
     {
         $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString('CHECK-ONLY mode only', $this->cutoverB1SliceRow());
         $this->assertStringContainsString('EXECUTE mode', $this->cutoverB2SliceRow());
-        $this->assertStringContainsString('4C-1c-2b** may begin', $this->cutoverB2SliceRow());
+        $this->assertStringContainsString('4C-1c-2b** may proceed', $this->cutoverB2SliceRow());
 
         $this->assertStringContainsString('GAP-026B-0 — Workspace RBAC authority cutover contract', $gaps);
         $this->assertStringContainsString('CHECK-ONLY (B-1)', $gaps);
@@ -415,7 +403,8 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
         $this->assertStringContainsString('GAP-026B-1 **Done**', $gaps);
         $this->assertStringContainsString('Part 2 merchant Access/Roles UI', $gaps);
         $this->assertStringContainsString('workspace-rbac:cutover-check', $gaps);
-        $this->assertStringContainsString('blocked until production cutover completes successfully', $gaps);
+        $this->assertStringContainsString('GAP-026B authorization prerequisite is now satisfied', $gaps);
+        $this->assertStringContainsString('GAP-026B (overall)** | **Done**', $gaps);
     }
 
     #[Test]
