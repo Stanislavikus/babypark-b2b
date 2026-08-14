@@ -1002,9 +1002,12 @@ persistence:
 - current `WorkspaceRole` assignments;
 - current canonical `WorkspacePermission` assignments.
 
-GAP-026B-2 implementation should evaluate those authority inputs through one
+GAP-026B-2 implementation **must** evaluate those authority inputs through one
 database-backed effective-permission projection/query rather than trusting
 `User.is_active` from the supplied Eloquent instance.
+
+Authoritative `WorkspaceAuthorization::effectivePermissions()` must **not** rely on a
+sequence of partially stale hydrated-model checks as equivalent compliance.
 
 Connector authorization remains scoped to the explicit `Workspace` and the existing
 `ConnectorAccount` critical section.
@@ -1014,20 +1017,20 @@ Connector authorization remains scoped to the explicit `Workspace` and the exist
 Authorization is a point-in-time post-lock authorization snapshot inside the enqueue
 transaction.
 
-- If revocation/deactivation committed **before** that authorization snapshot, dispatch
-  must fail closed.
-- A revocation committed **after** that authorization snapshot does **not**
-  retroactively cancel an already accepted/enqueued Connector operation.
-- Connector jobs do **not** re-authorize the initiating `User` at execution time in
-  GAP-026B-2.
+- If revocation/deactivation commits **before** the authoritative post-lock authorization
+  snapshot → fail closed.
+- If it commits **after** that snapshot, GAP-026B-2 does **not** require another
+  initiating-actor authorization check before the enqueue transaction commits.
+- The already-authorized in-flight enqueue transaction may complete.
+- Already queued/running Connector work is **not** retroactively cancelled.
+- Connector jobs do **not** re-authorize the initiating `User` at execution time.
 - Results/side effects remain workspace-owned; later merchant visibility remains governed
   by live workspace authorization.
 
-If future product requirements demand cancelling queued/running work when the initiating
-actor loses permission, that requires a new Stop-and-Amend.
+Do **not** call this “authorized as of transaction commit”; no shared serialization lock
+guarantees authority at commit time.
 
-Do **not** describe this as “authorized as of transaction commit”. There is no shared
-serialization lock guaranteeing that.
+Future cancellation-on-revocation remains a new Stop-and-Amend.
 
 **Connector dispatch must not acquire Workspace anti-lockout mutex (frozen)**
 

@@ -288,9 +288,12 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
         $this->assertStringContainsString('`workspace_users.is_active`', $section);
         $this->assertStringContainsString('current `WorkspaceRole` assignments', $section);
         $this->assertStringContainsString('current canonical `WorkspacePermission` assignments', $section);
+        $this->assertStringContainsString('GAP-026B-2 implementation **must** evaluate those authority inputs through one', $section);
         $this->assertStringContainsString('database-backed effective-permission projection/query', $section);
         $this->assertStringContainsString('rather than trusting', $section);
         $this->assertStringContainsString('`User.is_active` from the supplied Eloquent instance', $section);
+        $this->assertStringContainsString('`WorkspaceAuthorization::effectivePermissions()` must **not** rely on a', $section);
+        $this->assertStringContainsString('sequence of partially stale hydrated-model checks as equivalent compliance', $section);
         $this->assertStringContainsString('scoped to the explicit `Workspace`', $section);
     }
 
@@ -301,14 +304,18 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('**Connector dispatch revocation boundary (frozen residual)**', $section);
         $this->assertStringContainsString('point-in-time post-lock authorization snapshot', $section);
-        $this->assertStringContainsString('revocation/deactivation committed **before** that authorization snapshot', $section);
+        $this->assertStringContainsString('commits **before** the authoritative post-lock authorization', $section);
         $this->assertStringContainsString('fail closed', $section);
-        $this->assertStringContainsString('retroactively cancel an already accepted/enqueued Connector operation', $section);
+        $this->assertStringContainsString('commits **after** that snapshot, GAP-026B-2 does **not** require another', $section);
+        $this->assertStringContainsString('initiating-actor authorization check before the enqueue transaction commits', $section);
+        $this->assertStringContainsString('already-authorized in-flight enqueue transaction may complete', $section);
+        $this->assertStringContainsString('Already queued/running Connector work is **not** retroactively cancelled', $section);
         $this->assertStringContainsString('do **not** re-authorize the initiating `User` at execution time', $section);
         $this->assertStringContainsString('live workspace authorization', $section);
-        $this->assertStringContainsString('requires a new Stop-and-Amend', $section);
-        $this->assertStringContainsString('Do **not** describe this as “authorized as of transaction commit”', $section);
-        $this->assertStringContainsString('serialization lock guaranteeing that', $section);
+        $this->assertStringContainsString('Do **not** call this “authorized as of transaction commit”', $section);
+        $this->assertStringContainsString('no shared serialization lock', $section);
+        $this->assertStringContainsString('guarantees authority at commit time', $section);
+        $this->assertStringContainsString('Future cancellation-on-revocation remains a new Stop-and-Amend', $section);
     }
 
     #[Test]
