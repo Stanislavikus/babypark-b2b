@@ -270,31 +270,31 @@ inventing a new mutating domain feature.
 
 ---
 
-## 9. Merchant visibility of not-yet-connected platforms — new, deliberate read path required
+## 9. Merchant visibility of not-yet-connected platforms — merchant-safe catalog projection
 
 **Confirmed:** `ConnectorDefinitionResource::canAccess()` gates on
 `PlatformAdminAuthorization::canManage($user)` — a distinct,
-platform-operator-level check, unrelated to the workspace-scoped
-`ConnectorAccountPolicy::viewAny`/`view` that already grants
-Merchandiser read access to *existing* accounts.
+platform-operator-level check, unrelated to workspace-scoped connector
+authorization for *existing* accounts.
 
-**Rule:** There is currently no merchant-safe read path to "which
-platforms are eligible for `Інтеграції`" at all. This must be built
-as a **new, deliberate, merchant-safe projection** — reading only
-`name`, `code` (internal mapping key, never rendered), and `status`
-filtered per §1's exact eligibility definition (not a bare `status =
-Active` filter — it must also surface a `Deprecated` definition when
-this workspace already holds a non-deleted account against it) — never by
-widening `PlatformAdminAuthorization`
-(which remains the correct, unwidened gate for the real
-`ConnectorDefinitionResource`/`Платформи та джерела` CRUD surface) and
-never by silently inferring this access from `ConnectorAccountPolicy`
-eligibility (which only concerns accounts that already exist). Every
-merchant workspace role that can reach `Інтеграції` at all sees the
-full eligible-platform catalog defined in §1 — visibility here does
-not need per-role restriction beyond that, since a platform card with no
-account carries no sensitive data (see §11's action-boundary rule for
-what *does* still require the existing management-ability check).
+**026B repository status (post-B-2):** merchant-safe eligible-platform
+visibility is implemented via `EligibleConnectorPlatformCatalog` — a deliberate,
+merchant-safe projection reading only `name`, `code` (internal mapping key,
+never rendered), and `status` filtered per §1's exact eligibility definition
+(not a bare `status = Active` filter — it must also surface a `Deprecated`
+definition when this workspace already holds a non-deleted account against it).
+This projection is **separate** from `PlatformAdminAuthorization` (which remains
+the correct, unwidened gate for the real `ConnectorDefinitionResource` /
+`Платформи та джерела` CRUD surface) and is **not** inferred from
+`ConnectorAccountPolicy` eligibility alone (which only concerns accounts that
+already exist). Every merchant workspace membership that can reach `Інтеграції`
+at all sees the full eligible-platform catalog defined in §1 — visibility here
+does not need per-role restriction beyond that, since a platform card with no
+account carries no sensitive data (see §11's action-boundary rule for what *does*
+still require management capability).
+
+**Historical pre-B-2:** before GAP-026B-2, no merchant-safe read path existed;
+that gap motivated this projection and is closed in repository runtime.
 
 ---
 
@@ -356,26 +356,51 @@ Magento          Вимкнено
 
 ---
 
-## 11. Actions and authorization — no new permission model
+## 11. Actions and authorization — frozen workspace permission matrix
 
-**Confirmed:** `ConnectorAccountPolicy` separates `viewAny`/`view`
-(broader "read ability," includes Merchandiser) from `create`/
-`updateSettings`/`runConnectionCheck` (narrower "management ability,"
-excludes Merchandiser); `runDiscovery` has its own independent check
-already including Merchandiser for execution.
+**026B repository status (post-B-2):** connector authorization on this page
+follows the frozen workspace-permission matrix — not Merchandiser/job-title
+semantics. Effective tiers:
 
-**Rule:** A Merchandiser sees every platform card and its true health
-state. `Підключити` (new account) and any settings/reconfiguration
-action inside an account's own page remain gated by the existing
-management-ability check — unchanged, no new rule invented for this
-page. Per the approved contract's "Layer is a ceiling, not a grant"
-principle, Merchandiser reaching this page does not imply Merchandiser
-may perform every action visible on it.
+| Tier | Required workspace permission(s) | Landing behavior |
+|---|---|---|
+| Safe read / discovery-only | `view_connector_accounts` and/or `run_connector_discovery` without `manage_connector_accounts` | Full eligible-platform catalog; true health states; **no** active connection-check/runtime overlay loaded or serialized; **no** management actions |
+| Management | `manage_connector_accounts` | Full catalog; management actions (`Підключити`, settings/reconfiguration); active connection-check/runtime overlay via `ConnectorAccountUiState` where applicable |
 
-**Rule — 0-account and "connect another" states specifically:** a role
-without `create` authorization never sees a disabled `Підключити` /
+`ConnectorAccountPolicy` + `ConnectorAuthorization` evaluate these tiers through
+`WorkspaceAuthorization` — legacy `User.role` labels authorize nothing by
+themselves.
+
+**Connection-check / runtime overlay (management-only):** active connection-check
+state and runtime overlay presentation are **management-only** (`manage_connector_accounts`).
+Safe-read and discovery-only actors must not load or serialize connection-check
+overlay state on the landing surface or per-connection rows.
+
+**Rule:** Actors with safe-read or discovery-only capability see every platform
+card and its true health state. `Підключити` (new account) and any settings/
+reconfiguration action inside an account's own page remain gated by
+`manage_connector_accounts` — unchanged from the approved contract's "Layer is a
+ceiling, not a grant" principle. Reaching this page does not imply management
+capability.
+
+**Rule — 0-account and "connect another" states specifically:** an actor
+without `manage_connector_accounts` never sees a disabled `Підключити` /
 `Підключити ще` button with a tooltip explaining why it's inactive.
-Instead, that role sees explanatory secondary text in its place:
+Instead, that actor sees explanatory secondary text in its place:
+
+```
+Для підключення зверніться до адміністратора
+```
+
+A visibly-present-but-non-functional primary action is worse for a
+non-technical audience than a clear statement of what to do instead.
+This rule applies identically to the 0-account state (§10) and to
+`Підключити ще` inside an N-account platform's own list.
+
+**Historical pre-B-2 (PR #102):** before GAP-026B-2, authorization used fixed
+`User.role` checks (Merchandiser safe read/discovery vs Admin/Director
+management bypass) and `ConnectorAccountMerchandiserPresentation` for safe
+projection — superseded by the matrix above in repository runtime.
 
 ```
 Для підключення зверніться до адміністратора
@@ -457,6 +482,21 @@ unchanged; this is presentation vocabulary only.
    labels/colors use `IntegrationsStatusVocabulary`. No parallel
    runtime-check implementation, and no new aggregate runtime-check
    indicator invented for N-account platform cards.
+4. No Discovery-derived data appears on the landing card (§6) —
+   verified by a rendered-content test.
+5. No freshness/staleness threshold is introduced for `Connected`
+   (§7).
+6. The merchant-safe platform-catalog read path (§9) is implemented as
+   `EligibleConnectorPlatformCatalog` — a reviewed projection separate from
+   widened `PlatformAdminAuthorization` and not inferred from
+   `ConnectorAccountPolicy` alone.
+7. Active connection-check/runtime overlay is loaded and serialized only for
+   actors with `manage_connector_accounts`; safe-read/discovery-only actors
+   receive null overlay state with no connection-check queries on mount.
+8. Authorization and connect-copy behavior follow the frozen workspace
+   permission matrix (§11) — not Merchandiser/job-title semantics; actors
+   without `manage_connector_accounts` receive approved explanatory connect
+   copy instead of management actions.
 9. Merchant setup availability is resolved only via
    `ConnectorProfileRegistry::resolveAccountSetupProfile()` gated on
    `ConnectorCapability::AccountSetup` — no UI-local profile map, no
@@ -464,18 +504,11 @@ unchanged; this is presentation vocabulary only.
 10. Rollup must never treat `is_enabled=true` +
     `connection_status=Disabled` as Connected / "Працює" (defensive
     invariant; no enable/disable write path added — §8 Option B).
-4. No Discovery-derived data appears on the landing card (§6) —
-   verified by a rendered-content test.
-5. No freshness/staleness threshold is introduced for `Connected`
-   (§7).
-6. The merchant-safe platform-catalog read path (§9) is a genuinely
-   new, reviewed projection — not a widened `PlatformAdminAuthorization`
-   check and not inferred from `ConnectorAccountPolicy` alone.
-7. Implementation MUST NOT introduce a new enable/disable action or
+11. Implementation MUST NOT introduce a new enable/disable action or
    write path as part of this page's task (§8's settled Option B) —
    verified by final-diff inspection, not left as an open decision for
    the implementing agent to resolve.
-8. No forbidden vocabulary (per the approved contract's §13) appears
+12. No forbidden vocabulary (per the approved contract's §13) appears
    anywhere on this page, including the 0-account and N-account states
    added here.
 

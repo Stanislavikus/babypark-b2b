@@ -59,7 +59,7 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
         $this->assertStringContainsString('**Status:** Approved page-specific contract', $content);
         $this->assertStringContainsString('platform-first, adaptive destination', $content);
         $this->assertStringContainsString('corrected worst-wins', $content);
-        $this->assertStringContainsString('merchant-safe projection', $content);
+        $this->assertStringContainsString('EligibleConnectorPlatformCatalog', $content);
         $this->assertStringContainsString('Option B', $content);
         $this->assertStringContainsString('AccountSetup', $content);
         $this->assertStringContainsString('connector_definition_code', $content);
@@ -199,10 +199,14 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
             $content,
         );
         $this->assertStringContainsString(
-            'workspace-scoped RBAC foundation (**GAP-026**) is required before mutable Layer-B mapping UI may ship',
+            'mutable Layer-B mapping UI may ship only after verified **GAP-026B-2** repository merge',
             $content,
         );
         $this->assertStringContainsString(
+            'historical pre-B-2 fixed `User.role` authorization satisfies this UX contract',
+            $content,
+        );
+        $this->assertStringNotContainsString(
             'Do **not** claim that current fixed `User.role` authorization already satisfies this UX contract',
             $content,
         );
@@ -240,11 +244,15 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
             $content,
         );
         $this->assertStringContainsString(
+            'Historical pre-B-2:** fixed `User.role` authorization and `ConnectorAccountMerchandiserPresentation`',
+            $content,
+        );
+        $this->assertStringNotContainsString(
             'Current fixed `User.role` authorization is transitional under **GAP-026**',
             $content,
         );
         $this->assertStringContainsString(
-            'Required authorization-foundation work is therefore **not** merely navigation/labeling/gating UI work',
+            'Required authorization-foundation work was therefore **not** merely navigation/labeling/gating UI work',
             $content,
         );
     }

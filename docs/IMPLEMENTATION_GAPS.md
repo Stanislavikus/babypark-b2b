@@ -280,10 +280,13 @@ yet), but should be scheduled before any payment gateway integration work starts
   publication and persistence, discovery-run received/normalized accounting (106
   received / 102 normalized on the committed Magento pilot regression fixture),
   account projection updates after successful discovery, and Discovery Overview UI.
-- `ConnectorAccountMerchandiserPresentation` plus `ConnectorAccountPolicy`
-  updates (PR #102) close the Merchandiser `viewAny()`/`view()` and rendered
-  management-field security gap — `store_code`, `tenant_context`, credentials,
-  and other management-only connector details are not rendered to Merchandiser.
+- **Historical (PR #102, pre-B-2):** `ConnectorAccountMerchandiserPresentation` plus
+  transitional `ConnectorAccountPolicy` fixed-role updates closed the Merchandiser
+  `viewAny()`/`view()` and rendered management-field security gap — `store_code`,
+  `tenant_context`, credentials, and other management-only connector details were
+  not rendered to Merchandiser under pre-B-2 role semantics. **Superseded in
+  repository runtime by GAP-026B-2** (`ConnectorAccountCapabilityPresentation` +
+  workspace-RBAC matrix).
 - Connector-account **creation** and **credential-management/settings UI** remain
   absent (explicitly out of scope for 4B-2a-3).
 - Task 4B-2b Discovery Overview UI (PR #114) delivers Connector Account list
@@ -358,31 +361,35 @@ physical-delete attempts (archive remains valid) are implemented (Task 4C-1b).
 Canonical suggestion/read-model contract is frozen (Task 4C-1c-0, docs only).
 Canonical deterministic suggestion provider/read-model (4C-1c-1) is implemented.
 Workspace access / authorization contract is frozen (4C-1c-2a, docs only).
-Layer B mapping UI (4C-1c-2b) remains unimplemented and is blocked on
-workspace-scoped authorization foundation (see GAP-026). `SyncRun` / execution,
+Layer B mapping UI (4C-1c-2b) remains unimplemented — repository work may begin
+after verified GAP-026B-2 merge; merchant shipping/traffic under new authority
+remains blocked until successful production maintenance-window EXECUTE (see
+GAP-026). `SyncRun` / execution,
 preview, schedule, history, and `ExternalRecordLink` remain unimplemented.
 Connector-account creation and credential-management/settings UI remain absent.
 Task 4B-2c (discovered schema fields / change inspection) and retention jobs
 remain unimplemented.
 
-**ConnectorAccount authorization/rendered-view sub-gap (closed, PR #102 /
-Task 4B-2b-1e+1f):** `ConnectorAccountPolicy` grants Merchandiser
-`viewAny()`/`view()` (safe fields only) and `runDiscovery()` (enabled
-accounts only). Management abilities remain denied to Merchandiser.
-Field-level restrictions enforced via `ConnectorAccountMerchandiserPresentation`:
-query column selection, hidden attributes on Livewire serialization, and
-Filament table/infolist visibility for `store_code`/`tenant_context`.
-Merchandiser detail pages omit connection-check header actions and relation
-managers; `connectionChecks` presentation relations are not loaded.
-Sensitive fields excluded: `credentials`, `settings`, `base_url`,
-`store_code`, `tenant_context`, `auth_profile`. Current code in
-`ConnectorAccountResource`, `ViewConnectorAccount`, and
-`ConnectorAccountPolicy` confirms management-only fields such as `store_code`
-are not rendered to Merchandiser. Tests assert rendered HTML and Livewire
-payload absence, including connection-check management/history surfaces, not
-policy-layer alone.
+**ConnectorAccount authorization/rendered-view sub-gap (closed PR #102 /
+Task 4B-2b-1e+1f; historical pre-B-2 — superseded by GAP-026B-2 repository
+runtime):** transitional pre-B-2 `ConnectorAccountPolicy` granted Merchandiser
+`viewAny()`/`view()` (safe fields only) and `runDiscovery()` (enabled accounts
+only) via fixed `User.role` checks. Management abilities remained denied to
+Merchandiser. Field-level restrictions were enforced via historical
+`ConnectorAccountMerchandiserPresentation`: query column selection, hidden
+attributes on Livewire serialization, and Filament table/infolist visibility for
+`store_code`/`tenant_context`. Merchandiser detail pages omitted connection-check
+header actions and relation managers; `connectionChecks` presentation relations
+were not loaded. Sensitive fields excluded: `credentials`, `settings`,
+`base_url`, `store_code`, `tenant_context`, `auth_profile`. **026B repository
+status (post-B-2):** `ConnectorAccountCapabilityPresentation` applies
+capability-based safe projection from effective workspace permissions; connection-
+check overlay and management surfaces are management-only (`manage_connector_accounts`).
+Production EXECUTE activation remains pending.
 
-**Historical/transitional shipped role matrix (pre-4C-1c-2a current implementation; not normative target authorization; superseded by the GAP-026 workspace-scoped RBAC contract):**
+**Historical shipped role matrix (pre-4C-1c-2a / pre-B-2 transitional
+implementation; not normative target authorization; superseded by GAP-026B-2
+repository workspace-RBAC matrix):**
 
 (confirmed against `App\Enums\UserRole`):
 
@@ -402,8 +409,9 @@ Layer B mapping UI (4C-1c-2b),
 sync execution/preview/schedule/history
 (`SyncRun`, issues, merchant sync UX), `ExternalRecordLink`,
 connector-account creation and credential-management/settings UI.
-Workspace-scoped authorization foundation (GAP-026) is a prerequisite before
-mutable Layer B mapping UI.
+Workspace-scoped authorization foundation (GAP-026) repository runtime is
+**Implemented** (GAP-026B-2); production EXECUTE activation remains pending before
+mutable Layer B mapping UI may ship to merchant traffic.
 
 ### Classification after Sync UX / Domain Rebaseline (documentation pass)
 
@@ -480,8 +488,9 @@ Next task: Task 4B-2c — discovered schema fields / change inspection.
 
 **Task 4B-2b note (added 2026-08-07):** PR #102 merged queued discovery
 execution (`ConnectorDiscoveryRunJob`), the dispatch/persistence execution
-chain, Adobe discovery execution, account projection updates, and Merchandiser
-authorization/presentation closure (`ConnectorAccountMerchandiserPresentation`).
+chain, Adobe discovery execution, account projection updates, and historical
+pre-B-2 Merchandiser authorization/presentation closure
+(`ConnectorAccountMerchandiserPresentation` — superseded by GAP-026B-2).
 Earlier PRs #98–#101 delivered discovery runtime Stop-and-Amend, normalization,
 error vocabulary, and canonical hashing groundwork; PR #96/#4B-2b-0 added the
 `database_connectors` lane. PR #105 corrected received-vs-normalized discovery
@@ -989,14 +998,16 @@ Remaining connector gaps are tracked separately under GAP-006.
 - **Shipped runtime/read architecture (not a regression):** `ConnectorCapability`,
   Discovery execution, snapshot persistence, and Field Browser read-model
   architecture are shipped.
-- **Shipped but transitional authorization:** current `ConnectorAccountPolicy` is
-  also shipped, but its fixed `User.role` authorization behavior is transitional
-  under **GAP-026** — not normative target authorization.
+- **026B repository authorization (post-B-2):** `ConnectorAccountPolicy` +
+  `ConnectorAuthorization` evaluate the frozen workspace-permission matrix via
+  `WorkspaceAuthorization` — not fixed `User.role` semantics. Historical pre-B-2
+  fixed-role behavior is transitional evidence under **GAP-026** / PR #102 only.
 - **Remaining GAP-025 UX work:** copy/navigation/Layer-C gating/deeper Layer A/B
   surfaces.
-- **Separate prerequisite:** workspace-scoped authorization foundation is
-  **GAP-026** backend/security work and remains prerequisite for mutable Layer-B
-  mapping — it is not merely labeling/navigation/gating UI work.
+- **Separate prerequisite:** mutable Layer-B mapping UI (4C-1c-2b) — repository
+  work may proceed after verified GAP-026B-2 merge; merchant shipping/traffic
+  under new authority remains blocked until successful production maintenance-window
+  EXECUTE (GAP-026).
 
 **Implemented sync-domain backend (verified on `develop`; not a GAP-025 UX claim):**
 - `SyncConfiguration` persistence and domain write path (Task 4C-0).
@@ -1005,8 +1016,8 @@ Remaining connector gaps are tracked separately under GAP-006.
 - Canonical deterministic suggestion/read-model provider (Task 4C-1c-1).
 
 **Still absent in code (docs settled; runtime or UI missing):**
-- Layer B mapping UI (Task 4C-1c-2b) — blocked on workspace-scoped authorization
-  foundation (GAP-026);
+- Layer B mapping UI (Task 4C-1c-2b) — repository work may proceed after
+  verified GAP-026B-2 merge; merchant shipping blocked until production EXECUTE;
 - `SyncRun` / `SyncRunItem` persistence and execution runtime;
 - `ExternalRecordLink`;
 - sync execution runtime for merchant "Синхронізувати зараз";

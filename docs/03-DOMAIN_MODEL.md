@@ -4070,18 +4070,23 @@ especially `view_connector_accounts`, `run_connector_discovery`, and
   permission slice and requires its own future workspace-permission decision when
   scheduling ships.
 
-**Transitional current code (GAP-026 — not normative):**
+**Historical pre-B-2 shipped authorization (GAP-026 — not normative):**
 
-The shipped `ConnectorAccountPolicy` on `develop` still grants some connector
-abilities via fixed `User.role` checks (for example Merchandiser read/discovery,
-Admin/Director management bypass). That behavior is documented under **GAP-026**
-as transitional implementation mismatch only — it is **not** the target
-authorization contract and must not be extended.
+Before **GAP-026B-2**, the repository shipped `ConnectorAccountPolicy` that granted
+some connector abilities via fixed `User.role` checks (for example Merchandiser
+read/discovery, Admin/Director management bypass) and applied safe presentation
+through transitional `ConnectorAccountMerchandiserPresentation`. That pre-B-2
+behavior was transitional implementation mismatch only — it was **not** the target
+authorization contract and must not be extended or reintroduced.
 
-After GAP-026B authority cutover, normative connector authorization and safe
-presentation follow **Workspace RBAC authority cutover (Resolved — GAP-026B-0,
-2026-08-13)** — permission matrix, capability-based presentation invariant, and
-removal of `WorkspaceMembership` as an additional connector gate.
+**026B repository status (post-B-2):** connector authorization and safe presentation
+in the repository now follow **Workspace RBAC authority cutover (Resolved —
+GAP-026B-0, 2026-08-13)** — the frozen workspace-permission matrix via
+`ConnectorAuthorization` / `WorkspaceAuthorization`, capability-based presentation
+through `ConnectorAccountCapabilityPresentation`, and removal of
+`WorkspaceMembership` as an additional connector gate. **Production activation**
+of that authority switch remains pending maintenance-window **EXECUTE** — merging
+B-2 code is not itself production cutover.
 
 ### Connection-check capability and error mapping (Resolved)
 
@@ -4257,8 +4262,9 @@ recovery — lifecycle codes never overwrite it.
 
 #### Authorization and projection
 
-- `ConnectorAccountPolicy::runConnectionCheck()` — dedicated ability (currently
-  delegates to the same workspace/role rules as `view()`); dispatch uses
+- `ConnectorAccountPolicy::runConnectionCheck()` — dedicated ability; **management-only**
+  via `manage_connector_accounts` through `ConnectorAuthorization` /
+  `WorkspaceAuthorization` (not discovery-only or safe-read tiers). Dispatch uses
   `Gate::forUser($actor)->authorize('runConnectionCheck', $account)`.
 - Account projection mapping on terminal **vendor** outcomes:
 

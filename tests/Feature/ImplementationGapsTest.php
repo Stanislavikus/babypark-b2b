@@ -60,17 +60,22 @@ class ImplementationGapsTest extends TestCase
     }
 
     #[Test]
-    public function gap_025_marks_connector_account_authorization_as_transitional_under_gap_026(): void
+    public function gap_025_marks_connector_account_authorization_as_post_b2_repository_runtime(): void
     {
         $content = $this->gap025Section();
 
-        $this->assertStringContainsString('**Shipped but transitional authorization:**', $content);
+        $this->assertStringContainsString('**026B repository authorization (post-B-2):**', $content);
         $this->assertStringContainsString(
-            'fixed `User.role` authorization behavior is transitional',
+            'evaluate the frozen workspace-permission matrix via',
             $content,
         );
+        $this->assertStringContainsString('Historical pre-B-2', $content);
         $this->assertStringContainsString(
-            'under **GAP-026** — not normative target authorization',
+            'fixed-role behavior is transitional evidence under **GAP-026** / PR #102 only',
+            $content,
+        );
+        $this->assertStringNotContainsString(
+            '**Shipped but transitional authorization:**',
             $content,
         );
         $this->assertStringNotContainsString(
@@ -78,11 +83,11 @@ class ImplementationGapsTest extends TestCase
             $content,
         );
         $this->assertStringContainsString(
-            '**GAP-026** backend/security work and remains prerequisite for mutable Layer-B',
+            'work may proceed after verified GAP-026B-2 merge',
             $content,
         );
         $this->assertStringContainsString(
-            'not merely labeling/navigation/gating UI work',
+            'under new authority remains blocked until successful production maintenance-window',
             $content,
         );
         $this->assertStringNotContainsString(
@@ -105,7 +110,15 @@ class ImplementationGapsTest extends TestCase
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString(
-            '**Historical/transitional shipped role matrix (pre-4C-1c-2a current implementation; not normative target authorization; superseded by the GAP-026 workspace-scoped RBAC contract):**',
+            '**Historical shipped role matrix (pre-4C-1c-2a / pre-B-2 transitional',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'superseded by GAP-026B-2',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'repository workspace-RBAC matrix):**',
             $content,
         );
         $this->assertStringContainsString('| Admin | Yes | Yes (enabled accounts) | Yes |', $content);
