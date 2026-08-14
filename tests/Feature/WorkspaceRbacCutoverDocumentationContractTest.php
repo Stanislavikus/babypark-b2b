@@ -341,12 +341,9 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
 
         $accessSection = substr($section, $antiLockoutPos);
 
-        $this->assertStringContainsString('**current implementation (pre-B-2):**', $accessSection);
-        $this->assertStringContainsString('`WorkspaceAuthorization::activeMembership()` reads', $accessSection);
-        $this->assertStringContainsString('`users.is_active` from the passed `User` model instance', $accessSection);
-        $this->assertStringContainsString('**GAP-026B-2 requirement:**', $accessSection);
-        $this->assertStringContainsString('stale-model dependency', $accessSection);
-        $this->assertStringContainsString('database-backed projection/query', $accessSection);
+        $this->assertStringContainsString('**post-B-2 repository implementation:**', $accessSection);
+        $this->assertStringContainsString('database-backed projection', $accessSection);
+        $this->assertStringContainsString('not from the supplied Eloquent `User` instance', $accessSection);
         $this->assertStringContainsString('Access post-lock fresh `User` reload by stable ID remains required', $accessSection);
         $this->assertStringContainsString('removed merely because the central authorization query becomes DB-backed', $accessSection);
         $this->assertStringContainsString('`WorkspaceAccessMutationCoordinator` acquires the explicit `Workspace` row mutex', $accessSection);

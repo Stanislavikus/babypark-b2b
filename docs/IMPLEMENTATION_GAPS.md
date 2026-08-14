@@ -1146,25 +1146,28 @@ not alone make every legacy User mutation anti-lockout-safe.
 `PlatformAdminAuthorization` and `/cabinet` (`Customer` principal) remain outside
 GAP-026 workspace RBAC.
 
-**Verified current-code state (post GAP-026A-1):**
-- `App\Services\Workspace\WorkspaceAuthorization` implements explicit read-only
-  workspace permission evaluation (`allows`, `effectivePermissions`, `activeMembership`)
-  without `WorkspaceContext`, `WorkspaceMembership`, `User.role`, or Spatie.
+**Verified current-code state (post GAP-026B-2 repository implementation):**
+- `App\Services\Workspace\WorkspaceAuthorization` implements DB-backed effective-permission
+  projection (`allows`, `effectivePermissions`, `activeMembership`) without trusting
+  hydrated `User` state for authority inputs.
 - Five RBAC tables exist with composite workspace guards and RESTRICT semantics;
   `WorkspaceUser`, `WorkspaceRole`, `WorkspacePermission` models do **not** use
   `BelongsToWorkspace`.
 - `WorkspaceRbacPermissionSeeder` idempotently seeds all seven atomic permissions
   into `workspace_permissions`. Legacy `WorkspacePermissionSeeder` still seeds
-  Spatie `web`-guard permissions for transitional production authorization.
+  Spatie `web`-guard permissions for transitional production authorization outside
+  cut-over domains.
 - No production RBAC membership/role assignments are seeded by `DatabaseSeeder`.
-- **Still transitional (026B cutover required):** `User.role` participates directly
-  in authorization — e.g. `ConnectorAccountPolicy` and
-  `WorkspaceTaxSettingsAuthorization` still use legacy role/Spatie checks.
-- `WorkspaceMembership` still uses the MVP default-workspace shortcut; authoritative
-  membership for policies is **not** switched to `WorkspaceUser` until 026B.
+- **Cut-over domains in repository runtime (B-2):** `ConnectorAccountPolicy` +
+  `ConnectorAuthorization`; `ConnectorAccountCapabilityPresentation`; Integrations and
+  `ListPlatformConnections` runtime-overlay gating; `WorkspaceTaxSettingsAuthorization`
+  + write-time tax reauthorization; `FieldMappingAuthorizationService` outer seam;
+  redundant Connector `WorkspaceMembership` gates removed in B-2 scope.
+- `workspace-rbac:cutover-execute` command implemented; **production EXECUTE not yet
+  performed** — environment activation pending maintenance-window cutover.
+- `User.role` remains transitional for GAP-027 / platform surfaces outside cut-over
+  domains; it has **no** connector/tax/mapping/access authorization effect in B-2 paths.
 - Spatie Teams remains **disabled** — `config/permission.php` → `'teams' => false`.
-- Connector/mapping/tax **policy cutover** to `WorkspaceAuthorization` is **not**
-  done; workspace RBAC is not yet authoritative for merchant authorization.
 
 **Impact:**
 - Do not treat the current global Spatie configuration as satisfying the
