@@ -43,6 +43,13 @@ class ViewConnectorAccount extends ViewRecord
         $workspace = $this->presentationWorkspace();
         $presentation = app(ConnectorAccountCapabilityPresentation::class);
 
+        if ($presentation->showActiveConnectionCheck($user, $workspace)) {
+            $disabledReason = app(ConnectorAccountUiState::class)
+                ->manualCheckActionState($this->record)['disabled_reason'];
+
+            return filled($disabledReason) ? $disabledReason : null;
+        }
+
         if ($presentation->showDiscoveryExecution($user, $workspace)) {
             if (! config('connectors.discovery.manual_trigger_enabled')) {
                 return null;
@@ -50,13 +57,6 @@ class ViewConnectorAccount extends ViewRecord
 
             $disabledReason = app(ConnectorAccountUiState::class)
                 ->manualDiscoveryActionState($this->record)['disabled_reason'];
-
-            return filled($disabledReason) ? $disabledReason : null;
-        }
-
-        if ($presentation->showActiveConnectionCheck($user, $workspace)) {
-            $disabledReason = app(ConnectorAccountUiState::class)
-                ->manualCheckActionState($this->record)['disabled_reason'];
 
             return filled($disabledReason) ? $disabledReason : null;
         }

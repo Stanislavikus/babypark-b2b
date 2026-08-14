@@ -61,6 +61,149 @@ class ConnectorAccountCapabilityPresentationTest extends TestCase
         return $user;
     }
 
+    private function viewOnlyActor(): User
+    {
+        $user = $this->createStaffUser(UserRole::Manager);
+        $this->grantConnectorView($this->defaultWorkspace(), $user);
+
+        return $user;
+    }
+
+    #[Test]
+    public function manager_with_manage_and_discovery_capabilities_prefers_connection_check_subheading(): void
+    {
+        config(['connectors.discovery.manual_trigger_enabled' => true]);
+
+        $manager = $this->createStaffUserWithConnectorManage(UserRole::Manager);
+        $account = $this->createConnectorAccount(overrides: [
+            'is_enabled' => true,
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+        ]);
+
+        $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Running);
+
+        $detailComponent = Livewire::actingAs($manager)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSuccessful();
+
+        $expectedReason = __('connectors.ui.disabled_reasons.check_already_active');
+        $discoveryReason = __('connectors.ui.disabled_reasons.discovery_already_active');
+
+        $this->assertSame($expectedReason, $detailComponent->instance()->getSubheading());
+        $this->assertNotSame($discoveryReason, $detailComponent->instance()->getSubheading());
+    }
+
+    #[Test]
+    public function discovery_only_actor_shows_discovery_disabled_subheading(): void
+    {
+        config(['connectors.discovery.manual_trigger_enabled' => true]);
+
+        $actor = $this->discoveryActor();
+        $account = $this->createConnectorAccount(overrides: [
+            'is_enabled' => false,
+            'auth_profile' => 'adobe_commerce_paas_oauth1_integration',
+        ]);
+
+        $detailComponent = Livewire::actingAs($actor)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSuccessful();
+
+        $this->assertSame(
+            __('connectors.ui.disabled_reasons.account_disabled'),
+            $detailComponent->instance()->getSubheading(),
+        );
+    }
+
+    #[Test]
+    public function view_only_actor_has_no_management_or_discovery_subheading(): void
+    {
+        config(['connectors.discovery.manual_trigger_enabled' => true]);
+
+        $viewer = $this->viewOnlyActor();
+        $account = $this->createConnectorAccount(overrides: [
+            'is_enabled' => false,
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+        ]);
+
+        $detailComponent = Livewire::actingAs($viewer)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSuccessful();
+
+        $this->assertNull($detailComponent->instance()->getSubheading());
+    }
+
+    #[Test]
+    public function view_only_actor_list_and_detail_hide_sensitive_fields_without_management_surfaces(): void
+    {
+        $viewer = $this->viewOnlyActor();
+        $account = $this->createConnectorAccount(overrides: [
+            'base_url' => 'https://secret-shop.example.com',
+            'store_code' => 'secret-store',
+            'tenant_context' => 'secret-tenant',
+            'auth_profile' => 'adobe_commerce_paas_oauth1_integration',
+            'credentials' => AdobePaaSCredentialMapper::toStorageArray(
+                new OAuth1Credentials(
+                    'ck_'.self::CREDENTIAL_CANARY,
+                    'cs_'.self::CREDENTIAL_CANARY,
+                    'at_'.self::CREDENTIAL_CANARY,
+                    'ts_'.self::CREDENTIAL_CANARY,
+                ),
+            ),
+            'settings' => ['secret_setting' => self::SETTINGS_CANARY],
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+        ]);
+
+        $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Running, [
+            'technical_summary' => 'SECRET_RUNTIME_SUMMARY',
+        ]);
+
+        $listComponent = Livewire::actingAs($viewer)
+            ->test(ListConnectorAccounts::class)
+            ->assertCanSeeTableRecords([$account]);
+
+        $detailComponent = Livewire::actingAs($viewer)
+            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
+            ->assertSuccessful();
+
+        $canaries = [
+            self::CREDENTIAL_CANARY,
+            self::SETTINGS_CANARY,
+            'secret-shop.example.com',
+            'SECRET_RUNTIME_SUMMARY',
+            'runConnectionCheck',
+            'runDiscovery',
+            'connectionChecks',
+            'ConnectionChecksRelationManager',
+        ];
+
+        $this->assertNoCanariesInSurface(
+            $canaries,
+            $listComponent->html(),
+            json_encode($listComponent->snapshot, JSON_THROW_ON_ERROR),
+            json_encode($listComponent->effects, JSON_THROW_ON_ERROR),
+            $detailComponent->html(),
+            json_encode($detailComponent->snapshot, JSON_THROW_ON_ERROR),
+            json_encode($detailComponent->effects, JSON_THROW_ON_ERROR),
+        );
+
+        $headerActions = (new \ReflectionMethod(ViewConnectorAccount::class, 'getHeaderActions'))
+            ->invoke($detailComponent->instance());
+        $relationManagers = (new \ReflectionMethod(ViewConnectorAccount::class, 'getAllRelationManagers'))
+            ->invoke($detailComponent->instance());
+
+        $this->assertSame([], $headerActions);
+        $this->assertSame([DiscoveryRunsRelationManager::class], $relationManagers);
+        $this->assertNull($detailComponent->instance()->getSubheading());
+
+        $connectionCheckQueries = $this->captureConnectionCheckQueriesDuring(function () use ($viewer, $account): void {
+            Livewire::actingAs($viewer)
+                ->test(ListConnectorAccounts::class)
+                ->assertCanSeeTableRecords([$account]);
+        });
+
+        $this->assertSame([], $connectionCheckQueries);
+    }
+
     #[Test]
     public function discovery_actor_can_reach_list_and_view_enabled_account(): void
     {
