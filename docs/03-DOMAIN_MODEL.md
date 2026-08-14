@@ -979,8 +979,8 @@ semantics by themselves.
 **026B repository status (post-B-2 implementation):** `ConnectorAccountPolicy` and
 `ConnectorAuthorization` evaluate the workspace-RBAC matrix above via
 `WorkspaceAuthorization`. Legacy `User.role` labels have no connector authorization
-semantics in cut-over paths. Production environment activation still requires the
-maintenance-window EXECUTE cutover — repository runtime ≠ production activation.
+semantics in cut-over paths. Babypark pilot production cutover completed
+2026-08-14 (see GAP-026B in `IMPLEMENTATION_GAPS.md`).
 
 **Connector dispatch authorization freshness (frozen)**
 
@@ -1392,7 +1392,7 @@ cutover**.
 | Slice | Future runtime scope |
 |---|---|
 | **GAP-026B-1 — Access & Cutover Machinery** | Guarded cutover command/service: **CHECK-ONLY mode only** (diagnostics; no RBAC assignment/materialization). Access/Roles application write services; existing-membership role assignment/removal; membership activate/deactivate; role create/rename/permission edit/safe unused-role delete; merchant Access/Roles UI; global `User` deactivation integrity service; hard-delete guard; CHECK-ONLY cutover/runbook tests. **Explicitly no** connector/tax policy authority switch. **B-1-only release must not ship an executable production EXECUTE mode** — no production legacy membership/role backfill in a B-1-only deployment. |
-| **GAP-026B-2 — Authority & Presentation Cutover** | **EXECUTE mode** of the guarded cutover command/service (production legacy assignment materialization). `ConnectorAccountPolicy` migration; remove legacy `WorkspaceMembership` from connector authority paths; permission-based safe Connector presentation; merchant Integrations/catalog gating migration; tax authorization migration + write-time reauthorization; Mapping authorization seam; DB-fresh `WorkspaceAuthorization` effective-permission evaluation (persistence-backed authority inputs, not hydrated `User` state); Connector post-lock dispatch authorization freshness; accepted asynchronous revocation boundary (post-snapshot enqueue is not retroactively cancelled); explicit no-`Workspace`-row-mutex / no-`User`-row-mutex rule for Connector dispatch; cross-workspace + safe-state + Livewire serialization regressions; EXECUTE cutover/runbook tests. First production deployment containing B-2 must be the maintenance-window cutover deployment; merchant traffic stays blocked until EXECUTE + anti-lockout + smoke succeed. After B-2 implementation is merged and verified, repository development of **4C-1c-2b** may begin. An environment must execute EXECUTE during that cutover before serving new authority / Mapping UI to merchant traffic. |
+| **GAP-026B-2 — Authority & Presentation Cutover** | **Done / production-activated (2026-08-14).** EXECUTE mode of the guarded cutover command/service (production legacy assignment materialization). `ConnectorAccountPolicy` migration; remove legacy `WorkspaceMembership` from connector authority paths; permission-based safe Connector presentation; merchant Integrations/catalog gating migration; tax authorization migration + write-time reauthorization; Mapping authorization seam; DB-fresh `WorkspaceAuthorization` effective-permission evaluation (persistence-backed authority inputs, not hydrated `User` state); Connector post-lock dispatch authorization freshness; accepted asynchronous revocation boundary (post-snapshot enqueue is not retroactively cancelled); explicit no-`Workspace`-row-mutex / no-`User`-row-mutex rule for Connector dispatch; cross-workspace + safe-state + Livewire serialization regressions; EXECUTE cutover/runbook tests. Babypark pilot maintenance-window cutover completed 2026-08-14. After verified production EXECUTE, repository development of **4C-1c-2b** may proceed — authorization prerequisite satisfied. |
 
 This separates repository implementation readiness from environment production
 activation.
