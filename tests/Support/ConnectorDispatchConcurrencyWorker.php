@@ -66,6 +66,9 @@ function configureConnectorDispatchTestEnvironment(bool $discovery = false): voi
     if ($discovery) {
         Config::set('connectors.discovery.manual_trigger_enabled', true);
     }
+
+    // Prevent sync-queue inline job execution (HTTP hangs) in child worker processes.
+    Config::set('queue.default', 'database');
 }
 
 function runAccountLockA(string $accountId, string $ipcDir): void
