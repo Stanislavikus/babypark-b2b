@@ -155,7 +155,19 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $gap006 = $this->gap006Section();
 
-        $this->assertStringContainsString('Next task: Task 4B-2c', $gap006);
+        $this->assertStringContainsString(
+            '**Historical (Task 4B-2-0 sequencing, pre-connector-worker activation):** Next task',
+            $gap006
+        );
+        $this->assertStringContainsString('Task 4B-2c', $gap006);
+        $this->assertStringContainsString(
+            '**Current next repository implementation task:** Task **4C-1c-2b**',
+            $gap006
+        );
+        $this->assertStringNotContainsString(
+            "\nNext task: Task 4B-2c",
+            $gap006
+        );
         $this->assertMatchesRegularExpression(
             '/discovered schema fields.*change inspection|change inspection.*discovered schema fields/si',
             $gap006
@@ -341,9 +353,12 @@ class ConnectorAccountDocumentationTest extends TestCase
         $this->assertStringContainsString('**Task 4B-2b-0 note (added 2026-07-29):**', $gap006);
         $this->assertStringContainsString('database_connectors', $gap006);
         $this->assertStringContainsString('ConnectorDiscoveryRunJob', $gap006);
-        $this->assertStringContainsString('verified absent on 2026-08-14', $gap006);
         $this->assertStringContainsString(
-            'Do not claim connector discovery is production-operational until the dedicated worker is installed and verified',
+            'Connector-worker production activation sub-gap (closed 2026-08-15)',
+            $gap006
+        );
+        $this->assertStringContainsString(
+            'production-operational on the Babypark pilot',
             $gap006
         );
         $this->assertStringNotContainsString(
@@ -663,7 +678,8 @@ class ConnectorAccountDocumentationTest extends TestCase
         $this->assertStringContainsString('SaaS `Store`-header vs `store_code` reuse (B3)', $gaps);
         $this->assertStringContainsString('The B9 repository implementation and host-prerequisite verification are', $gaps);
         $this->assertStringContainsString('complete: this PR adds `php artisan queue:restart` to `deploy.sh`', $gaps);
-        $this->assertStringContainsString('babypark-connector-queue` remains intentionally uninstalled on the Babypark pilot host (verified absent 2026-08-14)', $gaps);
+        $this->assertStringContainsString('Connector-worker production activation sub-gap (closed 2026-08-15)', $gaps);
+        $this->assertStringContainsString('**Historical (verified absent 2026-08-14; closed 2026-08-15):** dedicated', $gaps);
         $this->assertStringContainsString('**GAP-024**', $gaps);
         $this->assertStringContainsString('is now **closed**', $gaps);
     }
@@ -884,7 +900,10 @@ class ConnectorAccountDocumentationTest extends TestCase
             'proposed operational values, not a pre-existing external standard',
             $techStack
         );
-        $this->assertStringContainsString('**Discovery worker activation gate:**', $techStack);
+        $this->assertStringContainsString(
+            '**Discovery worker activation gate (Babypark pilot):** closed 2026-08-15',
+            $techStack
+        );
 
         $gap006 = $this->gap006Section();
         $this->assertStringContainsString('ConnectorAccount authorization/rendered-view sub-gap (closed', $gap006);
@@ -1150,6 +1169,14 @@ class ConnectorAccountDocumentationTest extends TestCase
             $techStack
         );
         $this->assertStringContainsString('Post-merge activation runbook', $techStack);
+        $this->assertStringContainsString(
+            'generic — other/target environments; Babypark pilot completed 2026-08-15',
+            $techStack
+        );
+        $this->assertStringNotContainsString(
+            'program on the pilot host.',
+            $techStack
+        );
         $this->assertStringContainsString('babypark-connector-queue', $techStack);
         $this->assertStringContainsString("'connection_check'", $connectorsConfig);
         $this->assertStringContainsString("'schema_discovery'", $connectorsConfig);

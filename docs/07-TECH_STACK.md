@@ -407,28 +407,25 @@ in `docker/php/Dockerfile`; `cache_locks` table from standard cache migration.
 `retry_after` = 1200s (`CONNECTOR_QUEUE_RETRY_AFTER`); `ConnectorDiscoveryRunJob`
 on queue `connectors`; dedicated worker command
 `php artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600`
-(`connector-queue` service in `docker-compose.yml`; planned
-`babypark-connector-queue` Supervisor program for the pilot host).
+(`connector-queue` service in `docker-compose.yml`; `babypark-connector-queue`
+Supervisor program on the Babypark pilot host — verified `RUNNING` 2026-08-15).
 Production Supervisor, PHP path, pcntl availability, and the active
 `database` cache/lock store were verified on the pilot host. Application
-code now includes a real discovery job — implementing that job,
-docker-compose support, local/testing smoke tooling, or committed Supervisor
-guidance does **not** by itself establish permanent production Supervisor
-activation. The dedicated `babypark-connector-queue` permanent production
-worker remains a separate activation/readiness gate until confirmed
-`RUNNING` on the pilot host via `supervisorctl status`. Connection-check
+code includes a real discovery job. Permanent production Supervisor activation
+on the Babypark pilot completed 2026-08-15 — see `DEPLOY.md`. Connection-check
 connection, queue, timeout (45s), and lock `expireAfter` (120s) are
 **unchanged**. Repo-root
 `deploy.sh` runs `php artisan queue:restart` after `optimize:clear`; that signal
 requires the verified shared `database` cache store and
-Supervisor `autorestart=true` on each worker program.
+Supervisor `autorestart=true` on each worker program (verified for both workers
+2026-08-15).
 
-**Discovery worker activation gate:** The manual discovery trigger must not
-be enabled in production until `babypark-connector-queue` is confirmed
-`RUNNING` via `supervisorctl status`. Task 4B-2b-1's own delivery must
-include an explicit post-merge activation runbook (install/reread/update/start,
-plus an end-to-end smoke discovery run) as a separate, human-executed
-step — not silent deployment alongside the feature merge.
+**Discovery worker activation gate (Babypark pilot):** closed 2026-08-15.
+`CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=true` was enabled in production only
+after `babypark-connector-queue` was confirmed `RUNNING` via
+`supervisorctl status`, followed by one successful end-to-end manual Discovery from
+the admin UI. See `DEPLOY.md` for production evidence. The post-merge activation
+runbook below remains the reference for other environments.
 
 **Activation config flag (Task 4B-2b-1b):** `config/connectors.php` exposes
 `discovery.manual_trigger_enabled`, backed by
@@ -454,15 +451,15 @@ dispatch-service call cannot bypass the UI gate:
    the application exception class is added in Task 4B-2b-1). No
    `ConnectorDiscoveryRun` row is created and no HTTP call is made.
 
-**Post-merge activation runbook (Task 4B-2b-1 delivery — not executed in
-4B-2b-1b):**
+**Post-merge activation runbook (generic — other/target environments; Babypark pilot completed 2026-08-15, see `DEPLOY.md`):**
 
 1. Install/reread/update/start the Supervisor `babypark-connector-queue`
-   program on the pilot host.
+   program on the **target** host (not applicable to the Babypark pilot — already
+   activated).
 2. Confirm `supervisorctl status` shows `babypark-connector-queue` as
    `RUNNING`.
-3. Set `CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=true` in production
-   environment.
+3. Set `CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=true` in the target
+   production environment only after step 2 succeeds.
 4. Run `php artisan config:cache` (or the project's equivalent deploy step).
 5. Execute one end-to-end smoke discovery from the admin UI.
 6. Verify resulting queue/run/snapshot state.

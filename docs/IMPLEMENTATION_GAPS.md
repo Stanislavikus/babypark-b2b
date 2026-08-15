@@ -363,7 +363,10 @@ Canonical deterministic suggestion provider/read-model (4C-1c-1) is implemented.
 Workspace access / authorization contract is frozen (4C-1c-2a, docs only).
 Layer B mapping UI (4C-1c-2b) remains unimplemented — the GAP-026B
 authorization prerequisite is now satisfied (Babypark pilot production cutover
-completed 2026-08-14); repository implementation may proceed. `SyncRun` / execution,
+completed 2026-08-14); repository implementation may proceed. Connector Discovery
+is production-operational on the Babypark pilot (dedicated
+`babypark-connector-queue` worker verified `RUNNING` and one successful manual UI
+Discovery completed 2026-08-15). `SyncRun` / execution,
 preview, schedule, history, and `ExternalRecordLink` remain unimplemented.
 Connector-account creation and credential-management/settings UI remain absent.
 Task 4B-2c (discovered schema fields / change inspection) and retention jobs
@@ -386,6 +389,21 @@ capability-based safe projection from effective workspace permissions; connectio
 check overlay and management surfaces are management-only (`manage_connector_accounts`).
 Production EXECUTE activation completed on Babypark pilot 2026-08-14 (see GAP-026B).
 
+**Connector-worker production activation sub-gap (closed 2026-08-15):** permanent
+Supervisor program `babypark-connector-queue` installed and verified `RUNNING` on
+the Babypark pilot host; dedicated command
+`/usr/bin/php /var/www/babypark-b2b/artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600`;
+`babypark-queue` remains separately `RUNNING`; `php artisan queue:restart`
+verified both workers exit/restart with new PIDs; manual Discovery enabled only
+after worker verification (`CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=true`);
+one real merchant UI manual Adobe Commerce Discovery succeeded
+(`RUN=a281b181-f478-4b0b-8c7d-295c26265020`, `SNAPSHOT=a281b185-7618-4ce1-9c48-9ba5c8c87fca`,
+`STATUS=succeeded`, `CONNECTOR_JOBS=0`, `FAILED_JOBS=0`); worker log recorded
+`ConnectorDiscoveryRunJob ... DONE`. **Historical:** worker verified absent
+2026-08-14 before installation. See `DEPLOY.md` → Connector-worker production
+activation (completed 2026-08-15). **GAP-006 overall remains Open** — this
+closure records only the Babypark pilot production worker activation gate.
+
 **Historical shipped role matrix (pre-4C-1c-2a / pre-B-2 transitional
 implementation; not normative target authorization; superseded by GAP-026B-2
 repository workspace-RBAC matrix):**
@@ -404,7 +422,7 @@ repository workspace-RBAC matrix):**
 
 **GAP-006 overall remains Open.** Remaining scope: Task 4B-2c (discovered
 schema fields / change inspection), retention/pruning (4B-2d),
-Layer B mapping UI (4C-1c-2b),
+Layer B mapping UI (4C-1c-2b) — **next repository implementation task**,
 sync execution/preview/schedule/history
 (`SyncRun`, issues, merchant sync UX), `ExternalRecordLink`,
 connector-account creation and credential-management/settings UI.
@@ -477,14 +495,20 @@ Verified on 2026-07-31 (pilot host):
 - `lock_connection=null` resolves to the cache store's default DB connection (confirmed directly from the installed `laravel/framework` v11.54.0 source, `Illuminate\Cache\CacheManager::createDatabaseDriver`);
 - `lock_table=null` resolves to `cache_locks` (same source);
 - `cache` and `cache_locks` tables confirmed present with their expected structures (`key`/`value`/`expiration` and `key`/`owner`/`expiration`);
-- dedicated `babypark-connector-queue` remains intentionally uninstalled on the Babypark pilot host (verified absent 2026-08-14). Discovery job/runtime and `database_connectors` / `connectors` lane exist in application code (PR #102); permanent production Supervisor activation is a current operational gap/gate — not deferred because no discovery job exists.
+- **Historical (verified absent 2026-08-14; closed 2026-08-15):** dedicated
+  `babypark-connector-queue` was intentionally uninstalled on the Babypark pilot
+  host before permanent Supervisor activation. Discovery job/runtime and
+  `database_connectors` / `connectors` lane exist in application code (PR #102).
+  Permanent production Supervisor activation completed on the Babypark pilot
+  2026-08-15 — see connector-worker production activation sub-gap above and
+  `DEPLOY.md`.
 
 **Historical (Task 4B-2-0, 2026-07-22):** At promotion time, connector
 production-readiness also depended on **GAP-024** (framework upgrade). GAP-024
 is now **closed** on `develop` — see the GAP-024 entry for the final stack.
 Closing the B9 host-verification item did not, by itself, close GAP-024.
 
-Next task: Task 4B-2c — discovered schema fields / change inspection.
+**Historical (Task 4B-2-0 sequencing, pre-connector-worker activation):** Next task at that time was Task 4B-2c — discovered schema fields / change inspection. Task 4B-2c remains open future scope within GAP-006. **Current next repository implementation task:** Task **4C-1c-2b** (Layer B Mapping UI).
 
 **Task 4B-2b note (added 2026-08-07):** PR #102 merged queued discovery
 execution (`ConnectorDiscoveryRunJob`), the dispatch/persistence execution
@@ -497,11 +521,11 @@ error vocabulary, and canonical hashing groundwork; PR #96/#4B-2b-0 added the
 accounting and added the committed Magento pilot payload regression fixture
 (106 received attributes, 102 normalized attributes, 102 persisted normalized
 snapshot fields) with deterministic canonical hashing coverage in tests.
-Discovery Overview UI merged in PR #114 (Task 4B-2b complete). Permanent
-production `babypark-connector-queue` Supervisor activation remains a separate
-operational gate — verified absent on Babypark pilot 2026-08-14; do not claim
-connector discovery is production-operational until the dedicated worker is
-installed and verified.
+Discovery Overview UI merged in PR #114 (Task 4B-2b complete).
+**Historical (verified absent 2026-08-14):** permanent production
+`babypark-connector-queue` Supervisor activation was a separate operational gate
+before Babypark pilot installation completed 2026-08-15 (see connector-worker
+production activation sub-gap above).
 
 **Task 4B-2b UI note (added 2026-08-09):** PR #114 merged Discovery Overview UI
 on Connector Account — list last-successful-discovery projection, account-detail
@@ -519,12 +543,11 @@ not yet implemented.
 connector worker config (docker-compose + deferred permanent Supervisor
 installation for the pilot host), and `deploy.sh` `queue:restart`. Connection-check lane unchanged.
 B9 host-prerequisite verification completed 2026-07-31 (default worker `RUNNING`,
-`database` cache/lock store confirmed). Dedicated `babypark-connector-queue`
-on the Babypark pilot production host remains a separate permanent-activation
-gate — `ConnectorDiscoveryRunJob` and the `database_connectors` / `connectors`
-lane exist in application code (PR #102), but `babypark-connector-queue` was
-verified absent on 2026-08-14. Do not defer permanent connector-worker
-installation because "no discovery job exists"; Do not claim connector discovery is production-operational until the dedicated worker is installed and verified.
+`database` cache/lock store confirmed). **Historical (verified absent
+2026-08-14; closed 2026-08-15):** dedicated `babypark-connector-queue` on the
+Babypark pilot production host was a separate permanent-activation gate before
+installation completed 2026-08-15. `ConnectorDiscoveryRunJob` and the
+`database_connectors` / `connectors` lane exist in application code (PR #102).
 Discovery Overview UI is complete. **Historical:** GAP-024 was open at
 2026-07-31 verification; it is now **closed** (see GAP-024).
 

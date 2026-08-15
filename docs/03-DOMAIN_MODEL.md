@@ -3256,10 +3256,12 @@ which would trigger *both* candidate rules under an unordered reading):
   the account by `(created_at, id) DESC`** — a stale/delayed terminal
   write from an older run must never overwrite a newer run's result.
 
-**Worker-activation gate:** the second production worker
-(`babypark-connector-queue`) remains deferred per Task 4B-2b-0's own
-note; Task 4B-2b-1 must gate the manual UI trigger on its confirmed
-`RUNNING` state — see `07-TECH_STACK.md`.
+**Worker-activation gate (Babypark pilot):** closed 2026-08-15 — Supervisor program
+`babypark-connector-queue` installed, verified `RUNNING`, and confirmed processing
+`ConnectorDiscoveryRunJob` on the `database_connectors` / `connectors` lane; manual
+Discovery enabled only after worker verification; one successful production manual
+UI Discovery recorded (see `DEPLOY.md`). Task 4B-2b-1 gates the manual UI trigger on
+confirmed worker `RUNNING` state — see `07-TECH_STACK.md`.
 
 ### ConnectorSchemaSnapshot (Resolved)
 
@@ -4085,8 +4087,9 @@ GAP-026B-0, 2026-08-13)** — the frozen workspace-permission matrix via
 `ConnectorAuthorization` / `WorkspaceAuthorization`, capability-based presentation
 through `ConnectorAccountCapabilityPresentation`, and removal of
 `WorkspaceMembership` as an additional connector gate. **Production activation**
-of that authority switch remains pending maintenance-window **EXECUTE** — merging
-B-2 code is not itself production cutover.
+of that authority switch completed on the Babypark pilot on 2026-08-14 via the
+verified maintenance-window **EXECUTE** cutover. Merging B-2 code was not itself
+the production cutover; the separate production activation has now also completed.
 
 ### Connection-check capability and error mapping (Resolved)
 
