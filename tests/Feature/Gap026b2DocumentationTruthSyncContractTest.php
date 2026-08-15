@@ -80,7 +80,7 @@ class Gap026b2DocumentationTruthSyncContractTest extends TestCase
     }
 
     #[Test]
-    public function deploy_and_gaps_do_not_claim_no_discovery_job_exists_as_current_truth(): void
+    public function deploy_and_gaps_record_connector_discovery_production_operational_on_babypark_pilot(): void
     {
         $deploy = File::get(base_path('DEPLOY.md'));
         $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
@@ -91,6 +91,9 @@ class Gap026b2DocumentationTruthSyncContractTest extends TestCase
             'Deferred connector-worker installation',
             'no discovery job exists yet to process',
             'deferred until Task 4B-2b-1 introduces a discovery job',
+            '### Connector-worker production activation gap',
+            'is **not installed** on the pilot',
+            'verified absent 2026-08-14; operational gap',
         ];
 
         foreach ($staleDeployPhrases as $phrase) {
@@ -110,11 +113,19 @@ class Gap026b2DocumentationTruthSyncContractTest extends TestCase
             $gaps,
         );
         $this->assertStringContainsString(
-            'Do not claim connector discovery is production-operational until the dedicated worker is installed and verified',
+            'production-operational on the Babypark pilot',
             $gaps,
         );
         $this->assertStringContainsString(
-            'verified absent 2026-08-14',
+            'Connector-worker production activation sub-gap (closed 2026-08-15)',
+            $gaps,
+        );
+        $this->assertStringContainsString(
+            'Connector-worker production activation (completed 2026-08-15)',
+            $deploy,
+        );
+        $this->assertStringContainsString(
+            'babypark-connector-queue` | **RUNNING** (verified 2026-08-15)',
             $deploy,
         );
         $this->assertStringContainsString(
@@ -122,16 +133,20 @@ class Gap026b2DocumentationTruthSyncContractTest extends TestCase
             $deploy,
         );
         $this->assertStringContainsString(
-            '### Connector-worker production activation gap',
-            $deploy,
-        );
-        $this->assertStringContainsString(
             '4C-1c-2b',
             $deploy,
         );
         $this->assertStringContainsString(
-            '/usr/bin/php',
+            '/usr/bin/php /var/www/babypark-b2b/artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600',
             $deploy,
+        );
+        $this->assertStringContainsString(
+            'RUN=a281b181-f478-4b0b-8c7d-295c26265020',
+            $deploy,
+        );
+        $this->assertStringContainsString(
+            'GAP-006 overall remains Open',
+            $gaps,
         );
     }
 

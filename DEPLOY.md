@@ -5,22 +5,21 @@ your environment — they are not interchangeable.
 
 | Section | When to use |
 |---------|-------------|
-| **[Current Supervisor-based pilot deployment](#current-supervisor-based-pilot-deployment)** | **Active today** for the Babypark pilot: bare Ubuntu host, native PHP, MySQL, `database` queue driver, Supervisor-managed default worker (`babypark-queue`), repo-root `deploy.sh`. Connector worker (`babypark-connector-queue`) is a current operational gap — discovery job/runtime and `database_connectors` / `connectors` lane exist in application code, but the dedicated worker is not yet installed on the pilot host (verified absent 2026-08-14). |
+| **[Current Supervisor-based pilot deployment](#current-supervisor-based-pilot-deployment)** | **Active today** for the Babypark pilot: bare Ubuntu host, native PHP, MySQL, `database` queue driver, Supervisor-managed default worker (`babypark-queue`) and dedicated connector worker (`babypark-connector-queue`), repo-root `deploy.sh`. Connector Discovery is production-operational on the Babypark pilot (worker verified `RUNNING` and one successful manual UI Discovery completed 2026-08-15). |
 | **[Docker Compose reference deployment](#docker-compose-reference-deployment)** | Local full-stack parity and a possible future containerized layout. **Not** the current pilot's actual production setup (user-confirmed: production host does not run `docker compose`). |
 
 ---
 
 ## Current Supervisor-based pilot deployment
 
-The Babypark pilot runs on a bare host (not Docker Compose). The default queue
-worker (`babypark-queue`) is managed by Supervisor today and was verified
-`RUNNING` on 2026-07-31 (reconfirmed after GAP-026B cutover 2026-08-14). A second
-connector worker (`babypark-connector-queue`) is **not installed** on the pilot
-host — verified absent 2026-08-14. Discovery job/runtime and the
-`database_connectors` / `connectors` queue lane exist in application code; permanent
-connector-worker production activation is a current operational gap/gate, not
-deferred because "no discovery job exists". Deploys use the repo-root `deploy.sh`
-script run directly on the server.
+The Babypark pilot runs on a bare host (not Docker Compose). Two separate
+Supervisor queue workers are required and are both installed on the pilot host:
+`babypark-queue` (default lane) and `babypark-connector-queue` (connector lane).
+The default worker was verified `RUNNING` on 2026-07-31 (reconfirmed after
+GAP-026B cutover 2026-08-14). The dedicated connector worker was installed and
+verified `RUNNING` on 2026-08-15; Connector Discovery is production-operational
+on the Babypark pilot. Deploys use the repo-root `deploy.sh` script run directly
+on the server.
 
 ### Architecture overview (pilot)
 
@@ -28,8 +27,8 @@ script run directly on the server.
 Internet → Nginx → PHP-FPM (Laravel, /var/www/babypark-b2b)
                     ├── MySQL 8 (native or managed)
                     ├── Cache / locks (`database` store — verified on pilot host 2026-07-31)
-                    ├── Supervisor: babypark-queue (existing — default connection, short jobs)
-                    └── Supervisor: babypark-connector-queue (not installed on pilot — database_connectors / connectors lane exists in app code; operational gap)
+                    ├── Supervisor: babypark-queue (default connection, short jobs)
+                    └── Supervisor: babypark-connector-queue (database_connectors / connectors lane — verified RUNNING 2026-08-15)
 ```
 
 ### Application path
@@ -58,22 +57,20 @@ cd /var/www/babypark-b2b
    The pilot host uses the `database` cache/lock store (`cache` + `cache_locks`
    tables), verified on 2026-07-31 via `php artisan config:show cache`.
 2. **Supervisor `autorestart=true`** — each worker must exit gracefully after
-   `queue:restart` and be restarted by Supervisor (`babypark-queue` today;
-   `babypark-connector-queue` once installed).
+   `queue:restart` and be restarted by Supervisor (`babypark-queue` and
+   `babypark-connector-queue`).
 
-### Current and planned queue workers (pilot)
+### Queue workers (pilot)
 
 Two separate workers are required for connector discovery execution — they must
-never be merged into one process. The `database_connectors` / `connectors` lane and
-`ConnectorDiscoveryRunJob` exist in application code. On the Babypark pilot host
-only `babypark-queue` is installed today; `babypark-connector-queue` was verified
-absent on 2026-08-14. Do not claim connector discovery is production-operational
-until the dedicated worker is installed and verified.
+never be merged into one process. On the Babypark pilot host both workers are
+installed and verified `RUNNING` (connector worker activation completed
+2026-08-15).
 
 | Supervisor program | Status | Queue connection | Queue name | Worker command |
 |--------------------|--------|------------------|------------|----------------|
-| `babypark-queue` | **existing** (read live config from host) | `database` (default) | `default` | *(read from `/etc/supervisor/conf.d/babypark-queue.conf` — illustrative only: `php artisan queue:work --sleep=3 --tries=3 --max-time=3600`)* |
-| `babypark-connector-queue` | **not installed** (verified absent 2026-08-14; operational gap) | `database_connectors` | `connectors` | *(approved planned command — not active until installed: `php artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600`)* |
+| `babypark-queue` | **RUNNING** (verified 2026-08-15) | `database` (default) | `default` | *(read from `/etc/supervisor/conf.d/babypark-queue.conf` — illustrative only: `php artisan queue:work --sleep=3 --tries=3 --max-time=3600`)* |
+| `babypark-connector-queue` | **RUNNING** (verified 2026-08-15) | `database_connectors` | `connectors` | `/usr/bin/php /var/www/babypark-b2b/artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600` |
 
 Connection-check jobs stay on the **default** lane (45s job timeout, 90s
 `retry_after`). Discovery jobs use the **connector** lane (900s job
@@ -111,8 +108,9 @@ assumptions align with the live deployment baseline.
 | npm | 10.9.7 |
 
 The main Supervisor queue worker (`babypark-queue`) was confirmed running.
-`babypark-connector-queue` remains not installed on the pilot host (verified
-absent 2026-08-14) — see the connector-worker operational gap above.
+`babypark-connector-queue` was verified absent on the pilot host on 2026-08-14
+(historical) and installed/verified `RUNNING` on 2026-08-15 — see
+[Connector-worker production activation](#connector-worker-production-activation-completed-2026-08-15).
 
 A separate smoke checkout exists at `/var/www/babypark-b2b-smoke`, synchronized
 to merged `develop` at `41dbb97094df13df93e72e3eaab3a4c46976fc34`, with PHPUnit
@@ -152,41 +150,51 @@ on the pilot host.
 - The live `babypark-queue.conf` currently contains
   `command=php /var/www/babypark-b2b/artisan queue:work ...` (bare `php`, resolved
   via `PATH` at runtime), **not** the absolute path
-- Task 4B-2b discovery runtime exists in application code; production Supervisor
-  `babypark-connector-queue` worker installation remains pending on the pilot
-  host. The approved connector-worker `command=` line should use the verified
-  absolute path `/usr/bin/php` when installed — that is a decision for that
-  pending installation, not a claim about what the current config already contains
+- The live `babypark-connector-queue.conf` uses the verified absolute path
+  `/usr/bin/php` in its `command=` line (installed 2026-08-15)
 
 **`pcntl`:** installed (`php -m | grep -i '^pcntl$'` confirms `pcntl`)
 
-### Connector-worker production activation gap
+### Connector-worker production activation (completed 2026-08-15)
 
-The second worker (`babypark-connector-queue`) is **not installed** on the Babypark
-pilot host (verified absent 2026-08-14). Discovery job/runtime and the
-`database_connectors` / `connectors` lane already exist in application code — this
-is a current operational gap/gate, not deferred because "no discovery job exists".
-Do not claim connector discovery is production-operational until the dedicated
-worker is installed and verified.
+On **2026-08-15** the Babypark pilot completed permanent `babypark-connector-queue`
+Supervisor activation and verified Connector Discovery end-to-end in production.
 
-**Sequencing (repository vs production):** Task **4C-1c-2b** (Layer B mapping UI)
-is the next repository implementation task. Permanent `babypark-connector-queue`
-Supervisor activation on the pilot host is a separate production operational gate
-and must be completed before connector discovery is called production-operational.
-These are independent tracks — do not treat "next repository task" and "next
-production operation" as contradictory.
+**Worker installation and lane verification**
 
-When the connector worker is installed, mirror the live `babypark-queue`
-Supervisor block for logging conventions and create
-`/etc/supervisor/conf.d/babypark-connector-queue.conf` with the approved planned
-command:
+- installed Supervisor program `babypark-connector-queue` and confirmed `RUNNING`;
+- verified dedicated command:
+  `/usr/bin/php /var/www/babypark-b2b/artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600`;
+- verified production config: `APP_ENV=production`, database `babypark_b2b`,
+  connector queue `connectors`, `database_connectors.retry_after=1200`;
+- verified `babypark-queue` remains separately `RUNNING` on the default lane;
+- verified `php artisan queue:restart` caused both Supervisor workers to exit and
+  restart successfully with new PIDs (`autorestart=true`).
 
-```text
-php artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600
-```
+**Manual Discovery enablement and production smoke**
 
-Use `/usr/bin/php` explicitly in the `command=` line. Then run
-`supervisorctl reread`, `supervisorctl update`, and `supervisorctl status`.
+- enabled `CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=true` only after worker
+  verification;
+- executed one real merchant UI manual Discovery (`Отримати поля`) against Adobe
+  Commerce in production;
+- persisted discovery evidence:
+  - `RUN=a281b181-f478-4b0b-8c7d-295c26265020`
+  - `TRIGGER=manual`
+  - `STATUS=succeeded`
+  - `ATTEMPTS=1`
+  - `SNAPSHOT=a281b185-7618-4ce1-9c48-9ba5c8c87fca`
+  - `ERROR=NULL`
+  - `CONNECTOR_JOBS=0`
+  - `FAILED_JOBS=0`
+- dedicated worker log recorded:
+  `ConnectorDiscoveryRunJob ... RUNNING` then `ConnectorDiscoveryRunJob ... 832.26ms DONE`.
+
+**Historical:** on 2026-08-14 the dedicated worker was verified absent before
+installation. Connector Discovery is now production-operational on the Babypark
+pilot.
+
+**Next repository task:** Task **4C-1c-2b** (Layer B mapping UI) — authorization
+prerequisite satisfied (GAP-026B production cutover 2026-08-14).
 
 ### GAP-026B one-time Workspace RBAC cutover
 
