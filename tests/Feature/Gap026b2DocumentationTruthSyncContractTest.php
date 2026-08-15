@@ -45,6 +45,7 @@ class Gap026b2DocumentationTruthSyncContractTest extends TestCase
             'blocked until GAP-026B',
             'merchant shipping blocked until production EXECUTE',
             'remains blocked until successful production maintenance-window',
+            'remains pending maintenance-window **EXECUTE**',
         ];
 
         foreach ($files as $path) {
@@ -58,6 +59,12 @@ class Gap026b2DocumentationTruthSyncContractTest extends TestCase
                 );
             }
         }
+
+        $domainModel = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+        $this->assertStringContainsString(
+            'of that authority switch completed on the Babypark pilot on 2026-08-14',
+            $domainModel,
+        );
     }
 
     #[Test]

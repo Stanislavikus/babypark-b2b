@@ -4087,8 +4087,9 @@ GAP-026B-0, 2026-08-13)** — the frozen workspace-permission matrix via
 `ConnectorAuthorization` / `WorkspaceAuthorization`, capability-based presentation
 through `ConnectorAccountCapabilityPresentation`, and removal of
 `WorkspaceMembership` as an additional connector gate. **Production activation**
-of that authority switch remains pending maintenance-window **EXECUTE** — merging
-B-2 code is not itself production cutover.
+of that authority switch completed on the Babypark pilot on 2026-08-14 via the
+verified maintenance-window **EXECUTE** cutover. Merging B-2 code was not itself
+the production cutover; the separate production activation has now also completed.
 
 ### Connection-check capability and error mapping (Resolved)
 
