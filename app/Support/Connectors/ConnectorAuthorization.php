@@ -43,6 +43,18 @@ final class ConnectorAuthorization
         );
     }
 
+    public function canReadSyncMappings(User $user, Workspace $workspace): bool
+    {
+        return $this->workspaceAuthorization->allows($user, $workspace, WorkspacePermissions::VIEW_SYNC_MAPPINGS)
+            || $this->workspaceAuthorization->allows($user, $workspace, WorkspacePermissions::MANAGE_SYNC_MAPPINGS);
+    }
+
+    public function canLayerBExternalFieldReference(User $user, Workspace $workspace): bool
+    {
+        return $this->canSafeRead($user, $workspace)
+            || $this->canReadSyncMappings($user, $workspace);
+    }
+
     /**
      * @param  list<string>  $permissions
      */

@@ -427,13 +427,16 @@ Mapping-specific rules:
 - Platform-support/recovery mechanics are a separate future operational/security
   decision and must **not** silently bypass tenant authorization.
 
-**Verified current-code mismatch (docs-only note — see GAP-026)**
+**Historical note (superseded by GAP-026B — do not treat as current truth)**
 
-The repository baseline on `develop` still mixes fixed `User.role` checks with a
-small global Spatie permission set; `WorkspaceUser` membership is not implemented;
-`config/permission.php` has `'teams' => false`. The global Spatie configuration
-does **not** yet satisfy this contract. Workspace-scoped authorization foundation
-is an implementation prerequisite before mutable Layer-B mapping UI.
+Before GAP-026B production cutover (2026-08-14), the repository mixed fixed
+`User.role` checks with a small global Spatie permission set; `WorkspaceUser`
+membership was not yet authoritative for connector/tax/mapping/access domains.
+That transitional state is historical evidence only.
+
+**Current truth (post-GAP-026B):** GAP-026B authorization prerequisite is
+satisfied; production authority cutover completed; Task 4C-1c-2b Layer-B Mapping
+UI may proceed on `WorkspaceAuthorization` / `WorkspaceUser` RBAC.
 
 ### Workspace RBAC physical architecture [Resolved — GAP-026-0, 2026-08-13]
 

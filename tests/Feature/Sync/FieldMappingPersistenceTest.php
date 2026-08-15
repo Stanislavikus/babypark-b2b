@@ -865,7 +865,7 @@ class FieldMappingPersistenceTest extends TestCase
         );
         $this->assertNotSame($afterConfirm->configuration_revision, $afterReplace->configuration_revision);
 
-        $afterRemove = $service->remove($account, $configuration->id, $variantBinding->id);
+        $afterRemove = $service->remove($account, $configuration->id, $variantBinding->id, 'sku');
         $this->assertNotSame($afterReplace->configuration_revision, $afterRemove->configuration_revision);
     }
 
