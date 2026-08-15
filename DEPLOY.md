@@ -112,9 +112,11 @@ The main Supervisor queue worker (`babypark-queue`) was confirmed running.
 (historical) and installed/verified `RUNNING` on 2026-08-15 — see
 [Connector-worker production activation](#connector-worker-production-activation-completed-2026-08-15).
 
-A separate smoke checkout exists at `/var/www/babypark-b2b-smoke`, synchronized
-to merged `develop` at `41dbb97094df13df93e72e3eaab3a4c46976fc34`, with PHPUnit
-dev tooling and `pdo_sqlite` / `sqlite3` available for CLI smoke runs.
+A separate smoke checkout exists at `/var/www/babypark-b2b-smoke`. For the
+**2026-08-15 connector-worker production activation smoke baseline** it was
+synchronized to `1f0a106420fa82ac0ec4ce305ba32d7e7532d3d9` — a point-in-time
+activation baseline, not a claim about current `develop` HEAD. A two-pass real Adobe Commerce smoke Discovery succeeded on that baseline before permanent production activation completed. PHPUnit dev tooling and `pdo_sqlite` / `sqlite3`
+are available for CLI smoke runs.
 
 ### Verified current pilot state (2026-07-31)
 

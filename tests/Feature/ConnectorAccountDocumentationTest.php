@@ -155,7 +155,19 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $gap006 = $this->gap006Section();
 
-        $this->assertStringContainsString('Next task: Task 4B-2c', $gap006);
+        $this->assertStringContainsString(
+            '**Historical (Task 4B-2-0 sequencing, pre-connector-worker activation):** Next task',
+            $gap006
+        );
+        $this->assertStringContainsString('Task 4B-2c', $gap006);
+        $this->assertStringContainsString(
+            '**Current next repository implementation task:** Task **4C-1c-2b**',
+            $gap006
+        );
+        $this->assertStringNotContainsString(
+            "\nNext task: Task 4B-2c",
+            $gap006
+        );
         $this->assertMatchesRegularExpression(
             '/discovered schema fields.*change inspection|change inspection.*discovered schema fields/si',
             $gap006
@@ -1157,6 +1169,14 @@ class ConnectorAccountDocumentationTest extends TestCase
             $techStack
         );
         $this->assertStringContainsString('Post-merge activation runbook', $techStack);
+        $this->assertStringContainsString(
+            'generic — other/target environments; Babypark pilot completed 2026-08-15',
+            $techStack
+        );
+        $this->assertStringNotContainsString(
+            'program on the pilot host.',
+            $techStack
+        );
         $this->assertStringContainsString('babypark-connector-queue', $techStack);
         $this->assertStringContainsString("'connection_check'", $connectorsConfig);
         $this->assertStringContainsString("'schema_discovery'", $connectorsConfig);

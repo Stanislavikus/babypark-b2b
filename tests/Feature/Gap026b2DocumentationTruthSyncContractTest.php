@@ -151,6 +151,73 @@ class Gap026b2DocumentationTruthSyncContractTest extends TestCase
     }
 
     #[Test]
+    public function gaps_do_not_list_unqualified_4b2c_as_current_next_repository_task(): void
+    {
+        $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        $this->assertStringNotContainsString(
+            "\nNext task: Task 4B-2c",
+            $gaps,
+            'Unqualified current-looking Next task: Task 4B-2c must not appear in IMPLEMENTATION_GAPS.md',
+        );
+        $this->assertStringContainsString(
+            '**Current next repository implementation task:** Task **4C-1c-2b**',
+            $gaps,
+        );
+        $this->assertStringContainsString(
+            'Task 4B-2c remains open future scope within GAP-006',
+            $gaps,
+        );
+    }
+
+    #[Test]
+    public function tech_stack_activation_runbook_is_generic_not_pending_pilot_install(): void
+    {
+        $techStack = File::get(base_path('docs/07-TECH_STACK.md'));
+
+        $this->assertStringContainsString(
+            'Post-merge activation runbook (generic — other/target environments',
+            $techStack,
+        );
+        $this->assertStringContainsString(
+            'Babypark pilot completed 2026-08-15',
+            $techStack,
+        );
+        $this->assertStringNotContainsString(
+            'program on the pilot host.',
+            $techStack,
+            'Runbook must not instruct installing the connector worker on the Babypark pilot as a pending step',
+        );
+    }
+
+    #[Test]
+    public function deploy_records_historical_2026_08_15_smoke_activation_baseline(): void
+    {
+        $deploy = File::get(base_path('DEPLOY.md'));
+
+        $this->assertStringContainsString(
+            '1f0a106420fa82ac0ec4ce305ba32d7e7532d3d9',
+            $deploy,
+        );
+        $this->assertStringContainsString(
+            '2026-08-15 connector-worker production activation smoke baseline',
+            $deploy,
+        );
+        $this->assertStringContainsString(
+            'not a claim about current `develop` HEAD',
+            $deploy,
+        );
+        $this->assertStringContainsString(
+            'two-pass real Adobe Commerce smoke Discovery',
+            $deploy,
+        );
+        $this->assertStringNotContainsString(
+            '41dbb97094df13df93e72e3eaab3a4c46976fc34',
+            $deploy,
+        );
+    }
+
+    #[Test]
     public function deploy_records_babypark_pilot_gap_026b_cutover_completion(): void
     {
         $deploy = File::get(base_path('DEPLOY.md'));

@@ -451,15 +451,15 @@ dispatch-service call cannot bypass the UI gate:
    the application exception class is added in Task 4B-2b-1). No
    `ConnectorDiscoveryRun` row is created and no HTTP call is made.
 
-**Post-merge activation runbook (Task 4B-2b-1 delivery — not executed in
-4B-2b-1b):**
+**Post-merge activation runbook (generic — other/target environments; Babypark pilot completed 2026-08-15, see `DEPLOY.md`):**
 
 1. Install/reread/update/start the Supervisor `babypark-connector-queue`
-   program on the pilot host.
+   program on the **target** host (not applicable to the Babypark pilot — already
+   activated).
 2. Confirm `supervisorctl status` shows `babypark-connector-queue` as
    `RUNNING`.
-3. Set `CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=true` in production
-   environment.
+3. Set `CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=true` in the target
+   production environment only after step 2 succeeds.
 4. Run `php artisan config:cache` (or the project's equivalent deploy step).
 5. Execute one end-to-end smoke discovery from the admin UI.
 6. Verify resulting queue/run/snapshot state.

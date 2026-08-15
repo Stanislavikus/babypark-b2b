@@ -508,7 +508,7 @@ production-readiness also depended on **GAP-024** (framework upgrade). GAP-024
 is now **closed** on `develop` — see the GAP-024 entry for the final stack.
 Closing the B9 host-verification item did not, by itself, close GAP-024.
 
-Next task: Task 4B-2c — discovered schema fields / change inspection.
+**Historical (Task 4B-2-0 sequencing, pre-connector-worker activation):** Next task at that time was Task 4B-2c — discovered schema fields / change inspection. Task 4B-2c remains open future scope within GAP-006. **Current next repository implementation task:** Task **4C-1c-2b** (Layer B Mapping UI).
 
 **Task 4B-2b note (added 2026-08-07):** PR #102 merged queued discovery
 execution (`ConnectorDiscoveryRunJob`), the dispatch/persistence execution
