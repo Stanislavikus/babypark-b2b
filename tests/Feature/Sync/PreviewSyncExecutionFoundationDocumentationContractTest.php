@@ -234,9 +234,9 @@ class PreviewSyncExecutionFoundationDocumentationContractTest extends TestCase
     {
         $section = $this->previewExecutionFoundationContractSection();
 
-        $this->assertStringContainsString('Do **not** expose them', $section);
+        $this->assertStringContainsString('**not** expose them automatically', $section);
         $this->assertStringContainsString('automatically as completed synchronization history', $section);
-        $this->assertStringContainsString('No Preview-history merchant', $section);
+        $this->assertStringContainsString('Preview-history merchant', $section);
         $this->assertStringContainsString('page in the first runtime slice', $section);
         $this->assertStringContainsString('PO-4 remains open', $section);
     }
@@ -269,6 +269,82 @@ class PreviewSyncExecutionFoundationDocumentationContractTest extends TestCase
         $this->assertStringContainsString('**4C-2a**', $gaps);
         $this->assertStringContainsString('Preview-first Sync Execution Foundation Stop-and-Amend', $gaps);
         $this->assertStringContainsString('**4C-2b**', $gaps);
+    }
+
+    #[Test]
+    public function contract_clarifies_preview_history_is_audit_evidence_not_catalogue_replay(): void
+    {
+        $section = $this->previewExecutionFoundationContractSection();
+
+        $this->assertStringContainsString('immutable historical/audit evidence', $section);
+        $this->assertStringContainsString('what that execution evaluated and concluded', $section);
+        $this->assertStringContainsString('does **not** guarantee bit-for-bit replay', $section);
+        $this->assertStringContainsString('Product input snapshots are not persisted', $section);
+        $this->assertStringNotContainsString('audit/reproducibility evidence', $section);
+    }
+
+    #[Test]
+    public function contract_scopes_configuration_snapshot_reproducibility_to_configuration_owned_input(): void
+    {
+        $section = $this->previewExecutionFoundationContractSection();
+
+        $this->assertStringContainsString('configuration-owned semantic evidence only', $section);
+        $this->assertStringContainsString('configuration-owned input for revision `R` auditable and', $section);
+        $this->assertStringContainsString('reproducible', $section);
+        $this->assertStringContainsString('does **not** enable bit-for-bit replay of the', $section);
+        $this->assertStringContainsString('Product catalogue state', $section);
+        $this->assertStringContainsString('Product catalogue membership list', $section);
+        $this->assertStringContainsString('Product field-value snapshots', $section);
+    }
+
+    #[Test]
+    public function contract_resolves_all_products_membership_at_execution_start_not_admission(): void
+    {
+        $section = $this->previewExecutionFoundationContractSection();
+
+        $this->assertStringContainsString('**Temporal boundary (queued Preview):**', $section);
+        $this->assertStringContainsString('at admission as part of `configuration_snapshot`', $section);
+        $this->assertStringContainsString('are **not** admission-time snapshotted', $section);
+        $this->assertStringContainsString('resolved when the run **begins', $section);
+        $this->assertStringContainsString('execution**, under the fixed `all_products` predicate', $section);
+        $this->assertStringContainsString('created after admission but before execution begins **may** belong', $section);
+        $this->assertStringContainsString('`queued` status does **not** promise an admission-time catalogue snapshot', $section);
+        $this->assertStringContainsString('**not** silently expand because new Products are created later', $section);
+    }
+
+    #[Test]
+    public function contract_does_not_require_long_lived_execution_transaction(): void
+    {
+        $section = $this->previewExecutionFoundationContractSection();
+
+        $this->assertStringContainsString('one coherent execution set', $section);
+        $this->assertStringContainsString('without holding a long-lived DB transaction for the whole planner run', $section);
+        $this->assertStringContainsString('do **not** require', $section);
+        $this->assertStringContainsString('a long-lived DB transaction for the whole planner/execution pass', $section);
+    }
+
+    #[Test]
+    public function contract_separates_configuration_revision_from_product_data_freshness(): void
+    {
+        $section = $this->previewExecutionFoundationContractSection();
+
+        $this->assertStringContainsString('`configuration_revision` tracks configuration-owned execution state only', $section);
+        $this->assertStringContainsString('selection contract', $section);
+        $this->assertStringContainsString('does **not** prove Product catalogue membership or field data are unchanged', $section);
+        $this->assertStringContainsString('Product data freshness is a distinct concern', $section);
+        $this->assertStringContainsString('product-data readiness flag in 4C-2a', $section);
+        $this->assertStringContainsString('later exposure/Live contract must define how Product changes after Preview', $section);
+        $this->assertStringContainsString('re-preview requirements', $section);
+    }
+
+    #[Test]
+    public function contract_documents_sync_run_item_as_evaluation_conclusion_not_product_snapshot(): void
+    {
+        $section = $this->previewExecutionFoundationContractSection();
+
+        $this->assertStringContainsString('Each `SyncRunItem` is immutable historical/audit evidence', $section);
+        $this->assertStringContainsString('it is **not** a persisted Product input', $section);
+        $this->assertStringContainsString('does not by itself enable catalogue replay', $section);
     }
 
     /**

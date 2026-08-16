@@ -5311,6 +5311,25 @@ selection column yet. Before configurable selection ships: persist canonical
 selection, include it in configuration revision, and prove selection changes
 invalidate readiness.
 
+**Temporal boundary (queued Preview):** freeze the selection **predicate**
+`all_products` at admission as part of `configuration_snapshot`. Product
+membership and Product field data are **not** admission-time snapshotted.
+
+For the first Preview slice:
+
+- the effective Product execution set is resolved when the run **begins
+  execution**, under the fixed `all_products` predicate and workspace boundary;
+- a Product created after admission but before execution begins **may** belong
+  to the run;
+- `queued` status does **not** promise an admission-time catalogue snapshot;
+- once execution begins resolving/evaluating its Product set, the run must
+  **not** silently expand because new Products are created later.
+
+Task **4C-2b** must choose a mechanism that yields one coherent execution set
+without holding a long-lived DB transaction for the whole planner run. Do **not**
+prescribe exact SQL/cursor/chunk/materialization implementation in this
+docs-only contract. Do **not** claim immutable Product data replay.
+
 ##### Revision v3
 
 Current v2 hashes `enabled_operations`, `operational_state`, and
@@ -5342,6 +5361,24 @@ Canonical conceptual payload:
 
 Selection is included because revision represents effective execution
 configuration, not merely mutable DB columns.
+
+`configuration_revision` tracks configuration-owned execution state only:
+
+- enabled operations;
+- operational state;
+- selection contract;
+- field mappings.
+
+It does **not** prove Product catalogue membership or field data are unchanged.
+Product data freshness is a distinct concern. Do **not** invent a persisted
+product-data readiness flag in 4C-2a. Matching `configuration_revision` between
+a Preview run and the current configuration means the **configuration-owned
+semantic input** matches — not that the Product catalogue is identical.
+
+Before merchant Preview is later used as a prerequisite for consequential Live,
+the later exposure/Live contract must define how Product changes after Preview
+affect readiness and re-preview requirements. That is **not** part of 4C-2a
+runtime implementation.
 
 Task **4C-2b** must recompute existing `SyncConfiguration.configuration_revision`
 values under v3 before the first `SyncRun` comparison. This is safe because no
@@ -5472,8 +5509,14 @@ reread current mutable `FieldMapping` rows as execution truth. Subsequent
 configuration changes are allowed and naturally move current revision away from
 run revision `R`.
 
+At admission, `configuration_snapshot` freezes the selection **predicate**
+(`all_products`) and other configuration-owned semantic input for revision `R`.
+It does **not** freeze Product membership or Product field values. The
+effective Product execution set is resolved when execution **begins**, per the
+temporal boundary above.
+
 This contract guarantees configuration consistency, not full immutable
-Product-data replay.
+Product-data replay or bit-for-bit run replay.
 
 ##### Immutable configuration snapshot
 
@@ -5506,7 +5549,16 @@ Must contain **no**:
 - secret connector settings;
 - raw HTTP diagnostics;
 - raw vendor failures;
-- Product payload snapshot.
+- Product payload snapshot;
+- Product catalogue membership list;
+- Product field-value snapshots.
+
+`configuration_snapshot` is configuration-owned semantic evidence only. It
+makes the configuration-owned input for revision `R` auditable and
+reproducible — meaning the operations/state/selection contract/mappings that
+govern execution can be reconstructed from persisted run evidence. It is **not**
+a Product data snapshot and does **not** enable bit-for-bit replay of the
+Product catalogue state evaluated by the run.
 
 It is semantic configuration evidence, not the connector transport plan.
 
@@ -5563,6 +5615,11 @@ First domain is Products. Do **not** introduce `internal_record_type` /
 | `outcome` | Preview outcome |
 | `findings` | canonical safe historical findings JSON |
 | `created_at` / `updated_at` | project convention |
+
+Each `SyncRunItem` is immutable historical/audit evidence of what that execution
+evaluated and concluded for one `Product`. It records outcome/findings against
+live Product state at evaluation time; it is **not** a persisted Product input
+snapshot and does not by itself enable catalogue replay.
 
 Prefer workspace-aware product integrity.
 
@@ -5622,9 +5679,16 @@ represent current unresolved issues.
 
 ##### Preview history visibility
 
-Persist Preview runs as audit/reproducibility evidence. Do **not** expose them
-automatically as completed synchronization history. No Preview-history merchant
-page in the first runtime slice. PO-4 remains open.
+Persist Preview runs and their `SyncRunItem` rows as immutable
+historical/audit evidence of what that execution evaluated and concluded. Do
+**not** expose them automatically as completed synchronization history. No
+Preview-history merchant page in the first runtime slice. PO-4 remains open.
+
+**Audit vs replay (frozen):** `configuration_snapshot` makes the
+configuration-owned semantic input for revision `R` auditable/reproducible. The
+first slice does **not** guarantee bit-for-bit replay or reproduction of the
+Product catalogue state because Product input snapshots are not persisted. Do
+**not** add Product-data persistence merely to justify replay wording.
 
 ##### Concurrency
 
@@ -5633,9 +5697,11 @@ First invariant: at most one **active** `SyncRun` per `SyncConfiguration`.
 Active means `queued` or `running`.
 
 Serialize admission using the stable `SyncConfiguration` row inside a short DB
-transaction. Do **not** keep the lock during job execution. Do **not** invent a
-distributed lock unless implementation proves DB admission insufficient.
-Preview-vs-Live coexistence remains deferred.
+transaction. Do **not** keep the lock during job execution and do **not** require
+a long-lived DB transaction for the whole planner/execution pass. Task **4C-2b**
+must still yield one coherent Product execution set without admission-time
+Product snapshots. Do **not** invent a distributed lock unless implementation
+proves DB admission insufficient. Preview-vs-Live coexistence remains deferred.
 
 ##### Retry / idempotency / ExternalRecordLink
 
