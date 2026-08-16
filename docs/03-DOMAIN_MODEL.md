@@ -434,9 +434,9 @@ Before GAP-026B production cutover (2026-08-14), the repository mixed fixed
 membership was not yet authoritative for connector/tax/mapping/access domains.
 That transitional state is historical evidence only.
 
-**Current truth (post-GAP-026B):** GAP-026B authorization prerequisite is
+**Current truth (post-GAP-026B, post-PR #139):** GAP-026B authorization prerequisite is
 satisfied; production authority cutover completed; Task 4C-1c-2b Layer-B Mapping
-UI may proceed on `WorkspaceAuthorization` / `WorkspaceUser` RBAC.
+UI shipped on `WorkspaceAuthorization` / `WorkspaceUser` RBAC (PR #139).
 
 ### Workspace RBAC physical architecture [Resolved — GAP-026-0, 2026-08-13]
 
@@ -1140,7 +1140,7 @@ explicit `Workspace` / workspace-owned `SyncConfiguration` before invoking the
 existing projector/mutation service.
 
 Do **not** rewrite `FieldMappingMutationService` into an actor-aware RBAC service
-merely for GAP-026B. Task **4C-1c-2b** remains the first merchant Mapping UI.
+merely for GAP-026B. Task **4C-1c-2b** shipped the first merchant Mapping UI (PR #139).
 
 **Merchant Access / Roles scope (026B)**
 
@@ -1395,7 +1395,7 @@ cutover**.
 | Slice | Future runtime scope |
 |---|---|
 | **GAP-026B-1 — Access & Cutover Machinery** | Guarded cutover command/service: **CHECK-ONLY mode only** (diagnostics; no RBAC assignment/materialization). Access/Roles application write services; existing-membership role assignment/removal; membership activate/deactivate; role create/rename/permission edit/safe unused-role delete; merchant Access/Roles UI; global `User` deactivation integrity service; hard-delete guard; CHECK-ONLY cutover/runbook tests. **Explicitly no** connector/tax policy authority switch. **B-1-only release must not ship an executable production EXECUTE mode** — no production legacy membership/role backfill in a B-1-only deployment. |
-| **GAP-026B-2 — Authority & Presentation Cutover** | **Done / production-activated (2026-08-14).** EXECUTE mode of the guarded cutover command/service (production legacy assignment materialization). `ConnectorAccountPolicy` migration; remove legacy `WorkspaceMembership` from connector authority paths; permission-based safe Connector presentation; merchant Integrations/catalog gating migration; tax authorization migration + write-time reauthorization; Mapping authorization seam; DB-fresh `WorkspaceAuthorization` effective-permission evaluation (persistence-backed authority inputs, not hydrated `User` state); Connector post-lock dispatch authorization freshness; accepted asynchronous revocation boundary (post-snapshot enqueue is not retroactively cancelled); explicit no-`Workspace`-row-mutex / no-`User`-row-mutex rule for Connector dispatch; cross-workspace + safe-state + Livewire serialization regressions; EXECUTE cutover/runbook tests. Babypark pilot maintenance-window cutover completed 2026-08-14. After verified production EXECUTE, repository development of **4C-1c-2b** may proceed — authorization prerequisite satisfied. |
+| **GAP-026B-2 — Authority & Presentation Cutover** | **Done / production-activated (2026-08-14).** EXECUTE mode of the guarded cutover command/service (production legacy assignment materialization). `ConnectorAccountPolicy` migration; remove legacy `WorkspaceMembership` from connector authority paths; permission-based safe Connector presentation; merchant Integrations/catalog gating migration; tax authorization migration + write-time reauthorization; Mapping authorization seam; DB-fresh `WorkspaceAuthorization` effective-permission evaluation (persistence-backed authority inputs, not hydrated `User` state); Connector post-lock dispatch authorization freshness; accepted asynchronous revocation boundary (post-snapshot enqueue is not retroactively cancelled); explicit no-`Workspace`-row-mutex / no-`User`-row-mutex rule for Connector dispatch; cross-workspace + safe-state + Livewire serialization regressions; EXECUTE cutover/runbook tests. Babypark pilot maintenance-window cutover completed 2026-08-14. Layer B mapping UI (4C-1c-2b) shipped in PR #139 after B-2 production EXECUTE. |
 
 This separates repository implementation readiness from environment production
 activation.

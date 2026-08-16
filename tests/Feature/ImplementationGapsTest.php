@@ -51,8 +51,9 @@ class ImplementationGapsTest extends TestCase
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString('SyncConfiguration,', $content);
-        $this->assertStringContainsString('FieldMapping persistence, and canonical suggestion read-model implemented in', $content);
-        $this->assertStringContainsString('Layer B mapping UI still missing', $content);
+        $this->assertStringContainsString('FieldMapping persistence, canonical suggestion read-model, and Layer B mapping UI', $content);
+        $this->assertStringContainsString('shipped in backend/UI — PR #139 for 4C-1c-2b)', $content);
+        $this->assertStringNotContainsString('Layer B mapping UI still missing', $content);
         $this->assertStringNotContainsString(
             'Sync Domain persistence/runtime (`SyncConfiguration`, `FieldMapping`,',
             $content,
@@ -83,11 +84,15 @@ class ImplementationGapsTest extends TestCase
             $content,
         );
         $this->assertStringContainsString(
-            'GAP-026B production cutover completed 2026-08-14',
+            '**Shipped (Task 4C-1c-2b, PR #139):**',
             $content,
         );
         $this->assertStringContainsString(
-            'authorization prerequisite is satisfied',
+            'workspace-scoped',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'fresh Mapping authorization',
             $content,
         );
         $this->assertStringNotContainsString(
@@ -180,7 +185,7 @@ class ImplementationGapsTest extends TestCase
         $this->assertStringContainsString('Failure halts authorization cutover — no partial RBAC', $content);
         $this->assertStringContainsString('Legacy User lifecycle (026B cutover compatibility)', $content);
         $this->assertStringContainsString('Do not weaken RESTRICT FKs', $content);
-        $this->assertStringContainsString('4C-1c-2b Mapping UI authorization prerequisite is satisfied', $content);
+        $this->assertStringContainsString('Layer B mapping UI (4C-1c-2b) shipped in PR #139', $content);
         $this->assertStringContainsString('fb2c5a7a3f8a521a2bfca7583e57d1ae83e95bc9', $content);
     }
 

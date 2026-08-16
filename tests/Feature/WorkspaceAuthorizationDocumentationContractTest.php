@@ -276,7 +276,7 @@ class WorkspaceAuthorizationDocumentationContractTest extends TestCase
         $this->assertStringContainsString('GAP-026B-0 — Workspace RBAC authority cutover contract', $content);
         $this->assertStringContainsString('GAP-026B-1 — Access & Cutover Machinery', $content);
         $this->assertStringContainsString('GAP-026B-2 — Authority & Presentation Cutover', $content);
-        $this->assertStringContainsString('4C-1c-2b Mapping UI authorization prerequisite is satisfied', $content);
+        $this->assertStringContainsString('Layer B mapping UI (4C-1c-2b) shipped in PR #139', $content);
         $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
         $this->assertStringContainsString('GAP-026B (overall)** | **Done**', $content);
         $this->assertStringContainsString('production cutover completed 2026-08-14', $content);
@@ -307,7 +307,8 @@ class WorkspaceAuthorizationDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('**Implemented sync-domain backend (verified on `develop`; not a GAP-025 UX claim):**', $content);
         $this->assertStringContainsString('`SyncConfiguration` persistence and domain write path (Task 4C-0).', $content);
-        $this->assertStringContainsString('Layer B mapping UI still missing', $content);
+        $this->assertStringContainsString('PR #139 for 4C-1c-2b)', $content);
+        $this->assertStringNotContainsString('Layer B mapping UI still missing', $content);
         $this->assertStringNotContainsString(
             'Sync Domain persistence/runtime (`SyncConfiguration`, `FieldMapping`,',
             $content,

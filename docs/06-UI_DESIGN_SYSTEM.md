@@ -1682,7 +1682,7 @@ Detailed import/mapping flows should be described in a future dedicated import-f
 | **C — Діагностика** | Platform support/operator only — separate identity from workspace merchant memberships | Discovery runs, snapshot identifiers, technical summaries, redacted diagnostics |
 | **D — Каталог конекторів** | Platform operator / developer | `ConnectorDefinition`, schema sources, endpoints, auth profiles |
 
-**Layer is a visibility ceiling, not an authorization grant.** Layers A/B are reachable only by workspace merchant users whose membership has the required workspace-scoped atomic permissions (see `03-DOMAIN_MODEL.md` → **Workspace access model and authorization (Resolved — Task 4C-1c-2a)**). Business-owned role/access profile names (Admin, Director, Merchandiser, …) do **not** authorize anything by themselves. **026B repository status (post-B-2):** connector authorization and safe presentation are capability/workspace-permission based via `ConnectorAuthorization` / `WorkspaceAuthorization` and `ConnectorAccountCapabilityPresentation` — not fixed `User.role` or job-title semantics. **Production EXECUTE** of the authority switch remains an environment activation concern (maintenance-window cutover), not a repository-merge concern.
+**Layer is a visibility ceiling, not an authorization grant.** Layers A/B are reachable only by workspace merchant users whose membership has the required workspace-scoped atomic permissions (see `03-DOMAIN_MODEL.md` → **Workspace access model and authorization (Resolved — Task 4C-1c-2a)**). Business-owned role/access profile names (Admin, Director, Merchandiser, …) do **not** authorize anything by themselves. **026B repository status (post-B-2):** connector authorization and safe presentation are capability/workspace-permission based via `ConnectorAuthorization` / `WorkspaceAuthorization` and `ConnectorAccountCapabilityPresentation` — not fixed `User.role` or job-title semantics. Repository B-2 authorization uses workspace/capability permission semantics; Babypark pilot production EXECUTE cutover completed on **2026-08-14** and is no longer pending. Transitional authorization outside the cut-over domains remains tracked separately under **GAP-027**.
 
 **Layer C:** requires a distinct platform-support identity. If that model does not exist yet, Layer C is unavailable to **all** workspace merchant role/access profiles — it does not fall back to workspace Admin or any other business-owned role name. Layer C never lifts secret-redaction, credential-encryption, or workspace-isolation rules.
 
@@ -1765,8 +1765,8 @@ Answers: *is everything okay right now?* Shows last sync, next scheduled run (wh
 ### Layer B — synchronization setup, mapping, issues, history
 
 - **Synchronization setup:** data/domain + independently enabled semantic operations, selection, schedule, and (only if bidirectional ships) per-domain control questions in plain language (e.g. "Де ви хочете керувати цінами?") — no global silent ownership default; no merchant-facing "ownership" / "source of truth" wording. Ownership default remains an open Product Owner question.
-- **Mapping:** concept-first matrix with internal catalog/domain concepts as the primary rows; platform suggestions + discovery validation; not “map every external field.”
-- **Available fields / Field Browser:** architecture retained (`ViewConnectorSchemaSnapshot`, `ConnectorSchemaFieldPresenter`); reachable only as a supporting action from mapping (e.g. `Переглянути всі доступні поля Magento`), never a top-level nav destination. Merchant copy must not use snapshot/discovery vocabulary (§13 of contract).
+- **Mapping:** concept-first matrix with internal catalog/domain concepts as the primary rows; platform suggestions + discovery validation; not “map every external field.” Shipped on `ManageSyncFieldMappings` (Task 4C-1c-2b, PR #139).
+- **Available fields / Field Browser:** architecture retained (`ViewConnectorSchemaSnapshot`, `ConnectorSchemaFieldPresenter`); reachable only as a supporting action from mapping (e.g. `Переглянути всі доступні поля Magento`), never a top-level nav destination. PR #139 introduced compliant Layer-B title/copy on the Mapping supporting path; legacy/diagnostic reachability outside that path may still use snapshot-oriented copy (`connectors.ui.snapshot.*`).
 - **Issues:** summary on Overview; full filterable list with bulk actions when a category exceeds the implementation threshold. Historical run outcomes and current unresolved problems are distinct concepts (see Sync Domain Rebaseline).
 - **History:** sync-run history in business language — distinct from Layer C discovery diagnostics. Preview runs must not automatically appear as completed synchronizations.
 
@@ -1795,10 +1795,11 @@ Normative sync domain shape and merchant journey are settled (Sync Domain Rebase
 Current shipped UI has **not** been fully migrated to this contract:
 
 - `Платформи та джерела` and `Модель даних і коннектори` admin surfaces still exist for platform-operator work (Layer D) and pre-contract merchant paths.
-- Discovery Overview and Field Browser remain merchant-reachable with snapshot-oriented copy (`connectors.ui.snapshot.*` in `lang/uk.json`).
-- The `Інтеграції` landing surface exists as the merchant entry (`/admin/integrations`) per `docs/CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md`. Remaining GAP-025 work covers Field Browser copy, Discovery Overview merchant reachability, and Layer C gating.
+- Layer B mapping UI and Mapping → Available Fields supporting reference are shipped (Task 4C-1c-2b, PR #139) with workspace-scoped Mapping authorization and Layer-B merchant copy on that supporting path.
+- Discovery Overview and legacy/diagnostic Field Browser paths remain merchant-reachable with snapshot-oriented copy (`connectors.ui.snapshot.*` in `lang/uk.json`) when not entered from Mapping with mapping authorization.
+- The `Інтеграції` landing surface exists as the merchant entry (`/admin/integrations`) per `docs/CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md`. Remaining GAP-025 work covers legacy/diagnostic Field Browser reachability, Discovery Overview merchant reachability, and Layer C gating.
 
-Tracked as **known UX migration work** in `docs/IMPLEMENTATION_GAPS.md` (GAP-025). Do not document current UI as contract-compliant until migrated. Remaining Field Browser / Discovery / Layer C surfaces still fail that bar even though the `Інтеграції` landing now exists.
+Tracked as **known UX migration work** in `docs/IMPLEMENTATION_GAPS.md` (GAP-025). Do not document the full connector merchant UI as contract-compliant until remaining migration work lands. The Mapping supporting path is partially migrated; legacy Field Browser / Discovery / Layer C surfaces still fail that bar even though the `Інтеграції` landing and Layer B mapping UI now exist.
 
 ### Workspace access / Roles UI sequencing (Resolved — GAP-026-0, 2026-08-13)
 
