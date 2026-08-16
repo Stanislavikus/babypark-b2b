@@ -68,20 +68,24 @@ class Gap026b2DocumentationTruthSyncContractTest extends TestCase
     }
 
     #[Test]
-    public function authoritative_docs_state_4c_1c_2b_authorization_prerequisite_is_satisfied(): void
+    public function authoritative_docs_state_4c_1c_2b_is_shipped(): void
     {
         $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString(
-            'GAP-026B authorization prerequisite is now satisfied',
+            'Layer B mapping UI (4C-1c-2b) is implemented (PR #139',
             $gaps,
         );
         $this->assertStringContainsString(
-            '4C-1c-2b Mapping UI authorization prerequisite is satisfied',
+            'Layer B mapping UI (4C-1c-2b) shipped in PR #139',
             $gaps,
         );
         $this->assertStringNotContainsString(
             '4C-1c-2b Mapping UI remains blocked until production cutover completes successfully',
+            $gaps,
+        );
+        $this->assertStringNotContainsString(
+            'UI remains unimplemented',
             $gaps,
         );
     }
@@ -167,8 +171,17 @@ class Gap026b2DocumentationTruthSyncContractTest extends TestCase
             $gaps,
             'Unqualified current-looking Next task: Task 4B-2c must not appear in IMPLEMENTATION_GAPS.md',
         );
-        $this->assertStringContainsString(
+        $this->assertStringNotContainsString(
             '**Current next repository implementation task:** Task **4C-1c-2b**',
+            $gaps,
+            'Stale current-next-task pointer to 4C-1c-2b must not appear outside historical context',
+        );
+        $this->assertStringContainsString(
+            '**4C-1c-2b** | Layer B mapping UI:',
+            $gaps,
+        );
+        $this->assertStringContainsString(
+            'Done, PR #139',
             $gaps,
         );
         $this->assertStringContainsString(

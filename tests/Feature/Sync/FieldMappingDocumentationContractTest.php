@@ -143,6 +143,7 @@ class FieldMappingDocumentationContractTest extends TestCase
         $this->assertMatchesRegularExpression('/\*\*4C-1b\*\*.*— Done/', $content);
         $this->assertMatchesRegularExpression('/\*\*4C-1c-0\*\*.*— Done/', $content);
         $this->assertMatchesRegularExpression('/\*\*4C-1c-1\*\*.*— Done/', $content);
+        $this->assertMatchesRegularExpression('/\*\*4C-1c-2b\*\*.*Done, PR #139/', $content);
         $this->assertStringNotContainsString('4C-1b (not implemented)', $content);
     }
 

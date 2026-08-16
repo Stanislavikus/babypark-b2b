@@ -97,7 +97,7 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
 
         $this->assertStringContainsString('ViewConnectorSchemaSnapshot', $content);
         $this->assertStringContainsString('connectors.ui.snapshot.*', $content);
-        $this->assertStringContainsString('Do not document current UI as contract-compliant until migrated', $content);
+        $this->assertStringContainsString('Do not document the full connector merchant UI as contract-compliant until remaining migration work lands', $content);
         $this->assertStringContainsString('GAP-025', $content);
     }
 
@@ -186,7 +186,8 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
         $this->assertStringContainsString('CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md', $content);
         $this->assertStringContainsString('Зведення знімка', $content);
         $this->assertStringContainsString('**Status:** Open — partial (`Інтеграції` landing shipped; SyncConfiguration,', $content);
-        $this->assertStringContainsString('Layer B mapping UI still missing', $content);
+        $this->assertStringContainsString('PR #139 for 4C-1c-2b)', $content);
+        $this->assertStringNotContainsString('Layer B mapping UI still missing', $content);
     }
 
     #[Test]
@@ -199,11 +200,11 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
             $content,
         );
         $this->assertStringContainsString(
-            'mutable Layer-B mapping UI authorization prerequisite is satisfied',
+            'Task **4C-1c-2b** Layer-B Mapping UI and its Mapping-side Available Fields supporting path are shipped',
             $content,
         );
         $this->assertStringContainsString(
-            'GAP-026B production cutover completed 2026-08-14',
+            'Still absent mechanisms explicitly remain future',
             $content,
         );
         $this->assertStringContainsString(

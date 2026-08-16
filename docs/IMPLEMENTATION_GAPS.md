@@ -318,7 +318,7 @@ yet), but should be scheduled before any payment gateway integration work starts
   validation are implemented (Task 4C-1b, Done). Canonical
   suggestion/read-model and UI-prefill work is Task 4C-1c (4C-1c-0 docs contract
   frozen; 4C-1c-1 provider/read-model Done; 4C-1c-2a authorization contract
-  Done; 4C-1c-2b Layer B mapping UI remains unimplemented).
+  Done; 4C-1c-2b Layer B mapping UI Done, PR #139).
   Sync execution/preview/schedule/results remain later implementation slices
   after domain docs (now settled).
 
@@ -339,7 +339,7 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4C-1c-0** | Docs-only suggestion/read-model Stop-and-Amend — canonical qualification, confidence semantics, registry→discovery boundary — Done |
 | **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (no DB/migration scope) — Done |
 | **4C-1c-2a** | Workspace access / authorization contract — docs-only Stop-and-Amend — Done |
-| **4C-1c-2b** | Layer B mapping UI: high-confidence prefill + manual choice + explicit confirmation through 4C-1b service — after workspace-scoped authorization foundation |
+| **4C-1c-2b** | Layer B mapping UI: explicit `SyncConfiguration` Mapping page; deterministic high-confidence suggestion presentation; manual choose/change/remove; explicit confirmation through `FieldMappingMutationService`; stale-safe exact remove; workspace-scoped fresh Mapping authorization; Layer-B Available Fields supporting reference — Done, PR #139 |
 | **4C** | Remaining sync domain: `SyncRun` / `SyncRunItem`, `ExternalRecordLink`, preview/live execution, scheduling, sync history/issues, merchant sync UX beyond mapping |
 
 Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
@@ -361,9 +361,8 @@ physical-delete attempts (archive remains valid) are implemented (Task 4C-1b).
 Canonical suggestion/read-model contract is frozen (Task 4C-1c-0, docs only).
 Canonical deterministic suggestion provider/read-model (4C-1c-1) is implemented.
 Workspace access / authorization contract is frozen (4C-1c-2a, docs only).
-Layer B mapping UI (4C-1c-2b) remains unimplemented — the GAP-026B
-authorization prerequisite is now satisfied (Babypark pilot production cutover
-completed 2026-08-14); repository implementation may proceed. Connector Discovery
+Layer B mapping UI (4C-1c-2b) is implemented (PR #139, merge
+`9a4be2f29f239753151e33f0a107c33597a10f85`). Connector Discovery
 is production-operational on the Babypark pilot (dedicated
 `babypark-connector-queue` worker verified `RUNNING` and one successful manual UI
 Discovery completed 2026-08-15). `SyncRun` / execution,
@@ -421,15 +420,12 @@ repository workspace-RBAC matrix):**
 | Disabled account | Per role matrix (unaffected by disabled state) | No | Per role matrix |
 
 **GAP-006 overall remains Open.** Remaining scope: Task 4B-2c (discovered
-schema fields / change inspection), retention/pruning (4B-2d),
-Layer B mapping UI (4C-1c-2b) — **next repository implementation task**,
-sync execution/preview/schedule/history
-(`SyncRun`, issues, merchant sync UX), `ExternalRecordLink`,
-connector-account creation and credential-management/settings UI.
-Workspace-scoped authorization foundation (GAP-026) repository runtime is
+schema fields / change inspection), retention/pruning (4B-2d), sync
+execution/preview/schedule/history (`SyncRun`, issues, merchant sync UX),
+`ExternalRecordLink`, connector-account creation and credential-management/settings
+UI. Workspace-scoped authorization foundation (GAP-026) repository runtime is
 **Implemented** (GAP-026B-2) and production-activated on Babypark pilot
-(2026-08-14). The GAP-026B authorization prerequisite for Layer B mapping UI
-(4C-1c-2b) is satisfied; the UI itself remains unimplemented.
+(2026-08-14). Layer B mapping UI (4C-1c-2b) shipped in PR #139.
 
 ### Classification after Sync UX / Domain Rebaseline (documentation pass)
 
@@ -438,7 +434,7 @@ Distinguish carefully — do not treat every future possibility as an active GAP
 | Class | Item | Blocks Sync domain work now? |
 |---|---|---|
 | **A. Architecture blockers** | None identified against current `origin/develop` for the approved Sync Domain Rebaseline | No |
-| **B. Implementation gaps** | Workspace-scoped authorization foundation (GAP-026); Layer B mapping UI (4C-1c-2b); `SyncRun` / `SyncRunItem` / `ExternalRecordLink` persistence + runtime; preview/live execution; merchant sync UX beyond connection management; ConnectorSchemaDiff write path/consumer; connector-account create/settings UI; Field Browser copy / Layer C gating (GAP-025) | Yes for shipping sync; docs are settled |
+| **B. Implementation gaps** | `SyncRun` / `SyncRunItem` / `ExternalRecordLink` persistence + runtime; preview/live execution; merchant sync UX beyond connection management and mapping; ConnectorSchemaDiff write path/consumer; connector-account create/settings UI; remaining Connector UX migration / Layer C gating (GAP-025) | Yes for shipping sync; docs are settled |
 | **C. Connector-specific future verification (deferred Variant #2 / profile)** | What external contract `adobe_commerce_paas_oauth1_integration` intentionally covers; PaaS-only vs broader Magento REST-family; post-bootstrap runtime-contract/version/capability verification; Magento Open Source setup/auth compatibility; whether AccountSetup and final runtime contract must later split; whether exactly-one AccountSetup-profile invariant must ever change | **No** — deferred; not a blocker for generic Sync domain rebaseline |
 
 Do not add generic `edition` / `deployment_model` / `api_family` fields to
@@ -508,7 +504,7 @@ production-readiness also depended on **GAP-024** (framework upgrade). GAP-024
 is now **closed** on `develop` — see the GAP-024 entry for the final stack.
 Closing the B9 host-verification item did not, by itself, close GAP-024.
 
-**Historical (Task 4B-2-0 sequencing, pre-connector-worker activation):** Next task at that time was Task 4B-2c — discovered schema fields / change inspection. Task 4B-2c remains open future scope within GAP-006. **Current next repository implementation task:** Task **4C-1c-2b** (Layer B Mapping UI).
+**Historical (Task 4B-2-0 sequencing, pre-connector-worker activation):** Next task at that time was Task 4B-2c — discovered schema fields / change inspection. Task 4B-2c remains open future scope within GAP-006. **Historical (pre-PR #139):** Task **4C-1c-2b** (Layer B Mapping UI) was then the current next repository implementation task; shipped in PR #139 (merge `9a4be2f`).
 
 **Task 4B-2b note (added 2026-08-07):** PR #102 merged queued discovery
 execution (`ConnectorDiscoveryRunJob`), the dispatch/persistence execution
@@ -1013,9 +1009,20 @@ Remaining connector gaps are tracked separately under GAP-006.
   cards, adaptive 0/1/N destinations, §5 health rollup, merchant-safe
   `EligibleConnectorPlatformCatalog`). `ConnectorAccountResource` remains the
   account Overview destination but is no longer a top-level nav entry.
-- Field Browser (`ViewConnectorSchemaSnapshot`) remains merchant-reachable with
+- Layer B mapping UI ships on `ManageSyncFieldMappings` (Task 4C-1c-2b, PR #139):
+  explicit `SyncConfiguration` Mapping page; deterministic high-confidence
+  suggestion presentation; manual choose/change/remove; explicit confirmation
+  through `FieldMappingMutationService`; stale-safe exact remove; workspace-scoped
+  fresh Mapping authorization.
+- Available Fields supporting reference from Mapping: `ViewConnectorSchemaSnapshot`
+  is reachable from Mapping via `availableFieldsUrl`; mapping-authorized merchants
+  with `view_sync_mappings` receive Layer-B title/copy (`sync_mappings.available_fields_*`)
+  rather than snapshot/source metadata; ordinary Mapping UI does not expose Layer-C
+  snapshot terminology; no new top-level Available Fields navigation was introduced.
+- `ViewConnectorSchemaSnapshot` remains merchant-reachable on legacy/diagnostic
+  account paths without mapping authorization; those paths still use
   snapshot-oriented copy in `lang/uk.json` (e.g. `connectors.ui.snapshot.title`
-  = "Зведення знімка").
+  = "Зведення знімка"). Layer C still requires a distinct platform-support identity.
 - Discovery-related surfaces remain reachable through current account Overview
   paths.
 - **Shipped runtime/read architecture (not a regression):** `ConnectorCapability`,
@@ -1025,9 +1032,13 @@ Remaining connector gaps are tracked separately under GAP-006.
   `ConnectorAuthorization` evaluate the frozen workspace-permission matrix via
   `WorkspaceAuthorization` — not fixed `User.role` semantics. Historical pre-B-2
   fixed-role behavior is transitional evidence under **GAP-026** / PR #102 only.
-- **Remaining GAP-025 UX work:** copy/navigation/Layer-C gating/deeper Layer A/B
-  surfaces.
-- **Separate prerequisite (satisfied):** mutable Layer-B mapping UI (4C-1c-2b) — GAP-026B production cutover completed 2026-08-14; authorization prerequisite is satisfied; repository implementation may proceed. The UI itself remains unimplemented.
+- **Remaining GAP-025 UX work:** legacy/diagnostic Field Browser reachability on
+  non-mapping paths; Discovery Overview merchant reachability; Layer A Overview /
+  Layer B setup surfaces beyond connection create and mapping; Layer C gating when
+  platform-support identity exists.
+- **Shipped (Task 4C-1c-2b, PR #139):** Layer-B Mapping page and Mapping →
+  Available Fields supporting reference with workspace-scoped Mapping authorization
+  and Layer-B merchant copy on that path.
 
 **Implemented sync-domain backend (verified on `develop`; not a GAP-025 UX claim):**
 - `SyncConfiguration` persistence and domain write path (Task 4C-0).
@@ -1036,8 +1047,6 @@ Remaining connector gaps are tracked separately under GAP-006.
 - Canonical deterministic suggestion/read-model provider (Task 4C-1c-1).
 
 **Still absent in code (docs settled; runtime or UI missing):**
-- Layer B mapping UI (Task 4C-1c-2b) — GAP-026B authorization prerequisite
-  satisfied (production cutover 2026-08-14); UI remains unimplemented;
 - `SyncRun` / `SyncRunItem` persistence and execution runtime;
 - `ExternalRecordLink`;
 - sync execution runtime for merchant "Синхронізувати зараз";
@@ -1060,14 +1069,16 @@ contradicts an approved invariant.
   as a workaround — Layer C requires the separately resolved platform-support
   identity.
 
-**Next task:** Remaining Connector UX migration — Field Browser copy/navigation,
-Layer A Overview / Layer B setup surfaces beyond connection create, Layer C
-gating when platform-support identity exists. Backend mechanisms above remain
-separate scoped tasks.
+**Next task:** Remaining Connector UX migration — legacy/diagnostic Field Browser
+reachability and Layer C gating when platform-support identity exists; Discovery
+Overview merchant reachability; Layer A Overview / Layer B setup surfaces beyond
+connection create and mapping. Backend mechanisms above remain separate scoped
+tasks.
 
 **Status:** Open — partial (`Інтеграції` landing shipped; SyncConfiguration,
-FieldMapping persistence, and canonical suggestion read-model implemented in
-backend — Layer B mapping UI still missing); remaining UX migration work.
+FieldMapping persistence, canonical suggestion read-model, and Layer B mapping UI
+shipped in backend/UI — PR #139 for 4C-1c-2b); remaining Connector UX migration /
+Layer A-B-C boundary work.
 
 ---
 
@@ -1117,7 +1128,7 @@ explicit read-only `WorkspaceAuthorization` service with regression tests.
 | **GAP-026A (overall)** | **Done** — 026A-1 and 026A-2 foundation slices complete per original staging. |
 | **GAP-026B-0 — Workspace RBAC authority cutover contract** | **Done (docs/tests).** Frozen cutover boundaries for Connector/Tax/Mapping/Access; capability-based connector presentation; existing-memberships-only Access; User lifecycle transition rules; one-time maintenance cutover sequence; CHECK-ONLY (B-1) / EXECUTE (B-2) slice ownership; 026B-1/026B-2 split. See `03-DOMAIN_MODEL.md` → Workspace RBAC authority cutover (Resolved — GAP-026B-0). |
 | **GAP-026B-1 — Access & Cutover Machinery** | **Done.** Part 1 runtime core + Part 2 merchant Access/Roles UI; CHECK-ONLY `workspace-rbac:cutover-check`. EXECUTE ships with B-2 (see below). **Explicitly no** connector/tax policy authority switch in B-1-only runtime. |
-| **GAP-026B-2 — Authority & Presentation Cutover** | **Done / production-activated (2026-08-14).** Babypark pilot maintenance-window cutover completed successfully against `fb2c5a7a3f8a521a2bfca7583e57d1ae83e95bc9`. EXECUTE command `workspace-rbac:cutover-execute`; `ConnectorAccountPolicy` + `ConnectorAuthorization` workspace-RBAC matrix; `ConnectorAccountCapabilityPresentation` three-tier safe projection; Integrations/ListPlatformConnections runtime-overlay gating; `WorkspaceTaxSettingsAuthorization` + write-time reauthorization; `FieldMappingAuthorizationService` outer seam; DB-fresh `WorkspaceAuthorization`; Connector post-lock dispatch authorization freshness; MySQL concurrency proofs for post-lock revocation. | Historical: first production deployment containing B-2 was the maintenance-window cutover deployment. After B-2 merge and verified production EXECUTE, repository development of **4C-1c-2b** may proceed — authorization prerequisite now satisfied on Babypark pilot. |
+| **GAP-026B-2 — Authority & Presentation Cutover** | **Done / production-activated (2026-08-14).** Babypark pilot maintenance-window cutover completed successfully against `fb2c5a7a3f8a521a2bfca7583e57d1ae83e95bc9`. EXECUTE command `workspace-rbac:cutover-execute`; `ConnectorAccountPolicy` + `ConnectorAuthorization` workspace-RBAC matrix; `ConnectorAccountCapabilityPresentation` three-tier safe projection; Integrations/ListPlatformConnections runtime-overlay gating; `WorkspaceTaxSettingsAuthorization` + write-time reauthorization; `FieldMappingAuthorizationService` outer seam; DB-fresh `WorkspaceAuthorization`; Connector post-lock dispatch authorization freshness; MySQL concurrency proofs for post-lock revocation. | Historical: first production deployment containing B-2 was the maintenance-window cutover deployment. Layer B mapping UI (4C-1c-2b) shipped in PR #139 after B-2 production EXECUTE. |
 | **GAP-026B (overall)** | **Done** — production cutover completed 2026-08-14 on Babypark pilot. B-0 contract Done; B-1 Done; B-2 production-activated.
 
 **Legacy membership / role backfill matrix (026B production execution — GAP-026B-2 EXECUTE only):**
@@ -1220,8 +1231,8 @@ GAP-026 workspace RBAC.
 **Impact:**
 - Do not treat the current global Spatie configuration as satisfying the
   workspace-scoped RBAC contract.
-- Layer B mapping UI (4C-1c-2b) authorization prerequisite is satisfied
-  (GAP-026B production cutover 2026-08-14); the UI itself remains unimplemented.
+- Layer B mapping UI (4C-1c-2b) shipped in PR #139 on top of the GAP-026B
+  authorization foundation.
 - Do not add more fixed `User.role` policy branches as a workaround for mapping
   or connector authorization.
 - Target role-name-free authorization remains partially transitional outside scopes
@@ -1231,9 +1242,9 @@ GAP-026 workspace RBAC.
 - Cross-reference **GAP-004** for workspace data isolation — GAP-004 tracks
   table/query coverage audit, not permission semantics.
 
-**Next task:** Task 4C-1c-2b — Layer B mapping UI (authorization prerequisite satisfied).
+**Next task:** GAP-027 — platform-wide admin Resource RBAC and new-staff onboarding.
 
-**Status:** GAP-026A foundation **Done**; GAP-026B production cutover **Done** (2026-08-14 on Babypark pilot). physical architecture frozen (GAP-026-0). GAP-026B authorization prerequisite is now satisfied for Layer B mapping UI (4C-1c-2b). GAP-026B-0 cutover contract **Done**; GAP-026B-1 **Done**; GAP-026B-2 production-activated. 4C-1c-2b Mapping UI authorization prerequisite is satisfied; UI remains unimplemented. GAP-027 (platform-wide admin RBAC and new-staff onboarding) remains Open — newly created staff without `WorkspaceUser` still fail closed in Connector/Tax/Mapping/Access until GAP-027 ships.
+**Status:** GAP-026A foundation **Done**; GAP-026B production cutover **Done** (2026-08-14 on Babypark pilot). physical architecture frozen (GAP-026-0). GAP-026B-0 cutover contract **Done**; GAP-026B-1 **Done**; GAP-026B-2 production-activated. Layer B mapping UI (4C-1c-2b) shipped in PR #139. GAP-027 (platform-wide admin RBAC and new-staff onboarding) remains Open — newly created staff without `WorkspaceUser` still fail closed in Connector/Tax/Mapping/Access until GAP-027 ships.
 
 ---
 
