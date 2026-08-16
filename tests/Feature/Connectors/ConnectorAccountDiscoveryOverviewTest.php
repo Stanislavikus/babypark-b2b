@@ -75,7 +75,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertSee(__('connectors.ui.discovery.empty_state'));
+            ->assertSee(__('connectors.ui.available_fields.never_checked'));
     }
 
     #[Test]
@@ -87,7 +87,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
 
         $component = Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee(__('connectors.ui.runtime.discovery_running'));
+            ->assertSee(__('connectors.ui.available_fields.refreshing'));
 
         $this->assertStringContainsString('wire:poll.5s="refreshDiscoveryState"', $component->html());
     }
@@ -111,10 +111,11 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee(__('connectors.enums.discovery_run_status.succeeded'))
             ->assertSee('42')
-            ->assertSee(__('connectors.ui.snapshot.first_snapshot'))
-            ->assertSee(__('connectors.ui.snapshot.view_summary'));
+            ->assertSee(__('connectors.ui.available_fields.field_count'))
+            ->assertSee(__('connectors.ui.available_fields.checked_at'))
+            ->assertDontSee(__('connectors.ui.snapshot.first_snapshot'))
+            ->assertDontSee(__('connectors.ui.snapshot.view_summary'));
     }
 
     #[Test]
@@ -139,35 +140,33 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     }
 
     #[Test]
-    public function discovery_summary_shows_no_change_snapshot_state(): void
+    public function discovery_summary_projects_field_count_from_last_success_after_failure(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
             'last_discovery_at' => now(),
-            'last_successful_discovery_at' => now(),
+            'last_successful_discovery_at' => now()->subHour(),
         ]);
-        $hash = hash('sha256', 'same-hash');
-        // Distinct created_at avoids MySQL second-precision ties on latest('created_at').
-        $previousRun = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded, [
+        $successfulRun = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded, [
             'created_at' => now()->subHour(),
             'finished_at' => now()->subHour(),
         ]);
-        $previousSnapshot = $this->createSnapshotForRun($previousRun, [
-            'canonical_hash' => $hash,
+        $successfulSnapshot = $this->createSnapshotForRun($successfulRun, [
+            'field_count' => 17,
         ]);
-        $run = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded, [
+        $successfulRun->update(['snapshot_id' => $successfulSnapshot->id]);
+
+        $failedRun = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Failed, [
             'created_at' => now(),
             'finished_at' => now(),
+            'user_message_key' => 'connectors.errors.discovery_failed',
+            'technical_summary' => self::SENSITIVE_CANARY,
         ]);
-        $snapshot = $this->createSnapshotForRun($run, [
-            'previous_snapshot_id' => $previousSnapshot->id,
-            'canonical_hash' => $hash,
-        ]);
-        $run->update(['snapshot_id' => $snapshot->id]);
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee(__('connectors.ui.snapshot.no_change'));
+            ->assertSee('17')
+            ->assertSee(__('connectors.errors.discovery_failed', locale: 'uk'));
     }
 
     #[Test]
@@ -232,7 +231,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     }
 
     #[Test]
-    public function merchandiser_can_see_discovery_history_but_not_connection_checks(): void
+    public function merchant_overview_hides_discovery_history_relation_managers(): void
     {
         $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
         $this->grantConnectorDiscovery($this->defaultWorkspace(), $merchandiser);
@@ -243,26 +242,21 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
 
         $detailComponent = Livewire::actingAs($merchandiser)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertSee(__('connectors.ui.sections.discovery'))
-            ->assertDontSee(__('connectors.ui.relation.connection_checks'));
-
-        Livewire::actingAs($merchandiser)
-            ->test(DiscoveryRunsRelationManager::class, [
-                'ownerRecord' => $account,
-                'pageClass' => ViewConnectorAccount::class,
-            ])
-            ->assertSee(__('connectors.ui.relation.discovery_runs'));
+            ->assertSee(__('connectors.ui.sections.available_fields'))
+            ->assertDontSee(__('connectors.ui.relation.connection_checks'))
+            ->assertDontSee(__('connectors.ui.relation.discovery_runs'));
 
         $relationManagers = (new \ReflectionMethod(ViewConnectorAccount::class, 'getAllRelationManagers'))
             ->invoke($detailComponent->instance());
 
-        $this->assertSame([DiscoveryRunsRelationManager::class], $relationManagers);
+        $this->assertSame([], $relationManagers);
     }
 
     #[Test]
-    public function snapshot_detail_is_accessible_for_same_workspace_account(): void
+    public function snapshot_detail_is_accessible_for_mapping_authorized_actor(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $this->grantSyncMappingsView($this->defaultWorkspace(), $admin);
         $account = $this->createConnectorAccount();
         $run = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded);
         $snapshot = $this->createSnapshotForRun($run, [
@@ -276,15 +270,35 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
                 'snapshot' => $snapshot->getKey(),
             ])
             ->assertSee('15')
-            ->assertSee(__('connectors.ui.snapshot.first_snapshot'));
+            ->assertSee(__('sync_mappings.available_fields_title', [
+                'platform' => $account->connectorDefinition->name,
+            ]));
 
         $this->assertSensitiveFieldsAbsent($component);
+    }
+
+    #[Test]
+    public function snapshot_detail_requires_mapping_permission(): void
+    {
+        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorDiscovery($this->defaultWorkspace(), $merchandiser);
+        $account = $this->createConnectorAccount();
+        $run = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded);
+        $snapshot = $this->createSnapshotForRun($run);
+
+        Livewire::actingAs($merchandiser)
+            ->test(ViewConnectorSchemaSnapshot::class, [
+                'record' => $account->getKey(),
+                'snapshot' => $snapshot->getKey(),
+            ])
+            ->assertForbidden();
     }
 
     #[Test]
     public function foreign_account_snapshot_is_not_found(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $this->grantSyncMappingsView($this->defaultWorkspace(), $admin);
         $account = $this->createConnectorAccount();
         $foreignAccount = $this->createConnectorAccount();
         $run = $this->createDiscoveryRun($foreignAccount, ConnectorDiscoveryRunStatus::Succeeded);
@@ -302,6 +316,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     public function foreign_workspace_snapshot_is_not_found(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $this->grantSyncMappingsView($this->defaultWorkspace(), $admin);
         $foreignWorkspace = Workspace::query()->create(['name' => 'Foreign', 'is_default' => false]);
         $foreignAccount = $this->createConnectorAccount($foreignWorkspace);
         $run = $this->createDiscoveryRun($foreignAccount, ConnectorDiscoveryRunStatus::Succeeded);
@@ -470,7 +485,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
             ->assertActionDisabled('runDiscovery')
-            ->assertSee(__('connectors.ui.actions.discovery_already_active'));
+            ->assertSee(__('connectors.ui.actions.available_fields_refresh_active'));
     }
 
     #[Test]
@@ -565,14 +580,16 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
         $keys = [
             ...array_map(fn (ConnectorDiscoveryRunStatus $case) => $case->label(), ConnectorDiscoveryRunStatus::cases()),
             ...array_map(fn (ConnectorDiscoveryRunTrigger $case) => $case->label(), ConnectorDiscoveryRunTrigger::cases()),
-            'connectors.ui.sections.discovery',
-            'connectors.ui.actions.run_discovery',
-            'connectors.ui.runtime.discovery_waiting',
-            'connectors.ui.runtime.discovery_running',
-            'connectors.ui.notifications.discovery_started',
-            'connectors.ui.notifications.discovery_reused',
-            'connectors.ui.snapshot.first_snapshot',
-            'connectors.ui.snapshot.no_change',
+            'connectors.ui.sections.available_fields',
+            'connectors.ui.actions.refresh_available_fields',
+            'connectors.ui.available_fields.never_checked',
+            'connectors.ui.available_fields.refreshing',
+            'connectors.ui.available_fields.checked_at',
+            'connectors.ui.available_fields.field_count',
+            'connectors.ui.notifications.available_fields_refresh_started',
+            'connectors.ui.notifications.available_fields_refresh_reused',
+            'connectors.ui.notifications.available_fields_refresh_failed',
+            'connectors.ui.disabled_reasons.available_fields_refresh_active',
             'connectors.ui.relation.discovery_runs',
         ];
 

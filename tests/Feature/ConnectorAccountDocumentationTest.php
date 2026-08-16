@@ -340,7 +340,7 @@ class ConnectorAccountDocumentationTest extends TestCase
         $content = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
 
         $this->assertStringContainsString('## Connector Integration UX (Resolved — 2026-08-10)', $content);
-        $this->assertStringContainsString('Discovery Overview and Field Browser remain merchant-reachable with snapshot-oriented copy', $content);
+        $this->assertStringContainsString('GAP-025A cutover', $content);
         $this->assertStringContainsString('Shipped Task 4B implementation (pre-contract — historical reference)', $content);
         $this->assertStringNotContainsString('## Operational Connection Pattern (reusable)', $content);
     }

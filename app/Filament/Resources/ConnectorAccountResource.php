@@ -148,6 +148,28 @@ class ConnectorAccountResource extends Resource
                     }
 
                     $record->setRelation('latestPresentationDiscoveryRun', $latestRun);
+
+                    if ($latestRun->status === ConnectorDiscoveryRunStatus::Failed
+                        && $record->last_successful_discovery_at !== null) {
+                        $latestSuccessfulRun = ConnectorDiscoveryRun::query()
+                            ->where('connector_account_id', $record->getKey())
+                            ->where('status', ConnectorDiscoveryRunStatus::Succeeded)
+                            ->with([
+                                'snapshot' => fn ($snapshotQuery) => $snapshotQuery->select([
+                                    'id',
+                                    'connector_account_id',
+                                    'field_count',
+                                    'captured_at',
+                                ]),
+                            ])
+                            ->latest('created_at')
+                            ->first();
+
+                        if ($latestSuccessfulRun !== null && $latestSuccessfulRun->snapshot !== null) {
+                            $latestSuccessfulRun->snapshot->makeHidden(['canonical_hash']);
+                            $record->setRelation('latestSuccessfulPresentationDiscoveryRun', $latestSuccessfulRun);
+                        }
+                    }
                 }
             }
         }
@@ -197,7 +219,7 @@ class ConnectorAccountResource extends Resource
                             ->visible(fn (ConnectorAccount $record): bool => $uiState->attentionMessage($record) !== null),
                     ])
                     ->columns(2),
-                Section::make(__('connectors.ui.sections.discovery'))
+                Section::make(__('connectors.ui.sections.available_fields'))
                     ->schema([
                         ViewEntry::make('discovery_state')
                             ->label('')
@@ -207,6 +229,9 @@ class ConnectorAccountResource extends Resource
                                 'uiState' => $uiState,
                                 'latestRun' => $record->relationLoaded('latestPresentationDiscoveryRun')
                                     ? $record->getRelation('latestPresentationDiscoveryRun')
+                                    : null,
+                                'latestSuccessfulRun' => $record->relationLoaded('latestSuccessfulPresentationDiscoveryRun')
+                                    ? $record->getRelation('latestSuccessfulPresentationDiscoveryRun')
                                     : null,
                             ]),
                     ]),

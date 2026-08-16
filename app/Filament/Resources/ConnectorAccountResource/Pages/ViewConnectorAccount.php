@@ -5,8 +5,6 @@ namespace App\Filament\Resources\ConnectorAccountResource\Pages;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Filament\Resources\ConnectorAccountResource;
-use App\Filament\Resources\ConnectorAccountResource\RelationManagers\ConnectionChecksRelationManager;
-use App\Filament\Resources\ConnectorAccountResource\RelationManagers\DiscoveryRunsRelationManager;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorConnectionCheck;
 use App\Models\ConnectorDiscoveryRun;
@@ -80,16 +78,7 @@ class ViewConnectorAccount extends ViewRecord
 
     protected function getAllRelationManagers(): array
     {
-        $managers = [
-            DiscoveryRunsRelationManager::class,
-        ];
-
-        $user = auth()->user();
-        if ($user instanceof User && app(ConnectorAccountCapabilityPresentation::class)->showActiveConnectionCheck($user, $this->presentationWorkspace())) {
-            array_unshift($managers, ConnectionChecksRelationManager::class);
-        }
-
-        return $managers;
+        return [];
     }
 
     protected function getHeaderActions(): array
@@ -230,7 +219,7 @@ class ViewConnectorAccount extends ViewRecord
                 ? ['title' => app(ConnectorAccountUiState::class)
                     ->manualDiscoveryActionState($this->record)['disabled_reason']]
                 : [])
-            ->icon('heroicon-o-magnifying-glass-circle')
+            ->icon('heroicon-o-arrow-path')
             ->authorize('viewRunDiscovery')
             ->disabled(fn (): bool => ! app(ConnectorAccountUiState::class)
                 ->manualDiscoveryActionState($this->record)['enabled'])
@@ -259,7 +248,7 @@ class ViewConnectorAccount extends ViewRecord
                     if (! $decision->shouldDispatch) {
                         Notification::make()
                             ->success()
-                            ->title(__('connectors.ui.notifications.discovery_reused'))
+                            ->title(__('connectors.ui.notifications.available_fields_refresh_reused'))
                             ->send();
                     } elseif (in_array($run->status, [
                         ConnectorDiscoveryRunStatus::Queued,
@@ -267,12 +256,12 @@ class ViewConnectorAccount extends ViewRecord
                     ], true)) {
                         Notification::make()
                             ->success()
-                            ->title(__('connectors.ui.notifications.discovery_started'))
+                            ->title(__('connectors.ui.notifications.available_fields_refresh_started'))
                             ->send();
                     } elseif ($run->status === ConnectorDiscoveryRunStatus::Failed) {
                         Notification::make()
                             ->danger()
-                            ->title(__('connectors.ui.notifications.discovery_failed'))
+                            ->title(__('connectors.ui.notifications.available_fields_refresh_failed'))
                             ->body($presenter->present($run->user_message_key))
                             ->send();
                     }
@@ -281,20 +270,20 @@ class ViewConnectorAccount extends ViewRecord
                 } catch (ConnectorDiscoverySourceResolutionException) {
                     Notification::make()
                         ->danger()
-                        ->title(__('connectors.ui.notifications.discovery_failed'))
+                        ->title(__('connectors.ui.notifications.available_fields_refresh_failed'))
                         ->body(__('connectors.errors.discovery_source_unavailable'))
                         ->send();
                 } catch (ConnectorAccountDisabledException) {
                     Notification::make()
                         ->danger()
-                        ->title(__('connectors.ui.notifications.discovery_failed'))
+                        ->title(__('connectors.ui.notifications.available_fields_refresh_failed'))
                         ->body(__('connectors.errors.account_disabled'))
                         ->send();
                 } catch (AuthorizationException) {
                     if (! $this->record->is_enabled) {
                         Notification::make()
                             ->danger()
-                            ->title(__('connectors.ui.notifications.discovery_failed'))
+                            ->title(__('connectors.ui.notifications.available_fields_refresh_failed'))
                             ->body(__('connectors.errors.account_disabled'))
                             ->send();
                     } else {
