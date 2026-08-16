@@ -80,7 +80,7 @@
             <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
               {{ __('sync_mappings.columns.status') }}
             </th>
-            @if ($canMutate && $discoveryAvailable)
+            @if ($canMutate)
               <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 {{ __('sync_mappings.columns.actions') }}
               </th>
@@ -106,30 +106,52 @@
                   <span>{{ $row['status_label'] }}</span>
                 </span>
               </td>
-              @if ($canMutate && $discoveryAvailable)
+              @if ($canMutate)
                 <td class="px-4 py-3 text-right text-sm">
                   <div class="flex flex-wrap justify-end gap-2">
-                    @if ($row['semantic_state'] === 'suggested')
-                      <x-filament::button
-                        size="xs"
-                        color="primary"
-                        wire:click="confirmMapping({{ \Illuminate\Support\Js::from($row['field_binding_id']) }}, {{ \Illuminate\Support\Js::from($row['suggested_external_field_key']) }})"
-                        data-testid="sync-mapping-confirm"
-                      >
-                        {{ __('sync_mappings.actions.confirm') }}
-                      </x-filament::button>
-                    @endif
+                    @if ($discoveryAvailable)
+                      @if ($row['semantic_state'] === 'suggested')
+                        <x-filament::button
+                          size="xs"
+                          color="primary"
+                          wire:click="confirmMapping({{ \Illuminate\Support\Js::from($row['field_binding_id']) }}, {{ \Illuminate\Support\Js::from($row['suggested_external_field_key']) }})"
+                          data-testid="sync-mapping-confirm"
+                        >
+                          {{ __('sync_mappings.actions.confirm') }}
+                        </x-filament::button>
+                      @endif
 
-                    @if ($row['semantic_state'] === 'mapped' || $row['semantic_state'] === 'needs_attention')
-                      <x-filament::button
-                        size="xs"
-                        color="gray"
-                        wire:click="mountAction('changeMapping', {{ \Illuminate\Support\Js::from(['fieldBindingId' => $row['field_binding_id'], 'externalFieldKey' => $row['existing_external_field_key']]) }})"
-                        data-testid="sync-mapping-change"
-                      >
-                        {{ __('sync_mappings.actions.change') }}
-                      </x-filament::button>
+                      @if ($row['semantic_state'] === 'mapped' || $row['semantic_state'] === 'needs_attention')
+                        <x-filament::button
+                          size="xs"
+                          color="gray"
+                          wire:click="mountAction('changeMapping', {{ \Illuminate\Support\Js::from(['fieldBindingId' => $row['field_binding_id'], 'externalFieldKey' => $row['existing_external_field_key']]) }})"
+                          data-testid="sync-mapping-change"
+                        >
+                          {{ __('sync_mappings.actions.change') }}
+                        </x-filament::button>
 
+                        <x-filament::button
+                          size="xs"
+                          color="danger"
+                          wire:click="removeMapping({{ \Illuminate\Support\Js::from($row['field_binding_id']) }}, {{ \Illuminate\Support\Js::from($row['existing_external_field_key']) }})"
+                          data-testid="sync-mapping-remove"
+                        >
+                          {{ __('sync_mappings.actions.remove') }}
+                        </x-filament::button>
+                      @endif
+
+                      @if ($row['semantic_state'] === 'unmapped')
+                        <x-filament::button
+                          size="xs"
+                          color="gray"
+                          wire:click="mountAction('changeMapping', {{ \Illuminate\Support\Js::from(['fieldBindingId' => $row['field_binding_id'], 'externalFieldKey' => '' ]) }})"
+                          data-testid="sync-mapping-choose"
+                        >
+                          {{ __('sync_mappings.actions.choose') }}
+                        </x-filament::button>
+                      @endif
+                    @elseif ($row['semantic_state'] === 'mapped' || $row['semantic_state'] === 'needs_attention')
                       <x-filament::button
                         size="xs"
                         color="danger"
@@ -139,24 +161,13 @@
                         {{ __('sync_mappings.actions.remove') }}
                       </x-filament::button>
                     @endif
-
-                    @if ($row['semantic_state'] === 'unmapped')
-                      <x-filament::button
-                        size="xs"
-                        color="gray"
-                        wire:click="mountAction('changeMapping', {{ \Illuminate\Support\Js::from(['fieldBindingId' => $row['field_binding_id'], 'externalFieldKey' => '' ]) }})"
-                        data-testid="sync-mapping-choose"
-                      >
-                        {{ __('sync_mappings.actions.choose') }}
-                      </x-filament::button>
-                    @endif
                   </div>
                 </td>
               @endif
             </tr>
           @empty
             <tr>
-              <td colspan="{{ $canMutate && $discoveryAvailable ? 4 : 3 }}" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+              <td colspan="{{ $canMutate ? 4 : 3 }}" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                 {{ __('sync_mappings.empty') }}
               </td>
             </tr>

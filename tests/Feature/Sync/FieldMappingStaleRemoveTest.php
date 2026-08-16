@@ -46,9 +46,6 @@ class FieldMappingStaleRemoveTest extends TestCase
         $this->publishAuthoritativeSnapshot($account, ['field_x', 'field_y']);
 
         $service->confirm($account, $configuration->id, $binding->id, 'field_x');
-        $revisionAfterConfirm = SyncConfiguration::withoutWorkspaceScope()
-            ->findOrFail($configuration->id)
-            ->configuration_revision;
 
         $service->replace(
             $account,
@@ -57,6 +54,10 @@ class FieldMappingStaleRemoveTest extends TestCase
             'field_x',
             newExternalFieldKey: 'field_y',
         );
+
+        $revisionAfterReplace = SyncConfiguration::withoutWorkspaceScope()
+            ->findOrFail($configuration->id)
+            ->configuration_revision;
 
         $this->expectException(FieldMappingValidationException::class);
 
@@ -73,7 +74,7 @@ class FieldMappingStaleRemoveTest extends TestCase
                 ->findOrFail($configuration->id)
                 ->configuration_revision;
 
-            $this->assertNotSame($revisionAfterConfirm, $revisionAfterRejectedRemove);
+            $this->assertSame($revisionAfterReplace, $revisionAfterRejectedRemove);
         }
     }
 }

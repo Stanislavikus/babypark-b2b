@@ -8,6 +8,7 @@ use App\Filament\Pages\Sync\ManageSyncFieldMappings;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorSchemaSnapshot;
 use App\Models\ConnectorAccount;
+use App\Models\FieldBinding;
 use App\Models\FieldMapping;
 use App\Models\SyncConfiguration;
 use App\Models\User;
@@ -232,21 +233,9 @@ class ManageSyncFieldMappingsPageTest extends TestCase
     }
 
     #[Test]
-    public function no_discovery_state_is_read_only_without_remove_controls(): void
+    public function no_discovery_state_disables_confirm_change_and_choose_but_keeps_remove(): void
     {
-        $workspace = $this->defaultWorkspace();
-        $account = $this->createConnectorAccount($workspace, ['auth_profile' => 'test_sync_support']);
-        $configuration = $this->createProductsSyncConfiguration($account);
-        $binding = $this->productBinding('name');
-
-        FieldMapping::withoutWorkspaceScope()->create([
-            'id' => (string) Str::uuid(),
-            'workspace_id' => $workspace->id,
-            'sync_configuration_id' => $configuration->id,
-            'field_binding_id' => $binding->id,
-            'external_field_key' => 'legacy_key',
-        ]);
-
+        [$workspace, $account, $configuration, $binding, $externalFieldKey] = $this->noDiscoveryMappedFixture();
         $actor = $this->actorWithPermissions([WorkspacePermissions::MANAGE_SYNC_MAPPINGS]);
 
         Livewire::actingAs($actor)
@@ -255,9 +244,33 @@ class ManageSyncFieldMappingsPageTest extends TestCase
                 'configuration' => $configuration->id,
             ])
             ->assertSee(__('sync_mappings.no_discovery_notice', ['platform' => $account->connectorDefinition->name]))
-            ->assertSee('legacy_key')
-            ->assertDontSee(__('sync_mappings.actions.remove'))
-            ->assertDontSee(__('sync_mappings.actions.confirm'));
+            ->assertSee($externalFieldKey)
+            ->assertSeeHtml('data-testid="sync-mapping-remove"')
+            ->assertDontSeeHtml('data-testid="sync-mapping-confirm"')
+            ->assertDontSeeHtml('data-testid="sync-mapping-change"')
+            ->assertDontSeeHtml('data-testid="sync-mapping-choose"');
+    }
+
+    #[Test]
+    public function remove_succeeds_during_no_discovery_state(): void
+    {
+        [$workspace, $account, $configuration, $binding, $externalFieldKey] = $this->noDiscoveryMappedFixture();
+        $actor = $this->actorWithPermissions([WorkspacePermissions::MANAGE_SYNC_MAPPINGS]);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $configuration->id,
+            ])
+            ->call('removeMapping', $binding->id, $externalFieldKey)
+            ->assertNotified(__('sync_mappings.notifications.removed'))
+            ->assertOk();
+
+        $this->assertDatabaseMissing('field_mappings', [
+            'sync_configuration_id' => $configuration->id,
+            'field_binding_id' => $binding->id,
+            'external_field_key' => $externalFieldKey,
+        ]);
     }
 
     #[Test]
@@ -647,6 +660,27 @@ class ManageSyncFieldMappingsPageTest extends TestCase
         );
 
         return $tempRegistryPath;
+    }
+
+    /**
+     * @return array{0: Workspace, 1: ConnectorAccount, 2: SyncConfiguration, 3: FieldBinding, 4: string}
+     */
+    private function noDiscoveryMappedFixture(string $externalFieldKey = 'legacy_key'): array
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace, ['auth_profile' => 'test_sync_support']);
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $binding = $this->productBinding('name');
+
+        FieldMapping::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $workspace->id,
+            'sync_configuration_id' => $configuration->id,
+            'field_binding_id' => $binding->id,
+            'external_field_key' => $externalFieldKey,
+        ]);
+
+        return [$workspace, $account, $configuration, $binding, $externalFieldKey];
     }
 
     /**

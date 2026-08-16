@@ -158,7 +158,7 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
 
     public function removeMapping(string $fieldBindingId, string $externalFieldKey): void
     {
-        if (! $this->canMutate || ! $this->discoveryAvailable) {
+        if (! $this->canMutate) {
             abort(403);
         }
 
