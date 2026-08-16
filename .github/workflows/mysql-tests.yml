@@ -102,6 +102,9 @@ jobs:
       - name: FieldMapping persistence tests (MySQL)
         run: php artisan test --filter=FieldMapping
 
+      - name: SyncRun persistence foundation tests (MySQL)
+        run: php artisan test --filter=SyncRun
+
       - name: Workspace RBAC foundation tests (MySQL)
         run: php artisan test --filter=WorkspaceRbacFoundation
 

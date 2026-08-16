@@ -86,4 +86,9 @@ class SyncConfiguration extends Model
     {
         return $this->hasMany(FieldMapping::class);
     }
+
+    public function syncRuns(): HasMany
+    {
+        return $this->hasMany(SyncRun::class);
+    }
 }

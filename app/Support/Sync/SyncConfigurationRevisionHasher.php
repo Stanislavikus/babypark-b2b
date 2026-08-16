@@ -6,7 +6,7 @@ use App\Enums\SyncConfigurationOperationalState;
 
 final class SyncConfigurationRevisionHasher
 {
-    private const PREFIX = 'babypark.sync-configuration-revision.v2';
+    private const PREFIX = 'babypark.sync-configuration-revision.v3';
 
     /**
      * @param  list<FieldMappingRevisionEntry|array{field_binding_id: string, external_field_key: string}>  $fieldMappings
@@ -19,6 +19,9 @@ final class SyncConfigurationRevisionHasher
         $payload = new \stdClass;
         $payload->enabled_operations = $enabledOperations->values();
         $payload->operational_state = $operationalState->value;
+        $selection = new \stdClass;
+        $selection->mode = 'all_products';
+        $payload->selection = $selection;
         $payload->field_mappings = $this->canonicalizeFieldMappings($fieldMappings);
 
         $json = $this->encodeCanonicalJson($this->sortObjectKeysRecursively($payload));

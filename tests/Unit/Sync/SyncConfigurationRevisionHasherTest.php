@@ -144,4 +144,29 @@ class SyncConfigurationRevisionHasherTest extends TestCase
 
         SyncOperationSet::fromOperations([]);
     }
+
+    #[Test]
+    public function selection_all_products_advances_revision_from_v2_equivalent(): void
+    {
+        $operations = SyncOperationSet::fromOperations([SyncSemanticOperation::Import]);
+        $state = SyncConfigurationOperationalState::Enabled;
+
+        $v3 = $this->hasher->hash($operations, $state, []);
+
+        $migration = require database_path('migrations/2026_08_16_100000_sync_configuration_revision_v3.php');
+        $reflection = new \ReflectionClass($migration);
+        $hashV2 = $reflection->getMethod('hashRevisionV2');
+        $hashV2->setAccessible(true);
+        $canonical = $reflection->getMethod('canonicalizePersistedOperations');
+        $canonical->setAccessible(true);
+
+        $v2Equivalent = $hashV2->invoke(
+            $migration,
+            $canonical->invoke($migration, ['import']),
+            $state->value,
+            [],
+        );
+
+        $this->assertNotSame($v2Equivalent, $v3);
+    }
 }
