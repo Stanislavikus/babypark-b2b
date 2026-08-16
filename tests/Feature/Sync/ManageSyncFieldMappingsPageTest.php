@@ -13,14 +13,21 @@ use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceUser;
+use App\Services\Connectors\AuthoritativeConnectorSchemaSnapshotResolver;
+use App\Services\Sync\CanonicalFieldMappingSuggestionProvider;
 use App\Services\Sync\FieldMappingMutationService;
+use App\Services\Sync\FieldMappingReadModelProjector;
+use App\Support\CanonicalRegistry\CanonicalRegistryReader;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Js;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -318,13 +325,160 @@ class ManageSyncFieldMappingsPageTest extends TestCase
             newExternalFieldKey: 'field_y',
         );
 
+        $expectedBody = __('sync_mappings.errors.stale_state');
+
         Livewire::actingAs($actor)
             ->test(ManageSyncFieldMappings::class, [
                 'account' => $account->id,
                 'configuration' => $configuration->id,
             ])
             ->call('removeMapping', $binding->id, 'field_x')
-            ->assertNotified(__('sync_mappings.notifications.failed'));
+            ->assertNotified(
+                Notification::make()
+                    ->danger()
+                    ->title(__('sync_mappings.notifications.failed'))
+                    ->body($expectedBody),
+            );
+
+        $this->assertStringNotContainsString('SyncConfiguration', $expectedBody);
+        $this->assertStringNotContainsString('FieldBinding', $expectedBody);
+        $this->assertStringNotContainsString('FieldDefinition', $expectedBody);
+        $this->assertStringNotContainsString($binding->id, $expectedBody);
+        $this->assertStringNotContainsString($configuration->id, $expectedBody);
+    }
+
+    #[Test]
+    public function rendered_interaction_markup_serializes_hostile_external_field_keys_safely(): void
+    {
+        $externalKey = "field'with\\quote";
+        $registryPath = $this->bindHostileKeyCanonicalRegistry($externalKey);
+
+        try {
+            $workspace = $this->defaultWorkspace();
+            $account = $this->createConnectorAccount($workspace, ['auth_profile' => 'test_sync_support']);
+            $configuration = $this->createProductsSyncConfiguration($account);
+            $this->publishAuthoritativeSnapshot($account, [$externalKey]);
+            $actor = $this->actorWithPermissions([WorkspacePermissions::MANAGE_SYNC_MAPPINGS]);
+            $mappedBinding = $this->productBinding('description');
+
+            $component = Livewire::actingAs($actor)
+                ->test(ManageSyncFieldMappings::class, [
+                    'account' => $account->id,
+                    'configuration' => $configuration->id,
+                ]);
+
+            $suggestedRow = collect($component->instance()->displayRows)
+                ->first(fn (array $row) => $row['semantic_state'] === 'suggested'
+                    && ($row['suggested_external_field_key'] ?? null) === $externalKey);
+
+            $this->assertNotNull($suggestedRow);
+
+            $jsSuggestedBindingId = Js::from($suggestedRow['field_binding_id']);
+            $jsExternalKey = Js::from($externalKey);
+            $jsChangeArguments = Js::from([
+                'fieldBindingId' => $mappedBinding->id,
+                'externalFieldKey' => $externalKey,
+            ]);
+
+            $suggestedHtml = $component->html();
+
+            $this->assertStringContainsString(
+                'confirmMapping('.$jsSuggestedBindingId.', '.$jsExternalKey.')',
+                $suggestedHtml,
+            );
+            $this->assertDoesNotMatchRegularExpression(
+                '/wire:click="[^"]*confirmMapping\([^)]*\'field\'with/',
+                $suggestedHtml,
+            );
+
+            app(FieldMappingMutationService::class)->confirm(
+                $account,
+                $configuration->id,
+                $mappedBinding->id,
+                $externalKey,
+            );
+
+            $mappedComponent = Livewire::actingAs($actor)
+                ->test(ManageSyncFieldMappings::class, [
+                    'account' => $account->id,
+                    'configuration' => $configuration->id,
+                ]);
+
+            $mappedRow = collect($mappedComponent->instance()->displayRows)
+                ->first(fn (array $row) => ($row['existing_external_field_key'] ?? null) === $externalKey);
+
+            $this->assertNotNull($mappedRow);
+
+            $mappedHtml = $mappedComponent->html();
+
+            $this->assertStringContainsString(
+                'removeMapping('.Js::from($mappedRow['field_binding_id']).', '.$jsExternalKey.')',
+                $mappedHtml,
+            );
+            $this->assertStringContainsString(
+                'mountAction(\'changeMapping\', '.$jsChangeArguments.')',
+                $mappedHtml,
+            );
+            $this->assertDoesNotMatchRegularExpression(
+                '/wire:click="[^"]*(?:removeMapping|mountAction)[^"]*\'field\'with/',
+                $mappedHtml,
+            );
+        } finally {
+            if (File::isDirectory($registryPath)) {
+                File::deleteDirectory($registryPath);
+            }
+        }
+    }
+
+    #[Test]
+    public function change_mapping_with_hostile_current_external_key_replaces_exactly(): void
+    {
+        [$workspace, $account, $configuration] = $this->fixture();
+        $actor = $this->actorWithPermissions([WorkspacePermissions::MANAGE_SYNC_MAPPINGS]);
+        $binding = $this->productBinding('description');
+        $externalKey = "field'with\\quote";
+        $replacementKey = 'replacement_field_key';
+
+        $this->publishAuthoritativeSnapshot($account, [$externalKey, $replacementKey]);
+
+        app(FieldMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $binding->id,
+            $externalKey,
+        );
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $configuration->id,
+            ])
+            ->callAction(
+                'changeMapping',
+                data: ['external_field_key' => $replacementKey],
+                arguments: [
+                    'fieldBindingId' => $binding->id,
+                    'externalFieldKey' => $externalKey,
+                ],
+            )
+            ->assertNotified(__('sync_mappings.notifications.changed'));
+
+        $this->assertDatabaseHas('field_mappings', [
+            'sync_configuration_id' => $configuration->id,
+            'field_binding_id' => $binding->id,
+            'external_field_key' => $replacementKey,
+        ]);
+        $this->assertDatabaseMissing('field_mappings', [
+            'field_binding_id' => $binding->id,
+            'external_field_key' => $externalKey,
+        ]);
+        $this->assertSame(
+            1,
+            FieldMapping::withoutWorkspaceScope()
+                ->where('sync_configuration_id', $configuration->id)
+                ->where('field_binding_id', $binding->id)
+                ->count(),
+        );
     }
 
     #[Test]
@@ -420,5 +574,101 @@ class ManageSyncFieldMappingsPageTest extends TestCase
         $this->publishAuthoritativeSnapshot($account, ['name', 'sku', 'description']);
 
         return [$workspace, $account, $configuration];
+    }
+
+    private function bindHostileKeyCanonicalRegistry(string $externalKey): string
+    {
+        $tempRegistryPath = storage_path('framework/testing/canonical-registry-'.Str::random(8));
+        File::ensureDirectoryExists($tempRegistryPath);
+
+        $this->writeRegistryCsv($tempRegistryPath, 'canonical_product_fields.csv', [
+            [
+                'internal_code' => 'name',
+                'canonical_english_name' => 'name',
+                'uk_label' => 'name',
+                'ru_label' => 'name',
+                'description' => 'Test field',
+                'implementation_kind' => 'core_model_property',
+                'storage_owner' => 'Product',
+                'field_definition_eligibility' => 'yes',
+                'binding_strategy' => 'product',
+                'scope' => 'system',
+                'field_group_or_state' => 'basic_information',
+                'data_type_or_state' => 'text',
+                'value_shape' => 'scalar',
+                'structure_schema_ref' => 'not_applicable',
+                'is_localizable' => 'false',
+                'value_localization_strategy' => 'not_localizable',
+                'channel_value_strategy' => 'global_value',
+                'inheritance_strategy' => 'none',
+                'is_multi_value' => 'false',
+                'unit_family' => 'not_applicable',
+                'status' => 'active',
+                'mvp_tier' => 'A',
+                'default_enabled' => 'true',
+                'verification_status' => 'verified',
+                'recommended_action' => 'keep_as_is',
+                'supports_admin_display' => 'true',
+                'supports_b2b_display' => 'true',
+                'supports_search' => 'true',
+                'supports_filter' => 'true',
+                'supports_table_column' => 'true',
+                'evidence_subject_key' => 'field:name',
+            ],
+        ]);
+
+        $this->writeRegistryCsv($tempRegistryPath, 'canonical_product_field_mappings.csv', [
+            [
+                'internal_code' => 'name',
+                'channel' => 'adobe_commerce',
+                'external_field' => $externalKey,
+                'mapping_type' => 'direct',
+                'transformation' => 'not_applicable',
+                'applicability_id' => 'a001',
+                'requirement_level' => 'required',
+                'channel_schema_version' => '2.4.9-admin-rest',
+                'verification_status' => 'verified',
+                'evidence_subject_key' => 'mapping:adobe_commerce:name:'.$externalKey.':a001:2.4.9-admin-rest',
+            ],
+        ]);
+
+        $reader = new CanonicalRegistryReader($tempRegistryPath);
+        $this->app->instance(CanonicalRegistryReader::class, $reader);
+        $this->app->instance(
+            CanonicalFieldMappingSuggestionProvider::class,
+            new CanonicalFieldMappingSuggestionProvider($reader),
+        );
+        $this->app->instance(
+            FieldMappingReadModelProjector::class,
+            new FieldMappingReadModelProjector(
+                app(AuthoritativeConnectorSchemaSnapshotResolver::class),
+                app(CanonicalFieldMappingSuggestionProvider::class),
+            ),
+        );
+
+        return $tempRegistryPath;
+    }
+
+    /**
+     * @param  list<array<string, string>>  $rows
+     */
+    private function writeRegistryCsv(string $directory, string $filename, array $rows): void
+    {
+        $path = $directory.'/'.$filename;
+        $handle = fopen($path, 'w');
+
+        if ($rows === []) {
+            fclose($handle);
+
+            return;
+        }
+
+        fputcsv($handle, array_keys($rows[0]));
+
+        foreach ($rows as $row) {
+            fputcsv($handle, $row);
+        }
+
+        fclose($handle);
     }
 }

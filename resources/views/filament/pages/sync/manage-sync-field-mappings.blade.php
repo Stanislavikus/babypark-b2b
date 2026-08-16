@@ -113,7 +113,7 @@
                       <x-filament::button
                         size="xs"
                         color="primary"
-                        wire:click="confirmMapping(@js($row['field_binding_id']), @js($row['suggested_external_field_key']))"
+                        wire:click="confirmMapping({{ \Illuminate\Support\Js::from($row['field_binding_id']) }}, {{ \Illuminate\Support\Js::from($row['suggested_external_field_key']) }})"
                         data-testid="sync-mapping-confirm"
                       >
                         {{ __('sync_mappings.actions.confirm') }}
@@ -124,7 +124,7 @@
                       <x-filament::button
                         size="xs"
                         color="gray"
-                        wire:click="mountAction('changeMapping', @js(['fieldBindingId' => $row['field_binding_id'], 'externalFieldKey' => $row['existing_external_field_key']]))"
+                        wire:click="mountAction('changeMapping', {{ \Illuminate\Support\Js::from(['fieldBindingId' => $row['field_binding_id'], 'externalFieldKey' => $row['existing_external_field_key']]) }})"
                         data-testid="sync-mapping-change"
                       >
                         {{ __('sync_mappings.actions.change') }}
@@ -133,7 +133,7 @@
                       <x-filament::button
                         size="xs"
                         color="danger"
-                        wire:click="removeMapping(@js($row['field_binding_id']), @js($row['existing_external_field_key']))"
+                        wire:click="removeMapping({{ \Illuminate\Support\Js::from($row['field_binding_id']) }}, {{ \Illuminate\Support\Js::from($row['existing_external_field_key']) }})"
                         data-testid="sync-mapping-remove"
                       >
                         {{ __('sync_mappings.actions.remove') }}
@@ -144,7 +144,7 @@
                       <x-filament::button
                         size="xs"
                         color="gray"
-                        wire:click="mountAction('changeMapping', @js(['fieldBindingId' => $row['field_binding_id'], 'externalFieldKey' => '' ]))"
+                        wire:click="mountAction('changeMapping', {{ \Illuminate\Support\Js::from(['fieldBindingId' => $row['field_binding_id'], 'externalFieldKey' => '' ]) }})"
                         data-testid="sync-mapping-choose"
                       >
                         {{ __('sync_mappings.actions.choose') }}
