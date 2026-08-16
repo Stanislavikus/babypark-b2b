@@ -403,7 +403,7 @@ class WorkspaceRbacPhysicalArchitectureDocumentationContractTest extends TestCas
         $this->assertStringContainsString('GAP-026B-0 — Workspace RBAC authority cutover contract', $content);
         $this->assertStringContainsString('GAP-026B-1 — Access & Cutover Machinery', $content);
         $this->assertStringContainsString('GAP-026B-2 — Authority & Presentation Cutover', $content);
-        $this->assertStringContainsString('4C-1c-2b Mapping UI authorization prerequisite is satisfied', $content);
+        $this->assertStringContainsString('Layer B mapping UI (4C-1c-2b) shipped in PR #139', $content);
         $this->assertStringContainsString('physical architecture frozen (GAP-026-0)', $content);
         $this->assertStringContainsString('GAP-026B (overall)** | **Done**', $content);
         $this->assertStringContainsString('production cutover completed 2026-08-14', $content);
