@@ -13,6 +13,7 @@ use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceUser;
+use App\Services\Sync\FieldMappingMutationService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -271,6 +272,127 @@ class ManageSyncFieldMappingsPageTest extends TestCase
             ->assertDontSee('Discovery')
             ->assertDontSee('cs_live')
             ->assertDontSee('https://shop.example.com');
+    }
+
+    #[Test]
+    public function combined_mapping_and_connector_permissions_keep_layer_b_available_fields_presentation(): void
+    {
+        [$workspace, $account] = $this->fixture();
+        $snapshot = $this->publishAuthoritativeSnapshot($account, ['name', 'sku']);
+        $actor = $this->actorWithPermissions([
+            WorkspacePermissions::MANAGE_SYNC_MAPPINGS,
+            WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS,
+        ]);
+
+        Livewire::actingAs($actor)
+            ->test(ViewConnectorSchemaSnapshot::class, [
+                'record' => $account->getKey(),
+                'snapshot' => $snapshot->id,
+            ])
+            ->assertOk()
+            ->assertSee(__('sync_mappings.available_fields_title', ['platform' => $account->connectorDefinition->name]))
+            ->assertDontSee(__('connectors.ui.snapshot.title'))
+            ->assertDontSee(__('connectors.ui.columns.snapshot_state'))
+            ->assertDontSee(__('connectors.ui.columns.source'));
+    }
+
+    #[Test]
+    public function stale_mapping_failure_shows_merchant_message_not_technical_exception_text(): void
+    {
+        [$workspace, $account, $configuration] = $this->fixture();
+        $actor = $this->actorWithPermissions([WorkspacePermissions::MANAGE_SYNC_MAPPINGS]);
+        $binding = $this->productBinding('name');
+
+        $this->publishAuthoritativeSnapshot($account, ['field_x', 'field_y']);
+        app(FieldMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $binding->id,
+            'field_x',
+        );
+        app(FieldMappingMutationService::class)->replace(
+            $account,
+            $configuration->id,
+            $binding->id,
+            'field_x',
+            newExternalFieldKey: 'field_y',
+        );
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $configuration->id,
+            ])
+            ->call('removeMapping', $binding->id, 'field_x')
+            ->assertNotified(__('sync_mappings.notifications.failed'));
+    }
+
+    #[Test]
+    public function external_field_key_with_special_characters_is_passed_exactly_to_mutations(): void
+    {
+        [$workspace, $account, $configuration] = $this->fixture();
+        $actor = $this->actorWithPermissions([WorkspacePermissions::MANAGE_SYNC_MAPPINGS]);
+        $binding = $this->productBinding('description');
+        $externalKey = "field'with\\quote";
+
+        $this->publishAuthoritativeSnapshot($account, [$externalKey]);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $configuration->id,
+            ])
+            ->call('confirmMapping', $binding->id, $externalKey)
+            ->assertNotified(__('sync_mappings.notifications.confirmed'));
+
+        $this->assertDatabaseHas('field_mappings', [
+            'sync_configuration_id' => $configuration->id,
+            'field_binding_id' => $binding->id,
+            'external_field_key' => $externalKey,
+        ]);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $configuration->id,
+            ])
+            ->call('removeMapping', $binding->id, $externalKey)
+            ->assertNotified(__('sync_mappings.notifications.removed'));
+
+        $this->assertDatabaseMissing('field_mappings', [
+            'field_binding_id' => $binding->id,
+            'external_field_key' => $externalKey,
+        ]);
+    }
+
+    #[Test]
+    public function foreign_sync_configuration_for_same_workspace_account_fails_closed(): void
+    {
+        [$workspace, $account, $configuration] = $this->fixture();
+        $foreignAccount = $this->createConnectorAccount($workspace, ['auth_profile' => 'test_sync_support']);
+        $foreignConfiguration = $this->createProductsSyncConfiguration($foreignAccount);
+        $actor = $this->actorWithPermissions([WorkspacePermissions::MANAGE_SYNC_MAPPINGS]);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $foreignConfiguration->id,
+            ])
+            ->assertNotFound();
+    }
+
+    #[Test]
+    public function random_sync_configuration_uuid_fails_closed(): void
+    {
+        [$workspace, $account] = $this->fixture();
+        $actor = $this->actorWithPermissions([WorkspacePermissions::MANAGE_SYNC_MAPPINGS]);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => (string) Str::uuid(),
+            ])
+            ->assertNotFound();
     }
 
     /**

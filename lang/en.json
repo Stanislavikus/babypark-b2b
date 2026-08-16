@@ -331,5 +331,8 @@
     "sync_mappings.notifications.confirmed": "Mapping confirmed",
     "sync_mappings.notifications.changed": "Mapping updated",
     "sync_mappings.notifications.removed": "Mapping removed",
-    "sync_mappings.notifications.failed": "Mapping could not be updated"
+    "sync_mappings.notifications.failed": "Mapping could not be updated",
+    "sync_mappings.errors.stale_state": "The mapping has already changed. Refresh the page and try again.",
+    "sync_mappings.errors.conflict": "This field is already mapped to another catalog field. Choose a different platform field.",
+    "sync_mappings.errors.invalid_action": "This mapping action could not be completed. Refresh the page and try again."
 }

@@ -331,5 +331,8 @@
     "sync_mappings.notifications.confirmed": "Зіставлення підтверджено",
     "sync_mappings.notifications.changed": "Зіставлення оновлено",
     "sync_mappings.notifications.removed": "Зіставлення видалено",
-    "sync_mappings.notifications.failed": "Не вдалося оновити зіставлення"
+    "sync_mappings.notifications.failed": "Не вдалося оновити зіставлення",
+    "sync_mappings.errors.stale_state": "Зіставлення вже змінилося. Оновіть дані та повторіть дію.",
+    "sync_mappings.errors.conflict": "Це поле вже зіставлено з іншим полем каталогу. Виберіть інше поле платформи.",
+    "sync_mappings.errors.invalid_action": "Не вдалося виконати цю дію зіставлення. Оновіть дані та повторіть дію."
 }

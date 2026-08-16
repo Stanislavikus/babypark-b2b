@@ -4,6 +4,7 @@ namespace App\Filament\Pages\Sync;
 
 use App\Filament\Resources\ConnectorAccountResource;
 use App\Models\ConnectorAccount;
+use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Connectors\AuthoritativeConnectorSchemaSnapshotResolver;
@@ -13,6 +14,8 @@ use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAuthorization;
 use App\Support\Sync\Exceptions\FieldMappingConflictException;
 use App\Support\Sync\Exceptions\FieldMappingValidationException;
+use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
+use App\Support\Sync\FieldMappingPresentation\FieldMappingSafeMessagePresenter;
 use App\Support\Sync\FieldMappingPresentation\SyncFieldMappingRowPresenter;
 use App\Support\Sync\FieldMappingPresentation\SyncFieldMappingRowState;
 use App\Support\Sync\FieldMappingReadModel\DiscoveredExternalFieldChoice;
@@ -99,6 +102,11 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
         $resolvedAccount = $this->resolveAccount($account, $workspace);
 
         $this->accountId = (string) $resolvedAccount->getKey();
+
+        if (! $this->syncConfigurationBelongsToAccount($workspace, $resolvedAccount, $configuration)) {
+            abort(404);
+        }
+
         $this->configurationId = $configuration;
         $this->accountName = $resolvedAccount->name;
         $this->platformName = $resolvedAccount->connectorDefinition->name;
@@ -142,11 +150,7 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
         } catch (AuthorizationException) {
             abort(403);
         } catch (FieldMappingConflictException|FieldMappingValidationException $exception) {
-            Notification::make()
-                ->title(__('sync_mappings.notifications.failed'))
-                ->body($exception->getMessage())
-                ->danger()
-                ->send();
+            $this->notifyMappingFailure($exception);
         }
 
         $this->refreshReadModel();
@@ -177,12 +181,8 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
                 ->send();
         } catch (AuthorizationException) {
             abort(403);
-        } catch (FieldMappingValidationException $exception) {
-            Notification::make()
-                ->title(__('sync_mappings.notifications.failed'))
-                ->body($exception->getMessage())
-                ->danger()
-                ->send();
+        } catch (FieldMappingConflictException|FieldMappingValidationException $exception) {
+            $this->notifyMappingFailure($exception);
         }
 
         $this->refreshReadModel();
@@ -240,11 +240,7 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
                 } catch (AuthorizationException) {
                     abort(403);
                 } catch (FieldMappingConflictException|FieldMappingValidationException $exception) {
-                    Notification::make()
-                        ->title(__('sync_mappings.notifications.failed'))
-                        ->body($exception->getMessage())
-                        ->danger()
-                        ->send();
+                    $this->notifyMappingFailure($exception);
                 }
 
                 $this->refreshReadModel();
@@ -260,12 +256,16 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
 
         $this->canMutate = $this->workspaceAllowsMutation($user, $workspace);
 
-        $readModel = app(FieldMappingAuthorizationService::class)->projectReadModel(
-            $user,
-            $workspace->id,
-            $this->accountId,
-            $this->configurationId,
-        );
+        try {
+            $readModel = app(FieldMappingAuthorizationService::class)->projectReadModel(
+                $user,
+                $workspace->id,
+                $this->accountId,
+                $this->configurationId,
+            );
+        } catch (SyncConfigurationNotFoundException) {
+            abort(404);
+        }
 
         $this->discoveryAvailable = $readModel->discoveryAvailable;
         $this->externalFieldOptions = $this->buildExternalFieldOptions($readModel);
@@ -282,12 +282,16 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
 
             $workspace = $this->resolveMappingWorkspace();
 
-            $readModel = app(FieldMappingAuthorizationService::class)->projectReadModel(
-                $user,
-                $workspace->id,
-                $this->accountId,
-                $this->configurationId,
-            );
+            try {
+                $readModel = app(FieldMappingAuthorizationService::class)->projectReadModel(
+                    $user,
+                    $workspace->id,
+                    $this->accountId,
+                    $this->configurationId,
+                );
+            } catch (SyncConfigurationNotFoundException) {
+                abort(404);
+            }
         }
 
         $presenter = app(SyncFieldMappingRowPresenter::class);
@@ -483,5 +487,29 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
             $workspace,
             WorkspacePermissions::MANAGE_SYNC_MAPPINGS,
         );
+    }
+
+    protected function syncConfigurationBelongsToAccount(
+        Workspace $workspace,
+        ConnectorAccount $account,
+        string $configurationId,
+    ): bool {
+        return SyncConfiguration::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
+            ->where('connector_account_id', $account->id)
+            ->whereKey($configurationId)
+            ->exists();
+    }
+
+    protected function notifyMappingFailure(FieldMappingConflictException|FieldMappingValidationException $exception): void
+    {
+        $presenter = app(FieldMappingSafeMessagePresenter::class);
+        $presenter->report($exception);
+
+        Notification::make()
+            ->title(__('sync_mappings.notifications.failed'))
+            ->body($presenter->present($exception))
+            ->danger()
+            ->send();
     }
 }

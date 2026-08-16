@@ -114,8 +114,7 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
         abort_unless($user instanceof User, 403);
         $workspace = $this->account->workspace ?? Workspace::query()->findOrFail($this->account->workspace_id);
         $connectorAuthorization = app(ConnectorAuthorization::class);
-        $this->layerBPresentation = $connectorAuthorization->canReadSyncMappings($user, $workspace)
-            && ! $connectorAuthorization->canSafeRead($user, $workspace);
+        $this->layerBPresentation = $connectorAuthorization->canReadSyncMappings($user, $workspace);
 
         if ($this->layerBPresentation) {
             $this->sourceLabel = null;

@@ -331,5 +331,8 @@
     "sync_mappings.notifications.confirmed": "Сопоставление подтверждено",
     "sync_mappings.notifications.changed": "Сопоставление обновлено",
     "sync_mappings.notifications.removed": "Сопоставление удалено",
-    "sync_mappings.notifications.failed": "Не удалось обновить сопоставление"
+    "sync_mappings.notifications.failed": "Не удалось обновить сопоставление",
+    "sync_mappings.errors.stale_state": "Сопоставление уже изменилось. Обновите данные и повторите действие.",
+    "sync_mappings.errors.conflict": "Это поле уже сопоставлено с другим полем каталога. Выберите другое поле платформы.",
+    "sync_mappings.errors.invalid_action": "Не удалось выполнить это действие сопоставления. Обновите данные и повторите действие."
 }
