@@ -97,7 +97,7 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
 
         $this->assertStringContainsString('ViewConnectorSchemaSnapshot', $content);
         $this->assertStringContainsString('connectors.ui.snapshot.*', $content);
-        $this->assertStringContainsString('Do not document the full connector merchant UI as contract-compliant until remaining migration work lands', $content);
+        $this->assertStringContainsString('GAP-025A cutover', $content);
         $this->assertStringContainsString('GAP-025', $content);
     }
 
@@ -184,9 +184,9 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
         $this->assertStringContainsString('## GAP-025 — Connector Integration UX contract not yet migrated in shipped UI', $content);
         $this->assertStringContainsString('CONNECTOR_INTEGRATION_UX_CONTRACT.md', $content);
         $this->assertStringContainsString('CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md', $content);
-        $this->assertStringContainsString('Зведення знімка', $content);
+        $this->assertStringContainsString('GAP-025A', $content);
         $this->assertStringContainsString('**Status:** Open — partial (`Інтеграції` landing shipped; SyncConfiguration,', $content);
-        $this->assertStringContainsString('PR #139 for 4C-1c-2b)', $content);
+        $this->assertStringContainsString('GAP-025A merchant Connector Account Overview', $content);
         $this->assertStringNotContainsString('Layer B mapping UI still missing', $content);
     }
 
@@ -224,7 +224,7 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
 
         $this->assertStringContainsString('**snapshot persistence**', $content);
         $this->assertStringContainsString('**field query/read-model/presenter architecture**', $content);
-        $this->assertStringContainsString('migrated consistently with **GAP-025** and **GAP-026**', $content);
+        $this->assertStringContainsString('GAP-025A cutover', $content);
         $this->assertStringContainsString(
             'Do **not** interpret this as "security retained entirely" or "no backend rework required" for authorization/gating',
             $content,

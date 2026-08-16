@@ -51,8 +51,8 @@ class ImplementationGapsTest extends TestCase
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString('SyncConfiguration,', $content);
-        $this->assertStringContainsString('FieldMapping persistence, canonical suggestion read-model, and Layer B mapping UI', $content);
-        $this->assertStringContainsString('shipped in backend/UI — PR #139 for 4C-1c-2b)', $content);
+        $this->assertStringContainsString('GAP-025A merchant Connector Account Overview', $content);
+        $this->assertStringContainsString('shipped — PR #139 for 4C-1c-2b; GAP-025A', $content);
         $this->assertStringNotContainsString('Layer B mapping UI still missing', $content);
         $this->assertStringNotContainsString(
             'Sync Domain persistence/runtime (`SyncConfiguration`, `FieldMapping`,',

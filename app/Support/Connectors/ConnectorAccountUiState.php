@@ -307,7 +307,7 @@ final class ConnectorAccountUiState
      */
     public function manualDiscoveryActionState(ConnectorAccount $account): array
     {
-        $label = __('connectors.ui.actions.run_discovery');
+        $label = __('connectors.ui.actions.refresh_available_fields');
 
         if (! $account->is_enabled) {
             return [
@@ -335,8 +335,8 @@ final class ConnectorAccountUiState
         if ($this->hasActiveDiscoveryRun($account)) {
             return [
                 'enabled' => false,
-                'label' => __('connectors.ui.actions.discovery_already_active'),
-                'disabled_reason' => __('connectors.ui.disabled_reasons.discovery_already_active'),
+                'label' => __('connectors.ui.actions.available_fields_refresh_active'),
+                'disabled_reason' => __('connectors.ui.disabled_reasons.available_fields_refresh_active'),
             ];
         }
 
@@ -353,6 +353,60 @@ final class ConnectorAccountUiState
             'label' => $label,
             'disabled_reason' => null,
         ];
+    }
+
+    public function availableFieldsRefreshingLabel(?ConnectorDiscoveryRun $activeRun): ?string
+    {
+        if ($activeRun === null) {
+            return null;
+        }
+
+        return match ($activeRun->status) {
+            ConnectorDiscoveryRunStatus::Queued => __('connectors.ui.available_fields.refreshing'),
+            ConnectorDiscoveryRunStatus::Running => __('connectors.ui.available_fields.refreshing'),
+            default => null,
+        };
+    }
+
+    public function availableFieldsCheckedAt(ConnectorAccount $account, ?ConnectorDiscoveryRun $latestRun): ?string
+    {
+        if ($account->last_successful_discovery_at !== null) {
+            return ConnectorUiFormatter::formatDateTime($account->last_successful_discovery_at);
+        }
+
+        if ($latestRun?->status === ConnectorDiscoveryRunStatus::Succeeded && $latestRun->finished_at !== null) {
+            return ConnectorUiFormatter::formatDateTime($latestRun->finished_at);
+        }
+
+        return null;
+    }
+
+    public function availableFieldsFieldCount(
+        ConnectorAccount $account,
+        ?ConnectorDiscoveryRun $latestRun,
+        ?ConnectorDiscoveryRun $latestSuccessfulRun = null,
+    ): ?int {
+        if ($latestRun?->status === ConnectorDiscoveryRunStatus::Succeeded
+            && $latestRun->relationLoaded('snapshot')
+            && $latestRun->snapshot !== null) {
+            return $latestRun->snapshot->field_count;
+        }
+
+        if ($latestSuccessfulRun?->relationLoaded('snapshot')
+            && $latestSuccessfulRun->snapshot !== null) {
+            return $latestSuccessfulRun->snapshot->field_count;
+        }
+
+        return null;
+    }
+
+    public function availableFieldsFailureMessage(?ConnectorDiscoveryRun $latestRun): ?string
+    {
+        if ($latestRun === null || $latestRun->status !== ConnectorDiscoveryRunStatus::Failed) {
+            return null;
+        }
+
+        return $this->discoveryErrorMessage($latestRun);
     }
 
     public function schemaSourceLabel(?ConnectorSchemaSource $source): string

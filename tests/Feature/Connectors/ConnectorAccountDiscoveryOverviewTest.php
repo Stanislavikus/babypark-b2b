@@ -47,6 +47,16 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
 
     private const SENSITIVE_CANARY = 'DISCOVERY_SENSITIVE_CANARY_4B2B';
 
+    private const FALLBACK_SUCCESS_TECHNICAL_CANARY = 'GAP025A_FALLBACK_SUCCESS_TECHNICAL_CANARY';
+
+    private const FALLBACK_VENDOR_REQUEST_ID_CANARY = 'GAP025A_VENDOR_REQ_9911';
+
+    private const FALLBACK_ERROR_CODE_CANARY = 'gap025a_fallback_error_code';
+
+    private const FALLBACK_EXECUTION_ATTEMPTS = 77;
+
+    private const FALLBACK_DURATION_MS = 98765;
+
     private ?ConnectorDiscoveryDispatchPortStub $dispatchStub = null;
 
     protected function setUp(): void
@@ -75,7 +85,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertSee(__('connectors.ui.discovery.empty_state'));
+            ->assertSee(__('connectors.ui.available_fields.never_checked'));
     }
 
     #[Test]
@@ -87,7 +97,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
 
         $component = Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee(__('connectors.ui.runtime.discovery_running'));
+            ->assertSee(__('connectors.ui.available_fields.refreshing'));
 
         $this->assertStringContainsString('wire:poll.5s="refreshDiscoveryState"', $component->html());
     }
@@ -111,10 +121,11 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee(__('connectors.enums.discovery_run_status.succeeded'))
             ->assertSee('42')
-            ->assertSee(__('connectors.ui.snapshot.first_snapshot'))
-            ->assertSee(__('connectors.ui.snapshot.view_summary'));
+            ->assertSee(__('connectors.ui.available_fields.field_count'))
+            ->assertSee(__('connectors.ui.available_fields.checked_at'))
+            ->assertDontSee(__('connectors.ui.snapshot.first_snapshot'))
+            ->assertDontSee(__('connectors.ui.snapshot.view_summary'));
     }
 
     #[Test]
@@ -139,35 +150,66 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     }
 
     #[Test]
-    public function discovery_summary_shows_no_change_snapshot_state(): void
+    public function discovery_summary_projects_field_count_from_last_success_after_failure(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
             'last_discovery_at' => now(),
-            'last_successful_discovery_at' => now(),
+            'last_successful_discovery_at' => now()->subHour(),
         ]);
-        $hash = hash('sha256', 'same-hash');
-        // Distinct created_at avoids MySQL second-precision ties on latest('created_at').
-        $previousRun = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded, [
+        $successfulRun = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded, [
             'created_at' => now()->subHour(),
             'finished_at' => now()->subHour(),
+            'technical_summary' => self::FALLBACK_SUCCESS_TECHNICAL_CANARY,
+            'error_code' => self::FALLBACK_ERROR_CODE_CANARY,
+            'vendor_request_id' => self::FALLBACK_VENDOR_REQUEST_ID_CANARY,
+            'execution_attempts' => self::FALLBACK_EXECUTION_ATTEMPTS,
+            'duration_ms' => self::FALLBACK_DURATION_MS,
+            'cause_category' => 'vendor_unavailable',
+            'actionability' => 'automatic_retry',
+            'http_status' => 503,
+            'fields_received' => 999,
+            'fields_normalized' => 888,
+            'added_count' => 7,
+            'changed_count' => 6,
+            'removed_count' => 5,
+            'unchanged_count' => 4,
         ]);
-        $previousSnapshot = $this->createSnapshotForRun($previousRun, [
-            'canonical_hash' => $hash,
+        $successfulSnapshot = $this->createSnapshotForRun($successfulRun, [
+            'field_count' => 17,
+            'canonical_hash' => hash('sha256', self::SENSITIVE_CANARY),
         ]);
-        $run = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded, [
+        $successfulRun->update(['snapshot_id' => $successfulSnapshot->id]);
+
+        $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Failed, [
             'created_at' => now(),
             'finished_at' => now(),
+            'user_message_key' => 'connectors.errors.discovery_failed',
+            'technical_summary' => self::SENSITIVE_CANARY,
+            'error_code' => 'discovery_vendor_timeout',
         ]);
-        $snapshot = $this->createSnapshotForRun($run, [
-            'previous_snapshot_id' => $previousSnapshot->id,
-            'canonical_hash' => $hash,
-        ]);
-        $run->update(['snapshot_id' => $snapshot->id]);
 
-        Livewire::actingAs($admin)
+        $component = Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee(__('connectors.ui.snapshot.no_change'));
+            ->assertSee('17')
+            ->assertSee(__('connectors.ui.available_fields.field_count'))
+            ->assertSee(__('connectors.errors.discovery_failed', locale: 'uk'));
+
+        $this->assertSensitiveFieldsAbsent($component, [
+            self::FALLBACK_SUCCESS_TECHNICAL_CANARY,
+            self::FALLBACK_VENDOR_REQUEST_ID_CANARY,
+            self::FALLBACK_ERROR_CODE_CANARY,
+            '"execution_attempts":'.self::FALLBACK_EXECUTION_ATTEMPTS,
+            '"duration_ms":'.self::FALLBACK_DURATION_MS,
+            '"vendor_request_id":"'.self::FALLBACK_VENDOR_REQUEST_ID_CANARY,
+            '"fields_received":999',
+            '"fields_normalized":888',
+            '"http_status":503',
+            '"cause_category":"vendor_unavailable"',
+            '"actionability":"automatic_retry"',
+        ]);
+
+        $this->assertLatestSuccessfulPresentationDiscoveryRunMinimized($component);
     }
 
     #[Test]
@@ -232,7 +274,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     }
 
     #[Test]
-    public function merchandiser_can_see_discovery_history_but_not_connection_checks(): void
+    public function merchant_overview_hides_discovery_history_relation_managers(): void
     {
         $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
         $this->grantConnectorDiscovery($this->defaultWorkspace(), $merchandiser);
@@ -243,26 +285,21 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
 
         $detailComponent = Livewire::actingAs($merchandiser)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertSee(__('connectors.ui.sections.discovery'))
-            ->assertDontSee(__('connectors.ui.relation.connection_checks'));
-
-        Livewire::actingAs($merchandiser)
-            ->test(DiscoveryRunsRelationManager::class, [
-                'ownerRecord' => $account,
-                'pageClass' => ViewConnectorAccount::class,
-            ])
-            ->assertSee(__('connectors.ui.relation.discovery_runs'));
+            ->assertSee(__('connectors.ui.sections.available_fields'))
+            ->assertDontSee(__('connectors.ui.relation.connection_checks'))
+            ->assertDontSee(__('connectors.ui.relation.discovery_runs'));
 
         $relationManagers = (new \ReflectionMethod(ViewConnectorAccount::class, 'getAllRelationManagers'))
             ->invoke($detailComponent->instance());
 
-        $this->assertSame([DiscoveryRunsRelationManager::class], $relationManagers);
+        $this->assertSame([], $relationManagers);
     }
 
     #[Test]
-    public function snapshot_detail_is_accessible_for_same_workspace_account(): void
+    public function snapshot_detail_is_accessible_for_mapping_authorized_actor(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $this->grantSyncMappingsView($this->defaultWorkspace(), $admin);
         $account = $this->createConnectorAccount();
         $run = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded);
         $snapshot = $this->createSnapshotForRun($run, [
@@ -276,15 +313,35 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
                 'snapshot' => $snapshot->getKey(),
             ])
             ->assertSee('15')
-            ->assertSee(__('connectors.ui.snapshot.first_snapshot'));
+            ->assertSee(__('sync_mappings.available_fields_title', [
+                'platform' => $account->connectorDefinition->name,
+            ]));
 
         $this->assertSensitiveFieldsAbsent($component);
+    }
+
+    #[Test]
+    public function snapshot_detail_requires_mapping_permission(): void
+    {
+        $merchandiser = $this->createStaffUser(UserRole::Merchandiser);
+        $this->grantConnectorDiscovery($this->defaultWorkspace(), $merchandiser);
+        $account = $this->createConnectorAccount();
+        $run = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded);
+        $snapshot = $this->createSnapshotForRun($run);
+
+        Livewire::actingAs($merchandiser)
+            ->test(ViewConnectorSchemaSnapshot::class, [
+                'record' => $account->getKey(),
+                'snapshot' => $snapshot->getKey(),
+            ])
+            ->assertForbidden();
     }
 
     #[Test]
     public function foreign_account_snapshot_is_not_found(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $this->grantSyncMappingsView($this->defaultWorkspace(), $admin);
         $account = $this->createConnectorAccount();
         $foreignAccount = $this->createConnectorAccount();
         $run = $this->createDiscoveryRun($foreignAccount, ConnectorDiscoveryRunStatus::Succeeded);
@@ -302,6 +359,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
     public function foreign_workspace_snapshot_is_not_found(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $this->grantSyncMappingsView($this->defaultWorkspace(), $admin);
         $foreignWorkspace = Workspace::query()->create(['name' => 'Foreign', 'is_default' => false]);
         $foreignAccount = $this->createConnectorAccount($foreignWorkspace);
         $run = $this->createDiscoveryRun($foreignAccount, ConnectorDiscoveryRunStatus::Succeeded);
@@ -470,7 +528,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
             ->assertActionDisabled('runDiscovery')
-            ->assertSee(__('connectors.ui.actions.discovery_already_active'));
+            ->assertSee(__('connectors.ui.actions.available_fields_refresh_active'));
     }
 
     #[Test]
@@ -565,14 +623,16 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
         $keys = [
             ...array_map(fn (ConnectorDiscoveryRunStatus $case) => $case->label(), ConnectorDiscoveryRunStatus::cases()),
             ...array_map(fn (ConnectorDiscoveryRunTrigger $case) => $case->label(), ConnectorDiscoveryRunTrigger::cases()),
-            'connectors.ui.sections.discovery',
-            'connectors.ui.actions.run_discovery',
-            'connectors.ui.runtime.discovery_waiting',
-            'connectors.ui.runtime.discovery_running',
-            'connectors.ui.notifications.discovery_started',
-            'connectors.ui.notifications.discovery_reused',
-            'connectors.ui.snapshot.first_snapshot',
-            'connectors.ui.snapshot.no_change',
+            'connectors.ui.sections.available_fields',
+            'connectors.ui.actions.refresh_available_fields',
+            'connectors.ui.available_fields.never_checked',
+            'connectors.ui.available_fields.refreshing',
+            'connectors.ui.available_fields.checked_at',
+            'connectors.ui.available_fields.field_count',
+            'connectors.ui.notifications.available_fields_refresh_started',
+            'connectors.ui.notifications.available_fields_refresh_reused',
+            'connectors.ui.notifications.available_fields_refresh_failed',
+            'connectors.ui.disabled_reasons.available_fields_refresh_active',
             'connectors.ui.relation.discovery_runs',
         ];
 
@@ -650,7 +710,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
         ], $overrides));
     }
 
-    private function assertSensitiveFieldsAbsent(Testable $component): void
+    private function assertSensitiveFieldsAbsent(Testable $component, array $extraForbidden = []): void
     {
         $surfaces = [
             $component->html(),
@@ -658,7 +718,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
             json_encode($component->effects, JSON_THROW_ON_ERROR),
         ];
 
-        $forbidden = [
+        $forbidden = array_merge([
             self::SENSITIVE_CANARY,
             'endpoint_path',
             'canonical_hash',
@@ -669,13 +729,86 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
             'changed_count',
             'removed_count',
             'unchanged_count',
-        ];
+        ], $extraForbidden);
 
         foreach ($forbidden as $needle) {
             foreach ($surfaces as $surface) {
                 $this->assertStringNotContainsString($needle, $surface, "Sensitive value [{$needle}] leaked.");
             }
         }
+    }
+
+    private function assertLatestSuccessfulPresentationDiscoveryRunMinimized(Testable $component): void
+    {
+        $record = $component->instance()->record;
+
+        $this->assertTrue($record->relationLoaded('latestSuccessfulPresentationDiscoveryRun'));
+
+        $fallbackRun = $record->getRelation('latestSuccessfulPresentationDiscoveryRun');
+        $this->assertNotNull($fallbackRun);
+
+        $forbiddenRunAttributes = [
+            'execution_attempts',
+            'duration_ms',
+            'cause_category',
+            'actionability',
+            'error_code',
+            'http_status',
+            'technical_summary',
+            'vendor_request_id',
+            'fields_received',
+            'fields_normalized',
+            'added_count',
+            'changed_count',
+            'removed_count',
+            'unchanged_count',
+            'trigger',
+            'initiated_by_user_id',
+            'started_at',
+            'finished_at',
+            'user_message_key',
+            'previous_snapshot_id',
+            'connector_schema_source_id',
+            'workspace_id',
+            'retry_until_at',
+            'next_attempt_at',
+        ];
+
+        foreach ($forbiddenRunAttributes as $attribute) {
+            $this->assertArrayNotHasKey(
+                $attribute,
+                $fallbackRun->getAttributes(),
+                "Fallback presentation run must not load [{$attribute}].",
+            );
+        }
+
+        $this->assertArrayHasKey('id', $fallbackRun->getAttributes());
+        $this->assertArrayHasKey('connector_account_id', $fallbackRun->getAttributes());
+        $this->assertArrayHasKey('snapshot_id', $fallbackRun->getAttributes());
+
+        $snapshot = $fallbackRun->snapshot;
+        $this->assertNotNull($snapshot);
+
+        $forbiddenSnapshotAttributes = [
+            'canonical_hash',
+            'connector_schema_source_id',
+            'discovery_run_id',
+            'previous_snapshot_id',
+            'schema_version',
+            'workspace_id',
+        ];
+
+        foreach ($forbiddenSnapshotAttributes as $attribute) {
+            $this->assertArrayNotHasKey(
+                $attribute,
+                $snapshot->getAttributes(),
+                "Fallback presentation snapshot must not load [{$attribute}].",
+            );
+        }
+
+        $this->assertArrayHasKey('id', $snapshot->getAttributes());
+        $this->assertArrayHasKey('connector_account_id', $snapshot->getAttributes());
+        $this->assertArrayHasKey('field_count', $snapshot->getAttributes());
     }
 }
 

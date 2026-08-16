@@ -1796,10 +1796,11 @@ Current shipped UI has **not** been fully migrated to this contract:
 
 - `Платформи та джерела` and `Модель даних і коннектори` admin surfaces still exist for platform-operator work (Layer D) and pre-contract merchant paths.
 - Layer B mapping UI and Mapping → Available Fields supporting reference are shipped (Task 4C-1c-2b, PR #139) with workspace-scoped Mapping authorization and Layer-B merchant copy on that supporting path.
-- Discovery Overview and legacy/diagnostic Field Browser paths remain merchant-reachable with snapshot-oriented copy (`connectors.ui.snapshot.*` in `lang/uk.json`) when not entered from Mapping with mapping authorization.
-- The `Інтеграції` landing surface exists as the merchant entry (`/admin/integrations`) per `docs/CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md`. Remaining GAP-025 work covers legacy/diagnostic Field Browser reachability, Discovery Overview merchant reachability, and Layer C gating.
+- GAP-025A cutover: merchant `ConnectorAccount` Overview uses **Доступні поля** Layer A/B vocabulary; relation managers removed from merchant Overview; Available Fields route requires Mapping permission; only Mapping → Available Fields remains as merchant entry.
+- ConnectionChecks / DiscoveryRuns relation managers and backend runtime remain for future Layer C — not shown on merchant Overview by design (conservative projection until platform-support identity exists).
+- The `Інтеграції` landing surface exists as the merchant entry (`/admin/integrations`) per `docs/CONNECTOR_INTEGRATSII_PAGE_UX_CONTRACT.md`. Remaining GAP-025 work covers Layer C gating when platform-support identity exists.
 
-Tracked as **known UX migration work** in `docs/IMPLEMENTATION_GAPS.md` (GAP-025). Do not document the full connector merchant UI as contract-compliant until remaining migration work lands. The Mapping supporting path is partially migrated; legacy Field Browser / Discovery / Layer C surfaces still fail that bar even though the `Інтеграції` landing and Layer B mapping UI now exist.
+Tracked as **known UX migration work** in `docs/IMPLEMENTATION_GAPS.md` (GAP-025). GAP-025A closed the merchant Connector Account Overview / Available Fields cutover for ordinary workspace merchants. Remaining GAP-025 work is Layer C gating when platform-support identity exists.
 
 ### Workspace access / Roles UI sequencing (Resolved — GAP-026-0, 2026-08-13)
 

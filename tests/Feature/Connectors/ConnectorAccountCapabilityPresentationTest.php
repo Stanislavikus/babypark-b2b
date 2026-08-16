@@ -10,7 +10,6 @@ use App\Enums\ConnectorErrorCause;
 use App\Enums\UserRole;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ListConnectorAccounts;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
-use App\Filament\Resources\ConnectorAccountResource\RelationManagers\DiscoveryRunsRelationManager;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorConnectionCheck;
 use App\Models\User;
@@ -192,7 +191,7 @@ class ConnectorAccountCapabilityPresentationTest extends TestCase
             ->invoke($detailComponent->instance());
 
         $this->assertSame([], $headerActions);
-        $this->assertSame([DiscoveryRunsRelationManager::class], $relationManagers);
+        $this->assertSame([], $relationManagers);
         $this->assertNull($detailComponent->instance()->getSubheading());
 
         $connectionCheckQueries = $this->captureConnectionCheckQueriesDuring(function () use ($viewer, $account): void {
@@ -369,9 +368,7 @@ class ConnectorAccountCapabilityPresentationTest extends TestCase
             ->invoke($detailComponent->instance());
 
         $this->assertSame([], $headerActions);
-        $this->assertSame([
-            DiscoveryRunsRelationManager::class,
-        ], $relationManagers);
+        $this->assertSame([], $relationManagers);
         $this->assertNull($detailComponent->instance()->getSubheading());
     }
 

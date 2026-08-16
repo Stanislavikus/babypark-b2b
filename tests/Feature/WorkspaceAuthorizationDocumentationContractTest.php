@@ -307,7 +307,7 @@ class WorkspaceAuthorizationDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('**Implemented sync-domain backend (verified on `develop`; not a GAP-025 UX claim):**', $content);
         $this->assertStringContainsString('`SyncConfiguration` persistence and domain write path (Task 4C-0).', $content);
-        $this->assertStringContainsString('PR #139 for 4C-1c-2b)', $content);
+        $this->assertStringContainsString('GAP-025A merchant Connector Account Overview', $content);
         $this->assertStringNotContainsString('Layer B mapping UI still missing', $content);
         $this->assertStringNotContainsString(
             'Sync Domain persistence/runtime (`SyncConfiguration`, `FieldMapping`,',

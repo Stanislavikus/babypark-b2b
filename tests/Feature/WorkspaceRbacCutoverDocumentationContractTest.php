@@ -360,7 +360,7 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
         $this->assertStringContainsString('permission-based safe Connector presentation', $domainB2);
         $this->assertStringContainsString('production-activated (2026-08-14)', $domainB2);
         $this->assertStringContainsString('maintenance-window cutover completed 2026-08-14', $domainB2);
-        $this->assertStringContainsString('4C-1c-2b** may proceed', $domainB2);
+        $this->assertStringContainsString('Layer B mapping UI (4C-1c-2b) shipped in PR #139', $domainB2);
 
         $this->assertStringContainsString('EXECUTE command', $gapsB2);
         $this->assertStringContainsString('workspace-rbac:cutover-execute', $gapsB2);
@@ -394,7 +394,7 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('CHECK-ONLY mode only', $this->cutoverB1SliceRow());
         $this->assertStringContainsString('EXECUTE mode', $this->cutoverB2SliceRow());
-        $this->assertStringContainsString('4C-1c-2b** may proceed', $this->cutoverB2SliceRow());
+        $this->assertStringContainsString('Layer B mapping UI (4C-1c-2b) shipped in PR #139', $this->cutoverB2SliceRow());
 
         $this->assertStringContainsString('GAP-026B-0 — Workspace RBAC authority cutover contract', $gaps);
         $this->assertStringContainsString('CHECK-ONLY (B-1)', $gaps);
@@ -403,7 +403,7 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
         $this->assertStringContainsString('GAP-026B-1 **Done**', $gaps);
         $this->assertStringContainsString('Part 2 merchant Access/Roles UI', $gaps);
         $this->assertStringContainsString('workspace-rbac:cutover-check', $gaps);
-        $this->assertStringContainsString('GAP-026B authorization prerequisite is now satisfied', $gaps);
+        $this->assertStringContainsString('Layer B mapping UI (4C-1c-2b) shipped in PR #139', $gaps);
         $this->assertStringContainsString('GAP-026B (overall)** | **Done**', $gaps);
     }
 

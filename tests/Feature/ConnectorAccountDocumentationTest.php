@@ -161,6 +161,10 @@ class ConnectorAccountDocumentationTest extends TestCase
         );
         $this->assertStringContainsString('Task 4B-2c', $gap006);
         $this->assertStringContainsString(
+            '**Historical (pre-PR #139):** Task **4C-1c-2b** (Layer B Mapping UI) was then the current next repository implementation task; shipped in PR #139',
+            $gap006
+        );
+        $this->assertStringNotContainsString(
             '**Current next repository implementation task:** Task **4C-1c-2b**',
             $gap006
         );
@@ -340,7 +344,7 @@ class ConnectorAccountDocumentationTest extends TestCase
         $content = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
 
         $this->assertStringContainsString('## Connector Integration UX (Resolved — 2026-08-10)', $content);
-        $this->assertStringContainsString('Discovery Overview and Field Browser remain merchant-reachable with snapshot-oriented copy', $content);
+        $this->assertStringContainsString('GAP-025A cutover', $content);
         $this->assertStringContainsString('Shipped Task 4B implementation (pre-contract — historical reference)', $content);
         $this->assertStringNotContainsString('## Operational Connection Pattern (reusable)', $content);
     }

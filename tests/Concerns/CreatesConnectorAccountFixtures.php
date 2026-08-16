@@ -8,9 +8,11 @@ use App\Models\ConnectorAccount;
 use App\Models\ConnectorDefinition;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Models\WorkspaceUser;
 use App\Support\Connectors\AdobePaaS\AdobePaaSCredentialMapper;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
 use App\Support\Workspace\WorkspacePermissions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 trait CreatesConnectorAccountFixtures
@@ -93,6 +95,72 @@ trait CreatesConnectorAccountFixtures
                 WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
                 WorkspacePermissions::RUN_CONNECTOR_DISCOVERY,
             ],
+        );
+        $this->assignRoleToMembership($membership, $role);
+    }
+
+    protected function grantExactWorkspacePermissions(Workspace $workspace, User $user, array $permissionCodes): WorkspaceUser
+    {
+        $membership = WorkspaceUser::query()
+            ->where('workspace_id', $workspace->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($membership === null) {
+            $membership = $this->makeWorkspaceMembership($workspace, $user, true);
+        }
+
+        $role = $this->createRoleWithPermissions(
+            $workspace->id,
+            'Exact '.implode('_', $permissionCodes).' '.$user->id,
+            $permissionCodes,
+        );
+        $this->assignRoleToMembership($membership, $role);
+
+        return $membership;
+    }
+
+    protected function revokeAllWorkspaceRoles(WorkspaceUser $membership): void
+    {
+        DB::table('workspace_user_roles')
+            ->where('workspace_user_id', $membership->id)
+            ->delete();
+    }
+
+    protected function grantSyncMappingsView(Workspace $workspace, User $user): void
+    {
+        $membership = WorkspaceUser::query()
+            ->where('workspace_id', $workspace->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($membership === null) {
+            $membership = $this->makeWorkspaceMembership($workspace, $user, true);
+        }
+
+        $role = $this->createRoleWithPermissions(
+            $workspace->id,
+            'Sync Mappings Viewer '.$user->id,
+            [WorkspacePermissions::VIEW_SYNC_MAPPINGS],
+        );
+        $this->assignRoleToMembership($membership, $role);
+    }
+
+    protected function grantSyncMappingsManage(Workspace $workspace, User $user): void
+    {
+        $membership = WorkspaceUser::query()
+            ->where('workspace_id', $workspace->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($membership === null) {
+            $membership = $this->makeWorkspaceMembership($workspace, $user, true);
+        }
+
+        $role = $this->createRoleWithPermissions(
+            $workspace->id,
+            'Sync Mappings Manager '.$user->id,
+            [WorkspacePermissions::MANAGE_SYNC_MAPPINGS],
         );
         $this->assignRoleToMembership($membership, $role);
     }

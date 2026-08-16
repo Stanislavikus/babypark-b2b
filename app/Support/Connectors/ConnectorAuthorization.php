@@ -51,8 +51,7 @@ final class ConnectorAuthorization
 
     public function canLayerBExternalFieldReference(User $user, Workspace $workspace): bool
     {
-        return $this->canSafeRead($user, $workspace)
-            || $this->canReadSyncMappings($user, $workspace);
+        return $this->canReadSyncMappings($user, $workspace);
     }
 
     /**

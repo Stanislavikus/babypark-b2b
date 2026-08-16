@@ -1016,15 +1016,20 @@ Remaining connector gaps are tracked separately under GAP-006.
   fresh Mapping authorization.
 - Available Fields supporting reference from Mapping: `ViewConnectorSchemaSnapshot`
   is reachable from Mapping via `availableFieldsUrl`; mapping-authorized merchants
-  with `view_sync_mappings` receive Layer-B title/copy (`sync_mappings.available_fields_*`)
-  rather than snapshot/source metadata; ordinary Mapping UI does not expose Layer-C
-  snapshot terminology; no new top-level Available Fields navigation was introduced.
-- `ViewConnectorSchemaSnapshot` remains merchant-reachable on legacy/diagnostic
-  account paths without mapping authorization; those paths still use
-  snapshot-oriented copy in `lang/uk.json` (e.g. `connectors.ui.snapshot.title`
-  = "Зведення знімка"). Layer C still requires a distinct platform-support identity.
-- Discovery-related surfaces remain reachable through current account Overview
-  paths.
+  with `view_sync_mappings` / `manage_sync_mappings` receive Layer-B title/copy
+  (`sync_mappings.available_fields_*`); no other merchant entry path remains after
+  GAP-025A.
+- **GAP-025A cutover (shipped on branch `cursor/gap-025a-merchant-connector-cutover-a9b7`):**
+  merchant `ConnectorAccount` Overview rebaselined to Layer A/B **Доступні поля**
+  vocabulary; `DiscoveryRunsRelationManager` and `ConnectionChecksRelationManager`
+  removed from merchant Overview (backend classes preserved); manual discovery
+  action relabeled **Оновити доступні поля**; `ViewConnectorSchemaSnapshot`
+  requires Mapping read permission (`canLayerBExternalFieldReference` is
+  mapping-only); connector-only actors get 403 on snapshot route.
+- **ConnectionChecks history on merchant Overview:** intentionally not restored —
+  current merchant projection stays conservative until Layer C platform-support
+  identity exists; backend `ConnectionChecksRelationManager` remains for future
+  Layer C.
 - **Shipped runtime/read architecture (not a regression):** `ConnectorCapability`,
   Discovery execution, snapshot persistence, and Field Browser read-model
   architecture are shipped.
@@ -1032,13 +1037,14 @@ Remaining connector gaps are tracked separately under GAP-006.
   `ConnectorAuthorization` evaluate the frozen workspace-permission matrix via
   `WorkspaceAuthorization` — not fixed `User.role` semantics. Historical pre-B-2
   fixed-role behavior is transitional evidence under **GAP-026** / PR #102 only.
-- **Remaining GAP-025 UX work:** legacy/diagnostic Field Browser reachability on
-  non-mapping paths; Discovery Overview merchant reachability; Layer A Overview /
-  Layer B setup surfaces beyond connection create and mapping; Layer C gating when
-  platform-support identity exists.
+- **Remaining GAP-025 UX work:** Layer C gating when platform-support identity
+  exists; Layer B setup surfaces beyond connection create and mapping (sync
+  execution, preview, scheduling, issue aggregation).
 - **Shipped (Task 4C-1c-2b, PR #139):** Layer-B Mapping page and Mapping →
   Available Fields supporting reference with workspace-scoped Mapping authorization
   and Layer-B merchant copy on that path.
+- **Shipped (GAP-025A):** merchant Connector Account Overview / Available Fields
+  Layer A/B cutover for ordinary workspace merchants.
 
 **Implemented sync-domain backend (verified on `develop`; not a GAP-025 UX claim):**
 - `SyncConfiguration` persistence and domain write path (Task 4C-0).
@@ -1061,24 +1067,27 @@ not reopen it as an open research task unless current repository truth
 contradicts an approved invariant.
 
 **Impact:**
-- Do not document current connector merchant UI as compliant with
-  `CONNECTOR_INTEGRATION_UX_CONTRACT.md`.
-- Do not treat Discovery Overview as the long-term merchant destination — it is
-  Layer C/diagnostic vocabulary on a pre-migration merchant path.
+- GAP-025A rebaselined merchant `ConnectorAccount` Overview to Layer A/B
+  **Доступні поля** vocabulary; Discovery Overview / history relation managers are
+  no longer merchant destinations on that surface (backend preserved for future
+  Layer C).
+- Remaining non-compliance is Layer C platform-support gating and future sync
+  surfaces (execution, preview, scheduling, issues, history) — not the legacy
+  Discovery Overview merchant path removed by GAP-025A.
 - Do not widen any workspace merchant membership / role-access profile to Layer C
   as a workaround — Layer C requires the separately resolved platform-support
   identity.
 
-**Next task:** Remaining Connector UX migration — legacy/diagnostic Field Browser
-reachability and Layer C gating when platform-support identity exists; Discovery
-Overview merchant reachability; Layer A Overview / Layer B setup surfaces beyond
-connection create and mapping. Backend mechanisms above remain separate scoped
-tasks.
+**Next task:** Remaining Connector UX migration — Layer C gating when
+platform-support identity exists; Layer B setup surfaces beyond connection create
+and mapping (sync execution, preview, scheduling). Backend mechanisms above remain
+separate scoped tasks.
 
 **Status:** Open — partial (`Інтеграції` landing shipped; SyncConfiguration,
-FieldMapping persistence, canonical suggestion read-model, and Layer B mapping UI
-shipped in backend/UI — PR #139 for 4C-1c-2b); remaining Connector UX migration /
-Layer A-B-C boundary work.
+FieldMapping persistence, canonical suggestion read-model, Layer B mapping UI
+shipped — PR #139 for 4C-1c-2b; GAP-025A merchant Connector Account Overview /
+Available Fields cutover shipped); remaining Connector UX migration / Layer C
+boundary work.
 
 ---
 

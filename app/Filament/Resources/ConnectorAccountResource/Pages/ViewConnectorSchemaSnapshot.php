@@ -9,7 +9,6 @@ use App\Models\ConnectorSchemaSnapshotField;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
-use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorAuthorization;
 use App\Support\Connectors\ConnectorSchemaFieldPresenter;
 use App\Support\Connectors\ConnectorUiFormatter;
@@ -79,9 +78,7 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
 
     public function getTitle(): string|Htmlable
     {
-        return $this->layerBPresentation
-            ? __('sync_mappings.available_fields_title', ['platform' => $this->account->connectorDefinition->name])
-            : __('connectors.ui.snapshot.title');
+        return __('sync_mappings.available_fields_title', ['platform' => $this->account->connectorDefinition->name]);
     }
 
     public static function canAccess(array $parameters = []): bool
@@ -112,25 +109,11 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
 
         $user = Auth::user();
         abort_unless($user instanceof User, 403);
-        $workspace = $this->account->workspace ?? Workspace::query()->findOrFail($this->account->workspace_id);
-        $connectorAuthorization = app(ConnectorAuthorization::class);
-        $this->layerBPresentation = $connectorAuthorization->canReadSyncMappings($user, $workspace);
-
-        if ($this->layerBPresentation) {
-            $this->sourceLabel = null;
-            $this->capturedAt = ConnectorUiFormatter::formatDateTime($snapshotRecord->captured_at);
-            $this->fieldCount = $snapshotRecord->field_count;
-            $this->snapshotStateLabel = null;
-
-            return;
-        }
-
-        $uiState = app(ConnectorAccountUiState::class);
-
-        $this->sourceLabel = $uiState->schemaSourceLabel($snapshotRecord->schemaSource);
+        $this->layerBPresentation = true;
+        $this->sourceLabel = null;
         $this->capturedAt = ConnectorUiFormatter::formatDateTime($snapshotRecord->captured_at);
         $this->fieldCount = $snapshotRecord->field_count;
-        $this->snapshotStateLabel = $uiState->snapshotStateLabel($snapshotRecord);
+        $this->snapshotStateLabel = null;
     }
 
     public function table(Table $table): Table
@@ -295,10 +278,7 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
 
         $workspace = $record->workspace ?? Workspace::query()->findOrFail($record->workspace_id);
 
-        abort_unless(
-            $user->can('view', $record) || $this->canAccessLayerBFields($user, $workspace, $record),
-            403,
-        );
+        abort_unless($this->canAccessLayerBFields($user, $workspace, $record), 403);
 
         $presentation = app(ConnectorAccountCapabilityPresentation::class);
 
