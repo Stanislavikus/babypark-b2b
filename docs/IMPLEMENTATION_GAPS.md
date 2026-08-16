@@ -1067,10 +1067,13 @@ not reopen it as an open research task unless current repository truth
 contradicts an approved invariant.
 
 **Impact:**
-- Do not document current connector merchant UI as compliant with
-  `CONNECTOR_INTEGRATION_UX_CONTRACT.md`.
-- Do not treat Discovery Overview as the long-term merchant destination — it is
-  Layer C/diagnostic vocabulary on a pre-migration merchant path.
+- GAP-025A rebaselined merchant `ConnectorAccount` Overview to Layer A/B
+  **Доступні поля** vocabulary; Discovery Overview / history relation managers are
+  no longer merchant destinations on that surface (backend preserved for future
+  Layer C).
+- Remaining non-compliance is Layer C platform-support gating and future sync
+  surfaces (execution, preview, scheduling, issues, history) — not the legacy
+  Discovery Overview merchant path removed by GAP-025A.
 - Do not widen any workspace merchant membership / role-access profile to Layer C
   as a workaround — Layer C requires the separately resolved platform-support
   identity.

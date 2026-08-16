@@ -161,6 +161,10 @@ class ConnectorAccountDocumentationTest extends TestCase
         );
         $this->assertStringContainsString('Task 4B-2c', $gap006);
         $this->assertStringContainsString(
+            '**Historical (pre-PR #139):** Task **4C-1c-2b** (Layer B Mapping UI) was then the current next repository implementation task; shipped in PR #139',
+            $gap006
+        );
+        $this->assertStringNotContainsString(
             '**Current next repository implementation task:** Task **4C-1c-2b**',
             $gap006
         );
