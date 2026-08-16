@@ -929,7 +929,7 @@ Hardcoded workspace-specific behavior is prohibited.
 
 The system MUST NOT include logic such as:
 
-if ($workspaceId === BABYPARK_ID) {
+if ($workspaceId === NAMED_CUSTOMER_ID) {
     // special flow
 }
 

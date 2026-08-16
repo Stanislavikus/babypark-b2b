@@ -982,7 +982,7 @@ semantics by themselves.
 **026B repository status (post-B-2 implementation):** `ConnectorAccountPolicy` and
 `ConnectorAuthorization` evaluate the workspace-RBAC matrix above via
 `WorkspaceAuthorization`. Legacy `User.role` labels have no connector authorization
-semantics in cut-over paths. Babypark pilot production cutover completed
+semantics in cut-over paths. Reference-environment production cutover completed
 2026-08-14 (see GAP-026B in `IMPLEMENTATION_GAPS.md`).
 
 **Connector dispatch authorization freshness (frozen)**
@@ -1395,7 +1395,7 @@ cutover**.
 | Slice | Future runtime scope |
 |---|---|
 | **GAP-026B-1 — Access & Cutover Machinery** | Guarded cutover command/service: **CHECK-ONLY mode only** (diagnostics; no RBAC assignment/materialization). Access/Roles application write services; existing-membership role assignment/removal; membership activate/deactivate; role create/rename/permission edit/safe unused-role delete; merchant Access/Roles UI; global `User` deactivation integrity service; hard-delete guard; CHECK-ONLY cutover/runbook tests. **Explicitly no** connector/tax policy authority switch. **B-1-only release must not ship an executable production EXECUTE mode** — no production legacy membership/role backfill in a B-1-only deployment. |
-| **GAP-026B-2 — Authority & Presentation Cutover** | **Done / production-activated (2026-08-14).** EXECUTE mode of the guarded cutover command/service (production legacy assignment materialization). `ConnectorAccountPolicy` migration; remove legacy `WorkspaceMembership` from connector authority paths; permission-based safe Connector presentation; merchant Integrations/catalog gating migration; tax authorization migration + write-time reauthorization; Mapping authorization seam; DB-fresh `WorkspaceAuthorization` effective-permission evaluation (persistence-backed authority inputs, not hydrated `User` state); Connector post-lock dispatch authorization freshness; accepted asynchronous revocation boundary (post-snapshot enqueue is not retroactively cancelled); explicit no-`Workspace`-row-mutex / no-`User`-row-mutex rule for Connector dispatch; cross-workspace + safe-state + Livewire serialization regressions; EXECUTE cutover/runbook tests. Babypark pilot maintenance-window cutover completed 2026-08-14. Layer B mapping UI (4C-1c-2b) shipped in PR #139 after B-2 production EXECUTE. |
+| **GAP-026B-2 — Authority & Presentation Cutover** | **Done / production-activated (2026-08-14).** EXECUTE mode of the guarded cutover command/service (production legacy assignment materialization). `ConnectorAccountPolicy` migration; remove legacy `WorkspaceMembership` from connector authority paths; permission-based safe Connector presentation; merchant Integrations/catalog gating migration; tax authorization migration + write-time reauthorization; Mapping authorization seam; DB-fresh `WorkspaceAuthorization` effective-permission evaluation (persistence-backed authority inputs, not hydrated `User` state); Connector post-lock dispatch authorization freshness; accepted asynchronous revocation boundary (post-snapshot enqueue is not retroactively cancelled); explicit no-`Workspace`-row-mutex / no-`User`-row-mutex rule for Connector dispatch; cross-workspace + safe-state + Livewire serialization regressions; EXECUTE cutover/runbook tests. Reference-environment maintenance-window cutover completed 2026-08-14. Layer B mapping UI (4C-1c-2b) shipped in PR #139 after B-2 production EXECUTE. |
 
 This separates repository implementation readiness from environment production
 activation.
@@ -1573,6 +1573,136 @@ Pricing and availability should usually belong to the variant level.
 
 This avoids future problems when one product has several sellable versions with different SKU, price or stock.
 
+### Platform Product Capability Baseline
+[Resolved]
+
+The platform is a universal multi-tenant SaaS e-commerce Product Data Platform. It is not defined by a tiny fixed field list, a named customer, a first connected commerce account, or the first Magento connector.
+
+Reference clients validate the platform; they do not define the platform.
+
+The platform must support heterogeneous e-commerce catalogues across product verticals. Illustrative examples only — not a closed enum and not encoded as generic Product-core logic:
+
+- apparel;
+- footwear;
+- electronics;
+- home/furniture;
+- toys;
+- beauty;
+- automotive parts;
+- industrial products;
+- food/non-food packaged goods;
+- sports;
+- specialty retail;
+- B2B supplies.
+
+#### Product + Variant is a first-class invariant
+
+Normal platform cardinality:
+
+```text
+Product
+  └── 0..N ProductVariants
+```
+
+Product variants may differ by merchant-defined option dimensions such as color, size, material, capacity, memory, voltage, pack size, style, configuration, or arbitrary workspace-defined dimensions. These examples are not a closed enum.
+
+The architecture must not assume:
+
+- one Product = one SKU;
+- one Product = one price;
+- one Product = one inventory quantity;
+- one Product = one image;
+- one Product = one external record.
+
+Where domain ownership places SKU/GTIN/price/inventory/media on variants, connector execution must respect that model.
+
+MVP UI may still auto-create one hidden default variant for a simple single-SKU Product so merchants are not forced to understand variants. That is UX hiding. Do not invent a fake default variant merely to simplify Magento. A simple Product with one sellable SKU exports as a Magento simple product; a Product with 0..N meaningful variants exports as a Magento configurable family when Magento Product Export V1 applies.
+
+#### Configurable / variant product families are mandatory
+
+**Product + variants/options** is a configurable / variant product family. This is a first-class platform capability.
+
+This is different from a true **bundle / kit / composite product**, which combines multiple independently meaningful sellable components.
+
+Both concepts are distinct platform capabilities.
+
+Bundle / kit / composite composition is a legitimate future Product composition capability. Today's Product/Sync boundaries must not make it impossible. This baseline does not invent a full bundle persistence schema. Magento bundle-product support is not in Magento Product Export V1.
+
+Do not declare Magento Product Export V1 DONE while ordinary platform multi-variant Products are unsupported.
+
+#### Rich and extensible Product data
+
+The platform's product vocabulary is extensible and standards-backed; canonical fields are defaults/known concepts, not the maximum allowed product model.
+
+Preserve FieldDefinition, FieldBinding, workspace custom fields, mapping, and dynamic values as the mechanism for diverse product characteristics.
+
+Do not hardcode every possible e-commerce attribute as a Product DB column.
+
+Do not treat current Adobe rows in `docs/data/canonical_product_field_mappings.csv` as the complete Product vocabulary.
+
+#### Product assets / rich content
+
+The Product Data Platform conceptually supports rich Product assets including at least:
+
+- images;
+- video;
+- product manuals / instructions;
+- documents / PDFs;
+- certificates / technical documents where applicable.
+
+The architecture must allow both Product-level assets and Variant-specific assets where business semantics require them.
+
+Current implementation truth: Product currently carries an `images` JSON field. No first-class MediaAsset / ProductMedia / VariantMedia runtime model with asset-type or variant-level semantics is implemented.
+
+The Domain Model names MediaAsset / ProductMedia / VariantMedia as the conceptual target. Do not create a competing second media model. Do not collapse every asset forever into `products.images` JSON if richer media entities are later implemented along that existing conceptual path.
+
+This section defines required conceptual extensibility, not a new persistence schema. Do not freeze storage implementation beyond the already-resolved hybrid Field Dictionary and the current minimal `products.images` JSON.
+
+Required semantic concerns to preserve or explicitly leave extensible:
+
+- asset type;
+- product/variant association;
+- ordering;
+- primary/role;
+- locale where relevant;
+- external/source reference;
+- importability;
+- exportability.
+
+The target architecture must remain capable of evolving from the current minimal representation toward first-class Product/Variant assets without forcing connector-specific media fields into Product core.
+
+If Magento Product Export V1 does not consume video or documents, mark:
+
+`PLATFORM CAPABILITY — NOT IN THIS CONNECTOR V1`
+
+not:
+
+`BACKLOG BECAUSE PLATFORM DOES NOT NEED IT`
+
+#### Imported content is not limited to primitive attributes
+
+The connector/import architecture must be capable of bringing in structured attributes, variants/options, images, videos, documents/instructions, identifiers, relations where supported, and domain-owned values through their domains.
+
+Do not implement all import domains in this contract. FieldMapping remains semantic correspondence, not a universal transport DSL.
+
+#### Localization and market richness
+
+Do not assume one language or one storefront scope as permanent Product semantics.
+
+Preserve compatibility with:
+
+- localized product content (JSONB translation objects for `is_localizable = true`; MVP UI shows the primary workspace language);
+- multi-store / store-view external contexts (`SyncConfiguration.external_context` is connector-owned, not Product-core columns);
+- channel-specific presentation.
+
+Do not invent another localization persistence system here.
+
+#### Connector V1 must not redefine platform Product capabilities as nonexistent
+
+Connector V1 scope may defer vendor-specific support for some platform Product capabilities, but it must never redefine those platform capabilities as nonexistent.
+
+Examples: platform video asset; platform instruction/document asset; bundle/kit composition; advanced localization; additional product types.
+
 ### Product Type
 
 
@@ -1661,6 +1791,9 @@ The first version may support:
 - additional product images later.
 
 Media handling should not become a full DAM system in MVP.
+
+See **Platform Product Capability Baseline** for conceptual images, video, and
+document/instruction assets. Current runtime remains `products.images` JSON.
 
 ## Field Dictionary Context
 
@@ -2853,7 +2986,7 @@ domain services after terminal connection checks and discovery runs.
 
 #### Boundary vs legacy `SyncLog`
 
-`SyncLog` remains a **legacy summary log** for existing Babypark import/export
+`SyncLog` remains a **legacy summary log** for existing legacy import/export
 sync flows. It has no `workspace_id`, no `connector_account_id`, no running state,
 coarse `success|error` only, and legacy product/price/stock type enums. Task 4B
 **does not** extend or reuse `SyncLog` as a parent event table. New connector
@@ -3259,7 +3392,7 @@ which would trigger *both* candidate rules under an unordered reading):
   the account by `(created_at, id) DESC`** — a stale/delayed terminal
   write from an older run must never overwrite a newer run's result.
 
-**Worker-activation gate (Babypark pilot):** closed 2026-08-15 — Supervisor program
+**Worker-activation gate (reference environment):** closed 2026-08-15 — Supervisor program
 `babypark-connector-queue` installed, verified `RUNNING`, and confirmed processing
 `ConnectorDiscoveryRunJob` on the `database_connectors` / `connectors` lane; manual
 Discovery enabled only after worker verification; one successful production manual
@@ -4090,7 +4223,7 @@ GAP-026B-0, 2026-08-13)** — the frozen workspace-permission matrix via
 `ConnectorAuthorization` / `WorkspaceAuthorization`, capability-based presentation
 through `ConnectorAccountCapabilityPresentation`, and removal of
 `WorkspaceMembership` as an additional connector gate. **Production activation**
-of that authority switch completed on the Babypark pilot on 2026-08-14 via the
+of that authority switch completed on the reference environment on 2026-08-14 via the
 verified maintenance-window **EXECUTE** cutover. Merging B-2 code was not itself
 the production cutover; the separate production activation has now also completed.
 
@@ -5779,6 +5912,415 @@ Fixed `all_products` is a first-slice safe Preview constraint, not a sixth
 Product Owner question. PO-1 and PO-4 remain open. PO-2, PO-3, and PO-5 remain
 untouched.
 
+Historical implementation-slice IDs such as `4C-2b`, `4C-2b-2`, and `4C-2b-3`
+remain tracking labels. They are not mandatory future PR boundaries. Current
+coherent Magento execution stages are frozen in **Magento Product Export V1
+Execution Contract** below: Stage 1 Preview Engine → Stage 2 Merchant Preview →
+Stage 3 Live Engine.
+
+### Magento Product Export V1 Execution Contract
+[Resolved — Platform Product Scope Rebaseline]
+
+This section freezes Magento Product Export V1 remaining architecture so further
+implementation proceeds in three coherent stages. It does **not** duplicate
+Task 4C-2a.
+
+**Explicitly inherited unchanged from Preview-first Sync Execution Foundation
+Contract (Resolved — Task 4C-2a):**
+
+- Preview zero consequential mutation;
+- one SyncRun = one semantic operation;
+- SyncRunItem = Product;
+- `all_products` first selection;
+- `configuration_revision` / snapshot boundary;
+- one active run per SyncConfiguration;
+- short admission transaction;
+- no ExternalRecordLink during Preview;
+- normalized ready/warning/blocked Preview outcomes.
+
+Magento does not define the generic Product model. Magento V1 must support the
+platform's normal simple / non-variant Product and configurable / multi-variant
+Product cases.
+
+#### E1. Generic Product execution input
+
+Freeze the semantic boundary, not a PHP class name.
+
+Conceptually:
+
+```text
+Product execution aggregate
+  Product semantic values
+  0..N ProductVariants
+  variant option dimensions/values
+  domain-owned resolved values required by operation
+  run/configuration context
+```
+
+It is read-only execution input. It is not a second Product persistence model,
+not a serialized Magento payload, and not a Product snapshot database.
+
+The generic Product execution aggregate is vendor-neutral. Connector planner
+owns vendor representation.
+
+Scope discipline for Magento V1: the first runtime Product execution aggregate
+must contain only semantic inputs actually required by Magento V1 — ordinary
+Product data, 0..N ProductVariants and their option/value semantics, mapped
+fields, and required domain-owned resolved values.
+
+The aggregate MUST NOT pre-allocate speculative structures for capabilities
+that Magento V1 does not consume merely because they are valid platform
+concepts elsewhere. In particular, do not add speculative bundle/kit component
+collections, video payload collections, document/manual payload collections,
+generic future-channel bags, or unused universal transport metadata.
+
+Bundle composition, video, documents/instructions and other rich Product
+capabilities remain valid platform capabilities, but they enter an execution
+aggregate only when an actual connector/operation requires them.
+
+Reusable means extensible without redesign, not containing every future feature
+from day one.
+
+#### E2. SyncRunItem cardinality
+
+Preserve: one SyncRunItem = one platform Product outcome.
+
+One Product may produce 1 vendor request, N vendor requests, parent + child
+writes, option operations, link operations, or media operations.
+
+Transport/vendor operation cardinality must not redefine platform
+business-record outcome cardinality. Multi-store/store-view operations must
+not change SyncRunItem = Product.
+
+#### E3. Magento V1 product completeness
+
+Magento Product Export V1 must support:
+
+- simple products;
+- configurable / multi-variant products;
+
+corresponding to the platform's normal Product/Variant model.
+
+Intermediate implementation may add planner paths incrementally. The Magento V1
+DONE definition must not exclude multi-variant Products.
+
+Explicitly OUT unless separately justified:
+
+- Magento bundle;
+- grouped;
+- virtual;
+- downloadable;
+- gift-card-specific semantics.
+
+These vendor product types must not contaminate generic Product core.
+
+#### E4. Execution input classes
+
+Minimum classification:
+
+**Class A — mapped semantic Product data.** FieldBinding → FieldMapping →
+planner. Examples: name, brand, description, GTIN, custom product
+characteristics.
+
+**Class B — domain-owned resolved values.** Examples: price → PriceResolver;
+availability → AvailabilityResolver when included. No connector-specific
+alternate pricing path. PriceResolver remains the only price calculation path.
+
+**Class C — connector-owned operation configuration / metadata.** Examples:
+`attribute_set_id`, `type_id`, visibility, store-scope execution requirements.
+These are not fake Product fields. Adobe `attribute_set_id` is not a generic
+Product field.
+
+**Derived-value watch item.** A fourth class for platform-computed/derived
+values that are not stored FieldBinding values, have no separate canonical
+domain resolver, and are not vendor configuration is **not** created now. No
+current producer requires it. Document only as a watch-item.
+
+#### E5. Adobe attribute-set ownership
+
+Reject accidental equivalence: platform ProductType == Adobe `attribute_set_id`.
+Adobe `attribute_set_id` is not a generic Product field.
+
+| Concern | Owner |
+|---|---|
+| Semantic owner | Connector / Adobe profile — vendor attribute-set identity |
+| Persistence owner | SyncConfiguration-owned connector execution configuration |
+| Revision participation | Yes — part of `configuration_revision` when present |
+| `configuration_snapshot` participation | Yes — run-effective connector execution configuration |
+| Merchant/default behavior | Connected-account default / discovered attribute set; merchant does not edit it as a Product field |
+| Future multiple attribute-set compatibility | Additional SyncConfiguration-owned connector configuration, not ProductType and not FieldDefinition |
+
+Do not persist `attribute_set_id` in `external_context` merely because that
+field is JSON. `external_context` remains external business context
+(website/store/store-view), not a dump for vendor operation metadata.
+
+ProductType remains the platform template for field structure (hidden Basic
+Product in MVP). FieldDefinition / FieldBinding remain Product vocabulary.
+ConnectorAccount holds connection identity. Discovery metadata remains
+discovery.
+
+#### E6. Execution support truth
+
+Current binary `ConnectorSyncOperationSupport(data_domain, semantic_operation)`
+cannot truthfully advertise Preview supported / Live unsupported.
+
+Freeze support semantics that include execution mode, conceptually:
+
+```text
+data_domain
+semantic_operation
+execution_mode
+```
+
+Requirements:
+
+- unsupported pair/mode fails closed;
+- Preview never implies Live;
+- Preview and Live support are independent;
+- planner existence alone never advertises Live;
+- connector/profile owns declared support;
+- generic core understands semantic support without Adobe branching.
+
+Exact implementation API remains implementation-owned unless a later
+architectural contradiction appears.
+
+#### E7. SyncConfiguration merchant reachability
+
+A real merchant must reach the correct Adobe `products` / `export`
+SyncConfiguration without internal UUID knowledge.
+
+Rejected: picking an arbitrary "first configuration". Rejected: requiring the
+merchant to type a configuration UUID.
+
+**Frozen business behavior:** service-owned lazy ensure/create of the unique
+identity:
+
+```text
+ConnectorAccount
++ data_domain = products
++ default/empty external_context
+```
+
+with `export` enabled, triggered from the approved Integrations / Data Setup
+path once truthful Preview support is declared. Preserve service-owned
+mutation, workspace isolation, and external-context identity.
+
+Adobe `(products, export)` currently fail-closed, so configuration create
+cannot succeed until Stage 1 declares truthful Preview support. Order: support
+declaration → ensure configuration → merchant reachability. Do not freeze
+Filament page mechanics here.
+
+#### E8. Live authority
+
+Freeze a separate consequential permission:
+
+| Permission | Authority |
+|---|---|
+| `run_sync_live` | Execute consequential Live for an eligible SyncConfiguration and access the safe progress/result surface required for that execution. |
+
+Requirements:
+
+- Preview permission != Live permission (`run_sync_preview` cannot authorize Live);
+- absence = deny;
+- no role/job title implies permission;
+- no automatic legacy grant;
+- fresh authorization before consequential admission.
+
+Canonical atomic wording follows existing RBAC vocabulary (`run_sync_*` beside
+`run_connector_discovery` / `run_sync_preview`).
+
+#### E9. ExternalRecordLink structural contract
+
+Minimum architecture necessary for safe Live:
+
+- workspace-safe;
+- ConnectorAccount-scoped;
+- independent from transport attempts;
+- reusable where appropriate.
+
+Do not assume one Product = one external resource.
+
+Adobe identities (verified against Adobe Commerce REST configurable-product
+tutorials): parent configurable SKU, child simple SKUs, numeric resource IDs,
+external option/value identities.
+
+First Live structural contract (products domain):
+
+- typed `product_id`;
+- optional `product_variant_id` when the external record is a variant child;
+- role: `simple` | `configurable_parent` | `configurable_child`;
+- merchant-stable external identity: Adobe SKU;
+- optional numeric Adobe entity id as secondary;
+- unique within workspace + ConnectorAccount + role + external SKU.
+
+Do not invent a universal unrestricted polymorphic identity framework without
+evidence.
+
+#### E10. Live safety — hard invariants NOW
+
+[Resolved] invariants:
+
+- ambiguous consequential mutation is never blindly retried;
+- transport retry != business idempotency;
+- known-not-applied, known-applied and unknown/ambiguous states are
+  semantically distinct;
+- Preview authority never authorizes Live;
+- connector owns vendor-specific interpretation;
+- result persistence must remain merchant-safe and secret-safe;
+- Live must have a reconciliation strategy where the external API permits it;
+- automatic retry policy must be operation-specific.
+
+#### E11. Live safety — mechanics NOT over-frozen
+
+Do not pretend exact algorithms are already proven. The following are design
+hypotheses, not equally final domain invariants. They remain
+revalidation-sensitive rather than falsely [Resolved]:
+
+- POST vs PUT;
+- create-vs-update decision;
+- read-after-write;
+- ambiguous timeout reconciliation;
+- 429 handling;
+- record-level partial failure;
+- safe re-execution;
+- batch semantics.
+
+Before Stage 3 Live implementation, revalidate these mechanics against actual
+Adobe API behavior, Preview runtime lessons, and real connector test evidence.
+
+This revalidation does not require a new broad Stop-and-Amend unless a real
+architectural contradiction is found.
+
+#### E12. Multi-store / store-view scope
+
+Adobe REST store-view behavior (Adobe Bulk endpoints / store scopes): omitting
+store code uses default store; `<store_code>` updates one store; `all` updates
+all store scopes. Localized values and media gallery inheritance are
+store-view-scoped.
+
+**Magento V1 freeze:**
+
+- single/default store context only;
+- `SyncConfiguration.external_context` records that default/empty context;
+- multiple store views are out of Magento V1;
+- localized/store-scoped value fan-out is out of Magento V1;
+- SyncRunItem remains Product — one Product may still require multiple vendor
+  operations inside that one default context (parent + children + options +
+  media), which does not change business-record cardinality.
+
+PO-2 remains open for later merchant-configurable independent contexts.
+
+#### E13. Deactivation / removal semantics
+
+| Internal event | Magento V1 behavior |
+|---|---|
+| `Product.is_active` becomes false | Disable/unpublish the corresponding Adobe product(s) (`status` disabled). Do not delete the external resource. |
+| Product becomes unavailable (stock/availability) | Availability domain; do not map to Adobe deletion. Include AvailabilityResolver values only when the operation consumes them. |
+| Product is later hard-deleted | Hard-delete propagation is **outside V1**. Do not silently delete Adobe resources. Blocked/manual reconciliation. `SyncRunItem → Product` remains `ON DELETE RESTRICT`. |
+| Variant is deactivated | Disable the corresponding Adobe child simple when a child link exists. Do not delete. |
+| Variant is removed | Do not delete the Adobe child in V1. Disable if linked; leave ExternalRecordLink for reconciliation. |
+
+Do not silently map internal lifecycle to destructive Adobe deletion.
+
+#### E14. Rich media scope for Magento V1
+
+Do not let Magento V1 redefine the platform media model.
+
+Two decisions:
+
+1. **Platform capability** — rich assets (images, video, documents/instructions)
+   are first-class Product Data. See Platform Product Capability Baseline.
+2. **Magento Product Export V1 scope** — export primary image and additional
+   gallery images from current platform image assets (`products.images` JSON
+   today). Variant-specific images enter the child simple planner when the
+   platform actually has variant assets; current runtime does not. Video and
+   documents/instructions are `PLATFORM CAPABILITY — NOT IN THIS CONNECTOR V1`
+   because first V1 uses ordinary Adobe product image gallery APIs and must not
+   require Adobe-specific document extensions.
+
+Do not mark video/documents as globally deferred/unsupported merely because
+Adobe V1 does not consume them.
+
+#### E15. First Live transport strategy
+
+**Chosen:** synchronous Adobe REST through the existing Laravel connector queue
+runtime.
+
+Rejected for first V1: Adobe async/bulk. Official Adobe Bulk endpoints require
+RabbitMQ (or equivalent message broker) on the Commerce side, add partial-result
+and operation-status complexity, and are not justified by first V1 catalogue
+scale. Do not add infrastructure merely because Adobe offers an API.
+
+Transport choice remains connector-specific.
+
+#### Magento V1 DONE
+
+The connector must not be declared V1 complete merely because one simple SKU
+can be sent.
+
+Observable V1 DONE requires at minimum:
+
+- account setup works;
+- connection check works;
+- schema discovery works;
+- mapping setup works;
+- SyncConfiguration becomes merchant-reachable;
+- Preview works;
+- Preview performs zero consequential mutation;
+- Product-level results are understandable;
+- simple Product export works;
+- multi-variant/configurable Product export works;
+- external identities are preserved safely;
+- re-running does not blindly duplicate;
+- ambiguous consequential failures are handled safely;
+- deactivation behavior is defined;
+- store-context behavior is defined;
+- merchant receives understandable result;
+- real Adobe Commerce create/update validation succeeds.
+
+Media requirements follow E14.
+
+#### Coherent implementation stages
+
+Replace architecture micro-slicing with three principal outcomes. Existing
+labels such as `4C-2b-2` and `4C-2b-3` may remain historical tracking labels.
+They are not mandatory future PR boundaries. Internal PR subdivision is
+allowed for code-review/manageability. It must not create new architecture
+micro-slices unless a real unresolved architecture issue is discovered.
+
+**Stage 1 — Preview Engine**
+
+Business outcome: an authorized merchant/runtime actor can execute a
+persisted, zero-mutation Adobe Products Export Preview end-to-end against the
+full platform Product/Variant model.
+
+May coherently include: `run_sync_preview`; RBAC catalogue/materialization;
+SyncConfiguration reachability; snapshot builder; admission/concurrency;
+coherent Product execution set; generic Product execution aggregate;
+Product + variant value resolution; Adobe simple planner; Adobe configurable
+planner; background execution; normalized findings; truthful Preview
+execution support.
+
+No merchant-facing polished Preview page is required in Stage 1. No Live
+mutation.
+
+**Stage 2 — Merchant Preview**
+
+Business outcome: an authorized non-technical merchant can reach Preview
+through the approved Integrations/Data Setup path and understand Product-level
+ready/warning/blocked outcomes.
+
+Do not build generic Sync History product, SyncIssue, scheduling, or analytics
+merely for this stage.
+
+**Stage 3 — Live Engine + Real Magento Validation**
+
+Before coding, revalidate E11 mechanics. Then coherently implement: Live
+permission; ExternalRecordLink; simple Product execution; configurable Product
+execution; safe create/update behavior; reconciliation; normalized Live
+result; merchant-safe presentation; production activation; real Magento
+create/update verification.
+
 ### Canonical mapping registry role
 
 `docs/data/canonical_product_field_mappings.csv` is **platform-global
@@ -6647,7 +7189,7 @@ Any new tables created by the Field Foundation migration (`field_bindings`,
 `customer_field_values`) must include `workspace_id` from their first
 migration, per this same rule — not as an afterthought.
 
-Migration order: create `workspaces` → create default Babypark workspace → add nullable
+Migration order: create `workspaces` → create default workspace → add nullable
 `workspace_id` to `products` / `product_variants` / `categories` → backfill existing rows to the
 default workspace → make `workspace_id` not-nullable where safe → create the new Product Fields
 tables with `workspace_id` present from their first migration.

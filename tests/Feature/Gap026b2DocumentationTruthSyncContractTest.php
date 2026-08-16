@@ -62,7 +62,7 @@ class Gap026b2DocumentationTruthSyncContractTest extends TestCase
 
         $domainModel = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
         $this->assertStringContainsString(
-            'of that authority switch completed on the Babypark pilot on 2026-08-14',
+            'of that authority switch completed on the reference environment on 2026-08-14',
             $domainModel,
         );
     }

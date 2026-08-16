@@ -34,6 +34,9 @@ The architecture is defined by:
 - `03-DOMAIN_MODEL.md`
 - `04-ARCHITECTURE_PRINCIPLES.md`
 
+`08-CONNECTOR_SYNC_RUNTIME_ATLAS.md` locates current Connector/Sync
+implementation. It does not define architecture.
+
 This file defines the operating behavior required from AI while applying those documents.
 
 The working principle is simple:
@@ -83,6 +86,10 @@ For strategic, architectural, database, domain, security, payment, connector, im
 4. `03-DOMAIN_MODEL.md`
 5. `04-ARCHITECTURE_PRINCIPLES.md`
 6. `05-AI_WORKING_AGREEMENT.md`
+
+When the task touches Connector/Sync seams, also read
+`08-CONNECTOR_SYNC_RUNTIME_ATLAS.md` as a current-state locator. The Atlas is
+not normative. Verify the listed owner in code before modification.
 
 The AI must not rely on a memorized summary if the actual files are available.
 
@@ -903,6 +910,43 @@ When documentation changes are required, the AI must return:
 
 ---
 
+## Customer-neutral architecture
+
+No named customer or pilot may define:
+
+- domain model;
+- feature ceiling;
+- connector capability;
+- Product attributes;
+- variant cardinality;
+- architecture defaults.
+
+Reference clients validate the platform; they do not define the platform.
+
+A pilot may provide smoke evidence, production verification, UX feedback, or
+real API fixtures. A pilot must never determine platform capability.
+
+Do not introduce new customer-specific runtime identifiers. Existing hash
+prefixes, Supervisor program names, host paths, and cache prefixes require an
+explicit runtime migration before rename.
+
+## Atlas impact check
+
+Any Connector/Sync PR that materially changes an Atlas-listed seam must update
+the affected Atlas entry in the same PR.
+
+For every Connector/Sync PR:
+
+1. Did this PR touch an Atlas capability?
+2. Did current owner/status change?
+3. Was a reusable seam introduced?
+4. Is any stale ABSENT / NOT IMPLEMENTED state left?
+
+Only affected rows are updated. Do not require a full Atlas reread or a
+separate Atlas workstream.
+
+---
+
 ## Testing Requirements
 
 For business-critical logic, the AI must propose tests.
@@ -1051,7 +1095,7 @@ The AI is prohibited from:
 - mixing order status and payment status;
 - bypassing `WorkspaceOrderStatusMatrix`;
 - bypassing `InventoryReservation` / `AvailabilityResolver` for checkout stock protection;
-- hardcoding Babypark or any other client-specific logic;
+- hardcoding any named customer, pilot, or other client-specific logic;
 - leaking connector-specific payload structures into core entities;
 - storing raw payment data;
 - exposing technical architecture terms in ordinary UI;

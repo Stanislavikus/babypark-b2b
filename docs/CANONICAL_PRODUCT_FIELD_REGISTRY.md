@@ -1,6 +1,6 @@
 # Canonical Product Field Registry v7
 
-Self-contained contract for universal reusable product-data concepts within babypark B2B platform research coverage. Snapshot date: **2026-07-15**.
+Self-contained contract for universal reusable product-data concepts within this Product Data Platform research coverage. Snapshot date: **2026-07-15**.
 
 ## Purpose and scope
 

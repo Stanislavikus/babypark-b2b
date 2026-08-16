@@ -3,7 +3,7 @@
 ## Purpose
 
 This document records known, verified gaps between approved project documentation
-(00–07) and the actual state of the codebase on `develop`.
+(00–08) and the actual state of the codebase on `develop`.
 
 Entries here are NOT open product questions. The architectural decision is already
 **Resolved** in the referenced document — the gap is purely that the code has not
@@ -17,8 +17,9 @@ Rules for using this document:
   in the relevant PR/task description.
 - When a gap is closed, update its Status and keep the entry for history — do not
   delete it.
-- No Babypark-specific hardcoding is permitted as a "solution" to any gap (per
+- No named-customer or pilot-specific hardcoding is permitted as a "solution" to any gap (per
   `04-ARCHITECTURE_PRINCIPLES.md`, Configuration Over Custom Code mandate).
+  Reference clients validate the platform; they do not define the platform.
 
 Verified against `develop` as of the GAP-016 Field Foundation migration (PR pending):
 `app/Models/` contains `Category, Customer,
@@ -248,8 +249,9 @@ yet), but should be scheduled before any payment gateway integration work starts
 **Approved docs:**
 - `00-WHY.md`: platform must be connector-independent; "no connector should
   define the core product model."
-- `01-PRODUCT_VISION.md`, Babypark Pilot Scope: explicitly lists "ERP / 1C data
-  input" and "Google Sheets output" as valid, expected pilot requirements.
+- `01-PRODUCT_VISION.md`, Reference Clients Do Not Define the Platform: ERP / 1C
+  and Google Sheets may be needed earlier than a generic SaaS MVP; they remain
+  reusable connector families, not a named-customer architecture target.
 - `03-DOMAIN_MODEL.md`, MVP Domain Scope + Sync Domain Rebaseline:
   `ConnectorDefinition`, `ConnectorAccount`, `SyncConfiguration`,
   `FieldMapping`, `SyncRun` / `SyncRunItem`, and `ExternalRecordLink` are
@@ -287,8 +289,10 @@ yet), but should be scheduled before any payment gateway integration work starts
   not rendered to Merchandiser under pre-B-2 role semantics. **Superseded in
   repository runtime by GAP-026B-2** (`ConnectorAccountCapabilityPresentation` +
   workspace-RBAC matrix).
-- Connector-account **creation** and **credential-management/settings UI** remain
-  absent (explicitly out of scope for 4B-2a-3).
+- Connector-account **creation UI** is implemented
+  (`ConnectPlatformIntegration` on the Integrations path). **Credential-management /
+  settings edit UI** remains absent (update service exists;
+  `ConnectorAccountSettingsService::update()` has no Filament page).
 - Task 4B-2b Discovery Overview UI (PR #114) delivers Connector Account list
   last-successful-discovery projection, account-detail Discovery summary,
   Discovery history, minimal snapshot summary, and manual Discovery action
@@ -313,20 +317,19 @@ yet), but should be scheduled before any payment gateway integration work starts
   fail-closed for executable sync pairs.
 - Sync Domain entities still absent: `ExternalRecordLink`, preview/live execution,
   scheduling, sync history/issues, and merchant sync UX beyond connector
-  connection management. `SyncRun` / `SyncRunItem` persistence and revision v3
+  connection management and mapping. `SyncRun` / `SyncRunItem` persistence and revision v3
   rebaseline are implemented (Task 4C-2b-1, Done). `FieldMapping`
   persistence/manual confirmation and authoritative-discovery validation are
   implemented (Task 4C-1b, Done). Canonical suggestion/read-model and
   UI-prefill work is Task 4C-1c (4C-1c-0 docs contract frozen; 4C-1c-1
   provider/read-model Done; 4C-1c-2a authorization contract Done; 4C-1c-2b
   Layer B mapping UI Done, PR #139). Preview-first execution foundation
-  contract is frozen (Task 4C-2a, docs only): revision v3 + fixed
-  `all_products` selection, `run_sync_preview` normative eighth permission
-  (runtime catalogue still seven permissions until 4C-2b-2), `SyncRun`/
-  `SyncRunItem` physical contract, admission/concurrency/snapshot/planner
-  boundaries, Adobe operation-support truth gate. Preview admission/execution
-  runtime remains later implementation (Task 4C-2b-2+) after persistence
-  foundation (now landed for 4C-2b-1).
+  contract is frozen (Task 4C-2a, docs only). Magento Product Export V1
+  execution contract is frozen (Platform Product Scope Rebaseline, docs only):
+  `run_sync_preview` normative eighth permission (runtime catalogue still seven
+  permissions until Stage 1), Product execution aggregate, mode-aware support,
+  Live permission `run_sync_live`, ExternalRecordLink, and Live mechanics
+  revalidation. Preview admission/execution runtime remains Stage 1.
 
 **Task sequence (GAP-006 remains Open until implementation lands):**
 
@@ -346,18 +349,21 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (no DB/migration scope) — Done |
 | **4C-1c-2a** | Workspace access / authorization contract — docs-only Stop-and-Amend — Done |
 | **4C-1c-2b** | Layer B mapping UI: explicit `SyncConfiguration` Mapping page; deterministic high-confidence suggestion presentation; manual choose/change/remove; explicit confirmation through `FieldMappingMutationService`; stale-safe exact remove; workspace-scoped fresh Mapping authorization; Layer-B Available Fields supporting reference — Done, PR #139 |
-| **4C-2a** | Docs-only Preview-first Sync Execution Foundation Stop-and-Amend — `SyncRun`/`SyncRunItem` physical contract, revision v3 + fixed `all_products` selection, `run_sync_preview` normative permission (runtime pending 4C-2b-2), admission/concurrency/snapshot/planner boundaries, Adobe support-truth gate — Done |
+| **4C-2a** | Docs-only Preview-first Sync Execution Foundation Stop-and-Amend — `SyncRun`/`SyncRunItem` physical contract, revision v3 + fixed `all_products` selection, `run_sync_preview` normative permission (runtime pending Stage 1 / historical 4C-2b-2), admission/concurrency/snapshot/planner boundaries, Adobe support-truth gate — Done |
 | **4C-2b-1** | SyncRun Persistence & Revision Foundation — revision v3 runtime hasher + rebaseline, `SyncRun`/`SyncRunItem` persistence, enums/casts, workspace-aware integrity, Product composite FK support — Done |
-| **4C-2b-2** | Preview Authorization & Admission Foundation — `run_sync_preview` runtime permission, configuration snapshot builder, one-active-run admission — next |
-| **4C-2b-3** | Product Export Projection + Adobe Pure Planner — after docs-only Product Export Projection Stop-and-Amend |
-| **4C-2b** | Preview foundation umbrella — slices 4C-2b-1 (persistence + revision v3, Done), 4C-2b-2 (authorization + admission, next), 4C-2b-3 (Product Export Projection + Adobe pure planner, after docs-only Stop-and-Amend). Must **not** ship: merchant Preview UI; Live mutation; automatic `ConnectorSyncOperationSupport` flip |
-| **4C** | Remaining sync domain after 4C-2b foundation: merchant Preview exposure (after operation-support reconciliation), `ExternalRecordLink`, Live execution, scheduling, sync history/issues, merchant sync UX beyond mapping |
+| **4C-2b-2** | Historical tracking label — Preview Authorization & Admission Foundation. Not a mandatory future PR boundary. Absorbed by **Stage 1 — Preview Engine**. |
+| **4C-2b-3** | Historical tracking label — Product Export Projection + Adobe Pure Planner. Not a mandatory future PR boundary. Absorbed by **Stage 1 — Preview Engine** (Magento V1 contract now freezes Product+Variant execution input; no separate Product Export Projection Stop-and-Amend is required before Stage 1). |
+| **4C-2b** | Historical umbrella label for Preview foundation slices. 4C-2b-1 Done. Remaining Preview runtime is **Stage 1**. Must **not** ship: merchant Preview UI (that is Stage 2); Live mutation (Stage 3); automatic `ConnectorSyncOperationSupport` flip |
+| **Stage 1 — Preview Engine** | Current coherent outcome: persisted zero-mutation Adobe Products Export Preview against the full platform Product/Variant model. Includes `run_sync_preview`, SyncConfiguration reachability, snapshot/admission, Product execution aggregate, Adobe simple + configurable planners, truthful Preview support. Next implementation grouping. |
+| **Stage 2 — Merchant Preview** | Authorized non-technical merchant reaches Preview through Integrations/Data Setup and understands Product-level ready/warning/blocked outcomes. No Sync History product, SyncIssue, scheduling, or analytics merely for this stage. |
+| **Stage 3 — Live Engine** | After E11 revalidation: Live permission, ExternalRecordLink, simple + configurable Live execution, reconciliation, merchant-safe result, real Adobe create/update validation. |
+| **4C** | Remaining sync domain after Stage 3: scheduling, sync history/issues, merchant sync UX beyond mapping/Preview/Live |
 
 Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
 
 **Impact:**
 - Do not build a one-off, hardcoded 1C-to-database field mapping as a shortcut —
-  this is explicitly the "Babypark-specific hardcoded logic" that
+  this is explicitly the named-customer hardcoded logic that
   `04-ARCHITECTURE_PRINCIPLES.md` Mandate 9 forbids.
 - **`ImportedPriceTaxBasis`** (whether an imported row is net or gross) must be
   captured during connector import design — see GAP-018 cross-reference.
@@ -380,11 +386,17 @@ is production-operational on the Babypark pilot (dedicated
 Discovery completed 2026-08-15). `SyncRun` / `SyncRunItem` persistence and
 revision v3 rebaseline are implemented (Task 4C-2b-1). Preview admission,
 execution, schedule, history, and `ExternalRecordLink` remain unimplemented.
-`run_sync_preview` runtime permission remains pending Task 4C-2b-2. Adobe
-`(products, export)` support remains fail-closed. No merchant Preview UI exists.
-Connector-account creation and credential-management/settings UI remain absent.
-Task 4B-2c (discovered schema fields / change inspection) and retention jobs
-remain unimplemented.
+`run_sync_preview` runtime permission remains pending Stage 1 (historical label
+4C-2b-2). Adobe `(products, export)` support remains fail-closed. No merchant
+Preview UI exists. Connector-account **creation UI is implemented**
+(`ConnectPlatformIntegration`); credential-management/settings **edit** UI
+remains absent. Task 4B-2c (discovered schema fields / change inspection) and
+retention jobs remain unimplemented.
+
+**Current coherent Magento execution stages** (historical `4C-2b-*` labels are
+not mandatory PR boundaries): Stage 1 Preview Engine → Stage 2 Merchant Preview
+→ Stage 3 Live Engine. See `docs/03-DOMAIN_MODEL.md` → Magento Product Export
+V1 Execution Contract.
 
 **ConnectorAccount authorization/rendered-view sub-gap (closed PR #102 /
 Task 4B-2b-1e+1f; historical pre-B-2 — superseded by GAP-026B-2 repository
@@ -435,10 +447,10 @@ repository workspace-RBAC matrix):**
 | Disabled account | Per role matrix (unaffected by disabled state) | No | Per role matrix |
 
 **GAP-006 overall remains Open.** Remaining scope: Task 4B-2c (discovered
-schema fields / change inspection), retention/pruning (4B-2d), sync
-execution/preview/schedule/history (`SyncRun`, issues, merchant sync UX),
-`ExternalRecordLink`, connector-account creation and credential-management/settings
-UI. Workspace-scoped authorization foundation (GAP-026) repository runtime is
+schema fields / change inspection), retention/pruning (4B-2d), Magento Stages
+1–3 (Preview Engine, Merchant Preview, Live Engine), `ExternalRecordLink`,
+connector-account credential-management/settings **edit** UI (create UI shipped).
+Workspace-scoped authorization foundation (GAP-026) repository runtime is
 **Implemented** (GAP-026B-2) and production-activated on Babypark pilot
 (2026-08-14). Layer B mapping UI (4C-1c-2b) shipped in PR #139.
 
@@ -449,7 +461,7 @@ Distinguish carefully — do not treat every future possibility as an active GAP
 | Class | Item | Blocks Sync domain work now? |
 |---|---|---|
 | **A. Architecture blockers** | None identified against current `origin/develop` for the approved Sync Domain Rebaseline | No |
-| **B. Implementation gaps** | `SyncRun` / `SyncRunItem` / `ExternalRecordLink` persistence + runtime; preview/live execution; merchant sync UX beyond connection management and mapping; ConnectorSchemaDiff write path/consumer; connector-account create/settings UI; remaining Connector UX migration / Layer C gating (GAP-025) | Yes for shipping sync; docs are settled |
+| **B. Implementation gaps** | Preview/Live execution (Stage 1–3); `ExternalRecordLink`; merchant sync UX beyond connection create + mapping; ConnectorSchemaDiff write path/consumer; connector-account **settings edit** UI; remaining Connector UX migration / Layer C gating (GAP-025). `SyncRun`/`SyncRunItem` persistence is implemented (4C-2b-1). Connector-account **create** UI is implemented. | Yes for shipping sync; docs are settled |
 | **C. Connector-specific future verification (deferred Variant #2 / profile)** | What external contract `adobe_commerce_paas_oauth1_integration` intentionally covers; PaaS-only vs broader Magento REST-family; post-bootstrap runtime-contract/version/capability verification; Magento Open Source setup/auth compatibility; whether AccountSetup and final runtime contract must later split; whether exactly-one AccountSetup-profile invariant must ever change | **No** — deferred; not a blocker for generic Sync domain rebaseline |
 
 Do not add generic `edition` / `deployment_model` / `api_family` fields to
@@ -662,7 +674,7 @@ onboarded, or when explicitly prioritized in product planning.
   typical restock level," and whatever `pre_order` should mean operationally for this business).
 
 **Next task:** Not scheduled. Revisit when the business defines what "running low" and
-"pre-order" should concretely mean for Babypark's catalog.
+"pre-order" should concretely mean for a merchant catalogue.
 
 **Related finding (does not close this gap):** Shopify's `Variant Inventory Policy`
 (`deny`/`continue` — whether a variant can still be ordered at zero stock) is the standard
@@ -910,8 +922,9 @@ remains blocked by GAP-022.
   A separate Stop-and-Amend decision must evaluate
   `product_and_variant_two_bindings` before any seed of these fields.
 
-**Next task:** Evaluate variant-level binding need against real Babypark
-catalog data (or other pilot tenant) before seeding age_group/gender.
+**Next task:** Evaluate variant-level binding need against a real merchant
+catalogue and Magento configurable option dimensions — not against a named
+customer as architecture authority — before seeding age_group/gender.
 
 **Status:** Open, blocking dependency for future seed of age_group/gender —
 seeding must not proceed automatically just because options now exist.
@@ -1071,19 +1084,47 @@ Remaining connector gaps are tracked separately under GAP-006.
 
 **Still absent in code (docs settled; runtime or UI missing):**
 - Preview admission/execution runtime (`configuration_snapshot` builder,
-  one-active-run admission, planner — Task 4C-2b-2+);
-- normative eighth permission `run_sync_preview` (runtime catalogue still seven
-  permissions until Task 4C-2b-2);
-- Product Export Projection contract (docs-only Stop-and-Amend required before
-  4C-2b-3);
-- Adobe Products/Export Preview planner (Task 4C-2b-3, after projection contract);
-- `ExternalRecordLink`;
+  one-active-run admission, planner — **Stage 1**; historical labels 4C-2b-2+);
+- normative eighth permission `run_sync_preview` (runtime catalogue still seven permissions until 4C-2b-2 / Stage 1);
+- generic Product execution aggregate and Adobe simple + configurable planners
+  (**Stage 1**; Magento V1 contract frozen — no separate Product Export
+  Projection Stop-and-Amend is required before Stage 1);
+- mode-aware execution support (Preview vs Live independent; current binary
+  `ConnectorSyncOperationSupport` remains fail-closed for Adobe);
+- SyncConfiguration merchant reachability (lazy ensure; no UUID);
+- `run_sync_live` (Stage 3);
+- `ExternalRecordLink` (Stage 3);
+- Live execution after E11 revalidation (Stage 3);
 - sync execution runtime for merchant "Синхронізувати зараз";
-- Preview before first live sync;
+- Preview before first live sync (Stage 2 merchant exposure);
 - scheduling beyond Discovery;
 - ownership persistence/enforcement;
 - issue aggregation and bulk resolution;
 - sync-run history as a merchant Layer B surface.
+
+**Platform capability vs connector-V1-specific (do not conflate):**
+- first-class MediaAsset / ProductMedia / VariantMedia runtime — platform
+  capability gap; current media is `products.images` JSON;
+- video / documents / instructions as Product assets — platform capability;
+  Magento V1 marks them `PLATFORM CAPABILITY — NOT IN THIS CONNECTOR V1`;
+- bundle/kit composition persistence — platform future capability, not Magento V1;
+- Magento bundle/grouped/virtual/downloadable/gift-card types — connector-V1-out.
+
+**Technical debranding (docs neutralized; runtime identifiers frozen):**
+- SAFE TO NEUTRALIZE NOW: normative product/domain wording (this PR);
+- REQUIRES MIGRATION / REBASELINE: hash prefixes
+  `babypark.sync-configuration-revision.v3`,
+  `babypark.sync-run-input.v1`,
+  `babypark.sync-external-context.v1`,
+  `babypark.connector-schema-field.v1`,
+  `babypark.connector-schema-snapshot.v1`;
+- OPERATIONAL RENAME REQUIRED: Supervisor `babypark-queue` /
+  `babypark-connector-queue`; `CACHE_PREFIX=babypark_`;
+- EXTERNAL INFRASTRUCTURE IDENTITY: host path `/var/www/babypark-b2b`,
+  repository name, `APP_NAME`, fixture emails.
+
+Do not rename runtime hashes or worker names without the corresponding
+migration. No new customer-specific runtime identifier may be introduced.
 
 Each remains an implementation gap. Sync domain architecture is settled; do
 not reopen it as an open research task unless current repository truth
