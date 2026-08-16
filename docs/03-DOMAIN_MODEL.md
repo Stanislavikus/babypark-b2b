@@ -6022,9 +6022,7 @@ Minimum classification:
 planner. Examples: name, brand, description, GTIN, custom product
 characteristics.
 
-**Class B — domain-owned resolved values.** Examples: price → PriceResolver;
-availability → AvailabilityResolver when included. No connector-specific
-alternate pricing path. PriceResolver remains the only price calculation path.
+**Class B — domain-owned resolved values.** Examples: price → PriceResolver; availability → AvailabilityResolver when included. No connector-specific alternate pricing path. PriceResolver remains the only price calculation path.
 
 **Class C — connector-owned operation configuration / metadata.** Examples:
 `attribute_set_id`, `type_id`, visibility, store-scope execution requirements.
