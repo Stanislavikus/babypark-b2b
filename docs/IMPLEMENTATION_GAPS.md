@@ -319,7 +319,12 @@ yet), but should be scheduled before any payment gateway integration work starts
   suggestion/read-model and UI-prefill work is Task 4C-1c (4C-1c-0 docs contract
   frozen; 4C-1c-1 provider/read-model Done; 4C-1c-2a authorization contract
   Done; 4C-1c-2b Layer B mapping UI Done, PR #139).
-  Sync execution/preview/schedule/results remain later implementation slices
+  Preview-first execution foundation contract is frozen (Task 4C-2a, docs only):
+  revision v3 + fixed `all_products` selection, `run_sync_preview` normative
+  eighth permission (runtime catalogue still seven permissions until 4C-2b),
+  `SyncRun`/`SyncRunItem` physical contract, admission/concurrency/snapshot/planner
+  boundaries, Adobe operation-support truth gate.
+  Sync execution/preview runtime remains later implementation (Task 4C-2b+)
   after domain docs (now settled).
 
 **Task sequence (GAP-006 remains Open until implementation lands):**
@@ -340,7 +345,9 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (no DB/migration scope) — Done |
 | **4C-1c-2a** | Workspace access / authorization contract — docs-only Stop-and-Amend — Done |
 | **4C-1c-2b** | Layer B mapping UI: explicit `SyncConfiguration` Mapping page; deterministic high-confidence suggestion presentation; manual choose/change/remove; explicit confirmation through `FieldMappingMutationService`; stale-safe exact remove; workspace-scoped fresh Mapping authorization; Layer-B Available Fields supporting reference — Done, PR #139 |
-| **4C** | Remaining sync domain: `SyncRun` / `SyncRunItem`, `ExternalRecordLink`, preview/live execution, scheduling, sync history/issues, merchant sync UX beyond mapping |
+| **4C-2a** | Docs-only Preview-first Sync Execution Foundation Stop-and-Amend — `SyncRun`/`SyncRunItem` physical contract, revision v3 + fixed `all_products` selection, `run_sync_preview` normative permission (runtime pending 4C-2b), admission/concurrency/snapshot/planner boundaries, Adobe support-truth gate — Done |
+| **4C-2b** | Preview foundation implementation: revision v3 recompute, `run_sync_preview` runtime permission, `SyncRun`/`SyncRunItem` persistence, configuration snapshot, admission/concurrency, pure Adobe Products/Export Preview planner + isolated regression harness — no merchant Preview UI; no Live mutation; no automatic `ConnectorSyncOperationSupport` flip |
+| **4C** | Remaining sync domain after 4C-2b foundation: merchant Preview exposure (after operation-support reconciliation), `ExternalRecordLink`, Live execution, scheduling, sync history/issues, merchant sync UX beyond mapping |
 
 Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
 
@@ -362,7 +369,8 @@ Canonical suggestion/read-model contract is frozen (Task 4C-1c-0, docs only).
 Canonical deterministic suggestion provider/read-model (4C-1c-1) is implemented.
 Workspace access / authorization contract is frozen (4C-1c-2a, docs only).
 Layer B mapping UI (4C-1c-2b) is implemented (PR #139, merge
-`9a4be2f29f239753151e33f0a107c33597a10f85`). Connector Discovery
+`9a4be2f29f239753151e33f0a107c33597a10f85`). Preview-first execution
+foundation contract is frozen (Task 4C-2a, docs only). Connector Discovery
 is production-operational on the Babypark pilot (dedicated
 `babypark-connector-queue` worker verified `RUNNING` and one successful manual UI
 Discovery completed 2026-08-15). `SyncRun` / execution,
@@ -1053,7 +1061,10 @@ Remaining connector gaps are tracked separately under GAP-006.
 - Canonical deterministic suggestion/read-model provider (Task 4C-1c-1).
 
 **Still absent in code (docs settled; runtime or UI missing):**
-- `SyncRun` / `SyncRunItem` persistence and execution runtime;
+- `SyncRun` / `SyncRunItem` persistence and execution runtime (physical contract
+  frozen in Task 4C-2a);
+- normative eighth permission `run_sync_preview` (runtime catalogue still seven
+  permissions until Task 4C-2b);
 - `ExternalRecordLink`;
 - sync execution runtime for merchant "Синхронізувати зараз";
 - Preview before first live sync;

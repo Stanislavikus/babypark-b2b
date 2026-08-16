@@ -5229,6 +5229,435 @@ that contract; do not widen fixed `User.role` checks as a workaround.
 `CanonicalRegistryReader` is the existing read-only CSV access path. Do **not**
 create a second registry/loader in 4C-1c.
 
+#### Preview-first Sync Execution Foundation Contract
+[Resolved — Task 4C-2a]
+
+This section freezes the **minimum architecture** required before the first
+Preview foundation implementation (`SyncRun`, `SyncRunItem`, Preview
+authorization, revision v3, and the first Adobe Products/Export planner
+foundation). It is **architecture/documentation only**. It **authorizes** a later
+Preview foundation implementation slice. It does **not** authorize Live
+external mutation. First Live requires a separate Stop-and-Amend for external
+identity, retry/idempotency, and ambiguous applied-state semantics.
+
+##### First implementation target (frozen)
+
+| Dimension | First slice (4C-2b foundation) | Explicitly deferred |
+|---|---|---|
+| `data_domain` | `products` only | prices, inventory, categories, media, and other domains |
+| `semantic_operation` | `export` only | import (creates its own separate `SyncRun` when later implemented) |
+| Connector / profile target | Adobe PaaS | other connectors/profiles |
+| Execution mode | `preview` only | `live` (separate Stop-and-Amend) |
+
+This does **not** close the broader Product Owner question about eventual MVP
+domain breadth (PO-1 remains open).
+
+##### One SyncRun = one semantic operation
+
+Normative cardinality:
+
+```text
+one SyncRun
+  = one SyncConfiguration
+  + one semantic_operation
+  + one execution mode
+  + one configuration revision
+```
+
+A `SyncConfiguration` may enable both import and export. One run **never**
+executes both.
+
+**First-slice explicit admission rule:** there is **no** automatic fan-out such
+as “Preview configuration → automatically create Import run + Export run”. The
+requested semantic operation is explicit at admission. The first implementation
+accepts only `products` + `export` + `preview`. If Import is later implemented,
+it creates its own separate `SyncRun`.
+
+##### Preview / Live boundary
+
+Domain modes:
+
+- `preview`
+- `live`
+
+Only **Preview** is executable in the first implementation. The existence of a
+`live` enum/domain value must **not** make Live reachable.
+
+**Preview invariant:** zero consequential external mutation. No exceptions.
+
+##### First selection contract
+
+First Products Preview uses fixed effective selection:
+
+```text
+selection.mode = all_products
+```
+
+Meaning: all `Product` records belonging to the `SyncConfiguration` workspace.
+
+This is:
+
+- deliberate;
+- Preview-only;
+- not merchant-configurable;
+- not a permanent platform rule.
+
+Do **not** silently narrow selection by `is_active`, mapping completeness,
+channel eligibility, or warning/blocker state. Those affect evaluation/outcome,
+not membership.
+
+Because there is only one deterministic selection, do **not** persist a mutable
+selection column yet. Before configurable selection ships: persist canonical
+selection, include it in configuration revision, and prove selection changes
+invalidate readiness.
+
+##### Revision v3
+
+Current v2 hashes `enabled_operations`, `operational_state`, and
+`field_mappings` but no selection.
+
+Freeze:
+
+```text
+babypark.sync-configuration-revision.v3
+```
+
+Canonical conceptual payload:
+
+```json
+{
+  "enabled_operations": ["export"],
+  "operational_state": "enabled",
+  "selection": {
+    "mode": "all_products"
+  },
+  "field_mappings": [
+    {
+      "field_binding_id": "...",
+      "external_field_key": "..."
+    }
+  ]
+}
+```
+
+Selection is included because revision represents effective execution
+configuration, not merely mutable DB columns.
+
+Task **4C-2b** must recompute existing `SyncConfiguration.configuration_revision`
+values under v3 before the first `SyncRun` comparison. This is safe because no
+`SyncRun` history currently exists. This docs-only contract does **not**
+modify hashes in code.
+
+Reverified repository truth: `configuration_revision` is currently written on
+mutation but not compared against run history.
+
+##### Preview execution permission
+
+Freeze new atomic permission:
+
+| Permission | Authority |
+|---|---|
+| `run_sync_preview` | Execute a non-consequential Preview for an eligible `SyncConfiguration` and access the safe progress/result surface required for that execution. |
+
+Properties:
+
+- independent from Connector, Mapping, Access, and Tax permissions;
+- no existing permission implies it;
+- it implies none of them;
+- **no automatic legacy grant** to Owner, Admin, Director, Merchandiser,
+  Integration manager, or any legacy role/profile merely because of job title;
+- existing roles gain it only through deliberate access configuration.
+
+**Normative eighth permission / runtime seventh catalogue:** this docs-only
+contract introduces a normative **eighth** atomic workspace permission
+(`run_sync_preview`; runtime implementation: pending 4C-2b). Runtime code on
+current `develop` still contains exactly **seven** seeded permissions
+(`WorkspaceRbacPermissionSeeder`). Task **4C-2b** adds `run_sync_preview` to the
+runtime catalogue. Historical GAP-026B cutover documentation correctly continues
+to describe the **seven-permission** production cutover state.
+
+**Live authority:** do **not** add or freeze an implemented Live permission in
+4C-2a beyond the invariant that Preview authority must never silently become
+consequential Live authority. The exact Live permission is frozen in the Live
+Stop-and-Amend.
+
+##### Adobe operation-support truth
+
+Current repository truth (reverified):
+
+- `AdobePaaSConnectorAdapter` does **not** implement
+  `ConnectorSyncOperationSupport`;
+- `ConnectorSyncSupportResolver` therefore remains **fail-closed** for Adobe
+  `(products, export)` support advertisement.
+
+Freeze:
+
+- the presence of an internal Adobe Products/Export Preview planner is **not**,
+  by itself, sufficient to advertise the semantic operation as supported;
+- do **not** flip `ConnectorSyncOperationSupport(products, export)` merely
+  because planner code later exists;
+- before any real merchant Preview can become reachable, the application must
+  have a truthful support boundary for that runtime stage;
+- if implementation discovers that current `ConnectorSyncOperationSupport` cannot
+  truthfully represent “Preview supported, Live not yet supported”, that requires
+  a narrow Stop-and-Amend instead of stretching its meaning.
+
+This is intentionally a gate before merchant exposure, not something to bypass.
+
+##### Pure connector-owned Preview planner
+
+Preserve: `FieldMapping` ≠ execution plan.
+
+First Preview boundary:
+
+```text
+generic orchestration
+  → normalized semantic run input
+  → Adobe/profile-owned pure Preview planner
+  → normalized Preview findings/outcomes
+```
+
+Connector/profile owns:
+
+- Adobe-specific export payload construction;
+- transformation;
+- required external shape;
+- operation-specific validation.
+
+Core owns:
+
+- authorization;
+- admission;
+- selection;
+- immutable configuration input;
+- Product iteration;
+- run/item lifecycle;
+- normalized outcomes;
+- persistence.
+
+Preview planner must:
+
+- perform **no** mutating HTTP call;
+- create **no** `ExternalRecordLink`;
+- write **no** external record;
+- mutate **no** `Product`;
+- mutate **no** `FieldMapping`.
+
+Do **not** implement one shared `execute(..., dryRun=true)` where safety
+depends only on a flag. Do **not** define a universal transport DSL.
+
+##### Run admission and consistency
+
+Do **not** hold a database lock during queued/background execution.
+
+Freeze a short admission transaction:
+
+```text
+BEGIN
+  lock SyncConfiguration
+  freshly authorize run_sync_preview
+  verify workspace/configuration/account ownership
+  verify enabled state
+  verify requested operation enabled
+  verify required Preview planner is present
+  capture configuration_revision R
+  materialize immutable configuration_snapshot for R
+  verify no active run for this SyncConfiguration
+  create queued SyncRun
+COMMIT
+```
+
+Execution then uses the immutable `configuration_snapshot`. It must **not**
+reread current mutable `FieldMapping` rows as execution truth. Subsequent
+configuration changes are allowed and naturally move current revision away from
+run revision `R`.
+
+This contract guarantees configuration consistency, not full immutable
+Product-data replay.
+
+##### Immutable configuration snapshot
+
+Freeze non-secret `SyncRun.configuration_snapshot`.
+
+Conceptual payload:
+
+```json
+{
+  "version": "babypark.sync-run-input.v1",
+  "data_domain": "products",
+  "semantic_operation": "export",
+  "external_context": {},
+  "selection": {
+    "mode": "all_products"
+  },
+  "field_mappings": [
+    {
+      "field_binding_id": "...",
+      "external_field_key": "..."
+    }
+  ]
+}
+```
+
+Must contain **no**:
+
+- credentials;
+- access tokens;
+- secret connector settings;
+- raw HTTP diagnostics;
+- raw vendor failures;
+- Product payload snapshot.
+
+It is semantic configuration evidence, not the connector transport plan.
+
+##### SyncRun first physical contract
+
+Minimum later schema:
+
+| Column | Contract |
+|---|---|
+| `id` | UUID PK |
+| `workspace_id` | required |
+| `sync_configuration_id` | required |
+| `configuration_revision` | required |
+| `mode` | `preview` / `live` domain; Preview executable first |
+| `semantic_operation` | explicit one-operation-per-run |
+| `status` | `queued` / `running` / `completed` / `failed` |
+| `initiated_by_user_id` | nullable |
+| `configuration_snapshot` | canonical safe JSON |
+| `started_at` | nullable |
+| `completed_at` | nullable |
+| `created_at` / `updated_at` | project convention |
+
+Lifecycle:
+
+```text
+queued → running → completed
+                 ↘ failed
+```
+
+Do **not** add `cancelled` until cancellation exists.
+
+A Preview with blocked/warning items may still have `run.status = completed`
+because business findings are not infrastructure failure.
+
+Require workspace-aware FK from `SyncRun` to `SyncConfiguration` and historical
+retention semantics. Do **not** cascade-delete historical runs with
+configuration deletion.
+
+Do **not** add in the first slice: summary counters, retry count, transport
+attempts, schedule id, `ExternalRecordLink`, diagnostic reference, or readiness
+flag.
+
+##### SyncRunItem identity (Products first slice)
+
+First domain is Products. Do **not** introduce `internal_record_type` /
+`internal_record_id`. Use typed `product_id`.
+
+| Column | Contract |
+|---|---|
+| `id` | UUID PK |
+| `workspace_id` | required |
+| `sync_run_id` | required |
+| `product_id` | typed `Product` FK |
+| `outcome` | Preview outcome |
+| `findings` | canonical safe historical findings JSON |
+| `created_at` / `updated_at` | project convention |
+
+Prefer workspace-aware product integrity.
+
+**Product deletion edge (frozen):**
+
+```text
+SyncRunItem → Product
+ON DELETE RESTRICT
+```
+
+after verifying physical FK feasibility.
+
+This deliberately differs from the existing compositional
+`Product → ProductVariant` `CASCADE` relationship: `ProductVariant` has no
+independent meaning after its `Product` disappears, while `SyncRunItem` is
+immutable historical evidence about a `Product`.
+
+Current repository truth: `Product` has no `SoftDeletes` and no normal
+`ProductResource` `DeleteAction`; merchant/admin Product hard-delete is not
+presently a reachable product flow. Therefore `RESTRICT` is forward-looking
+historical protection, not something already validated against an existing
+deletion workflow. A future Product-deletion feature must explicitly resolve
+historical-run retention rather than silently inheriting cascade deletion.
+
+##### Preview outcomes — exactly three
+
+Freeze only:
+
+| Outcome | Merchant concept |
+|---|---|
+| `ready` | готові |
+| `warning` | потребує уваги |
+| `blocked` | неможливо |
+
+Do **not** add `excluded` in 4C-2a. With fixed `all_products` selection and no
+configurable filtering/exclusion mechanism, there is no truthful first-slice
+producer for an excluded outcome. A Product outside selection would have no
+`SyncRunItem`; under fixed `all_products`, that case does not occur for a
+`Product` belonging to the selected workspace.
+
+Do **not** freeze Live outcomes in 4C-2a.
+
+##### Findings are historical evidence, not SyncIssue
+
+`SyncRunItem.findings` may contain zero or more normalized findings. Minimum
+semantic structure:
+
+- stable normalized code;
+- semantic subject where relevant;
+- merchant-safe message key;
+- whitelisted safe context.
+
+No raw exception text, HTTP response, credentials, or vendor diagnostics.
+
+Do **not** create `SyncIssue`. Do **not** claim historical Preview findings
+represent current unresolved issues.
+
+##### Preview history visibility
+
+Persist Preview runs as audit/reproducibility evidence. Do **not** expose them
+automatically as completed synchronization history. No Preview-history merchant
+page in the first runtime slice. PO-4 remains open.
+
+##### Concurrency
+
+First invariant: at most one **active** `SyncRun` per `SyncConfiguration`.
+
+Active means `queued` or `running`.
+
+Serialize admission using the stable `SyncConfiguration` row inside a short DB
+transaction. Do **not** keep the lock during job execution. Do **not** invent a
+distributed lock unless implementation proves DB admission insufficient.
+Preview-vs-Live coexistence remains deferred.
+
+##### Retry / idempotency / ExternalRecordLink
+
+Preview has no consequential mutation. 4C-2a does **not** freeze Live retry
+semantics. Before Live, `ExternalRecordLink`, operation-specific idempotency,
+retry rules, and ambiguous/unknown applied-state semantics require a separate
+Stop-and-Amend. Transport attempts are never `SyncRunItem` rows.
+`ExternalRecordLink` is not required for Preview.
+
+##### Implementation sequencing
+
+| Slice | Scope |
+|---|---|
+| **4C-2a** | This docs-only contract — Done |
+| **4C-2b** (immediate next code foundation) | May implement: revision v3; `run_sync_preview` runtime permission; `SyncRun` / `SyncRunItem` persistence; `configuration_snapshot`; run admission/concurrency foundation; pure Preview planner contract; Adobe Products/Export planner implementation + isolated regression harness. Must **not** ship: merchant Preview UI; consequential external mutation; automatic flip of `ConnectorSyncOperationSupport`. |
+| **Before first real merchant Preview** | Explicitly reconcile the operation-support boundary so the platform can truthfully represent the runtime actually available. Do not bypass `ConnectorSyncOperationSupport`. If current support vocabulary cannot represent Preview-only support safely, require a narrow Stop-and-Amend before exposure. |
+| **Before Live** | Separate contract for `ExternalRecordLink`, Live permission, Adobe Live executor, idempotency/retry, ambiguous applied-state behavior. Scheduling/history/current issues later. |
+
+Fixed `all_products` is a first-slice safe Preview constraint, not a sixth
+Product Owner question. PO-1 and PO-4 remain open. PO-2, PO-3, and PO-5 remain
+untouched.
+
 ### Canonical mapping registry role
 
 `docs/data/canonical_product_field_mappings.csv` is **platform-global
