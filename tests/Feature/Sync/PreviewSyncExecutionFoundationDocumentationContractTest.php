@@ -278,23 +278,78 @@ class PreviewSyncExecutionFoundationDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('immutable historical/audit evidence', $section);
         $this->assertStringContainsString('what that execution evaluated and concluded', $section);
-        $this->assertStringContainsString('does **not** guarantee bit-for-bit replay', $section);
+        $this->assertStringContainsString('The first slice does **not**', $section);
+        $this->assertStringContainsString('guarantee bit-for-bit replay', $section);
         $this->assertStringContainsString('Product input snapshots are not persisted', $section);
         $this->assertStringNotContainsString('audit/reproducibility evidence', $section);
     }
 
     #[Test]
-    public function contract_scopes_configuration_snapshot_reproducibility_to_configuration_owned_input(): void
+    public function contract_scopes_configuration_snapshot_reproducibility_to_run_effective_input(): void
     {
         $section = $this->previewExecutionFoundationContractSection();
 
-        $this->assertStringContainsString('configuration-owned semantic evidence only', $section);
-        $this->assertStringContainsString('configuration-owned input for revision `R` auditable and', $section);
-        $this->assertStringContainsString('reproducible', $section);
+        $this->assertStringContainsString('immutable **run-effective** configuration-owned', $section);
+        $this->assertStringContainsString('is **not** a complete serialized `SyncConfiguration`', $section);
+        $this->assertStringContainsString('is **not** required to be sufficient to recompute `configuration_revision`', $section);
+        $this->assertStringContainsString('run-effective configuration-owned semantic', $section);
+        $this->assertStringContainsString('auditable/reproducible for this run', $section);
+        $this->assertStringContainsString('**not** reconstruct the complete revision payload', $section);
         $this->assertStringContainsString('does **not** enable bit-for-bit replay of the', $section);
         $this->assertStringContainsString('Product catalogue state', $section);
         $this->assertStringContainsString('Product catalogue membership list', $section);
         $this->assertStringContainsString('Product field-value snapshots', $section);
+        $this->assertStringContainsString('the full `enabled_operations` set', $section);
+        $this->assertStringContainsString('`operational_state`', $section);
+    }
+
+    #[Test]
+    public function contract_revision_enabled_operations_is_full_canonical_configuration_set(): void
+    {
+        $section = $this->previewExecutionFoundationContractSection();
+
+        $this->assertStringContainsString('**Full configuration revision (not run-filtered):**', $section);
+        $this->assertStringContainsString('complete canonical enabled-operation set', $section);
+        $this->assertStringContainsString('canonically sorted per `SyncOperationSet`', $section);
+        $this->assertStringContainsString('independent of the `semantic_operation` selected for any particular `SyncRun`', $section);
+        $this->assertStringContainsString('**first-slice example only**', $section);
+        $this->assertStringContainsString('"enabled_operations": ["export", "import"]', $section);
+        $this->assertStringContainsString('silently omits another enabled operation', $section);
+    }
+
+    #[Test]
+    public function contract_distinguishes_configuration_enabled_operations_from_run_semantic_operation(): void
+    {
+        $section = $this->previewExecutionFoundationContractSection();
+
+        $this->assertStringContainsString('`configuration.enabled_operations`', $section);
+        $this->assertStringContainsString('`run.semantic_operation`', $section);
+        $this->assertStringContainsString('one `SyncRun` = one explicit semantic operation', $section);
+    }
+
+    #[Test]
+    public function contract_records_both_configuration_revision_and_snapshot_on_run(): void
+    {
+        $section = $this->previewExecutionFoundationContractSection();
+
+        $this->assertStringContainsString('`configuration_revision` — fingerprint of the full configuration-owned', $section);
+        $this->assertStringContainsString('`configuration_snapshot` — immutable **run-effective**', $section);
+        $this->assertStringContainsString('which configuration state admitted it', $section);
+        $this->assertStringContainsString('which immutable semantic inputs it executes with', $section);
+    }
+
+    #[Test]
+    public function contract_temporal_and_audit_rules_remain_after_revision_snapshot_clarification(): void
+    {
+        $section = $this->previewExecutionFoundationContractSection();
+
+        $this->assertStringContainsString('resolved when the run **begins', $section);
+        $this->assertStringContainsString('are **not** admission-time snapshotted', $section);
+        $this->assertStringContainsString('The first slice does **not**', $section);
+        $this->assertStringContainsString('guarantee bit-for-bit replay', $section);
+        $this->assertStringContainsString('Product data freshness is a distinct concern', $section);
+        $this->assertStringContainsString('without holding a long-lived DB transaction for the whole planner run', $section);
+        $this->assertStringContainsString('immutable historical/audit evidence', $section);
     }
 
     #[Test]
@@ -328,7 +383,7 @@ class PreviewSyncExecutionFoundationDocumentationContractTest extends TestCase
     {
         $section = $this->previewExecutionFoundationContractSection();
 
-        $this->assertStringContainsString('`configuration_revision` tracks configuration-owned execution state only', $section);
+        $this->assertStringContainsString('`configuration_revision` tracks the full configuration-owned revision state', $section);
         $this->assertStringContainsString('selection contract', $section);
         $this->assertStringContainsString('does **not** prove Product catalogue membership or field data are unchanged', $section);
         $this->assertStringContainsString('Product data freshness is a distinct concern', $section);

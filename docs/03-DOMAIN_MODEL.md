@@ -5341,7 +5341,7 @@ Freeze:
 babypark.sync-configuration-revision.v3
 ```
 
-Canonical conceptual payload:
+Canonical conceptual payload (first-slice example — export-only configuration):
 
 ```json
 {
@@ -5359,10 +5359,39 @@ Canonical conceptual payload:
 }
 ```
 
+**Full configuration revision (not run-filtered):** `SyncConfiguration.configuration_revision`
+is a fingerprint of the **complete** configuration-owned revision state for the
+`SyncConfiguration`, not of one `SyncRun`. Therefore revision-v3 `enabled_operations`
+must contain the complete canonical enabled-operation set:
+
+- deduplicated;
+- canonically sorted per `SyncOperationSet` / revision-hasher contract;
+- independent of the `semantic_operation` selected for any particular `SyncRun`.
+
+The JSON example above with `"enabled_operations": ["export"]` is a valid
+**first-slice example only**. A future configuration with both import and export
+enabled would hash conceptually as:
+
+```json
+"enabled_operations": ["export", "import"]
+```
+
+using the canonical lexical ordering defined by `SyncOperationSet` / the revision
+hasher.
+
+Do **not** let a run with `semantic_operation = export` produce a configuration
+revision that silently omits another enabled operation.
+
+Preserve one `SyncRun` = one explicit semantic operation. These are different
+dimensions:
+
+- `configuration.enabled_operations` — full enabled set on the configuration;
+- `run.semantic_operation` — the single operation this run executes.
+
 Selection is included because revision represents effective execution
 configuration, not merely mutable DB columns.
 
-`configuration_revision` tracks configuration-owned execution state only:
+`configuration_revision` tracks the full configuration-owned revision state:
 
 - enabled operations;
 - operational state;
@@ -5509,11 +5538,11 @@ reread current mutable `FieldMapping` rows as execution truth. Subsequent
 configuration changes are allowed and naturally move current revision away from
 run revision `R`.
 
-At admission, `configuration_snapshot` freezes the selection **predicate**
-(`all_products`) and other configuration-owned semantic input for revision `R`.
-It does **not** freeze Product membership or Product field values. The
-effective Product execution set is resolved when execution **begins**, per the
-temporal boundary above.
+At admission, `configuration_snapshot` freezes the run-effective
+configuration-owned semantic input for this run under revision `R` (including
+the selection **predicate** `all_products`). It does **not** freeze Product
+membership or Product field values. The effective Product execution set is
+resolved when execution **begins**, per the temporal boundary above.
 
 This contract guarantees configuration consistency, not full immutable
 Product-data replay or bit-for-bit run replay.
@@ -5522,7 +5551,19 @@ Product-data replay or bit-for-bit run replay.
 
 Freeze non-secret `SyncRun.configuration_snapshot`.
 
-Conceptual payload:
+**Revision vs snapshot (frozen):**
+
+- `configuration_revision` — fingerprint of the full configuration-owned
+  revision state that admitted this run;
+- `configuration_snapshot` — immutable **run-effective** configuration-owned
+  semantic input consumed by this specific run under that revision.
+
+`configuration_snapshot` is **not** a complete serialized `SyncConfiguration`
+and is **not** required to be sufficient to recompute `configuration_revision`.
+The run records both fields together: which configuration state admitted it,
+and which immutable semantic inputs it executes with.
+
+Conceptual payload (first-slice example):
 
 ```json
 {
@@ -5551,13 +5592,26 @@ Must contain **no**:
 - raw vendor failures;
 - Product payload snapshot;
 - Product catalogue membership list;
-- Product field-value snapshots.
+- Product field-value snapshots;
+- the full `enabled_operations` set;
+- `operational_state`.
 
-`configuration_snapshot` is configuration-owned semantic evidence only. It
-makes the configuration-owned input for revision `R` auditable and
-reproducible — meaning the operations/state/selection contract/mappings that
-govern execution can be reconstructed from persisted run evidence. It is **not**
-a Product data snapshot and does **not** enable bit-for-bit replay of the
+First-slice `configuration_snapshot` contains run-effective planner inputs:
+
+- `data_domain`;
+- requested `semantic_operation`;
+- `external_context`;
+- selection predicate;
+- `field_mappings`.
+
+It is **not** required to contain the full `enabled_operations` set or
+`operational_state` — those are admission/configuration-state facts, not planner
+execution inputs for the already-admitted run. Do **not** add them merely for
+symmetry.
+
+`configuration_snapshot` makes the run-effective configuration-owned semantic
+input auditable/reproducible for this run. It does **not** reconstruct the
+complete revision payload and does **not** enable bit-for-bit replay of the
 Product catalogue state evaluated by the run.
 
 It is semantic configuration evidence, not the connector transport plan.
@@ -5684,11 +5738,12 @@ historical/audit evidence of what that execution evaluated and concluded. Do
 **not** expose them automatically as completed synchronization history. No
 Preview-history merchant page in the first runtime slice. PO-4 remains open.
 
-**Audit vs replay (frozen):** `configuration_snapshot` makes the
-configuration-owned semantic input for revision `R` auditable/reproducible. The
-first slice does **not** guarantee bit-for-bit replay or reproduction of the
-Product catalogue state because Product input snapshots are not persisted. Do
-**not** add Product-data persistence merely to justify replay wording.
+**Audit vs replay (frozen):** `configuration_snapshot` makes the run-effective
+configuration-owned semantic input auditable/reproducible for this run. It does
+**not** reconstruct the complete revision payload. The first slice does **not**
+guarantee bit-for-bit replay or reproduction of the Product catalogue state
+because Product input snapshots are not persisted. Do **not** add Product-data
+persistence merely to justify replay wording.
 
 ##### Concurrency
 
