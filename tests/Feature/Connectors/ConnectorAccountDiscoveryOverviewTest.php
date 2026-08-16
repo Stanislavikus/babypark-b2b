@@ -47,6 +47,16 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
 
     private const SENSITIVE_CANARY = 'DISCOVERY_SENSITIVE_CANARY_4B2B';
 
+    private const FALLBACK_SUCCESS_TECHNICAL_CANARY = 'GAP025A_FALLBACK_SUCCESS_TECHNICAL_CANARY';
+
+    private const FALLBACK_VENDOR_REQUEST_ID_CANARY = 'GAP025A_VENDOR_REQ_9911';
+
+    private const FALLBACK_ERROR_CODE_CANARY = 'gap025a_fallback_error_code';
+
+    private const FALLBACK_EXECUTION_ATTEMPTS = 77;
+
+    private const FALLBACK_DURATION_MS = 98765;
+
     private ?ConnectorDiscoveryDispatchPortStub $dispatchStub = null;
 
     protected function setUp(): void
@@ -150,23 +160,56 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
         $successfulRun = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded, [
             'created_at' => now()->subHour(),
             'finished_at' => now()->subHour(),
+            'technical_summary' => self::FALLBACK_SUCCESS_TECHNICAL_CANARY,
+            'error_code' => self::FALLBACK_ERROR_CODE_CANARY,
+            'vendor_request_id' => self::FALLBACK_VENDOR_REQUEST_ID_CANARY,
+            'execution_attempts' => self::FALLBACK_EXECUTION_ATTEMPTS,
+            'duration_ms' => self::FALLBACK_DURATION_MS,
+            'cause_category' => 'vendor_unavailable',
+            'actionability' => 'automatic_retry',
+            'http_status' => 503,
+            'fields_received' => 999,
+            'fields_normalized' => 888,
+            'added_count' => 7,
+            'changed_count' => 6,
+            'removed_count' => 5,
+            'unchanged_count' => 4,
         ]);
         $successfulSnapshot = $this->createSnapshotForRun($successfulRun, [
             'field_count' => 17,
+            'canonical_hash' => hash('sha256', self::SENSITIVE_CANARY),
         ]);
         $successfulRun->update(['snapshot_id' => $successfulSnapshot->id]);
 
-        $failedRun = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Failed, [
+        $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Failed, [
             'created_at' => now(),
             'finished_at' => now(),
             'user_message_key' => 'connectors.errors.discovery_failed',
             'technical_summary' => self::SENSITIVE_CANARY,
+            'error_code' => 'discovery_vendor_timeout',
         ]);
 
-        Livewire::actingAs($admin)
+        $component = Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
             ->assertSee('17')
+            ->assertSee(__('connectors.ui.available_fields.field_count'))
             ->assertSee(__('connectors.errors.discovery_failed', locale: 'uk'));
+
+        $this->assertSensitiveFieldsAbsent($component, [
+            self::FALLBACK_SUCCESS_TECHNICAL_CANARY,
+            self::FALLBACK_VENDOR_REQUEST_ID_CANARY,
+            self::FALLBACK_ERROR_CODE_CANARY,
+            '"execution_attempts":'.self::FALLBACK_EXECUTION_ATTEMPTS,
+            '"duration_ms":'.self::FALLBACK_DURATION_MS,
+            '"vendor_request_id":"'.self::FALLBACK_VENDOR_REQUEST_ID_CANARY,
+            '"fields_received":999',
+            '"fields_normalized":888',
+            '"http_status":503',
+            '"cause_category":"vendor_unavailable"',
+            '"actionability":"automatic_retry"',
+        ]);
+
+        $this->assertLatestSuccessfulPresentationDiscoveryRunMinimized($component);
     }
 
     #[Test]
@@ -667,7 +710,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
         ], $overrides));
     }
 
-    private function assertSensitiveFieldsAbsent(Testable $component): void
+    private function assertSensitiveFieldsAbsent(Testable $component, array $extraForbidden = []): void
     {
         $surfaces = [
             $component->html(),
@@ -675,7 +718,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
             json_encode($component->effects, JSON_THROW_ON_ERROR),
         ];
 
-        $forbidden = [
+        $forbidden = array_merge([
             self::SENSITIVE_CANARY,
             'endpoint_path',
             'canonical_hash',
@@ -686,13 +729,86 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
             'changed_count',
             'removed_count',
             'unchanged_count',
-        ];
+        ], $extraForbidden);
 
         foreach ($forbidden as $needle) {
             foreach ($surfaces as $surface) {
                 $this->assertStringNotContainsString($needle, $surface, "Sensitive value [{$needle}] leaked.");
             }
         }
+    }
+
+    private function assertLatestSuccessfulPresentationDiscoveryRunMinimized(Testable $component): void
+    {
+        $record = $component->instance()->record;
+
+        $this->assertTrue($record->relationLoaded('latestSuccessfulPresentationDiscoveryRun'));
+
+        $fallbackRun = $record->getRelation('latestSuccessfulPresentationDiscoveryRun');
+        $this->assertNotNull($fallbackRun);
+
+        $forbiddenRunAttributes = [
+            'execution_attempts',
+            'duration_ms',
+            'cause_category',
+            'actionability',
+            'error_code',
+            'http_status',
+            'technical_summary',
+            'vendor_request_id',
+            'fields_received',
+            'fields_normalized',
+            'added_count',
+            'changed_count',
+            'removed_count',
+            'unchanged_count',
+            'trigger',
+            'initiated_by_user_id',
+            'started_at',
+            'finished_at',
+            'user_message_key',
+            'previous_snapshot_id',
+            'connector_schema_source_id',
+            'workspace_id',
+            'retry_until_at',
+            'next_attempt_at',
+        ];
+
+        foreach ($forbiddenRunAttributes as $attribute) {
+            $this->assertArrayNotHasKey(
+                $attribute,
+                $fallbackRun->getAttributes(),
+                "Fallback presentation run must not load [{$attribute}].",
+            );
+        }
+
+        $this->assertArrayHasKey('id', $fallbackRun->getAttributes());
+        $this->assertArrayHasKey('connector_account_id', $fallbackRun->getAttributes());
+        $this->assertArrayHasKey('snapshot_id', $fallbackRun->getAttributes());
+
+        $snapshot = $fallbackRun->snapshot;
+        $this->assertNotNull($snapshot);
+
+        $forbiddenSnapshotAttributes = [
+            'canonical_hash',
+            'connector_schema_source_id',
+            'discovery_run_id',
+            'previous_snapshot_id',
+            'schema_version',
+            'workspace_id',
+        ];
+
+        foreach ($forbiddenSnapshotAttributes as $attribute) {
+            $this->assertArrayNotHasKey(
+                $attribute,
+                $snapshot->getAttributes(),
+                "Fallback presentation snapshot must not load [{$attribute}].",
+            );
+        }
+
+        $this->assertArrayHasKey('id', $snapshot->getAttributes());
+        $this->assertArrayHasKey('connector_account_id', $snapshot->getAttributes());
+        $this->assertArrayHasKey('field_count', $snapshot->getAttributes());
     }
 }
 

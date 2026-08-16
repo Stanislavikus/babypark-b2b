@@ -152,6 +152,11 @@ class ConnectorAccountResource extends Resource
                     if ($latestRun->status === ConnectorDiscoveryRunStatus::Failed
                         && $record->last_successful_discovery_at !== null) {
                         $latestSuccessfulRun = ConnectorDiscoveryRun::query()
+                            ->select([
+                                'id',
+                                'connector_account_id',
+                                'snapshot_id',
+                            ])
                             ->where('connector_account_id', $record->getKey())
                             ->where('status', ConnectorDiscoveryRunStatus::Succeeded)
                             ->with([
@@ -159,14 +164,12 @@ class ConnectorAccountResource extends Resource
                                     'id',
                                     'connector_account_id',
                                     'field_count',
-                                    'captured_at',
                                 ]),
                             ])
                             ->latest('created_at')
                             ->first();
 
                         if ($latestSuccessfulRun !== null && $latestSuccessfulRun->snapshot !== null) {
-                            $latestSuccessfulRun->snapshot->makeHidden(['canonical_hash']);
                             $record->setRelation('latestSuccessfulPresentationDiscoveryRun', $latestSuccessfulRun);
                         }
                     }
