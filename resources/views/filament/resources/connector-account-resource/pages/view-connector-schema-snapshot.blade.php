@@ -1,17 +1,21 @@
 <x-filament-panels::page>
     <x-filament::section>
         <dl class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            @if (! $layerBPresentation && $sourceLabel !== null)
+                <div>
+                    <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                        {{ __('connectors.ui.columns.source') }}
+                    </dt>
+                    <dd class="mt-1 text-sm text-gray-950 dark:text-white">
+                        {{ $sourceLabel }}
+                    </dd>
+                </div>
+            @endif
             <div>
                 <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    {{ __('connectors.ui.columns.source') }}
-                </dt>
-                <dd class="mt-1 text-sm text-gray-950 dark:text-white">
-                    {{ $sourceLabel }}
-                </dd>
-            </div>
-            <div>
-                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    {{ __('connectors.ui.columns.captured_at') }}
+                    {{ $layerBPresentation
+                        ? __('sync_mappings.available_fields_last_checked')
+                        : __('connectors.ui.columns.captured_at') }}
                 </dt>
                 <dd class="mt-1 text-sm text-gray-950 dark:text-white">
                     {{ $capturedAt ?? __('connectors.ui.common.dash') }}
@@ -19,13 +23,13 @@
             </div>
             <div>
                 <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
-                    {{ __('connectors.ui.columns.field_count') }}
+                    {{ __('sync_mappings.available_fields_count') }}
                 </dt>
                 <dd class="mt-1 text-sm text-gray-950 dark:text-white">
                     {{ $fieldCount }}
                 </dd>
             </div>
-            @if ($snapshotStateLabel !== null)
+            @if (! $layerBPresentation && $snapshotStateLabel !== null)
                 <div>
                     <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
                         {{ __('connectors.ui.columns.snapshot_state') }}

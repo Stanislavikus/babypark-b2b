@@ -109,16 +109,18 @@ final class FieldMappingMutationService
         ConnectorAccount $account,
         string $syncConfigurationId,
         string $fieldBindingId,
+        string $externalFieldKey,
     ): SyncConfiguration {
         return $this->mutationCoordinator->mutateLocked(
             $account,
             $syncConfigurationId,
-            function (SyncConfiguration $configuration) use ($fieldBindingId): void {
+            function (SyncConfiguration $configuration) use ($fieldBindingId, $externalFieldKey): void {
                 $this->bindingValidator->assertProductsConfiguration($configuration);
 
                 $mapping = FieldMapping::withoutWorkspaceScope()
                     ->where('sync_configuration_id', $configuration->id)
                     ->where('field_binding_id', $fieldBindingId)
+                    ->where('external_field_key', $externalFieldKey)
                     ->first();
 
                 if ($mapping === null) {

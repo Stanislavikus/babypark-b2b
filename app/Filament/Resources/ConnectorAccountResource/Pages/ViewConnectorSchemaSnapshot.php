@@ -10,8 +10,10 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
+use App\Support\Connectors\ConnectorAuthorization;
 use App\Support\Connectors\ConnectorSchemaFieldPresenter;
 use App\Support\Connectors\ConnectorUiFormatter;
+use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\TextEntry;
@@ -28,6 +30,7 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
 
@@ -43,13 +46,15 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
 
     public ConnectorAccount $account;
 
-    public string $sourceLabel;
+    public ?string $sourceLabel;
 
     public ?string $capturedAt;
 
     public int $fieldCount;
 
     public ?string $snapshotStateLabel;
+
+    public bool $layerBPresentation = false;
 
     #[Locked]
     public string $snapshotId;
@@ -74,7 +79,28 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
 
     public function getTitle(): string|Htmlable
     {
-        return __('connectors.ui.snapshot.title');
+        return $this->layerBPresentation
+            ? __('sync_mappings.available_fields_title', ['platform' => $this->account->connectorDefinition->name])
+            : __('connectors.ui.snapshot.title');
+    }
+
+    public static function canAccess(array $parameters = []): bool
+    {
+        $user = Auth::user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        return app(ConnectorAuthorization::class)->canLayerBExternalFieldReference(
+            $user,
+            app(WorkspaceContext::class)->current(),
+        );
+    }
+
+    public static function authorizeResourceAccess(): void
+    {
+        abort_unless(static::canAccess(), 403);
     }
 
     public function mount(int|string $record, string $snapshot): void
@@ -83,6 +109,21 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
         $this->accountId = (string) $this->account->getKey();
         $snapshotRecord = $this->resolveSnapshotRecord($snapshot);
         $this->snapshotId = (string) $snapshotRecord->getKey();
+
+        $user = Auth::user();
+        abort_unless($user instanceof User, 403);
+        $workspace = $this->account->workspace ?? Workspace::query()->findOrFail($this->account->workspace_id);
+        $connectorAuthorization = app(ConnectorAuthorization::class);
+        $this->layerBPresentation = $connectorAuthorization->canReadSyncMappings($user, $workspace);
+
+        if ($this->layerBPresentation) {
+            $this->sourceLabel = null;
+            $this->capturedAt = ConnectorUiFormatter::formatDateTime($snapshotRecord->captured_at);
+            $this->fieldCount = $snapshotRecord->field_count;
+            $this->snapshotStateLabel = null;
+
+            return;
+        }
 
         $uiState = app(ConnectorAccountUiState::class);
 
@@ -249,12 +290,16 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
             ->whereKey($key)
             ->firstOrFail();
 
-        abort_unless(auth()->user()?->can('view', $record), 403);
-
         $user = auth()->user();
         abort_unless($user instanceof User, 403);
 
         $workspace = $record->workspace ?? Workspace::query()->findOrFail($record->workspace_id);
+
+        abort_unless(
+            $user->can('view', $record) || $this->canAccessLayerBFields($user, $workspace, $record),
+            403,
+        );
+
         $presentation = app(ConnectorAccountCapabilityPresentation::class);
 
         $record = $presentation->sanitizeRecord($record, $user, $workspace);
@@ -269,6 +314,15 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
         }
 
         return $record;
+    }
+
+    private function canAccessLayerBFields(User $user, Workspace $workspace, ConnectorAccount $record): bool
+    {
+        if ($record->workspace_id !== $workspace->id) {
+            return false;
+        }
+
+        return app(ConnectorAuthorization::class)->canLayerBExternalFieldReference($user, $workspace);
     }
 
     protected function resolveSnapshotRecord(string $snapshotId): ConnectorSchemaSnapshot
