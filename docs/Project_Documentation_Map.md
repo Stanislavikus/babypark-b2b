@@ -243,7 +243,7 @@ This document describes:
   SyncConfiguration; first persistence contract resolved — Task 4C-1a, 2026-08-12;
   `field_binding_id` + `external_field_key` minimum slice for `products` domain);
 - SyncRun / SyncRunItem (preview/live execution evidence; SyncRunItem =
-  business-record outcome);
+  business-record outcome; first physical contract resolved — Task 4C-2a);
 - ExternalRecordLink (account-scoped internal ↔ external record identity).
 
 Historical note: earlier drafts listed `ImportJob` / `ExportJob` / `SyncJob`
