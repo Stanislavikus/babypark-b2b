@@ -350,7 +350,7 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4C-2b-1** | SyncRun Persistence & Revision Foundation — revision v3 runtime hasher + rebaseline, `SyncRun`/`SyncRunItem` persistence, enums/casts, workspace-aware integrity, Product composite FK support — Done |
 | **4C-2b-2** | Preview Authorization & Admission Foundation — `run_sync_preview` runtime permission, configuration snapshot builder, one-active-run admission — next |
 | **4C-2b-3** | Product Export Projection + Adobe Pure Planner — after docs-only Product Export Projection Stop-and-Amend |
-| **4C-2b** | Remaining Preview foundation after 4C-2b-1/2/3 slices: merchant Preview exposure (after operation-support reconciliation), scheduling — no Live mutation; no automatic `ConnectorSyncOperationSupport` flip |
+| **4C-2b** | Preview foundation umbrella — slices 4C-2b-1 (persistence + revision v3, Done), 4C-2b-2 (authorization + admission, next), 4C-2b-3 (Product Export Projection + Adobe pure planner, after docs-only Stop-and-Amend). Must **not** ship: merchant Preview UI; Live mutation; automatic `ConnectorSyncOperationSupport` flip |
 | **4C** | Remaining sync domain after 4C-2b foundation: merchant Preview exposure (after operation-support reconciliation), `ExternalRecordLink`, Live execution, scheduling, sync history/issues, merchant sync UX beyond mapping |
 
 Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
@@ -1077,7 +1077,6 @@ Remaining connector gaps are tracked separately under GAP-006.
 - Product Export Projection contract (docs-only Stop-and-Amend required before
   4C-2b-3);
 - Adobe Products/Export Preview planner (Task 4C-2b-3, after projection contract);
-- `ExternalRecordLink`;
 - `ExternalRecordLink`;
 - sync execution runtime for merchant "Синхронізувати зараз";
 - Preview before first live sync;
