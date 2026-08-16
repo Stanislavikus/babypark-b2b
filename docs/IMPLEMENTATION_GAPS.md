@@ -311,21 +311,22 @@ yet), but should be scheduled before any payment gateway integration work starts
   when a profile adapter does not declare support). Vocabulary implemented:
   `products` + `import`/`export`. Adobe Commerce production profile remains
   fail-closed for executable sync pairs.
-- Sync Domain entities still absent: `SyncRun` / `SyncRunItem`,
-  `ExternalRecordLink`, preview/live execution, scheduling, sync history/issues,
-  and merchant sync UX beyond connector connection management.
-  `FieldMapping` persistence/manual confirmation and authoritative-discovery
-  validation are implemented (Task 4C-1b, Done). Canonical
-  suggestion/read-model and UI-prefill work is Task 4C-1c (4C-1c-0 docs contract
-  frozen; 4C-1c-1 provider/read-model Done; 4C-1c-2a authorization contract
-  Done; 4C-1c-2b Layer B mapping UI Done, PR #139).
-  Preview-first execution foundation contract is frozen (Task 4C-2a, docs only):
-  revision v3 + fixed `all_products` selection, `run_sync_preview` normative
-  eighth permission (runtime catalogue still seven permissions until 4C-2b),
-  `SyncRun`/`SyncRunItem` physical contract, admission/concurrency/snapshot/planner
-  boundaries, Adobe operation-support truth gate.
-  Sync execution/preview runtime remains later implementation (Task 4C-2b+)
-  after domain docs (now settled).
+- Sync Domain entities still absent: `ExternalRecordLink`, preview/live execution,
+  scheduling, sync history/issues, and merchant sync UX beyond connector
+  connection management. `SyncRun` / `SyncRunItem` persistence and revision v3
+  rebaseline are implemented (Task 4C-2b-1, Done). `FieldMapping`
+  persistence/manual confirmation and authoritative-discovery validation are
+  implemented (Task 4C-1b, Done). Canonical suggestion/read-model and
+  UI-prefill work is Task 4C-1c (4C-1c-0 docs contract frozen; 4C-1c-1
+  provider/read-model Done; 4C-1c-2a authorization contract Done; 4C-1c-2b
+  Layer B mapping UI Done, PR #139). Preview-first execution foundation
+  contract is frozen (Task 4C-2a, docs only): revision v3 + fixed
+  `all_products` selection, `run_sync_preview` normative eighth permission
+  (runtime catalogue still seven permissions until 4C-2b-2), `SyncRun`/
+  `SyncRunItem` physical contract, admission/concurrency/snapshot/planner
+  boundaries, Adobe operation-support truth gate. Preview admission/execution
+  runtime remains later implementation (Task 4C-2b-2+) after persistence
+  foundation (now landed for 4C-2b-1).
 
 **Task sequence (GAP-006 remains Open until implementation lands):**
 
@@ -345,8 +346,11 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (no DB/migration scope) — Done |
 | **4C-1c-2a** | Workspace access / authorization contract — docs-only Stop-and-Amend — Done |
 | **4C-1c-2b** | Layer B mapping UI: explicit `SyncConfiguration` Mapping page; deterministic high-confidence suggestion presentation; manual choose/change/remove; explicit confirmation through `FieldMappingMutationService`; stale-safe exact remove; workspace-scoped fresh Mapping authorization; Layer-B Available Fields supporting reference — Done, PR #139 |
-| **4C-2a** | Docs-only Preview-first Sync Execution Foundation Stop-and-Amend — `SyncRun`/`SyncRunItem` physical contract, revision v3 + fixed `all_products` selection, `run_sync_preview` normative permission (runtime pending 4C-2b), admission/concurrency/snapshot/planner boundaries, Adobe support-truth gate — Done |
-| **4C-2b** | Preview foundation implementation: revision v3 recompute, `run_sync_preview` runtime permission, `SyncRun`/`SyncRunItem` persistence, configuration snapshot, admission/concurrency, pure Adobe Products/Export Preview planner + isolated regression harness — no merchant Preview UI; no Live mutation; no automatic `ConnectorSyncOperationSupport` flip |
+| **4C-2a** | Docs-only Preview-first Sync Execution Foundation Stop-and-Amend — `SyncRun`/`SyncRunItem` physical contract, revision v3 + fixed `all_products` selection, `run_sync_preview` normative permission (runtime pending 4C-2b-2), admission/concurrency/snapshot/planner boundaries, Adobe support-truth gate — Done |
+| **4C-2b-1** | SyncRun Persistence & Revision Foundation — revision v3 runtime hasher + rebaseline, `SyncRun`/`SyncRunItem` persistence, enums/casts, workspace-aware integrity, Product composite FK support — Done |
+| **4C-2b-2** | Preview Authorization & Admission Foundation — `run_sync_preview` runtime permission, configuration snapshot builder, one-active-run admission — next |
+| **4C-2b-3** | Product Export Projection + Adobe Pure Planner — after docs-only Product Export Projection Stop-and-Amend |
+| **4C-2b** | Remaining Preview foundation after 4C-2b-1/2/3 slices: merchant Preview exposure (after operation-support reconciliation), scheduling — no Live mutation; no automatic `ConnectorSyncOperationSupport` flip |
 | **4C** | Remaining sync domain after 4C-2b foundation: merchant Preview exposure (after operation-support reconciliation), `ExternalRecordLink`, Live execution, scheduling, sync history/issues, merchant sync UX beyond mapping |
 
 Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
@@ -373,8 +377,11 @@ Layer B mapping UI (4C-1c-2b) is implemented (PR #139, merge
 foundation contract is frozen (Task 4C-2a, docs only). Connector Discovery
 is production-operational on the Babypark pilot (dedicated
 `babypark-connector-queue` worker verified `RUNNING` and one successful manual UI
-Discovery completed 2026-08-15). `SyncRun` / execution,
-preview, schedule, history, and `ExternalRecordLink` remain unimplemented.
+Discovery completed 2026-08-15). `SyncRun` / `SyncRunItem` persistence and
+revision v3 rebaseline are implemented (Task 4C-2b-1). Preview admission,
+execution, schedule, history, and `ExternalRecordLink` remain unimplemented.
+`run_sync_preview` runtime permission remains pending Task 4C-2b-2. Adobe
+`(products, export)` support remains fail-closed. No merchant Preview UI exists.
 Connector-account creation and credential-management/settings UI remain absent.
 Task 4B-2c (discovered schema fields / change inspection) and retention jobs
 remain unimplemented.
@@ -1057,14 +1064,20 @@ Remaining connector gaps are tracked separately under GAP-006.
 **Implemented sync-domain backend (verified on `develop`; not a GAP-025 UX claim):**
 - `SyncConfiguration` persistence and domain write path (Task 4C-0).
 - `FieldMapping` persistence, manual confirmation, authoritative-discovery
-  validation, and revision v2 integration (Task 4C-1b).
+  validation, and revision v3 integration (Task 4C-1b + 4C-2b-1).
 - Canonical deterministic suggestion/read-model provider (Task 4C-1c-1).
+- `SyncRun` / `SyncRunItem` persistence foundation and revision v3 rebaseline
+  (Task 4C-2b-1).
 
 **Still absent in code (docs settled; runtime or UI missing):**
-- `SyncRun` / `SyncRunItem` persistence and execution runtime (physical contract
-  frozen in Task 4C-2a);
+- Preview admission/execution runtime (`configuration_snapshot` builder,
+  one-active-run admission, planner — Task 4C-2b-2+);
 - normative eighth permission `run_sync_preview` (runtime catalogue still seven
-  permissions until Task 4C-2b);
+  permissions until Task 4C-2b-2);
+- Product Export Projection contract (docs-only Stop-and-Amend required before
+  4C-2b-3);
+- Adobe Products/Export Preview planner (Task 4C-2b-3, after projection contract);
+- `ExternalRecordLink`;
 - `ExternalRecordLink`;
 - sync execution runtime for merchant "Синхронізувати зараз";
 - Preview before first live sync;
