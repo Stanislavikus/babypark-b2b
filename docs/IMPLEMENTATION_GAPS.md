@@ -356,7 +356,7 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4C-2b-3** | Historical tracking label — Product Export Projection + Adobe Pure Planner. Not a mandatory future PR boundary. Absorbed by **Stage 1 — Preview Engine** (Magento V1 contract now freezes Product+Variant execution input; no separate Product Export Projection Stop-and-Amend is required before Stage 1). |
 | **4C-2b** | Historical umbrella label for Preview foundation slices. 4C-2b-1 Done. Remaining Preview runtime is **Stage 1**. Must **not** ship: merchant Preview UI (that is Stage 2); Live mutation (Stage 3); automatic `ConnectorSyncOperationSupport` flip |
 | **Stage 1 — Preview Engine** | Persisted zero-mutation Adobe Products Export Preview against the full platform Product/Variant model — **Done** (PR on `cursor/adobe-preview-engine-stage1-2d6d`). Includes `run_sync_preview`, SyncConfiguration reachability, snapshot/admission, Product execution aggregate, Adobe simple + configurable planners, truthful Preview-only mode-aware support, `FieldOptionMapping`, connector execution configuration, revision v4. Merchant Preview UI remains Stage 2A; Live mutation Stage 3. |
-| **Stage 2-0 — Merchant Preview Authorization & Remediation Contract** | Docs-only freeze: `manage_sync_configurations` (normative ninth permission; runtime pending Stage 2A); permission independence; no hidden mutation under `run_sync_preview`; non-mutating existence check (Stage 2A required); three-layer attribute-set trace; pre-admission vs completed findings; historical/current remediation split; remediation presentation semantics; Stage 2A/2B sequencing — **pending** |
+| **Stage 2-0 — Merchant Preview Authorization & Remediation Contract** | Docs-only freeze: `manage_sync_configurations` (normative ninth permission; runtime pending Stage 2A); permission independence; no hidden mutation under `run_sync_preview`; non-mutating existence check (Stage 2A required); three-layer attribute-set trace; pre-admission vs completed findings; historical/current remediation split; remediation presentation semantics; Stage 2A/2B sequencing — **Done (docs contract)** |
 | **Stage 2A — Merchant Preview Core + Connector Setup** | Runtime `manage_sync_configurations`; actor-aware setup authorization; non-mutating existence check; merchant Preview UI; attribute-set setup; completed-result summary; Needs-attention working set; contextual remediation; honest `NO_EDIT_SURFACE`; explicit rerun — **pending** |
 | **Stage 2B — Option Mapping Remediation** | Minimal Option Mapping read model/UI; `MissingOptionMapping` / `ExternalOptionMissingOrStale` focused remediation — **pending** (after 2A) |
 | **Stage 3 — Live Engine** | After E11 revalidation: Live permission, ExternalRecordLink, simple + configurable Live execution, reconciliation, merchant-safe result, real Adobe create/update validation. |
@@ -392,9 +392,10 @@ Preview admission and background Preview execution are implemented (Stage 1).
 Schedule, history, and `ExternalRecordLink` remain unimplemented.
 `run_sync_preview` runtime permission is implemented (Stage 1; eighth catalogue
 permission). Adobe `(products, export)` Preview support is declared; Live remains
-unsupported. No merchant Preview UI exists (Stage 2A). `manage_sync_configurations`
-is normatively frozen in Stage 2-0; runtime catalogue remains **eight**
-permissions until Stage 2A. Connector-account **creation UI is implemented**
+unsupported. No merchant Preview UI exists (Stage 2A). Stage 2-0 merchant Preview
+authorization/remediation contract is **Done (docs contract)**.
+`manage_sync_configurations` is normatively frozen; runtime catalogue remains
+**eight** permissions until Stage 2A. Connector-account **creation UI is implemented**
 (`ConnectPlatformIntegration`); credential-management/settings **edit** UI
 remains absent. Task 4B-2c (discovered schema fields / change inspection) and
 retention jobs remain unimplemented.

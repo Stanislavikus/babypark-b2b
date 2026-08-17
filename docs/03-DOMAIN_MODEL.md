@@ -6191,20 +6191,30 @@ merchant to type a configuration UUID.
 ```text
 Workspace
 → ConnectorAccount
-→ SyncConfiguration
-→ semantic operation (products + export for Adobe V1)
+→ data_domain
+→ external_context
 ```
+
+Semantic operation (e.g. `products` + `export` for Adobe V1) is an enabled/run-target
+operation on that exact `SyncConfiguration` — **not** part of `SyncConfiguration`
+identity and **not** a reason to create a second `SyncConfiguration`. One
+domain/context `SyncConfiguration` may enable multiple semantic operations (see
+**Semantic operations** above). For Adobe V1 merchant reachability, resolve the
+`(products, export)` operation through this identity — not by picking an arbitrary
+first configuration.
 
 Rejected: silently choosing the first configuration; creating a configuration
 because the actor opened Preview; inferring authorization from URL IDs; using a
-foreign workspace/account/configuration relationship.
+foreign workspace/account/configuration relationship; creating a second
+`SyncConfiguration` merely because import and export are independently enabled.
 
 **Mutating ensure path (Stage 1 runtime):** `SyncConfigurationReachabilityService::
 ensureProductsExportConfiguration()` and `AdobeProductExportSetupService::
 ensureProductsExportConfiguration()` may create a row and/or enable Export —
-committed mutations. These are valid only on actor-aware boundaries that require
-`manage_sync_configurations` (Stage 2A). See **Stage 2-0** — Preview-only actors
-must never call them.
+committed mutations. When invoked from a **merchant-facing mutation path**, an
+outer actor-aware boundary must require `manage_sync_configurations` (Stage 2A).
+This contract does not silently outlaw trusted/system orchestration paths. See
+**Stage 2-0** — Preview-only actors must never call them.
 
 **Read-only existence (Stage 2A required):** `SyncPreviewConfigurationReadinessPort::
 isReady(SyncConfiguration)` answers readiness for an **already-resolved**

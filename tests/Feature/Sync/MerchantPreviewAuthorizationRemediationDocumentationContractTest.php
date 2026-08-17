@@ -9,6 +9,59 @@ use Tests\TestCase;
 class MerchantPreviewAuthorizationRemediationDocumentationContractTest extends TestCase
 {
     #[Test]
+    public function domain_model_documents_sync_configuration_identity_without_semantic_operation(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $e7Section = $this->extractE7Section($content);
+
+        $this->assertStringContainsString('the unique configuration identity is:', $e7Section);
+        $this->assertStringContainsString('→ data_domain', $e7Section);
+        $this->assertStringContainsString('→ external_context', $e7Section);
+        $this->assertStringNotContainsString('→ semantic operation', $e7Section);
+        $this->assertStringContainsString('not** part of `SyncConfiguration` identity', $e7Section);
+        $this->assertStringContainsString('not** a reason to create a second `SyncConfiguration`', $e7Section);
+        $this->assertStringContainsString('may enable multiple semantic operations', $e7Section);
+    }
+
+    #[Test]
+    public function domain_model_documents_ensure_helpers_require_manage_sync_configurations_on_merchant_mutation_path(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $e7Section = $this->extractE7Section($content);
+
+        $this->assertStringContainsString('merchant-facing mutation path', $e7Section);
+        $this->assertStringContainsString('outer actor-aware boundary must require `manage_sync_configurations`', $e7Section);
+        $this->assertStringContainsString('does not silently outlaw trusted/system orchestration paths', $e7Section);
+        $this->assertStringNotContainsString('valid only on actor-aware boundaries that require', $e7Section);
+    }
+
+    #[Test]
+    public function ux_contract_distinguishes_shipped_preview_runtime_from_pending_merchant_ui(): void
+    {
+        $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
+
+        $this->assertStringContainsString('**Existing-vs-future boundary:**', $content);
+        $this->assertStringContainsString('Preview computation/runtime is shipped', $content);
+        $this->assertStringContainsString('Merchant Preview UI and remediation presentation remain pending Stage 2A', $content);
+        $this->assertStringContainsString('Option Mapping remediation UI remains **pending Stage 2B**', $content);
+        $this->assertStringContainsString('must **not** conclude that dry-run/preview computation is still absent', $content);
+    }
+
+    #[Test]
+    public function ui_design_system_distinguishes_shipped_preview_runtime_from_pending_merchant_ux(): void
+    {
+        $content = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
+
+        $this->assertStringContainsString('### Existing-vs-future UX boundary', $content);
+        $this->assertStringContainsString('Stage 1 Preview Engine is **shipped**', $content);
+        $this->assertStringContainsString('Stage 2-0 merchant Preview authorization/remediation contract is **Done (docs contract)**', $content);
+        $this->assertStringContainsString('Do not treat Preview computation/runtime as future work', $content);
+        $this->assertStringContainsString('merchant Preview UX/remediation surfaces remain pending in Stage 2A/2B', $content);
+    }
+
+    #[Test]
     public function domain_model_documents_manage_sync_configurations_as_normative_ninth_permission_pending_stage_2a(): void
     {
         $section = $this->stage20ContractSection();
@@ -154,16 +207,18 @@ class MerchantPreviewAuthorizationRemediationDocumentationContractTest extends T
     }
 
     #[Test]
-    public function implementation_gaps_records_stage_2_0_2a_2b_and_manage_sync_configurations_runtime_pending(): void
+    public function implementation_gaps_records_stage_2_0_done_and_2a_2b_runtime_pending(): void
     {
         $gaps = $this->gap006Section();
 
         $this->assertStringContainsString('**Stage 2-0 — Merchant Preview Authorization & Remediation Contract**', $gaps);
+        $this->assertStringContainsString('**Done (docs contract)**', $gaps);
         $this->assertStringContainsString('**Stage 2A — Merchant Preview Core + Connector Setup**', $gaps);
         $this->assertStringContainsString('**Stage 2B — Option Mapping Remediation**', $gaps);
         $this->assertStringContainsString('runtime pending Stage 2A', $gaps);
         $this->assertStringContainsString('runtime catalogue remains **eight**', $gaps);
         $this->assertStringNotContainsString('| **Stage 2 — Merchant Preview** |', $gaps);
+        $this->assertStringNotContainsString('Stage 2A/2B sequencing — **pending**', $gaps);
     }
 
     #[Test]
@@ -208,5 +263,23 @@ class MerchantPreviewAuthorizationRemediationDocumentationContractTest extends T
         }
 
         return $matches[0];
+    }
+
+    /**
+     * @param  non-empty-string  $content
+     * @return non-empty-string
+     */
+    private function extractE7Section(string $content): string
+    {
+        if (! preg_match(
+            '/#### E7\. SyncConfiguration merchant reachability\n(.*?)'
+            .'(?=\n#### E8\. Live authority)/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate E7 SyncConfiguration merchant reachability section in 03-DOMAIN_MODEL.md');
+        }
+
+        return $matches[1];
     }
 }
