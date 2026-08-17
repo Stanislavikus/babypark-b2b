@@ -13,14 +13,14 @@ class MerchantPreviewAuthorizationRemediationDocumentationContractTest extends T
     {
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
 
-        $e7Section = $this->extractE7Section($content);
+        $e7Section = preg_replace('/\s+/', ' ', $this->extractE7Section($content)) ?? '';
 
         $this->assertStringContainsString('the unique configuration identity is:', $e7Section);
         $this->assertStringContainsString('→ data_domain', $e7Section);
         $this->assertStringContainsString('→ external_context', $e7Section);
         $this->assertStringNotContainsString('→ semantic operation', $e7Section);
-        $this->assertStringContainsString('not** part of `SyncConfiguration` identity', $e7Section);
-        $this->assertStringContainsString('not** a reason to create a second `SyncConfiguration`', $e7Section);
+        $this->assertStringContainsString('**not** part of `SyncConfiguration` identity', $e7Section);
+        $this->assertStringContainsString('**not** a reason to create a second `SyncConfiguration`', $e7Section);
         $this->assertStringContainsString('may enable multiple semantic operations', $e7Section);
     }
 
@@ -209,14 +209,14 @@ class MerchantPreviewAuthorizationRemediationDocumentationContractTest extends T
     #[Test]
     public function implementation_gaps_records_stage_2_0_done_and_2a_2b_runtime_pending(): void
     {
-        $gaps = $this->gap006Section();
+        $gaps = preg_replace('/\s+/', ' ', $this->gap006Section()) ?? '';
 
         $this->assertStringContainsString('**Stage 2-0 — Merchant Preview Authorization & Remediation Contract**', $gaps);
         $this->assertStringContainsString('**Done (docs contract)**', $gaps);
         $this->assertStringContainsString('**Stage 2A — Merchant Preview Core + Connector Setup**', $gaps);
         $this->assertStringContainsString('**Stage 2B — Option Mapping Remediation**', $gaps);
         $this->assertStringContainsString('runtime pending Stage 2A', $gaps);
-        $this->assertStringContainsString('runtime catalogue remains **eight**', $gaps);
+        $this->assertStringContainsString('runtime catalogue remains **eight** permissions until Stage 2A', $gaps);
         $this->assertStringNotContainsString('| **Stage 2 — Merchant Preview** |', $gaps);
         $this->assertStringNotContainsString('Stage 2A/2B sequencing — **pending**', $gaps);
     }
