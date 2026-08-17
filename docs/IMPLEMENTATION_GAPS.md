@@ -598,15 +598,12 @@ Discovery Overview UI is complete. **Historical:** GAP-024 was open at
 **Approved docs:**
 - `02-ATTRIBUTE_DICTIONARY.md`, Channel Mappings Protection: "Core tables must never contain
   temporary attributes like google_title, rozetka_price, or prom_description."
-- Canonical Product Field Registry DEC-011: `onec_guid` is `connector_only`, not a Product/System Attribute.
+- Canonical Product Field Registry DEC-011: `onec_guid` is `external_identity` / `ExternalRecordLink`, not a Product/System Attribute and not FieldMapping.
 - Canonical registry: `meta_title` / `meta_description` are platform SEO `core_model_property` Product concepts; `rozetka_category_id` is `connector_only`.
 
 **Current code:**
-- Connector-specific leakage (must eventually leave Product core):
-  - `products.rozetka_category_id` — Rozetka marketplace category reference;
-  - `products.onec_guid` and `product_variants.onec_guid` — 1C external identity columns.
-  These are vendor-instance identity/mapping leftovers. Do not create FieldDefinitions for them.
-  Destination for identity is the account-scoped external identity boundary, not Product core.
+- **connector field/mapping leakage:** `products.rozetka_category_id` is `connector_only` / `ConnectorMapping` (channel category mapping). It is not record identity.
+- **external identity leakage:** `products.onec_guid` and `product_variants.onec_guid` are `external_identity` / `ExternalRecordLink` (vendor-instance record identity). They are not FieldMapping and not Product taxonomy. Eventual destination: ConnectorAccount-scoped ExternalRecordLink boundary. Physical columns remain temporary legacy debt. Do not create FieldDefinitions for them.
 - Valid platform Product core that happens to be physical columns (not equivalent leakage):
   - `products.meta_title`;
   - `products.meta_description`.
@@ -614,20 +611,24 @@ Discovery Overview UI is complete. **Historical:** GAP-024 was open at
   Do not treat generic reusable SEO fields as connector-specific leakage merely because they
   are columns on `products`.
 
-**Impact:** connector-specific columns in Product core block a clean Connector Foundation
-(GAP-006) identity/mapping split if left unaddressed. SEO columns do not belong in that same
-debt inventory.
+**Impact:** connector field/mapping leakage and external identity leakage in Product core
+block a clean Connector Foundation (GAP-006) identity/mapping split if left unaddressed.
+SEO columns do not belong in that same debt inventory.
 
 **Decision:** do not register `rozetka_category_id` or `onec_guid` as System Attributes or
-FieldDefinitions. No further connector-specific columns should be added to core Product tables.
+FieldDefinitions. Do not treat `onec_guid` as ConnectorMapping/FieldMapping. No further
+connector-specific columns should be added to core Product tables.
 Physical `onec_guid` / `rozetka_category_id` columns are not deleted in a docs-only PR.
 
-**Next task:** migrate connector-specific identity/mapping columns behind ConnectorAccount-scoped
-external identity / mapping layers and deprecate the raw columns. SEO fields remain Product core
+**Next task:** migrate external identity leakage behind the ConnectorAccount-scoped
+ExternalRecordLink boundary, and migrate connector field/mapping leakage behind mapping
+layers; then deprecate the raw columns. SEO fields remain Product core
 unless a later localization/store-view DEC says otherwise.
 
 **Status:** Open, low priority for column migration (no active Rozetka export; 1C identity remains
-legacy runtime). Canonical classification of `onec_guid` corrected by DEC-011.
+legacy runtime). Canonical classification of `onec_guid` corrected by DEC-011 to
+`external_identity` / `ExternalRecordLink` / `external_identity_only`. Runtime ExternalRecordLink
+remains absent.
 
 ---
 

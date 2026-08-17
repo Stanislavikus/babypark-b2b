@@ -307,11 +307,17 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
     {
         $row = $this->canonicalFieldRow('onec_guid');
 
-        $this->assertSame('connector_only', $row['implementation_kind']);
-        $this->assertSame('ConnectorMapping', $row['storage_owner']);
+        $this->assertSame('external_identity', $row['implementation_kind']);
+        $this->assertSame('ExternalRecordLink', $row['storage_owner']);
         $this->assertSame('no', $row['field_definition_eligibility']);
+        $this->assertSame('not_applicable', $row['binding_strategy']);
         $this->assertSame('not_applicable', $row['scope']);
-        $this->assertSame('connector_mapping_only', $row['recommended_action']);
+        $this->assertSame('not_applicable', $row['field_group_or_state']);
+        $this->assertSame('not_applicable', $row['data_type_or_state']);
+        $this->assertSame('external_identity_only', $row['recommended_action']);
+        $this->assertNotSame('ConnectorMapping', $row['storage_owner']);
+        $this->assertNotSame('connector_mapping_only', $row['recommended_action']);
+        $this->assertNotSame('connector_only', $row['implementation_kind']);
         $this->assertNotSame('core_model_property', $row['implementation_kind']);
         $this->assertNotSame('system', $row['scope']);
         $this->assertNotSame('keep_as_is', $row['recommended_action']);
@@ -319,10 +325,25 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
         $registry = File::get(base_path('docs/CANONICAL_PRODUCT_FIELD_REGISTRY.md'));
         $this->assertStringContainsString('### DEC-011 — onec_guid is connector-owned identity', $registry);
         $this->assertStringContainsString('Do **not** create a FieldDefinition for it', $registry);
+        $this->assertStringContainsString('implementation_kind=external_identity', $registry);
+        $this->assertStringContainsString('storage_owner=ExternalRecordLink', $registry);
+        $this->assertStringContainsString('recommended_action=external_identity_only', $registry);
+        $this->assertStringContainsString('implementation_kind: external_identity', $registry);
+        $this->assertStringContainsString('storage_owner: ExternalRecordLink', $registry);
+        $this->assertStringContainsString('recommended_action: external_identity_only', $registry);
+
+        $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
+        $this->assertStringContainsString('IMPLEMENTED (legacy physical columns)', $atlas);
+        $this->assertStringContainsString('canonical classification `external_identity`', $atlas);
+        $this->assertStringContainsString('Current physical owner: Product / ProductVariant legacy columns', $atlas);
+        $this->assertStringContainsString('target semantic owner: ExternalRecordLink', $atlas);
+        $this->assertStringContainsString('connector-owned identity debt', $atlas);
+        $this->assertStringContainsString('| ExternalRecordLink | CONFIRMED ABSENT |', $atlas);
 
         $phase2 = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
         $this->assertStringContainsString('legacy 1C connector identity', $phase2);
         $this->assertStringContainsString('not deferred System Fields', $phase2);
+        $this->assertStringContainsString('not FieldMapping', $phase2);
     }
 
     #[Test]
@@ -364,11 +385,15 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
 
         $this->assertStringContainsString('`products.rozetka_category_id`', $section);
         $this->assertStringContainsString('`products.onec_guid`', $section);
+        $this->assertStringContainsString('connector field/mapping leakage', $section);
+        $this->assertStringContainsString('external identity leakage', $section);
         $this->assertStringContainsString('Valid platform Product core that happens to be physical columns', $section);
         $this->assertStringContainsString('`products.meta_title`', $section);
         $this->assertStringContainsString('`products.meta_description`', $section);
         $this->assertStringContainsString('core_model_property', $section);
         $this->assertStringContainsString('Do not treat generic reusable SEO fields as connector-specific leakage', $section);
+        $this->assertStringContainsString('ConnectorAccount-scoped ExternalRecordLink', $section);
+        $this->assertStringNotContainsString('`onec_guid` is `connector_only`', $section);
         $this->assertStringNotContainsString(
             'contains `rozetka_category_id`, `meta_title`, `meta_description` as native columns — a direct instance',
             $section,

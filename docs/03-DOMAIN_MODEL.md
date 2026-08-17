@@ -7301,8 +7301,10 @@ registered in a later Phase 2 pass — this is an explicit, documented scope bou
 oversight.
 
 `products.onec_guid` and `product_variants.onec_guid` are legacy 1C connector identity
-columns, not deferred System Fields. They must not be promoted into FieldDefinition or
-generic Product/System Attributes. See DEC-011 and GAP-007.
+columns, not deferred System Fields and not FieldMapping. They must not be promoted into
+FieldDefinition, ConnectorMapping, or generic Product/System Attributes. Canonical
+classification is `external_identity` with semantic owner ExternalRecordLink (runtime still
+absent). See DEC-011 and GAP-007.
 
 `rozetka_category_id` is connector-specific leakage (GAP-007). `meta_title` and
 `meta_description` are platform SEO Product concepts that happen to be physical columns;
