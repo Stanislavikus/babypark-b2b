@@ -22,12 +22,17 @@ final class AdobeProductExportPreviewCapability implements SyncPreviewConfigurat
     public function prepareRun(
         string $workspaceId,
         string $connectorAccountId,
-        SyncConfiguration $configuration,
         array $snapshot,
     ): AdobeProductExportExecutionMetadata {
-        $exportConfiguration = AdobeProductExportExecutionConfiguration::fromPayload(
-            $configuration->connectorExecutionConfiguration()->payload(),
-        );
+        $connectorConfig = $snapshot['connector_execution_configuration'] ?? null;
+
+        if (! is_array($connectorConfig)) {
+            throw ConnectorExecutionConfigurationValidationException::invalidPayload(
+                'Snapshot connector_execution_configuration must be a JSON object.',
+            );
+        }
+
+        $exportConfiguration = AdobeProductExportExecutionConfiguration::fromPayload($connectorConfig);
 
         return $this->metadataReader->read(
             $workspaceId,

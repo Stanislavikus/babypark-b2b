@@ -38,6 +38,6 @@ final readonly class AdobeProductExportExecutionMetadata
             return false;
         }
 
-        return $attribute->frontendInput === 'select';
+        return $attribute->frontendInput === 'select' && $attribute->scope === 'global';
     }
 }

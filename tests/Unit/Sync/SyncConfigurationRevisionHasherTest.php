@@ -266,6 +266,49 @@ class SyncConfigurationRevisionHasherTest extends TestCase
     }
 
     #[Test]
+    public function nested_object_key_order_produces_identical_v4_revision(): void
+    {
+        $left = ConnectorExecutionConfiguration::fromPayload([
+            'nested' => ['a' => 1, 'b' => 2],
+        ]);
+
+        $right = ConnectorExecutionConfiguration::fromPayload([
+            'nested' => ['b' => 2, 'a' => 1],
+        ]);
+
+        $runtimeLeft = $this->hasher->hash(
+            SyncOperationSet::fromOperations([SyncSemanticOperation::Export]),
+            SyncConfigurationOperationalState::Enabled,
+            [],
+            $left,
+        );
+
+        $runtimeRight = $this->hasher->hash(
+            SyncOperationSet::fromOperations([SyncSemanticOperation::Export]),
+            SyncConfigurationOperationalState::Enabled,
+            [],
+            $right,
+        );
+
+        $this->assertSame($runtimeLeft, $runtimeRight);
+
+        $migration = require database_path('migrations/2026_08_17_120000_sync_configuration_revision_v4.php');
+        $reflection = new \ReflectionClass($migration);
+        $hashMethod = $reflection->getMethod('hashRevisionV4');
+        $hashMethod->setAccessible(true);
+
+        $migrationHash = $hashMethod->invoke(
+            $migration,
+            ['export'],
+            SyncConfigurationOperationalState::Enabled->value,
+            [],
+            ['nested' => ['b' => 2, 'a' => 1]],
+        );
+
+        $this->assertSame($migrationHash, $runtimeLeft);
+    }
+
+    #[Test]
     public function v4_migration_down_restores_v3_hash_semantics(): void
     {
         $migrationV4 = require database_path('migrations/2026_08_17_120000_sync_configuration_revision_v4.php');

@@ -3,6 +3,7 @@
 namespace App\Services\Sync;
 
 use App\Enums\AttributeDataType;
+use App\Enums\FieldObjectType;
 use App\Models\FieldDefinition;
 use App\Models\FieldMapping;
 use App\Support\Sync\Exceptions\FieldMappingValidationException;
@@ -19,14 +20,34 @@ final class FieldDefinitionInternalOptionValidator
             throw FieldMappingValidationException::mappingNotFound($mapping->sync_configuration_id, $mapping->id);
         }
 
-        if ($definition->data_type !== AttributeDataType::Select && $definition->data_type !== AttributeDataType::MultiSelect) {
-            return;
+        if ($mapping->fieldBinding?->object_type !== FieldObjectType::ProductVariant) {
+            throw FieldMappingValidationException::invalidInternalOptionKey(
+                $internalOptionKey,
+                $definition->id,
+            );
+        }
+
+        if ($definition->data_type !== AttributeDataType::Select) {
+            throw FieldMappingValidationException::invalidInternalOptionKey(
+                $internalOptionKey,
+                $definition->id,
+            );
+        }
+
+        if ($definition->is_multi_value) {
+            throw FieldMappingValidationException::invalidInternalOptionKey(
+                $internalOptionKey,
+                $definition->id,
+            );
         }
 
         $allowedOptionKeys = $this->allowedOptionKeys($definition);
 
         if ($allowedOptionKeys === []) {
-            return;
+            throw FieldMappingValidationException::invalidInternalOptionKey(
+                $internalOptionKey,
+                $definition->id,
+            );
         }
 
         if (! in_array($internalOptionKey, $allowedOptionKeys, true)) {

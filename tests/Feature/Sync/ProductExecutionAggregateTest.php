@@ -91,4 +91,35 @@ class ProductExecutionAggregateTest extends TestCase
         $this->assertSame('VAR-SKU', $aggregate->variants[0]->values[$skuBindingId]->value);
         $this->assertSame('blue', $aggregate->variants[0]->values[$colorBindingId]->value);
     }
+
+    #[Test]
+    public function builder_returns_aggregate_when_zero_field_mappings(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'PARENT',
+            'name' => 'No Mapping Product',
+            'is_active' => true,
+        ]);
+
+        ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'VAR-SKU',
+            'is_active' => true,
+        ]);
+
+        $aggregates = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            ['field_mappings' => []],
+        );
+
+        $this->assertCount(1, $aggregates);
+        $this->assertSame((string) $product->id, $aggregates[0]->productId);
+        $this->assertSame([], $aggregates[0]->productValues);
+    }
 }

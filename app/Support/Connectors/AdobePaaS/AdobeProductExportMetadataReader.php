@@ -11,7 +11,7 @@ use App\Support\Connectors\Transport\ConnectorTransportLimits;
 
 final class AdobeProductExportMetadataReader
 {
-    private const string ATTRIBUTE_SETS_ENDPOINT = '/V1/products/attribute-sets/sets';
+    private const string ATTRIBUTE_SETS_LIST_ENDPOINT = '/V1/products/attribute-sets/sets/list';
 
     public function __construct(
         private readonly AdobePaaSRequestContextFactory $contextFactory,
@@ -32,7 +32,9 @@ final class AdobeProductExportMetadataReader
         }
 
         $selectedAttributeSetId = $this->resolveSelectedAttributeSetId($attributeSets, $attributeSetId);
-        $attributes = $this->fetchAttributesForSet($context, $selectedAttributeSetId);
+        $attributes = $this->attributeSetExists($attributeSets, $selectedAttributeSetId)
+            ? $this->fetchAttributesForSet($context, $selectedAttributeSetId)
+            : [];
 
         return new AdobeProductExportExecutionMetadata(
             selectedAttributeSetId: $selectedAttributeSetId,
@@ -46,7 +48,7 @@ final class AdobeProductExportMetadataReader
      */
     private function fetchAttributeSets(AdobePaaSRequestContext $context): array
     {
-        $payload = $this->sendGet($context, self::ATTRIBUTE_SETS_ENDPOINT);
+        $payload = $this->sendGet($context, self::ATTRIBUTE_SETS_LIST_ENDPOINT);
 
         /** @var list<array<string, mixed>> $items */
         $items = $payload['items'] ?? [];
@@ -83,7 +85,7 @@ final class AdobeProductExportMetadataReader
         $payload = $this->sendGet($context, $endpoint);
 
         /** @var list<array<string, mixed>> $items */
-        $items = $payload['items'] ?? [];
+        $items = $this->parseTopLevelListPayload($payload, 'attribute set attributes');
         $attributes = [];
 
         foreach ($items as $item) {
@@ -136,7 +138,7 @@ final class AdobeProductExportMetadataReader
         $payload = $this->sendGet($context, $endpoint);
 
         /** @var list<array<string, mixed>> $items */
-        $items = $payload['items'] ?? [];
+        $items = $this->parseTopLevelListPayload($payload, 'attribute options');
 
         return $this->normalizeOptionItems($items);
     }
@@ -147,15 +149,7 @@ final class AdobeProductExportMetadataReader
     private function resolveSelectedAttributeSetId(array $attributeSets, ?int $attributeSetId): int
     {
         if ($attributeSetId !== null) {
-            foreach ($attributeSets as $attributeSet) {
-                if ($attributeSet['attribute_set_id'] === $attributeSetId) {
-                    return $attributeSetId;
-                }
-            }
-
-            throw new \RuntimeException(
-                'Configured Adobe attribute_set_id does not exist in the connected store.',
-            );
+            return $attributeSetId;
         }
 
         if (count($attributeSets) === 1) {
@@ -163,6 +157,20 @@ final class AdobeProductExportMetadataReader
         }
 
         throw new AdobeProductExportSetupRequiredException($attributeSets);
+    }
+
+    /**
+     * @param  list<array{attribute_set_id: int, attribute_set_name: string}>  $attributeSets
+     */
+    private function attributeSetExists(array $attributeSets, int $attributeSetId): bool
+    {
+        foreach ($attributeSets as $attributeSet) {
+            if ($attributeSet['attribute_set_id'] === $attributeSetId) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function requiresOptionFetch(string $frontendInput): bool
@@ -214,11 +222,29 @@ final class AdobeProductExportMetadataReader
     }
 
     /**
+     * @return list<array<string, mixed>>
+     */
+    private function parseTopLevelListPayload(array $payload, string $subject): array
+    {
+        if (! array_is_list($payload)) {
+            throw new \RuntimeException(
+                'Adobe product export '.$subject.' response must be a top-level JSON array.',
+            );
+        }
+
+        return $payload;
+    }
+
+    /**
      * @return array<string, string>
      */
     private function normalizeInlineOptions(mixed $rawOptions): array
     {
         if (! is_array($rawOptions)) {
+            return [];
+        }
+
+        if (! array_is_list($rawOptions)) {
             return [];
         }
 

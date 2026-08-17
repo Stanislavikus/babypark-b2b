@@ -17,13 +17,12 @@ final class TestSyncPreviewCapability implements SyncPreviewConfigurationReadine
     public function prepareRun(
         string $workspaceId,
         string $connectorAccountId,
-        SyncConfiguration $configuration,
         array $snapshot,
     ): object {
         return (object) [
             'workspace_id' => $workspaceId,
             'connector_account_id' => $connectorAccountId,
-            'sync_configuration_id' => $configuration->id,
+            'snapshot_attribute_set_id' => $snapshot['connector_execution_configuration']['attribute_set_id'] ?? null,
         ];
     }
 

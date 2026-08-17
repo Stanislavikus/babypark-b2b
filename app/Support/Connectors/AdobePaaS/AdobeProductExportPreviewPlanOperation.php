@@ -5,7 +5,7 @@ namespace App\Support\Connectors\AdobePaaS;
 final readonly class AdobeProductExportPreviewPlanOperation
 {
     /**
-     * @param  array<string, scalar|null>  $context
+     * @param  array<string, mixed>  $context
      */
     public function __construct(
         public string $operation,
@@ -13,7 +13,7 @@ final readonly class AdobeProductExportPreviewPlanOperation
     ) {}
 
     /**
-     * @return array{operation: string, context: array<string, scalar|null>}
+     * @return array{operation: string, context: array<string, mixed>}
      */
     public function toArray(): array
     {

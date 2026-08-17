@@ -5,9 +5,10 @@ namespace App\Services\Sync;
 use App\Models\ConnectorAccount;
 use App\Models\SyncConfiguration;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionConfiguration;
+use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionMetadata;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportMetadataReader;
-use App\Support\Connectors\AdobePaaS\Exceptions\AdobeProductExportSetupRequiredException;
 use App\Support\Sync\ConnectorExecutionConfiguration;
+use App\Support\Sync\Exceptions\ConnectorExecutionConfigurationValidationException;
 use Illuminate\Support\Facades\DB;
 
 final class AdobeProductExportSetupService
@@ -28,14 +29,16 @@ final class AdobeProductExportSetupService
 
         $preferredAttributeSetId = $this->resolvePreferredAttributeSetId($configuration);
 
-        try {
-            $metadata = $this->metadataReader->read(
-                $account->workspace_id,
-                $account->id,
-                $preferredAttributeSetId,
+        $metadata = $this->metadataReader->read(
+            $account->workspace_id,
+            $account->id,
+            $preferredAttributeSetId,
+        );
+
+        if (! $this->selectedAttributeSetExists($metadata)) {
+            throw ConnectorExecutionConfigurationValidationException::invalidPayload(
+                'Configured Adobe attribute_set_id does not exist in the connected store.',
             );
-        } catch (AdobeProductExportSetupRequiredException) {
-            return $configuration->refresh();
         }
 
         $adobeConfiguration = AdobeProductExportExecutionConfiguration::fromPayload([
@@ -82,5 +85,16 @@ final class AdobeProductExportSetupService
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function selectedAttributeSetExists(AdobeProductExportExecutionMetadata $metadata): bool
+    {
+        foreach ($metadata->attributeSets as $attributeSet) {
+            if (($attributeSet['attribute_set_id'] ?? null) === $metadata->selectedAttributeSetId) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

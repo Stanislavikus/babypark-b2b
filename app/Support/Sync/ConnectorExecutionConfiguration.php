@@ -104,7 +104,7 @@ final readonly class ConnectorExecutionConfiguration
             return self::canonicalizePayload($value);
         }
 
-        if (is_bool($value) || is_int($value) || is_string($value) || $value === null) {
+        if (is_bool($value) || is_int($value) || is_float($value) || is_string($value) || $value === null) {
             return $value;
         }
 

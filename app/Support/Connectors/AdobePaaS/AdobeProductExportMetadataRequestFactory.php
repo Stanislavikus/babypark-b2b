@@ -52,6 +52,11 @@ final class AdobeProductExportMetadataRequestFactory
 
         $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
         $urlWithoutQuery = $parsed['scheme'].'://'.$parsed['host'].$port.$path;
+
+        if (! $this->requiresSearchCriteria($endpointPath)) {
+            return $urlWithoutQuery;
+        }
+
         $query = http_build_query(
             ['searchCriteria' => ['pageSize' => 200]],
             '',
@@ -60,5 +65,10 @@ final class AdobeProductExportMetadataRequestFactory
         );
 
         return $urlWithoutQuery.'?'.$query;
+    }
+
+    private function requiresSearchCriteria(string $endpointPath): bool
+    {
+        return str_ends_with($endpointPath, '/list');
     }
 }

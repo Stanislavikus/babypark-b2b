@@ -34,14 +34,16 @@ class AdobeProductExportMetadataReaderTest extends TestCase
     }
 
     #[Test]
-    public function it_auto_selects_when_only_one_attribute_set_exists(): void
+    public function it_uses_attribute_sets_list_route_with_search_criteria(): void
     {
         $account = $this->createConnectorAccount();
+        $capturedUris = [];
 
-        $reader = $this->readerWithTransport(new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request): ConnectorHttpResult {
+        $reader = $this->readerWithTransport(new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request) use (&$capturedUris): ConnectorHttpResult {
             $uri = (string) $request->request->getUri();
+            $capturedUris[] = $uri;
 
-            if (str_contains($uri, '/attribute-sets/sets')) {
+            if (str_contains($uri, '/attribute-sets/sets/list')) {
                 return new ConnectorHttpResult(200, [], json_encode([
                     'items' => [
                         ['attribute_set_id' => 9, 'attribute_set_name' => 'Baby'],
@@ -51,15 +53,55 @@ class AdobeProductExportMetadataReaderTest extends TestCase
 
             if (str_contains($uri, '/attribute-sets/9/attributes')) {
                 return new ConnectorHttpResult(200, [], json_encode([
+                    [
+                        'attribute_id' => 100,
+                        'attribute_code' => 'color',
+                        'frontend_input' => 'select',
+                        'scope' => 'global',
+                        'options' => [
+                            ['value' => '93', 'label' => 'Red'],
+                        ],
+                    ],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            return new ConnectorHttpResult(404, [], '{}');
+        }));
+
+        $metadata = $reader->read($account->workspace_id, $account->id);
+
+        $this->assertSame(9, $metadata->selectedAttributeSetId);
+        $this->assertGreaterThanOrEqual(2, count($capturedUris));
+        $this->assertStringContainsString('/attribute-sets/sets/list', $capturedUris[0]);
+        $this->assertStringContainsString('searchCriteria', $capturedUris[0]);
+        $this->assertStringNotContainsString('searchCriteria', (string) end($capturedUris));
+    }
+
+    #[Test]
+    public function it_auto_selects_when_only_one_attribute_set_exists(): void
+    {
+        $account = $this->createConnectorAccount();
+
+        $reader = $this->readerWithTransport(new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request): ConnectorHttpResult {
+            $uri = (string) $request->request->getUri();
+
+            if (str_contains($uri, '/attribute-sets/sets/list')) {
+                return new ConnectorHttpResult(200, [], json_encode([
                     'items' => [
-                        [
-                            'attribute_id' => 100,
-                            'attribute_code' => 'color',
-                            'frontend_input' => 'select',
-                            'scope' => 'global',
-                            'options' => [
-                                ['value' => '93', 'label' => 'Red'],
-                            ],
+                        ['attribute_set_id' => 9, 'attribute_set_name' => 'Baby'],
+                    ],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            if (str_contains($uri, '/attribute-sets/9/attributes')) {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    [
+                        'attribute_id' => 100,
+                        'attribute_code' => 'color',
+                        'frontend_input' => 'select',
+                        'scope' => 'global',
+                        'options' => [
+                            ['value' => '93', 'label' => 'Red'],
                         ],
                     ],
                 ], JSON_THROW_ON_ERROR));
@@ -96,7 +138,7 @@ class AdobeProductExportMetadataReaderTest extends TestCase
     }
 
     #[Test]
-    public function it_throws_when_explicit_attribute_set_id_does_not_exist(): void
+    public function it_returns_stale_explicit_attribute_set_without_attributes(): void
     {
         $account = $this->createConnectorAccount();
 
@@ -108,10 +150,61 @@ class AdobeProductExportMetadataReaderTest extends TestCase
             ], JSON_THROW_ON_ERROR));
         }));
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('does not exist');
+        $metadata = $reader->read($account->workspace_id, $account->id, 99);
 
-        $reader->read($account->workspace_id, $account->id, 99);
+        $this->assertSame(99, $metadata->selectedAttributeSetId);
+        $this->assertSame([], $metadata->attributes);
+    }
+
+    #[Test]
+    public function it_fetches_options_from_top_level_array_without_search_criteria(): void
+    {
+        $account = $this->createConnectorAccount();
+        $capturedUris = [];
+
+        $reader = $this->readerWithTransport(new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request) use (&$capturedUris): ConnectorHttpResult {
+            $uri = (string) $request->request->getUri();
+            $capturedUris[] = $uri;
+
+            if (str_contains($uri, '/attribute-sets/sets/list')) {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'items' => [
+                        ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
+                    ],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            if (str_contains($uri, '/attribute-sets/4/attributes')) {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    [
+                        'attribute_id' => 200,
+                        'attribute_code' => 'size',
+                        'frontend_input' => 'select',
+                        'scope' => 'global',
+                        'options' => [],
+                    ],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            if (str_contains($uri, '/attributes/size/options')) {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    ['value' => '10', 'label' => 'Small'],
+                    ['value' => '11', 'label' => 'Medium'],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            return new ConnectorHttpResult(404, [], '{}');
+        }));
+
+        $metadata = $reader->read($account->workspace_id, $account->id);
+
+        $optionsUri = collect($capturedUris)->first(
+            static fn (string $uri): bool => str_contains($uri, '/attributes/size/options'),
+        );
+
+        $this->assertNotNull($optionsUri);
+        $this->assertStringNotContainsString('searchCriteria', $optionsUri);
+        $this->assertTrue($metadata->optionExists('size', '10'));
     }
 
     #[Test]
@@ -135,6 +228,13 @@ class AdobeProductExportMetadataReaderTest extends TestCase
                     scope: 'global',
                     options: [],
                 ),
+                'store_color' => new AdobeAttributeMetadata(
+                    attributeId: 102,
+                    code: 'store_color',
+                    frontendInput: 'select',
+                    scope: 'store',
+                    options: ['93' => 'Red'],
+                ),
             ],
         );
 
@@ -142,6 +242,7 @@ class AdobeProductExportMetadataReaderTest extends TestCase
         $this->assertNull($metadata->attributeByCode('missing'));
         $this->assertTrue($metadata->isConfigurableCompatible('color'));
         $this->assertFalse($metadata->isConfigurableCompatible('name'));
+        $this->assertFalse($metadata->isConfigurableCompatible('store_color'));
     }
 
     private function readerWithTransport(RecordingConnectorHttpTransport $transport): AdobeProductExportMetadataReader

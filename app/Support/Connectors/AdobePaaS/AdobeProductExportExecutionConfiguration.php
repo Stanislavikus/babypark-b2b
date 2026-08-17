@@ -13,6 +13,14 @@ final readonly class AdobeProductExportExecutionConfiguration
      */
     public static function fromPayload(array $payload): self
     {
+        $unknownKeys = array_diff(array_keys($payload), ['attribute_set_id']);
+
+        if ($unknownKeys !== []) {
+            throw ConnectorExecutionConfigurationValidationException::invalidPayload(
+                'Adobe product export execution configuration contains unknown keys: '.implode(', ', $unknownKeys).'.',
+            );
+        }
+
         $attributeSetId = $payload['attribute_set_id'] ?? null;
 
         if (! is_int($attributeSetId)) {

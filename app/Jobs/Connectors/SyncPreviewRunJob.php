@@ -5,7 +5,6 @@ namespace App\Jobs\Connectors;
 use App\Enums\SyncRunStatus;
 use App\Models\ConnectorAccount;
 use App\Models\Product;
-use App\Models\SyncConfiguration;
 use App\Models\SyncRun;
 use App\Models\SyncRunItem;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
@@ -78,11 +77,6 @@ class SyncPreviewRunJob implements ShouldQueue
 
         $run = $reserved;
 
-        $configuration = SyncConfiguration::withoutWorkspaceScope()
-            ->where('workspace_id', $this->workspaceId)
-            ->where('id', $run->sync_configuration_id)
-            ->firstOrFail();
-
         $account = ConnectorAccount::withoutWorkspaceScope()
             ->where('workspace_id', $this->workspaceId)
             ->where('id', $this->connectorAccountId)
@@ -116,7 +110,6 @@ class SyncPreviewRunJob implements ShouldQueue
         $runContext = $capability->prepareRun(
             $this->workspaceId,
             $this->connectorAccountId,
-            $configuration,
             $snapshot,
         );
 

@@ -6,6 +6,7 @@ use App\Enums\AttributeDataType;
 use App\Enums\FieldObjectType;
 use App\Enums\SyncPreviewFindingCode;
 use App\Enums\SyncPreviewOutcome;
+use App\Services\Pricing\ResolvedPrice;
 use App\Support\Sync\Preview\MappedFieldValue;
 use App\Support\Sync\Preview\ProductExecutionAggregate;
 use App\Support\Sync\Preview\ProductVariantExecutionSlice;
@@ -25,20 +26,7 @@ final class AdobeProductExportPreviewPlanner
         /** @var list<SyncPreviewFinding> $findings */
         $findings = [];
 
-        $connectorConfig = $configurationSnapshot['connector_execution_configuration'] ?? [];
-        $attributeSetId = null;
-
-        if (! is_array($connectorConfig) || ! isset($connectorConfig['attribute_set_id'])) {
-            $findings[] = new SyncPreviewFinding(SyncPreviewFindingCode::AttributeSetUnconfigured);
-        } else {
-            $rawAttributeSetId = $connectorConfig['attribute_set_id'];
-
-            if (is_int($rawAttributeSetId) || (is_string($rawAttributeSetId) && ctype_digit($rawAttributeSetId))) {
-                $attributeSetId = (int) $rawAttributeSetId;
-            } else {
-                $findings[] = new SyncPreviewFinding(SyncPreviewFindingCode::AttributeSetInvalid);
-            }
-        }
+        $attributeSetId = $this->resolveAttributeSetId($configurationSnapshot, $findings);
 
         if ($metadata !== null && $attributeSetId !== null) {
             $attributeSetExists = false;
@@ -112,6 +100,7 @@ final class AdobeProductExportPreviewPlanner
                 $aggregate,
                 $mappedBindings,
                 $skuBindingId,
+                $attributeSetId,
                 $metadata,
             );
 
@@ -124,7 +113,12 @@ final class AdobeProductExportPreviewPlanner
             );
         }
 
-        $simpleResult = $this->planSimplePath($aggregate, $skuBindingId);
+        $simpleResult = $this->planSimplePath(
+            $aggregate,
+            $skuBindingId,
+            $attributeSetId,
+            $nameBindingId,
+        );
         $findings = array_merge($findings, $simpleResult['findings']);
 
         return new SyncPreviewPlanResult(
@@ -135,12 +129,38 @@ final class AdobeProductExportPreviewPlanner
     }
 
     /**
-     * @param  array<string, array<string, mixed>>  $mappedBindings
+     * @param  array<string, mixed>  $configurationSnapshot
+     * @param  list<SyncPreviewFinding>  $findings
+     */
+    private function resolveAttributeSetId(array $configurationSnapshot, array &$findings): ?int
+    {
+        $connectorConfig = $configurationSnapshot['connector_execution_configuration'] ?? [];
+
+        if (! is_array($connectorConfig) || ! isset($connectorConfig['attribute_set_id'])) {
+            $findings[] = new SyncPreviewFinding(SyncPreviewFindingCode::AttributeSetUnconfigured);
+
+            return null;
+        }
+
+        $rawAttributeSetId = $connectorConfig['attribute_set_id'];
+
+        if (is_int($rawAttributeSetId) || (is_string($rawAttributeSetId) && ctype_digit($rawAttributeSetId))) {
+            return (int) $rawAttributeSetId;
+        }
+
+        $findings[] = new SyncPreviewFinding(SyncPreviewFindingCode::AttributeSetInvalid);
+
+        return null;
+    }
+
+    /**
      * @return array{findings: list<SyncPreviewFinding>, plan: ?AdobeProductExportPreviewPlan}
      */
     private function planSimplePath(
         ProductExecutionAggregate $aggregate,
         ?string $skuBindingId,
+        ?int $attributeSetId,
+        ?string $nameBindingId,
     ): array {
         $findings = [];
         $variantSlice = $aggregate->variants[0] ?? null;
@@ -162,6 +182,10 @@ final class AdobeProductExportPreviewPlanner
             ? $this->mappedScalarValue($variantSlice->values[$skuBindingId] ?? null)
             : null;
 
+        $name = $nameBindingId !== null
+            ? $this->mappedScalarValue($aggregate->productValues[$nameBindingId] ?? null)
+            : null;
+
         $plan = new AdobeProductExportPreviewPlan([
             new AdobeProductExportPreviewPlanOperation(
                 operation: 'simple_product',
@@ -169,6 +193,14 @@ final class AdobeProductExportPreviewPlanner
                     'product_id' => $aggregate->productId,
                     'variant_id' => $variantSlice->variantId,
                     'sku' => is_string($sku) ? $sku : (is_scalar($sku) ? (string) $sku : null),
+                    'attribute_set_id' => $attributeSetId,
+                    'name' => is_string($name) ? $name : (is_scalar($name) ? (string) $name : null),
+                    'product_type' => 'simple',
+                    'visibility' => 'not_visible',
+                    'status' => 1,
+                    'mapped_product_values' => $this->serializeMappedValues($aggregate->productValues),
+                    'mapped_variant_values' => $this->serializeMappedValues($variantSlice->values),
+                    'resolved_price' => $this->serializeResolvedPrice($variantSlice->resolvedPrice),
                 ],
             ),
         ]);
@@ -184,6 +216,7 @@ final class AdobeProductExportPreviewPlanner
         ProductExecutionAggregate $aggregate,
         array $mappedBindings,
         ?string $skuBindingId,
+        ?int $attributeSetId,
         ?AdobeProductExportExecutionMetadata $metadata,
     ): array {
         $findings = [];
@@ -225,6 +258,8 @@ final class AdobeProductExportPreviewPlanner
         $completeVariantCount = 0;
         /** @var array<string, int> $combinationCounts */
         $combinationCounts = [];
+        /** @var array<string, array<string, true>> $usedInternalOptionKeysByBinding */
+        $usedInternalOptionKeysByBinding = [];
 
         foreach ($aggregate->variants as $variantSlice) {
             $externalCombination = [];
@@ -272,6 +307,7 @@ final class AdobeProductExportPreviewPlanner
                     );
                 }
 
+                $usedInternalOptionKeysByBinding[$bindingId][$internalKey] = true;
                 $externalCombination[$externalKey] = $externalOptionValue;
             }
 
@@ -318,23 +354,41 @@ final class AdobeProductExportPreviewPlanner
             return ['findings' => $findings, 'plan' => null];
         }
 
+        $nameBindingId = $this->findBindingIdByExternalKeyFromIndexed($mappedBindings, 'name');
+        $name = $nameBindingId !== null
+            ? $this->mappedScalarValue($aggregate->productValues[$nameBindingId] ?? null)
+            : null;
+
         $operations = [
             new AdobeProductExportPreviewPlanOperation(
                 operation: 'configurable_parent',
-                context: ['product_id' => $aggregate->productId],
+                context: [
+                    'product_id' => $aggregate->productId,
+                    'attribute_set_id' => $attributeSetId,
+                    'name' => is_string($name) ? $name : (is_scalar($name) ? (string) $name : null),
+                    'product_type' => 'configurable',
+                    'visibility' => 'catalog_search',
+                    'status' => 1,
+                    'mapped_product_values' => $this->serializeMappedValues($aggregate->productValues),
+                ],
             ),
         ];
 
         foreach ($dimensions as $dimension) {
+            $externalKey = $dimension['external_field_key'];
+            $bindingId = $dimension['field_binding_id'];
+            $attributeMetadata = $metadata?->attributeByCode($externalKey);
+
             $operations[] = new AdobeProductExportPreviewPlanOperation(
                 operation: 'configurable_attribute',
                 context: [
-                    'external_field_key' => $dimension['external_field_key'],
-                    'field_binding_id' => $dimension['field_binding_id'],
+                    'external_field_key' => $externalKey,
+                    'field_binding_id' => $bindingId,
+                    'attribute_id' => $attributeMetadata?->attributeId,
                 ],
             );
 
-            $seenInternalKeys = [];
+            $usedInternalKeys = $usedInternalOptionKeysByBinding[$bindingId] ?? [];
 
             foreach ($dimension['option_mappings'] as $optionMapping) {
                 $internalKey = $optionMapping['internal_option_key'] ?? null;
@@ -344,19 +398,19 @@ final class AdobeProductExportPreviewPlanner
                     continue;
                 }
 
-                if (isset($seenInternalKeys[$internalKey])) {
+                if (! isset($usedInternalKeys[$internalKey])) {
                     continue;
                 }
-
-                $seenInternalKeys[$internalKey] = true;
 
                 $operations[] = new AdobeProductExportPreviewPlanOperation(
                     operation: 'option_assignment',
                     context: [
-                        'field_binding_id' => $dimension['field_binding_id'],
-                        'external_field_key' => $dimension['external_field_key'],
+                        'field_binding_id' => $bindingId,
+                        'external_field_key' => $externalKey,
+                        'attribute_id' => $attributeMetadata?->attributeId,
                         'internal_option_key' => $internalKey,
                         'external_option_value' => $externalValue,
+                        'value_index' => $externalValue,
                     ],
                 );
             }
@@ -373,6 +427,12 @@ final class AdobeProductExportPreviewPlanner
                     'product_id' => $aggregate->productId,
                     'variant_id' => $variantSlice->variantId,
                     'sku' => is_string($sku) ? $sku : (is_scalar($sku) ? (string) $sku : null),
+                    'attribute_set_id' => $attributeSetId,
+                    'product_type' => 'simple',
+                    'visibility' => 'not_visible',
+                    'status' => 1,
+                    'mapped_variant_values' => $this->serializeMappedValues($variantSlice->values),
+                    'resolved_price' => $this->serializeResolvedPrice($variantSlice->resolvedPrice),
                 ],
             );
 
@@ -412,7 +472,8 @@ final class AdobeProductExportPreviewPlanner
                 continue;
             }
 
-            $isQualifying = false;
+            /** @var array<string, true> $distinctValues */
+            $distinctValues = [];
 
             foreach ($aggregate->variants as $variantSlice) {
                 $mapped = $variantSlice->values[$bindingId] ?? null;
@@ -433,11 +494,16 @@ final class AdobeProductExportPreviewPlanner
                     continue;
                 }
 
-                $isQualifying = true;
-                break;
+                $value = $mapped->value;
+
+                if ($value === null || $value === '') {
+                    continue;
+                }
+
+                $distinctValues[is_string($value) ? $value : (string) $value] = true;
             }
 
-            if (! $isQualifying) {
+            if (count($distinctValues) < 2) {
                 continue;
             }
 
@@ -509,6 +575,39 @@ final class AdobeProductExportPreviewPlanner
         return $findings;
     }
 
+    /**
+     * @param  array<string, MappedFieldValue>  $values
+     * @return array<string, mixed>
+     */
+    private function serializeMappedValues(array $values): array
+    {
+        $serialized = [];
+
+        foreach ($values as $bindingId => $mapped) {
+            $serialized[$bindingId] = [
+                'internal_code' => $mapped->internalCode,
+                'value' => $mapped->value,
+            ];
+        }
+
+        return $serialized;
+    }
+
+    private function serializeResolvedPrice(?ResolvedPrice $resolvedPrice): ?array
+    {
+        if ($resolvedPrice === null) {
+            return null;
+        }
+
+        return [
+            'effective_net_price' => $resolvedPrice->effectiveNetPrice,
+            'gross_price' => $resolvedPrice->grossPrice,
+            'currency' => $resolvedPrice->currency,
+            'vat_rate' => $resolvedPrice->vatRate,
+            'source' => $resolvedPrice->source,
+        ];
+    }
+
     private function mappedScalarValue(?MappedFieldValue $mapped): mixed
     {
         return $mapped?->value;
@@ -545,6 +644,20 @@ final class AdobeProductExportPreviewPlanner
                 $bindingId = $mapping['field_binding_id'] ?? null;
 
                 return is_string($bindingId) ? $bindingId : null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $mappedBindings
+     */
+    private function findBindingIdByExternalKeyFromIndexed(array $mappedBindings, string $externalFieldKey): ?string
+    {
+        foreach ($mappedBindings as $bindingId => $mapping) {
+            if (($mapping['external_field_key'] ?? null) === $externalFieldKey) {
+                return $bindingId;
             }
         }
 

@@ -4,7 +4,6 @@ namespace App\Services\Sync;
 
 use App\Models\ConnectorAccount;
 use App\Models\FieldMapping;
-use App\Support\Connectors\AdobePaaS\AdobeFieldOptionMappingOptionValidator;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Sync\FieldOptionMappingOptionValidator;
 use Illuminate\Contracts\Container\Container;
@@ -21,11 +20,8 @@ final class FieldOptionMappingOptionValidatorResolver
     {
         $definition = $this->profileRegistry->profileDefinition($account->auth_profile);
 
-        if (
-            $definition->connectorDefinitionCode === 'adobe_commerce'
-            && $definition->profileCode !== 'test_sync_support'
-        ) {
-            return $this->container->make(AdobeFieldOptionMappingOptionValidator::class);
+        if ($definition->fieldOptionMappingValidatorClass !== null) {
+            return $this->container->make($definition->fieldOptionMappingValidatorClass);
         }
 
         return new FieldDefinitionOnlyOptionValidator($this->internalOptionValidator);

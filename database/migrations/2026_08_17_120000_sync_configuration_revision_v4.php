@@ -125,9 +125,39 @@ return new class extends Migration
             return [];
         }
 
-        ksort($decoded, SORT_STRING);
+        $canonical = $this->canonicalizeConnectorExecutionConfiguration($decoded);
 
-        return $decoded;
+        return is_array($canonical) ? $canonical : [];
+    }
+
+    /**
+     * @param  array<mixed>  $value
+     * @return array<mixed>
+     */
+    private function canonicalizeConnectorExecutionConfiguration(array $value): array
+    {
+        if (array_is_list($value)) {
+            return array_map(
+                fn (mixed $item): mixed => is_array($item) ? $this->canonicalizeConnectorExecutionConfiguration($item) : $item,
+                $value,
+            );
+        }
+
+        ksort($value, SORT_STRING);
+
+        $canonical = [];
+
+        foreach ($value as $key => $nested) {
+            if (! is_string($key)) {
+                continue;
+            }
+
+            $canonical[$key] = is_array($nested)
+                ? $this->canonicalizeConnectorExecutionConfiguration($nested)
+                : $nested;
+        }
+
+        return $canonical;
     }
 
     /**
@@ -190,6 +220,10 @@ return new class extends Migration
         array $fieldMappings,
         array $connectorExecutionConfiguration,
     ): string {
+        $connectorExecutionConfiguration = $this->canonicalizeConnectorExecutionConfiguration(
+            $connectorExecutionConfiguration,
+        );
+
         $payload = new stdClass;
         $payload->enabled_operations = $enabledOperations;
         $payload->operational_state = $operationalState;

@@ -135,6 +135,42 @@ class SyncPreviewExecutionTest extends TestCase
         $this->assertNotNull($run->completed_at);
     }
 
+    #[Test]
+    public function preview_job_uses_admitted_snapshot_after_live_configuration_mutation(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareMappedConfiguration($account);
+        $actor = $this->grantPreviewPermission($account->workspace);
+
+        $run = app(SyncPreviewAdmissionService::class)->admit(
+            $actor,
+            $account,
+            $configuration->id,
+            SyncSemanticOperation::Export,
+        );
+
+        $admittedSnapshot = $run->configuration_snapshot;
+        $this->assertSame(4, $admittedSnapshot['connector_execution_configuration']['attribute_set_id']);
+
+        app(SyncConfigurationService::class)->updateConnectorExecutionConfiguration(
+            $account,
+            $configuration->id,
+            ConnectorExecutionConfiguration::fromPayload(['attribute_set_id' => 12]),
+        );
+
+        (new SyncPreviewRunJob($account->workspace_id, $account->id, $run->id))->handle(
+            app(ProductExecutionAggregateBuilder::class),
+            app(SyncPreviewConnectorCapabilityResolver::class),
+        );
+
+        $run = SyncRun::withoutWorkspaceScope()->findOrFail($run->id);
+        $this->assertSame(SyncRunStatus::Completed, $run->status);
+        $this->assertSame(
+            4,
+            $run->configuration_snapshot['connector_execution_configuration']['attribute_set_id'],
+        );
+    }
+
     private function prepareMappedConfiguration(ConnectorAccount $account): SyncConfiguration
     {
         $configuration = $this->createProductsSyncConfiguration($account);

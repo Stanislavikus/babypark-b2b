@@ -7,6 +7,7 @@ use App\Support\Connectors\Exceptions\ConnectorProfileNotFoundException;
 use App\Support\Connectors\Exceptions\DisabledConnectorProfileException;
 use App\Support\Connectors\Exceptions\InvalidConnectorProfileConfiguration;
 use App\Support\Connectors\Exceptions\UnsupportedConnectorCapabilityException;
+use App\Support\Sync\FieldOptionMappingOptionValidator;
 use App\Support\Sync\Preview\SyncPreviewConnectorCapability;
 use Illuminate\Contracts\Container\Container;
 use ValueError;
@@ -334,6 +335,45 @@ class ConnectorProfileRegistry
             $previewCapabilityClass = $configuredPreviewCapability;
         }
 
+        $fieldOptionMappingValidatorClass = null;
+
+        if (array_key_exists('field_option_mapping_validator', $profileConfig)) {
+            $configuredValidator = $profileConfig['field_option_mapping_validator'];
+
+            if (! is_string($configuredValidator) || $configuredValidator === '') {
+                throw new InvalidConnectorProfileConfiguration(
+                    sprintf(
+                        'Connector profile [%s] key [field_option_mapping_validator] must be a non-empty class-string.',
+                        $profileCode,
+                    ),
+                );
+            }
+
+            if (! class_exists($configuredValidator)) {
+                throw new InvalidConnectorProfileConfiguration(
+                    sprintf(
+                        'Connector profile [%s] field_option_mapping_validator class [%s] does not exist.',
+                        $profileCode,
+                        $configuredValidator,
+                    ),
+                );
+            }
+
+            if (! is_subclass_of($configuredValidator, FieldOptionMappingOptionValidator::class)
+                && $configuredValidator !== FieldOptionMappingOptionValidator::class) {
+                throw new InvalidConnectorProfileConfiguration(
+                    sprintf(
+                        'Connector profile [%s] field_option_mapping_validator class [%s] must implement %s.',
+                        $profileCode,
+                        $configuredValidator,
+                        FieldOptionMappingOptionValidator::class,
+                    ),
+                );
+            }
+
+            $fieldOptionMappingValidatorClass = $configuredValidator;
+        }
+
         return new ConnectorProfileDefinition(
             profileCode: $profileCode,
             enabled: $profileConfig['enabled'],
@@ -342,6 +382,7 @@ class ConnectorProfileRegistry
             accountSchemaClass: $accountSchemaClass,
             capabilities: $capabilities,
             previewCapabilityClass: $previewCapabilityClass,
+            fieldOptionMappingValidatorClass: $fieldOptionMappingValidatorClass,
         );
     }
 }

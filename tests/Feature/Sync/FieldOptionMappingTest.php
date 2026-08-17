@@ -12,6 +12,7 @@ use App\Services\Sync\FieldOptionMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionConfiguration;
 use App\Support\Sync\ConnectorExecutionConfiguration;
+use App\Support\Sync\Exceptions\FieldMappingValidationException;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -169,6 +170,66 @@ class FieldOptionMappingTest extends TestCase
             AdobeProductExportExecutionConfiguration::fromPayload(
                 SyncConfiguration::withoutWorkspaceScope()->findOrFail($configuration->id)->connectorExecutionConfiguration()->payload(),
             )->attributeSetId,
+        );
+    }
+
+    #[Test]
+    public function confirm_rejects_non_select_field_option_mapping(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $binding = $this->productVariantBinding('sku');
+        $this->publishAuthoritativeSnapshot($account, ['sku']);
+
+        app(FieldMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $binding->id,
+            'sku',
+        );
+
+        $mapping = FieldMapping::withoutWorkspaceScope()
+            ->where('sync_configuration_id', $configuration->id)
+            ->sole();
+
+        $this->expectException(FieldMappingValidationException::class);
+
+        app(FieldOptionMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $mapping->id,
+            'not-a-select-code',
+            '93',
+        );
+    }
+
+    #[Test]
+    public function confirm_rejects_unknown_internal_option_key(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $binding = $this->productVariantBinding('color');
+        $this->publishAuthoritativeSnapshot($account, ['color']);
+
+        app(FieldMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $binding->id,
+            'color',
+        );
+
+        $mapping = FieldMapping::withoutWorkspaceScope()
+            ->where('sync_configuration_id', $configuration->id)
+            ->sole();
+
+        $this->expectException(FieldMappingValidationException::class);
+
+        app(FieldOptionMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $mapping->id,
+            'purple',
+            '93',
         );
     }
 

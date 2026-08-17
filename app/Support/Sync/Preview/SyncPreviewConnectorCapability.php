@@ -2,8 +2,6 @@
 
 namespace App\Support\Sync\Preview;
 
-use App\Models\SyncConfiguration;
-
 interface SyncPreviewConnectorCapability
 {
     /**
@@ -12,7 +10,6 @@ interface SyncPreviewConnectorCapability
     public function prepareRun(
         string $workspaceId,
         string $connectorAccountId,
-        SyncConfiguration $configuration,
         array $snapshot,
     ): object;
 

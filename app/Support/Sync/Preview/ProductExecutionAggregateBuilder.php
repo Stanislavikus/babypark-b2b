@@ -35,19 +35,17 @@ class ProductExecutionAggregateBuilder
 
         $bindingIds = $this->extractMappedBindingIds($configurationSnapshot);
 
-        if ($bindingIds === []) {
-            return [];
-        }
-
-        $bindings = FieldBinding::withoutWorkspaceScope()
-            ->with('fieldDefinition')
-            ->where(function ($query) use ($workspaceId): void {
-                $query->whereNull('workspace_id')
-                    ->orWhere('workspace_id', $workspaceId);
-            })
-            ->whereIn('id', $bindingIds)
-            ->get()
-            ->keyBy('id');
+        $bindings = $bindingIds === []
+            ? collect()
+            : FieldBinding::withoutWorkspaceScope()
+                ->with('fieldDefinition')
+                ->where(function ($query) use ($workspaceId): void {
+                    $query->whereNull('workspace_id')
+                        ->orWhere('workspace_id', $workspaceId);
+                })
+                ->whereIn('id', $bindingIds)
+                ->get()
+                ->keyBy('id');
 
         $products = Product::withoutWorkspaceScope()
             ->where('workspace_id', $workspaceId)
@@ -59,19 +57,23 @@ class ProductExecutionAggregateBuilder
         $loadedProductIds = $products->pluck('id')->all();
         $variantIds = $products->flatMap(static fn (Product $product) => $product->variants->pluck('id'))->all();
 
-        $productFieldValues = ProductFieldValue::withoutWorkspaceScope()
-            ->where('workspace_id', $workspaceId)
-            ->whereIn('product_id', $loadedProductIds)
-            ->whereIn('field_binding_id', $bindingIds)
-            ->get()
-            ->groupBy('product_id');
+        $productFieldValues = $bindingIds === []
+            ? collect()
+            : ProductFieldValue::withoutWorkspaceScope()
+                ->where('workspace_id', $workspaceId)
+                ->whereIn('product_id', $loadedProductIds)
+                ->whereIn('field_binding_id', $bindingIds)
+                ->get()
+                ->groupBy('product_id');
 
-        $variantFieldValues = VariantFieldValue::withoutWorkspaceScope()
-            ->where('workspace_id', $workspaceId)
-            ->whereIn('variant_id', $variantIds)
-            ->whereIn('field_binding_id', $bindingIds)
-            ->get()
-            ->groupBy('variant_id');
+        $variantFieldValues = $bindingIds === []
+            ? collect()
+            : VariantFieldValue::withoutWorkspaceScope()
+                ->where('workspace_id', $workspaceId)
+                ->whereIn('variant_id', $variantIds)
+                ->whereIn('field_binding_id', $bindingIds)
+                ->get()
+                ->groupBy('variant_id');
 
         return $products
             ->map(function (Product $product) use ($bindings, $productFieldValues, $variantFieldValues): ProductExecutionAggregate {
