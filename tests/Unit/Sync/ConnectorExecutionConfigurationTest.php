@@ -4,6 +4,7 @@ namespace Tests\Unit\Sync;
 
 use App\Support\Sync\ConnectorExecutionConfiguration;
 use App\Support\Sync\Exceptions\ConnectorExecutionConfigurationValidationException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -20,15 +21,25 @@ class ConnectorExecutionConfigurationTest extends TestCase
     }
 
     #[Test]
-    public function non_finite_float_values_are_rejected(): void
+    #[DataProvider('nonFiniteFloatProvider')]
+    public function non_finite_float_values_are_rejected(float $value): void
     {
-        foreach ([INF, -INF, NAN] as $value) {
-            try {
-                ConnectorExecutionConfiguration::fromPayload(['rate' => $value]);
-                $this->fail('Expected invalid payload exception for non-finite float.');
-            } catch (ConnectorExecutionConfigurationValidationException) {
-                // expected
-            }
-        }
+        $this->expectException(ConnectorExecutionConfigurationValidationException::class);
+
+        ConnectorExecutionConfiguration::fromPayload([
+            'rate' => $value,
+        ]);
+    }
+
+    /**
+     * @return array<string, array{0: float}>
+     */
+    public static function nonFiniteFloatProvider(): array
+    {
+        return [
+            'INF' => [INF],
+            '-INF' => [-INF],
+            'NAN' => [NAN],
+        ];
     }
 }
