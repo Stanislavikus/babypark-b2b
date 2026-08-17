@@ -239,10 +239,6 @@ class ProductExecutionAggregateBuilder
             if ($variant !== null) {
                 return $variant->getAttribute($column);
             }
-
-            if ($column === 'sku') {
-                return $product->getAttribute('sku');
-            }
         }
 
         return null;

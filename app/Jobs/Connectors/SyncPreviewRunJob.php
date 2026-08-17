@@ -53,14 +53,30 @@ class SyncPreviewRunJob implements ShouldQueue
         ProductExecutionAggregateBuilder $aggregateBuilder,
         SyncPreviewConnectorCapabilityResolver $capabilityResolver,
     ): void {
-        $run = SyncRun::withoutWorkspaceScope()
-            ->where('workspace_id', $this->workspaceId)
-            ->where('id', $this->syncRunId)
-            ->first();
+        $reserved = DB::transaction(function (): ?SyncRun {
+            $run = SyncRun::withoutWorkspaceScope()
+                ->where('workspace_id', $this->workspaceId)
+                ->where('id', $this->syncRunId)
+                ->lockForUpdate()
+                ->first();
 
-        if ($run === null || $run->status !== SyncRunStatus::Queued) {
+            if ($run === null || $run->status !== SyncRunStatus::Queued) {
+                return null;
+            }
+
+            $run->update([
+                'status' => SyncRunStatus::Running,
+                'started_at' => now(),
+            ]);
+
+            return $run->refresh();
+        });
+
+        if ($reserved === null) {
             return;
         }
+
+        $run = $reserved;
 
         $configuration = SyncConfiguration::withoutWorkspaceScope()
             ->where('workspace_id', $this->workspaceId)
@@ -71,11 +87,6 @@ class SyncPreviewRunJob implements ShouldQueue
             ->where('workspace_id', $this->workspaceId)
             ->where('id', $this->connectorAccountId)
             ->firstOrFail();
-
-        $run->update([
-            'status' => SyncRunStatus::Running,
-            'started_at' => now(),
-        ]);
 
         $snapshot = $run->configuration_snapshot ?? [];
         $snapshot = is_array($snapshot) ? $snapshot : [];
@@ -88,6 +99,19 @@ class SyncPreviewRunJob implements ShouldQueue
             ->all();
 
         $aggregates = $aggregateBuilder->buildForProductIds($this->workspaceId, $productIds, $snapshot);
+        $returnedProductIds = array_map(
+            static fn ($aggregate): string => $aggregate->productId,
+            $aggregates,
+        );
+
+        $missingProductIds = array_values(array_diff($productIds, $returnedProductIds));
+
+        if ($missingProductIds !== []) {
+            throw new \RuntimeException(
+                'Product execution aggregate builder omitted requested product ids: '.implode(', ', $missingProductIds),
+            );
+        }
+
         $capability = $capabilityResolver->resolve($account);
         $runContext = $capability->prepareRun(
             $this->workspaceId,
@@ -96,10 +120,10 @@ class SyncPreviewRunJob implements ShouldQueue
             $snapshot,
         );
 
-        DB::transaction(function () use ($run, $aggregates, $capability, $snapshot, $runContext): void {
-            foreach ($aggregates as $aggregate) {
-                $result = $capability->planProduct($aggregate, $snapshot, $runContext);
+        foreach ($aggregates as $aggregate) {
+            $result = $capability->planProduct($aggregate, $snapshot, $runContext);
 
+            DB::transaction(function () use ($run, $aggregate, $result): void {
                 SyncRunItem::withoutWorkspaceScope()->create([
                     'id' => (string) Str::uuid(),
                     'workspace_id' => $run->workspace_id,
@@ -111,13 +135,31 @@ class SyncPreviewRunJob implements ShouldQueue
                         $result->findings,
                     ),
                 ]);
+            });
+        }
+
+        $completed = DB::transaction(function (): bool {
+            $run = SyncRun::withoutWorkspaceScope()
+                ->where('workspace_id', $this->workspaceId)
+                ->where('id', $this->syncRunId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($run === null || $run->status !== SyncRunStatus::Running) {
+                return false;
             }
 
             $run->update([
                 'status' => SyncRunStatus::Completed,
                 'completed_at' => now(),
             ]);
+
+            return true;
         });
+
+        if (! $completed) {
+            throw new \RuntimeException('Preview run was not in running state during completion transition.');
+        }
     }
 
     private function terminalizeFailedRun(): void

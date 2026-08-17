@@ -127,7 +127,7 @@ class AdobeProductExportPreviewPlannerTest extends TestCase
     private function snapshotWithMappings(array $fieldMappings): array
     {
         return [
-            'version' => 'babypark.sync-run-input.v1',
+            'version' => 'platform.sync-run-input.v1',
             'data_domain' => 'products',
             'semantic_operation' => 'export',
             'external_context' => [],

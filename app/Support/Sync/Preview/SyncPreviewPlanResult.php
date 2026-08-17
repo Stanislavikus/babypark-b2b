@@ -12,5 +12,6 @@ final readonly class SyncPreviewPlanResult
     public function __construct(
         public SyncPreviewOutcome $outcome,
         public array $findings,
+        public ?object $connectorPlan = null,
     ) {}
 }

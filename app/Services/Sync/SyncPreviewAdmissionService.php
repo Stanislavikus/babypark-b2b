@@ -39,12 +39,6 @@ final class SyncPreviewAdmissionService
             throw new \RuntimeException('Sync preview admission must not run inside a nested transaction.');
         }
 
-        $workspace = $account->workspace()->withoutGlobalScopes()->firstOrFail();
-
-        if (! $this->authorization->allows($actor, $workspace, WorkspacePermissions::RUN_SYNC_PREVIEW)) {
-            throw SyncPreviewAdmissionException::notAuthorized();
-        }
-
         $run = null;
 
         DB::transaction(function () use (
@@ -56,7 +50,22 @@ final class SyncPreviewAdmissionService
         ): void {
             $configuration = $this->mutationCoordinator->lockConfiguration($account, $syncConfigurationId);
 
-            if ($configuration->workspace_id !== $account->workspace_id || $configuration->connector_account_id !== $account->id) {
+            $freshAccount = ConnectorAccount::withoutWorkspaceScope()
+                ->where('workspace_id', $account->workspace_id)
+                ->where('id', $account->id)
+                ->firstOrFail();
+
+            $workspace = $freshAccount->workspace()->withoutGlobalScopes()->firstOrFail();
+
+            if (! $this->authorization->allows($actor, $workspace, WorkspacePermissions::RUN_SYNC_PREVIEW)) {
+                throw SyncPreviewAdmissionException::notAuthorized();
+            }
+
+            if (! $freshAccount->is_enabled) {
+                throw SyncPreviewAdmissionException::accountNotEnabled($freshAccount->id);
+            }
+
+            if ($configuration->workspace_id !== $freshAccount->workspace_id || $configuration->connector_account_id !== $freshAccount->id) {
                 throw SyncConfigurationNotFoundException::forId($syncConfigurationId);
             }
 
@@ -69,7 +78,7 @@ final class SyncPreviewAdmissionService
             }
 
             if (! $this->syncSupportResolver->supports(
-                $account,
+                $freshAccount,
                 $configuration->data_domain,
                 $semanticOperation,
                 SyncRunMode::Preview,
@@ -77,7 +86,7 @@ final class SyncPreviewAdmissionService
                 throw SyncPreviewAdmissionException::operationNotSupported();
             }
 
-            if (! $this->readinessResolver->resolve($account)->isReady($configuration)) {
+            if (! $this->readinessResolver->resolve($freshAccount)->isReady($configuration)) {
                 throw SyncPreviewAdmissionException::attributeSetUnconfigured();
             }
 
@@ -109,11 +118,24 @@ final class SyncPreviewAdmissionService
             throw new \RuntimeException('Preview run was not created during admission.');
         }
 
-        SyncPreviewRunJob::dispatch(
-            $account->workspace_id,
-            $account->id,
-            $run->id,
-        )->afterCommit();
+        try {
+            SyncPreviewRunJob::dispatch(
+                $account->workspace_id,
+                $account->id,
+                $run->id,
+            );
+        } catch (\Throwable $exception) {
+            SyncRun::withoutWorkspaceScope()
+                ->where('workspace_id', $account->workspace_id)
+                ->where('id', $run->id)
+                ->where('status', SyncRunStatus::Queued)
+                ->update([
+                    'status' => SyncRunStatus::Failed,
+                    'completed_at' => now(),
+                ]);
+
+            throw SyncPreviewAdmissionException::dispatchFailed(previous: $exception);
+        }
 
         return $run->refresh();
     }

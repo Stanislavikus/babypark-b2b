@@ -35,4 +35,14 @@ final class SyncPreviewAdmissionException extends RuntimeException
     {
         return new self('Connector execution configuration is missing attribute_set_id.');
     }
+
+    public static function accountNotEnabled(string $connectorAccountId): self
+    {
+        return new self("Connector account '{$connectorAccountId}' is not enabled.");
+    }
+
+    public static function dispatchFailed(?\Throwable $previous = null): self
+    {
+        return new self('Preview run job dispatch failed after admission.', previous: $previous);
+    }
 }

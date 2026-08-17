@@ -17,6 +17,7 @@ final class FieldOptionMappingMutationService
         private readonly SyncConfigurationMutationCoordinator $mutationCoordinator,
         private readonly FieldOptionMappingBindingValidator $bindingValidator,
         private readonly FieldOptionMappingConstraintViolationClassifier $constraintViolationClassifier,
+        private readonly FieldOptionMappingOptionValidatorResolver $optionValidatorResolver,
     ) {}
 
     public function confirm(
@@ -29,13 +30,20 @@ final class FieldOptionMappingMutationService
         return $this->mutationCoordinator->mutateLocked(
             $account,
             $syncConfigurationId,
-            function (SyncConfiguration $configuration) use ($fieldMappingId, $internalOptionKey, $externalOptionValue): void {
+            function (SyncConfiguration $configuration) use ($account, $fieldMappingId, $internalOptionKey, $externalOptionValue): void {
                 $this->bindingValidator->assertProductsConfiguration($configuration);
                 $mapping = $this->bindingValidator->assertOwnedMapping($configuration, $fieldMappingId);
 
                 if ($this->exactMappingExists($mapping, $internalOptionKey, $externalOptionValue)) {
                     return;
                 }
+
+                $this->optionValidatorResolver->resolve($account)->validate(
+                    $account,
+                    $mapping,
+                    $internalOptionKey,
+                    $externalOptionValue,
+                );
 
                 $existing = FieldOptionMapping::withoutWorkspaceScope()
                     ->where('field_mapping_id', $mapping->id)
@@ -68,6 +76,7 @@ final class FieldOptionMappingMutationService
             $account,
             $syncConfigurationId,
             function (SyncConfiguration $configuration) use (
+                $account,
                 $fieldMappingId,
                 $internalOptionKey,
                 $externalOptionValue,
@@ -93,6 +102,13 @@ final class FieldOptionMappingMutationService
                 if ($targetInternalKey === $internalOptionKey && $targetExternalValue === $externalOptionValue) {
                     return;
                 }
+
+                $this->optionValidatorResolver->resolve($account)->validate(
+                    $account,
+                    $mapping,
+                    $targetInternalKey,
+                    $targetExternalValue,
+                );
 
                 $optionMapping->delete();
 
