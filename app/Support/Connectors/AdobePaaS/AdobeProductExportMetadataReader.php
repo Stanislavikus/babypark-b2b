@@ -19,10 +19,14 @@ final class AdobeProductExportMetadataReader
         private readonly ConnectorHttpTransport $transport,
     ) {}
 
+    /**
+     * @param  list<string>  $relevantAttributeCodes  mapped external_field_keys for this run
+     */
     public function read(
         string $workspaceId,
         string $connectorAccountId,
         ?int $attributeSetId = null,
+        array $relevantAttributeCodes = [],
     ): AdobeProductExportExecutionMetadata {
         $context = $this->contextFactory->create($workspaceId, $connectorAccountId);
         $attributeSets = $this->fetchAttributeSets($context);
@@ -35,6 +39,14 @@ final class AdobeProductExportMetadataReader
         $attributes = $this->attributeSetExists($attributeSets, $selectedAttributeSetId)
             ? $this->fetchAttributesForSet($context, $selectedAttributeSetId)
             : [];
+
+        if ($relevantAttributeCodes !== []) {
+            $attributes = $this->enrichMappedAttributes(
+                $context,
+                $attributes,
+                $this->normalizeRelevantAttributeCodes($relevantAttributeCodes),
+            );
+        }
 
         return new AdobeProductExportExecutionMetadata(
             selectedAttributeSetId: $selectedAttributeSetId,
@@ -89,44 +101,128 @@ final class AdobeProductExportMetadataReader
         $attributes = [];
 
         foreach ($items as $item) {
-            $attributeCode = $item['attribute_code'] ?? null;
+            $parsed = $this->parseSetMembershipAttribute($item);
 
-            if (! is_string($attributeCode) || $attributeCode === '') {
+            if ($parsed === null) {
                 continue;
             }
 
-            $attributeId = $item['attribute_id'] ?? null;
-            $frontendInput = $item['frontend_input'] ?? null;
-            $scope = $item['scope'] ?? null;
-
-            if (! is_int($attributeId) && ! (is_string($attributeId) && ctype_digit($attributeId))) {
-                continue;
-            }
-
-            if (! is_string($frontendInput) || $frontendInput === '') {
-                continue;
-            }
-
-            if (! is_string($scope) || $scope === '') {
-                continue;
-            }
-
-            $options = $this->normalizeInlineOptions($item['options'] ?? null);
-
-            if ($this->requiresOptionFetch($frontendInput) && $options === []) {
-                $options = $this->fetchAttributeOptions($context, $attributeCode);
-            }
-
-            $attributes[$attributeCode] = new AdobeAttributeMetadata(
-                attributeId: (int) $attributeId,
-                code: $attributeCode,
-                frontendInput: $frontendInput,
-                scope: $scope,
-                options: $options,
-            );
+            $attributes[$parsed->code] = $parsed;
         }
 
         return $attributes;
+    }
+
+    /**
+     * @param  array<string, AdobeAttributeMetadata>  $attributes
+     * @param  list<string>  $relevantAttributeCodes
+     * @return array<string, AdobeAttributeMetadata>
+     */
+    private function enrichMappedAttributes(
+        AdobePaaSRequestContext $context,
+        array $attributes,
+        array $relevantAttributeCodes,
+    ): array {
+        foreach ($relevantAttributeCodes as $code) {
+            if (! isset($attributes[$code])) {
+                continue;
+            }
+
+            $current = $attributes[$code];
+            $needsDetail = $current->attributeId === 0
+                || $current->frontendInput === ''
+                || $current->scope === '';
+
+            if ($needsDetail) {
+                $detail = $this->fetchAttributeDetail($context, $code);
+
+                if ($detail !== null) {
+                    $current = $this->mergeAttributeMetadata($current, $detail);
+                    $attributes[$code] = $current;
+                }
+            }
+
+            if ($this->requiresOptionFetch($current->frontendInput) && $current->options === []) {
+                $attributes[$code] = new AdobeAttributeMetadata(
+                    attributeId: $current->attributeId,
+                    code: $current->code,
+                    frontendInput: $current->frontendInput,
+                    scope: $current->scope,
+                    options: $this->fetchAttributeOptions($context, $code),
+                );
+            }
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function parseSetMembershipAttribute(array $item): ?AdobeAttributeMetadata
+    {
+        $attributeCode = $item['attribute_code'] ?? null;
+
+        if (! is_string($attributeCode) || $attributeCode === '') {
+            return null;
+        }
+
+        $attributeId = $this->parsePositiveInt($item['attribute_id'] ?? null) ?? 0;
+        $frontendInput = is_string($item['frontend_input'] ?? null) ? $item['frontend_input'] : '';
+        $scope = is_string($item['scope'] ?? null) ? $item['scope'] : '';
+
+        return new AdobeAttributeMetadata(
+            attributeId: $attributeId,
+            code: $attributeCode,
+            frontendInput: $frontendInput,
+            scope: $scope,
+            options: $this->normalizeInlineOptions($item['options'] ?? null),
+        );
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function fetchAttributeDetail(AdobePaaSRequestContext $context, string $attributeCode): ?array
+    {
+        $endpoint = '/V1/products/attributes/'.rawurlencode($attributeCode);
+        $payload = $this->sendGet($context, $endpoint);
+
+        if (! is_array($payload) || array_is_list($payload)) {
+            return null;
+        }
+
+        $code = $payload['attribute_code'] ?? null;
+
+        if (! is_string($code) || $code === '') {
+            return null;
+        }
+
+        return $payload;
+    }
+
+    private function mergeAttributeMetadata(AdobeAttributeMetadata $current, array $detail): AdobeAttributeMetadata
+    {
+        $attributeId = $this->parsePositiveInt($detail['attribute_id'] ?? null) ?? $current->attributeId;
+        $frontendInput = is_string($detail['frontend_input'] ?? null) && $detail['frontend_input'] !== ''
+            ? $detail['frontend_input']
+            : $current->frontendInput;
+        $scope = is_string($detail['scope'] ?? null) && $detail['scope'] !== ''
+            ? $detail['scope']
+            : $current->scope;
+        $options = $current->options;
+
+        if ($options === [] && isset($detail['options'])) {
+            $options = $this->normalizeInlineOptions($detail['options']);
+        }
+
+        return new AdobeAttributeMetadata(
+            attributeId: $attributeId,
+            code: $current->code,
+            frontendInput: $frontendInput,
+            scope: $scope,
+            options: $options,
+        );
     }
 
     /**
@@ -173,9 +269,41 @@ final class AdobeProductExportMetadataReader
         return false;
     }
 
+    /**
+     * @param  list<string>  $codes
+     * @return list<string>
+     */
+    private function normalizeRelevantAttributeCodes(array $codes): array
+    {
+        $normalized = [];
+
+        foreach ($codes as $code) {
+            if (is_string($code) && $code !== '') {
+                $normalized[] = $code;
+            }
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
     private function requiresOptionFetch(string $frontendInput): bool
     {
         return in_array($frontendInput, ['select', 'multiselect'], true);
+    }
+
+    private function parsePositiveInt(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value > 0 ? $value : null;
+        }
+
+        if (is_string($value) && ctype_digit($value)) {
+            $parsed = (int) $value;
+
+            return $parsed > 0 ? $parsed : null;
+        }
+
+        return null;
     }
 
     /**

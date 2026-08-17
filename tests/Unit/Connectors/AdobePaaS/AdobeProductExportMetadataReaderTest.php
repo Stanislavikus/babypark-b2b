@@ -196,7 +196,7 @@ class AdobeProductExportMetadataReaderTest extends TestCase
             return new ConnectorHttpResult(404, [], '{}');
         }));
 
-        $metadata = $reader->read($account->workspace_id, $account->id);
+        $metadata = $reader->read($account->workspace_id, $account->id, null, ['size']);
 
         $optionsUri = collect($capturedUris)->first(
             static fn (string $uri): bool => str_contains($uri, '/attributes/size/options'),
@@ -243,6 +243,65 @@ class AdobeProductExportMetadataReaderTest extends TestCase
         $this->assertTrue($metadata->isConfigurableCompatible('color'));
         $this->assertFalse($metadata->isConfigurableCompatible('name'));
         $this->assertFalse($metadata->isConfigurableCompatible('store_color'));
+    }
+
+    #[Test]
+    public function it_enriches_mapped_attribute_scope_from_detail_endpoint_when_set_response_omits_scope(): void
+    {
+        $account = $this->createConnectorAccount();
+        $capturedUris = [];
+
+        $reader = $this->readerWithTransport(new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request) use (&$capturedUris): ConnectorHttpResult {
+            $uri = (string) $request->request->getUri();
+            $capturedUris[] = $uri;
+
+            if (str_contains($uri, '/attribute-sets/sets/list')) {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'items' => [
+                        ['attribute_set_id' => 9, 'attribute_set_name' => 'Baby'],
+                    ],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            if (str_contains($uri, '/attribute-sets/9/attributes')) {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    [
+                        'attribute_id' => 100,
+                        'attribute_code' => 'color',
+                        'frontend_input' => 'select',
+                        'options' => [
+                            ['value' => '93', 'label' => 'Red'],
+                        ],
+                    ],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            if (str_contains($uri, '/products/attributes/color') && ! str_contains($uri, '/options')) {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'attribute_id' => 100,
+                    'attribute_code' => 'color',
+                    'frontend_input' => 'select',
+                    'scope' => 'global',
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            return new ConnectorHttpResult(404, [], '{}');
+        }));
+
+        $metadata = $reader->read($account->workspace_id, $account->id, 9, ['color']);
+
+        $this->assertTrue($metadata->isConfigurableCompatible('color'));
+        $this->assertTrue(
+            collect($capturedUris)->contains(
+                static fn (string $uri): bool => str_contains($uri, '/products/attributes/color')
+                    && ! str_contains($uri, '/options'),
+            ),
+        );
+        $this->assertFalse(
+            collect($capturedUris)->contains(
+                static fn (string $uri): bool => str_contains($uri, '/products/attributes/name'),
+            ),
+        );
     }
 
     private function readerWithTransport(RecordingConnectorHttpTransport $transport): AdobeProductExportMetadataReader

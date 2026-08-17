@@ -63,6 +63,54 @@ final class AdobeProductExportSetupService
         });
     }
 
+    public function configureAttributeSet(ConnectorAccount $account, int $attributeSetId): SyncConfiguration
+    {
+        if ($attributeSetId < 1) {
+            throw ConnectorExecutionConfigurationValidationException::invalidPayload(
+                'attribute_set_id must be a positive integer.',
+            );
+        }
+
+        $configuration = $this->reachabilityService->ensureProductsExportConfiguration($account);
+        $metadata = $this->metadataReader->read(
+            $account->workspace_id,
+            $account->id,
+            $attributeSetId,
+        );
+
+        $exists = false;
+
+        foreach ($metadata->attributeSets as $attributeSet) {
+            if (($attributeSet['attribute_set_id'] ?? null) === $attributeSetId) {
+                $exists = true;
+                break;
+            }
+        }
+
+        if (! $exists) {
+            throw ConnectorExecutionConfigurationValidationException::invalidPayload(
+                'Configured Adobe attribute_set_id does not exist in the connected store.',
+            );
+        }
+
+        $adobeConfiguration = AdobeProductExportExecutionConfiguration::fromPayload([
+            'attribute_set_id' => $attributeSetId,
+        ]);
+
+        return DB::transaction(function () use ($account, $configuration, $adobeConfiguration): SyncConfiguration {
+            $locked = SyncConfiguration::withoutWorkspaceScope()
+                ->where('id', $configuration->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            return $this->configurationService->updateConnectorExecutionConfiguration(
+                $account,
+                $locked->id,
+                ConnectorExecutionConfiguration::fromPayload($adobeConfiguration->toPayload()),
+            );
+        });
+    }
+
     private function hasConfiguredAttributeSet(SyncConfiguration $configuration): bool
     {
         try {

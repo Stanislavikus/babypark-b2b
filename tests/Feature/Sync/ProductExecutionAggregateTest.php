@@ -122,4 +122,40 @@ class ProductExecutionAggregateTest extends TestCase
         $this->assertSame((string) $product->id, $aggregates[0]->productId);
         $this->assertSame([], $aggregates[0]->productValues);
     }
+
+    #[Test]
+    public function builder_retains_mapped_binding_descriptor_when_value_is_null(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'PARENT',
+            'name' => 'Null Value Product',
+            'is_active' => true,
+        ]);
+
+        $descriptionBinding = $this->productBinding('description');
+
+        $snapshot = [
+            'field_mappings' => [
+                [
+                    'field_binding_id' => $descriptionBinding->id,
+                    'external_field_key' => 'description',
+                ],
+            ],
+        ];
+
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            $snapshot,
+        )[0];
+
+        $mapped = $aggregate->productValues[$descriptionBinding->id] ?? null;
+
+        $this->assertNotNull($mapped);
+        $this->assertSame('description', $mapped->internalCode);
+        $this->assertNull($mapped->value);
+    }
 }

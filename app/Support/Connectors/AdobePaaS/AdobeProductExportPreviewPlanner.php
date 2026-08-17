@@ -15,6 +15,14 @@ use App\Support\Sync\Preview\SyncPreviewPlanResult;
 
 final class AdobeProductExportPreviewPlanner
 {
+    private const string VISIBILITY_CATALOG_SEARCH = 'catalog_search';
+
+    private const int VISIBILITY_CATALOG_SEARCH_NUMERIC = 4;
+
+    private const string VISIBILITY_NOT_VISIBLE = 'not_visible';
+
+    private const int VISIBILITY_NOT_VISIBLE_NUMERIC = 1;
+
     /**
      * @param  array<string, mixed>  $configurationSnapshot
      */
@@ -52,6 +60,7 @@ final class AdobeProductExportPreviewPlanner
 
         $nameBindingId = $this->findBindingIdByExternalKey($fieldMappings, 'name');
         $skuBindingId = $this->findBindingIdByExternalKey($fieldMappings, 'sku');
+        $statusBindingId = $this->findBindingIdByExternalKey($fieldMappings, 'status');
 
         if ($nameBindingId === null) {
             $findings[] = new SyncPreviewFinding(
@@ -67,18 +76,41 @@ final class AdobeProductExportPreviewPlanner
             );
         }
 
-        if ($nameBindingId !== null) {
-            $nameValue = $this->mappedScalarValue($aggregate->productValues[$nameBindingId] ?? null);
+        if ($statusBindingId === null) {
+            $findings[] = new SyncPreviewFinding(
+                SyncPreviewFindingCode::MissingRequiredFieldMapping,
+                subject: 'status',
+            );
+        }
 
-            if ($nameValue === null || $nameValue === '') {
+        if ($metadata !== null) {
+            foreach ($fieldMappings as $mapping) {
+                $externalKey = $mapping['external_field_key'] ?? null;
+                $bindingId = $mapping['field_binding_id'] ?? null;
+
+                if (! is_string($externalKey) || $externalKey === '') {
+                    continue;
+                }
+
+                if ($metadata->attributeByCode($externalKey) === null) {
+                    $findings[] = new SyncPreviewFinding(
+                        SyncPreviewFindingCode::MappedFieldAbsentFromSelectedSet,
+                        subject: $externalKey,
+                        context: is_string($bindingId) ? ['field_binding_id' => $bindingId] : [],
+                    );
+                }
+            }
+        }
+
+        $findings = array_merge($findings, $this->evaluateRequiredProductMappedValues($aggregate));
+
+        if ($nameBindingId !== null) {
+            $nameMapped = $aggregate->productValues[$nameBindingId] ?? null;
+
+            if ($nameMapped === null || $this->isEmptyMappedValue($nameMapped->value)) {
                 $findings[] = new SyncPreviewFinding(
                     SyncPreviewFindingCode::MissingName,
                     subject: $aggregate->productId,
-                );
-            } elseif (! isset($aggregate->productValues[$nameBindingId])) {
-                $findings[] = new SyncPreviewFinding(
-                    SyncPreviewFindingCode::MissingMappedProductValue,
-                    subject: $nameBindingId,
                 );
             }
         }
@@ -95,12 +127,15 @@ final class AdobeProductExportPreviewPlanner
             );
         }
 
+        $adobeStatus = $this->resolveAdobeStatus($aggregate, $statusBindingId);
+
         if ($aggregate->hasMultipleSellableVariants()) {
             $configurableResult = $this->planConfigurablePath(
                 $aggregate,
                 $mappedBindings,
                 $skuBindingId,
                 $attributeSetId,
+                $adobeStatus,
                 $metadata,
             );
 
@@ -115,9 +150,12 @@ final class AdobeProductExportPreviewPlanner
 
         $simpleResult = $this->planSimplePath(
             $aggregate,
+            $mappedBindings,
             $skuBindingId,
             $attributeSetId,
             $nameBindingId,
+            $adobeStatus,
+            $metadata,
         );
         $findings = array_merge($findings, $simpleResult['findings']);
 
@@ -154,13 +192,17 @@ final class AdobeProductExportPreviewPlanner
     }
 
     /**
+     * @param  array<string, array<string, mixed>>  $mappedBindings
      * @return array{findings: list<SyncPreviewFinding>, plan: ?AdobeProductExportPreviewPlan}
      */
     private function planSimplePath(
         ProductExecutionAggregate $aggregate,
+        array $mappedBindings,
         ?string $skuBindingId,
         ?int $attributeSetId,
         ?string $nameBindingId,
+        ?int $adobeStatus,
+        ?AdobeProductExportExecutionMetadata $metadata,
     ): array {
         $findings = [];
         $variantSlice = $aggregate->variants[0] ?? null;
@@ -172,7 +214,22 @@ final class AdobeProductExportPreviewPlanner
         $findings = array_merge(
             $findings,
             $this->evaluateVariantCommon($variantSlice, $skuBindingId),
+            $this->evaluateRequiredVariantMappedValues($variantSlice),
         );
+
+        $projectedProduct = $this->projectMappedValues(
+            $aggregate->productValues,
+            $mappedBindings,
+            $metadata,
+        );
+        $findings = array_merge($findings, $projectedProduct['findings']);
+
+        $projectedVariant = $this->projectMappedValues(
+            $variantSlice->values,
+            $mappedBindings,
+            $metadata,
+        );
+        $findings = array_merge($findings, $projectedVariant['findings']);
 
         if ($this->hasBlockingFinding($findings)) {
             return ['findings' => $findings, 'plan' => null];
@@ -196,10 +253,11 @@ final class AdobeProductExportPreviewPlanner
                     'attribute_set_id' => $attributeSetId,
                     'name' => is_string($name) ? $name : (is_scalar($name) ? (string) $name : null),
                     'product_type' => 'simple',
-                    'visibility' => 'not_visible',
-                    'status' => 1,
-                    'mapped_product_values' => $this->serializeMappedValues($aggregate->productValues),
-                    'mapped_variant_values' => $this->serializeMappedValues($variantSlice->values),
+                    'visibility' => self::VISIBILITY_CATALOG_SEARCH,
+                    'visibility_numeric' => self::VISIBILITY_CATALOG_SEARCH_NUMERIC,
+                    'status' => $adobeStatus,
+                    'mapped_product_values' => $projectedProduct['projected'],
+                    'mapped_variant_values' => $projectedVariant['projected'],
                     'resolved_price' => $this->serializeResolvedPrice($variantSlice->resolvedPrice),
                 ],
             ),
@@ -217,10 +275,15 @@ final class AdobeProductExportPreviewPlanner
         array $mappedBindings,
         ?string $skuBindingId,
         ?int $attributeSetId,
+        ?int $adobeStatus,
         ?AdobeProductExportExecutionMetadata $metadata,
     ): array {
         $findings = [];
         $dimensions = $this->qualifyingConfigurableDimensions($aggregate, $mappedBindings);
+        $dimensionBindingIds = array_map(
+            static fn (array $dimension): string => $dimension['field_binding_id'],
+            $dimensions,
+        );
 
         if ($dimensions === []) {
             $findings[] = new SyncPreviewFinding(
@@ -260,10 +323,13 @@ final class AdobeProductExportPreviewPlanner
         $combinationCounts = [];
         /** @var array<string, array<string, true>> $usedInternalOptionKeysByBinding */
         $usedInternalOptionKeysByBinding = [];
+        /** @var array<string, list<array<string, mixed>>> $resolvedConfigurableByVariant */
+        $resolvedConfigurableByVariant = [];
 
         foreach ($aggregate->variants as $variantSlice) {
             $externalCombination = [];
             $variantComplete = true;
+            $resolvedConfigurableValues = [];
 
             foreach ($dimensions as $dimension) {
                 $bindingId = $dimension['field_binding_id'];
@@ -271,7 +337,7 @@ final class AdobeProductExportPreviewPlanner
                 $optionMappings = $dimension['option_mappings'];
                 $dimensionValue = $this->mappedScalarValue($variantSlice->values[$bindingId] ?? null);
 
-                if ($dimensionValue === null || $dimensionValue === '') {
+                if ($this->isEmptyMappedValue($dimensionValue)) {
                     $findings[] = new SyncPreviewFinding(
                         SyncPreviewFindingCode::MissingMappedVariantValue,
                         subject: $variantSlice->variantId,
@@ -309,12 +375,32 @@ final class AdobeProductExportPreviewPlanner
 
                 $usedInternalOptionKeysByBinding[$bindingId][$internalKey] = true;
                 $externalCombination[$externalKey] = $externalOptionValue;
+
+                $attributeMetadata = $metadata?->attributeByCode($externalKey);
+                $resolvedConfigurableValues[] = [
+                    'field_binding_id' => $bindingId,
+                    'external_field_key' => $externalKey,
+                    'attribute_id' => $attributeMetadata?->attributeId,
+                    'internal_option_key' => $internalKey,
+                    'value_index' => $externalOptionValue,
+                ];
             }
+
+            $resolvedConfigurableByVariant[$variantSlice->variantId] = $resolvedConfigurableValues;
 
             $findings = array_merge(
                 $findings,
                 $this->evaluateVariantCommon($variantSlice, $skuBindingId),
+                $this->evaluateRequiredVariantMappedValues($variantSlice, $dimensionBindingIds),
             );
+
+            $projectedVariant = $this->projectMappedValues(
+                $variantSlice->values,
+                $mappedBindings,
+                $metadata,
+                $dimensionBindingIds,
+            );
+            $findings = array_merge($findings, $projectedVariant['findings']);
 
             if ($variantComplete && $externalCombination !== []) {
                 $completeVariantCount++;
@@ -350,6 +436,13 @@ final class AdobeProductExportPreviewPlanner
             }
         }
 
+        $projectedProduct = $this->projectMappedValues(
+            $aggregate->productValues,
+            $mappedBindings,
+            $metadata,
+        );
+        $findings = array_merge($findings, $projectedProduct['findings']);
+
         if ($this->hasBlockingFinding($findings)) {
             return ['findings' => $findings, 'plan' => null];
         }
@@ -367,9 +460,10 @@ final class AdobeProductExportPreviewPlanner
                     'attribute_set_id' => $attributeSetId,
                     'name' => is_string($name) ? $name : (is_scalar($name) ? (string) $name : null),
                     'product_type' => 'configurable',
-                    'visibility' => 'catalog_search',
-                    'status' => 1,
-                    'mapped_product_values' => $this->serializeMappedValues($aggregate->productValues),
+                    'visibility' => self::VISIBILITY_CATALOG_SEARCH,
+                    'visibility_numeric' => self::VISIBILITY_CATALOG_SEARCH_NUMERIC,
+                    'status' => $adobeStatus,
+                    'mapped_product_values' => $projectedProduct['projected'],
                 ],
             ),
         ];
@@ -421,6 +515,13 @@ final class AdobeProductExportPreviewPlanner
                 ? $this->mappedScalarValue($variantSlice->values[$skuBindingId] ?? null)
                 : null;
 
+            $projectedVariant = $this->projectMappedValues(
+                $variantSlice->values,
+                $mappedBindings,
+                $metadata,
+                $dimensionBindingIds,
+            );
+
             $operations[] = new AdobeProductExportPreviewPlanOperation(
                 operation: 'simple_child',
                 context: [
@@ -429,9 +530,13 @@ final class AdobeProductExportPreviewPlanner
                     'sku' => is_string($sku) ? $sku : (is_scalar($sku) ? (string) $sku : null),
                     'attribute_set_id' => $attributeSetId,
                     'product_type' => 'simple',
-                    'visibility' => 'not_visible',
-                    'status' => 1,
-                    'mapped_variant_values' => $this->serializeMappedValues($variantSlice->values),
+                    'visibility' => self::VISIBILITY_NOT_VISIBLE,
+                    'visibility_numeric' => self::VISIBILITY_NOT_VISIBLE_NUMERIC,
+                    'status' => $adobeStatus,
+                    'name' => is_string($name) ? $name : (is_scalar($name) ? (string) $name : null),
+                    'mapped_product_values' => $projectedProduct['projected'],
+                    'mapped_variant_values' => $projectedVariant['projected'],
+                    'resolved_configurable_values' => $resolvedConfigurableByVariant[$variantSlice->variantId] ?? [],
                     'resolved_price' => $this->serializeResolvedPrice($variantSlice->resolvedPrice),
                 ],
             );
@@ -496,7 +601,7 @@ final class AdobeProductExportPreviewPlanner
 
                 $value = $mapped->value;
 
-                if ($value === null || $value === '') {
+                if ($this->isEmptyMappedValue($value)) {
                     continue;
                 }
 
@@ -522,6 +627,127 @@ final class AdobeProductExportPreviewPlanner
         );
 
         return $dimensions;
+    }
+
+    /**
+     * @param  array<string, MappedFieldValue>  $values
+     * @param  array<string, array<string, mixed>>  $mappedBindings
+     * @param  list<string>  $dimensionBindingIds
+     * @return array{projected: array<string, mixed>, findings: list<SyncPreviewFinding>}
+     */
+    private function projectMappedValues(
+        array $values,
+        array $mappedBindings,
+        ?AdobeProductExportExecutionMetadata $metadata,
+        array $dimensionBindingIds = [],
+    ): array {
+        $findings = [];
+        $projected = [];
+
+        foreach ($values as $bindingId => $mapped) {
+            $mapping = $mappedBindings[$bindingId] ?? null;
+            $externalFieldKey = is_array($mapping) ? ($mapping['external_field_key'] ?? null) : null;
+            $optionMappings = is_array($mapping) ? ($mapping['option_mappings'] ?? []) : [];
+
+            $entry = [
+                'internal_code' => $mapped->internalCode,
+                'internal_value' => $mapped->value,
+                'external_value' => $mapped->value,
+            ];
+
+            if ($mapped->dataType === AttributeDataType::Select && ! $mapped->isMultiValue) {
+                if ($this->isEmptyMappedValue($mapped->value)) {
+                    $entry['external_value'] = null;
+                } else {
+                    $internalKey = is_string($mapped->value) ? $mapped->value : (string) $mapped->value;
+                    $externalOptionValue = $this->resolveExternalOptionValue(
+                        is_array($optionMappings) ? $optionMappings : [],
+                        $internalKey,
+                    );
+
+                    if ($externalOptionValue === null) {
+                        $findings[] = new SyncPreviewFinding(
+                            SyncPreviewFindingCode::MissingOptionMapping,
+                            subject: $bindingId,
+                            context: ['internal_option_key' => $internalKey],
+                        );
+                        $entry['external_value'] = null;
+                    } else {
+                        if ($metadata !== null
+                            && is_string($externalFieldKey)
+                            && ! $metadata->optionExists($externalFieldKey, $externalOptionValue)
+                        ) {
+                            $findings[] = new SyncPreviewFinding(
+                                SyncPreviewFindingCode::ExternalOptionMissingOrStale,
+                                subject: $bindingId,
+                                context: [
+                                    'external_field_key' => $externalFieldKey,
+                                    'external_option_value' => $externalOptionValue,
+                                ],
+                            );
+                        }
+
+                        $entry['external_value'] = $externalOptionValue;
+                    }
+                }
+            } elseif (($externalFieldKey ?? '') === 'status') {
+                $entry['external_value'] = $this->mapPlatformActiveToAdobeStatus($mapped->value);
+            }
+
+            if (in_array($bindingId, $dimensionBindingIds, true)) {
+                $entry['is_configurable_dimension'] = true;
+            }
+
+            $projected[$bindingId] = $entry;
+        }
+
+        return ['projected' => $projected, 'findings' => $findings];
+    }
+
+    /**
+     * @return list<SyncPreviewFinding>
+     */
+    private function evaluateRequiredProductMappedValues(ProductExecutionAggregate $aggregate): array
+    {
+        $findings = [];
+
+        foreach ($aggregate->productValues as $bindingId => $mapped) {
+            if ($mapped->isRequired && $this->isEmptyMappedValue($mapped->value)) {
+                $findings[] = new SyncPreviewFinding(
+                    SyncPreviewFindingCode::MissingMappedProductValue,
+                    subject: $bindingId,
+                );
+            }
+        }
+
+        return $findings;
+    }
+
+    /**
+     * @param  list<string>  $dimensionBindingIds
+     * @return list<SyncPreviewFinding>
+     */
+    private function evaluateRequiredVariantMappedValues(
+        ProductVariantExecutionSlice $variantSlice,
+        array $dimensionBindingIds = [],
+    ): array {
+        $findings = [];
+
+        foreach ($variantSlice->values as $bindingId => $mapped) {
+            if (in_array($bindingId, $dimensionBindingIds, true)) {
+                continue;
+            }
+
+            if ($mapped->isRequired && $this->isEmptyMappedValue($mapped->value)) {
+                $findings[] = new SyncPreviewFinding(
+                    SyncPreviewFindingCode::MissingMappedVariantValue,
+                    subject: $variantSlice->variantId,
+                    context: ['field_binding_id' => $bindingId],
+                );
+            }
+        }
+
+        return $findings;
     }
 
     /**
@@ -552,7 +778,7 @@ final class AdobeProductExportPreviewPlanner
         if ($skuBindingId !== null) {
             $sku = $this->mappedScalarValue($variantSlice->values[$skuBindingId] ?? null);
 
-            if ($sku === null || $sku === '') {
+            if ($this->isEmptyMappedValue($sku)) {
                 $findings[] = new SyncPreviewFinding(
                     SyncPreviewFindingCode::MissingSku,
                     subject: $variantSlice->variantId,
@@ -575,22 +801,33 @@ final class AdobeProductExportPreviewPlanner
         return $findings;
     }
 
-    /**
-     * @param  array<string, MappedFieldValue>  $values
-     * @return array<string, mixed>
-     */
-    private function serializeMappedValues(array $values): array
+    private function resolveAdobeStatus(ProductExecutionAggregate $aggregate, ?string $statusBindingId): ?int
     {
-        $serialized = [];
-
-        foreach ($values as $bindingId => $mapped) {
-            $serialized[$bindingId] = [
-                'internal_code' => $mapped->internalCode,
-                'value' => $mapped->value,
-            ];
+        if ($statusBindingId === null) {
+            return null;
         }
 
-        return $serialized;
+        $mapped = $aggregate->productValues[$statusBindingId] ?? null;
+
+        if ($mapped === null) {
+            return null;
+        }
+
+        return $this->mapPlatformActiveToAdobeStatus($mapped->value);
+    }
+
+    private function mapPlatformActiveToAdobeStatus(mixed $value): int
+    {
+        if ($value === true || $value === 1 || $value === '1') {
+            return 1;
+        }
+
+        return 2;
+    }
+
+    private function isEmptyMappedValue(mixed $value): bool
+    {
+        return $value === null || $value === '';
     }
 
     private function serializeResolvedPrice(?ResolvedPrice $resolvedPrice): ?array
@@ -689,6 +926,7 @@ final class AdobeProductExportPreviewPlanner
             SyncPreviewFindingCode::MissingRequiredFieldMapping,
             SyncPreviewFindingCode::MissingName,
             SyncPreviewFindingCode::MissingSku,
+            SyncPreviewFindingCode::MissingMappedProductValue,
             SyncPreviewFindingCode::MissingMappedVariantValue,
             SyncPreviewFindingCode::MissingOptionMapping,
             SyncPreviewFindingCode::ConfigurableVariantsIncomplete,

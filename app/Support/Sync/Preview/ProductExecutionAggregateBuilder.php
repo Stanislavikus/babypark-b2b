@@ -205,10 +205,6 @@ class ProductExecutionAggregateBuilder
             AttributeStorageType::Relation => $this->resolveRelationValue($binding, $product, $variant),
         };
 
-        if ($value === null) {
-            return null;
-        }
-
         return new MappedFieldValue(
             fieldBindingId: (string) $binding->id,
             internalCode: (string) $definition->code,

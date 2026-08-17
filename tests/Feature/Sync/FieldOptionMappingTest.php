@@ -2,8 +2,15 @@
 
 namespace Tests\Feature\Sync;
 
+use App\Enums\AttributeDataType;
+use App\Enums\AttributeScope;
+use App\Enums\AttributeStatus;
+use App\Enums\AttributeStorageType;
+use App\Enums\FieldObjectType;
 use App\Enums\SyncDataDomain;
 use App\Enums\SyncSemanticOperation;
+use App\Models\FieldBinding;
+use App\Models\FieldDefinition;
 use App\Models\FieldMapping;
 use App\Models\FieldOptionMapping;
 use App\Models\SyncConfiguration;
@@ -171,6 +178,70 @@ class FieldOptionMappingTest extends TestCase
                 SyncConfiguration::withoutWorkspaceScope()->findOrFail($configuration->id)->connectorExecutionConfiguration()->payload(),
             )->attributeSetId,
         );
+    }
+
+    #[Test]
+    public function confirm_accepts_product_level_select_option_mapping(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $workspace = $account->workspace;
+        $definition = FieldDefinition::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'code' => 'product_select_test',
+            'data_type' => AttributeDataType::Select,
+            'scope' => AttributeScope::WorkspaceCustom,
+            'localized_labels' => ['uk' => 'Тест'],
+            'description' => null,
+            'validation_rules' => [
+                'options' => [
+                    ['code' => 'cotton', 'labels' => ['uk' => 'Бавовна']],
+                ],
+            ],
+            'is_localizable' => false,
+            'is_multi_value' => false,
+            'status' => AttributeStatus::Active,
+        ]);
+        $binding = FieldBinding::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'field_definition_id' => $definition->id,
+            'object_type' => FieldObjectType::Product,
+            'storage_type' => AttributeStorageType::Dynamic,
+            'storage_path' => null,
+            'field_group' => 'characteristics',
+            'is_required' => false,
+            'is_filterable' => false,
+            'is_sortable' => false,
+            'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+            'sort_order' => 999,
+            'status' => AttributeStatus::Active,
+        ]);
+        $this->publishAuthoritativeSnapshot($account, ['material']);
+
+        app(FieldMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $binding->id,
+            'material',
+        );
+
+        $mapping = FieldMapping::withoutWorkspaceScope()
+            ->where('sync_configuration_id', $configuration->id)
+            ->sole();
+
+        app(FieldOptionMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $mapping->id,
+            'cotton',
+            '148',
+        );
+
+        $this->assertDatabaseHas('field_option_mappings', [
+            'field_mapping_id' => $mapping->id,
+            'internal_option_key' => 'cotton',
+            'external_option_value' => '148',
+        ]);
     }
 
     #[Test]

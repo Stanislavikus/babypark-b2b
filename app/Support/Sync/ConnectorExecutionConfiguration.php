@@ -104,7 +104,17 @@ final readonly class ConnectorExecutionConfiguration
             return self::canonicalizePayload($value);
         }
 
-        if (is_bool($value) || is_int($value) || is_float($value) || is_string($value) || $value === null) {
+        if (is_float($value)) {
+            if (! is_finite($value)) {
+                throw ConnectorExecutionConfigurationValidationException::invalidPayload(
+                    'Connector execution configuration values must be finite JSON numbers.',
+                );
+            }
+
+            return $value;
+        }
+
+        if (is_bool($value) || is_int($value) || is_string($value) || $value === null) {
             return $value;
         }
 

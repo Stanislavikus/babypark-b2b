@@ -38,7 +38,29 @@ final class AdobeProductExportPreviewCapability implements SyncPreviewConfigurat
             $workspaceId,
             $connectorAccountId,
             $exportConfiguration->attributeSetId,
+            $this->extractRelevantAttributeCodes($snapshot),
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     * @return list<string>
+     */
+    private function extractRelevantAttributeCodes(array $snapshot): array
+    {
+        /** @var list<array<string, mixed>> $fieldMappings */
+        $fieldMappings = $snapshot['field_mappings'] ?? [];
+        $codes = [];
+
+        foreach ($fieldMappings as $mapping) {
+            $externalFieldKey = $mapping['external_field_key'] ?? null;
+
+            if (is_string($externalFieldKey) && $externalFieldKey !== '') {
+                $codes[] = $externalFieldKey;
+            }
+        }
+
+        return array_values(array_unique($codes));
     }
 
     /**
