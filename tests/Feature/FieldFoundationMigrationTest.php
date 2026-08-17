@@ -329,6 +329,12 @@ class FieldFoundationMigrationTest extends TestCase
     {
         Artisan::call('migrate:fresh');
 
+        if (Schema::hasTable('field_option_mappings')) {
+            $fieldOptionMappingsMigration = require database_path('migrations/2026_08_17_100000_field_option_mappings.php');
+            $fieldOptionMappingsMigration->down();
+            $this->assertFalse(Schema::hasTable('field_option_mappings'));
+        }
+
         if (Schema::hasTable('field_mappings')) {
             $fieldMappingsMigration = require database_path('migrations/2026_08_12_110000_field_mappings.php');
             $fieldMappingsMigration->down();

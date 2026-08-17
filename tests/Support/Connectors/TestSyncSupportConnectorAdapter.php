@@ -3,6 +3,7 @@
 namespace Tests\Support\Connectors;
 
 use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Support\Connectors\ConnectorAdapter;
 use App\Support\Connectors\ConnectorSyncOperationSupport;
@@ -20,8 +21,11 @@ final class TestSyncSupportConnectorAdapter implements ConnectorAdapter, Connect
         $this->supportedPairs = $supportedPairs;
     }
 
-    public function supports(SyncDataDomain $dataDomain, SyncSemanticOperation $operation): bool
-    {
+    public function supports(
+        SyncDataDomain $dataDomain,
+        SyncSemanticOperation $operation,
+        SyncRunMode $mode,
+    ): bool {
         foreach ($this->supportedPairs as [$supportedDomain, $supportedOperation]) {
             if ($supportedDomain === $dataDomain && $supportedOperation === $operation) {
                 return true;

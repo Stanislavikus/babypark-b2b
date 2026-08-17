@@ -296,6 +296,7 @@
     "workspace_access.permissions.manage_sync_mappings": "Управление сопоставлениями данных",
     "workspace_access.permissions.manage_workspace_access": "Управление доступом",
     "workspace_access.permissions.manage_workspace_tax_settings": "Управление налогами",
+    "workspace_access.permissions.run_sync_preview": "Предпросмотр синхронизации",
     "workspace_access.errors.unauthorized": "У вас больше нет права управлять доступом. Обновите страницу.",
     "workspace_access.errors.lockout": "Это изменение нельзя выполнить, потому что после него никто не сможет управлять доступом.",
     "workspace_access.errors.role_still_assigned": "Роль используется пользователями. Сначала снимите её со всех пользователей.",

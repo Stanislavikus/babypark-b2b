@@ -3,6 +3,7 @@
 namespace App\Support\Connectors;
 
 use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Models\ConnectorAccount;
 
@@ -16,6 +17,7 @@ final class ConnectorSyncSupportResolver
         ConnectorAccount $account,
         SyncDataDomain $dataDomain,
         SyncSemanticOperation $operation,
+        SyncRunMode $mode,
     ): bool {
         $adapter = $this->profileRegistry->resolveAdapter($account->auth_profile);
 
@@ -23,6 +25,15 @@ final class ConnectorSyncSupportResolver
             return false;
         }
 
-        return $adapter->supports($dataDomain, $operation);
+        return $adapter->supports($dataDomain, $operation, $mode);
+    }
+
+    public function supportsConfiguration(
+        ConnectorAccount $account,
+        SyncDataDomain $dataDomain,
+        SyncSemanticOperation $operation,
+    ): bool {
+        return $this->supports($account, $dataDomain, $operation, SyncRunMode::Preview)
+            || $this->supports($account, $dataDomain, $operation, SyncRunMode::Live);
     }
 }

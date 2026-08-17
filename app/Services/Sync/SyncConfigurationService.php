@@ -6,6 +6,7 @@ use App\Enums\SyncDataDomain;
 use App\Models\ConnectorAccount;
 use App\Models\SyncConfiguration;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
+use App\Support\Sync\ConnectorExecutionConfiguration;
 use App\Support\Sync\Exceptions\SyncConfigurationConflictException;
 use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
 use App\Support\Sync\Exceptions\UnsupportedSyncOperationException;
@@ -46,6 +47,7 @@ final class SyncConfigurationService
                         $operationSet,
                         $input->operationalState,
                         [],
+                        ConnectorExecutionConfiguration::empty(),
                     ),
                 ]);
             });
@@ -101,9 +103,21 @@ final class SyncConfigurationService
         SyncOperationSet $operationSet,
     ): void {
         foreach ($operationSet->operations() as $operation) {
-            if (! $this->syncSupportResolver->supports($account, $dataDomain, $operation)) {
+            if (! $this->syncSupportResolver->supportsConfiguration($account, $dataDomain, $operation)) {
                 throw UnsupportedSyncOperationException::forPair($dataDomain, $operation);
             }
         }
+    }
+
+    public function updateConnectorExecutionConfiguration(
+        ConnectorAccount $account,
+        string $syncConfigurationId,
+        ConnectorExecutionConfiguration $connectorExecutionConfiguration,
+    ): SyncConfiguration {
+        return $this->mutationCoordinator->updateConnectorExecutionConfiguration(
+            $account,
+            $syncConfigurationId,
+            $connectorExecutionConfiguration,
+        );
     }
 }

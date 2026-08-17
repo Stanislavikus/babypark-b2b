@@ -10,6 +10,8 @@ final readonly class ConnectorProfileDefinition
      * @param  class-string<ConnectorAdapter>  $adapterClass
      * @param  class-string<ConnectorAccountSchema>  $accountSchemaClass
      * @param  list<ConnectorCapability>  $capabilities
+     * @param  class-string|null  $previewCapabilityClass
+     * @param  class-string|null  $fieldOptionMappingValidatorClass
      */
     public function __construct(
         public string $profileCode,
@@ -18,6 +20,8 @@ final readonly class ConnectorProfileDefinition
         public string $adapterClass,
         public string $accountSchemaClass,
         public array $capabilities,
+        public ?string $previewCapabilityClass = null,
+        public ?string $fieldOptionMappingValidatorClass = null,
     ) {}
 
     public function supports(ConnectorCapability $capability): bool

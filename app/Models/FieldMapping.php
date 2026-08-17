@@ -6,6 +6,7 @@ use App\Support\Workspace\BelongsToWorkspace;
 use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FieldMapping extends Model
 {
@@ -27,6 +28,11 @@ class FieldMapping extends Model
     public function fieldBinding(): BelongsTo
     {
         return $this->belongsTo(FieldBinding::class);
+    }
+
+    public function optionMappings(): HasMany
+    {
+        return $this->hasMany(FieldOptionMapping::class);
     }
 
     public function workspace(): BelongsTo

@@ -326,10 +326,11 @@ yet), but should be scheduled before any payment gateway integration work starts
   Layer B mapping UI Done, PR #139). Preview-first execution foundation
   contract is frozen (Task 4C-2a, docs only). Magento Product Export V1
   execution contract is frozen (Platform Product Scope Rebaseline, docs only):
-  `run_sync_preview` normative eighth permission (runtime catalogue still seven
-  permissions until Stage 1), Product execution aggregate, mode-aware support,
-  Live permission `run_sync_live`, ExternalRecordLink, and Live mechanics
-  revalidation. Preview admission/execution runtime remains Stage 1.
+  `run_sync_preview` eighth permission (runtime catalogue eight permissions —
+  Stage 1 Done), Product execution aggregate, mode-aware support, FieldOptionMapping,
+  Preview admission/execution, connector execution configuration + revision v4
+  (Stage 1 Done). Live permission `run_sync_live`, ExternalRecordLink, and Live
+  mechanics remain Stage 3.
 
 **Task sequence (GAP-006 remains Open until implementation lands):**
 
@@ -354,7 +355,7 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4C-2b-2** | Historical tracking label — Preview Authorization & Admission Foundation. Not a mandatory future PR boundary. Absorbed by **Stage 1 — Preview Engine**. |
 | **4C-2b-3** | Historical tracking label — Product Export Projection + Adobe Pure Planner. Not a mandatory future PR boundary. Absorbed by **Stage 1 — Preview Engine** (Magento V1 contract now freezes Product+Variant execution input; no separate Product Export Projection Stop-and-Amend is required before Stage 1). |
 | **4C-2b** | Historical umbrella label for Preview foundation slices. 4C-2b-1 Done. Remaining Preview runtime is **Stage 1**. Must **not** ship: merchant Preview UI (that is Stage 2); Live mutation (Stage 3); automatic `ConnectorSyncOperationSupport` flip |
-| **Stage 1 — Preview Engine** | Current coherent outcome: persisted zero-mutation Adobe Products Export Preview against the full platform Product/Variant model. Includes `run_sync_preview`, SyncConfiguration reachability, snapshot/admission, Product execution aggregate, Adobe simple + configurable planners, truthful Preview support, and E5 connector execution configuration persistence plus revision/snapshot rebaseline if required (current revision v3 has no connector execution-configuration input). Next implementation grouping. |
+| **Stage 1 — Preview Engine** | Persisted zero-mutation Adobe Products Export Preview against the full platform Product/Variant model — **Done** (PR on `cursor/adobe-preview-engine-stage1-2d6d`). Includes `run_sync_preview`, SyncConfiguration reachability, snapshot/admission, Product execution aggregate, Adobe simple + configurable planners, truthful Preview-only mode-aware support, `FieldOptionMapping`, connector execution configuration, revision v4. Merchant Preview UI remains Stage 2; Live mutation Stage 3. |
 | **Stage 2 — Merchant Preview** | Authorized non-technical merchant reaches Preview through Integrations/Data Setup and understands Product-level ready/warning/blocked outcomes. No Sync History product, SyncIssue, scheduling, or analytics merely for this stage. |
 | **Stage 3 — Live Engine** | After E11 revalidation: Live permission, ExternalRecordLink, simple + configurable Live execution, reconciliation, merchant-safe result, real Adobe create/update validation. |
 | **4C** | Remaining sync domain after Stage 3: scheduling, sync history/issues, merchant sync UX beyond mapping/Preview/Live |
@@ -384,19 +385,19 @@ foundation contract is frozen (Task 4C-2a, docs only). Connector Discovery
 is production-operational on the Babypark pilot (dedicated
 `babypark-connector-queue` worker verified `RUNNING` and one successful manual UI
 Discovery completed 2026-08-15). `SyncRun` / `SyncRunItem` persistence and
-revision v3 rebaseline are implemented (Task 4C-2b-1). Preview admission,
-execution, schedule, history, and `ExternalRecordLink` remain unimplemented.
-`run_sync_preview` runtime permission remains pending Stage 1 (historical label
-4C-2b-2). Adobe `(products, export)` support remains fail-closed. No merchant
-Preview UI exists. Connector-account **creation UI is implemented**
+revision v4 rebaseline are implemented (Task 4C-2b-1; Stage 1 extends to v4).
+Preview admission and background Preview execution are implemented (Stage 1).
+Schedule, history, and `ExternalRecordLink` remain unimplemented.
+`run_sync_preview` runtime permission is implemented (Stage 1; eighth catalogue
+permission). Adobe `(products, export)` Preview support is declared; Live remains
+unsupported. No merchant Preview UI exists (Stage 2). Connector-account **creation UI is implemented**
 (`ConnectPlatformIntegration`); credential-management/settings **edit** UI
 remains absent. Task 4B-2c (discovered schema fields / change inspection) and
 retention jobs remain unimplemented.
 
 **Current coherent Magento execution stages** (historical `4C-2b-*` labels are
 not mandatory PR boundaries): Stage 1 Preview Engine → Stage 2 Merchant Preview
-→ Stage 3 Live Engine. See `docs/03-DOMAIN_MODEL.md` → Magento Product Export
-V1 Execution Contract.
+→ Stage 3 Live Engine. Stage 1 delivered connector execution configuration persistence plus revision/snapshot rebaseline (revision v4). The prior current revision v3 has no connector execution-configuration input; v4 is the run-effective revision for Preview. See `docs/03-DOMAIN_MODEL.md` → Magento Product Export V1 Execution Contract.
 
 **ConnectorAccount authorization/rendered-view sub-gap (closed PR #102 /
 Task 4B-2b-1e+1f; historical pre-B-2 — superseded by GAP-026B-2 repository
@@ -1097,28 +1098,26 @@ Remaining connector gaps are tracked separately under GAP-006.
   (Task 4C-2b-1).
 
 **Still absent in code (docs settled; runtime or UI missing):**
-- Preview admission/execution runtime (`configuration_snapshot` builder,
-  one-active-run admission, planner — **Stage 1**; historical labels 4C-2b-2+);
-- normative eighth permission `run_sync_preview` (runtime catalogue still seven permissions until 4C-2b-2 / Stage 1);
-- generic Product execution aggregate and Adobe simple + configurable planners
-  (**Stage 1**; Magento V1 contract frozen — no separate Product Export
-  Projection Stop-and-Amend is required before Stage 1);
-- SyncConfiguration-owned connector execution configuration (E5 Adobe
-  attribute-set context/default) plus revision-version rebaseline and
-  snapshot inclusion if the hasher input set grows — **Stage 1** (current
-  revision v3 has no connector execution-configuration input);
-- mode-aware execution support (Preview vs Live independent; current binary
-  `ConnectorSyncOperationSupport` remains fail-closed for Adobe);
-- SyncConfiguration merchant reachability (lazy ensure; no UUID);
-- `run_sync_live` (Stage 3);
-- `ExternalRecordLink` (Stage 3);
-- Live execution after E11 revalidation (Stage 3);
-- sync execution runtime for merchant "Синхронізувати зараз";
-- Preview before first live sync (Stage 2 merchant exposure);
+- merchant Preview UI and Integrations Preview surface (**Stage 2**);
+- `run_sync_live` (**Stage 3**);
+- `ExternalRecordLink` (**Stage 3**);
+- Live execution after E11 revalidation (**Stage 3**);
+- sync execution runtime for merchant "Синхронізувати зараз" (Live);
 - scheduling beyond Discovery;
 - ownership persistence/enforcement;
 - issue aggregation and bulk resolution;
 - sync-run history as a merchant Layer B surface.
+
+**Implemented in Stage 1 — Preview Engine (verified on branch `cursor/adobe-preview-engine-stage1-2d6d`):**
+- Preview admission/execution runtime (`SyncPreviewAdmissionService`,
+  `SyncPreviewConfigurationSnapshotBuilder`, `SyncPreviewRunJob`);
+- eighth permission `run_sync_preview` (not auto-granted to legacy roles);
+- generic Product execution aggregate + Adobe simple/configurable Preview planner;
+- `FieldOptionMapping` persistence and revision participation;
+- SyncConfiguration-owned connector execution configuration + revision v4;
+- mode-aware execution support (Adobe Products/Export: Preview supported, Live not);
+- SyncConfiguration merchant reachability (`SyncConfigurationReachabilityService`);
+- Adobe Product Export metadata reader (connector-owned HTTP seam).
 
 **Platform capability vs connector-V1-specific (do not conflate):**
 - first-class MediaAsset / ProductMedia / VariantMedia runtime — platform

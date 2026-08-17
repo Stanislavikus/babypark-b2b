@@ -172,4 +172,11 @@ trait CreatesConnectorAccountFixtures
 
         return $user;
     }
+
+    protected function createSyncSupportAccount(array $overrides = []): ConnectorAccount
+    {
+        return $this->createConnectorAccount(null, array_merge([
+            'auth_profile' => 'test_sync_support',
+        ], $overrides));
+    }
 }

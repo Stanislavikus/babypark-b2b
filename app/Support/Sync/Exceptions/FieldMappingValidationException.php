@@ -54,4 +54,18 @@ final class FieldMappingValidationException extends RuntimeException
             "No field mapping identified by {$identifier} exists in sync configuration {$syncConfigurationId}.",
         );
     }
+
+    public static function invalidInternalOptionKey(string $internalOptionKey, string $fieldDefinitionId): self
+    {
+        return new self(
+            "Internal option '{$internalOptionKey}' is not allowed for field definition {$fieldDefinitionId}.",
+        );
+    }
+
+    public static function invalidExternalOptionValue(string $externalOptionValue, string $externalFieldKey): self
+    {
+        return new self(
+            "External option '{$externalOptionValue}' is not valid for external field '{$externalFieldKey}'.",
+        );
+    }
 }

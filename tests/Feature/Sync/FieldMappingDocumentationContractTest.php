@@ -71,6 +71,16 @@ class FieldMappingDocumentationContractTest extends TestCase
     }
 
     #[Test]
+    public function domain_model_documents_field_option_mapping_contract(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString('#### FieldOptionMapping persistence contract', $content);
+        $this->assertStringContainsString('UNIQUE(field_mapping_id, internal_option_key)', $content);
+        $this->assertStringContainsString('Stable internal option code', $content);
+    }
+
+    #[Test]
     public function contract_limits_first_slice_to_products_field_bindings(): void
     {
         $section = $this->fieldMappingPersistenceContractSection();
