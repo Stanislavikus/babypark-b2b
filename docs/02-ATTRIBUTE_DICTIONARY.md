@@ -335,7 +335,7 @@ Customer system fields reuse several Product group codes and add two Customer-on
 | `field_group` | Purpose | Customer fields | Notes |
 |---|---|---|---|
 | `basic_information` | Core identity and status | `name`, `is_active`, `short_name` | Reused from Product taxonomy |
-| `identifiers` | Legal and external IDs | `edrpou`, `ipn`, `onec_guid` | Reused from Product taxonomy |
+| `identifiers` | Legal and external IDs | `edrpou`, `ipn`, `onec_guid` | `edrpou` / `ipn` reused from Product taxonomy. `onec_guid` is a Customer-side legacy 1C identity column, **not** a Product System Attribute (DEC-011). |
 | `contacts` | People and communication | `email`, `manager_name`, `manager_phone` | **Customer-only** — not used for Product fields |
 | `commercial_terms` | Financial and pricing defaults | `payment_delay_days`, `credit_limit`, `current_debt`, `default_price_list_id` | **Customer-only** — B2B cabinet hides `credit_limit` / `current_debt` |
 | `internal` | Staff-only references | `account_manager_id`, `backup_manager_id` | Reused from Product taxonomy |

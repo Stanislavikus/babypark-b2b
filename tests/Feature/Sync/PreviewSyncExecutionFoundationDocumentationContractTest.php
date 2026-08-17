@@ -410,7 +410,7 @@ class PreviewSyncExecutionFoundationDocumentationContractTest extends TestCase
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
 
         if (! preg_match(
-            '/#### Preview-first Sync Execution Foundation Contract\n\[Resolved — Task 4C-2a\]\n\n(.*?)(?=\n### Canonical mapping registry role)/s',
+            '/#### Preview-first Sync Execution Foundation Contract\n\[Resolved — Task 4C-2a\]\n\n(.*?)(?=\n### Magento Product Export V1 Execution Contract)/s',
             $content,
             $matches,
         )) {

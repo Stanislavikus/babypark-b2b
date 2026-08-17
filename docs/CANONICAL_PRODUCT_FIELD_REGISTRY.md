@@ -1,6 +1,6 @@
 # Canonical Product Field Registry v7
 
-Self-contained contract for universal reusable product-data concepts within babypark B2B platform research coverage. Snapshot date: **2026-07-15**.
+Self-contained contract for universal reusable product-data concepts within this Product Data Platform research coverage. Snapshot date: **2026-07-15**.
 
 ## Purpose and scope
 
@@ -99,6 +99,15 @@ implementation_kind=connector_only
   → storage_owner=ConnectorMapping, field_definition_eligibility=no,
     scope=not_applicable, data_type_or_state=not_applicable
 
+implementation_kind=external_identity
+  → storage_owner=ExternalRecordLink,
+    field_definition_eligibility=no,
+    binding_strategy=not_applicable,
+    scope=not_applicable,
+    field_group_or_state=not_applicable,
+    data_type_or_state=not_applicable,
+    recommended_action=external_identity_only
+
 implementation_kind=pricing_domain
   → field_definition_eligibility=no, inheritance_strategy=domain_owned
 
@@ -169,7 +178,7 @@ Do **not** model these as multi-select text fields.
 
 ## Channel field prohibition
 
-Forbidden as core fields: `google_title`, `shopify_title`, etc. Channel-specific labels exist only in `canonical_product_field_mappings.csv` and `canonical_product_field_option_mappings.csv`.
+Forbidden as core fields: `google_title`, `shopify_title`, 1C GUID / `onec_guid` as a generic Product/System Attribute, etc. Channel-specific labels exist only in `canonical_product_field_mappings.csv` and `canonical_product_field_option_mappings.csv`. Vendor/external identities belong behind connector-owned, account-scoped external identity — not Product core columns as architecture.
 
 ## MPN — full formulation
 
@@ -194,6 +203,29 @@ Google: `identifier_exists = false` only when identifiers **truly do not exist**
 - `recommended_action: connector_mapping_only`
 - Do **not** design logic "empty fields → false"
 - `manufacturer_identifier_status: unknown | assigned | not_assigned` — research candidate, **not created** in this registry
+
+## onec_guid — full formulation
+
+1C GUID is a connector/external-identity concern. It is **not** a generic Product/System Attribute and **not** a FieldMapping / ConnectorMapping concern.
+
+- `implementation_kind: external_identity`
+- `storage_owner: ExternalRecordLink`
+- `field_definition_eligibility: no`
+- `binding_strategy: not_applicable`
+- `scope: not_applicable`
+- `field_group_or_state: not_applicable`
+- `data_type_or_state: not_applicable`
+- `recommended_action: external_identity_only`
+- Do **not** create a FieldDefinition for it
+- Physical `products.onec_guid` and `product_variants.onec_guid` remain legacy runtime debt until migrated behind ConnectorAccount-scoped ExternalRecordLink
+- Do **not** treat this registry row as permission to keep 1C identity in Product core forever
+- Do **not** treat `storage_owner: ExternalRecordLink` as a claim that ExternalRecordLink runtime exists
+
+FieldMapping answers which semantic product field corresponds to which external field.
+
+ExternalRecordLink answers which internal business record corresponds to which external record identity.
+
+`onec_guid` belongs to the second concern.
 
 ## hasEnergyConsumptionDetails
 
@@ -239,11 +271,11 @@ FK/semantic-FK integrity, but not enum membership.
 - `binding_strategy` (observed, extend via DEC): `product | product_variant | product_and_variant_two_bindings | not_applicable`
 - `scope` (observed, extend via DEC): `system | platform_library | not_applicable`
 - `mvp_tier` (observed, extend via DEC): `A | B | C | not_applicable`; invariant: `mvp_tier=A → default_enabled=true`
-- `implementation_kind` (observed, extend via DEC): `compliance_entity | computed_projection | connector_only | core_model_property | dynamic_field | inventory_domain | media_domain | pricing_domain | product_association_domain | relation`
-- `storage_owner` (observed, extend via DEC): `Category | ConnectorMapping | FieldDefinition | MediaAsset | PriceListItem | Product | ProductAssociation | ProductVariant | calculated | not_implemented`
+- `implementation_kind` (observed, extend via DEC): `compliance_entity | computed_projection | connector_only | core_model_property | dynamic_field | external_identity | inventory_domain | media_domain | pricing_domain | product_association_domain | relation`
+- `storage_owner` (observed, extend via DEC): `Category | ConnectorMapping | ExternalRecordLink | FieldDefinition | MediaAsset | PriceListItem | Product | ProductAssociation | ProductVariant | calculated | not_implemented`
 - `field_definition_eligibility` (observed): `yes | no`
 - `verification_status` (observed, extend via DEC): `verified | partially_verified | needs_legal_review`
-- `recommended_action` (observed, extend via DEC): `add_to_platform_library | computed_not_editable | connector_mapping_only | covered_by_existing_domain | keep_as_is | needs_legal_review | relation_not_field`
+- `recommended_action` (observed, extend via DEC): `add_to_platform_library | computed_not_editable | connector_mapping_only | covered_by_existing_domain | external_identity_only | keep_as_is | needs_legal_review | relation_not_field`
 - `is_localizable` / `value_localization_strategy` cross-column invariant as defined in "Cross-column invariants" above.
 - **Field-specific invariant:** `has_energy_consumption_details.data_type_or_state` MUST be `not_applicable`; its structured shape is represented only by `value_shape: structured_object`. (`data_type_or_state` and `value_shape` are distinct columns — structural shape belongs to `value_shape`, never to `data_type_or_state`.)
 
@@ -565,6 +597,17 @@ connector-account-specific external references, not global Registry data.
 
 - `evidence_subject_key: decision:DEC-010`
 
+### DEC-011 — onec_guid is connector-owned identity
+
+- **candidate concepts:** generic Product/System Attribute (`core_model_property`); FieldDefinition; `connector_only` / `ConnectorMapping` / `connector_mapping_only`; connector/external-identity behind account-scoped ExternalRecordLink
+- **sources compared:** `docs/data/canonical_product_fields.csv` prior `core_model_property` then `connector_only` rows; `database/migrations/2024_06_01_100001_create_products_table.php` (`products.onec_guid`); `database/migrations/2024_06_01_100002_create_product_variants_table.php` (`product_variants.onec_guid`); Platform Product Capability Baseline; Magento V1 E9 ExternalRecordLink contract
+- **semantic differences:** a 1C GUID is a vendor-instance external record identity, not a reusable Product characteristic, SKU/GTIN, System Attribute, or field/value mapping
+- **canonical code selected:** keep `internal_code: onec_guid` as `implementation_kind: external_identity`, `storage_owner: ExternalRecordLink`, `field_definition_eligibility: no`, `recommended_action: external_identity_only`
+- **why selected:** FieldMapping answers which semantic product field corresponds to which external field. ExternalRecordLink answers which internal business record corresponds to which external record identity. `onec_guid` belongs to the second concern. Customer-neutral Product/Sync contract forbids promoting the first ERP connector's identity into Product core; FieldDefinition would freeze 1C GUID as merchant-editable Product data; `connector_only` / `ConnectorMapping` would freeze it as a mapping/transformation field
+- **rejected alternatives:** keep `core_model_property` / `scope: system` / `keep_as_is`; create a FieldDefinition; classify as `connector_only` / `ConnectorMapping` / `connector_mapping_only`; delete the physical column in a docs-only PR; treat 1C GUID as a generic Product identifier equivalent to SKU/GTIN; freeze a universal ExternalRecordLink schema, Magento role enum, or new unique constraint
+- **mapping/transformation consequence:** do not add a FieldMapping or FieldDefinition for `onec_guid`. Physical `products.onec_guid` and `product_variants.onec_guid` remain legacy runtime debt until migrated behind the ConnectorAccount-scoped ExternalRecordLink boundary. This DEC does not implement ExternalRecordLink and does not freeze its persistence. 1C is not a declared mapping `channel` in this registry; that absence must not be "fixed" by promoting the GUID into Product core or into ConnectorMapping.
+- `evidence_subject_key: decision:DEC-011`
+
 ### DEC-002 — identifier_exists connector-only
 
 - **candidate concepts:** FieldDefinition boolean, connector transformation flag, inferred-from-empty-fields
@@ -676,6 +719,7 @@ Based on `database/seeders/FieldDefinitionSeeder.php` (develop@3c3f926) and `doc
 | `name.is_localizable` | Seeded `false`; docs say localizable for product-level content | Registry marks `false` matching **current seeder**; docs/02 conflict flagged for future DEC |
 | `status` data_type | Seeded as `boolean` mapping `is_active` | Registry keeps `boolean`; enum lifecycle (draft/active/archived) deferred |
 | Legacy `products.sku` column | DB has product-level SKU; seeder binds SKU to variant | Registry follows seeder (variant); legacy column noted as migration debt |
+| `onec_guid` classified as Product/System then as ConnectorMapping | Was `core_model_property` / `keep_as_is`, then `connector_only` / `ConnectorMapping` / `connector_mapping_only` | DEC-011: `external_identity` / `ExternalRecordLink` / `external_identity_only`; not a System Field and not a FieldMapping; physical columns are legacy identity debt |
 
 ### Connector-only (not FieldDefinition)
 
@@ -683,6 +727,12 @@ Based on `database/seeders/FieldDefinitionSeeder.php` (develop@3c3f926) and `doc
 |---|---|
 | `identifier_exists` | google_merchant |
 | `rozetka_category_id` | rozetka |
+
+### External identity (not FieldDefinition, not FieldMapping)
+
+| internal_code | Semantic owner | Notes |
+|---|---|---|
+| `onec_guid` | ExternalRecordLink | 1C vendor-instance record identity. Physical columns are legacy debt. Runtime ExternalRecordLink remains absent. |
 
 ### Unverified (research appendix only)
 

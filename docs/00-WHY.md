@@ -126,6 +126,8 @@ No company-specific logic should be hardcoded into the core.
 
 Company-specific behavior should be handled through configuration, permissions, mappings, channel settings and reusable platform abstractions.
 
+**Resolved.** Reference clients validate the platform; they do not define the platform. A named customer or pilot may provide smoke evidence, production verification, UX feedback, or real API fixtures. A named customer or pilot must never determine platform capability, Product architecture, catalogue complexity, or connector completeness.
+
 ## What Makes This Platform Different
 
 This platform is not intended to become another ERP, CRM, accounting system, marketplace or website builder.

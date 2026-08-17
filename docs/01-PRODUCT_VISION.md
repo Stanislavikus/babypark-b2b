@@ -4,7 +4,7 @@
 
 ## Product Summary
 
-The platform is a SaaS Product Data Platform for small and growing product businesses.
+The platform is a universal multi-tenant SaaS e-commerce Product Data Platform for small and growing product businesses. It is not limited to one assortment, industry, catalogue structure, or first connected commerce account.
 
 It allows a business to manage product information once and use it across its own B2B sales channel, product storefront, catalogues, feeds, APIs, marketplace connectors and future integrations.
 
@@ -550,6 +550,10 @@ This document does not define the complete list of product fields.
 
 The complete product field list must be defined in the Attribute Dictionary.
 
+Canonical fields are defaults and known concepts, not the maximum allowed product model. The platform Product vocabulary is extensible through FieldDefinition, FieldBinding, workspace custom fields, mapping, and dynamic values.
+
+Product + 0..N ProductVariants is the normal platform cardinality. See `03-DOMAIN_MODEL.md` → Platform Product Capability Baseline.
+
 The Attribute Dictionary must normalize and document product fields from:
 
 - authoritative product and commerce standards;
@@ -568,7 +572,7 @@ The Attribute Dictionary must normalize and document product fields from:
 
 - B2B and wholesale-specific requirements;
 
-- Babypark pilot requirements where they represent reusable product concepts.
+- heterogeneous e-commerce catalogues across product verticals (illustrative only: apparel, footwear, electronics, home/furniture, toys, beauty, automotive parts, industrial products, food/non-food packaged goods, sports, specialty retail, B2B supplies). Vertical examples are not a closed enum and must not be encoded as generic Product-core logic.
 
 Product information includes groups such as:
 
@@ -1074,35 +1078,31 @@ The MVP should not require full online payment integration.
 
 However, the order model should include payment status so that payment gateway integration can be added later without rewriting the order model.
 
-## Babypark Pilot Scope
+## Reference Clients Do Not Define the Platform
 
-The Babypark use case may require additional connectors earlier than a generic SaaS MVP.
+**Resolved.**
 
-For Babypark, the platform may need:
+The platform is a customer-neutral multi-tenant SaaS Product Data Platform. It is not limited by the assortment, industry, catalogue structure, or connector needs of the first connected commerce account, pilot environment, or reference environment.
 
-- ERP / 1C data input;
+A reference client / pilot environment may:
 
-- Google Sheets output;
+- provide smoke evidence;
+- provide production verification;
+- provide UX feedback;
+- provide real API fixtures.
 
-- website-related data migration or import;
+A reference client / pilot environment must never:
 
-- B2B catalogue;
+- be the architecture target;
+- define product scope;
+- be the source of Product requirements;
+- be the reason a connector capability exists;
+- bound supported catalogue complexity;
+- define Magento V1 completeness.
 
-- customer-specific pricing or discounts;
+Reference clients validate the platform; they do not define the platform.
 
-- order transfer to an external system;
-
-- product table for admin operations;
-
-- margin visibility.
-
-These requirements are valid for the pilot.
-
-However, Babypark-specific logic must not be hardcoded into the platform core.
-
-Pilot requirements should be implemented through reusable connectors, mappings, pricing rules and configuration whenever possible.
-
-The Babypark pilot must help build the general SaaS product, not create a separate custom system.
+Connector families such as 1C, Adobe Commerce, Shopify, BigCommerce, Google Merchant, Rozetka, Google Sheets, and CSV are reusable platform integrations. Their priority may be influenced by a pilot schedule. Their capability must remain reusable platform capability.
 
 ## Admin Product Table and Views
 
@@ -1426,13 +1426,13 @@ The pricing model should support these concepts without hardcoding one interpret
 
 **Resolved.**
 
-Babypark may need ERP / 1C and Google Sheets earlier than the generic SaaS MVP.
+A pilot or reference environment may need particular connectors earlier than a generic SaaS MVP. Those needs may influence implementation priority.
 
-These needs may influence connector implementation priority.
+All such work must be implemented as reusable connector, mapping, pricing or configuration functionality.
 
-However, all Babypark-related work must be implemented as reusable connector, mapping, pricing or configuration functionality.
+Named-customer or pilot-specific logic must never be hardcoded into the SaaS core.
 
-Babypark-specific logic must never be hardcoded into the SaaS core.
+Reference clients validate the platform; they do not define the platform.
 
 This decision is closed and must not be reopened without a documentation-level decision.
 
