@@ -5647,13 +5647,20 @@ Properties:
   Integration manager, or any legacy role/profile merely because of job title;
 - existing roles gain it only through deliberate access configuration.
 
-**Normative eighth permission / runtime seventh catalogue:** this docs-only
-contract introduces a normative **eighth** atomic workspace permission
-(`run_sync_preview`; runtime implementation: pending 4C-2b). Runtime code on
-current `develop` still contains exactly **seven** seeded permissions
-(`WorkspaceRbacPermissionSeeder`). Task **4C-2b** adds `run_sync_preview` to the
-runtime catalogue. Historical GAP-026B cutover documentation correctly continues
-to describe the **seven-permission** production cutover state.
+**Normative eighth permission:** this docs-only contract introduced a normative
+**eighth** atomic workspace permission (`run_sync_preview`; historical runtime
+implementation target: Task 4C-2b / **Stage 1 — Preview Engine**).
+
+**Repository status (post–Stage 1):** `run_sync_preview` is implemented in the
+runtime catalogue (`WorkspaceRbacPermissionSeeder`; eighth seeded permission).
+Historical GAP-026B cutover documentation correctly continues to describe the
+**seven-permission** production cutover state at the time of EXECUTE.
+
+**Normative ninth permission (Stage 2-0):** `manage_sync_configurations` is
+frozen in **Merchant Preview Authorization & Remediation Contract (Resolved —
+Stage 2-0)** below. Runtime implementation remains **pending Stage 2A** — the
+current PHP permission catalogue remains at **eight** permissions until then.
+Do not claim nine runtime permissions before Stage 2A lands.
 
 **Live authority:** do **not** add or freeze an implemented Live permission in
 4C-2a beyond the invariant that Preview authority must never silently become
@@ -6179,23 +6186,46 @@ SyncConfiguration without internal UUID knowledge.
 Rejected: picking an arbitrary "first configuration". Rejected: requiring the
 merchant to type a configuration UUID.
 
-**Frozen business behavior:** service-owned lazy ensure/create of the unique
-identity:
+**Frozen business behavior:** the unique configuration identity is:
 
 ```text
-ConnectorAccount
-+ data_domain = products
-+ default/empty external_context
+Workspace
+→ ConnectorAccount
+→ data_domain
+→ external_context
 ```
 
-with `export` enabled, triggered from the approved Integrations / Data Setup
-path once truthful Preview support is declared. Preserve service-owned
-mutation, workspace isolation, and external-context identity.
+Semantic operation (e.g. `products` + `export` for Adobe V1) is an enabled/run-target
+operation on that exact `SyncConfiguration` — **not** part of `SyncConfiguration`
+identity and **not** a reason to create a second `SyncConfiguration`. One
+domain/context `SyncConfiguration` may enable multiple semantic operations (see
+**Semantic operations** above). For Adobe V1 merchant reachability, resolve the
+`(products, export)` operation through this identity — not by picking an arbitrary
+first configuration.
 
-Adobe `(products, export)` currently fail-closed, so configuration create
-cannot succeed until Stage 1 declares truthful Preview support. Order: support
-declaration → ensure configuration → merchant reachability. Do not freeze
-Filament page mechanics here.
+Rejected: silently choosing the first configuration; creating a configuration
+because the actor opened Preview; inferring authorization from URL IDs; using a
+foreign workspace/account/configuration relationship; creating a second
+`SyncConfiguration` merely because import and export are independently enabled.
+
+**Mutating ensure path (Stage 1 runtime):** `SyncConfigurationReachabilityService::
+ensureProductsExportConfiguration()` and `AdobeProductExportSetupService::
+ensureProductsExportConfiguration()` may create a row and/or enable Export —
+committed mutations. When invoked from a **merchant-facing mutation path**, an
+outer actor-aware boundary must require `manage_sync_configurations` (Stage 2A).
+This contract does not silently outlaw trusted/system orchestration paths. See
+**Stage 2-0** — Preview-only actors must never call them.
+
+**Read-only existence (Stage 2A required):** `SyncPreviewConfigurationReadinessPort::
+isReady(SyncConfiguration)` answers readiness for an **already-resolved**
+configuration, not whether one exists. Stage 2A must add a genuinely non-mutating
+existence/lookup method (exact name/class implementation-owned) for
+`run_sync_preview`-only UI to distinguish setup-required from setup-exists
+without calling either `ensure*()` helper.
+
+Adobe `(products, export)` Preview support is declared (Stage 1). Merchant UI
+reachability and setup authority are frozen in Stage 2-0 / implemented in Stage
+2A. Do not freeze Filament page mechanics here.
 
 #### E8. Live authority
 
@@ -6408,14 +6438,34 @@ Do not implement that persistence in this docs contract.
 No merchant-facing polished Preview page is required in Stage 1. No Live
 mutation.
 
-**Stage 2 — Merchant Preview**
+**Stage 2-0 — Merchant Preview Authorization & Remediation Contract**
 
-Business outcome: an authorized non-technical merchant can reach Preview
-through the approved Integrations/Data Setup path and understand Product-level
-ready/warning/blocked outcomes.
+Docs-only freeze (this section). No runtime/UI implementation in this slice.
+See **Merchant Preview Authorization & Remediation Contract (Resolved —
+Stage 2-0)** below.
+
+**Stage 2A — Merchant Preview Core + Connector Setup**
+
+Business outcome: an authorized non-technical merchant can reach Preview through
+the approved Integrations/Data Setup path, complete prerequisite connector setup
+when authorized, and understand Product-level ready/warning/blocked outcomes with
+honest contextual remediation.
+
+Includes: runtime `manage_sync_configurations`; actor-aware SyncConfiguration
+setup authorization; non-mutating existence check; exact Preview
+entry/reachability; safe Adobe attribute-set setup; Preview run lifecycle;
+completed-result summary; Needs-attention working set; Product-level findings;
+contextual remediation; Mapping deep links; temporal/staleness behavior; honest
+`NO_EDIT_SURFACE`; explicit rerun.
 
 Do not build generic Sync History product, SyncIssue, scheduling, or analytics
 merely for this stage.
+
+**Stage 2B — Minimal Option Mapping Remediation**
+
+Option Mapping read model/UI; outer actor-aware authorization; focused exact
+option remediation for `MissingOptionMapping` and `ExternalOptionMissingOrStale`.
+Independently reviewable after 2A architecture is established.
 
 **Stage 3 — Live Engine + Real Magento Validation**
 
@@ -6424,6 +6474,235 @@ permission; ExternalRecordLink; simple Product execution; configurable Product
 execution; safe create/update behavior; reconciliation; normalized Live
 result; merchant-safe presentation; production activation; real Magento
 create/update verification.
+
+#### Merchant Preview Authorization & Remediation Contract
+[Resolved — Stage 2-0]
+
+This section freezes the minimum authorization, setup, temporal, and remediation
+contract required before merchant-facing Preview UI is implemented. It resolves
+the architecture gap: Preview execution has `run_sync_preview`, Mapping has
+independent read/manage permissions, but merchant mutation of
+SyncConfiguration-owned setup had no explicit workspace authority.
+
+**Docs-only in Stage 2-0.** Runtime implementation of `manage_sync_configurations`,
+the non-mutating existence check, merchant Preview UI, and remediation
+presenters belongs to **Stage 2A** / **Stage 2B** as sequenced above.
+
+##### Normative ninth workspace permission — `manage_sync_configurations`
+
+| Permission | Authority |
+|---|---|
+| `manage_sync_configurations` | Merchant-facing mutation of SyncConfiguration-owned Layer-B setup state through approved application/domain services. |
+
+First concrete Stage 2A use: Adobe Products Export → connector execution
+configuration → selected Adobe attribute set. The permission is intentionally
+connector-neutral; future merchant-visible SyncConfiguration setup mutations may
+also require it when separately designed. The permission's existence does not
+automatically authorize or expose those future controls.
+
+**Runtime status:** normative target frozen in Stage 2-0; **runtime catalogue
+implementation pending Stage 2A.** Current PHP permission catalogue remains at
+**eight** permissions (`run_sync_preview` added in Stage 1) until Stage 2A.
+
+##### Permission independence matrix (frozen)
+
+These authority axes are independent. No permission implies another unless a
+future contract explicitly changes the matrix.
+
+| Permission | Owns | Does **not** grant |
+|---|---|---|
+| `manage_connector_accounts` | Connection setup, credentials, connector account settings, enable/disable/archive, management-only connection checks | SyncConfiguration mutation, Mapping mutation, Preview execution |
+| `manage_sync_configurations` | SyncConfiguration-owned Layer-B setup mutations (e.g. connector execution configuration, enabled operations, selection, external context when exposed) | Connector credentials/settings mutation, FieldMapping/FieldOptionMapping mutation, Preview execution |
+| `view_sync_mappings` | Read-only Mapping remediation/reference surface | Mapping mutation, SyncConfiguration mutation, Preview execution |
+| `manage_sync_mappings` | FieldMapping and child FieldOptionMapping mutation | Unrelated SyncConfiguration setup, connector account management, Preview execution |
+| `run_sync_preview` | Entering merchant Preview surface; starting/restarting Preview; safe queued/running/completed Preview result; minimum run-relevant setup **read** projection (§ Safe read vs mutation) | SyncConfiguration mutation, Mapping mutation, connector account management |
+
+Do **not** introduce `view_sync_configurations` merely for symmetry in Stage 2.
+
+FieldOptionMapping uses the same Mapping authority boundary as FieldMapping. Do
+**not** introduce `manage_sync_option_mappings` merely for symmetry.
+
+##### Safe read vs mutation under `run_sync_preview`
+
+An actor with `run_sync_preview` may read the minimum merchant-safe run-relevant
+setup projection needed to:
+
+- understand what Preview will check;
+- understand that required setup is incomplete;
+- understand that another authorized user must complete setup.
+
+That does **not** turn Preview permission into generic SyncConfiguration
+management access. No sensitive connector-account configuration, credentials,
+Layer-C diagnostics, or raw configuration JSON becomes visible through either
+`run_sync_preview` or `manage_sync_configurations`.
+
+An actor with `manage_sync_configurations` may read the safe state necessary to
+manage those settings.
+
+##### Non-mutating existence check (Stage 2A required scope)
+
+Verified gap: `SyncPreviewConfigurationReadinessPort::isReady(SyncConfiguration
+$configuration): bool` takes an already-resolved `SyncConfiguration`. The only
+current existence helpers — `SyncConfigurationReachabilityService::
+ensureProductsExportConfiguration()` and `AdobeProductExportSetupService::
+ensureProductsExportConfiguration()` — **mutate** (create a row and/or enable
+Export, persist connector execution configuration).
+
+Stage 2A must add one new, genuinely non-mutating existence/lookup method (exact
+name/class implementation-owned) that a `run_sync_preview`-only actor's UI calls
+to determine "setup required" vs "setup exists" **without** calling either
+`ensure*()` helper.
+
+##### No hidden configuration mutation from Preview
+
+A merchant action authorized only by `run_sync_preview` must **not**:
+
+- create a `SyncConfiguration`;
+- enable an operation;
+- alter `external_context` or selection;
+- persist connector execution configuration;
+- choose or auto-save an Adobe attribute set;
+- call an `ensure*()` helper whose observable result performs any of those
+  mutations.
+
+When setup mutation seams are reached from merchant UI in Stage 2A, the outer
+actor-aware boundary must require `manage_sync_configurations`. Prefer an outer
+actor-aware authorization/application boundary analogous to
+`FieldMappingAuthorizationService` — not authorization buried inside
+actor-agnostic domain mutation services unless existing architecture requires
+that pattern.
+
+##### Three-layer Adobe attribute-set failure trace (frozen)
+
+1. **Write-time validation** — the approved setup mutation path rejects invalid
+   Adobe execution configuration before persistence.
+2. **Admission/readiness validation** — any invalid persisted configuration
+   that nevertheless exists is rejected fail-closed before a normal Preview
+   result (`SyncPreviewAdmissionException::attributeSetUnconfigured()` for
+   Adobe V1).
+3. **Completed-Preview findings** — structurally valid configuration may still
+   prove semantically stale/incompatible during execution (e.g.
+   `AttributeSetInvalid` when a valid positive `attribute_set_id` no longer
+   exists in the connected Adobe account).
+
+`AttributeSetUnconfigured` (admission/setup) ≠ `AttributeSetInvalid` (completed
+Preview finding). `MappedFieldAbsentFromSelectedSet` is a different finding
+entirely — do not conflate with `AttributeSetInvalid`.
+
+Do not document write-time validation as proof that malformed persisted state is
+impossible. Admission/readiness remains defense in depth.
+
+##### Pre-Preview setup vs completed Preview findings
+
+**A. Pre-Preview setup problem** — run-effective connector execution
+configuration absent or invalid at admission. Preview admission fails before a
+normal Preview result. Merchant concept: *Потрібно завершити налаштування перед
+перевіркою* — not *Товар заблокований*. If the actor has
+`manage_sync_configurations`, Stage 2A may offer the setup action; otherwise:
+*У вас немає доступу до цієї настройки.* Do not convert admission/setup failure
+into fake Product-level `SyncRunItem` findings.
+
+**B. Completed Preview problem** — configuration structurally valid at admission
+but semantically stale/incompatible during execution. Legitimate completed Preview
+evidence (e.g. `AttributeSetInvalid`) may route to connector setup remediation.
+
+##### Connector metadata read and locking (Stage 2A)
+
+Preserve the existing short-lock architecture verified in
+`AdobeProductExportSetupService`: metadata reads happen **before** the locked
+transaction, never inside it.
+
+```text
+read connector metadata
+→ validate proposed choice
+→ short DB transaction
+→ lock SyncConfiguration
+→ persist through existing mutation service
+→ commit
+```
+
+Do not hold a DB transaction across vendor HTTP work.
+
+##### Preview outcomes remain three-state
+
+Normative vocabulary: `ready` / `warning` / `blocked`. Stage 2-0 does not
+change severity assignment.
+
+Current Adobe Products Export implementation classifies all implemented finding
+codes as blocking in `AdobeProductExportPreviewPlanner::hasBlockingFinding()` —
+current implementation truth, **not** a frozen invariant that Adobe Warning
+must always equal 0. Stage 2A UI must correctly render zero warnings today and
+remain valid when a future planner legitimately produces warnings. No cosmetic
+reclassification merely to populate the warning bucket.
+
+##### Historical finding vs current remediation (frozen)
+
+```text
+historical cause
+    ← SyncRunItem.findings + run configuration_snapshot
+
+current remediation possibility
+    ← current authorization + current destination existence
+    + current safe configuration state
+```
+
+Historical findings are never rewritten because current data/configuration
+changed. Current mutable state must not be used to falsify what the old run
+evaluated.
+
+##### Configuration drift vs Product-data freshness
+
+`run.configuration_revision != current.configuration_revision` does **not**
+automatically invalidate every finding destination (e.g. toggling
+`operational_state` may change revision without touching FieldMapping
+correspondence). A revision change proves some configuration-owned state changed;
+it does not prove the specific finding's remediation target changed.
+
+For a precise finding: use immutable finding/snapshot identity; compare only the
+relevant current destination state; if the target is no longer safely meaningful,
+suppress the misleading action and recommend rerun. Merchant copy:
+*Налаштування змінилися після цієї перевірки. Запустіть перевірку ще раз.*
+
+`configuration_revision` tracks configuration-owned state only. It does **not**
+snapshot or prove freshness of Product/Variant values. Even when revisions match,
+an old Preview is not proof that today's Product data is unchanged. Verification
+after Product-data change requires an explicit new Preview.
+
+##### Remediation presentation contract (presentation-only; no persistence)
+
+Do **not** persist remediation classification. Do **not** create `SyncIssue`.
+
+**A. Remediation area** (what kind of problem): `PRODUCT_DATA`, `VARIANT_DATA`,
+`FIELD_MAPPING`, `OPTION_MAPPING`, `CONNECTOR_SETUP`, `PRICING`.
+
+**B. Current actionability** (what may this actor do now): `ACTION_AVAILABLE`,
+`VIEW_ONLY`, `PERMISSION_REQUIRED`, `NO_EDIT_SURFACE`,
+`CURRENT_CONFIGURATION_CHANGED`.
+
+A finding may expose more than one remediation destination when multiple real
+resolution paths exist. Do not force one false primary "Fix".
+
+##### No fake Product editor
+
+Verified: no Filament/Livewire surface references `ProductFieldValue::` or
+`VariantFieldValue::` for editing; `ProductResource` renders zero
+FieldBinding-driven dynamic inputs. `NO_EDIT_SURFACE` is the correct, **dominant**
+current actionability for most Product/Variant-data findings — not an edge case.
+
+Merchant UI may provide *[Відкрити товар]* for context but must not show
+*[Виправити]* unless the destination can actually edit the affected value. Do not
+solve this gap by creating a second Product editor. Do not tell the merchant to
+fix values in 1C/Magento/another source unless configuration establishes that
+authority.
+
+##### Field context and taxonomy
+
+For field-related findings, use the existing Product Field model for presentation:
+Product / Variant → `attribute_group` → localized `FieldDefinition` label (e.g.
+*Варіант → Характеристики → Колір*). Do not create a Preview-specific Product
+field taxonomy. Field taxonomy answers what data is affected; remediation
+area/actionability answers where/how the actor can deal with it — orthogonal
+dimensions.
 
 ### Canonical mapping registry role
 

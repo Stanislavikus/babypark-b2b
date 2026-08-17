@@ -1788,7 +1788,22 @@ Before merge, connector UI must satisfy contract §15: connector-capability gati
 
 ### Existing-vs-future UX boundary
 
-Normative sync domain shape and merchant journey are settled (Sync Domain Rebaseline in `03-DOMAIN_MODEL.md`). The connector UX contract still defines required behavior **when implemented** for: sync execution, Preview, enabled semantic operations, scheduling, ownership persistence (if bidirectional ships), issue aggregation, bulk resolution, sync-run history. None of these runtimes are implied to exist today beyond Discovery runtime and connection check. Remaining work is implementation/UI migration, not another open architecture research pass, unless current repository truth contradicts an approved invariant.
+Normative sync domain shape and merchant journey are settled (Sync Domain Rebaseline in `03-DOMAIN_MODEL.md`). Stage 1 Preview Engine is **shipped** — persisted zero-mutation Preview computation/runtime (`run_sync_preview`, admission, persisted Preview runs). Stage 2-0 merchant Preview authorization/remediation contract is **Done (docs contract)**. Stage 2A delivers merchant Preview UI, remediation presentation, `manage_sync_configurations` runtime permission, and non-mutating SyncConfiguration existence lookup. Stage 2B delivers Option Mapping remediation UI. The connector UX contract still defines required behavior **when implemented** for: consequential Live sync execution, scheduling, ownership persistence (if bidirectional ships), issue aggregation, bulk resolution, and sync-run history. Do not treat Preview computation/runtime as future work — only merchant Preview UX/remediation surfaces remain pending in Stage 2A/2B. Remaining work is implementation/UI migration, not another open architecture research pass, unless current repository truth contradicts an approved invariant.
+
+### Merchant Preview interaction rules (Resolved — Stage 2-0)
+
+Normative detail: `docs/03-DOMAIN_MODEL.md` → Merchant Preview Authorization &
+Remediation Contract; `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md` §16.
+
+Summary rules for Stage 2A UI — prevent divergence from the contract:
+
+- **Needs attention first** — surface blocked/attention Product outcomes before decorative sync summary.
+- **Exact field context** where evidence permits — use Product Field taxonomy (*Варіант → Характеристики → Колір*), not Preview-specific field labels.
+- **Honest action state** — `NO_EDIT_SURFACE` is the dominant case for Product/Variant findings today; show *[Виправити]* only when an authorized editor exists.
+- **Explicit rerun** — when configuration drift makes a historical finding's fix unsafe: *Налаштування змінилися після цієї перевірки. Запустіть перевірку ще раз.*
+- **No technical connector vocabulary** — never expose `attribute_set_id`, snapshot/discovery internals, or raw finding codes in Layer A/B.
+- **Setup-required vs product-blocked** — pre-admission setup: *Потрібно завершити налаштування перед перевіркою*; without setup permission: *У вас немає доступу до цієї настройки* — not *Товар заблокований*.
+- **Three outcome buckets** — ready / warning / blocked. Zero warnings may be correct today; do not design UI assuming warnings are always present.
 
 ### Known implementation mismatch (not architectural regression)
 

@@ -282,13 +282,15 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
         $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString('**Stage 1 — Preview Engine**', $gaps);
-        $this->assertStringContainsString('**Stage 2 — Merchant Preview**', $gaps);
+        $this->assertStringContainsString('**Stage 2-0 — Merchant Preview Authorization & Remediation Contract**', $gaps);
+        $this->assertStringContainsString('**Stage 2A — Merchant Preview Core + Connector Setup**', $gaps);
+        $this->assertStringContainsString('**Stage 2B — Option Mapping Remediation**', $gaps);
         $this->assertStringContainsString('**Stage 3 — Live Engine**', $gaps);
         $this->assertStringContainsString('Historical tracking label', $gaps);
         $this->assertStringContainsString('Not a mandatory future PR boundary', $gaps);
         $this->assertStringContainsString('Current coherent Magento execution stages', $gaps);
         $this->assertStringContainsString('connector execution configuration persistence plus revision/snapshot rebaseline', $gaps);
-        $this->assertStringContainsString('current revision v3 has no connector execution-configuration input', $gaps);
+        $this->assertStringContainsString('revision v4', $gaps);
     }
 
     #[Test]

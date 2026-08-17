@@ -90,7 +90,7 @@ class PreviewSyncExecutionFoundationDocumentationContractTest extends TestCase
     }
 
     #[Test]
-    public function contract_freezes_run_sync_preview_as_independent_pending_permission(): void
+    public function contract_freezes_run_sync_preview_as_independent_permission_with_post_stage_1_runtime_status(): void
     {
         $section = $this->previewExecutionFoundationContractSection();
 
@@ -98,9 +98,10 @@ class PreviewSyncExecutionFoundationDocumentationContractTest extends TestCase
         $this->assertStringContainsString('independent from Connector, Mapping, Access, and Tax permissions', $section);
         $this->assertStringContainsString('no existing permission implies it', $section);
         $this->assertStringContainsString('it implies none of them', $section);
-        $this->assertStringContainsString('normative **eighth** atomic workspace permission', $section);
-        $this->assertStringContainsString('runtime implementation: pending 4C-2b', $section);
-        $this->assertStringContainsString('exactly **seven** seeded permissions', $section);
+        $this->assertStringContainsString('**eighth** atomic workspace permission', $section);
+        $this->assertStringContainsString('Repository status (post–Stage 1):', $section);
+        $this->assertStringContainsString('eighth seeded permission', $section);
+        $this->assertStringContainsString('seven-permission** production cutover state', $section);
     }
 
     #[Test]

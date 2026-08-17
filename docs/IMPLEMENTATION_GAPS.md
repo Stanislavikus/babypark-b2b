@@ -355,8 +355,10 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4C-2b-2** | Historical tracking label — Preview Authorization & Admission Foundation. Not a mandatory future PR boundary. Absorbed by **Stage 1 — Preview Engine**. |
 | **4C-2b-3** | Historical tracking label — Product Export Projection + Adobe Pure Planner. Not a mandatory future PR boundary. Absorbed by **Stage 1 — Preview Engine** (Magento V1 contract now freezes Product+Variant execution input; no separate Product Export Projection Stop-and-Amend is required before Stage 1). |
 | **4C-2b** | Historical umbrella label for Preview foundation slices. 4C-2b-1 Done. Remaining Preview runtime is **Stage 1**. Must **not** ship: merchant Preview UI (that is Stage 2); Live mutation (Stage 3); automatic `ConnectorSyncOperationSupport` flip |
-| **Stage 1 — Preview Engine** | Persisted zero-mutation Adobe Products Export Preview against the full platform Product/Variant model — **Done** (PR on `cursor/adobe-preview-engine-stage1-2d6d`). Includes `run_sync_preview`, SyncConfiguration reachability, snapshot/admission, Product execution aggregate, Adobe simple + configurable planners, truthful Preview-only mode-aware support, `FieldOptionMapping`, connector execution configuration, revision v4. Merchant Preview UI remains Stage 2; Live mutation Stage 3. |
-| **Stage 2 — Merchant Preview** | Authorized non-technical merchant reaches Preview through Integrations/Data Setup and understands Product-level ready/warning/blocked outcomes. No Sync History product, SyncIssue, scheduling, or analytics merely for this stage. |
+| **Stage 1 — Preview Engine** | Persisted zero-mutation Adobe Products Export Preview against the full platform Product/Variant model — **Done** (PR on `cursor/adobe-preview-engine-stage1-2d6d`). Includes `run_sync_preview`, SyncConfiguration reachability, snapshot/admission, Product execution aggregate, Adobe simple + configurable planners, truthful Preview-only mode-aware support, `FieldOptionMapping`, connector execution configuration, revision v4. Merchant Preview UI remains Stage 2A; Live mutation Stage 3. |
+| **Stage 2-0 — Merchant Preview Authorization & Remediation Contract** | Docs-only freeze: `manage_sync_configurations` (normative ninth permission; runtime pending Stage 2A); permission independence; no hidden mutation under `run_sync_preview`; non-mutating existence check (Stage 2A required); three-layer attribute-set trace; pre-admission vs completed findings; historical/current remediation split; remediation presentation semantics; Stage 2A/2B sequencing — **Done (docs contract)** |
+| **Stage 2A — Merchant Preview Core + Connector Setup** | Runtime `manage_sync_configurations`; actor-aware setup authorization; non-mutating existence check; merchant Preview UI; attribute-set setup; completed-result summary; Needs-attention working set; contextual remediation; honest `NO_EDIT_SURFACE`; explicit rerun — **pending** |
+| **Stage 2B — Option Mapping Remediation** | Minimal Option Mapping read model/UI; `MissingOptionMapping` / `ExternalOptionMissingOrStale` focused remediation — **pending** (after 2A) |
 | **Stage 3 — Live Engine** | After E11 revalidation: Live permission, ExternalRecordLink, simple + configurable Live execution, reconciliation, merchant-safe result, real Adobe create/update validation. |
 | **4C** | Remaining sync domain after Stage 3: scheduling, sync history/issues, merchant sync UX beyond mapping/Preview/Live |
 
@@ -390,14 +392,21 @@ Preview admission and background Preview execution are implemented (Stage 1).
 Schedule, history, and `ExternalRecordLink` remain unimplemented.
 `run_sync_preview` runtime permission is implemented (Stage 1; eighth catalogue
 permission). Adobe `(products, export)` Preview support is declared; Live remains
-unsupported. No merchant Preview UI exists (Stage 2). Connector-account **creation UI is implemented**
+unsupported. No merchant Preview UI exists (Stage 2A). Stage 2-0 merchant Preview
+authorization/remediation contract is **Done (docs contract)**.
+`manage_sync_configurations` is normatively frozen; runtime catalogue remains
+**eight** permissions until Stage 2A. Connector-account **creation UI is implemented**
 (`ConnectPlatformIntegration`); credential-management/settings **edit** UI
 remains absent. Task 4B-2c (discovered schema fields / change inspection) and
 retention jobs remain unimplemented.
 
 **Current coherent Magento execution stages** (historical `4C-2b-*` labels are
-not mandatory PR boundaries): Stage 1 Preview Engine → Stage 2 Merchant Preview
-→ Stage 3 Live Engine. Stage 1 delivered connector execution configuration persistence plus revision/snapshot rebaseline (revision v4). The prior current revision v3 has no connector execution-configuration input; v4 is the run-effective revision for Preview. See `docs/03-DOMAIN_MODEL.md` → Magento Product Export V1 Execution Contract.
+not mandatory PR boundaries): Stage 1 Preview Engine → Stage 2-0 Authorization &
+Remediation contract (docs) → Stage 2A Merchant Preview Core + Connector Setup
+→ Stage 2B Option Mapping Remediation → Stage 3 Live Engine. Stage 1 delivered
+connector execution configuration persistence plus revision/snapshot rebaseline
+(revision v4). See `docs/03-DOMAIN_MODEL.md` → Magento Product Export V1
+Execution Contract and Merchant Preview Authorization & Remediation Contract.
 
 **ConnectorAccount authorization/rendered-view sub-gap (closed PR #102 /
 Task 4B-2b-1e+1f; historical pre-B-2 — superseded by GAP-026B-2 repository
@@ -1098,7 +1107,10 @@ Remaining connector gaps are tracked separately under GAP-006.
   (Task 4C-2b-1).
 
 **Still absent in code (docs settled; runtime or UI missing):**
-- merchant Preview UI and Integrations Preview surface (**Stage 2**);
+- merchant Preview UI and Integrations Preview surface (**Stage 2A**);
+- `manage_sync_configurations` runtime permission (**Stage 2A**);
+- non-mutating SyncConfiguration existence lookup for Preview-only actors (**Stage 2A**);
+- Option Mapping remediation UI (**Stage 2B**);
 - `run_sync_live` (**Stage 3**);
 - `ExternalRecordLink` (**Stage 3**);
 - Live execution after E11 revalidation (**Stage 3**);
