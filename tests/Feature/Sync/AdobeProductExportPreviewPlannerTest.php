@@ -105,7 +105,7 @@ class AdobeProductExportPreviewPlannerTest extends TestCase
 
         $this->assertSame(SyncPreviewOutcome::Blocked, $result->outcome);
         $this->assertTrue(collect($result->findings)->contains(
-            fn ($finding) => $finding->code === SyncPreviewFindingCode::MissingVariantOptionValue
+            fn ($finding) => $finding->code === SyncPreviewFindingCode::MissingMappedVariantValue
                 && $finding->subject === (string) $variantC->id,
         ));
         $this->assertTrue(collect($result->findings)->contains(

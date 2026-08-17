@@ -169,8 +169,9 @@ class FieldOptionMappingTest extends TestCase
     private function indexExists(string $table, string $indexName): bool
     {
         $connection = Schema::getConnection();
+        $driver = $connection->getDriverName();
 
-        if ($connection->getDriverName() === 'sqlite') {
+        if ($driver === 'sqlite') {
             $indexes = $connection->select("PRAGMA index_list('{$table}')");
 
             foreach ($indexes as $index) {
@@ -178,6 +179,18 @@ class FieldOptionMappingTest extends TestCase
                     return true;
                 }
             }
+
+            return false;
+        }
+
+        if ($driver === 'mysql') {
+            $database = $connection->getDatabaseName();
+            $result = $connection->select(
+                'SELECT 1 FROM information_schema.statistics WHERE table_schema = ? AND table_name = ? AND index_name = ? LIMIT 1',
+                [$database, $table, $indexName],
+            );
+
+            return $result !== [];
         }
 
         return false;

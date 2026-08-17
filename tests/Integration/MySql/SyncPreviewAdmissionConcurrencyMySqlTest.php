@@ -15,6 +15,7 @@ use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Component\Process\Process;
@@ -38,11 +39,14 @@ class SyncPreviewAdmissionConcurrencyMySqlTest extends TestCase
             $this->markTestSkipped('MySQL-only concurrency proof.');
         }
 
+        Artisan::call('migrate:fresh');
+
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->seedFieldDefinitions();
         $this->configureSyncSupportProfile([
+            [SyncDataDomain::Products, SyncSemanticOperation::Import],
             [SyncDataDomain::Products, SyncSemanticOperation::Export],
         ]);
 
@@ -78,6 +82,7 @@ class SyncPreviewAdmissionConcurrencyMySqlTest extends TestCase
 
         $workerScript = base_path('tests/Support/SyncPreviewAdmissionConcurrencyWorker.php');
         $phpBinary = PHP_BINARY;
+        $workerEnv = $this->mysqlWorkerEnvironment();
 
         $processA = new Process([
             $phpBinary,
@@ -88,11 +93,18 @@ class SyncPreviewAdmissionConcurrencyMySqlTest extends TestCase
             $configuration->id,
             $actor->id,
             $ipcDir,
-        ], base_path());
+        ], base_path(), $workerEnv);
         $processA->setTimeout(120);
         $processA->start();
 
-        $this->waitForIpcFile($ipcDir.'/lock_acquired');
+        try {
+            $this->waitForIpcFile($ipcDir.'/lock_acquired');
+        } catch (\Throwable $exception) {
+            $processA->wait();
+            $this->fail(
+                'Worker A output: '.$processA->getOutput().$processA->getErrorOutput().' | '.$exception->getMessage(),
+            );
+        }
 
         $processB = new Process([
             $phpBinary,
@@ -103,13 +115,23 @@ class SyncPreviewAdmissionConcurrencyMySqlTest extends TestCase
             $configuration->id,
             $actor->id,
             $ipcDir,
-        ], base_path());
+        ], base_path(), $workerEnv);
         $processB->setTimeout(120);
-        $processB->run();
+        $processB->start();
+
+        $deadline = time() + 30;
+        while (time() < $deadline && ! $processB->isRunning()) {
+            usleep(50_000);
+        }
+
+        $this->assertTrue($processB->isRunning(), 'Second admission should block while the configuration row is locked.');
 
         file_put_contents($ipcDir.'/release_lock', '1');
         $processA->wait();
+        $processB->wait();
 
+        $this->assertSame(0, $processA->getExitCode(), $processA->getErrorOutput());
+        $this->assertSame(0, $processB->getExitCode(), $processB->getErrorOutput());
         $this->assertStringContainsString('active', strtolower($processB->getOutput().$processB->getErrorOutput()));
 
         $activeCount = SyncRun::withoutWorkspaceScope()
@@ -118,6 +140,27 @@ class SyncPreviewAdmissionConcurrencyMySqlTest extends TestCase
             ->count();
 
         $this->assertLessThanOrEqual(1, $activeCount);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function mysqlWorkerEnvironment(): array
+    {
+        $connection = DB::connection();
+
+        return array_merge($_ENV, [
+            'APP_ENV' => 'testing',
+            'APP_KEY' => config('app.key'),
+            'DB_CONNECTION' => $connection->getName(),
+            'DB_HOST' => (string) $connection->getConfig('host'),
+            'DB_PORT' => (string) $connection->getConfig('port'),
+            'DB_DATABASE' => (string) $connection->getConfig('database'),
+            'DB_USERNAME' => (string) $connection->getConfig('username'),
+            'DB_PASSWORD' => (string) $connection->getConfig('password'),
+            'DB_SOCKET' => (string) ($connection->getConfig('unix_socket') ?? ''),
+            'QUEUE_CONNECTION' => 'sync',
+        ]);
     }
 
     private function waitForIpcFile(string $path, int $seconds = 30): void

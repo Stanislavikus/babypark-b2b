@@ -42,6 +42,28 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (Schema::hasTable('field_option_mappings')) {
+            $driver = Schema::getConnection()->getDriverName();
+
+            if ($driver === 'mysql') {
+                Schema::table('field_option_mappings', function (Blueprint $table) {
+                    $table->dropForeign('fom_ws_mapping_fk');
+                });
+            } else {
+                Schema::table('field_option_mappings', function (Blueprint $table) {
+                    $table->dropForeign(['workspace_id', 'field_mapping_id']);
+                });
+            }
+
+            Schema::dropIfExists('field_option_mappings');
+
+            if ($this->indexExists('field_mappings', 'fm_ws_id_unique')) {
+                Schema::table('field_mappings', function (Blueprint $table) {
+                    $table->dropUnique('fm_ws_id_unique');
+                });
+            }
+        }
+
         $driver = Schema::getConnection()->getDriverName();
 
         if ($driver === 'mysql') {
@@ -164,6 +186,36 @@ return new class extends Migration
         $json = $this->encodeCanonicalJson($this->sortObjectKeysRecursively($payload));
 
         return hash('sha256', self::REVISION_V2_PREFIX."\n".$json);
+    }
+
+    private function indexExists(string $table, string $indexName): bool
+    {
+        $connection = Schema::getConnection();
+        $driver = $connection->getDriverName();
+
+        if ($driver === 'sqlite') {
+            $indexes = $connection->select("PRAGMA index_list('{$table}')");
+
+            foreach ($indexes as $index) {
+                if (($index->name ?? null) === $indexName) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        if ($driver === 'mysql') {
+            $database = $connection->getDatabaseName();
+            $result = $connection->select(
+                'SELECT 1 FROM information_schema.statistics WHERE table_schema = ? AND table_name = ? AND index_name = ? LIMIT 1',
+                [$database, $table, $indexName],
+            );
+
+            return $result !== [];
+        }
+
+        return false;
     }
 
     private function encodeCanonicalJson(mixed $value): string

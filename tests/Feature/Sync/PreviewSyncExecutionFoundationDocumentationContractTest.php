@@ -116,12 +116,12 @@ class PreviewSyncExecutionFoundationDocumentationContractTest extends TestCase
     }
 
     #[Test]
-    public function implementation_gaps_documents_eighth_permission_docs_to_code_gap(): void
+    public function implementation_gaps_documents_run_sync_preview_runtime_status(): void
     {
         $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
-        $this->assertStringContainsString('`run_sync_preview` normative', $gaps);
-        $this->assertStringContainsString('runtime catalogue still seven permissions until 4C-2b', $gaps);
+        $this->assertStringContainsString('`run_sync_preview`', $gaps);
+        $this->assertStringContainsString('Stage 1', $gaps);
     }
 
     #[Test]

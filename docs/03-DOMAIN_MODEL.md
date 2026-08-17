@@ -4988,6 +4988,75 @@ Canonical registry `transformation` values describe connector-adapter/runtime
 interpretation — not mandatory generic persisted transformation on the
 correspondence row.
 
+#### FieldOptionMapping persistence contract
+[Resolved — Stage 1 Preview Engine, 2026-08-17]
+
+Narrow Stage-1 addition for Adobe configurable products. This is **not** a global
+canonical option registry and **not** transport state.
+
+##### Relationship
+
+```text
+FieldMapping
+  └── 0..N FieldOptionMappings
+```
+
+| Question | Owner |
+|---|---|
+| Which internal semantic field ↔ which external field? | `FieldMapping` |
+| Which internal stable option ↔ which external connector option value? | `FieldOptionMapping` |
+
+##### Minimum physical schema — `field_option_mappings`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID NOT NULL | Workspace-owned row |
+| `field_mapping_id` | UUID NOT NULL | Child of exactly one `FieldMapping` |
+| `internal_option_key` | string NOT NULL | Stable internal option code — never translated display label |
+| `external_option_value` | string NOT NULL | Opaque connector option value/identity |
+| `created_at` / `updated_at` | timestamps | |
+
+Minimum uniqueness:
+
+```text
+UNIQUE(field_mapping_id, internal_option_key)
+```
+
+Do **not** create generic uniqueness on `external_option_value`.
+
+Workspace-safe FK integrity required. If composite FK requires it,
+`field_mappings` must expose `UNIQUE(workspace_id, id)`.
+
+Deleting a `FieldMapping` **cascades** its `FieldOptionMappings` — these rows
+have no meaning independently of the parent mapping.
+
+##### Confirmation semantics
+
+Persisted `FieldOptionMapping` = explicit authoritative correspondence.
+
+Label equality may later generate a **suggestion**. Label equality must **never**
+become persisted authority automatically.
+
+No Stage-1 merchant `FieldOptionMapping` UI.
+
+##### Revision participation
+
+Effective `FieldOptionMappings` participate in `configuration_revision` (v4)
+and immutable `configuration_snapshot` for admitted Preview runs.
+
+##### Mutation boundary
+
+All `FieldOptionMapping` mutations route through the locked
+`SyncConfiguration` mutation coordinator — same boundary as `FieldMapping`.
+Do **not** call `save()` directly from UI/controller code.
+
+Initial mutation operations:
+
+- confirm/upsert exact correspondence;
+- replace external correspondence;
+- remove correspondence.
+
 #### Canonical FieldMapping suggestion/read-model contract
 [Resolved — Task 4C-1c-0, 2026-08-12]
 

@@ -112,9 +112,9 @@ final class AdobeProductExportPreviewPlanner
 
             if ($colorValue === null || $colorValue === '') {
                 $findings[] = new SyncPreviewFinding(
-                    SyncPreviewFindingCode::MissingVariantOptionValue,
+                    SyncPreviewFindingCode::MissingMappedVariantValue,
                     subject: $variantSlice->variantId,
-                    context: ['option' => 'color'],
+                    context: ['field_binding_id' => $colorBindingId],
                 );
 
                 continue;
@@ -144,7 +144,7 @@ final class AdobeProductExportPreviewPlanner
             );
         }
 
-        if ($this->hasBlockingFinding($findings, SyncPreviewFindingCode::MissingVariantOptionValue)) {
+        if ($this->hasBlockingFinding($findings, SyncPreviewFindingCode::MissingMappedVariantValue)) {
             $findings[] = new SyncPreviewFinding(
                 SyncPreviewFindingCode::ConfigurableVariantsIncomplete,
                 subject: (string) $aggregate->product->id,

@@ -46,23 +46,26 @@ class SyncRunPersistenceMySqlTest extends TestCase
         ]);
     }
 
-    public function test_revision_v3_rebaseline_matches_runtime_hasher_on_mysql(): void
+    public function test_revision_v4_rebaseline_matches_runtime_hasher_on_mysql(): void
     {
         $account = $this->createConnectorAccount(null, ['auth_profile' => 'test_sync_support']);
         $configuration = $this->createProductsSyncConfiguration($account);
 
-        $migration = require database_path('migrations/2026_08_16_100000_sync_configuration_revision_v3.php');
+        $migration = require database_path('migrations/2026_08_17_120000_sync_configuration_revision_v4.php');
         $reflection = new \ReflectionClass($migration);
-        $hashMethod = $reflection->getMethod('hashRevisionV3');
+        $hashMethod = $reflection->getMethod('hashRevisionV4');
         $hashMethod->setAccessible(true);
         $canonicalMethod = $reflection->getMethod('canonicalizePersistedOperations');
         $canonicalMethod->setAccessible(true);
+        $connectorConfigMethod = $reflection->getMethod('decodeConnectorExecutionConfiguration');
+        $connectorConfigMethod->setAccessible(true);
 
         $migrationHash = $hashMethod->invoke(
             $migration,
             $canonicalMethod->invoke($migration, ['import']),
             SyncConfigurationOperationalState::Enabled->value,
             [],
+            $connectorConfigMethod->invoke($migration, null),
         );
 
         $stored = SyncConfiguration::withoutWorkspaceScope()->findOrFail($configuration->id)->configuration_revision;
