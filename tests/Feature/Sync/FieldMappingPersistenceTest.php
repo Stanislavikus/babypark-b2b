@@ -367,11 +367,11 @@ class FieldMappingPersistenceTest extends TestCase
     }
 
     #[Test]
-    public function migration_v3_rebaseline_matches_runtime_hasher_for_empty_mappings(): void
+    public function migration_v4_rebaseline_matches_runtime_hasher_for_empty_mappings(): void
     {
-        $migration = require database_path('migrations/2026_08_16_100000_sync_configuration_revision_v3.php');
+        $migration = require database_path('migrations/2026_08_17_120000_sync_configuration_revision_v4.php');
         $reflection = new \ReflectionClass($migration);
-        $hashMethod = $reflection->getMethod('hashRevisionV3');
+        $hashMethod = $reflection->getMethod('hashRevisionV4');
         $hashMethod->setAccessible(true);
         $canonicalMethod = $reflection->getMethod('canonicalizePersistedOperations');
         $canonicalMethod->setAccessible(true);
@@ -386,7 +386,7 @@ class FieldMappingPersistenceTest extends TestCase
 
         foreach ($cases as [$operations, $state]) {
             $canonical = $canonicalMethod->invoke($migration, $operations);
-            $migrationHash = $hashMethod->invoke($migration, $canonical, $state->value, []);
+            $migrationHash = $hashMethod->invoke($migration, $canonical, $state->value, [], []);
             $runtimeHash = $hasher->hash(
                 SyncOperationSet::fromOperations(
                     array_map(

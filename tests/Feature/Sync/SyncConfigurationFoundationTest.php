@@ -5,6 +5,7 @@ namespace Tests\Feature\Sync;
 use App\Enums\ConnectorDirection;
 use App\Enums\SyncConfigurationOperationalState;
 use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorDefinition;
@@ -580,14 +581,15 @@ class SyncConfigurationFoundationTest extends TestCase
     }
 
     #[Test]
-    public function adobe_commerce_profile_remains_fail_closed_for_products_sync_pairs(): void
+    public function adobe_commerce_profile_supports_products_export_preview_only(): void
     {
         $account = $this->createConnectorAccount();
 
         $resolver = app(ConnectorSyncSupportResolver::class);
 
-        $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Import));
-        $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export));
+        $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview));
+        $this->assertTrue($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview));
+        $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live));
 
         $this->expectException(UnsupportedSyncOperationException::class);
 
@@ -608,7 +610,7 @@ class SyncConfigurationFoundationTest extends TestCase
         $account = $this->createConnectorAccount();
         $resolver = app(ConnectorSyncSupportResolver::class);
 
-        $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Import));
+        $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview));
     }
 
     #[Test]

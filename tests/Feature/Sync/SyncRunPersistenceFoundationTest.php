@@ -9,8 +9,7 @@ use App\Enums\SyncRunMode;
 use App\Enums\SyncRunStatus;
 use App\Enums\SyncSemanticOperation;
 use App\Enums\UserRole;
-use App\Jobs\RunSyncPreview;
-use App\Jobs\SyncPreviewJob;
+use App\Jobs\Connectors\SyncPreviewRunJob;
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
 use App\Models\FieldMapping;
@@ -22,7 +21,9 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
+use App\Services\Sync\SyncPreviewAdmissionService;
 use App\Services\Sync\UpdateSyncConfigurationInput;
+use App\Support\Connectors\AdobePaaS\AdobeProductExportPreviewPlanner;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
 use App\Support\Sync\FieldMappingRevisionEntry;
@@ -35,7 +36,6 @@ use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
@@ -65,7 +65,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function revision_hasher_uses_v3_prefix(): void
+    public function revision_hasher_uses_v4_prefix(): void
     {
         $hasher = new SyncConfigurationRevisionHasher;
         $revision = $hasher->hash(
@@ -74,9 +74,9 @@ class SyncRunPersistenceFoundationTest extends TestCase
             [],
         );
 
-        $migration = $this->revisionV3Migration();
+        $migration = $this->revisionV4Migration();
         $reflection = new \ReflectionClass($migration);
-        $hashMethod = $reflection->getMethod('hashRevisionV3');
+        $hashMethod = $reflection->getMethod('hashRevisionV4');
         $hashMethod->setAccessible(true);
         $canonicalMethod = $reflection->getMethod('canonicalizePersistedOperations');
         $canonicalMethod->setAccessible(true);
@@ -86,11 +86,12 @@ class SyncRunPersistenceFoundationTest extends TestCase
             $canonicalMethod->invoke($migration, ['import']),
             SyncConfigurationOperationalState::Enabled->value,
             [],
+            [],
         );
 
         $this->assertSame($expected, $revision);
         $this->assertNotSame(
-            $this->migrationHashV2(['import'], SyncConfigurationOperationalState::Enabled->value, []),
+            $this->migrationHashV3(['import'], SyncConfigurationOperationalState::Enabled->value, []),
             $revision,
         );
     }
@@ -185,7 +186,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function migration_v3_matches_runtime_hasher_for_non_canonical_mapping_insert_order(): void
+    public function migration_v4_matches_runtime_hasher_for_non_canonical_mapping_insert_order(): void
     {
         $account = $this->createSyncSupportAccount();
         $configuration = $this->createProductsSyncConfiguration($account);
@@ -214,9 +215,9 @@ class SyncRunPersistenceFoundationTest extends TestCase
             ],
         ]);
 
-        $migration = $this->revisionV3Migration();
+        $migration = $this->revisionV4Migration();
         $reflection = new \ReflectionClass($migration);
-        $hashMethod = $reflection->getMethod('hashRevisionV3');
+        $hashMethod = $reflection->getMethod('hashRevisionV4');
         $hashMethod->setAccessible(true);
         $canonicalMethod = $reflection->getMethod('canonicalizePersistedOperations');
         $canonicalMethod->setAccessible(true);
@@ -228,6 +229,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
             $canonicalMethod->invoke($migration, ['import']),
             SyncConfigurationOperationalState::Enabled->value,
             $mappingMethod->invoke($migration, $configuration->id),
+            [],
         );
 
         $runtimeHash = (new SyncConfigurationRevisionHasher)->hash(
@@ -524,22 +526,23 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function workspace_permission_catalogue_remains_seven_permissions(): void
+    public function workspace_permission_catalogue_contains_eighth_run_sync_preview_permission(): void
     {
-        $this->assertCount(7, WorkspacePermissions::catalogue());
-        $this->assertNotContains('run_sync_preview', WorkspacePermissions::catalogue());
+        $this->assertCount(8, WorkspacePermissions::catalogue());
+        $this->assertContains(WorkspacePermissions::RUN_SYNC_PREVIEW, WorkspacePermissions::catalogue());
     }
 
     #[Test]
-    public function adobe_products_export_support_remains_fail_closed(): void
+    public function adobe_products_export_supports_preview_only(): void
     {
         app()->forgetInstance(ConnectorProfileRegistry::class);
 
         $account = $this->createConnectorAccount();
         $resolver = app(ConnectorSyncSupportResolver::class);
 
-        $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export));
-        $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Import));
+        $this->assertTrue($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview));
+        $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live));
+        $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview));
 
         $this->configureSyncSupportProfile([
             [SyncDataDomain::Products, SyncSemanticOperation::Import],
@@ -548,10 +551,9 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function no_preview_queue_job_or_merchant_route_was_introduced(): void
+    public function preview_queue_job_exists_without_merchant_route(): void
     {
-        $this->assertFalse(class_exists(RunSyncPreview::class));
-        $this->assertFalse(class_exists(SyncPreviewJob::class));
+        $this->assertTrue(class_exists(SyncPreviewRunJob::class));
 
         $routePaths = collect(app('router')->getRoutes())->map(
             static fn ($route): string => $route->uri(),
@@ -565,8 +567,8 @@ class SyncRunPersistenceFoundationTest extends TestCase
     public function no_live_mutation_or_external_record_link_implementation_exists(): void
     {
         $this->assertFalse(class_exists(ExternalRecordLink::class));
-        $this->assertFalse(File::exists(app_path('Services/Sync/SyncRunAdmissionService.php')));
-        $this->assertFalse(File::exists(app_path('Services/Sync/SyncPreviewPlanner.php')));
+        $this->assertTrue(class_exists(SyncPreviewAdmissionService::class));
+        $this->assertTrue(class_exists(AdobeProductExportPreviewPlanner::class));
     }
 
     #[Test]
@@ -759,6 +761,32 @@ class SyncRunPersistenceFoundationTest extends TestCase
             $operationalState,
             $fieldMappings,
         );
+    }
+
+    /**
+     * @param  list<string>  $operations
+     * @param  list<array{field_binding_id: string, external_field_key: string}>  $fieldMappings
+     */
+    private function migrationHashV3(array $operations, string $operationalState, array $fieldMappings): string
+    {
+        $migration = $this->revisionV3Migration();
+        $reflection = new \ReflectionClass($migration);
+        $hashMethod = $reflection->getMethod('hashRevisionV3');
+        $hashMethod->setAccessible(true);
+        $canonicalMethod = $reflection->getMethod('canonicalizePersistedOperations');
+        $canonicalMethod->setAccessible(true);
+
+        return $hashMethod->invoke(
+            $migration,
+            $canonicalMethod->invoke($migration, $operations),
+            $operationalState,
+            $fieldMappings,
+        );
+    }
+
+    private function revisionV4Migration(): object
+    {
+        return require database_path('migrations/2026_08_17_120000_sync_configuration_revision_v4.php');
     }
 
     private function revisionV3Migration(): object

@@ -18,6 +18,8 @@ final class WorkspacePermissions
 
     public const MANAGE_TAX_SETTINGS = 'manage_workspace_tax_settings';
 
+    public const RUN_SYNC_PREVIEW = 'run_sync_preview';
+
     /**
      * @return list<string>
      */
@@ -31,6 +33,7 @@ final class WorkspacePermissions
             self::MANAGE_SYNC_MAPPINGS,
             self::MANAGE_WORKSPACE_ACCESS,
             self::MANAGE_TAX_SETTINGS,
+            self::RUN_SYNC_PREVIEW,
         ];
     }
 }
