@@ -12,6 +12,7 @@ use App\Jobs\Connectors\SyncPreviewRunJob;
 use App\Jobs\Connectors\SyncPreviewRunJobExecutionException;
 use App\Models\ConnectorAccount;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\SyncConfiguration;
 use App\Models\SyncRun;
 use App\Models\SyncRunItem;
@@ -70,8 +71,16 @@ class SyncPreviewExecutionTest extends TestCase
         $product = Product::withoutWorkspaceScope()->create([
             'workspace_id' => $account->workspace_id,
             'onec_guid' => (string) Str::uuid(),
-            'sku' => 'PREVIEW-SKU',
+            'sku' => 'LEGACY-SKU',
             'name' => 'Preview Product',
+            'is_active' => true,
+        ]);
+
+        ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $account->workspace_id,
+            'product_id' => $product->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'PREVIEW-VAR-SKU',
             'is_active' => true,
         ]);
 

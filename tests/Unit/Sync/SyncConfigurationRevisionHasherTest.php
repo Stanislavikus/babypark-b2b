@@ -213,4 +213,81 @@ class SyncConfigurationRevisionHasherTest extends TestCase
 
         $this->assertSame($migrationHash, $runtime);
     }
+
+    #[Test]
+    public function v4_revision_namespace_is_customer_neutral(): void
+    {
+        $reflection = new \ReflectionClass(SyncConfigurationRevisionHasher::class);
+        $prefixConstant = $reflection->getReflectionConstant('PREFIX');
+        $this->assertNotNull($prefixConstant);
+        $prefix = $prefixConstant->getValue();
+
+        $this->assertIsString($prefix);
+        $this->assertStringStartsWith('platform.sync-configuration-revision.v4', $prefix);
+        $this->assertStringNotContainsString('babypark', $prefix);
+    }
+
+    #[Test]
+    public function opaque_connector_execution_configuration_canonicalizes_nested_connector_payload(): void
+    {
+        $payload = [
+            'nested' => [
+                'channel' => 'wholesale',
+                'flags' => ['a', 'b'],
+            ],
+            'z_key' => 1,
+        ];
+
+        $config = ConnectorExecutionConfiguration::fromPayload($payload);
+
+        $this->assertSame([
+            'nested' => [
+                'channel' => 'wholesale',
+                'flags' => ['a', 'b'],
+            ],
+            'z_key' => 1,
+        ], $config->payload());
+
+        $revisionWithNested = $this->hasher->hash(
+            SyncOperationSet::fromOperations([SyncSemanticOperation::Export]),
+            SyncConfigurationOperationalState::Enabled,
+            [],
+            $config,
+        );
+
+        $revisionWithout = $this->hasher->hash(
+            SyncOperationSet::fromOperations([SyncSemanticOperation::Export]),
+            SyncConfigurationOperationalState::Enabled,
+            [],
+            ConnectorExecutionConfiguration::empty(),
+        );
+
+        $this->assertNotSame($revisionWithout, $revisionWithNested);
+    }
+
+    #[Test]
+    public function v4_migration_down_restores_v3_hash_semantics(): void
+    {
+        $migrationV4 = require database_path('migrations/2026_08_17_120000_sync_configuration_revision_v4.php');
+        $reflectionV4 = new \ReflectionClass($migrationV4);
+        $downMethod = $reflectionV4->getMethod('rebaselineConfigurationRevisionsToV3');
+        $downMethod->setAccessible(true);
+
+        $migrationV3 = require database_path('migrations/2026_08_16_100000_sync_configuration_revision_v3.php');
+        $reflectionV3 = new \ReflectionClass($migrationV3);
+        $hashV3 = $reflectionV3->getMethod('hashRevisionV3');
+        $hashV3->setAccessible(true);
+        $canonical = $reflectionV3->getMethod('canonicalizePersistedOperations');
+        $canonical->setAccessible(true);
+
+        $expectedV3 = $hashV3->invoke(
+            $migrationV3,
+            $canonical->invoke($migrationV3, ['import']),
+            SyncConfigurationOperationalState::Enabled->value,
+            [],
+        );
+
+        $this->assertSame(64, strlen($expectedV3));
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $expectedV3);
+    }
 }
