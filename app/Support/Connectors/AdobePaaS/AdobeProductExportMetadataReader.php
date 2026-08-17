@@ -20,6 +20,21 @@ final class AdobeProductExportMetadataReader
     ) {}
 
     /**
+     * @return list<array{attribute_set_id: int, attribute_set_name: string}>
+     */
+    public function listAttributeSets(string $workspaceId, string $connectorAccountId): array
+    {
+        $context = $this->contextFactory->create($workspaceId, $connectorAccountId);
+        $attributeSets = $this->fetchAttributeSets($context);
+
+        if ($attributeSets === []) {
+            throw new \RuntimeException('Adobe attribute set metadata response did not contain any attribute sets.');
+        }
+
+        return $attributeSets;
+    }
+
+    /**
      * @param  list<string>  $relevantAttributeCodes  mapped external_field_keys for this run
      */
     public function read(

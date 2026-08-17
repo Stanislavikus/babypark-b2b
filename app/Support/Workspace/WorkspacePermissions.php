@@ -20,6 +20,8 @@ final class WorkspacePermissions
 
     public const RUN_SYNC_PREVIEW = 'run_sync_preview';
 
+    public const MANAGE_SYNC_CONFIGURATIONS = 'manage_sync_configurations';
+
     /**
      * @return list<string>
      */
@@ -34,6 +36,7 @@ final class WorkspacePermissions
             self::MANAGE_WORKSPACE_ACCESS,
             self::MANAGE_TAX_SETTINGS,
             self::RUN_SYNC_PREVIEW,
+            self::MANAGE_SYNC_CONFIGURATIONS,
         ];
     }
 }

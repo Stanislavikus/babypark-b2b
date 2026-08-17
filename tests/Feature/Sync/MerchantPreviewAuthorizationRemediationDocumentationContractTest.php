@@ -62,14 +62,13 @@ class MerchantPreviewAuthorizationRemediationDocumentationContractTest extends T
     }
 
     #[Test]
-    public function domain_model_documents_manage_sync_configurations_as_normative_ninth_permission_pending_stage_2a(): void
+    public function domain_model_documents_manage_sync_configurations_as_normative_ninth_permission_implemented_in_stage_2a_1(): void
     {
         $section = $this->stage20ContractSection();
 
         $this->assertStringContainsString('`manage_sync_configurations`', $section);
         $this->assertStringContainsString('Normative ninth workspace permission', $section);
-        $this->assertStringContainsString('implementation pending Stage 2A', $section);
-        $this->assertStringContainsString('**eight** permissions', $section);
+        $this->assertStringContainsString('**nine** permissions', File::get(base_path('docs/03-DOMAIN_MODEL.md')));
     }
 
     #[Test]
@@ -188,7 +187,7 @@ class MerchantPreviewAuthorizationRemediationDocumentationContractTest extends T
 
         $this->assertStringContainsString('## 16. Merchant Preview authorization and remediation (Resolved — Stage 2-0)', $content);
         $this->assertStringContainsString('`manage_sync_configurations`', $content);
-        $this->assertStringContainsString('runtime pending Stage', $content);
+        $this->assertStringContainsString('implemented Stage 2A-1', $content);
         $this->assertStringContainsString('No fake Fix', $content);
         $this->assertStringContainsString('create `SyncIssue`', $content);
         $this->assertStringContainsString('`attribute_set_id` as merchant', $content);
@@ -216,20 +215,20 @@ class MerchantPreviewAuthorizationRemediationDocumentationContractTest extends T
         $this->assertStringContainsString('**Stage 2A — Merchant Preview Core + Connector Setup**', $gaps);
         $this->assertStringContainsString('**Stage 2B — Option Mapping Remediation**', $gaps);
         $this->assertStringContainsString('runtime pending Stage 2A', $gaps);
-        $this->assertStringContainsString('runtime catalogue remains **eight** permissions until Stage 2A', $gaps);
+        $this->assertStringContainsString('Stage 2A-1 Done', $gaps);
+        $this->assertStringContainsString('Stage 2A-2 pending', $gaps);
         $this->assertStringNotContainsString('| **Stage 2 — Merchant Preview** |', $gaps);
         $this->assertStringNotContainsString('Stage 2A/2B sequencing — **pending**', $gaps);
     }
 
     #[Test]
-    public function atlas_documents_manage_sync_configurations_and_existence_lookup_as_not_implemented(): void
+    public function atlas_documents_manage_sync_configurations_and_existence_lookup_as_implemented_in_stage_2a_1(): void
     {
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
-        $this->assertStringContainsString('`manage_sync_configurations` permission | RESOLVED — NOT IMPLEMENTED', $atlas);
-        $this->assertStringContainsString('SyncConfiguration non-mutating existence lookup', $atlas);
-        $this->assertStringContainsString('RESOLVED — NOT IMPLEMENTED', $atlas);
-        $this->assertStringContainsString('must not call `ensure*()` helpers', $atlas);
+        $this->assertStringContainsString('`manage_sync_configurations` permission | IMPLEMENTED (Stage 2A-1)', $atlas);
+        $this->assertStringContainsString('SyncConfiguration non-mutating existence lookup | IMPLEMENTED (Stage 2A-1)', $atlas);
+        $this->assertStringContainsString('Adobe Products Export merchant setup (Layer B) | IMPLEMENTED (Stage 2A-1)', $atlas);
     }
 
     /**

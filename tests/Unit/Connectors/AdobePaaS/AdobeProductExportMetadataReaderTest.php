@@ -119,6 +119,27 @@ class AdobeProductExportMetadataReaderTest extends TestCase
     }
 
     #[Test]
+    public function list_attribute_sets_returns_catalogue_without_setup_required_exception(): void
+    {
+        $account = $this->createConnectorAccount();
+
+        $reader = $this->readerWithTransport(new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request): ConnectorHttpResult {
+            return new ConnectorHttpResult(200, [], json_encode([
+                'items' => [
+                    ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
+                    ['attribute_set_id' => 9, 'attribute_set_name' => 'Baby'],
+                ],
+            ], JSON_THROW_ON_ERROR));
+        }));
+
+        $sets = $reader->listAttributeSets($account->workspace_id, $account->id);
+
+        $this->assertCount(2, $sets);
+        $this->assertSame(4, $sets[0]['attribute_set_id']);
+        $this->assertSame('Baby', $sets[1]['attribute_set_name']);
+    }
+
+    #[Test]
     public function it_requires_setup_when_multiple_sets_exist_without_explicit_id(): void
     {
         $account = $this->createConnectorAccount();

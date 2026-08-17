@@ -526,9 +526,9 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function workspace_permission_catalogue_contains_eighth_run_sync_preview_permission(): void
+    public function workspace_permission_catalogue_contains_ninth_permission_including_manage_sync_configurations(): void
     {
-        $this->assertCount(8, WorkspacePermissions::catalogue());
+        $this->assertCount(9, WorkspacePermissions::catalogue());
         $this->assertContains(WorkspacePermissions::RUN_SYNC_PREVIEW, WorkspacePermissions::catalogue());
     }
 

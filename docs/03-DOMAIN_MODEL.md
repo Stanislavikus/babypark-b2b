@@ -5652,15 +5652,18 @@ Properties:
 implementation target: Task 4C-2b / **Stage 1 — Preview Engine**).
 
 **Repository status (post–Stage 1):** `run_sync_preview` is implemented in the
-runtime catalogue (`WorkspaceRbacPermissionSeeder`; eighth seeded permission).
-Historical GAP-026B cutover documentation correctly continues to describe the
-**seven-permission** production cutover state at the time of EXECUTE.
+runtime catalogue (`WorkspaceRbacPermissionSeeder`; eighth seeded permission at
+Stage 1 landing). Historical GAP-026B cutover documentation correctly continues to
+describe the **seven-permission** production cutover state at the time of
+EXECUTE.
 
-**Normative ninth permission (Stage 2-0):** `manage_sync_configurations` is
-frozen in **Merchant Preview Authorization & Remediation Contract (Resolved —
-Stage 2-0)** below. Runtime implementation remains **pending Stage 2A** — the
-current PHP permission catalogue remains at **eight** permissions until then.
-Do not claim nine runtime permissions before Stage 2A lands.
+**Normative ninth permission (Stage 2-0 / Stage 2A-1):** `manage_sync_configurations`
+is frozen in **Merchant Preview Authorization & Remediation Contract (Resolved —
+Stage 2-0)** and **implemented in Stage 2A-1** runtime catalogue. Stage 2A
+remains incomplete until Stage 2A-2 Merchant Preview work surface ships.
+Do not claim nine runtime permissions before Stage 2A-1 lands. Stage 2A-1
+implemented the ninth permission (`manage_sync_configurations`); Stage 2A remains
+incomplete until Stage 2A-2 Merchant Preview work surface ships.
 
 **Live authority:** do **not** add or freeze an implemented Live permission in
 4C-2a beyond the invariant that Preview authority must never silently become
@@ -6216,16 +6219,16 @@ outer actor-aware boundary must require `manage_sync_configurations` (Stage 2A).
 This contract does not silently outlaw trusted/system orchestration paths. See
 **Stage 2-0** — Preview-only actors must never call them.
 
-**Read-only existence (Stage 2A required):** `SyncPreviewConfigurationReadinessPort::
+**Read-only existence (Stage 2A-1 implemented):** `SyncPreviewConfigurationReadinessPort::
 isReady(SyncConfiguration)` answers readiness for an **already-resolved**
-configuration, not whether one exists. Stage 2A must add a genuinely non-mutating
-existence/lookup method (exact name/class implementation-owned) for
-`run_sync_preview`-only UI to distinguish setup-required from setup-exists
-without calling either `ensure*()` helper.
+configuration, not whether one exists. `SyncConfigurationLookupService` provides
+a genuinely non-mutating identity lookup (workspace + connector account +
+data domain + external context) without calling `ensure*()` helpers. Merchant
+Preview result/worklist UI remains Stage 2A-2.
 
-Adobe `(products, export)` Preview support is declared (Stage 1). Merchant UI
-reachability and setup authority are frozen in Stage 2-0 / implemented in Stage
-2A. Do not freeze Filament page mechanics here.
+Adobe `(products, export)` Preview support is declared (Stage 1). Layer-B Adobe
+Products Export setup authority and reachability are implemented in Stage
+2A-1. Merchant Preview result/worklist remains Stage 2A-2.
 
 #### E8. Live authority
 
@@ -6501,8 +6504,9 @@ also require it when separately designed. The permission's existence does not
 automatically authorize or expose those future controls.
 
 **Runtime status:** normative target frozen in Stage 2-0; **runtime catalogue
-implementation pending Stage 2A.** Current PHP permission catalogue remains at
-**eight** permissions (`run_sync_preview` added in Stage 1) until Stage 2A.
+implementation landed in Stage 2A-1** (`manage_sync_configurations` ninth
+permission). Current PHP permission catalogue is **nine** permissions. Stage
+2A remains incomplete until Stage 2A-2 Merchant Preview work surface ships.
 
 ##### Permission independence matrix (frozen)
 
