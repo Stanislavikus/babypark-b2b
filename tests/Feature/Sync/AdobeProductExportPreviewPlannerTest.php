@@ -48,11 +48,16 @@ class AdobeProductExportPreviewPlannerTest extends TestCase
             'is_active' => true,
         ]);
 
-        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProducts(collect([$product]))[0];
         $snapshot = $this->snapshotWithMappings([
             ['field_binding_id' => $this->productBinding('name')->id, 'external_field_key' => 'name'],
             ['field_binding_id' => $this->productVariantBinding('sku')->id, 'external_field_key' => 'sku'],
         ]);
+
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            $snapshot,
+        )[0];
 
         $result = $this->planner->plan($aggregate, $snapshot);
 
@@ -84,10 +89,6 @@ class AdobeProductExportPreviewPlannerTest extends TestCase
         $this->assertNotNull($variantA);
         $this->assertNotNull($variantB);
 
-        $product->load('variants');
-
-        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProducts(collect([$product]))[0];
-
         $snapshot = $this->snapshotWithMappings([
             ['field_binding_id' => $this->productBinding('name')->id, 'external_field_key' => 'name'],
             ['field_binding_id' => $skuBinding->id, 'external_field_key' => 'sku'],
@@ -100,6 +101,12 @@ class AdobeProductExportPreviewPlannerTest extends TestCase
                 ],
             ],
         ]);
+
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            $snapshot,
+        )[0];
 
         $result = $this->planner->plan($aggregate, $snapshot);
 

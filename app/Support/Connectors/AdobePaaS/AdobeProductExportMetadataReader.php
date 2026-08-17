@@ -2,6 +2,7 @@
 
 namespace App\Support\Connectors\AdobePaaS;
 
+use App\Support\Connectors\AdobePaaS\Exceptions\AdobeProductExportSetupRequiredException;
 use App\Support\Connectors\OAuth1\OAuth1SigningContext;
 use App\Support\Connectors\Transport\ConnectorHttpTransport;
 use App\Support\Connectors\Transport\ConnectorOutboundRequest;
@@ -21,47 +22,34 @@ final class AdobeProductExportMetadataReader
     public function read(
         string $workspaceId,
         string $connectorAccountId,
-        ?int $preferredAttributeSetId = null,
+        ?int $attributeSetId = null,
     ): AdobeProductExportExecutionMetadata {
         $context = $this->contextFactory->create($workspaceId, $connectorAccountId);
-        $signingContext = new OAuth1SigningContext(
-            bin2hex(random_bytes(16)),
-            time(),
-        );
+        $attributeSets = $this->fetchAttributeSets($context);
 
-        $request = $this->requestFactory->build(
-            $context,
-            self::ATTRIBUTE_SETS_ENDPOINT,
-            $signingContext,
-        );
-
-        $outboundRequest = new ConnectorOutboundRequest(
-            $request,
-            new ConnectorTransportLimits(
-                connectTimeoutSeconds: 10.0,
-                totalTimeoutSeconds: 60.0,
-                maxResponseBodyBytes: 2 * 1024 * 1024,
-            ),
-        );
-
-        try {
-            $httpResult = $this->transport->send($outboundRequest);
-        } catch (ConnectorTransportException $exception) {
-            throw new \RuntimeException(
-                'Adobe attribute set metadata could not be retrieved.',
-                previous: $exception,
-            );
+        if ($attributeSets === []) {
+            throw new \RuntimeException('Adobe attribute set metadata response did not contain any attribute sets.');
         }
 
-        $payload = json_decode($httpResult->body, true);
+        $selectedAttributeSetId = $this->resolveSelectedAttributeSetId($attributeSets, $attributeSetId);
+        $attributes = $this->fetchAttributesForSet($context, $selectedAttributeSetId);
 
-        if (! is_array($payload)) {
-            throw new \RuntimeException('Adobe attribute set metadata response was not valid JSON.');
-        }
+        return new AdobeProductExportExecutionMetadata(
+            selectedAttributeSetId: $selectedAttributeSetId,
+            attributeSets: $attributeSets,
+            attributes: $attributes,
+        );
+    }
+
+    /**
+     * @return list<array{attribute_set_id: int, attribute_set_name: string}>
+     */
+    private function fetchAttributeSets(AdobePaaSRequestContext $context): array
+    {
+        $payload = $this->sendGet($context, self::ATTRIBUTE_SETS_ENDPOINT);
 
         /** @var list<array<string, mixed>> $items */
         $items = $payload['items'] ?? [];
-
         $attributeSets = [];
 
         foreach ($items as $item) {
@@ -78,42 +66,194 @@ final class AdobeProductExportMetadataReader
             ];
         }
 
-        if ($attributeSets === []) {
-            throw new \RuntimeException('Adobe attribute set metadata response did not contain any attribute sets.');
-        }
-
         usort(
             $attributeSets,
             static fn (array $left, array $right): int => $left['attribute_set_id'] <=> $right['attribute_set_id'],
         );
 
-        $selectedAttributeSetId = $this->resolveSelectedAttributeSetId($attributeSets, $preferredAttributeSetId);
+        return $attributeSets;
+    }
 
-        return new AdobeProductExportExecutionMetadata(
-            selectedAttributeSetId: $selectedAttributeSetId,
-            attributeSets: $attributeSets,
-        );
+    /**
+     * @return array<string, AdobeAttributeMetadata>
+     */
+    private function fetchAttributesForSet(AdobePaaSRequestContext $context, int $attributeSetId): array
+    {
+        $endpoint = '/V1/products/attribute-sets/'.$attributeSetId.'/attributes';
+        $payload = $this->sendGet($context, $endpoint);
+
+        /** @var list<array<string, mixed>> $items */
+        $items = $payload['items'] ?? [];
+        $attributes = [];
+
+        foreach ($items as $item) {
+            $attributeCode = $item['attribute_code'] ?? null;
+
+            if (! is_string($attributeCode) || $attributeCode === '') {
+                continue;
+            }
+
+            $attributeId = $item['attribute_id'] ?? null;
+            $frontendInput = $item['frontend_input'] ?? null;
+            $scope = $item['scope'] ?? null;
+
+            if (! is_int($attributeId) && ! (is_string($attributeId) && ctype_digit($attributeId))) {
+                continue;
+            }
+
+            if (! is_string($frontendInput) || $frontendInput === '') {
+                continue;
+            }
+
+            if (! is_string($scope) || $scope === '') {
+                continue;
+            }
+
+            $options = $this->normalizeInlineOptions($item['options'] ?? null);
+
+            if ($this->requiresOptionFetch($frontendInput) && $options === []) {
+                $options = $this->fetchAttributeOptions($context, $attributeCode);
+            }
+
+            $attributes[$attributeCode] = new AdobeAttributeMetadata(
+                attributeId: (int) $attributeId,
+                code: $attributeCode,
+                frontendInput: $frontendInput,
+                scope: $scope,
+                options: $options,
+            );
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function fetchAttributeOptions(AdobePaaSRequestContext $context, string $attributeCode): array
+    {
+        $endpoint = '/V1/products/attributes/'.rawurlencode($attributeCode).'/options';
+        $payload = $this->sendGet($context, $endpoint);
+
+        /** @var list<array<string, mixed>> $items */
+        $items = $payload['items'] ?? [];
+
+        return $this->normalizeOptionItems($items);
     }
 
     /**
      * @param  list<array{attribute_set_id: int, attribute_set_name: string}>  $attributeSets
      */
-    private function resolveSelectedAttributeSetId(array $attributeSets, ?int $preferredAttributeSetId): int
+    private function resolveSelectedAttributeSetId(array $attributeSets, ?int $attributeSetId): int
     {
-        if ($preferredAttributeSetId !== null) {
+        if ($attributeSetId !== null) {
             foreach ($attributeSets as $attributeSet) {
-                if ($attributeSet['attribute_set_id'] === $preferredAttributeSetId) {
-                    return $preferredAttributeSetId;
+                if ($attributeSet['attribute_set_id'] === $attributeSetId) {
+                    return $attributeSetId;
                 }
             }
+
+            throw new \RuntimeException(
+                'Configured Adobe attribute_set_id does not exist in the connected store.',
+            );
         }
 
-        foreach ($attributeSets as $attributeSet) {
-            if (strcasecmp($attributeSet['attribute_set_name'], 'Default') === 0) {
-                return $attributeSet['attribute_set_id'];
+        if (count($attributeSets) === 1) {
+            return $attributeSets[0]['attribute_set_id'];
+        }
+
+        throw new AdobeProductExportSetupRequiredException($attributeSets);
+    }
+
+    private function requiresOptionFetch(string $frontendInput): bool
+    {
+        return in_array($frontendInput, ['select', 'multiselect'], true);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sendGet(AdobePaaSRequestContext $context, string $endpointPath): array
+    {
+        $signingContext = new OAuth1SigningContext(
+            bin2hex(random_bytes(16)),
+            time(),
+        );
+
+        $request = $this->requestFactory->build(
+            $context,
+            $endpointPath,
+            $signingContext,
+        );
+
+        $outboundRequest = new ConnectorOutboundRequest(
+            $request,
+            new ConnectorTransportLimits(
+                connectTimeoutSeconds: 10.0,
+                totalTimeoutSeconds: 60.0,
+                maxResponseBodyBytes: 2 * 1024 * 1024,
+            ),
+        );
+
+        try {
+            $httpResult = $this->transport->send($outboundRequest);
+        } catch (ConnectorTransportException $exception) {
+            throw new \RuntimeException(
+                'Adobe product export metadata could not be retrieved.',
+                previous: $exception,
+            );
+        }
+
+        $payload = json_decode($httpResult->body, true);
+
+        if (! is_array($payload)) {
+            throw new \RuntimeException('Adobe product export metadata response was not valid JSON.');
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function normalizeInlineOptions(mixed $rawOptions): array
+    {
+        if (! is_array($rawOptions)) {
+            return [];
+        }
+
+        return $this->normalizeOptionItems($rawOptions);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @return array<string, string>
+     */
+    private function normalizeOptionItems(array $items): array
+    {
+        $options = [];
+
+        foreach ($items as $item) {
+            if (! is_array($item)) {
+                continue;
             }
+
+            $value = $item['value'] ?? null;
+            $label = $item['label'] ?? null;
+
+            if (! is_string($value) && ! is_int($value)) {
+                continue;
+            }
+
+            $normalizedValue = (string) $value;
+
+            if ($normalizedValue === '') {
+                continue;
+            }
+
+            $options[$normalizedValue] = is_string($label) ? $label : $normalizedValue;
         }
 
-        return $attributeSets[0]['attribute_set_id'];
+        return $options;
     }
 }

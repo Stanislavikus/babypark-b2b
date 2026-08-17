@@ -4,6 +4,7 @@ namespace App\Support\Connectors\AdobePaaS;
 
 use App\Enums\SyncPreviewFindingCode;
 use App\Enums\SyncPreviewOutcome;
+use App\Support\Sync\Preview\MappedFieldValue;
 use App\Support\Sync\Preview\ProductExecutionAggregate;
 use App\Support\Sync\Preview\ProductVariantExecutionSlice;
 use App\Support\Sync\Preview\SyncPreviewFinding;
@@ -17,6 +18,7 @@ final class AdobeProductExportPreviewPlanner
     public function plan(
         ProductExecutionAggregate $aggregate,
         array $configurationSnapshot,
+        ?AdobeProductExportExecutionMetadata $metadata = null,
     ): SyncPreviewPlanResult {
         /** @var list<SyncPreviewFinding> $findings */
         $findings = [];
@@ -50,14 +52,14 @@ final class AdobeProductExportPreviewPlanner
         }
 
         if ($nameBindingId !== null) {
-            $nameValue = $aggregate->productValues[$nameBindingId] ?? null;
+            $nameValue = $this->mappedScalarValue($aggregate->productValues[$nameBindingId] ?? null);
 
             if ($nameValue === null || $nameValue === '') {
                 $findings[] = new SyncPreviewFinding(
                     SyncPreviewFindingCode::MissingName,
-                    subject: (string) $aggregate->product->id,
+                    subject: $aggregate->productId,
                 );
-            } elseif ($nameBindingId !== null && ! isset($aggregate->productValues[$nameBindingId])) {
+            } elseif (! isset($aggregate->productValues[$nameBindingId])) {
                 $findings[] = new SyncPreviewFinding(
                     SyncPreviewFindingCode::MissingMappedProductValue,
                     subject: $nameBindingId,
@@ -65,10 +67,10 @@ final class AdobeProductExportPreviewPlanner
             }
         }
 
-        if ($aggregate->isConfigurable()) {
+        if ($aggregate->hasMultipleSellableVariants()) {
             $findings = array_merge(
                 $findings,
-                $this->planConfigurablePath($aggregate, $mappedBindings, $colorBindingId, $skuBindingId),
+                $this->planConfigurablePath($aggregate, $mappedBindings, $colorBindingId, $skuBindingId, $metadata),
             );
         } else {
             $findings = array_merge(
@@ -92,6 +94,7 @@ final class AdobeProductExportPreviewPlanner
         array $mappedBindings,
         ?string $colorBindingId,
         ?string $skuBindingId,
+        ?AdobeProductExportExecutionMetadata $metadata,
     ): array {
         $findings = [];
 
@@ -104,11 +107,21 @@ final class AdobeProductExportPreviewPlanner
             return $findings;
         }
 
+        $colorExternalKey = $mappedBindings[$colorBindingId]['external_field_key'] ?? 'color';
+        $colorExternalKey = is_string($colorExternalKey) ? $colorExternalKey : 'color';
+
+        if ($metadata !== null && ! $metadata->isConfigurableCompatible($colorExternalKey)) {
+            $findings[] = new SyncPreviewFinding(
+                SyncPreviewFindingCode::MissingRequiredFieldMapping,
+                subject: 'color',
+            );
+        }
+
         $colorMapping = $mappedBindings[$colorBindingId] ?? null;
         $optionMappings = is_array($colorMapping['option_mappings'] ?? null) ? $colorMapping['option_mappings'] : [];
 
         foreach ($aggregate->variants as $variantSlice) {
-            $colorValue = $variantSlice->values[$colorBindingId] ?? null;
+            $colorValue = $this->mappedScalarValue($variantSlice->values[$colorBindingId] ?? null);
 
             if ($colorValue === null || $colorValue === '') {
                 $findings[] = new SyncPreviewFinding(
@@ -122,10 +135,12 @@ final class AdobeProductExportPreviewPlanner
 
             $internalKey = is_string($colorValue) ? $colorValue : (string) $colorValue;
             $hasMapping = false;
+            $externalOptionValue = null;
 
             foreach ($optionMappings as $optionMapping) {
                 if (($optionMapping['internal_option_key'] ?? null) === $internalKey) {
                     $hasMapping = true;
+                    $externalOptionValue = $optionMapping['external_option_value'] ?? null;
                     break;
                 }
             }
@@ -138,6 +153,14 @@ final class AdobeProductExportPreviewPlanner
                 );
             }
 
+            if ($metadata !== null && $hasMapping && is_string($externalOptionValue) && ! $metadata->optionExists($colorExternalKey, $externalOptionValue)) {
+                $findings[] = new SyncPreviewFinding(
+                    SyncPreviewFindingCode::MissingOptionMapping,
+                    subject: $colorBindingId,
+                    context: ['external_option_value' => $externalOptionValue],
+                );
+            }
+
             $findings = array_merge(
                 $findings,
                 $this->evaluateVariantCommon($variantSlice, $skuBindingId),
@@ -147,7 +170,7 @@ final class AdobeProductExportPreviewPlanner
         if ($this->hasBlockingFinding($findings, SyncPreviewFindingCode::MissingMappedVariantValue)) {
             $findings[] = new SyncPreviewFinding(
                 SyncPreviewFindingCode::ConfigurableVariantsIncomplete,
-                subject: (string) $aggregate->product->id,
+                subject: $aggregate->productId,
             );
         }
 
@@ -167,12 +190,12 @@ final class AdobeProductExportPreviewPlanner
             return $findings;
         }
 
-        $sku = $aggregate->product->sku;
+        $sku = $this->resolveSkuValue($aggregate, $skuBindingId);
 
         if ($sku === null || $sku === '') {
             $findings[] = new SyncPreviewFinding(
                 SyncPreviewFindingCode::MissingSku,
-                subject: (string) $aggregate->product->id,
+                subject: $aggregate->productId,
             );
         }
 
@@ -189,7 +212,7 @@ final class AdobeProductExportPreviewPlanner
         $findings = [];
 
         if ($skuBindingId !== null) {
-            $sku = $variantSlice->sku;
+            $sku = $this->mappedScalarValue($variantSlice->values[$skuBindingId] ?? null);
 
             if ($sku === null || $sku === '') {
                 $findings[] = new SyncPreviewFinding(
@@ -212,6 +235,28 @@ final class AdobeProductExportPreviewPlanner
         }
 
         return $findings;
+    }
+
+    private function resolveSkuValue(ProductExecutionAggregate $aggregate, string $skuBindingId): ?string
+    {
+        if ($aggregate->hasSellableVariants()) {
+            $firstVariant = $aggregate->variants[0] ?? null;
+
+            if ($firstVariant !== null) {
+                $value = $this->mappedScalarValue($firstVariant->values[$skuBindingId] ?? null);
+
+                return is_string($value) ? $value : (is_scalar($value) ? (string) $value : null);
+            }
+        }
+
+        $value = $this->mappedScalarValue($aggregate->productValues[$skuBindingId] ?? null);
+
+        return is_string($value) ? $value : (is_scalar($value) ? (string) $value : null);
+    }
+
+    private function mappedScalarValue(?MappedFieldValue $mapped): mixed
+    {
+        return $mapped?->value;
     }
 
     /**

@@ -6,6 +6,7 @@ use App\Models\ConnectorAccount;
 use App\Models\SyncConfiguration;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionConfiguration;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportMetadataReader;
+use App\Support\Connectors\AdobePaaS\Exceptions\AdobeProductExportSetupRequiredException;
 use App\Support\Sync\ConnectorExecutionConfiguration;
 use Illuminate\Support\Facades\DB;
 
@@ -27,11 +28,15 @@ final class AdobeProductExportSetupService
 
         $preferredAttributeSetId = $this->resolvePreferredAttributeSetId($configuration);
 
-        $metadata = $this->metadataReader->read(
-            $account->workspace_id,
-            $account->id,
-            $preferredAttributeSetId,
-        );
+        try {
+            $metadata = $this->metadataReader->read(
+                $account->workspace_id,
+                $account->id,
+                $preferredAttributeSetId,
+            );
+        } catch (AdobeProductExportSetupRequiredException) {
+            return $configuration->refresh();
+        }
 
         $adobeConfiguration = AdobeProductExportExecutionConfiguration::fromPayload([
             'attribute_set_id' => $metadata->selectedAttributeSetId,

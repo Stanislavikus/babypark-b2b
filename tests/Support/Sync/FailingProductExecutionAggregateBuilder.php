@@ -3,8 +3,8 @@
 namespace Tests\Support\Sync;
 
 use App\Services\Pricing\PriceResolver;
+use App\Support\Sync\Preview\ProductExecutionAggregate;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
-use Illuminate\Support\Collection;
 
 final class FailingProductExecutionAggregateBuilder extends ProductExecutionAggregateBuilder
 {
@@ -13,7 +13,12 @@ final class FailingProductExecutionAggregateBuilder extends ProductExecutionAggr
         parent::__construct(app(PriceResolver::class));
     }
 
-    public function buildForProducts(Collection $products): array
+    /**
+     * @param  list<string>  $productIds
+     * @param  array<string, mixed>  $configurationSnapshot
+     * @return list<ProductExecutionAggregate>
+     */
+    public function buildForProductIds(string $workspaceId, array $productIds, array $configurationSnapshot): array
     {
         throw new \RuntimeException('forced preview failure');
     }

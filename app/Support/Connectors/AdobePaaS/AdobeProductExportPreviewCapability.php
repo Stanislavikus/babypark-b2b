@@ -48,7 +48,7 @@ final class AdobeProductExportPreviewCapability implements SyncPreviewConfigurat
             throw new \InvalidArgumentException('Adobe product export preview requires AdobeProductExportExecutionMetadata run context.');
         }
 
-        return $this->planner->plan($aggregate, $snapshot);
+        return $this->planner->plan($aggregate, $snapshot, $runContext);
     }
 
     public function isReady(SyncConfiguration $configuration): bool

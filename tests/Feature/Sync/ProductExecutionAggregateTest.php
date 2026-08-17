@@ -57,13 +57,38 @@ class ProductExecutionAggregateTest extends TestCase
             'value_text' => 'blue',
         ]);
 
-        $product->load('variants');
+        $snapshot = [
+            'field_mappings' => [
+                [
+                    'field_binding_id' => $this->productBinding('name')->id,
+                    'external_field_key' => 'name',
+                ],
+                [
+                    'field_binding_id' => $this->productVariantBinding('sku')->id,
+                    'external_field_key' => 'sku',
+                ],
+                [
+                    'field_binding_id' => $this->productVariantBinding('color')->id,
+                    'external_field_key' => 'color',
+                ],
+            ],
+        ];
 
-        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProducts(collect([$product]))[0];
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            $snapshot,
+        )[0];
 
-        $this->assertSame('Aggregate Product', $aggregate->productValues[$this->productBinding('name')->id]);
-        $this->assertCount(1, $aggregate->variants);
-        $this->assertSame('VAR-SKU', $aggregate->variants[0]->sku);
-        $this->assertSame('blue', $aggregate->variants[0]->values[$this->productVariantBinding('color')->id]);
+        $nameBindingId = $this->productBinding('name')->id;
+        $skuBindingId = $this->productVariantBinding('sku')->id;
+        $colorBindingId = $this->productVariantBinding('color')->id;
+
+        $this->assertSame('Aggregate Product', $aggregate->productValues[$nameBindingId]->value);
+        $this->assertSame(1, $aggregate->sellableVariantCount);
+        $this->assertTrue($aggregate->hasSellableVariants());
+        $this->assertFalse($aggregate->hasMultipleSellableVariants());
+        $this->assertSame('VAR-SKU', $aggregate->variants[0]->values[$skuBindingId]->value);
+        $this->assertSame('blue', $aggregate->variants[0]->values[$colorBindingId]->value);
     }
 }

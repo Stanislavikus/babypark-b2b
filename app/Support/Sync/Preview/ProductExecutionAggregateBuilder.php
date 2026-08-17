@@ -23,16 +23,21 @@ class ProductExecutionAggregateBuilder
     ) {}
 
     /**
-     * @param  Collection<int, Product>  $products
+     * @param  list<string>  $productIds
+     * @param  array<string, mixed>  $configurationSnapshot
      * @return list<ProductExecutionAggregate>
      */
-    public function buildForProducts(Collection $products): array
+    public function buildForProductIds(string $workspaceId, array $productIds, array $configurationSnapshot): array
     {
-        if ($products->isEmpty()) {
+        if ($productIds === []) {
             return [];
         }
 
-        $workspaceId = (string) $products->first()->workspace_id;
+        $bindingIds = $this->extractMappedBindingIds($configurationSnapshot);
+
+        if ($bindingIds === []) {
+            return [];
+        }
 
         $bindings = FieldBinding::withoutWorkspaceScope()
             ->with('fieldDefinition')
@@ -40,20 +45,31 @@ class ProductExecutionAggregateBuilder
                 $query->whereNull('workspace_id')
                     ->orWhere('workspace_id', $workspaceId);
             })
-            ->whereIn('object_type', [FieldObjectType::Product, FieldObjectType::ProductVariant])
+            ->whereIn('id', $bindingIds)
             ->get()
             ->keyBy('id');
 
-        $productIds = $products->pluck('id')->all();
+        $products = Product::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->whereIn('id', $productIds)
+            ->with(['variants' => static fn ($query) => $query->where('is_active', true)])
+            ->orderBy('id')
+            ->get();
+
+        $loadedProductIds = $products->pluck('id')->all();
         $variantIds = $products->flatMap(static fn (Product $product) => $product->variants->pluck('id'))->all();
 
         $productFieldValues = ProductFieldValue::withoutWorkspaceScope()
-            ->whereIn('product_id', $productIds)
+            ->where('workspace_id', $workspaceId)
+            ->whereIn('product_id', $loadedProductIds)
+            ->whereIn('field_binding_id', $bindingIds)
             ->get()
             ->groupBy('product_id');
 
         $variantFieldValues = VariantFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
             ->whereIn('variant_id', $variantIds)
+            ->whereIn('field_binding_id', $bindingIds)
             ->get()
             ->groupBy('variant_id');
 
@@ -66,56 +82,79 @@ class ProductExecutionAggregateBuilder
                         continue;
                     }
 
-                    $value = $this->resolveBindingValue(
+                    $mapped = $this->resolveMappedFieldValue(
                         $binding,
                         $product,
                         null,
                         $productFieldValues->get($product->id, collect()),
                     );
 
-                    if ($value !== null) {
-                        $productValues[$bindingId] = $value;
+                    if ($mapped !== null) {
+                        $productValues[$bindingId] = $mapped;
                     }
                 }
 
-                $variants = $product->variants
-                    ->map(function (ProductVariant $variant) use ($bindings, $variantFieldValues): ProductVariantExecutionSlice {
-                        $values = [];
+                $sellableVariants = $product->variants;
+                $variantSlices = [];
 
-                        foreach ($bindings as $bindingId => $binding) {
-                            if ($binding->object_type !== FieldObjectType::ProductVariant) {
-                                continue;
-                            }
+                foreach ($sellableVariants as $variant) {
+                    $values = [];
 
-                            $value = $this->resolveBindingValue(
-                                $binding,
-                                $variant->product,
-                                $variant,
-                                $variantFieldValues->get($variant->id, collect()),
-                            );
-
-                            if ($value !== null) {
-                                $values[$bindingId] = $value;
-                            }
+                    foreach ($bindings as $bindingId => $binding) {
+                        if ($binding->object_type !== FieldObjectType::ProductVariant) {
+                            continue;
                         }
 
-                        [$resolvedPrice, $priceStatus] = $this->resolvePrice($variant);
-
-                        return new ProductVariantExecutionSlice(
-                            variantId: (string) $variant->id,
-                            sku: (string) $variant->sku,
-                            values: $values,
-                            resolvedPrice: $resolvedPrice,
-                            priceResolutionStatus: $priceStatus,
+                        $mapped = $this->resolveMappedFieldValue(
+                            $binding,
+                            $product,
+                            $variant,
+                            $variantFieldValues->get($variant->id, collect()),
                         );
-                    })
-                    ->values()
-                    ->all();
+
+                        if ($mapped !== null) {
+                            $values[$bindingId] = $mapped;
+                        }
+                    }
+
+                    [$resolvedPrice, $priceStatus] = $this->resolvePrice($variant);
+
+                    $variantSlices[] = new ProductVariantExecutionSlice(
+                        variantId: (string) $variant->id,
+                        values: $values,
+                        resolvedPrice: $resolvedPrice,
+                        priceResolutionStatus: $priceStatus,
+                    );
+                }
+
+                if ($sellableVariants->isEmpty()) {
+                    foreach ($bindings as $bindingId => $binding) {
+                        if ($binding->object_type !== FieldObjectType::ProductVariant) {
+                            continue;
+                        }
+
+                        if (isset($productValues[$bindingId])) {
+                            continue;
+                        }
+
+                        $mapped = $this->resolveMappedFieldValue(
+                            $binding,
+                            $product,
+                            null,
+                            collect(),
+                        );
+
+                        if ($mapped !== null) {
+                            $productValues[$bindingId] = $mapped;
+                        }
+                    }
+                }
 
                 return new ProductExecutionAggregate(
-                    product: $product,
+                    productId: (string) $product->id,
                     productValues: $productValues,
-                    variants: $variants,
+                    variants: $variantSlices,
+                    sellableVariantCount: $sellableVariants->count(),
                 );
             })
             ->values()
@@ -123,19 +162,60 @@ class ProductExecutionAggregateBuilder
     }
 
     /**
+     * @param  array<string, mixed>  $configurationSnapshot
+     * @return list<string>
+     */
+    private function extractMappedBindingIds(array $configurationSnapshot): array
+    {
+        /** @var list<array<string, mixed>> $fieldMappings */
+        $fieldMappings = $configurationSnapshot['field_mappings'] ?? [];
+        $bindingIds = [];
+
+        foreach ($fieldMappings as $mapping) {
+            $bindingId = $mapping['field_binding_id'] ?? null;
+
+            if (is_string($bindingId) && $bindingId !== '') {
+                $bindingIds[] = $bindingId;
+            }
+        }
+
+        return array_values(array_unique($bindingIds));
+    }
+
+    /**
      * @param  Collection<int, ProductFieldValue|VariantFieldValue>  $storedValues
      */
-    private function resolveBindingValue(
+    private function resolveMappedFieldValue(
         FieldBinding $binding,
         Product $product,
         ?ProductVariant $variant,
         Collection $storedValues,
-    ): mixed {
-        return match ($binding->storage_type) {
+    ): ?MappedFieldValue {
+        $definition = $binding->fieldDefinition;
+
+        if ($definition === null) {
+            return null;
+        }
+
+        $value = match ($binding->storage_type) {
             AttributeStorageType::Column => $this->resolveColumnValue($binding, $product, $variant),
             AttributeStorageType::Dynamic => $this->resolveDynamicValue($binding, $storedValues),
-            AttributeStorageType::Relation => null,
+            AttributeStorageType::Relation => $this->resolveRelationValue($binding, $product, $variant),
         };
+
+        if ($value === null) {
+            return null;
+        }
+
+        return new MappedFieldValue(
+            fieldBindingId: (string) $binding->id,
+            internalCode: (string) $definition->code,
+            objectType: $binding->object_type,
+            dataType: $definition->data_type,
+            isRequired: (bool) $binding->is_required,
+            isMultiValue: (bool) $definition->is_multi_value,
+            value: $value,
+        );
     }
 
     private function resolveColumnValue(
@@ -155,11 +235,25 @@ class ProductExecutionAggregateBuilder
             return $product->getAttribute($column);
         }
 
-        if ($table === 'product_variants' && $variant !== null) {
-            return $variant->getAttribute($column);
+        if ($table === 'product_variants') {
+            if ($variant !== null) {
+                return $variant->getAttribute($column);
+            }
+
+            if ($column === 'sku') {
+                return $product->getAttribute('sku');
+            }
         }
 
         return null;
+    }
+
+    private function resolveRelationValue(
+        FieldBinding $binding,
+        Product $product,
+        ?ProductVariant $variant,
+    ): mixed {
+        return $this->resolveColumnValue($binding, $product, $variant);
     }
 
     /**

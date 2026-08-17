@@ -3,11 +3,13 @@
 namespace App\Jobs\Connectors;
 
 use App\Enums\SyncRunStatus;
+use App\Models\ConnectorAccount;
 use App\Models\Product;
+use App\Models\SyncConfiguration;
 use App\Models\SyncRun;
 use App\Models\SyncRunItem;
-use App\Support\Connectors\AdobePaaS\AdobeProductExportPreviewPlanner;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
+use App\Support\Sync\Preview\SyncPreviewConnectorCapabilityResolver;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -36,10 +38,10 @@ class SyncPreviewRunJob implements ShouldQueue
 
     public function handle(
         ProductExecutionAggregateBuilder $aggregateBuilder,
-        AdobeProductExportPreviewPlanner $planner,
+        SyncPreviewConnectorCapabilityResolver $capabilityResolver,
     ): void {
         try {
-            $this->execute($aggregateBuilder, $planner);
+            $this->execute($aggregateBuilder, $capabilityResolver);
         } catch (\Throwable) {
             $this->terminalizeFailedRun();
 
@@ -49,7 +51,7 @@ class SyncPreviewRunJob implements ShouldQueue
 
     private function execute(
         ProductExecutionAggregateBuilder $aggregateBuilder,
-        AdobeProductExportPreviewPlanner $planner,
+        SyncPreviewConnectorCapabilityResolver $capabilityResolver,
     ): void {
         $run = SyncRun::withoutWorkspaceScope()
             ->where('workspace_id', $this->workspaceId)
@@ -60,29 +62,49 @@ class SyncPreviewRunJob implements ShouldQueue
             return;
         }
 
+        $configuration = SyncConfiguration::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspaceId)
+            ->where('id', $run->sync_configuration_id)
+            ->firstOrFail();
+
+        $account = ConnectorAccount::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspaceId)
+            ->where('id', $this->connectorAccountId)
+            ->firstOrFail();
+
         $run->update([
             'status' => SyncRunStatus::Running,
             'started_at' => now(),
         ]);
 
-        $products = Product::withoutWorkspaceScope()
-            ->where('workspace_id', $this->workspaceId)
-            ->with(['variants'])
-            ->orderBy('id')
-            ->get();
-
-        $aggregates = $aggregateBuilder->buildForProducts($products);
         $snapshot = $run->configuration_snapshot ?? [];
+        $snapshot = is_array($snapshot) ? $snapshot : [];
 
-        DB::transaction(function () use ($run, $aggregates, $planner, $snapshot): void {
+        $productIds = Product::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspaceId)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(static fn ($id): string => (string) $id)
+            ->all();
+
+        $aggregates = $aggregateBuilder->buildForProductIds($this->workspaceId, $productIds, $snapshot);
+        $capability = $capabilityResolver->resolve($account);
+        $runContext = $capability->prepareRun(
+            $this->workspaceId,
+            $this->connectorAccountId,
+            $configuration,
+            $snapshot,
+        );
+
+        DB::transaction(function () use ($run, $aggregates, $capability, $snapshot, $runContext): void {
             foreach ($aggregates as $aggregate) {
-                $result = $planner->plan($aggregate, is_array($snapshot) ? $snapshot : []);
+                $result = $capability->planProduct($aggregate, $snapshot, $runContext);
 
                 SyncRunItem::withoutWorkspaceScope()->create([
                     'id' => (string) Str::uuid(),
                     'workspace_id' => $run->workspace_id,
                     'sync_run_id' => $run->id,
-                    'product_id' => $aggregate->product->id,
+                    'product_id' => $aggregate->productId,
                     'outcome' => $result->outcome,
                     'findings' => array_map(
                         static fn ($finding) => $finding->toArray(),

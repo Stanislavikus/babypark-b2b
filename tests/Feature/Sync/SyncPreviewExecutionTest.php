@@ -21,9 +21,9 @@ use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
 use App\Services\Sync\SyncPreviewAdmissionService;
 use App\Services\Sync\UpdateSyncConfigurationInput;
-use App\Support\Connectors\AdobePaaS\AdobeProductExportPreviewPlanner;
 use App\Support\Sync\ConnectorExecutionConfiguration;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
+use App\Support\Sync\Preview\SyncPreviewConnectorCapabilityResolver;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -84,7 +84,7 @@ class SyncPreviewExecutionTest extends TestCase
 
         (new SyncPreviewRunJob($account->workspace_id, $account->id, $run->id))->handle(
             app(ProductExecutionAggregateBuilder::class),
-            app(AdobeProductExportPreviewPlanner::class),
+            app(SyncPreviewConnectorCapabilityResolver::class),
         );
 
         $run = SyncRun::withoutWorkspaceScope()->findOrFail($run->id);
@@ -114,7 +114,7 @@ class SyncPreviewExecutionTest extends TestCase
         try {
             (new SyncPreviewRunJob($account->workspace_id, $account->id, $run->id))->handle(
                 $builder,
-                app(AdobeProductExportPreviewPlanner::class),
+                app(SyncPreviewConnectorCapabilityResolver::class),
             );
             $this->fail('Expected preview job to throw.');
         } catch (SyncPreviewRunJobExecutionException) {
