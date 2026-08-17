@@ -10,6 +10,7 @@ use App\Models\SyncConfiguration;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\FieldOptionMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
+use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionConfiguration;
 use App\Support\Sync\ConnectorExecutionConfiguration;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
@@ -163,7 +164,12 @@ class FieldOptionMappingTest extends TestCase
 
         $after = SyncConfiguration::withoutWorkspaceScope()->findOrFail($configuration->id)->configuration_revision;
         $this->assertNotSame($before, $after);
-        $this->assertSame(4, SyncConfiguration::withoutWorkspaceScope()->findOrFail($configuration->id)->connectorExecutionConfiguration()->attributeSetId());
+        $this->assertSame(
+            4,
+            AdobeProductExportExecutionConfiguration::fromPayload(
+                SyncConfiguration::withoutWorkspaceScope()->findOrFail($configuration->id)->connectorExecutionConfiguration()->payload(),
+            )->attributeSetId,
+        );
     }
 
     private function indexExists(string $table, string $indexName): bool

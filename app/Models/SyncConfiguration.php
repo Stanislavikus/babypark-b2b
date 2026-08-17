@@ -32,7 +32,6 @@ class SyncConfiguration extends Model
         'enabled_operations',
         'operational_state',
         'configuration_revision',
-        'connector_execution_configuration',
     ];
 
     protected static function booted(): void

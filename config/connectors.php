@@ -2,6 +2,7 @@
 
 use App\Support\Connectors\AdobePaaS\AdobePaaSAccountSchema;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectorAdapter;
+use App\Support\Connectors\AdobePaaS\AdobeProductExportPreviewCapability;
 
 return [
     'discovery' => [
@@ -22,6 +23,7 @@ return [
                 'schema_discovery',
                 'account_setup',
             ],
+            'preview_capability' => AdobeProductExportPreviewCapability::class,
         ],
     ],
 ];

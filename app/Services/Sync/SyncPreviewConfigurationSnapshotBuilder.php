@@ -33,7 +33,7 @@ final class SyncPreviewConfigurationSnapshotBuilder
         );
 
         return [
-            'version' => 'babypark.sync-run-input.v1',
+            'version' => 'platform.sync-run-input.v1',
             'data_domain' => $configuration->data_domain->value,
             'semantic_operation' => $semanticOperation->value,
             'external_context' => $configuration->external_context ?? [],

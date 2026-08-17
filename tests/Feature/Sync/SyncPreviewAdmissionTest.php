@@ -90,7 +90,7 @@ class SyncPreviewAdmissionTest extends TestCase
 
         $this->assertSame(SyncRunStatus::Queued, $run->status);
         $this->assertSame(SyncRunMode::Preview, $run->mode);
-        $this->assertSame('babypark.sync-run-input.v1', $run->configuration_snapshot['version']);
+        $this->assertSame('platform.sync-run-input.v1', $run->configuration_snapshot['version']);
         $this->assertSame('all_products', $run->configuration_snapshot['selection']['mode']);
 
         Bus::assertDispatched(SyncPreviewRunJob::class);

@@ -7,6 +7,7 @@ use App\Support\Connectors\Exceptions\ConnectorProfileNotFoundException;
 use App\Support\Connectors\Exceptions\DisabledConnectorProfileException;
 use App\Support\Connectors\Exceptions\InvalidConnectorProfileConfiguration;
 use App\Support\Connectors\Exceptions\UnsupportedConnectorCapabilityException;
+use App\Support\Sync\Preview\SyncPreviewConnectorCapability;
 use Illuminate\Contracts\Container\Container;
 use ValueError;
 
@@ -294,6 +295,45 @@ class ConnectorProfileRegistry
             }
         }
 
+        $previewCapabilityClass = null;
+
+        if (array_key_exists('preview_capability', $profileConfig)) {
+            $configuredPreviewCapability = $profileConfig['preview_capability'];
+
+            if (! is_string($configuredPreviewCapability) || $configuredPreviewCapability === '') {
+                throw new InvalidConnectorProfileConfiguration(
+                    sprintf(
+                        'Connector profile [%s] key [preview_capability] must be a non-empty class-string.',
+                        $profileCode,
+                    ),
+                );
+            }
+
+            if (! class_exists($configuredPreviewCapability)) {
+                throw new InvalidConnectorProfileConfiguration(
+                    sprintf(
+                        'Connector profile [%s] preview_capability class [%s] does not exist.',
+                        $profileCode,
+                        $configuredPreviewCapability,
+                    ),
+                );
+            }
+
+            if (! is_subclass_of($configuredPreviewCapability, SyncPreviewConnectorCapability::class)
+                && $configuredPreviewCapability !== SyncPreviewConnectorCapability::class) {
+                throw new InvalidConnectorProfileConfiguration(
+                    sprintf(
+                        'Connector profile [%s] preview_capability class [%s] must implement %s.',
+                        $profileCode,
+                        $configuredPreviewCapability,
+                        SyncPreviewConnectorCapability::class,
+                    ),
+                );
+            }
+
+            $previewCapabilityClass = $configuredPreviewCapability;
+        }
+
         return new ConnectorProfileDefinition(
             profileCode: $profileCode,
             enabled: $profileConfig['enabled'],
@@ -301,6 +341,7 @@ class ConnectorProfileRegistry
             adapterClass: $adapterClass,
             accountSchemaClass: $accountSchemaClass,
             capabilities: $capabilities,
+            previewCapabilityClass: $previewCapabilityClass,
         );
     }
 }

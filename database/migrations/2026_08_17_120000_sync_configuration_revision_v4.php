@@ -7,7 +7,7 @@ return new class extends Migration
 {
     private const REVISION_V3_PREFIX = 'babypark.sync-configuration-revision.v3';
 
-    private const REVISION_V4_PREFIX = 'babypark.sync-configuration-revision.v4';
+    private const REVISION_V4_PREFIX = 'platform.sync-configuration-revision.v4';
 
     public function up(): void
     {

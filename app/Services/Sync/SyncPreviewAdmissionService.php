@@ -14,6 +14,7 @@ use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
 use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
 use App\Support\Sync\Exceptions\SyncPreviewAdmissionException;
+use App\Support\Sync\Preview\SyncPreviewConfigurationReadinessResolver;
 use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -25,6 +26,7 @@ final class SyncPreviewAdmissionService
         private readonly ConnectorSyncSupportResolver $syncSupportResolver,
         private readonly SyncConfigurationMutationCoordinator $mutationCoordinator,
         private readonly SyncPreviewConfigurationSnapshotBuilder $snapshotBuilder,
+        private readonly SyncPreviewConfigurationReadinessResolver $readinessResolver,
     ) {}
 
     public function admit(
@@ -75,7 +77,7 @@ final class SyncPreviewAdmissionService
                 throw SyncPreviewAdmissionException::operationNotSupported();
             }
 
-            if ($configuration->connectorExecutionConfiguration()->attributeSetId() === null) {
+            if (! $this->readinessResolver->resolve($account)->isReady($configuration)) {
                 throw SyncPreviewAdmissionException::attributeSetUnconfigured();
             }
 

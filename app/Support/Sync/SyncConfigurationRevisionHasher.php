@@ -6,7 +6,7 @@ use App\Enums\SyncConfigurationOperationalState;
 
 final class SyncConfigurationRevisionHasher
 {
-    private const PREFIX = 'babypark.sync-configuration-revision.v4';
+    private const PREFIX = 'platform.sync-configuration-revision.v4';
 
     /**
      * @param  list<FieldMappingRevisionEntry|array{
