@@ -1616,7 +1616,18 @@ The architecture must not assume:
 
 Where domain ownership places SKU/GTIN/price/inventory/media on variants, connector execution must respect that model.
 
-MVP UI may still auto-create one hidden default variant for a simple single-SKU Product so merchants are not forced to understand variants. That is UX hiding. Do not invent a fake default variant merely to simplify Magento. A simple Product with one sellable SKU exports as a Magento simple product; a Product with 0..N meaningful variants exports as a Magento configurable family when Magento Product Export V1 applies.
+MVP UI may still auto-create one hidden default variant for a simple single-SKU Product so merchants are not forced to understand variants. That is UX hiding. Do not invent a fake default variant merely to simplify Magento.
+
+Platform invariant remains:
+
+```text
+Product → 0..N ProductVariants
+```
+
+Zero variants does not mean Magento configurable. Magento Product Export V1 execution semantics distinguish:
+
+- ordinary non-variant / single-sellable-unit Product → Magento simple;
+- Product with meaningful option variants → Magento configurable family.
 
 #### Configurable / variant product families are mandatory
 
@@ -6001,6 +6012,13 @@ Magento Product Export V1 must support:
 
 corresponding to the platform's normal Product/Variant model.
 
+Platform `Product → 0..N ProductVariants` does not itself select Magento configurable. Magento execution maps:
+
+- ordinary non-variant / single-sellable-unit Product → simple;
+- Product with meaningful option variants → configurable family.
+
+Zero variants does not mean configurable. Do not invent a Magento-only fake default variant.
+
 Intermediate implementation may add planner paths incrementally. The Magento V1
 DONE definition must not exclude multi-variant Products.
 
@@ -6046,7 +6064,9 @@ Adobe `attribute_set_id` is not a generic Product field.
 | Revision participation | Yes — part of `configuration_revision` when present |
 | `configuration_snapshot` participation | Yes — run-effective connector execution configuration |
 | Merchant/default behavior | Connected-account default / discovered attribute set; merchant does not edit it as a Product field |
-| Future multiple attribute-set compatibility | Additional SyncConfiguration-owned connector configuration, not ProductType and not FieldDefinition |
+| Future multiple attribute-set compatibility | Additional SyncConfiguration-owned connector configuration or connector-owned mapping; not ProductType and not FieldDefinition. A later connector-owned mapping from Product classification/type to Adobe attribute sets is allowed if that becomes the correct generalized Adobe behavior. |
+
+**First Magento V1 shape:** one SyncConfiguration resolves one Adobe attribute-set context/default for its run. Heterogeneous Products must not silently receive an invalid attribute set. Preview must block/report a Product when the selected Adobe configuration cannot represent its required mapped attributes. Future multiple-attribute-set support remains possible through connector-owned configuration/mapping.
 
 Do not persist `attribute_set_id` in `external_context` merely because that
 field is JSON. `external_context` remains external business context
@@ -6129,30 +6149,40 @@ Canonical atomic wording follows existing RBAC vocabulary (`run_sync_*` beside
 
 #### E9. ExternalRecordLink structural contract
 
-Minimum architecture necessary for safe Live:
+Minimum generic architecture necessary for safe Live. This is connector-neutral. Do not freeze Magento product-type roles as platform ExternalRecordLink vocabulary.
+
+Preserve:
 
 - workspace-safe;
 - ConnectorAccount-scoped;
-- independent from transport attempts;
-- reusable where appropriate.
+- internal business-record identity explicit;
+- Products first slice may distinguish Product and ProductVariant identity;
+- external identifier/value owned by connector semantics;
+- external identity independent from transport attempts;
+- no fuzzy/name-based matching;
+- no assumption one Product = one external resource.
 
-Do not assume one Product = one external resource.
+Do not replace Magento planner roles with another premature universal enum. If a generic `external_record_type`, role, or namespace is later necessary, keep it opaque and connector-owned unless repository evidence proves a closed universal vocabulary.
 
-Adobe identities (verified against Adobe Commerce REST configurable-product
-tutorials): parent configurable SKU, child simple SKUs, numeric resource IDs,
-external option/value identities.
+Do not freeze an irreversible generic database unique key in this contract. Connector-owned uniqueness may later be required for a specific vendor; that is not a generic Product unique index.
 
-First Live structural contract (products domain):
+Do not invent a universal unrestricted polymorphic identity framework without evidence.
 
-- typed `product_id`;
-- optional `product_variant_id` when the external record is a variant child;
-- role: `simple` | `configurable_parent` | `configurable_child`;
-- merchant-stable external identity: Adobe SKU;
-- optional numeric Adobe entity id as secondary;
-- unique within workspace + ConnectorAccount + role + external SKU.
+#### Adobe Magento V1 identity notes
 
-Do not invent a universal unrestricted polymorphic identity framework without
-evidence.
+These are Adobe planner/executor and result semantics. They are **not** generic ExternalRecordLink vocabulary.
+
+Adobe Commerce REST configurable-product identities include:
+
+- simple product;
+- configurable parent;
+- simple child;
+- parent configurable SKU;
+- child simple SKUs;
+- numeric resource IDs;
+- external option/value identities.
+
+Adobe Live may associate one platform Product with parent and child external records. That fan-out does not change `SyncRunItem = Product` and does not authorize Magento role names as platform ExternalRecordLink columns.
 
 #### E10. Live safety — hard invariants NOW
 
@@ -6297,7 +6327,14 @@ SyncConfiguration reachability; snapshot builder; admission/concurrency;
 coherent Product execution set; generic Product execution aggregate;
 Product + variant value resolution; Adobe simple planner; Adobe configurable
 planner; background execution; normalized findings; truthful Preview
-execution support.
+execution support; **SyncConfiguration-owned connector execution configuration
+required by E5** (Adobe attribute-set context/default for the run), including
+persistence ownership, revision-version change/rebaseline if the hasher input
+set grows (current revision v3 has no connector execution-configuration input),
+`configuration_snapshot` inclusion, and corresponding migration/tests.
+
+Do not rediscover a hidden revision-v4 prerequisite halfway through Stage 1.
+Do not implement that persistence in this docs contract.
 
 No merchant-facing polished Preview page is required in Stage 1. No Live
 mutation.
@@ -7256,16 +7293,20 @@ Explicitly excluded from Phase 1 seed, with no placeholder record created:
 Field Foundation renaming of 02-ATTRIBUTE_DICTIONARY.md's former "Variant-Level" terminology —
 see that document's Assignment Level Rules section.)*
 
-Existing `products` columns not covered above (`onec_guid`, `barcode_box`,
+Existing `products` columns not covered above (`barcode_box`,
 `min_order_quantity`, `order_step`, `package_quantity`, `package_type`, `units_per_box`,
 `boxes_per_pallet`, `lead_time_days`, `net_weight`, `gross_weight`, `volume_m3`, `depth_mm`,
 `width_mm`, `height_mm`, `synced_at`) are intentionally out of scope for Phase 1 and are
 registered in a later Phase 2 pass — this is an explicit, documented scope boundary, not an
 oversight.
 
-`rozetka_category_id`, `meta_title`, `meta_description` on `products` are channel-specific
-fields that violate the Channel Mappings Protection rule in `02-ATTRIBUTE_DICTIONARY.md`. They
-are NOT registered as System Attributes here. See `GAP-007` in `IMPLEMENTATION_GAPS.md`.
+`products.onec_guid` and `product_variants.onec_guid` are legacy 1C connector identity
+columns, not deferred System Fields. They must not be promoted into FieldDefinition or
+generic Product/System Attributes. See DEC-011 and GAP-007.
+
+`rozetka_category_id` is connector-specific leakage (GAP-007). `meta_title` and
+`meta_description` are platform SEO Product concepts that happen to be physical columns;
+they are not equivalent connector leakage.
 
 The pre-existing `product_variants.attributes` JSON column (cast as `array` on the
 `ProductVariant` model) is a legacy ad-hoc dynamic-attribute mechanism. The Product Fields

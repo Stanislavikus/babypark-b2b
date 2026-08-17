@@ -354,7 +354,7 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4C-2b-2** | Historical tracking label — Preview Authorization & Admission Foundation. Not a mandatory future PR boundary. Absorbed by **Stage 1 — Preview Engine**. |
 | **4C-2b-3** | Historical tracking label — Product Export Projection + Adobe Pure Planner. Not a mandatory future PR boundary. Absorbed by **Stage 1 — Preview Engine** (Magento V1 contract now freezes Product+Variant execution input; no separate Product Export Projection Stop-and-Amend is required before Stage 1). |
 | **4C-2b** | Historical umbrella label for Preview foundation slices. 4C-2b-1 Done. Remaining Preview runtime is **Stage 1**. Must **not** ship: merchant Preview UI (that is Stage 2); Live mutation (Stage 3); automatic `ConnectorSyncOperationSupport` flip |
-| **Stage 1 — Preview Engine** | Current coherent outcome: persisted zero-mutation Adobe Products Export Preview against the full platform Product/Variant model. Includes `run_sync_preview`, SyncConfiguration reachability, snapshot/admission, Product execution aggregate, Adobe simple + configurable planners, truthful Preview support. Next implementation grouping. |
+| **Stage 1 — Preview Engine** | Current coherent outcome: persisted zero-mutation Adobe Products Export Preview against the full platform Product/Variant model. Includes `run_sync_preview`, SyncConfiguration reachability, snapshot/admission, Product execution aggregate, Adobe simple + configurable planners, truthful Preview support, and E5 connector execution configuration persistence plus revision/snapshot rebaseline if required (current revision v3 has no connector execution-configuration input). Next implementation grouping. |
 | **Stage 2 — Merchant Preview** | Authorized non-technical merchant reaches Preview through Integrations/Data Setup and understands Product-level ready/warning/blocked outcomes. No Sync History product, SyncIssue, scheduling, or analytics merely for this stage. |
 | **Stage 3 — Live Engine** | After E11 revalidation: Live permission, ExternalRecordLink, simple + configurable Live execution, reconciliation, merchant-safe result, real Adobe create/update validation. |
 | **4C** | Remaining sync domain after Stage 3: scheduling, sync history/issues, merchant sync UX beyond mapping/Preview/Live |
@@ -593,28 +593,41 @@ Discovery Overview UI is complete. **Historical:** GAP-024 was open at
 
 ---
 
-## GAP-007 — Channel-specific fields leaked into core `products` table
+## GAP-007 — Connector-specific columns leaked into core `products` table
 
 **Approved docs:**
 - `02-ATTRIBUTE_DICTIONARY.md`, Channel Mappings Protection: "Core tables must never contain
   temporary attributes like google_title, rozetka_price, or prom_description."
+- Canonical Product Field Registry DEC-011: `onec_guid` is `connector_only`, not a Product/System Attribute.
+- Canonical registry: `meta_title` / `meta_description` are platform SEO `core_model_property` Product concepts; `rozetka_category_id` is `connector_only`.
 
 **Current code:**
-- The `products` table (base migration `create_products_table`) contains `rozetka_category_id`,
-  `meta_title`, `meta_description` as native columns — a direct instance of the pattern the
-  Channel Mappings Protection rule forbids.
+- Connector-specific leakage (must eventually leave Product core):
+  - `products.rozetka_category_id` — Rozetka marketplace category reference;
+  - `products.onec_guid` and `product_variants.onec_guid` — 1C external identity columns.
+  These are vendor-instance identity/mapping leftovers. Do not create FieldDefinitions for them.
+  Destination for identity is the account-scoped external identity boundary, not Product core.
+- Valid platform Product core that happens to be physical columns (not equivalent leakage):
+  - `products.meta_title`;
+  - `products.meta_description`.
+  Canonical registry classifies both as Product SEO `core_model_property` with `keep_as_is`.
+  Do not treat generic reusable SEO fields as connector-specific leakage merely because they
+  are columns on `products`.
 
-**Impact:** direct violation of the documented rule; blocks a clean Connector Foundation
-(GAP-006) implementation later if left unaddressed.
+**Impact:** connector-specific columns in Product core block a clean Connector Foundation
+(GAP-006) identity/mapping split if left unaddressed. SEO columns do not belong in that same
+debt inventory.
 
-**Decision:** these three columns are not registered as System Attributes in Product Fields
-Foundation, and no further channel-specific columns should be added to core tables going
-forward.
+**Decision:** do not register `rozetka_category_id` or `onec_guid` as System Attributes or
+FieldDefinitions. No further connector-specific columns should be added to core Product tables.
+Physical `onec_guid` / `rozetka_category_id` columns are not deleted in a docs-only PR.
 
-**Next task:** Connector Foundation (sequenced after GAP-003 closes) migrates these into a
-proper channel-mapping layer and deprecates the raw columns.
+**Next task:** migrate connector-specific identity/mapping columns behind ConnectorAccount-scoped
+external identity / mapping layers and deprecate the raw columns. SEO fields remain Product core
+unless a later localization/store-view DEC says otherwise.
 
-**Status:** Open, low priority (no active Rozetka export in the current pilot scope).
+**Status:** Open, low priority for column migration (no active Rozetka export; 1C identity remains
+legacy runtime). Canonical classification of `onec_guid` corrected by DEC-011.
 
 ---
 
@@ -1089,6 +1102,10 @@ Remaining connector gaps are tracked separately under GAP-006.
 - generic Product execution aggregate and Adobe simple + configurable planners
   (**Stage 1**; Magento V1 contract frozen — no separate Product Export
   Projection Stop-and-Amend is required before Stage 1);
+- SyncConfiguration-owned connector execution configuration (E5 Adobe
+  attribute-set context/default) plus revision-version rebaseline and
+  snapshot inclusion if the hasher input set grows — **Stage 1** (current
+  revision v3 has no connector execution-configuration input);
 - mode-aware execution support (Preview vs Live independent; current binary
   `ConnectorSyncOperationSupport` remains fail-closed for Adobe);
 - SyncConfiguration merchant reachability (lazy ensure; no UUID);
@@ -1110,18 +1127,31 @@ Remaining connector gaps are tracked separately under GAP-006.
 - bundle/kit composition persistence — platform future capability, not Magento V1;
 - Magento bundle/grouped/virtual/downloadable/gift-card types — connector-V1-out.
 
-**Technical debranding (docs neutralized; runtime identifiers frozen):**
-- SAFE TO NEUTRALIZE NOW: normative product/domain wording (this PR);
-- REQUIRES MIGRATION / REBASELINE: hash prefixes
+**Technical debranding residue (docs neutralized; runtime identifiers frozen):**
+
+- **SAFE TEXTUAL/UI NEUTRALIZATION** (runtime PHP; compact cleanup gap; **not** this docs PR;
+  **not** hash/worker migration debt):
+  - `app/Filament/Resources/ProductResource.php` URL placeholder `https://babypark.ua/product/...`;
+  - `ProductResource` section title `Основне (з 1С)` (create/edit and view).
+  Neutralize these literals in a later runtime/UI cleanup PR. Do not hide them under revision-hash
+  or Supervisor rename work.
+- **MIGRATION/REBASELINE REQUIRED:** hash prefixes
   `babypark.sync-configuration-revision.v3`,
   `babypark.sync-run-input.v1`,
   `babypark.sync-external-context.v1`,
   `babypark.connector-schema-field.v1`,
   `babypark.connector-schema-snapshot.v1`;
-- OPERATIONAL RENAME REQUIRED: Supervisor `babypark-queue` /
+- **OPERATIONAL INFRASTRUCTURE RENAME:** Supervisor `babypark-queue` /
   `babypark-connector-queue`; `CACHE_PREFIX=babypark_`;
-- EXTERNAL INFRASTRUCTURE IDENTITY: host path `/var/www/babypark-b2b`,
-  repository name, `APP_NAME`, fixture emails.
+- **EXTERNAL INFRASTRUCTURE IDENTITY:** host path `/var/www/babypark-b2b`,
+  repository name, `APP_NAME`, fixture emails;
+- **LEGITIMATE CONNECTOR FAMILY NAME:** 1C, Adobe Commerce, Magento, Shopify, BigCommerce,
+  Google Merchant, Rozetka, Google Sheets, CSV — these names are vendor families, not a named
+  customer defining Product architecture.
+
+Historical production evidence in `DEPLOY.md` / GAP-026B may retain the literal old environment
+identifier where needed for audit provenance. That is operational history, not architecture
+authority.
 
 Do not rename runtime hashes or worker names without the corresponding
 migration. No new customer-specific runtime identifier may be introduced.

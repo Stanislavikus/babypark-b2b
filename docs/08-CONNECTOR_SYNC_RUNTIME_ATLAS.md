@@ -23,7 +23,9 @@ It is **not** a backlog, changelog, historical narrative, replacement for `IMPLE
 
 Completed capabilities remain here. Only their previous status is replaced. Git owns history.
 
-**Verification baseline:** `develop` @ `87104f5f503a6e5c0af8046f668cc2bb74998729` (2026-08-16).
+**Initial Atlas extraction baseline:** `develop` @ `87104f5f503a6e5c0af8046f668cc2bb74998729` (2026-08-16).
+
+This records initial provenance only. It is not a claim that every Atlas row was globally reverified at that SHA after every future PR. Subsequent freshness is maintained through same-PR touched-seam replacement and Git history. Do not add per-row SHA bureaucracy.
 
 **Same-PR rule:** any Connector/Sync PR that materially changes an Atlas-listed seam must update the affected Atlas entry in the same PR. Only touched seams require re-verification.
 
@@ -67,6 +69,7 @@ A reuse-intent marker does **not** mean implementation exists.
 | Pricing / PriceResolver | IMPLEMENTED | Product Domain | `app/Services/Pricing/PriceResolver.php` | `price_lists`; `price_list_items`; variant price caches | `tests/Feature/PriceInspectorTest.php` | `docs/03-DOMAIN_MODEL.md` → PriceResolver | platform-reusable |
 | Availability / AvailabilityResolver | IMPLEMENTED | Product Domain | `app/Services/Availability/AvailabilityResolver.php` | `inventory_records`; variant availability caches | `tests/Unit/AvailabilityServicesTest.php` | `docs/03-DOMAIN_MODEL.md` → AvailabilityResolver | platform-reusable |
 | Current media persistence | IMPLEMENTED | Product Domain | `app/Models/Product.php` (`images` JSON); `database/migrations/2024_06_01_100001_create_products_table.php` | `products.images` | `tests/Feature/ListProductsViewActionTest.php` | `docs/03-DOMAIN_MODEL.md` → Media; Platform Product Capability Baseline | platform-reusable |
+| Legacy `products.onec_guid` / `product_variants.onec_guid` | IMPLEMENTED (physical column; canonical classification `connector_only`) | Connector identity debt | `app/Models/Product.php`; `app/Models/ProductVariant.php`; `database/migrations/2024_06_01_100001_create_products_table.php` | `products.onec_guid`; `product_variants.onec_guid` | `tests/Feature/Sync/PlatformProductScopeAndConnectorAtlasDocumentationContractTest.php` | DEC-011; GAP-007 | connector-owned |
 | First-class MediaAsset / ProductMedia / VariantMedia | CONFIRMED ABSENT | Product Domain | *(no models)* | none | `tests/Feature/Sync/PlatformProductScopeAndConnectorAtlasDocumentationContractTest.php` | `docs/03-DOMAIN_MODEL.md` → Media | platform-reusable |
 | ConnectorDefinition | IMPLEMENTED | Connector | `app/Models/ConnectorDefinition.php` | `connector_definitions` | `tests/Feature/ConnectorDefinitionResourceTest.php` | `docs/03-DOMAIN_MODEL.md` → ConnectorDefinition | platform-reusable |
 | ConnectorAccount | IMPLEMENTED | Connector | `app/Models/ConnectorAccount.php`; `app/Services/Connectors/ConnectorAccountSettingsService.php` | `connector_accounts` | `tests/Feature/Connectors/ConnectorAccountSettingsServiceTest.php` | `docs/03-DOMAIN_MODEL.md` → ConnectorAccount | platform-reusable |
@@ -89,7 +92,7 @@ A reuse-intent marker does **not** mean implementation exists.
 | Preview admission | RESOLVED — NOT IMPLEMENTED | Connector | no admission service; `SyncRun.configuration_snapshot` column exists unused by a builder | `sync_runs` | `tests/Feature/Sync/SyncRunPersistenceFoundationTest.php` | `docs/03-DOMAIN_MODEL.md` → Run admission | platform-reusable |
 | Product execution aggregate | RESOLVED — NOT IMPLEMENTED | Product Domain | *(absent)* | none — read-only execution input, not persistence | `tests/Feature/Sync/PlatformProductScopeAndConnectorAtlasDocumentationContractTest.php` | `docs/03-DOMAIN_MODEL.md` → Magento V1 / Generic Product execution input | platform-reusable / family-hypothesis |
 | Adobe Products/Export planner | CONFIRMED ABSENT | Connector | *(no planner class)* | none | `tests/Feature/Sync/PlatformProductScopeAndConnectorAtlasDocumentationContractTest.php` | `docs/03-DOMAIN_MODEL.md` → Pure connector-owned Preview planner | connector-owned |
-| ExternalRecordLink | CONFIRMED ABSENT | Connector | class does not exist (`tests/Feature/Sync/SyncRunPersistenceFoundationTest.php` asserts absence) | none | `tests/Feature/Sync/SyncRunPersistenceFoundationTest.php` | `docs/03-DOMAIN_MODEL.md` → ExternalRecordLink; Magento V1 structural contract | platform-reusable / family-hypothesis |
+| ExternalRecordLink | CONFIRMED ABSENT | Connector | class does not exist (`tests/Feature/Sync/SyncRunPersistenceFoundationTest.php` asserts absence) | none | `tests/Feature/Sync/SyncRunPersistenceFoundationTest.php` | `docs/03-DOMAIN_MODEL.md` → E9 generic ExternalRecordLink | platform-reusable / family-hypothesis |
 | Live execution | CONFIRMED ABSENT | Connector | *(absent)* | none | `tests/Feature/Sync/PreviewSyncExecutionFoundationDocumentationContractTest.php` | `docs/03-DOMAIN_MODEL.md` → Magento V1 Live safety | connector-owned transport; platform-reusable outcomes |
 | Queues / connector lane | IMPLEMENTED | Operations | `config/queue.php`; `app/Jobs/Connectors/ConnectorDiscoveryRunJob.php`; `app/Jobs/Connectors/ConnectorConnectionCheckJob.php` | `jobs` / `database_connectors` | `tests/Feature/Connectors/ConnectorConnectionCheckDispatchServiceTest.php` | `DEPLOY.md`; `docs/07-TECH_STACK.md` | platform-reusable |
 | Deployment / RBAC cutover | IMPLEMENTED | Operations | `DEPLOY.md` | host Supervisor programs | `tests/Feature/Gap026b2DocumentationTruthSyncContractTest.php` | `DEPLOY.md` | operational |
@@ -113,7 +116,7 @@ Reference families — not an exhaustive roadmap.
 | `attribute_set_id` / `type_id` / visibility | CONFIRMED ABSENT as Product fields | n/a | connector-owned | n/a | n/a | n/a | connector-owned |
 | Shopify GraphQL IDs | CONFIRMED ABSENT | n/a | n/a | connector-owned | n/a | n/a | connector-owned |
 | Google Merchant feed vocabulary | CONFIRMED ABSENT in Product core | n/a | n/a | n/a | connector-owned | n/a | connector-owned |
-| 1C contractor/document vocabulary | CONFIRMED ABSENT in Product core | connector-owned | n/a | n/a | n/a | n/a | connector-owned |
+| 1C GUID / `onec_guid` as Product/System field | CONFIRMED ABSENT as generic Product core (physical columns remain legacy) | connector-owned identity | n/a | n/a | n/a | connector-owned |
 
 ### Reusability principle
 

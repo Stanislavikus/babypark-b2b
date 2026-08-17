@@ -121,6 +121,10 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
         $this->assertStringContainsString('0..N ProductVariants', $section);
         $this->assertStringContainsString('one Product = one SKU', $section);
         $this->assertStringContainsString('Do not invent a fake default variant merely to simplify Magento', $section);
+        $this->assertStringContainsString('Zero variants does not mean Magento configurable', $section);
+        $this->assertStringContainsString('ordinary non-variant / single-sellable-unit Product → Magento simple', $section);
+        $this->assertStringContainsString('Product with meaningful option variants → Magento configurable family', $section);
+        $this->assertStringNotContainsString('0..N meaningful variants exports as a Magento configurable', $section);
     }
 
     #[Test]
@@ -283,6 +287,8 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
         $this->assertStringContainsString('Historical tracking label', $gaps);
         $this->assertStringContainsString('Not a mandatory future PR boundary', $gaps);
         $this->assertStringContainsString('Current coherent Magento execution stages', $gaps);
+        $this->assertStringContainsString('connector execution configuration persistence plus revision/snapshot rebaseline', $gaps);
+        $this->assertStringContainsString('current revision v3 has no connector execution-configuration input', $gaps);
     }
 
     #[Test]
@@ -294,6 +300,185 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
         $this->assertStringContainsString('No named customer or pilot may define', $agreement);
         $this->assertStringContainsString('variant cardinality', $agreement);
         $this->assertStringContainsString('Do not introduce new customer-specific runtime identifiers', $agreement);
+    }
+
+    #[Test]
+    public function onec_guid_is_not_a_generic_core_model_property_product_system_field(): void
+    {
+        $row = $this->canonicalFieldRow('onec_guid');
+
+        $this->assertSame('connector_only', $row['implementation_kind']);
+        $this->assertSame('ConnectorMapping', $row['storage_owner']);
+        $this->assertSame('no', $row['field_definition_eligibility']);
+        $this->assertSame('not_applicable', $row['scope']);
+        $this->assertSame('connector_mapping_only', $row['recommended_action']);
+        $this->assertNotSame('core_model_property', $row['implementation_kind']);
+        $this->assertNotSame('system', $row['scope']);
+        $this->assertNotSame('keep_as_is', $row['recommended_action']);
+
+        $registry = File::get(base_path('docs/CANONICAL_PRODUCT_FIELD_REGISTRY.md'));
+        $this->assertStringContainsString('### DEC-011 — onec_guid is connector-owned identity', $registry);
+        $this->assertStringContainsString('Do **not** create a FieldDefinition for it', $registry);
+
+        $phase2 = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+        $this->assertStringContainsString('legacy 1C connector identity', $phase2);
+        $this->assertStringContainsString('not deferred System Fields', $phase2);
+    }
+
+    #[Test]
+    public function generic_external_record_link_contract_does_not_freeze_magento_role_vocabulary(): void
+    {
+        $section = $this->externalRecordLinkGenericSection();
+
+        $this->assertStringContainsString('workspace-safe', $section);
+        $this->assertStringContainsString('ConnectorAccount-scoped', $section);
+        $this->assertStringContainsString('internal business-record identity explicit', $section);
+        $this->assertStringContainsString('no assumption one Product = one external resource', $section);
+        $this->assertStringContainsString('Do not freeze an irreversible generic database unique key', $section);
+        $this->assertStringNotContainsString('configurable_parent', $section);
+        $this->assertStringNotContainsString('configurable_child', $section);
+        $this->assertStringNotContainsString('simple |', $section);
+
+        $adobeNotes = $this->adobeMagentoIdentityNotesSection();
+        $this->assertStringContainsString('simple product', $adobeNotes);
+        $this->assertStringContainsString('configurable parent', $adobeNotes);
+        $this->assertStringContainsString('simple child', $adobeNotes);
+        $this->assertStringContainsString('They are **not** generic ExternalRecordLink vocabulary.', $adobeNotes);
+    }
+
+    #[Test]
+    public function atlas_uses_initial_extraction_provenance_wording(): void
+    {
+        $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
+
+        $this->assertStringContainsString('**Initial Atlas extraction baseline:**', $atlas);
+        $this->assertStringContainsString('This records initial provenance only', $atlas);
+        $this->assertStringContainsString('not a claim that every Atlas row was globally reverified', $atlas);
+        $this->assertStringNotContainsString('**Verification baseline:**', $atlas);
+    }
+
+    #[Test]
+    public function gap_007_distinguishes_connector_leakage_from_generic_seo_fields(): void
+    {
+        $section = $this->gap007Section();
+
+        $this->assertStringContainsString('`products.rozetka_category_id`', $section);
+        $this->assertStringContainsString('`products.onec_guid`', $section);
+        $this->assertStringContainsString('Valid platform Product core that happens to be physical columns', $section);
+        $this->assertStringContainsString('`products.meta_title`', $section);
+        $this->assertStringContainsString('`products.meta_description`', $section);
+        $this->assertStringContainsString('core_model_property', $section);
+        $this->assertStringContainsString('Do not treat generic reusable SEO fields as connector-specific leakage', $section);
+        $this->assertStringNotContainsString(
+            'contains `rozetka_category_id`, `meta_title`, `meta_description` as native columns — a direct instance',
+            $section,
+        );
+    }
+
+    #[Test]
+    public function stage_1_includes_execution_config_revision_and_snapshot_consequences(): void
+    {
+        $section = $this->magentoV1ContractSection();
+
+        $this->assertStringContainsString('SyncConfiguration-owned connector execution configuration', $section);
+        $this->assertStringContainsString('current revision v3 has no connector execution-configuration input', $section);
+        $this->assertStringContainsString('revision-version change/rebaseline', $section);
+        $this->assertStringContainsString('configuration_snapshot` inclusion', $section);
+        $this->assertStringContainsString('Do not rediscover a hidden revision-v4 prerequisite', $section);
+    }
+
+    #[Test]
+    public function safe_customer_specific_textual_residue_is_not_classified_as_migration_bound(): void
+    {
+        $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        $this->assertStringContainsString('**SAFE TEXTUAL/UI NEUTRALIZATION**', $gaps);
+        $this->assertStringContainsString('https://babypark.ua/product/...', $gaps);
+        $this->assertStringContainsString('Основне (з 1С)', $gaps);
+        $this->assertStringContainsString('**not** hash/worker migration debt', $gaps);
+        $this->assertStringContainsString('**LEGITIMATE CONNECTOR FAMILY NAME:**', $gaps);
+
+        $this->assertDoesNotMatchRegularExpression(
+            '/MIGRATION\/REBASELINE REQUIRED:[\s\S]*?babypark\.ua\/product/',
+            $gaps,
+        );
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function canonicalFieldRow(string $internalCode): array
+    {
+        $handle = fopen(base_path('docs/data/canonical_product_fields.csv'), 'r');
+        $this->assertNotFalse($handle);
+        $header = fgetcsv($handle);
+        $this->assertIsArray($header);
+
+        while (($data = fgetcsv($handle)) !== false) {
+            $row = array_combine($header, $data);
+            if ($row !== false && ($row['internal_code'] ?? null) === $internalCode) {
+                fclose($handle);
+
+                return $row;
+            }
+        }
+
+        fclose($handle);
+        $this->fail("Could not locate canonical field row {$internalCode}");
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function externalRecordLinkGenericSection(): string
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        if (! preg_match(
+            '/#### E9. ExternalRecordLink structural contract\n\n(.*?)(?=\n#### )/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate generic ExternalRecordLink contract section');
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function adobeMagentoIdentityNotesSection(): string
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        if (! preg_match(
+            '/#### Adobe Magento V1 identity notes\n\n(.*?)(?=\n#### E10)/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate Adobe Magento V1 identity notes');
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function gap007Section(): string
+    {
+        $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        if (! preg_match(
+            '/## GAP-007 — Connector-specific columns leaked into core `products` table\n\n(.*?)(?=\n---\n\n## GAP-008 —)/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate GAP-007 section');
+        }
+
+        return $matches[1];
     }
 
     /**
