@@ -7,6 +7,7 @@ use App\Enums\SyncDataDomain;
 use App\Enums\SyncSemanticOperation;
 use App\Filament\Pages\Sync\ListSyncDataSetup;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
+use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
 use App\Models\ConnectorAccount;
 use App\Models\SyncConfiguration;
 use App\Models\User;
@@ -156,6 +157,38 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
             ->test(ManageAdobeProductsExportSetup::class, ['account' => $account->id])
             ->assertOk()
             ->assertSee(__('sync_data_setup.adobe_products_export.attribute_set_label'));
+    }
+
+    #[Test]
+    public function generic_export_support_without_adobe_preview_capability_hides_view_connector_setup_link(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->syncSupportAccount($workspace);
+        $actor = $this->actorWithPermissions($workspace, [
+            WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+        ]);
+
+        Livewire::actingAs($actor)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertOk()
+            ->assertActionDoesNotExist('openAdobeExportSetup');
+    }
+
+    #[Test]
+    public function eligible_adobe_profile_with_safe_read_and_manage_sync_configurations_shows_view_connector_setup_link(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $actor = $this->actorWithPermissions($workspace, [
+            WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+        ]);
+
+        Livewire::actingAs($actor)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertOk()
+            ->assertActionExists('openAdobeExportSetup');
     }
 
     #[Test]
@@ -996,6 +1029,17 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
     {
         $actor = User::factory()->create(['is_active' => true]);
         $this->grantExactWorkspacePermissions($workspace, $actor, [$permission]);
+
+        return $actor;
+    }
+
+    /**
+     * @param  list<string>  $permissions
+     */
+    private function actorWithPermissions(Workspace $workspace, array $permissions): User
+    {
+        $actor = User::factory()->create(['is_active' => true]);
+        $this->grantExactWorkspacePermissions($workspace, $actor, $permissions);
 
         return $actor;
     }

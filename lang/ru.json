@@ -362,7 +362,6 @@
     "sync_data_setup.adobe_products_export.current_selection": "Текущий выбор: {name}",
     "sync_data_setup.adobe_products_export.stale_selection": "Сохранённый набор атрибутов больше недоступен. Выберите актуальный набор и сохраните.",
     "sync_data_setup.adobe_products_export.account_unavailable": "Это подключение временно недоступно для настройки.",
-    "sync_data_setup.adobe_products_export.account_unavailable": "Это подключение временно недоступно для настройки.",
     "sync_data_setup.adobe_products_export.configuration_paused": "Эта конфигурация синхронизации приостановлена — запуск невозможен, пока её не активируют снова.",
     "sync_data_setup.adobe_products_export.link": "Настройка экспорта товаров",
     "sync_data_setup.navigation.group": "Синхронизация",

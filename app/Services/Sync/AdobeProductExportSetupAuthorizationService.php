@@ -42,6 +42,24 @@ final class AdobeProductExportSetupAuthorizationService
         );
     }
 
+    public function isEligibleAdobeProductsExportSetupTarget(
+        User $actor,
+        Workspace $workspace,
+        string $connectorAccountId,
+    ): bool {
+        if (! $this->canAccess($actor, $workspace)) {
+            return false;
+        }
+
+        $projection = $this->projectionQuery->resolveEligibility($workspace->id, $connectorAccountId);
+
+        if ($projection === null) {
+            return false;
+        }
+
+        return $this->targetEligibility->isEligible($projection);
+    }
+
     /**
      * @return list<SyncDataSetupTargetSummary>
      */
