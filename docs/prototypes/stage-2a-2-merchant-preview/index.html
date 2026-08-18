@@ -17,6 +17,7 @@
         <button class="btn" id="theme-toggle" type="button">Тема</button>
       </div>
       <nav class="nav-tabs" aria-label="Стани Preview">
+        <button type="button" data-screen="not-ready">Setup not ready</button>
         <button type="button" data-screen="ready" class="active">Готово до перевірки</button>
         <button type="button" data-screen="setup-manage">Setup + права</button>
         <button type="button" data-screen="setup-view">Setup без прав</button>
@@ -33,6 +34,22 @@
   </header>
 
   <main class="page">
+    <section id="screen-not-ready" class="screen">
+      <div class="card">
+        <p class="context-line">Платформа: Adobe Commerce · Акаунт: Babypark UA Store</p>
+      </div>
+      <div class="card">
+        <p data-testid="sync-preview-configuration-not-ready">Потрібно завершити налаштування перед перевіркою.</p>
+        <p class="hint">Стан: configuration_not_ready — конфігурація існує, але поточна readiness=false.</p>
+        <p style="margin-top:0.75rem"><a class="btn primary" href="#">Відкрити налаштування</a> <span class="hint">(manage_sync_configurations)</span></p>
+      </div>
+      <div class="card">
+        <p>Той самий setup notice на Completed/Failed, коли readiness стала false після запуску:</p>
+        <p data-testid="sync-preview-current-setup-required" style="margin-top:0.5rem">Потрібно завершити налаштування перед перевіркою.</p>
+        <p class="hint">Історичний результат (summary/worklist) лишається видимим; rerun/retry приховані до відновлення readiness.</p>
+      </div>
+    </section>
+
     <section id="screen-ready" class="screen active">
       <div class="card">
         <p class="context-line">Платформа: Adobe Commerce · Акаунт: Babypark UA Store</p>

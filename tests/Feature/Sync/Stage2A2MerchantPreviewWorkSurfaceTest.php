@@ -294,7 +294,7 @@ class Stage2A2MerchantPreviewWorkSurfaceTest extends TestCase
             ->assertSee(__('sync_preview.lifecycle.failed'))
             ->assertDontSee('Alpha')
             ->assertDontSee('SKU-A')
-            ->assertDontSee('data-testid="sync-preview-worklist-row-', false);
+            ->assertDontSee('data-testid="sync-preview-worklist"', false);
     }
 
     #[Test]

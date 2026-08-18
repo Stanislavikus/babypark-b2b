@@ -69,7 +69,7 @@ class Stage2A2MerchantPreviewConformanceTest extends TestCase
     }
 
     #[Test]
-    public function readiness_false_before_first_run_hides_start_action(): void
+    public function readiness_false_before_first_run_shows_configuration_not_ready_with_setup_notice(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->adobeAccount($workspace);
@@ -82,15 +82,48 @@ class Stage2A2MerchantPreviewConformanceTest extends TestCase
             operationalState: SyncConfigurationOperationalState::Enabled,
         ));
 
+        $countBefore = SyncRun::withoutWorkspaceScope()->count();
+
         Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->assertSet('pageState', 'ready_to_preview')
+            ->assertSet('pageState', 'configuration_not_ready')
             ->assertSet('canStartPreview', false)
-            ->assertDontSee('data-testid="sync-preview-start"', false);
+            ->assertSet('currentSetupRequired', true)
+            ->assertSee('data-testid="sync-preview-configuration-not-ready"', false)
+            ->assertSee(__('sync_preview.states.setup_required'))
+            ->assertSee(__('sync_preview.states.setup_permission_required'))
+            ->assertDontSee('data-testid="sync-preview-start"', false)
+            ->call('refreshPresentation');
+
+        $this->assertSame($countBefore, SyncRun::withoutWorkspaceScope()->count());
     }
 
     #[Test]
-    public function completed_run_with_current_readiness_false_hides_rerun_action(): void
+    public function readiness_false_before_first_run_with_manage_setup_shows_setup_action(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $actor = $this->actorWithPermissions($workspace, [
+            WorkspacePermissions::RUN_SYNC_PREVIEW,
+            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+        ]);
+
+        app(SyncConfigurationService::class)->create($account, new CreateSyncConfigurationInput(
+            dataDomain: SyncDataDomain::Products,
+            externalContext: SyncExternalContext::default(),
+            enabledOperations: [SyncSemanticOperation::Export],
+            operationalState: SyncConfigurationOperationalState::Enabled,
+        ));
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertSet('pageState', 'configuration_not_ready')
+            ->assertSee('data-testid="sync-preview-setup-action"', false)
+            ->assertDontSee(__('sync_preview.states.setup_permission_required'));
+    }
+
+    #[Test]
+    public function completed_run_with_current_readiness_false_keeps_results_and_shows_setup_notice(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->adobeAccount($workspace);
@@ -107,11 +140,95 @@ class Stage2A2MerchantPreviewConformanceTest extends TestCase
             [SyncPreviewOutcome::Ready, 1],
         ]);
 
+        $countBefore = SyncRun::withoutWorkspaceScope()->count();
+
         Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
             ->assertSet('pageState', 'completed')
             ->assertSet('canStartPreview', false)
+            ->assertSet('currentSetupRequired', true)
+            ->assertSee('data-testid="sync-preview-completed-summary"', false)
+            ->assertSee('data-testid="sync-preview-current-setup-required"', false)
+            ->assertSee(__('sync_preview.states.setup_required'))
+            ->assertSee(__('sync_preview.states.setup_permission_required'))
+            ->assertDontSee('data-testid="sync-preview-rerun"', false)
+            ->call('refreshPresentation');
+
+        $this->assertSame($countBefore, SyncRun::withoutWorkspaceScope()->count());
+    }
+
+    #[Test]
+    public function completed_run_with_current_readiness_false_and_manage_setup_shows_setup_action(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->actorWithPermissions($workspace, [
+            WorkspacePermissions::RUN_SYNC_PREVIEW,
+            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+        ]);
+
+        app(SyncConfigurationService::class)->updateConnectorExecutionConfiguration(
+            $account,
+            $configuration->id,
+            ConnectorExecutionConfiguration::fromPayload([]),
+        );
+
+        $this->createCompletedRun($workspace, $configuration->refresh(), $actor, [
+            [SyncPreviewOutcome::Ready, 1],
+        ]);
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertSet('pageState', 'completed')
+            ->assertSee('data-testid="sync-preview-completed-summary"', false)
+            ->assertSee('data-testid="sync-preview-current-setup-required"', false)
+            ->assertSee('data-testid="sync-preview-setup-action"', false)
             ->assertDontSee('data-testid="sync-preview-rerun"', false);
+    }
+
+    #[Test]
+    public function failed_run_with_current_readiness_false_keeps_failed_state_and_shows_setup_notice(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::RUN_SYNC_PREVIEW);
+
+        $run = SyncRun::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $workspace->id,
+            'sync_configuration_id' => $configuration->id,
+            'configuration_revision' => $configuration->configuration_revision,
+            'mode' => SyncRunMode::Preview,
+            'semantic_operation' => SyncSemanticOperation::Export,
+            'status' => SyncRunStatus::Failed,
+            'initiated_by_user_id' => $actor->id,
+            'configuration_snapshot' => ['field_mappings' => []],
+            'completed_at' => now(),
+        ]);
+
+        app(SyncConfigurationService::class)->updateConnectorExecutionConfiguration(
+            $account,
+            $configuration->id,
+            ConnectorExecutionConfiguration::fromPayload([]),
+        );
+
+        $countBefore = SyncRun::withoutWorkspaceScope()->count();
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertSet('pageState', 'failed')
+            ->assertSet('displayedRunId', $run->id)
+            ->assertSet('canStartPreview', false)
+            ->assertSet('currentSetupRequired', true)
+            ->assertSee(__('sync_preview.lifecycle.failed'))
+            ->assertSee('data-testid="sync-preview-current-setup-required"', false)
+            ->assertSee(__('sync_preview.states.setup_required'))
+            ->assertDontSee('data-testid="sync-preview-retry"', false)
+            ->call('refreshPresentation');
+
+        $this->assertSame($countBefore, SyncRun::withoutWorkspaceScope()->count());
     }
 
     #[Test]

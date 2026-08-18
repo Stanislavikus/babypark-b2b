@@ -17,6 +17,7 @@ Files:
 ## Covered merchant states
 
 1. Preview ready to start / no previous run (`ready_to_preview`)
+2. Configuration exists but not ready (`configuration_not_ready`) — before first Preview
 2. Setup required + actor can configure (`configuration_absent` + setup action)
 3. Setup required + actor cannot configure (`configuration_absent` + permission copy)
 4. Account unavailable (`account_unavailable`)
