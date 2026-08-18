@@ -357,8 +357,8 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **4C-2b** | Historical umbrella label for Preview foundation slices. 4C-2b-1 Done. Remaining Preview runtime is **Stage 1**. Must **not** ship: merchant Preview UI (that is Stage 2); Live mutation (Stage 3); automatic `ConnectorSyncOperationSupport` flip |
 | **Stage 1 — Preview Engine** | Persisted zero-mutation Adobe Products Export Preview against the full platform Product/Variant model — **Done** (PR on `cursor/adobe-preview-engine-stage1-2d6d`). Includes `run_sync_preview`, SyncConfiguration reachability, snapshot/admission, Product execution aggregate, Adobe simple + configurable planners, truthful Preview-only mode-aware support, `FieldOptionMapping`, connector execution configuration, revision v4. Merchant Preview UI remains Stage 2A; Live mutation Stage 3. |
 | **Stage 2-0 — Merchant Preview Authorization & Remediation Contract** | Docs-only freeze: `manage_sync_configurations` (normative ninth permission; runtime pending Stage 2A); permission independence; no hidden mutation under `run_sync_preview`; non-mutating existence check (Stage 2A required); three-layer attribute-set trace; pre-admission vs completed findings; historical/current remediation split; remediation presentation semantics; Stage 2A/2B sequencing — **Done (docs contract)** |
-| **Stage 2A — Merchant Preview Core + Connector Setup** | **Done** — Stage 2A-1 Done (sync setup authority + Adobe Products Export setup); Stage 2A-2 Done (merchant Preview work surface: landing reachability, advisory read model, explicit start via admission, lifecycle, completed summary, Needs-attention worklist, contextual remediation presentation, canonical ProductVariant SKU identity, no bulk remediation). Stage 2B remains pending (Option Mapping remediation UI). |
-| **Stage 2B — Option Mapping Remediation** | Minimal Option Mapping read model/UI; `MissingOptionMapping` / `ExternalOptionMissingOrStale` focused remediation — **pending** (after 2A) |
+| **Stage 2A — Merchant Preview Core + Connector Setup** | **Done** — Stage 2A-1 Done (sync setup authority + Adobe Products Export setup); Stage 2A-2 Done (merchant Preview work surface: landing reachability, advisory read model, explicit start via admission, lifecycle, completed summary, Needs-attention worklist, contextual remediation presentation, canonical ProductVariant SKU identity, no bulk remediation). |
+| **Stage 2B — Option Mapping Remediation** | **Done** — `ManageSyncFieldOptionMappings` nested read model/UI on existing `view_sync_mappings` / `manage_sync_mappings` permissions only; authoritative persisted connector snapshot metadata on read (zero HTTP); `confirm`/`replace` retain connector external validation outside locked DB transaction; Preview findings remain historical after remediation; narrow stale/orphan option-mapping cleanup (does **not** fix Product/Variant select value integrity). Stage 3 remains pending. |
 | **Stage 3 — Live Engine** | After E11 revalidation: Live permission, ExternalRecordLink, simple + configurable Live execution, reconciliation, merchant-safe result, real Adobe create/update validation. |
 | **4C** | Remaining sync domain after Stage 3: scheduling, sync history/issues, merchant sync UX beyond mapping/Preview/Live |
 
@@ -392,10 +392,11 @@ Preview admission and background Preview execution are implemented (Stage 1).
 Schedule, history, and `ExternalRecordLink` remain unimplemented.
 `run_sync_preview` runtime permission is implemented (Stage 1; eighth catalogue
 permission). Adobe `(products, export)` Preview support is declared; Live remains
-unsupported. No merchant Preview UI exists (Stage 2A). Stage 2-0 merchant Preview
-authorization/remediation contract is **Done (docs contract)**.
-`manage_sync_configurations` is normatively frozen; runtime catalogue remains
-**eight** permissions until Stage 2A. Connector-account **creation UI is implemented**
+unsupported. Stage 2A merchant Preview UI and Stage 2A-1 `manage_sync_configurations`
+runtime permission are implemented. Stage 2B Option Mapping remediation UI is
+implemented (`ManageSyncFieldOptionMappings`). Stage 2-0 merchant Preview
+authorization/remediation contract is **Done (docs contract)**. Runtime catalogue
+is **nine** permissions (`manage_sync_configurations` landed Stage 2A-1). Connector-account **creation UI is implemented**
 (`ConnectPlatformIntegration`); credential-management/settings **edit** UI
 remains absent. Task 4B-2c (discovered schema fields / change inspection) and
 retention jobs remain unimplemented.
@@ -403,7 +404,7 @@ retention jobs remain unimplemented.
 **Current coherent Magento execution stages** (historical `4C-2b-*` labels are
 not mandatory PR boundaries): Stage 1 Preview Engine → Stage 2-0 Authorization &
 Remediation contract (docs) → Stage 2A Merchant Preview Core + Connector Setup
-→ Stage 2B Option Mapping Remediation → Stage 3 Live Engine. Stage 1 delivered
+→ Stage 2B Option Mapping Remediation (Done) → Stage 3 Live Engine (pending). Stage 1 delivered
 connector execution configuration persistence plus revision/snapshot rebaseline
 (revision v4). See `docs/03-DOMAIN_MODEL.md` → Magento Product Export V1
 Execution Contract and Merchant Preview Authorization & Remediation Contract.
@@ -457,8 +458,8 @@ repository workspace-RBAC matrix):**
 | Disabled account | Per role matrix (unaffected by disabled state) | No | Per role matrix |
 
 **GAP-006 overall remains Open.** Remaining scope: Task 4B-2c (discovered
-schema fields / change inspection), retention/pruning (4B-2d), Magento Stages
-1–3 (Preview Engine, Merchant Preview, Live Engine), `ExternalRecordLink`,
+schema fields / change inspection), retention/pruning (4B-2d), Stage 3 Live Engine,
+`ExternalRecordLink`,
 connector-account credential-management/settings **edit** UI (create UI shipped).
 Workspace-scoped authorization foundation (GAP-026) repository runtime is
 **Implemented** (GAP-026B-2) and production-activated on Babypark pilot
@@ -471,7 +472,7 @@ Distinguish carefully — do not treat every future possibility as an active GAP
 | Class | Item | Blocks Sync domain work now? |
 |---|---|---|
 | **A. Architecture blockers** | None identified against current `origin/develop` for the approved Sync Domain Rebaseline | No |
-| **B. Implementation gaps** | Preview/Live execution (Stage 1–3); `ExternalRecordLink`; merchant sync UX beyond connection create + mapping; ConnectorSchemaDiff write path/consumer; connector-account **settings edit** UI; remaining Connector UX migration / Layer C gating (GAP-025). `SyncRun`/`SyncRunItem` persistence is implemented (4C-2b-1). Connector-account **create** UI is implemented. | Yes for shipping sync; docs are settled |
+| **B. Implementation gaps** | Live execution (Stage 3); `ExternalRecordLink`; merchant sync UX beyond connection create + mapping + Preview + Option Mapping remediation; ConnectorSchemaDiff write path/consumer; connector-account **settings edit** UI; remaining Connector UX migration / Layer C gating (GAP-025). Stage 1 Preview Engine, Stage 2A merchant Preview, and Stage 2B Option Mapping remediation are implemented. `SyncRun`/`SyncRunItem` persistence is implemented (4C-2b-1). Connector-account **create** UI is implemented. | Yes for shipping sync; docs are settled |
 | **C. Connector-specific future verification (deferred Variant #2 / profile)** | What external contract `adobe_commerce_paas_oauth1_integration` intentionally covers; PaaS-only vs broader Magento REST-family; post-bootstrap runtime-contract/version/capability verification; Magento Open Source setup/auth compatibility; whether AccountSetup and final runtime contract must later split; whether exactly-one AccountSetup-profile invariant must ever change | **No** — deferred; not a blocker for generic Sync domain rebaseline |
 
 Do not add generic `edition` / `deployment_model` / `api_family` fields to
@@ -1089,9 +1090,16 @@ Remaining connector gaps are tracked separately under GAP-006.
   `ConnectorAuthorization` evaluate the frozen workspace-permission matrix via
   `WorkspaceAuthorization` — not fixed `User.role` semantics. Historical pre-B-2
   fixed-role behavior is transitional evidence under **GAP-026** / PR #102 only.
+- **Shipped (Stage 2B):** Option Mapping remediation UI on
+  `ManageSyncFieldOptionMappings` — nested read model/UI using existing
+  `view_sync_mappings` / `manage_sync_mappings` permissions only; authoritative
+  persisted connector snapshot metadata on read (zero HTTP); `confirm`/`replace`
+  retain connector external validation outside locked DB transaction; Preview
+  findings remain historical after remediation; narrow stale/orphan option-mapping
+  cleanup (does **not** fix Product/Variant select value integrity).
 - **Remaining GAP-025 UX work:** Layer C gating when platform-support identity
-  exists; Layer B setup surfaces beyond connection create and mapping (sync
-  execution, preview, scheduling, issue aggregation).
+  exists; Layer B setup surfaces beyond connection create, mapping, Preview, and
+  Option Mapping remediation (Live sync execution, scheduling, issue aggregation).
 - **Shipped (Task 4C-1c-2b, PR #139):** Layer-B Mapping page and Mapping →
   Available Fields supporting reference with workspace-scoped Mapping authorization
   and Layer-B merchant copy on that path.
@@ -1107,10 +1115,6 @@ Remaining connector gaps are tracked separately under GAP-006.
   (Task 4C-2b-1).
 
 **Still absent in code (docs settled; runtime or UI missing):**
-- merchant Preview UI and Integrations Preview surface (**Stage 2A**);
-- `manage_sync_configurations` runtime permission (**Stage 2A**);
-- non-mutating SyncConfiguration existence lookup for Preview-only actors (**Stage 2A**);
-- Option Mapping remediation UI (**Stage 2B**);
 - `run_sync_live` (**Stage 3**);
 - `ExternalRecordLink` (**Stage 3**);
 - Live execution after E11 revalidation (**Stage 3**);
@@ -1185,9 +1189,9 @@ contradicts an approved invariant.
   identity.
 
 **Next task:** Remaining Connector UX migration — Layer C gating when
-platform-support identity exists; Layer B setup surfaces beyond connection create
-and mapping (sync execution, preview, scheduling). Backend mechanisms above remain
-separate scoped tasks.
+platform-support identity exists; Layer B setup surfaces beyond connection create,
+mapping, Preview, and Option Mapping remediation (Live sync execution, scheduling).
+Backend mechanisms above remain separate scoped tasks.
 
 **Status:** Open — partial (`Інтеграції` landing shipped; SyncConfiguration,
 FieldMapping persistence, canonical suggestion read-model, Layer B mapping UI

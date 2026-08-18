@@ -80,11 +80,9 @@
             <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
               {{ __('sync_mappings.columns.status') }}
             </th>
-            @if ($canMutate)
-              <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                {{ __('sync_mappings.columns.actions') }}
-              </th>
-            @endif
+            <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              {{ __('sync_mappings.columns.actions') }}
+            </th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-200 dark:divide-white/10">
@@ -106,9 +104,21 @@
                   <span>{{ $row['status_label'] }}</span>
                 </span>
               </td>
-              @if ($canMutate)
-                <td class="px-4 py-3 text-right text-sm">
-                  <div class="flex flex-wrap justify-end gap-2">
+              <td class="px-4 py-3 text-right text-sm">
+                <div class="flex flex-wrap justify-end gap-2">
+                  @if (! empty($row['option_mapping_url']))
+                    <x-filament::button
+                      tag="a"
+                      :href="$row['option_mapping_url']"
+                      size="xs"
+                      color="gray"
+                      data-testid="sync-mapping-option-values"
+                    >
+                      {{ $canMutate ? __('sync_mappings.actions.option_values') : __('sync_mappings.actions.view_option_values') }}
+                    </x-filament::button>
+                  @endif
+
+                  @if ($canMutate)
                     @if ($discoveryAvailable)
                       @if ($row['semantic_state'] === 'suggested')
                         <x-filament::button
@@ -161,13 +171,13 @@
                         {{ __('sync_mappings.actions.remove') }}
                       </x-filament::button>
                     @endif
-                  </div>
-                </td>
-              @endif
+                  @endif
+                </div>
+              </td>
             </tr>
           @empty
             <tr>
-              <td colspan="{{ $canMutate ? 4 : 3 }}" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+              <td colspan="4" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                 {{ __('sync_mappings.empty') }}
               </td>
             </tr>

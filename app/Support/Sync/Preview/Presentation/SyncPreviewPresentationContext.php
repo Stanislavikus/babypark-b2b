@@ -4,12 +4,15 @@ namespace App\Support\Sync\Preview\Presentation;
 
 use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
 use App\Filament\Pages\Sync\ManageSyncFieldMappings;
+use App\Filament\Pages\Sync\ManageSyncFieldOptionMappings;
 use App\Filament\Resources\ProductResource;
 use App\Models\FieldBinding;
+use App\Models\FieldMapping;
 use App\Models\ProductVariant;
 use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Sync\FieldOptionMappingEligibilityResolver;
 
 final readonly class SyncPreviewPresentationContext
 {
@@ -195,6 +198,32 @@ final readonly class SyncPreviewPresentationContext
         return ManageSyncFieldMappings::getUrl([
             'account' => $this->accountId,
             'configuration' => $this->configuration->id,
+        ]);
+    }
+
+    public function optionMappingUrl(?string $fieldBindingId): ?string
+    {
+        if ($this->configuration === null || $fieldBindingId === null || $fieldBindingId === '') {
+            return null;
+        }
+
+        $mapping = FieldMapping::withoutWorkspaceScope()
+            ->where('sync_configuration_id', $this->configuration->id)
+            ->where('field_binding_id', $fieldBindingId)
+            ->first();
+
+        if ($mapping === null) {
+            return null;
+        }
+
+        if (! app(FieldOptionMappingEligibilityResolver::class)->isEligibleMapping($mapping)) {
+            return null;
+        }
+
+        return ManageSyncFieldOptionMappings::getUrl([
+            'account' => $this->accountId,
+            'configuration' => $this->configuration->id,
+            'mapping' => $mapping->id,
         ]);
     }
 

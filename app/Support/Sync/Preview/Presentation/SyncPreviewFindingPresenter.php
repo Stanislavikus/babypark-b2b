@@ -241,8 +241,10 @@ final class SyncPreviewFindingPresenter
                 ),
             };
 
-            if ($stale) {
+            if ($stale || $context->fieldMappingChanged($bindingId)) {
                 $actionability = SyncPreviewRemediationActionability::CurrentConfigurationChanged;
+            } else {
+                $actionability = $this->optionMappingActionability($context, $bindingId);
             }
         }
 
@@ -255,8 +257,17 @@ final class SyncPreviewFindingPresenter
                     area: SyncPreviewRemediationArea::OptionMapping,
                     actionability: $actionability,
                     label: __('sync_preview.remediation.option_mapping'),
-                    actionLabel: null,
-                    actionUrl: null,
+                    actionLabel: match ($actionability) {
+                        SyncPreviewRemediationActionability::ActionAvailable => __('sync_preview.actions.configure_option_mapping'),
+                        SyncPreviewRemediationActionability::ViewOnly => __('sync_preview.actions.view_option_mapping'),
+                        default => null,
+                    },
+                    actionUrl: in_array($actionability, [
+                        SyncPreviewRemediationActionability::ActionAvailable,
+                        SyncPreviewRemediationActionability::ViewOnly,
+                    ], true)
+                        ? $context->optionMappingUrl($bindingId)
+                        : null,
                     statusMessage: $this->statusMessageFor($actionability),
                 ),
                 $this->productContextDestination($context, $productId),
@@ -310,6 +321,25 @@ final class SyncPreviewFindingPresenter
     ): SyncPreviewRemediationActionability {
         if ($bindingId !== null && $context->fieldMappingChanged($bindingId)) {
             return SyncPreviewRemediationActionability::CurrentConfigurationChanged;
+        }
+
+        if ($context->canManageMappings) {
+            return SyncPreviewRemediationActionability::ActionAvailable;
+        }
+
+        if ($context->canViewMappings) {
+            return SyncPreviewRemediationActionability::ViewOnly;
+        }
+
+        return SyncPreviewRemediationActionability::PermissionRequired;
+    }
+
+    private function optionMappingActionability(
+        SyncPreviewPresentationContext $context,
+        ?string $bindingId,
+    ): SyncPreviewRemediationActionability {
+        if ($bindingId === null || $context->optionMappingUrl($bindingId) === null) {
+            return SyncPreviewRemediationActionability::NoEditSurface;
         }
 
         if ($context->canManageMappings) {
