@@ -295,8 +295,12 @@ Remediation Contract (Resolved — Stage 2-0)**. Summary-level UI rules:
 (`run_sync_preview`, admission, persisted Preview runs) is **shipped**. Stage
 2A-1 is **shipped** (`manage_sync_configurations`, non-mutating existence lookup,
 Adobe Products Export Layer-B setup on `ListSyncDataSetup` + `ManageAdobeProductsExportSetup`).
-Merchant Preview result/worklist UI and remediation presenters remain **Stage
-2A-2**. Option Mapping remediation UI is **Stage 2B**.
+**Stage 2A-2 is shipped** — merchant Preview work surface on
+`ManageAdobeProductsExportPreview`, evolved `ListSyncDataSetup` landing
+(independent Setup/Preview actions), advisory read model, explicit start via
+admission, lifecycle, completed summary, Needs-attention worklist, contextual
+remediation presenters, and explicit no-bulk-action exception. Option Mapping
+remediation UI remains **Stage 2B**.
 
 ### Layer-B SyncConfiguration management authority
 

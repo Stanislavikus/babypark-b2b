@@ -5659,11 +5659,10 @@ EXECUTE.
 
 **Normative ninth permission (Stage 2-0 / Stage 2A-1):** `manage_sync_configurations`
 is frozen in **Merchant Preview Authorization & Remediation Contract (Resolved —
-Stage 2-0)** and **implemented in Stage 2A-1** runtime catalogue. Stage 2A
-remains incomplete until Stage 2A-2 Merchant Preview work surface ships.
-Do not claim nine runtime permissions before Stage 2A-1 lands. Stage 2A-1
-implemented the ninth permission (`manage_sync_configurations`); Stage 2A remains
-incomplete until Stage 2A-2 Merchant Preview work surface ships.
+Stage 2-0)** and **implemented in Stage 2A-1** runtime catalogue. **Stage 2A-2**
+implemented the merchant Preview work surface (landing reachability, advisory read
+model, explicit start, lifecycle, completed summary, Needs-attention worklist,
+contextual remediation presentation). **Stage 2A is Done.** Stage 2B remains pending.
 
 **Live authority:** do **not** add or freeze an implemented Live permission in
 4C-2a beyond the invariant that Preview authority must never silently become
@@ -6224,11 +6223,11 @@ isReady(SyncConfiguration)` answers readiness for an **already-resolved**
 configuration, not whether one exists. `SyncConfigurationLookupService` provides
 a genuinely non-mutating identity lookup (workspace + connector account +
 data domain + external context) without calling `ensure*()` helpers. Merchant
-Preview result/worklist UI remains Stage 2A-2.
+Preview result/worklist UI is **implemented in Stage 2A-2**.
 
 Adobe `(products, export)` Preview support is declared (Stage 1). Layer-B Adobe
 Products Export setup authority and reachability are implemented in Stage
-2A-1. Merchant Preview result/worklist remains Stage 2A-2.
+2A-1. Merchant Preview work surface is **implemented in Stage 2A-2**.
 
 #### E8. Live authority
 
@@ -6505,8 +6504,8 @@ automatically authorize or expose those future controls.
 
 **Runtime status:** normative target frozen in Stage 2-0; **runtime catalogue
 implementation landed in Stage 2A-1** (`manage_sync_configurations` ninth
-permission). Current PHP permission catalogue is **nine** permissions. Stage
-2A remains incomplete until Stage 2A-2 Merchant Preview work surface ships.
+permission). Current PHP permission catalogue is **nine** permissions. **Stage 2A-2**
+shipped the merchant Preview work surface; **Stage 2A is Done.**
 
 ##### Permission independence matrix (frozen)
 
