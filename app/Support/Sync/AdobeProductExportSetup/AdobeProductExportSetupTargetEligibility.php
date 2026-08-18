@@ -6,6 +6,7 @@ use App\Enums\SyncDataDomain;
 use App\Enums\SyncSemanticOperation;
 use App\Models\ConnectorAccount;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportPreviewCapability;
+use App\Support\Connectors\ConnectorAccountLayerBSetupEligibilityProjection;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
 
@@ -20,18 +21,29 @@ final class AdobeProductExportSetupTargetEligibility
         private readonly ConnectorProfileRegistry $profileRegistry,
     ) {}
 
-    public function isEligible(ConnectorAccount $account): bool
+    public function isEligible(ConnectorAccountLayerBSetupEligibilityProjection $projection): bool
     {
         if (! $this->syncSupportResolver->supportsConfiguration(
-            $account,
+            $this->accountReferenceForSupport($projection),
             SyncDataDomain::Products,
             SyncSemanticOperation::Export,
         )) {
             return false;
         }
 
-        $definition = $this->profileRegistry->profileDefinition($account->auth_profile);
+        $definition = $this->profileRegistry->profileDefinition($projection->authProfile);
 
         return $definition->previewCapabilityClass === AdobeProductExportPreviewCapability::class;
+    }
+
+    private function accountReferenceForSupport(
+        ConnectorAccountLayerBSetupEligibilityProjection $projection,
+    ): ConnectorAccount {
+        $account = new ConnectorAccount([
+            'auth_profile' => $projection->authProfile,
+        ]);
+        $account->exists = true;
+
+        return $account;
     }
 }

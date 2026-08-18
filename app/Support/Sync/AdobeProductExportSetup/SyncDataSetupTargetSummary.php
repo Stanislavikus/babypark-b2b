@@ -9,7 +9,6 @@ final readonly class SyncDataSetupTargetSummary
         public string $platformName,
         public string $accountName,
         public bool $setupUsable,
-        public string $targetLabel,
-        public string $setupUrl,
+        public SyncDataSetupTargetKind $targetKind,
     ) {}
 }

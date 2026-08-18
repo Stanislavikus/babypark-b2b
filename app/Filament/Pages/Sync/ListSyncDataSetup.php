@@ -4,6 +4,8 @@ namespace App\Filament\Pages\Sync;
 
 use App\Models\User;
 use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
+use App\Support\Sync\AdobeProductExportSetup\SyncDataSetupTargetKind;
+use App\Support\Sync\AdobeProductExportSetup\SyncDataSetupTargetSummary;
 use App\Support\Workspace\Rbac\Concerns\RequiresFreshWorkspaceSyncConfigurationPermission;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Pages\Page;
@@ -65,15 +67,31 @@ class ListSyncDataSetup extends Page
             ->listEligibleSetupTargets($user, $workspace);
 
         $this->targets = array_map(
-            static fn ($summary): array => [
+            fn (SyncDataSetupTargetSummary $summary): array => [
                 'account_id' => $summary->accountId,
                 'platform_name' => $summary->platformName,
                 'account_name' => $summary->accountName,
                 'setup_usable' => $summary->setupUsable,
-                'target_label' => $summary->targetLabel,
-                'setup_url' => $summary->setupUrl,
+                'target_label' => $this->presentTargetLabel($summary->targetKind),
+                'setup_url' => $this->presentSetupUrl($summary),
             ],
             $summaries,
         );
+    }
+
+    private function presentTargetLabel(SyncDataSetupTargetKind $targetKind): string
+    {
+        return match ($targetKind) {
+            SyncDataSetupTargetKind::AdobeProductsExport => __('sync_data_setup.targets.adobe_products_export'),
+        };
+    }
+
+    private function presentSetupUrl(SyncDataSetupTargetSummary $summary): string
+    {
+        return match ($summary->targetKind) {
+            SyncDataSetupTargetKind::AdobeProductsExport => ManageAdobeProductsExportSetup::getUrl([
+                'account' => $summary->accountId,
+            ]),
+        };
     }
 }

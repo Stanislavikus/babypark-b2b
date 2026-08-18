@@ -4,16 +4,17 @@ namespace App\Services\Sync;
 
 use App\Enums\SyncConfigurationOperationalState;
 use App\Enums\SyncSemanticOperation;
-use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
 use App\Models\ConnectorAccount;
 use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionConfiguration;
+use App\Support\Connectors\ConnectorAccountLayerBSetupEligibilityProjection;
 use App\Support\Connectors\ConnectorAccountLayerBSetupProjection;
 use App\Support\Sync\AdobeProductExportSetup\AdobeProductExportSetupReadModel;
 use App\Support\Sync\AdobeProductExportSetup\AdobeProductExportSetupTargetEligibility;
+use App\Support\Sync\AdobeProductExportSetup\SyncDataSetupTargetKind;
 use App\Support\Sync\AdobeProductExportSetup\SyncDataSetupTargetSummary;
 use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -52,20 +53,17 @@ final class AdobeProductExportSetupAuthorizationService
 
         $targets = [];
 
-        foreach ($this->projectionQuery->listForWorkspace($workspace->id) as $projection) {
-            $account = $this->resolveConnectorAccount($workspace->id, $projection->id);
-
-            if (! $this->targetEligibility->isEligible($account)) {
+        foreach ($this->projectionQuery->listEligibilityForWorkspace($workspace->id) as $eligibilityProjection) {
+            if (! $this->targetEligibility->isEligible($eligibilityProjection)) {
                 continue;
             }
 
             $targets[] = new SyncDataSetupTargetSummary(
-                accountId: $projection->id,
-                platformName: $projection->platformName,
-                accountName: $projection->accountName,
-                setupUsable: $projection->setupUsable,
-                targetLabel: __('sync_data_setup.targets.adobe_products_export'),
-                setupUrl: ManageAdobeProductsExportSetup::getUrl(['account' => $projection->id]),
+                accountId: $eligibilityProjection->id,
+                platformName: $eligibilityProjection->platformName,
+                accountName: $eligibilityProjection->accountName,
+                setupUsable: $eligibilityProjection->isSetupUsable(),
+                targetKind: SyncDataSetupTargetKind::AdobeProductsExport,
             );
         }
 
@@ -77,21 +75,25 @@ final class AdobeProductExportSetupAuthorizationService
         string $workspaceId,
         string $connectorAccountId,
     ): AdobeProductExportSetupReadModel {
-        [$workspace, $projection] = $this->resolveProjection($actor, $workspaceId, $connectorAccountId);
+        [$workspace, $projection, $eligibilityProjection] = $this->resolveProjectionContext(
+            $actor,
+            $workspaceId,
+            $connectorAccountId,
+        );
 
         if (! $this->canAccess($actor, $workspace)) {
             throw new AuthorizationException('This action is unauthorized.');
         }
 
-        $account = $this->resolveConnectorAccount($workspaceId, $connectorAccountId);
-
-        if (! $this->targetEligibility->isEligible($account)) {
+        if (! $this->targetEligibility->isEligible($eligibilityProjection)) {
             throw new AuthorizationException('This action is unauthorized.');
         }
 
-        $configuration = $this->lookupService->findProductsDefaultContext($account);
+        $configuration = $this->lookupService->findProductsDefaultContext(
+            $this->accountReference($eligibilityProjection),
+        );
 
-        if (! ConnectorAccountLayerBSetupProjection::isSetupUsable($account)) {
+        if (! $eligibilityProjection->isSetupUsable()) {
             return $this->buildReadModel(
                 projection: $projection,
                 configuration: $configuration,
@@ -99,6 +101,7 @@ final class AdobeProductExportSetupAuthorizationService
             );
         }
 
+        $account = $this->resolveConnectorAccountForConnectorExecution($workspaceId, $connectorAccountId);
         $attributeSets = $this->setupService->listAvailableAttributeSets($account);
 
         return $this->buildReadModel(
@@ -114,21 +117,25 @@ final class AdobeProductExportSetupAuthorizationService
         string $connectorAccountId,
         int $attributeSetId,
     ): SyncConfiguration {
-        [$workspace] = $this->resolveWorkspaceAccount($actor, $workspaceId, $connectorAccountId);
+        [$workspace, , $eligibilityProjection] = $this->resolveProjectionContext(
+            $actor,
+            $workspaceId,
+            $connectorAccountId,
+        );
 
         if (! $this->canAccess($actor, $workspace)) {
             throw new AuthorizationException('This action is unauthorized.');
         }
 
-        $account = $this->resolveConnectorAccount($workspaceId, $connectorAccountId);
-
-        if (! $this->targetEligibility->isEligible($account)) {
+        if (! $this->targetEligibility->isEligible($eligibilityProjection)) {
             throw new AuthorizationException('This action is unauthorized.');
         }
 
-        if (! ConnectorAccountLayerBSetupProjection::isSetupUsable($account)) {
+        if (! $eligibilityProjection->isSetupUsable()) {
             throw new AuthorizationException('This action is unauthorized.');
         }
+
+        $account = $this->resolveConnectorAccountForConnectorExecution($workspaceId, $connectorAccountId);
 
         $this->setupService->validateAttributeSetSelection($account, $attributeSetId);
 
@@ -140,9 +147,13 @@ final class AdobeProductExportSetupAuthorizationService
     }
 
     /**
-     * @return array{0: Workspace, 1: ConnectorAccountLayerBSetupProjection}
+     * @return array{
+     *     0: Workspace,
+     *     1: ConnectorAccountLayerBSetupProjection,
+     *     2: ConnectorAccountLayerBSetupEligibilityProjection
+     * }
      */
-    private function resolveProjection(
+    private function resolveProjectionContext(
         User $actor,
         string $workspaceId,
         string $connectorAccountId,
@@ -150,12 +161,13 @@ final class AdobeProductExportSetupAuthorizationService
         [$workspace] = $this->resolveWorkspaceAccount($actor, $workspaceId, $connectorAccountId);
 
         $projection = $this->projectionQuery->resolve($workspaceId, $connectorAccountId);
+        $eligibilityProjection = $this->projectionQuery->resolveEligibility($workspaceId, $connectorAccountId);
 
-        if ($projection === null) {
+        if ($projection === null || $eligibilityProjection === null) {
             throw new AuthorizationException('This action is unauthorized.');
         }
 
-        return [$workspace, $projection];
+        return [$workspace, $projection, $eligibilityProjection];
     }
 
     /**
@@ -172,7 +184,7 @@ final class AdobeProductExportSetupAuthorizationService
             throw new AuthorizationException('This action is unauthorized.');
         }
 
-        $projection = $this->projectionQuery->resolve($workspaceId, $connectorAccountId);
+        $projection = $this->projectionQuery->resolveEligibility($workspaceId, $connectorAccountId);
 
         if ($projection === null) {
             throw new AuthorizationException('This action is unauthorized.');
@@ -181,8 +193,23 @@ final class AdobeProductExportSetupAuthorizationService
         return [$workspace];
     }
 
-    private function resolveConnectorAccount(string $workspaceId, string $connectorAccountId): ConnectorAccount
-    {
+    private function accountReference(
+        ConnectorAccountLayerBSetupEligibilityProjection $projection,
+    ): ConnectorAccount {
+        $account = new ConnectorAccount;
+        $account->forceFill([
+            'id' => $projection->id,
+            'workspace_id' => $projection->workspaceId,
+        ]);
+        $account->exists = true;
+
+        return $account;
+    }
+
+    private function resolveConnectorAccountForConnectorExecution(
+        string $workspaceId,
+        string $connectorAccountId,
+    ): ConnectorAccount {
         $account = ConnectorAccount::withoutWorkspaceScope()
             ->where('workspace_id', $workspaceId)
             ->where('id', $connectorAccountId)

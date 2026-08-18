@@ -26,11 +26,13 @@ use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionConfiguration;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportMetadataReader;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportMetadataRequestFactory;
 use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
+use App\Support\Connectors\ConnectorAccountLayerBSetupEligibilityProjection;
 use App\Support\Connectors\ConnectorAccountLayerBSetupProjection;
 use App\Support\Connectors\ConnectorAuthorization;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorOutboundRequest;
 use App\Support\Connectors\Transport\ConnectorTransportException;
+use App\Support\Connectors\Transport\TransportFailureReason;
 use App\Support\Sync\ConnectorExecutionConfiguration;
 use App\Support\Sync\Exceptions\ConnectorExecutionConfigurationValidationException;
 use App\Support\Sync\SyncExternalContext;
@@ -305,6 +307,30 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
 
         $this->assertTrue($configuration->enabledOperationSet()->contains(SyncSemanticOperation::Export));
         $this->assertSame(SyncDataDomain::Products, $configuration->data_domain);
+    }
+
+    #[Test]
+    public function ensure_products_export_preserves_existing_import_and_adds_export(): void
+    {
+        $account = $this->syncSupportAccount();
+        $configuration = SyncConfiguration::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'data_domain' => SyncDataDomain::Products,
+            'external_context' => SyncExternalContext::default()->payload(),
+            'external_context_key' => SyncExternalContext::default()->uniquenessKey(),
+            'enabled_operations' => [SyncSemanticOperation::Import->value],
+            'operational_state' => SyncConfigurationOperationalState::Enabled,
+            'configuration_revision' => 'import-only-'.Str::random(8),
+        ]);
+
+        $ensured = app(SyncConfigurationReachabilityService::class)
+            ->ensureProductsExportConfiguration($account);
+
+        $this->assertSame($configuration->id, $ensured->id);
+        $this->assertTrue($ensured->enabledOperationSet()->contains(SyncSemanticOperation::Import));
+        $this->assertTrue($ensured->enabledOperationSet()->contains(SyncSemanticOperation::Export));
     }
 
     #[Test]
@@ -610,11 +636,11 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
     }
 
     #[Test]
-    public function explicit_valid_save_enables_export_for_disabled_export_configuration(): void
+    public function malformed_adobe_import_only_configuration_save_fails_closed_without_repair(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->adobeAccount($workspace);
-        $configuration = $this->createExportDisabledProductsConfiguration($account);
+        $configuration = $this->createExportDisabledProductsConfigurationWithAttributeSet($account, 4);
         $actor = $this->actorWithPermission($workspace, WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS);
         $this->bindSetupTransport($this->attributeSetsListResponse([
             ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
@@ -627,7 +653,7 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
             ->assertNotified();
 
         $configuration->refresh();
-        $this->assertTrue($configuration->enabledOperationSet()->contains(SyncSemanticOperation::Export));
+        $this->assertFalse($configuration->enabledOperationSet()->contains(SyncSemanticOperation::Export));
     }
 
     #[Test]
@@ -721,8 +747,12 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
     #[Test]
     public function atomic_rollback_when_persistence_fails_with_export_disabled_configuration(): void
     {
-        $account = $this->adobeAccount();
-        $configuration = $this->createExportDisabledProductsConfiguration($account);
+        $account = $this->syncSupportAccount();
+        $configuration = $this->insertProductsConfigurationRecord(
+            $account,
+            enabledOperations: [SyncSemanticOperation::Import],
+            connectorExecutionConfiguration: null,
+        );
         $revisionBefore = $configuration->configuration_revision;
         $transport = $this->attributeSetsListResponse([
             ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
@@ -752,14 +782,17 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
         $actor = $this->actorWithPermission($workspace, WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS);
 
         $transport = new RecordingConnectorHttpTransport(
-            fn (ConnectorOutboundRequest $request, int $sendCount): ConnectorHttpResult => throw new ConnectorTransportException('upstream unavailable'),
+            fn (ConnectorOutboundRequest $request, int $sendCount): ConnectorHttpResult => throw new ConnectorTransportException(
+                TransportFailureReason::ConnectionFailed,
+            ),
         );
         $this->bindSetupTransport($transport);
 
         Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportSetup::class, ['account' => $account->id])
             ->assertOk()
-            ->assertSee(__('sync_data_setup.errors.remote_unavailable'));
+            ->assertSee(__('sync_data_setup.errors.remote_unavailable'))
+            ->assertDontSee('Connector transport failed.');
     }
 
     #[Test]
@@ -808,6 +841,26 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
     }
 
     #[Test]
+    public function eligibility_and_landing_queries_do_not_select_sensitive_connector_fields(): void
+    {
+        $merchantColumns = ConnectorAccountLayerBSetupProjection::selectColumns();
+        $eligibilityColumns = ConnectorAccountLayerBSetupEligibilityProjection::selectColumns();
+
+        $sensitiveWithoutInternalProfile = array_values(array_filter(
+            ConnectorAccountCapabilityPresentation::hiddenAttributes(),
+            static fn (string $attribute): bool => $attribute !== 'auth_profile',
+        ));
+
+        foreach ($sensitiveWithoutInternalProfile as $hidden) {
+            $this->assertNotContains($hidden, $merchantColumns);
+            $this->assertNotContains($hidden, $eligibilityColumns);
+        }
+
+        $this->assertNotContains('auth_profile', $merchantColumns);
+        $this->assertContains('auth_profile', $eligibilityColumns);
+    }
+
+    #[Test]
     public function stale_configured_set_shows_needs_attention_state_in_ui(): void
     {
         $workspace = $this->defaultWorkspace();
@@ -818,10 +871,20 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
             ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
         ]));
 
+        $readModel = app(AdobeProductExportSetupAuthorizationService::class)->projectReadModel(
+            $actor,
+            $workspace->id,
+            $account->id,
+        );
+        $this->assertTrue($readModel->configuredSetStale);
+        $this->assertTrue($readModel->setupRequired);
+
         Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportSetup::class, ['account' => $account->id])
-            ->assertSee(__('sync_data_setup.adobe_products_export.stale_selection'))
-            ->assertSee(__('sync_data_setup.adobe_products_export.setup_required'));
+            ->assertSet('configuredSetStale', true)
+            ->assertSet('setupRequired', true)
+            ->assertSee('data-testid="sync-data-setup-stale"', false)
+            ->assertSee('data-testid="sync-data-setup-required"', false);
     }
 
     #[Test]
