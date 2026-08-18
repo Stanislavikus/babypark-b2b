@@ -22,26 +22,11 @@
 
     @switch($pageState)
       @case('configuration_absent')
-        <x-filament::section>
-          <p class="text-sm text-gray-700 dark:text-gray-200" data-testid="sync-preview-setup-required">
-            {{ __('sync_preview.states.setup_required') }}
-          </p>
-          @if ($canManageSetup)
-            <div class="mt-3">
-              <x-filament::button
-                tag="a"
-                :href="\App\Filament\Pages\Sync\ManageAdobeProductsExportSetup::getUrl(['account' => $accountId])"
-                data-testid="sync-preview-setup-action"
-              >
-                {{ __('sync_data_setup.page.open_setup') }}
-              </x-filament::button>
-            </div>
-          @else
-            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {{ __('sync_preview.states.setup_permission_required') }}
-            </p>
-          @endif
-        </x-filament::section>
+        @include('filament.pages.sync.partials.sync-preview-setup-notice', [
+          'accountId' => $accountId,
+          'canManageSetup' => $canManageSetup,
+          'testId' => 'sync-preview-setup-required',
+        ])
         @break
 
       @case('account_unavailable')
@@ -68,6 +53,14 @@
         </x-filament::section>
         @break
 
+      @case('configuration_not_ready')
+        @include('filament.pages.sync.partials.sync-preview-setup-notice', [
+          'accountId' => $accountId,
+          'canManageSetup' => $canManageSetup,
+          'testId' => 'sync-preview-configuration-not-ready',
+        ])
+        @break
+
       @case('ready_to_preview')
         <x-filament::section>
           @if ($canStartPreview)
@@ -92,6 +85,13 @@
         @break
 
       @case('failed')
+        @if ($currentSetupRequired)
+          @include('filament.pages.sync.partials.sync-preview-setup-notice', [
+            'accountId' => $accountId,
+            'canManageSetup' => $canManageSetup,
+            'testId' => 'sync-preview-current-setup-required',
+          ])
+        @endif
         <x-filament::section>
           <p class="text-sm text-danger-600 dark:text-danger-400" data-testid="sync-preview-failed">
             {{ __('sync_preview.lifecycle.failed') }}
@@ -107,6 +107,13 @@
         @break
 
       @case('completed')
+        @if ($currentSetupRequired)
+          @include('filament.pages.sync.partials.sync-preview-setup-notice', [
+            'accountId' => $accountId,
+            'canManageSetup' => $canManageSetup,
+            'testId' => 'sync-preview-current-setup-required',
+          ])
+        @endif
         <x-filament::section>
           <div class="space-y-3" data-testid="sync-preview-completed-summary">
             <p class="text-sm font-medium text-gray-800 dark:text-gray-100">
@@ -177,7 +184,7 @@
               </thead>
               <tbody>
                 @forelse ($worklistRows as $row)
-                  <tr class="border-b border-gray-100 align-top dark:border-gray-800" data-testid="sync-preview-worklist-row-{{ $row['product_id'] }}">
+                  <tr class="border-b border-gray-100 align-top dark:border-gray-800" data-testid="sync-preview-worklist-row">
                     <td class="px-3 py-3">{!! $row['identity_html'] !!}</td>
                     <td class="px-3 py-3">
                       <x-filament::badge :color="$row['outcome_color']">

@@ -18,5 +18,6 @@ final readonly class SyncPreviewMerchantReadModel
         public ?string $configurationId,
         public ?SyncPreviewMerchantResultSummary $resultSummary,
         public bool $hasActiveRun,
+        public bool $currentSetupRequired = false,
     ) {}
 }

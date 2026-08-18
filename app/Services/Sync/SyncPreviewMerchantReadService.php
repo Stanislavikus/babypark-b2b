@@ -63,6 +63,7 @@ final class SyncPreviewMerchantReadService
                 configurationId: $configuration?->id,
                 resultSummary: null,
                 hasActiveRun: false,
+                currentSetupRequired: false,
             );
         }
 
@@ -79,6 +80,7 @@ final class SyncPreviewMerchantReadService
                 configurationId: null,
                 resultSummary: null,
                 hasActiveRun: false,
+                currentSetupRequired: false,
             );
         }
 
@@ -144,7 +146,19 @@ final class SyncPreviewMerchantReadService
         $latestRun = $this->findLatestRelevantRun($workspace->id, $configuration->id);
 
         if ($latestRun === null) {
-            $canStart = $this->readinessResolver->resolve($account)->isReady($configuration);
+            if ($this->currentSetupRequired($account, $configuration)) {
+                return $this->baseModel(
+                    SyncPreviewMerchantPageState::ConfigurationNotReady,
+                    $projection,
+                    $configuration,
+                    $canManageSetup,
+                    null,
+                    null,
+                    false,
+                    false,
+                    true,
+                );
+            }
 
             return $this->baseModel(
                 SyncPreviewMerchantPageState::ReadyToPreview,
@@ -154,9 +168,12 @@ final class SyncPreviewMerchantReadService
                 null,
                 null,
                 false,
-                $canStart,
+                true,
             );
         }
+
+        $canStartAfterTerminalRun = $this->canStartAfterTerminalRun($account, $configuration);
+        $currentSetupRequired = $this->currentSetupRequired($account, $configuration);
 
         if ($latestRun->status === SyncRunStatus::Failed) {
             return $this->baseModel(
@@ -167,7 +184,8 @@ final class SyncPreviewMerchantReadService
                 $latestRun,
                 null,
                 false,
-                $this->canStartAfterTerminalRun($account, $configuration),
+                $canStartAfterTerminalRun,
+                $currentSetupRequired,
             );
         }
 
@@ -179,7 +197,8 @@ final class SyncPreviewMerchantReadService
             $latestRun,
             $this->buildResultSummary($latestRun),
             false,
-            $this->canStartAfterTerminalRun($account, $configuration),
+            $canStartAfterTerminalRun,
+            $currentSetupRequired,
         );
     }
 
@@ -192,6 +211,7 @@ final class SyncPreviewMerchantReadService
         ?SyncPreviewMerchantResultSummary $resultSummary,
         bool $hasActiveRun,
         bool $canStartPreview = false,
+        bool $currentSetupRequired = false,
     ): SyncPreviewMerchantReadModel {
         $configurationChanged = $displayedRun !== null
             && $displayedRun->configuration_revision !== $configuration->configuration_revision;
@@ -208,7 +228,21 @@ final class SyncPreviewMerchantReadService
             configurationId: $configuration->id,
             resultSummary: $resultSummary,
             hasActiveRun: $hasActiveRun,
+            currentSetupRequired: $currentSetupRequired,
         );
+    }
+
+    private function currentSetupRequired(ConnectorAccount $account, SyncConfiguration $configuration): bool
+    {
+        if ($configuration->operational_state !== SyncConfigurationOperationalState::Enabled) {
+            return false;
+        }
+
+        if (! $configuration->enabledOperationSet()->contains(SyncSemanticOperation::Export)) {
+            return false;
+        }
+
+        return ! $this->readinessResolver->resolve($account)->isReady($configuration);
     }
 
     private function buildResultSummary(SyncRun $run): SyncPreviewMerchantResultSummary

@@ -59,6 +59,8 @@ class ManageAdobeProductsExportPreview extends Page
 
     public bool $configurationChangedSinceRun = false;
 
+    public bool $currentSetupRequired = false;
+
     public bool $pollActive = false;
 
     public ?string $lifecycleLabel = null;
@@ -198,6 +200,7 @@ class ManageAdobeProductsExportPreview extends Page
         $this->canManageSetup = $readModel->canManageSetup;
         $this->canStartPreview = $readModel->canStartPreview;
         $this->configurationChangedSinceRun = $readModel->configurationChangedSinceRun;
+        $this->currentSetupRequired = $readModel->currentSetupRequired;
         $this->displayedRunId = $readModel->displayedRunId;
         $this->configurationId = $readModel->configurationId;
         $this->pollActive = in_array($readModel->pageState, [

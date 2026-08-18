@@ -77,7 +77,6 @@ final class SyncPreviewWorklistPresenter
             $attentionSummary = $this->summarizeAttention($findings);
 
             $rows[] = [
-                'product_id' => (string) $product->id,
                 'identity_html' => $this->identityPresenter->presentHtml($product, $product->variants),
                 'outcome_label' => $this->outcomeLabel($item->outcome),
                 'outcome_color' => $this->outcomeColor($item->outcome),
