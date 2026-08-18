@@ -22,8 +22,6 @@ final readonly class SyncPreviewRemediationDestinationPresentation
     public function toArray(): array
     {
         return [
-            'area' => $this->area->value,
-            'actionability' => $this->actionability->value,
             'label' => $this->label,
             'action_label' => $this->actionLabel,
             'action_url' => $this->actionUrl,

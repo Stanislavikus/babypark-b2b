@@ -17,6 +17,7 @@ final class SyncPreviewFindingPresenter
 
     public function __construct(
         private readonly SyncPreviewFieldContextPresenter $fieldContextPresenter,
+        private readonly SyncPreviewFindingReferenceResolver $referenceResolver,
     ) {}
 
     /**
@@ -27,8 +28,8 @@ final class SyncPreviewFindingPresenter
         SyncPreviewPresentationContext $context,
         string $productId,
     ): SyncPreviewFindingPresentation {
-        $codeValue = $finding['code'] ?? null;
-        $code = is_string($codeValue) ? SyncPreviewFindingCode::tryFrom($codeValue) : null;
+        $reference = $this->referenceResolver->resolve($finding);
+        $code = $reference->code;
 
         if ($code === null) {
             return new SyncPreviewFindingPresentation(
@@ -39,39 +40,54 @@ final class SyncPreviewFindingPresenter
             );
         }
 
-        $subject = is_string($finding['subject'] ?? null) ? $finding['subject'] : null;
-        $rawContext = $finding['context'] ?? [];
-        $findingContext = is_array($rawContext) ? $rawContext : [];
-        $bindingId = is_string($findingContext['field_binding_id'] ?? null)
-            ? $findingContext['field_binding_id']
-            : null;
-        $binding = $context->binding($bindingId);
-        $variant = $context->variant($subject);
+        $binding = $context->binding($reference->fieldBindingId);
+        $variant = $reference->showsVariantContext ? $context->variant($reference->variantId) : null;
         $fieldContext = $this->fieldContextPresenter->present($binding);
-        $variantContext = $this->fieldContextPresenter->presentVariantContext(
-            $variant,
-            $code === SyncPreviewFindingCode::MissingSku,
-        );
+        $variantContext = $reference->showsVariantContext
+            ? $this->fieldContextPresenter->presentVariantContext(
+                $variant,
+                $code === SyncPreviewFindingCode::MissingSku,
+            )
+            : null;
 
         return match ($code) {
             SyncPreviewFindingCode::MissingRequiredFieldMapping => $this->presentMissingRequiredFieldMapping(
-                $subject,
+                is_string($finding['subject'] ?? null) ? $finding['subject'] : null,
                 $context,
             ),
             SyncPreviewFindingCode::MissingMappedProductValue,
-            SyncPreviewFindingCode::MissingName => $this->presentProductDataFinding($code, $binding, $fieldContext, $variantContext, $context, $productId),
+            SyncPreviewFindingCode::MissingName => $this->presentProductDataFinding($code, $fieldContext, $variantContext, $context, $productId),
             SyncPreviewFindingCode::MissingMappedVariantValue,
             SyncPreviewFindingCode::MissingSku,
             SyncPreviewFindingCode::DuplicateConfigurableCombination,
             SyncPreviewFindingCode::NoSellableVariant,
-            SyncPreviewFindingCode::ConfigurableVariantsIncomplete => $this->presentVariantDataFinding($code, $binding, $fieldContext, $variantContext, $context, $productId),
+            SyncPreviewFindingCode::ConfigurableVariantsIncomplete => $this->presentVariantDataFinding($code, $fieldContext, $variantContext, $context, $productId),
             SyncPreviewFindingCode::MissingOptionMapping,
-            SyncPreviewFindingCode::ExternalOptionMissingOrStale => $this->presentOptionMappingFinding($code, $binding, $fieldContext, $variantContext, $bindingId, $context, $productId),
+            SyncPreviewFindingCode::ExternalOptionMissingOrStale => $this->presentOptionMappingFinding(
+                $code,
+                $reference,
+                $fieldContext,
+                $variantContext,
+                $context,
+                $productId,
+            ),
             SyncPreviewFindingCode::AttributeSetUnconfigured,
             SyncPreviewFindingCode::AttributeSetInvalid => $this->presentConnectorSetupFinding($code, $fieldContext, $variantContext, $context),
-            SyncPreviewFindingCode::MappedFieldAbsentFromSelectedSet => $this->presentMappedFieldAbsentFromSelectedSet($binding, $fieldContext, $variantContext, $bindingId, $context),
+            SyncPreviewFindingCode::MappedFieldAbsentFromSelectedSet => $this->presentMappedFieldAbsentFromSelectedSet(
+                $binding,
+                $fieldContext,
+                $variantContext,
+                $reference->fieldBindingId,
+                $context,
+            ),
             SyncPreviewFindingCode::InvalidConfigurableAttribute,
-            SyncPreviewFindingCode::NoConfigurableDimension => $this->presentFieldMappingFinding($code, $binding, $fieldContext, $variantContext, $bindingId, $context),
+            SyncPreviewFindingCode::NoConfigurableDimension => $this->presentFieldMappingFinding(
+                $code,
+                $fieldContext,
+                $variantContext,
+                $reference->fieldBindingId,
+                $context,
+            ),
             SyncPreviewFindingCode::PriceUnavailable,
             SyncPreviewFindingCode::PriceConfigurationError => $this->presentPricingFinding($code, $fieldContext, $variantContext, $context, $productId),
         };
@@ -114,7 +130,6 @@ final class SyncPreviewFindingPresenter
 
     private function presentFieldMappingFinding(
         SyncPreviewFindingCode $code,
-        ?FieldBinding $binding,
         ?string $fieldContext,
         ?string $variantContext,
         ?string $bindingId,
@@ -125,7 +140,7 @@ final class SyncPreviewFindingPresenter
                 ? SyncPreviewRemediationActionability::CurrentConfigurationChanged
                 : $this->fieldMappingActionability($context, $bindingId);
         } else {
-            $actionability = ($bindingId !== null && $context->mappingChanged($bindingId))
+            $actionability = ($bindingId !== null && $context->fieldMappingChanged($bindingId))
                 ? SyncPreviewRemediationActionability::CurrentConfigurationChanged
                 : $this->fieldMappingActionability($context, $bindingId);
         }
@@ -147,7 +162,7 @@ final class SyncPreviewFindingPresenter
         ?string $bindingId,
         SyncPreviewPresentationContext $context,
     ): SyncPreviewFindingPresentation {
-        $mappingActionability = ($bindingId !== null && $context->mappingChanged($bindingId))
+        $mappingActionability = ($bindingId !== null && $context->fieldMappingChanged($bindingId))
             ? SyncPreviewRemediationActionability::CurrentConfigurationChanged
             : $this->fieldMappingActionability($context, $bindingId);
 
@@ -170,7 +185,6 @@ final class SyncPreviewFindingPresenter
 
     private function presentProductDataFinding(
         SyncPreviewFindingCode $code,
-        ?FieldBinding $binding,
         ?string $fieldContext,
         ?string $variantContext,
         SyncPreviewPresentationContext $context,
@@ -189,7 +203,6 @@ final class SyncPreviewFindingPresenter
 
     private function presentVariantDataFinding(
         SyncPreviewFindingCode $code,
-        ?FieldBinding $binding,
         ?string $fieldContext,
         ?string $variantContext,
         SyncPreviewPresentationContext $context,
@@ -208,16 +221,30 @@ final class SyncPreviewFindingPresenter
 
     private function presentOptionMappingFinding(
         SyncPreviewFindingCode $code,
-        ?FieldBinding $binding,
+        SyncPreviewFindingReference $reference,
         ?string $fieldContext,
         ?string $variantContext,
-        ?string $bindingId,
         SyncPreviewPresentationContext $context,
         string $productId,
     ): SyncPreviewFindingPresentation {
-        $actionability = ($bindingId !== null && $context->optionMappingChanged($bindingId))
-            ? SyncPreviewRemediationActionability::CurrentConfigurationChanged
-            : SyncPreviewRemediationActionability::NoEditSurface;
+        $bindingId = $reference->fieldBindingId;
+        $actionability = SyncPreviewRemediationActionability::NoEditSurface;
+
+        if ($bindingId !== null) {
+            $stale = match ($code) {
+                SyncPreviewFindingCode::MissingOptionMapping => $reference->internalOptionKey !== null
+                    && $context->optionMappingChanged($bindingId, $reference->internalOptionKey),
+                SyncPreviewFindingCode::ExternalOptionMissingOrStale => $context->externalOptionTargetChanged(
+                    $bindingId,
+                    $reference->externalFieldKey,
+                    $reference->externalOptionValue,
+                ),
+            };
+
+            if ($stale) {
+                $actionability = SyncPreviewRemediationActionability::CurrentConfigurationChanged;
+            }
+        }
 
         return new SyncPreviewFindingPresentation(
             summary: __($code->messageKey()),
@@ -281,7 +308,7 @@ final class SyncPreviewFindingPresenter
         SyncPreviewPresentationContext $context,
         ?string $bindingId,
     ): SyncPreviewRemediationActionability {
-        if ($bindingId !== null && $context->mappingChanged($bindingId)) {
+        if ($bindingId !== null && $context->fieldMappingChanged($bindingId)) {
             return SyncPreviewRemediationActionability::CurrentConfigurationChanged;
         }
 
@@ -305,8 +332,8 @@ final class SyncPreviewFindingPresenter
             actionability: $actionability,
             label: __('sync_preview.remediation.field_mapping'),
             actionLabel: match ($actionability) {
-                SyncPreviewRemediationActionability::ActionAvailable,
-                SyncPreviewRemediationActionability::ViewOnly => __('sync_preview.actions.configure_mapping'),
+                SyncPreviewRemediationActionability::ActionAvailable => __('sync_preview.actions.configure_mapping'),
+                SyncPreviewRemediationActionability::ViewOnly => __('sync_preview.actions.view_mapping'),
                 default => null,
             },
             actionUrl: in_array($actionability, [

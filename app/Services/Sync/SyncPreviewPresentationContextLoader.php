@@ -10,6 +10,7 @@ use App\Models\SyncRunItem;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionConfiguration;
+use App\Support\Sync\Preview\Presentation\SyncPreviewFindingReferenceResolver;
 use App\Support\Sync\Preview\Presentation\SyncPreviewPresentationContext;
 use Illuminate\Support\Collection;
 
@@ -18,6 +19,7 @@ final class SyncPreviewPresentationContextLoader
     public function __construct(
         private readonly SyncConfigurationMutationCoordinator $mutationCoordinator,
         private readonly AdobeProductsExportPreviewAuthorizationService $authorizationService,
+        private readonly SyncPreviewFindingReferenceResolver $referenceResolver,
     ) {}
 
     public function loadForRun(
@@ -65,19 +67,14 @@ final class SyncPreviewPresentationContextLoader
                     continue;
                 }
 
-                $context = $finding['context'] ?? [];
-                if (! is_array($context)) {
-                    $context = [];
+                $reference = $this->referenceResolver->resolve($finding);
+
+                if ($reference->fieldBindingId !== null) {
+                    $bindingIds[] = $reference->fieldBindingId;
                 }
 
-                $bindingId = $context['field_binding_id'] ?? null;
-                if (is_string($bindingId) && $bindingId !== '') {
-                    $bindingIds[] = $bindingId;
-                }
-
-                $subject = $finding['subject'] ?? null;
-                if (is_string($subject) && $subject !== '') {
-                    $variantIds[] = $subject;
+                if ($reference->variantId !== null) {
+                    $variantIds[] = $reference->variantId;
                 }
             }
         }
@@ -105,7 +102,7 @@ final class SyncPreviewPresentationContextLoader
                 ->whereIn('product_id', $productIds)
                 ->whereIn('id', array_values(array_unique($variantIds)))
                 ->get()
-                ->keyBy('id')
+                ->keyBy(fn (ProductVariant $variant): string => (string) $variant->id)
                 ->all();
         }
 

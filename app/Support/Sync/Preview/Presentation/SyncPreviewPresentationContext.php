@@ -56,6 +56,11 @@ final readonly class SyncPreviewPresentationContext
 
     public function mappingChanged(string $bindingId): bool
     {
+        return $this->fieldMappingChanged($bindingId);
+    }
+
+    public function fieldMappingChanged(string $bindingId): bool
+    {
         $historical = $this->historicalMappingsByBindingId[$bindingId] ?? null;
         $current = $this->currentMappingsByBindingId[$bindingId] ?? null;
 
@@ -67,14 +72,79 @@ final readonly class SyncPreviewPresentationContext
             return true;
         }
 
-        return $historical['external_field_key'] !== $current['external_field_key']
-            || $this->canonicalizeOptions($historical['option_mappings'])
-            !== $this->canonicalizeOptions($current['option_mappings']);
+        return $historical['external_field_key'] !== $current['external_field_key'];
     }
 
-    public function optionMappingChanged(string $bindingId): bool
+    public function optionMappingChanged(string $bindingId, ?string $internalOptionKey = null): bool
     {
-        return $this->mappingChanged($bindingId);
+        $historical = $this->historicalMappingsByBindingId[$bindingId] ?? null;
+        $current = $this->currentMappingsByBindingId[$bindingId] ?? null;
+
+        if ($historical === null && $current === null) {
+            return false;
+        }
+
+        if ($historical === null || $current === null) {
+            return true;
+        }
+
+        if ($historical['external_field_key'] !== $current['external_field_key']) {
+            return true;
+        }
+
+        if ($internalOptionKey === null) {
+            return $this->canonicalizeOptions($historical['option_mappings'])
+                !== $this->canonicalizeOptions($current['option_mappings']);
+        }
+
+        $historicalOption = $this->optionMappingForKey($historical['option_mappings'], $internalOptionKey);
+        $currentOption = $this->optionMappingForKey($current['option_mappings'], $internalOptionKey);
+
+        return $historicalOption !== $currentOption;
+    }
+
+    public function externalOptionTargetChanged(
+        string $bindingId,
+        ?string $externalFieldKey,
+        ?string $externalOptionValue,
+    ): bool {
+        if ($this->fieldMappingChanged($bindingId)) {
+            return true;
+        }
+
+        $historical = $this->historicalMappingsByBindingId[$bindingId] ?? null;
+        $current = $this->currentMappingsByBindingId[$bindingId] ?? null;
+
+        if ($historical === null || $current === null) {
+            return $historical !== $current;
+        }
+
+        if ($externalFieldKey !== null && $historical['external_field_key'] !== $externalFieldKey) {
+            return true;
+        }
+
+        if ($externalOptionValue === null) {
+            return false;
+        }
+
+        $historicalOptions = $this->canonicalizeOptions($historical['option_mappings']);
+        $currentOptions = $this->canonicalizeOptions($current['option_mappings']);
+
+        foreach ($historicalOptions as $option) {
+            if ($option['external_option_value'] === $externalOptionValue) {
+                $matchingCurrent = collect($currentOptions)->first(
+                    fn (array $currentOption): bool => $currentOption['internal_option_key'] === $option['internal_option_key'],
+                );
+
+                if ($matchingCurrent === null) {
+                    return true;
+                }
+
+                return $matchingCurrent['external_option_value'] !== $option['external_option_value'];
+            }
+        }
+
+        return false;
     }
 
     public function mappingSetChanged(): bool
@@ -90,12 +160,21 @@ final readonly class SyncPreviewPresentationContext
         }
 
         foreach ($historicalKeys as $bindingId) {
-            if ($this->mappingChanged($bindingId)) {
+            if ($this->fullMappingPayloadChanged($bindingId)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    public function fullMappingPayloadChanged(string $bindingId): bool
+    {
+        if ($this->fieldMappingChanged($bindingId)) {
+            return true;
+        }
+
+        return $this->optionMappingChanged($bindingId);
     }
 
     public function connectorSetupChanged(): bool
@@ -162,5 +241,25 @@ final readonly class SyncPreviewPresentationContext
         );
 
         return $normalized;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $options
+     */
+    private function optionMappingForKey(array $options, string $internalOptionKey): ?string
+    {
+        foreach ($options as $option) {
+            if (! is_array($option)) {
+                continue;
+            }
+
+            if (($option['internal_option_key'] ?? null) === $internalOptionKey) {
+                $external = $option['external_option_value'] ?? null;
+
+                return is_string($external) ? $external : null;
+            }
+        }
+
+        return null;
     }
 }

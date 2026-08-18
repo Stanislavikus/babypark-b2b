@@ -70,13 +70,15 @@
 
       @case('ready_to_preview')
         <x-filament::section>
-          <x-filament::button
-            wire:click="startPreview"
-            color="primary"
-            data-testid="sync-preview-start"
-          >
-            {{ __('sync_preview.actions.start') }}
-          </x-filament::button>
+          @if ($canStartPreview)
+            <x-filament::button
+              wire:click="startPreview"
+              color="primary"
+              data-testid="sync-preview-start"
+            >
+              {{ __('sync_preview.actions.start') }}
+            </x-filament::button>
+          @endif
         </x-filament::section>
         @break
 
@@ -120,9 +122,11 @@
                 {{ __('sync_preview.results.completed_at', ['datetime' => $completedAtLabel]) }}
               </p>
             @endif
-            <x-filament::button wire:click="startPreview" color="gray" data-testid="sync-preview-rerun">
-              {{ __('sync_preview.actions.rerun') }}
-            </x-filament::button>
+            @if ($canStartPreview)
+              <x-filament::button wire:click="startPreview" color="gray" data-testid="sync-preview-rerun">
+                {{ __('sync_preview.actions.rerun') }}
+              </x-filament::button>
+            @endif
           </div>
         </x-filament::section>
 

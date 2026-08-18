@@ -179,7 +179,7 @@ final class SyncPreviewMerchantReadService
             $latestRun,
             $this->buildResultSummary($latestRun),
             false,
-            true,
+            $this->canStartAfterTerminalRun($account, $configuration),
         );
     }
 
@@ -242,6 +242,7 @@ final class SyncPreviewMerchantReadService
             ->where('semantic_operation', SyncSemanticOperation::Export)
             ->whereIn('status', [SyncRunStatus::Queued, SyncRunStatus::Running])
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->first();
     }
 
@@ -254,6 +255,7 @@ final class SyncPreviewMerchantReadService
             ->where('semantic_operation', SyncSemanticOperation::Export)
             ->whereIn('status', [SyncRunStatus::Completed, SyncRunStatus::Failed])
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->first();
     }
 
