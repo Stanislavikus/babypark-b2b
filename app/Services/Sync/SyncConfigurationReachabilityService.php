@@ -41,14 +41,11 @@ final class SyncConfigurationReachabilityService
             return $configuration->refresh();
         }
 
-        $enabledOperations = $configuration->enabledOperationSet()->operations();
-        $enabledOperations[] = SyncSemanticOperation::Export;
-
         return $this->configurationService->update(
             $account,
             $configuration->id,
             new UpdateSyncConfigurationInput(
-                enabledOperations: $enabledOperations,
+                enabledOperations: [SyncSemanticOperation::Export],
             ),
         );
     }

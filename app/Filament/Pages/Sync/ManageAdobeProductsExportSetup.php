@@ -5,6 +5,8 @@ namespace App\Filament\Pages\Sync;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
+use App\Services\Sync\ConnectorAccountLayerBSetupProjectionQuery;
+use App\Support\Connectors\Transport\ConnectorTransportException;
 use App\Support\Sync\AdobeProductExportSetup\AdobeProductExportSetupSafeMessagePresenter;
 use App\Support\Sync\Exceptions\ConnectorExecutionConfigurationValidationException;
 use App\Support\Workspace\Rbac\Concerns\RequiresFreshWorkspaceSyncConfigurationPermission;
@@ -19,6 +21,7 @@ use Filament\Schemas\Schema;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Locked;
 use Throwable;
 
@@ -46,7 +49,14 @@ class ManageAdobeProductsExportSetup extends Page implements HasForms
 
     public bool $configuredSetStale = false;
 
+    public bool $configurationPaused = false;
+
+    public bool $metadataUnavailable = false;
+
     public ?string $configuredAttributeSetName = null;
+
+    /** @var array<string, string> */
+    public array $attributeSetOptions = [];
 
     public ?array $data = [];
 
@@ -82,10 +92,10 @@ class ManageAdobeProductsExportSetup extends Page implements HasForms
                     ->schema([
                         Select::make('attribute_set_id')
                             ->label(__('sync_data_setup.adobe_products_export.attribute_set_label'))
-                            ->options(fn (): array => $this->attributeSetOptions())
+                            ->options(fn (): array => $this->attributeSetOptions)
                             ->required()
                             ->native(false)
-                            ->disabled(fn (): bool => ! $this->setupUsable),
+                            ->disabled(fn (): bool => ! $this->setupUsable || $this->metadataUnavailable),
                     ]),
             ])
             ->statePath('data');
@@ -102,7 +112,7 @@ class ManageAdobeProductsExportSetup extends Page implements HasForms
             abort(403);
         }
 
-        if (! $this->setupUsable) {
+        if (! $this->setupUsable || $this->metadataUnavailable) {
             abort(403);
         }
 
@@ -142,23 +152,37 @@ class ManageAdobeProductsExportSetup extends Page implements HasForms
         } catch (AuthorizationException) {
             abort(403);
         } catch (Throwable $exception) {
-            $presenter = app(AdobeProductExportSetupSafeMessagePresenter::class);
+            Log::warning('sync_data_setup.read_model_failed', [
+                'workspace_id' => $workspace->id,
+                'connector_account_id' => $this->accountId,
+                'exception' => $exception,
+            ]);
 
-            Notification::make()
-                ->title(__('sync_data_setup.errors.unavailable'))
-                ->body($presenter->present($exception))
-                ->danger()
-                ->send();
+            if (app(AdobeProductExportSetupAuthorizationService::class)->canAccess($user, $workspace)) {
+                $projection = app(ConnectorAccountLayerBSetupProjectionQuery::class)
+                    ->resolve($workspace->id, $this->accountId);
 
-            abort(403);
+                if ($projection !== null) {
+                    $this->platformName = $projection->platformName;
+                    $this->accountName = $projection->accountName;
+                    $this->setupUsable = $projection->setupUsable;
+                }
+            }
+
+            $this->applyUnavailableReadState($exception);
+
+            return;
         }
 
+        $this->metadataUnavailable = false;
         $this->platformName = $readModel->account->platformName;
         $this->accountName = $readModel->account->accountName;
         $this->setupUsable = $readModel->account->setupUsable;
         $this->setupRequired = $readModel->setupRequired;
         $this->configuredSetStale = $readModel->configuredSetStale;
+        $this->configurationPaused = $readModel->configurationPaused;
         $this->configuredAttributeSetName = $readModel->configuredAttributeSetName;
+        $this->attributeSetOptions = $this->mapAttributeSetOptions($readModel->availableAttributeSets);
 
         $selectedId = $readModel->configuredAttributeSetId
             ?? $readModel->preselectedAttributeSetId;
@@ -168,29 +192,33 @@ class ManageAdobeProductsExportSetup extends Page implements HasForms
         ]);
     }
 
+    private function applyUnavailableReadState(Throwable $exception): void
+    {
+        $presenter = app(AdobeProductExportSetupSafeMessagePresenter::class);
+
+        $this->metadataUnavailable = true;
+        $this->attributeSetOptions = [];
+        $this->setupRequired = true;
+        $this->configuredSetStale = false;
+        $this->configurationPaused = false;
+        $this->configuredAttributeSetName = null;
+
+        Notification::make()
+            ->title(__('sync_data_setup.errors.unavailable'))
+            ->body($presenter->present($exception))
+            ->danger()
+            ->send();
+    }
+
     /**
+     * @param  list<array{attribute_set_id: int, attribute_set_name: string}>  $attributeSets
      * @return array<string, string>
      */
-    private function attributeSetOptions(): array
+    private function mapAttributeSetOptions(array $attributeSets): array
     {
-        $user = Auth::user();
-        abort_unless($user instanceof User, 403);
-
-        $workspace = $this->resolveSyncSetupWorkspace();
-
-        try {
-            $readModel = app(AdobeProductExportSetupAuthorizationService::class)->projectReadModel(
-                $user,
-                $workspace->id,
-                $this->accountId,
-            );
-        } catch (AuthorizationException) {
-            return [];
-        }
-
         $options = [];
 
-        foreach ($readModel->availableAttributeSets as $attributeSet) {
+        foreach ($attributeSets as $attributeSet) {
             $options[(string) $attributeSet['attribute_set_id']] = $attributeSet['attribute_set_name'];
         }
 
@@ -199,6 +227,14 @@ class ManageAdobeProductsExportSetup extends Page implements HasForms
 
     private function notifyFailure(Throwable $exception): void
     {
+        if (! $exception instanceof ConnectorExecutionConfigurationValidationException
+            && ! $exception instanceof ConnectorTransportException) {
+            Log::warning('sync_data_setup.save_failed', [
+                'connector_account_id' => $this->accountId,
+                'exception' => $exception,
+            ]);
+        }
+
         $presenter = app(AdobeProductExportSetupSafeMessagePresenter::class);
 
         Notification::make()

@@ -5,6 +5,7 @@ namespace Tests\Feature\Sync;
 use App\Enums\SyncConfigurationOperationalState;
 use App\Enums\SyncDataDomain;
 use App\Enums\SyncSemanticOperation;
+use App\Filament\Pages\Sync\ListSyncDataSetup;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
 use App\Models\ConnectorAccount;
 use App\Models\SyncConfiguration;
@@ -29,6 +30,7 @@ use App\Support\Connectors\ConnectorAccountLayerBSetupProjection;
 use App\Support\Connectors\ConnectorAuthorization;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorOutboundRequest;
+use App\Support\Connectors\Transport\ConnectorTransportException;
 use App\Support\Sync\ConnectorExecutionConfiguration;
 use App\Support\Sync\Exceptions\ConnectorExecutionConfigurationValidationException;
 use App\Support\Sync\SyncExternalContext;
@@ -129,6 +131,32 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
     }
 
     #[Test]
+    public function manage_sync_configurations_only_actor_can_discover_data_setup_entry_and_navigate_to_adobe_setup(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS);
+        $this->bindSetupTransport($this->attributeSetsListResponse([
+            ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
+        ]));
+
+        $this->assertFalse(app(ConnectorAuthorization::class)->canSafeRead($actor, $workspace));
+
+        Livewire::actingAs($actor)
+            ->test(ListSyncDataSetup::class)
+            ->assertOk()
+            ->assertSee(__('sync_data_setup.navigation.label'))
+            ->assertSee(__('sync_data_setup.targets.adobe_products_export'))
+            ->assertSee(__('sync_data_setup.page.open_setup'))
+            ->assertSee('data-testid="sync-data-setup-target-'.$account->id.'"', false);
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportSetup::class, ['account' => $account->id])
+            ->assertOk()
+            ->assertSee(__('sync_data_setup.adobe_products_export.attribute_set_label'));
+    }
+
+    #[Test]
     public function manage_sync_configurations_only_actor_can_reach_setup_without_connector_read(): void
     {
         $workspace = $this->defaultWorkspace();
@@ -226,7 +254,7 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
     public function lookup_finds_products_default_configuration_without_mutation(): void
     {
         $account = $this->syncSupportAccount();
-        $configuration = $this->createProductsExportConfiguration($account, exportEnabled: false);
+        $configuration = $this->createExportDisabledProductsConfiguration($account);
 
         $found = app(SyncConfigurationLookupService::class)->findProductsDefaultContext($account);
 
@@ -457,7 +485,153 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
     }
 
     #[Test]
-    public function fresh_authorization_revocation_before_persistence_fails_closed(): void
+    public function form_render_does_not_duplicate_adobe_http_requests(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS);
+        $transport = $this->attributeSetsListResponse([
+            ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
+            ['attribute_set_id' => 9, 'attribute_set_name' => 'Baby'],
+        ]);
+        $this->bindSetupTransport($transport);
+
+        $component = Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportSetup::class, ['account' => $account->id])
+            ->assertOk();
+
+        $this->assertSame(1, $transport->sendCount);
+
+        $component->call('$refresh')->assertOk();
+
+        $this->assertSame(1, $transport->sendCount);
+    }
+
+    #[Test]
+    public function unsupported_non_adobe_target_zero_http_before_metadata(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->syncSupportAccount($workspace);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS);
+        $transport = $this->attributeSetsListResponse([
+            ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
+        ]);
+        $this->bindSetupTransport($transport);
+
+        $this->expectException(AuthorizationException::class);
+
+        try {
+            app(AdobeProductExportSetupAuthorizationService::class)->projectReadModel(
+                $actor,
+                $workspace->id,
+                $account->id,
+            );
+        } finally {
+            $this->assertSame(0, $transport->sendCount);
+        }
+    }
+
+    #[Test]
+    public function disabled_target_zero_http_before_metadata(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace, ['is_enabled' => false]);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS);
+        $transport = $this->attributeSetsListResponse([
+            ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
+        ]);
+        $this->bindSetupTransport($transport);
+
+        $readModel = app(AdobeProductExportSetupAuthorizationService::class)->projectReadModel(
+            $actor,
+            $workspace->id,
+            $account->id,
+        );
+
+        $this->assertSame(0, $transport->sendCount);
+        $this->assertFalse($readModel->account->setupUsable);
+        $this->assertTrue($readModel->setupRequired);
+        $this->assertSame([], $readModel->availableAttributeSets);
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportSetup::class, ['account' => $account->id])
+            ->assertOk()
+            ->assertSee(__('sync_data_setup.adobe_products_export.account_unavailable'));
+    }
+
+    #[Test]
+    public function export_disabled_with_valid_attribute_set_requires_setup(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $configuration = $this->createExportDisabledProductsConfigurationWithAttributeSet($account, 4);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS);
+        $this->bindSetupTransport($this->attributeSetsListResponse([
+            ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
+        ]));
+
+        $readModel = app(AdobeProductExportSetupAuthorizationService::class)->projectReadModel(
+            $actor,
+            $workspace->id,
+            $account->id,
+        );
+
+        $this->assertTrue($readModel->setupRequired);
+        $this->assertFalse($readModel->exportEnabled);
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportSetup::class, ['account' => $account->id])
+            ->assertOk()
+            ->assertSee(__('sync_data_setup.adobe_products_export.setup_required'))
+            ->assertDontSee(__('sync_data_setup.adobe_products_export.current_selection', [
+                'name' => 'Default',
+            ]));
+    }
+
+    #[Test]
+    public function page_read_with_export_disabled_configuration_causes_zero_mutation(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $configuration = $this->createExportDisabledProductsConfigurationWithAttributeSet($account, 4);
+        $revisionBefore = $configuration->fresh()->configuration_revision;
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS);
+        $this->bindSetupTransport($this->attributeSetsListResponse([
+            ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
+        ]));
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportSetup::class, ['account' => $account->id])
+            ->assertOk();
+
+        $configuration->refresh();
+        $this->assertFalse($configuration->enabledOperationSet()->contains(SyncSemanticOperation::Export));
+        $this->assertSame($revisionBefore, $configuration->configuration_revision);
+    }
+
+    #[Test]
+    public function explicit_valid_save_enables_export_for_disabled_export_configuration(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $configuration = $this->createExportDisabledProductsConfiguration($account);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS);
+        $this->bindSetupTransport($this->attributeSetsListResponse([
+            ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
+        ]));
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportSetup::class, ['account' => $account->id])
+            ->set('data.attribute_set_id', '4')
+            ->call('save')
+            ->assertNotified();
+
+        $configuration->refresh();
+        $this->assertTrue($configuration->enabledOperationSet()->contains(SyncSemanticOperation::Export));
+    }
+
+    #[Test]
+    public function post_vendor_read_permission_revocation_fails_closed_without_mutation(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->adobeAccount($workspace);
@@ -466,23 +640,126 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
             ->where('workspace_id', $workspace->id)
             ->where('user_id', $actor->id)
             ->firstOrFail();
-        $this->bindSetupTransport($this->attributeSetsListResponse([
-            ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
-        ]));
 
-        app(AdobeProductExportSetupService::class)->validateAttributeSetSelection($account, 4);
-        $this->revokeAllWorkspaceRoles($membership);
+        $transport = new RecordingConnectorHttpTransport(
+            function (ConnectorOutboundRequest $request, int $sendCount) use ($membership): ConnectorHttpResult {
+                $this->revokeAllWorkspaceRoles($membership);
+
+                return new ConnectorHttpResult(
+                    200,
+                    [],
+                    json_encode(['items' => [
+                        ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
+                    ]], JSON_THROW_ON_ERROR),
+                );
+            },
+        );
+        $this->bindSetupTransport($transport);
 
         $this->expectException(AuthorizationException::class);
 
-        app(AdobeProductExportSetupAuthorizationService::class)->configureAttributeSet(
-            $actor,
-            $workspace->id,
-            $account->id,
-            4,
+        try {
+            app(AdobeProductExportSetupAuthorizationService::class)->configureAttributeSet(
+                $actor,
+                $workspace->id,
+                $account->id,
+                4,
+            );
+        } finally {
+            $this->assertNull(app(SyncConfigurationLookupService::class)->findProductsDefaultContext($account));
+        }
+    }
+
+    #[Test]
+    public function adobe_http_occurs_outside_setup_persistence_transaction(): void
+    {
+        $account = $this->adobeAccount();
+        $baselineTransactionLevel = DB::transactionLevel();
+
+        $transport = new RecordingConnectorHttpTransport(
+            function (ConnectorOutboundRequest $request, int $sendCount) use ($baselineTransactionLevel): ConnectorHttpResult {
+                $this->assertSame($baselineTransactionLevel, DB::transactionLevel());
+
+                return new ConnectorHttpResult(
+                    200,
+                    [],
+                    json_encode(['items' => [
+                        ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
+                    ]], JSON_THROW_ON_ERROR),
+                );
+            },
         );
 
-        $this->assertNull(app(SyncConfigurationLookupService::class)->findProductsDefaultContext($account));
+        $service = $this->setupServiceWithTransport($transport);
+        $service->configureAttributeSet($account, 4);
+
+        $this->assertSame(1, $transport->sendCount);
+    }
+
+    #[Test]
+    public function atomic_rollback_when_persistence_fails_after_absent_configuration(): void
+    {
+        $account = $this->adobeAccount();
+        $transport = $this->attributeSetsListResponse([
+            ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
+        ]);
+        $this->bindSetupTransport($transport);
+
+        $this->injectConnectorExecutionConfigurationPersistenceFailure();
+
+        $service = app(AdobeProductExportSetupService::class);
+
+        $this->expectException(\RuntimeException::class);
+
+        try {
+            $service->configureAttributeSet($account, 4);
+        } finally {
+            $this->assertNull(app(SyncConfigurationLookupService::class)->findProductsDefaultContext($account));
+        }
+    }
+
+    #[Test]
+    public function atomic_rollback_when_persistence_fails_with_export_disabled_configuration(): void
+    {
+        $account = $this->adobeAccount();
+        $configuration = $this->createExportDisabledProductsConfiguration($account);
+        $revisionBefore = $configuration->configuration_revision;
+        $transport = $this->attributeSetsListResponse([
+            ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
+        ]);
+        $this->bindSetupTransport($transport);
+
+        $this->injectConnectorExecutionConfigurationPersistenceFailure();
+
+        $service = app(AdobeProductExportSetupService::class);
+
+        $this->expectException(\RuntimeException::class);
+
+        try {
+            $service->configureAttributeSet($account, 4);
+        } finally {
+            $configuration->refresh();
+            $this->assertFalse($configuration->enabledOperationSet()->contains(SyncSemanticOperation::Export));
+            $this->assertSame($revisionBefore, $configuration->configuration_revision);
+        }
+    }
+
+    #[Test]
+    public function remote_metadata_failure_does_not_abort_as_authorization_failure(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS);
+
+        $transport = new RecordingConnectorHttpTransport(
+            fn (ConnectorOutboundRequest $request, int $sendCount): ConnectorHttpResult => throw new ConnectorTransportException('upstream unavailable'),
+        );
+        $this->bindSetupTransport($transport);
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportSetup::class, ['account' => $account->id])
+            ->assertOk()
+            ->assertSee(__('sync_data_setup.errors.remote_unavailable'));
     }
 
     #[Test]
@@ -548,7 +825,7 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
     }
 
     #[Test]
-    public function permission_revocation_blocks_subsequent_livewire_save(): void
+    public function same_livewire_component_rejects_mutation_after_permission_revocation(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->adobeAccount($workspace);
@@ -561,19 +838,95 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
             ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
         ]));
 
-        $this->bindSetupTransport($this->attributeSetsListResponse([
-            ['attribute_set_id' => 4, 'attribute_set_name' => 'Default'],
-        ]));
-
-        Livewire::actingAs($actor)
+        $component = Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportSetup::class, ['account' => $account->id])
             ->assertOk();
 
         $this->revokeAllWorkspaceRoles($membership);
 
-        Livewire::actingAs($actor)
-            ->test(ManageAdobeProductsExportSetup::class, ['account' => $account->id])
+        $component
+            ->call('save')
             ->assertForbidden();
+
+        $this->assertNull(app(SyncConfigurationLookupService::class)->findProductsDefaultContext($account));
+    }
+
+    private function createExportDisabledProductsConfiguration(ConnectorAccount $account): SyncConfiguration
+    {
+        return $this->insertProductsConfigurationRecord(
+            $account,
+            enabledOperations: [SyncSemanticOperation::Import],
+            connectorExecutionConfiguration: null,
+        );
+    }
+
+    private function createExportDisabledProductsConfigurationWithAttributeSet(
+        ConnectorAccount $account,
+        int $attributeSetId,
+    ): SyncConfiguration {
+        return $this->insertProductsConfigurationRecord(
+            $account,
+            enabledOperations: [SyncSemanticOperation::Import],
+            connectorExecutionConfiguration: ['attribute_set_id' => $attributeSetId],
+        );
+    }
+
+    /**
+     * @param  list<SyncSemanticOperation|string>  $enabledOperations
+     * @param  array<string, mixed>|null  $connectorExecutionConfiguration
+     */
+    private function insertProductsConfigurationRecord(
+        ConnectorAccount $account,
+        array $enabledOperations,
+        ?array $connectorExecutionConfiguration,
+    ): SyncConfiguration {
+        $id = (string) Str::uuid();
+        $externalContext = SyncExternalContext::default();
+        $operationValues = array_map(
+            static fn (SyncSemanticOperation|string $operation): string => $operation instanceof SyncSemanticOperation
+                ? $operation->value
+                : $operation,
+            $enabledOperations,
+        );
+
+        DB::table('sync_configurations')->insert([
+            'id' => $id,
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'data_domain' => SyncDataDomain::Products->value,
+            'external_context' => json_encode($externalContext->payload(), JSON_THROW_ON_ERROR),
+            'external_context_key' => $externalContext->uniquenessKey(),
+            'enabled_operations' => json_encode($operationValues, JSON_THROW_ON_ERROR),
+            'operational_state' => SyncConfigurationOperationalState::Enabled->value,
+            'configuration_revision' => 'export-disabled-'.Str::random(8),
+            'connector_execution_configuration' => $connectorExecutionConfiguration !== null
+                ? json_encode($connectorExecutionConfiguration, JSON_THROW_ON_ERROR)
+                : null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return SyncConfiguration::withoutWorkspaceScope()->findOrFail($id);
+    }
+
+    private function injectConnectorExecutionConfigurationPersistenceFailure(): void
+    {
+        $armed = true;
+
+        DB::listen(function ($query) use (&$armed): void {
+            if (! $armed) {
+                return;
+            }
+
+            if (! str_contains(strtolower($query->sql), 'update')
+                || ! str_contains($query->sql, 'connector_execution_configuration')) {
+                return;
+            }
+
+            $armed = false;
+
+            throw new \RuntimeException('injected persistence failure');
+        });
     }
 
     private function actorWithPermission(Workspace $workspace, string $permission): User
@@ -647,9 +1000,9 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
         return app(AdobeProductExportSetupService::class);
     }
 
-    private function adobeAccount(?Workspace $workspace = null): ConnectorAccount
+    private function adobeAccount(?Workspace $workspace = null, array $overrides = []): ConnectorAccount
     {
-        return $this->createConnectorAccount($workspace);
+        return $this->createConnectorAccount($workspace, $overrides);
     }
 
     private function syncSupportAccount(?Workspace $workspace = null): ConnectorAccount

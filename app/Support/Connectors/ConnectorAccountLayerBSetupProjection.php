@@ -62,12 +62,4 @@ final readonly class ConnectorAccountLayerBSetupProjection
     {
         return (bool) $account->is_enabled;
     }
-
-    /**
-     * Defense in depth when a hydrated model is returned alongside the projection.
-     */
-    public static function sanitizeLoadedAccount(ConnectorAccount $account): ConnectorAccount
-    {
-        return $account->makeHidden(ConnectorAccountCapabilityPresentation::hiddenAttributes());
-    }
 }

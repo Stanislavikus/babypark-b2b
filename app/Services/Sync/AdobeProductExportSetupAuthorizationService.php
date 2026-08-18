@@ -2,6 +2,9 @@
 
 namespace App\Services\Sync;
 
+use App\Enums\SyncConfigurationOperationalState;
+use App\Enums\SyncSemanticOperation;
+use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
 use App\Models\ConnectorAccount;
 use App\Models\SyncConfiguration;
 use App\Models\User;
@@ -10,6 +13,8 @@ use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionConfiguration;
 use App\Support\Connectors\ConnectorAccountLayerBSetupProjection;
 use App\Support\Sync\AdobeProductExportSetup\AdobeProductExportSetupReadModel;
+use App\Support\Sync\AdobeProductExportSetup\AdobeProductExportSetupTargetEligibility;
+use App\Support\Sync\AdobeProductExportSetup\SyncDataSetupTargetSummary;
 use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Auth\Access\AuthorizationException;
 
@@ -24,6 +29,7 @@ final class AdobeProductExportSetupAuthorizationService
         private readonly ConnectorAccountLayerBSetupProjectionQuery $projectionQuery,
         private readonly SyncConfigurationLookupService $lookupService,
         private readonly AdobeProductExportSetupService $setupService,
+        private readonly AdobeProductExportSetupTargetEligibility $targetEligibility,
     ) {}
 
     public function canAccess(User $actor, Workspace $workspace): bool
@@ -33,6 +39,37 @@ final class AdobeProductExportSetupAuthorizationService
             $workspace,
             WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
         );
+    }
+
+    /**
+     * @return list<SyncDataSetupTargetSummary>
+     */
+    public function listEligibleSetupTargets(User $actor, Workspace $workspace): array
+    {
+        if (! $this->canAccess($actor, $workspace)) {
+            throw new AuthorizationException('This action is unauthorized.');
+        }
+
+        $targets = [];
+
+        foreach ($this->projectionQuery->listForWorkspace($workspace->id) as $projection) {
+            $account = $this->resolveConnectorAccount($workspace->id, $projection->id);
+
+            if (! $this->targetEligibility->isEligible($account)) {
+                continue;
+            }
+
+            $targets[] = new SyncDataSetupTargetSummary(
+                accountId: $projection->id,
+                platformName: $projection->platformName,
+                accountName: $projection->accountName,
+                setupUsable: $projection->setupUsable,
+                targetLabel: __('sync_data_setup.targets.adobe_products_export'),
+                setupUrl: ManageAdobeProductsExportSetup::getUrl(['account' => $projection->id]),
+            );
+        }
+
+        return $targets;
     }
 
     public function projectReadModel(
@@ -47,25 +84,27 @@ final class AdobeProductExportSetupAuthorizationService
         }
 
         $account = $this->resolveConnectorAccount($workspaceId, $connectorAccountId);
-        $attributeSets = $this->setupService->listAvailableAttributeSets($account);
+
+        if (! $this->targetEligibility->isEligible($account)) {
+            throw new AuthorizationException('This action is unauthorized.');
+        }
+
         $configuration = $this->lookupService->findProductsDefaultContext($account);
 
-        $configuredId = $this->resolveConfiguredAttributeSetId($configuration);
-        $configuredName = $this->resolveAttributeSetName($attributeSets, $configuredId);
-        $configuredStale = $configuredId !== null && $configuredName === null;
-        $setupRequired = $configuredId === null || $configuredStale;
-        $preselected = count($attributeSets) === 1
-            ? $attributeSets[0]['attribute_set_id']
-            : null;
+        if (! ConnectorAccountLayerBSetupProjection::isSetupUsable($account)) {
+            return $this->buildReadModel(
+                projection: $projection,
+                configuration: $configuration,
+                attributeSets: [],
+            );
+        }
 
-        return new AdobeProductExportSetupReadModel(
-            account: $projection,
-            availableAttributeSets: $attributeSets,
-            configuredAttributeSetId: $configuredId,
-            configuredAttributeSetName: $configuredName,
-            configuredSetStale: $configuredStale,
-            setupRequired: $setupRequired,
-            preselectedAttributeSetId: $preselected,
+        $attributeSets = $this->setupService->listAvailableAttributeSets($account);
+
+        return $this->buildReadModel(
+            projection: $projection,
+            configuration: $configuration,
+            attributeSets: $attributeSets,
         );
     }
 
@@ -82,6 +121,14 @@ final class AdobeProductExportSetupAuthorizationService
         }
 
         $account = $this->resolveConnectorAccount($workspaceId, $connectorAccountId);
+
+        if (! $this->targetEligibility->isEligible($account)) {
+            throw new AuthorizationException('This action is unauthorized.');
+        }
+
+        if (! ConnectorAccountLayerBSetupProjection::isSetupUsable($account)) {
+            throw new AuthorizationException('This action is unauthorized.');
+        }
 
         $this->setupService->validateAttributeSetSelection($account, $attributeSetId);
 
@@ -146,6 +193,48 @@ final class AdobeProductExportSetupAuthorizationService
         }
 
         return $account;
+    }
+
+    /**
+     * @param  list<array{attribute_set_id: int, attribute_set_name: string}>  $attributeSets
+     */
+    private function buildReadModel(
+        ConnectorAccountLayerBSetupProjection $projection,
+        ?SyncConfiguration $configuration,
+        array $attributeSets,
+    ): AdobeProductExportSetupReadModel {
+        $exportEnabled = $configuration !== null
+            && $configuration->enabledOperationSet()->contains(SyncSemanticOperation::Export);
+        $configurationPaused = $configuration !== null
+            && $configuration->operational_state === SyncConfigurationOperationalState::Paused;
+
+        $configuredId = $this->resolveConfiguredAttributeSetId($configuration);
+        $configuredName = $this->resolveAttributeSetName($attributeSets, $configuredId);
+        $configuredStale = $configuredId !== null
+            && $projection->setupUsable
+            && $configuredName === null;
+        $hasValidConfiguredSet = $configuredId !== null && ! $configuredStale;
+
+        $setupRequired = $configuration === null
+            || ! $exportEnabled
+            || ! $hasValidConfiguredSet;
+
+        $preselected = $projection->setupUsable
+            && count($attributeSets) === 1
+            ? $attributeSets[0]['attribute_set_id']
+            : null;
+
+        return new AdobeProductExportSetupReadModel(
+            account: $projection,
+            availableAttributeSets: $attributeSets,
+            configuredAttributeSetId: $configuredId,
+            configuredAttributeSetName: $configuredName,
+            configuredSetStale: $configuredStale,
+            setupRequired: $setupRequired,
+            preselectedAttributeSetId: $preselected,
+            exportEnabled: $exportEnabled,
+            configurationPaused: $configurationPaused,
+        );
     }
 
     private function resolveConfiguredAttributeSetId(?SyncConfiguration $configuration): ?int

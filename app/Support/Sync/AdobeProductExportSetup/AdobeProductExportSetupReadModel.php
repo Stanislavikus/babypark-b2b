@@ -17,5 +17,7 @@ final readonly class AdobeProductExportSetupReadModel
         public bool $configuredSetStale,
         public bool $setupRequired,
         public ?int $preselectedAttributeSetId,
+        public bool $exportEnabled = false,
+        public bool $configurationPaused = false,
     ) {}
 }

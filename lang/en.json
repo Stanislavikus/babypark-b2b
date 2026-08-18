@@ -379,5 +379,13 @@
     "sync_data_setup.adobe_products_export.current_selection": "Current selection: {name}",
     "sync_data_setup.adobe_products_export.stale_selection": "The saved attribute set is no longer available. Choose a current set and save.",
     "sync_data_setup.adobe_products_export.account_unavailable": "This connection is unavailable for setup right now.",
-    "sync_data_setup.adobe_products_export.link": "Product export setup"
+    "sync_data_setup.adobe_products_export.configuration_paused": "This sync configuration is paused and cannot run until it is re-enabled.",
+    "sync_data_setup.adobe_products_export.link": "Product export setup",
+    "sync_data_setup.navigation.group": "Synchronization",
+    "sync_data_setup.navigation.label": "Data setup",
+    "sync_data_setup.page.title": "Sync data setup",
+    "sync_data_setup.page.empty": "No eligible sync data setup targets are available in this workspace yet.",
+    "sync_data_setup.page.target_context": "Platform: {platform} · Account: {account}",
+    "sync_data_setup.page.open_setup": "Open setup",
+    "sync_data_setup.targets.adobe_products_export": "Adobe Commerce product export"
 }

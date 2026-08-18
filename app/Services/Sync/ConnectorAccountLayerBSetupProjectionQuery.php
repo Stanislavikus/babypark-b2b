@@ -22,4 +22,19 @@ final class ConnectorAccountLayerBSetupProjectionQuery
 
         return ConnectorAccountLayerBSetupProjection::fromAccount($account);
     }
+
+    /**
+     * @return list<ConnectorAccountLayerBSetupProjection>
+     */
+    public function listForWorkspace(string $workspaceId): array
+    {
+        return ConnectorAccount::withoutWorkspaceScope()
+            ->select(ConnectorAccountLayerBSetupProjection::selectColumns())
+            ->where('workspace_id', $workspaceId)
+            ->with('connectorDefinition:id,name,code')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (ConnectorAccount $account): ConnectorAccountLayerBSetupProjection => ConnectorAccountLayerBSetupProjection::fromAccount($account))
+            ->all();
+    }
 }
