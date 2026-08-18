@@ -3,6 +3,17 @@
 Static fixture-backed reference for the merchant Preview workflow implemented in
 `ManageAdobeProductsExportPreview` and the evolved `ListSyncDataSetup` landing.
 
+## Renderable prototype
+
+Open **`index.html`** in a browser (or serve the folder statically). Tabs cover the
+merchant lifecycle states, remediation actionability matrix, and product identity rules
+described below.
+
+Files:
+
+- `index.html` — interactive non-runtime screens
+- `styles.css` — shared styling (light/dark toggle)
+
 ## Covered merchant states
 
 1. Preview ready to start / no previous run (`ready_to_preview`)
@@ -42,4 +53,8 @@ does not expose a fake «Fix selected» bulk action.
 
 ## Verification
 
-Automated coverage: `tests/Feature/Sync/Stage2A2MerchantPreviewWorkSurfaceTest.php`.
+Automated coverage:
+
+- `tests/Feature/Sync/Stage2A2MerchantPreviewWorkSurfaceTest.php`
+- `tests/Feature/Sync/Stage2A2MerchantPreviewConformanceTest.php`
+- `tests/Unit/Sync/Preview/SyncPreviewFindingReferenceResolverTest.php`
