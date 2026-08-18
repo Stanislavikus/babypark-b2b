@@ -6234,47 +6234,105 @@ Mapping remediation UI is **implemented in Stage 2B**.
 
 #### E8. Live authority
 
-Freeze a separate consequential permission:
+[Resolved — Stage 3-0] Freeze the **tenth** atomic workspace permission:
 
 | Permission | Authority |
 |---|---|
-| `run_sync_live` | Execute consequential Live for an eligible SyncConfiguration and access the safe progress/result surface required for that execution. |
+| `run_sync_live` | Execute consequential Live synchronization for an eligible SyncConfiguration and access the merchant-safe progress/result surface required for that execution. |
 
-Requirements:
+**Independence (frozen):**
 
-- Preview permission != Live permission (`run_sync_preview` cannot authorize Live);
-- absence = deny;
-- no role/job title implies permission;
-- no automatic legacy grant;
-- fresh authorization before consequential admission.
+| Permission | Does **not** imply `run_sync_live` |
+|---|---|
+| `run_sync_preview` | yes — Preview permission != Live permission |
+| `manage_sync_configurations` | yes |
+| `view_sync_mappings` / `manage_sync_mappings` | yes |
+| `view_connector_accounts` / `manage_connector_accounts` | yes |
+
+No role/job-title name implies Live authority. Absence means deny.
+
+**Runtime rollout (Stage 3A):** append to `WorkspacePermissions` catalogue; normal
+idempotent permission seeder creates the catalogue row; **no** GAP-026B-style
+membership cutover; **no** automatic grant to existing roles/templates/memberships.
+Existing actors remain fail-closed until explicitly granted.
+
+**Admission commit point:** fresh `run_sync_live` authorization is required
+immediately before consequential Live admission. After successful admission, actor
+revocation does **not** cancel that already-admitted background command. Merchant
+result/read surfaces continue to use fresh authorization. Do not introduce generic
+cancellation in Stage 3.
+
+**Repository status (post–Stage 3-0):** normative target frozen; runtime catalogue
+remains **nine** permissions until Stage 3A.
 
 Canonical atomic wording follows existing RBAC vocabulary (`run_sync_*` beside
 `run_connector_discovery` / `run_sync_preview`).
 
 #### E9. ExternalRecordLink structural contract
 
-Minimum generic architecture necessary for safe Live. This is connector-neutral. Do not freeze Magento product-type roles as platform ExternalRecordLink vocabulary.
+[Resolved — Stage 3-0] Minimum generic architecture necessary for safe Live. This
+is connector-neutral. Do not freeze Magento product-type roles as platform
+ExternalRecordLink vocabulary.
 
-Preserve:
+`ExternalRecordLink` is a separate external-identity concept:
 
 - workspace-safe;
 - ConnectorAccount-scoped;
-- internal business-record identity explicit;
-- Products first slice may distinguish Product and ProductVariant identity;
-- external identifier/value owned by connector semantics;
-- external identity independent from transport attempts;
-- no fuzzy/name-based matching;
-- no assumption one Product = one external resource.
+- **not** SyncConfiguration-scoped;
+- independent from transport attempts;
+- explicit trusted correspondence between an internal business record and an
+  external record identity.
 
-Do not replace Magento planner roles with another premature universal enum. If a generic `external_record_type`, role, or namespace is later necessary, keep it opaque and connector-owned unless repository evidence proves a closed universal vocabulary.
+Products V1 may distinguish structurally: `Product`, `ProductVariant`. Prefer
+typed workspace-aware FKs over an unrestricted polymorphic framework.
 
-Do not freeze an irreversible generic database unique key in this contract. Connector-owned uniqueness may later be required for a specific vendor; that is not a generic Product unique index.
+**Candidate first physical shape:**
 
-Do not invent a universal unrestricted polymorphic identity framework without evidence.
+| Column | Notes |
+|---|---|
+| `id` | UUID PK |
+| `workspace_id` | tenant scope |
+| `connector_account_id` | account scope |
+| `product_id` | nullable |
+| `product_variant_id` | nullable |
+| `external_identifier` | connector-owned identity string |
+| `timestamps` | |
+
+Require: exactly one of `product_id` / `product_variant_id` is non-null. Require
+workspace-safe composite FKs. No CASCADE behavior may silently forget external
+identity.
+
+**Fan-out remains allowed.** Do **not** freeze `UNIQUE(connector_account_id,
+product_id)` or `UNIQUE(connector_account_id, product_variant_id)`. A single
+internal record may legitimately fan out to multiple external identities.
+
+**Exact duplicate association prevention (frozen):**
+
+```text
+UNIQUE(workspace_id, connector_account_id, product_id, external_identifier)
+UNIQUE(workspace_id, connector_account_id, product_variant_id, external_identifier)
+```
+
+These prohibit duplicate copies of the **same** correspondence while still
+allowing `Product A → external X` and `Product A → external Y`. Do **not** make
+`external_identifier` globally unique per account.
+
+Do not create generic Magento parent/simple/child enum, external product role
+vocabulary, or unrestricted `internal_type`/`internal_id` polymorphism. No
+`onec_guid` migration/backfill for Adobe. No fuzzy/name matching.
+
+If implementation research demonstrates exact-association uniqueness above is not
+portable to supported MySQL/SQLite or conflicts with a real known connector
+identity requirement: **STOP** before migration and report. Do not silently
+substitute one-link-per-subject uniqueness.
+
+**Repository status (post–Stage 3-0):** normative contract frozen; table/model
+absent until Stage 3A.
 
 #### Adobe Magento V1 identity notes
 
-These are Adobe planner/executor and result semantics. They are **not** generic ExternalRecordLink vocabulary.
+These are Adobe planner/executor and result semantics. They are **not** generic
+ExternalRecordLink vocabulary.
 
 Adobe Commerce REST configurable-product identities include:
 
@@ -6286,26 +6344,103 @@ Adobe Commerce REST configurable-product identities include:
 - numeric resource IDs;
 - external option/value identities.
 
-Adobe Live may associate one platform Product with parent and child external records. That fan-out does not change `SyncRunItem = Product` and does not authorize Magento role names as platform ExternalRecordLink columns.
+**Adobe child/simple (frozen — Stage 3-0):**
+
+- external identity = canonical mapped `ProductVariant` SKU;
+- `ExternalRecordLink` subject = `ProductVariant`.
+
+**Adobe configurable parent (frozen — Stage 3-0):**
+
+Do **not** silently use physical `products.sku` as canonical parent identity.
+Canonical platform SKU is variant-level. Adobe configurable parent SKU is
+**connector-owned generated external identity** — deterministic, stable across
+reruns, computable before first POST, recomputable after crash/DB failure even
+when no link was persisted, derived only from stable immutable platform identity,
+independent from Product name / variant SKUs / labels, valid within Adobe SKU
+syntax/length constraints, collision-checked before create, not a generic
+Product field, not a fake `ProductVariant`. Prefer stable Workspace + Product
+identity as input. After confirmed/reconciled parent creation, persist generated
+parent SKU in a Product-scoped `ExternalRecordLink`. Simple/non-configurable
+Product export uses the `ProductVariant` link, not a synthetic Product parent
+link.
+
+Adobe Live may associate one platform Product with parent and child external
+records. That fan-out does not change `SyncRunItem = Product` and does not
+authorize Magento role names as platform ExternalRecordLink columns.
 
 #### E10. Live safety — hard invariants NOW
 
-[Resolved] invariants:
+[Resolved — Stage 3-0] invariants:
 
 - ambiguous consequential mutation is never blindly retried;
-- transport retry != business idempotency;
-- known-not-applied, known-applied and unknown/ambiguous states are
-  semantically distinct;
+- transport retry != business idempotency != job retry != business re-execution !=
+  reconciliation;
+- `KNOWN_NOT_APPLIED`, `KNOWN_APPLIED`, `UNKNOWN_OR_AMBIGUOUS` are semantically
+  distinct applied-state knowledge; transport/HTTP failure does **not**
+  automatically mean `KNOWN_NOT_APPLIED`;
 - Preview authority never authorizes Live;
 - connector owns vendor-specific interpretation;
 - result persistence must remain merchant-safe and secret-safe;
 - Live must have a reconciliation strategy where the external API permits it;
-- automatic retry policy must be operation-specific.
+- automatic retry policy must be operation-specific;
+- Live job retry: **none automatically** (`tries = 1`);
+- at most one queued/running `SyncRun` per `SyncConfiguration` — **mode-agnostic**
+  (Preview+Preview, Preview+Live, Live+Preview, Live+Live all reject a second);
+- stale active-run recovery is **required** before Adobe Live support may be
+  advertised — execution-lease/runtime-window model; recovery must prevent
+  overlapping consequential writers;
+- historical Preview `connectorPlan` is **not** a Live write script;
+- selective "retry failed only" is **out** of Stage 3 V1.
+
+#### E10.1 Live Product outcomes (frozen — Stage 3-0)
+
+`SyncRun.status` remains infrastructure lifecycle: `queued`, `running`,
+`completed`, `failed`. Do **not** add `partial`/`ambiguous` to `SyncRunStatus`. A
+`completed` run may contain unsuccessful Product outcomes.
+
+`SyncRunItem` remains: one Product = one business outcome. Preview outcomes
+remain `ready` / `warning` / `blocked` — do **not** reuse them for Live.
+
+**Live Product outcomes (frozen):**
+
+| Outcome | Meaning |
+|---|---|
+| `SYNCHRONIZED` | Desired external Product state confirmed for every intended operation (create/update/reconciled/no-op where appropriate). |
+| `NOT_APPLIED` | No intended consequential operation applied; includes current validation block or known external rejection. |
+| `PARTIAL` | At least one intended operation is `KNOWN_APPLIED`; at least one is `KNOWN_NOT_APPLIED`; no unresolved `UNKNOWN` remains. |
+| `AMBIGUOUS` | At least one intended operation remains `UNKNOWN_OR_AMBIGUOUS`. |
+
+`AMBIGUOUS` outranks `PARTIAL`. Do **not** create item-level `FAILED`. Run/job
+lifecycle failure belongs to `SyncRun.status`. The database outcome column already
+physically supports strings — do not add a migration merely for Live outcome
+values. Future runtime must replace/refine the Preview-only Eloquent cast so
+Preview and Live rows are mode-safe.
+
+Do **not** create one `SyncRunItem` per Adobe request. Do **not** create a
+vendor-operation persistence table in V1 unless implementation / real-Adobe
+evidence proves deterministic identities + links + GET reconciliation
+insufficient.
 
 #### E11. Live safety — mechanics NOT over-frozen
 
-Do not pretend exact algorithms are already proven. The following are design
-hypotheses, not equally final domain invariants. They remain
+[Resolved — Stage 3-0 for stale-run safety model; other mechanics remain
+revalidation-sensitive]
+
+**Now frozen (Stage 3-0):** stale active-run recovery uses an execution-lease /
+runtime-window model — not merely `started_at older than N → mark Failed`. Live
+job explicitly uses `tries = 1` independent of worker `--tries`; explicit
+execution timeout below connector queue `retry_after`; finite writer
+lease/deadline; worker must not start a **new** consequential external request
+after lease expiry; automatic stale-running recovery may terminalize a run only
+after the original writer lease is conclusively expired; recovery timing must
+include allowance for maximum in-flight connector request / worker termination
+window; queued-run recovery must no-op if run is no longer `Queued`; stale Live
+run becomes terminal historical evidence; recovery must **not** automatically
+replay the consequential Product command; subsequent Live uses
+reconciliation-first behavior for identities whose prior applied state might be
+unknown.
+
+Do not pretend exact algorithms for the following are already proven. They remain
 revalidation-sensitive rather than falsely [Resolved]:
 
 - POST vs PUT;
@@ -6315,9 +6450,10 @@ revalidation-sensitive rather than falsely [Resolved]:
 - 429 handling;
 - record-level partial failure;
 - safe re-execution;
-- batch semantics.
+- batch semantics;
+- exact Adobe mutation endpoint sequence for configurable Products.
 
-Before Stage 3 Live implementation, revalidate these mechanics against actual
+Before Stage 3B+ Live implementation, revalidate these mechanics against actual
 Adobe API behavior, Preview runtime lessons, and real connector test evidence.
 
 This revalidation does not require a new broad Stop-and-Amend unless a real
@@ -6353,6 +6489,17 @@ PO-2 remains open for later merchant-configurable independent contexts.
 | Variant is removed | Do not delete the Adobe child in V1. Disable if linked; leave ExternalRecordLink for reconciliation. |
 
 Do not silently map internal lifecycle to destructive Adobe deletion.
+
+**Semantic separation (frozen — Stage 3-0):**
+
+- **Active execution input:** active/sellable variants used for normal Product
+  projection and simple/configurable classification (Preview aggregate semantics
+  unchanged).
+- **Live lifecycle input:** enough inactive linked-variant information to disable
+  already-existing Adobe children safely.
+
+Stage 3 must **not** change Preview semantics so inactive variants become
+configurable sellable dimensions.
 
 #### E14. Rich media scope for Magento V1
 
@@ -6488,13 +6635,26 @@ Key runtime behaviors (Stage 2B):
 
 Independently reviewable after 2A architecture is established.
 
-**Stage 3 — Live Engine + Real Magento Validation**
+**Stage 3-0 — Live Safety, Identity & First-Live Contract** — **Done (docs contract)**
 
-Before coding, revalidate E11 mechanics. Then coherently implement: Live
-permission; ExternalRecordLink; simple Product execution; configurable Product
-execution; safe create/update behavior; reconciliation; normalized Live
-result; merchant-safe presentation; production activation; real Magento
-create/update verification.
+Docs-only freeze before the first consequential external write. See **Live Safety,
+Identity & First-Live Contract (Resolved — Stage 3-0)** below. No runtime
+implementation in this slice.
+
+**Stage 3A–3E — Live Engine implementation slices** — **Pending**
+
+After Stage 3-0 merges, implement in order:
+
+| Slice | Scope | Adobe Products/Export/Live support |
+|---|---|---|
+| **3A — Live Safety Foundation** | `run_sync_live` permission; stale-active-run lease/recovery; Live outcome persistence; `ExternalRecordLink` persistence; `SyncLiveAdmissionService`; Live job shell (`tries = 1`, safe timeout); Preview×Live concurrency tests | remains **false** |
+| **3B — Adobe Simple Live** | Shared Adobe semantic planning boundary; child/simple external identity; GET/POST/PUT Product transport; `ExternalRecordLink` read/write; create/update/reconciliation; simple Product Live execution; applied-state classification | remains **false** |
+| **3C — Adobe Configurable Live** | Connector-owned deterministic parent SKU; child/parent/options/link command compilation; partial/ambiguous outcomes; inactive linked-variant lifecycle; configurable recovery/reconciliation | remains **false** |
+| **3D — Adobe Media + Merchant First Live** | Required E14 primary/gallery image export; merchant Live admission action on `ManageAdobeProductsExportPreview`; queued/running/result presentation; final safe merchant copy | remains **false** until real proof |
+| **3E — Real Adobe Validation + Truth Flip** | Disposable write harness; target-version proof; correct API-contract deviations; only then flip `Adobe Products / Export / Live = true` | flip only after successful evidence |
+
+Production Live remains **NOT IMPLEMENTED** until Stage 3E completes with explicit
+human authorization. No deployment without separate explicit approval.
 
 #### Merchant Preview Authorization & Remediation Contract
 [Resolved — Stage 2-0]
@@ -6726,6 +6886,218 @@ Product / Variant → `attribute_group` → localized `FieldDefinition` label (e
 field taxonomy. Field taxonomy answers what data is affected; remediation
 area/actionability answers where/how the actor can deal with it — orthogonal
 dimensions.
+
+### Live Safety, Identity & First-Live Contract
+[Resolved — Stage 3-0]
+
+**Docs-only in Stage 3-0.** No runtime implementation, migration, permission row,
+`ExternalRecordLink` table, Adobe write, Live support flip, or deploy in this
+slice. Normative contract for Stage 3A–3E implementation.
+
+##### Current baseline truth (frozen)
+
+| Stage | Status |
+|---|---|
+| Stage 1 — Preview Engine | **Done** |
+| Stage 2A — Merchant Preview | **Done** |
+| Stage 2B — Option Mapping Remediation | **Done** |
+| Stage 3-0 — Live Safety, Identity & First-Live Contract | **Done (docs contract)** |
+| Stage 3A–3E — Live implementation slices | **Pending** |
+| Production Live | **NOT IMPLEMENTED** |
+
+**Current runtime (reverified):**
+
+- `SyncRunMode` already contains Preview + Live;
+- `SyncRun` / `SyncRunItem` persistence already exists;
+- `ConnectorSyncOperationSupport` is mode-aware;
+- Adobe Products / Export / Preview is supported;
+- Adobe Products / Export / Live is **not** supported;
+- `run_sync_live` does not exist yet;
+- `ExternalRecordLink` does not exist yet;
+- no consequential Adobe Product writer exists;
+- `ProductExecutionAggregateBuilder` currently belongs to the Preview namespace but
+  contains semantically reusable Product execution input;
+- Preview planner may emit an in-memory `connectorPlan` — that plan is **not** a
+  Live HTTP command plan;
+- one active queued/running run per `SyncConfiguration` already exists;
+- no stale active-run recovery exists.
+
+##### Preview → Manual Live trust
+
+A first manual Live requires a relevant Preview that:
+
+- belongs to the same `SyncConfiguration`;
+- is Products / Export / Preview / `Completed`;
+- was created from **current** `configuration_revision`.
+
+Do **not** require arbitrary Preview-age TTL, Product-wide revision, or zero
+blocked Product rows. A Completed current-revision Preview may contain
+warning/blocked Products. Blocked Products do not globally prevent Live for other
+safely exportable Products.
+
+The historical Preview `connectorPlan` must **not** be executed. At Live
+execution:
+
+1. consume the admitted **current** configuration snapshot;
+2. obtain current Adobe execution metadata required for validation;
+3. rebuild Product execution aggregates from fresh Product/Variant/Price state;
+4. evaluate the shared Adobe semantic planning truth again;
+5. compile consequential commands only from that fresh evaluation;
+6. currently blocked Products receive Live `NOT_APPLIED` with zero write.
+
+Configuration-owned changes (`FieldMapping`, `FieldOptionMapping`, connector
+execution setup / attribute set) change `configuration_revision` and require a
+new Preview before first Live. No arbitrary "Preview older than N minutes" rule.
+
+Merchant copy must state: current Product data will be checked again immediately
+before transfer.
+
+##### Shared Adobe semantic truth
+
+`AdobeProductExportPreviewPlan` is **not** a Live write script. Known Preview
+limitations include: configurable parent lacks external parent SKU; `child_link`
+lacks concrete parent/child external identities; no create/update decision; no
+`ExternalRecordLink` decision; no reconciliation decision; no inactive lifecycle
+command; no media command; current operation order is not a proven Adobe mutation
+sequence.
+
+Freeze one semantic source of truth:
+
+```text
+Product execution input
+        ↓
+Adobe semantic classification/projection
+    ├── Preview findings/presentation
+    └── Live command compilation
+```
+
+Preview and Live must **not** independently redefine: simple vs configurable
+classification; mapped-field projection; Option Mapping interpretation;
+configurable dimensions; required-data semantics; status/visibility semantics.
+
+The Live command compiler owns: concrete Adobe external identity; GET/POST/PUT
+decision; external request ordering; Adobe request payload; `ExternalRecordLink`
+use; reconciliation semantics.
+
+Do not persist raw request payloads in Preview findings or merchant Livewire
+state. Do not implement one shared mutating `execute(..., dryRun=true)` path.
+
+##### Create / update / reconciliation
+
+**No-link create:** compute deterministic intended identity → GET identity before
+POST → only trusted known-missing permits create → if identity exists without
+trusted `ExternalRecordLink`, classify as ownership/collision (no adopt-by-name,
+no fuzzy-match, no blind PUT) → POST → definitive success persists
+`ExternalRecordLink` immediately → ambiguous timeout/drop/response → GET
+reconciliation → classify `KNOWN_APPLIED` only from connector-specific sufficient
+evidence → otherwise `UNKNOWN_OR_AMBIGUOUS`.
+
+**Existing link:** GET trusted stored external identity → if present use proven
+Adobe update semantics → ambiguous write → GET reconciliation → missing linked
+external resource requires connector-owned recreate/attention behavior validated
+against real Adobe before support flip.
+
+Do not assume HTTP status alone universally proves applied state. Do not
+automatically retry a whole Product after a consequential attempt. POST/PUT may
+be resent only when connector-specific evidence proves prior attempt
+`KNOWN_NOT_APPLIED`. Do not copy Discovery/ConnectionCheck `retryUntil`/`release`
+semantics to writes.
+
+##### Configurable Product execution
+
+Adobe V1 must support normal platform configurable/multi-variant Product. Current
+Preview operation ordering is **not** frozen as Live ordering. Expected dependency
+shape: reconcile/resolve child identities → create/update child simple records →
+reconcile/resolve deterministic parent identity → create/update parent → ensure
+configurable option definitions → ensure child links → verify/reconcile as
+required. Real Adobe validation is required for final command order. No Adobe
+bulk/async write transport in V1 — synchronous Adobe REST through existing
+connector queue runtime.
+
+##### First-Live merchant UX
+
+Smallest first-Live surface: `ManageAdobeProductsExportPreview`. Do not turn
+Integrations into an execution console.
+
+After a relevant Completed current-revision Preview, a user with `run_sync_live`
+may receive an explicit Live action.
+
+Merchant confirmation concept:
+
+> Передати товари в Adobe Commerce?
+>
+> Це реальна дія — дані будуть передані у ваш магазин. Перед передачею ми ще
+> раз перевіримо актуальні дані товарів.
+
+Preview summary may guide but must **not** be described as the frozen payload
+Live will send. If Preview contains blocked Products, explain that products still
+not ready during the fresh Live check will not be changed externally.
+
+Running state: honest queued/running; optional processed Product count from
+persisted outcomes; no fake percentage; no summary-counter table solely for
+progress.
+
+Completed summary vocabulary: *Синхронізовано* / *Не передано* / *Частково
+синхронізовано* / *Не вдалося підтвердити*. `AMBIGUOUS` copy concept: *Не
+вдалося підтвердити результат для N товарів. Не повторюйте передачу, доки їхній
+стан не буде перевірено.*
+
+Do **not** expose: `ExternalRecordLink`, idempotency, reconciliation, transport
+attempts, HTTP codes, Adobe entity IDs, raw payloads, connector internals.
+Preview permission never implies Live authority. No request-access subsystem.
+
+##### Selective retry is out
+
+"Retry failed only" is explicitly **out** of Stage 3 V1. Current run snapshot
+freezes `selection.mode = all_products`. V1 recovery: remediate/verify → Preview
+when required → new all-products Live execution → `ExternalRecordLink` +
+reconciliation prevents blind duplicate create.
+
+##### Live support truth
+
+Current Adobe support truth remains:
+
+- Products / Export / Preview = **true**
+- Products / Export / Live = **false**
+
+Keep Live **false** through internal implementation slices 3A–3D. Flip to **true**
+only when advertised V1 is coherent for: simple + configurable Products;
+`ExternalRecordLink`; safe create/update/reconciliation; inactive lifecycle (E13);
+required E14 image behavior; partial/ambiguous Product outcomes; stale-run
+safety; `run_sync_live` authorization; merchant first-Live UX; real Adobe
+validation (Stage 3E).
+
+##### Real Adobe validation gate
+
+Before support truth flips, an explicitly authorized disposable Adobe smoke
+harness must prove actual target-version behavior. At minimum: SIMPLE
+(GET-absent/create/verify/update/verify/disable/rerun-reconcile); CONFIGURABLE
+(child/parent/options/link/create/update/repeated-safe/partial-interruption);
+TRANSPORT (validation rejection, missing Product, identity collision, relevant
+status codes, timeout/connection-loss classification). Use disposable Stage-3
+test identities. Require explicit human authorization. No production catalogue
+writes. No destructive Product DELETE for cleanup — disable / disposable identity
+policy.
+
+##### Transport contract
+
+Reuse existing transport chain: OAuth1 → `ConnectorOutboundRequest` →
+SSRF-safe destination resolution → `ConnectorRequestSender` → capped response →
+`ConnectorHttpResult`. No second HTTP stack. Before Live, consequential-write
+transport needs POST/PUT construction, GET Product reconciliation, bounded
+outbound request body, Product-resource-specific status/result mapping,
+timeout/applied-state classification suitable for reconciliation, merchant-safe
+exception normalization. Discovery/ConnectionCheck retry semantics do not
+authorize Live write retries.
+
+##### Explicit non-goals (Stage 3)
+
+Scheduling; generic Sync History product; SyncIssue subsystem; selective retry;
+Product-ID subset execution; workflow canvas; execution graph; transport log UI;
+raw request/response UI; Adobe bulk/async APIs; destructive Adobe Product DELETE;
+Product-wide revision; Preview TTL; generic Product parent SKU; Magento role enum
+in Product core; universal polymorphic external identity framework; automatic
+consequential-write replay.
 
 ### Canonical mapping registry role
 

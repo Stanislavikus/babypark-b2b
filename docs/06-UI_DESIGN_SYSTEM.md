@@ -1788,7 +1788,7 @@ Before merge, connector UI must satisfy contract §15: connector-capability gati
 
 ### Existing-vs-future UX boundary
 
-Normative sync domain shape and merchant journey are settled (Sync Domain Rebaseline in `03-DOMAIN_MODEL.md`). Stage 1 Preview Engine is **shipped** — persisted zero-mutation Preview computation/runtime (`run_sync_preview`, admission, persisted Preview runs). Do not treat Preview computation/runtime as future work. Stage 2-0 merchant Preview authorization/remediation contract is **Done (docs contract)**. **Stage 2A is Done** — Stage 2A-1 (setup authority) and Stage 2A-2 (merchant Preview work surface, remediation presentation, Needs-attention worklist, canonical ProductVariant SKU identity, no bulk remediation). **Stage 2B is Done** — Option Mapping remediation UI on `ManageSyncFieldOptionMappings` (existing `view_sync_mappings` / `manage_sync_mappings` permissions only; snapshot-metadata read with zero HTTP; connector validation outside locked DB transaction on confirm/replace; historical Preview findings after remediation; narrow stale/orphan cleanup only). The connector UX contract still defines required behavior **when implemented** for: consequential Live sync execution, scheduling, ownership persistence (if bidirectional ships), issue aggregation, bulk resolution, and sync-run history. Remaining work is implementation/UI migration, not another open architecture research pass, unless current repository truth contradicts an approved invariant.
+Normative sync domain shape and merchant journey are settled (Sync Domain Rebaseline in `03-DOMAIN_MODEL.md`). Stage 1 Preview Engine is **shipped** — persisted zero-mutation Preview computation/runtime (`run_sync_preview`, admission, persisted Preview runs). Do not treat Preview computation/runtime as future work. Stage 2-0 merchant Preview authorization/remediation contract is **Done (docs contract)**. **Stage 2A is Done** — Stage 2A-1 (setup authority) and Stage 2A-2 (merchant Preview work surface, remediation presentation, Needs-attention worklist, canonical ProductVariant SKU identity, no bulk remediation). **Stage 2B is Done** — Option Mapping remediation UI on `ManageSyncFieldOptionMappings` (existing `view_sync_mappings` / `manage_sync_mappings` permissions only; snapshot-metadata read with zero HTTP; connector validation outside locked DB transaction on confirm/replace; historical Preview findings after remediation; narrow stale/orphan cleanup only). **Stage 3-0** Live Safety, Identity & First-Live contract is **Done (docs contract)** — no Live runtime yet. The connector UX contract still defines required behavior **when implemented** for: consequential Live sync execution (Stage 3A–3E), scheduling, ownership persistence (if bidirectional ships), issue aggregation, bulk resolution, and sync-run history. Remaining work is implementation/UI migration, not another open architecture research pass, unless current repository truth contradicts an approved invariant.
 
 ### Merchant Preview interaction rules (Resolved — Stage 2-0)
 
@@ -1804,6 +1804,35 @@ Summary rules for Stage 2A UI — prevent divergence from the contract:
 - **No technical connector vocabulary** — never expose `attribute_set_id`, snapshot/discovery internals, or raw finding codes in Layer A/B.
 - **Setup-required vs product-blocked** — pre-admission setup: *Потрібно завершити налаштування перед перевіркою*; without setup permission: *У вас немає доступу до цієї настройки* — not *Товар заблокований*.
 - **Three outcome buckets** — ready / warning / blocked. Zero warnings may be correct today; do not design UI assuming warnings are always present.
+
+### Merchant First-Live interaction rules (Resolved — Stage 3-0)
+
+Normative detail: `docs/03-DOMAIN_MODEL.md` → **Live Safety, Identity & First-Live
+Contract (Resolved — Stage 3-0)**; `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md` §17.
+
+**Docs-only in Stage 3-0.** No Live action ships until Stage 3D runtime.
+
+Summary rules for first-Live UI on `ManageAdobeProductsExportPreview`:
+
+- **Smallest surface** — first Live admission lives on the existing Adobe Products
+  Export Preview page; do not turn `Інтеграції` into an execution console.
+- **Separate authority** — `run_sync_preview` never implies `run_sync_live`; Live
+  action visible only to actors with `run_sync_live` after a Completed
+  current-revision Preview exists.
+- **Honest confirmation** — merchant copy must state this is a real external
+  transfer and Product data will be re-checked immediately before write. Preview
+  summary is guidance, not a frozen Live payload.
+- **Blocked Products** — explain that Products still not ready during the fresh Live
+  check will not be changed externally.
+- **Running state** — honest queued/running; optional processed Product count from
+  persisted outcomes; no fake percentage progress bar.
+- **Completed vocabulary** — *Синхронізовано* / *Не передано* / *Частково
+  синхронізовано* / *Не вдалося підтвердити*; `AMBIGUOUS` warns not to repeat
+  transfer until verified.
+- **No connector internals** — never expose `ExternalRecordLink`, idempotency,
+  reconciliation, transport attempts, HTTP codes, Adobe entity IDs, or raw payloads
+  in Layer A/B.
+- **No selective retry** — no "retry failed only" action in Stage 3 V1.
 
 ### Known implementation mismatch (not architectural regression)
 

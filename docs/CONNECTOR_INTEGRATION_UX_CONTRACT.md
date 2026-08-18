@@ -8,9 +8,9 @@
 
 **Scope:** Every current and future connector-facing surface — Magento today; Shopify, Google Sheets, 1C, marketplaces, and any subsequent connector tomorrow. A connector UI is not acceptance-tested against "does it look like Magento's" — it is tested against this contract, §15.
 
-**Non-goal:** This contract does not itself authorize arbitrary backend work and is not the workspace-permission implementation specification beyond the approved domain authorization contract in `docs/03-DOMAIN_MODEL.md` → **Workspace access model and authorization (Resolved — Task 4C-1c-2a)** and **Preview-first Sync Execution Foundation Contract (Resolved — Task 4C-2a)** / **Merchant Preview Authorization & Remediation Contract (Resolved — Stage 2-0)**. Some underlying mechanisms are already shipped (for example `ConnectorCapability`, Discovery runtime, snapshot persistence, workspace isolation guards, Layer-B Mapping UI on `ManageSyncFieldMappings`, Mapping → Available Fields supporting reference with workspace-scoped Mapping authorization, Stage 1 Preview Engine with `run_sync_preview` and persisted zero-mutation Preview runs, Stage 2A-1 `manage_sync_configurations` runtime permission and Adobe Products Export Layer-B setup, Stage 2A-2 merchant Preview work surface and remediation presentation, **Stage 2B Option Mapping remediation UI on `ManageSyncFieldOptionMappings`**). Missing backend/runtime/security prerequisites require their own scoped tasks. Specifically, Task **4C-1c-2b** Layer-B Mapping UI and its Mapping-side Available Fields supporting path are shipped (PR #139, merge `9a4be2f`). Task **4C-2a** freezes Preview execution architecture (docs only); **`run_sync_preview` runtime and `SyncRun` Preview execution are implemented in Stage 1** (PR #145). **Stage 2-0** freezes merchant Preview authorization/remediation contract (docs only). **Stage 2A** (2A-1 + 2A-2) is **shipped** — `manage_sync_configurations`, non-mutating existence lookup, Adobe Products Export setup, merchant Preview UI, and contextual remediation presentation. **Stage 2B is shipped** — Option Mapping remediation on `ManageSyncFieldOptionMappings` using existing `view_sync_mappings` / `manage_sync_mappings` permissions only. Mechanisms that explicitly remain future include scheduling, issue aggregation/bulk resolution, sync-run history, ownership persistence/enforcement, broader Layer-C platform-support identity/gating, and **Stage 3** Live Engine. Do **not** claim that historical pre-B-2 fixed `User.role` authorization satisfies this UX contract — that transitional behavior is historical evidence only under **GAP-026** / PR #102.
+**Non-goal:** This contract does not itself authorize arbitrary backend work and is not the workspace-permission implementation specification beyond the approved domain authorization contract in `docs/03-DOMAIN_MODEL.md` → **Workspace access model and authorization (Resolved — Task 4C-1c-2a)** and **Preview-first Sync Execution Foundation Contract (Resolved — Task 4C-2a)** / **Merchant Preview Authorization & Remediation Contract (Resolved — Stage 2-0)**. Some underlying mechanisms are already shipped (for example `ConnectorCapability`, Discovery runtime, snapshot persistence, workspace isolation guards, Layer-B Mapping UI on `ManageSyncFieldMappings`, Mapping → Available Fields supporting reference with workspace-scoped Mapping authorization, Stage 1 Preview Engine with `run_sync_preview` and persisted zero-mutation Preview runs, Stage 2A-1 `manage_sync_configurations` runtime permission and Adobe Products Export Layer-B setup, Stage 2A-2 merchant Preview work surface and remediation presentation, **Stage 2B Option Mapping remediation UI on `ManageSyncFieldOptionMappings`**). Missing backend/runtime/security prerequisites require their own scoped tasks. Specifically, Task **4C-1c-2b** Layer-B Mapping UI and its Mapping-side Available Fields supporting path are shipped (PR #139, merge `9a4be2f`). Task **4C-2a** freezes Preview execution architecture (docs only); **`run_sync_preview` runtime and `SyncRun` Preview execution are implemented in Stage 1** (PR #145). **Stage 2-0** freezes merchant Preview authorization/remediation contract (docs only). **Stage 2A** (2A-1 + 2A-2) is **shipped** — `manage_sync_configurations`, non-mutating existence lookup, Adobe Products Export setup, merchant Preview UI, and contextual remediation presentation. **Stage 2B is shipped** — Option Mapping remediation on `ManageSyncFieldOptionMappings` using existing `view_sync_mappings` / `manage_sync_mappings` permissions only. Mechanisms that explicitly remain future include scheduling, issue aggregation/bulk resolution, sync-run history, ownership persistence/enforcement, broader Layer-C platform-support identity/gating, and **Stage 3A–3E** Live Engine implementation slices (**Stage 3-0** Live Safety contract is **Done (docs)**). Do **not** claim that historical pre-B-2 fixed `User.role` authorization satisfies this UX contract — that transitional behavior is historical evidence only under **GAP-026** / PR #102.
 
-**Existing-vs-future boundary:** This contract defines the *required UX* for synchronization, preview/dry-run, scheduling, mapping, issues, history, and bulk resolution *when those surfaces/concerns are implemented*. Normative sync domain shape is now settled in `docs/03-DOMAIN_MODEL.md` (Sync Domain Rebaseline: `SyncConfiguration` → `FieldMapping` + `SyncRun` → `SyncRunItem`, account-scoped `ExternalRecordLink`). **Preview computation/runtime is shipped** — Stage 1 Preview Engine delivers persisted zero-mutation Preview (`run_sync_preview`, admission, Preview `SyncRun` persistence). **Stage 2A-2 merchant Preview work surface and remediation presentation are shipped**; **Stage 2A is Done**. **Stage 2B Option Mapping remediation UI is shipped** on `ManageSyncFieldOptionMappings` (existing `view_sync_mappings` / `manage_sync_mappings` permissions only; authoritative persisted connector snapshot metadata on read with zero HTTP; `confirm`/`replace` retain connector external validation outside locked DB transaction; Preview findings remain historical after remediation; narrow stale/orphan option-mapping cleanup does **not** fix Product/Variant select value integrity). Live consequential sync execution, scheduling beyond Discovery, issue aggregation, bulk resolution, sync-run history, ownership persistence/enforcement, and broader merchant sync surfaces remain future implementation gaps requiring their own scoped passes before the corresponding UI ships. This contract does **not** assert that every entity or runtime mechanism exists beyond what is confirmed elsewhere in this document — but a reader must **not** conclude that dry-run/preview computation is still absent. Those platform-owned sync UX/orchestration concerns do **not** become `ConnectorCapability` cases merely because they are optional or future.
+**Existing-vs-future boundary:** This contract defines the *required UX* for synchronization, preview/dry-run, scheduling, mapping, issues, history, and bulk resolution *when those surfaces/concerns are implemented*. Normative sync domain shape is now settled in `docs/03-DOMAIN_MODEL.md` (Sync Domain Rebaseline: `SyncConfiguration` → `FieldMapping` + `SyncRun` → `SyncRunItem`, account-scoped `ExternalRecordLink`). **Preview computation/runtime is shipped** — Stage 1 Preview Engine delivers persisted zero-mutation Preview (`run_sync_preview`, admission, Preview `SyncRun` persistence). **Stage 2A-2 merchant Preview work surface and remediation presentation are shipped**; **Stage 2A is Done**. **Stage 2B Option Mapping remediation UI is shipped** on `ManageSyncFieldOptionMappings` (existing `view_sync_mappings` / `manage_sync_mappings` permissions only; authoritative persisted connector snapshot metadata on read with zero HTTP; `confirm`/`replace` retain connector external validation outside locked DB transaction; Preview findings remain historical after remediation; narrow stale/orphan option-mapping cleanup does **not** fix Product/Variant select value integrity). Live consequential sync execution (**Stage 3A–3E**; **Stage 3-0** docs contract **Done**), scheduling beyond Discovery, issue aggregation, bulk resolution, sync-run history, ownership persistence/enforcement, and broader merchant sync surfaces remain future implementation gaps requiring their own scoped passes before the corresponding UI ships. This contract does **not** assert that every entity or runtime mechanism exists beyond what is confirmed elsewhere in this document — but a reader must **not** conclude that dry-run/preview computation is still absent. Those platform-owned sync UX/orchestration concerns do **not** become `ConnectorCapability` cases merely because they are optional or future.
 
 ---
 
@@ -369,3 +369,65 @@ Merchant Preview surfaces use exactly three outcome buckets: ready / warning /
 blocked. Current Adobe implementation may show zero warnings — that is not a
 permanent contract. Do not depict nonzero warnings as the typical case in Stage
 2A examples when they cannot currently occur.
+
+---
+
+## 17. Merchant First-Live UX (Resolved — Stage 3-0)
+
+Normative detail: `docs/03-DOMAIN_MODEL.md` → **Live Safety, Identity & First-Live
+Contract (Resolved — Stage 3-0)**. Summary-level UI rules:
+`docs/06-UI_DESIGN_SYSTEM.md` → Merchant First-Live interaction rules.
+
+**Implementation status:** Stage 3-0 is **docs-only**. No Live action, permission
+row, or Adobe write ships in this slice. Runtime lands in Stage 3A–3E (merchant
+first-Live action in Stage 3D).
+
+### Smallest first-Live surface
+
+First manual Live admission belongs on `ManageAdobeProductsExportPreview`. Do
+**not** turn `Інтеграції` into an execution console.
+
+### Live authority
+
+`run_sync_live` (tenth normative permission; runtime pending Stage 3A) is
+independent from `run_sync_preview`, `manage_sync_configurations`, Mapping
+permissions, and connector-account permissions. Preview permission never implies
+Live authority.
+
+### Preview prerequisite
+
+After a relevant Completed current-revision Preview (`products` / `export` /
+Preview / same `SyncConfiguration`), a user with `run_sync_live` may receive an
+explicit Live action. Preview summary may guide but must **not** be described as
+the frozen payload Live will send.
+
+### Merchant confirmation copy
+
+Concept:
+
+> Передати товари в Adobe Commerce?
+>
+> Це реальна дія — дані будуть передані у ваш магазин. Перед передачею ми ще
+> раз перевіримо актуальні дані товарів.
+
+If Preview contained blocked Products, explain that Products still not ready
+during the fresh Live check will not be changed externally.
+
+### Running and completed states
+
+Running: honest queued/running; optional processed Product count from persisted
+outcomes; no fake percentage. Completed vocabulary: *Синхронізовано* / *Не
+передано* / *Частково синхронізовано* / *Не вдалося підтвердити*. `AMBIGUOUS`:
+*Не вдалося підтвердити результат для N товарів. Не повторюйте передачу, доки
+їхній стан не буде перевірено.*
+
+### Forbidden merchant exposure
+
+Do **not** expose `ExternalRecordLink`, idempotency, reconciliation, transport
+attempts, HTTP codes, Adobe entity IDs, raw payloads, or connector internals in
+Layer A/B.
+
+### No selective retry
+
+"Retry failed only" is explicitly **out** of Stage 3 V1. Recovery path: remediate /
+verify → Preview when required → new all-products Live execution.

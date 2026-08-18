@@ -185,10 +185,10 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
         $section = $this->magentoV1ContractSection();
 
         $this->assertStringContainsString('Preview permission != Live permission', $section);
-        $this->assertStringContainsString('`run_sync_preview` cannot authorize Live', $section);
+        $this->assertStringContainsString('`run_sync_preview`', $section);
         $this->assertStringContainsString('`run_sync_live`', $section);
-        $this->assertStringContainsString('no role/job title implies permission', $section);
-        $this->assertStringContainsString('no automatic legacy grant', $section);
+        $this->assertStringContainsString('No role/job-title name implies Live authority', $section);
+        $this->assertStringContainsString('**no** automatic grant', $section);
     }
 
     #[Test]
@@ -241,7 +241,7 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
 
         $this->assertStringContainsString('ambiguous consequential mutation is never blindly retried', $section);
         $this->assertStringContainsString('transport retry != business idempotency', $section);
-        $this->assertStringContainsString('unknown/ambiguous states are', $section);
+        $this->assertStringContainsString('`UNKNOWN_OR_AMBIGUOUS`', $section);
     }
 
     #[Test]
@@ -252,7 +252,7 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
         $this->assertStringContainsString('mechanics NOT over-frozen', $section);
         $this->assertStringContainsString('revalidation-sensitive rather than falsely [Resolved]', $section);
         $this->assertStringContainsString('POST vs PUT', $section);
-        $this->assertStringContainsString('Before Stage 3 Live implementation, revalidate these mechanics', $section);
+        $this->assertStringContainsString('Before Stage 3B+ Live implementation, revalidate these mechanics', $section);
     }
 
     #[Test]
@@ -285,7 +285,8 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
         $this->assertStringContainsString('**Stage 2-0 — Merchant Preview Authorization & Remediation Contract**', $gaps);
         $this->assertStringContainsString('**Stage 2A — Merchant Preview Core + Connector Setup**', $gaps);
         $this->assertStringContainsString('**Stage 2B — Option Mapping Remediation**', $gaps);
-        $this->assertStringContainsString('**Stage 3 — Live Engine**', $gaps);
+        $this->assertStringContainsString('**Stage 3-0 — Live Safety, Identity & First-Live Contract**', $gaps);
+        $this->assertStringContainsString('**Stage 3A–3E — Live Engine implementation slices**', $gaps);
         $this->assertStringContainsString('Historical tracking label', $gaps);
         $this->assertStringContainsString('Not a mandatory future PR boundary', $gaps);
         $this->assertStringContainsString('Current coherent Magento execution stages', $gaps);
@@ -355,9 +356,11 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
 
         $this->assertStringContainsString('workspace-safe', $section);
         $this->assertStringContainsString('ConnectorAccount-scoped', $section);
-        $this->assertStringContainsString('internal business-record identity explicit', $section);
-        $this->assertStringContainsString('no assumption one Product = one external resource', $section);
-        $this->assertStringContainsString('Do not freeze an irreversible generic database unique key', $section);
+        $this->assertStringContainsString('explicit trusted correspondence', $section);
+        $this->assertStringContainsString('Fan-out remains allowed', $section);
+        $this->assertStringContainsString('UNIQUE(workspace_id, connector_account_id, product_id, external_identifier)', $section);
+        $this->assertStringContainsString('UNIQUE(workspace_id, connector_account_id, product_variant_id, external_identifier)', $section);
+        $this->assertStringContainsString('Do **not** freeze `UNIQUE(connector_account_id,', $section);
         $this->assertStringNotContainsString('configurable_parent', $section);
         $this->assertStringNotContainsString('configurable_child', $section);
         $this->assertStringNotContainsString('simple |', $section);
@@ -366,7 +369,7 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
         $this->assertStringContainsString('simple product', $adobeNotes);
         $this->assertStringContainsString('configurable parent', $adobeNotes);
         $this->assertStringContainsString('simple child', $adobeNotes);
-        $this->assertStringContainsString('They are **not** generic ExternalRecordLink vocabulary.', $adobeNotes);
+        $this->assertStringContainsString('**not** generic', $adobeNotes);
     }
 
     #[Test]

@@ -330,7 +330,7 @@ yet), but should be scheduled before any payment gateway integration work starts
   Stage 1 Done), Product execution aggregate, mode-aware support, FieldOptionMapping,
   Preview admission/execution, connector execution configuration + revision v4
   (Stage 1 Done). Live permission `run_sync_live`, ExternalRecordLink, and Live
-  mechanics remain Stage 3.
+  mechanics remain Stage 3A–3E (Stage 3-0 docs contract **Done**).
 
 **Task sequence (GAP-006 remains Open until implementation lands):**
 
@@ -358,8 +358,9 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **Stage 1 — Preview Engine** | Persisted zero-mutation Adobe Products Export Preview against the full platform Product/Variant model — **Done** (PR on `cursor/adobe-preview-engine-stage1-2d6d`). Includes `run_sync_preview`, SyncConfiguration reachability, snapshot/admission, Product execution aggregate, Adobe simple + configurable planners, truthful Preview-only mode-aware support, `FieldOptionMapping`, connector execution configuration, revision v4. Merchant Preview UI remains Stage 2A; Live mutation Stage 3. |
 | **Stage 2-0 — Merchant Preview Authorization & Remediation Contract** | Docs-only freeze: `manage_sync_configurations` (normative ninth permission; runtime pending Stage 2A); permission independence; no hidden mutation under `run_sync_preview`; non-mutating existence check (Stage 2A required); three-layer attribute-set trace; pre-admission vs completed findings; historical/current remediation split; remediation presentation semantics; Stage 2A/2B sequencing — **Done (docs contract)** |
 | **Stage 2A — Merchant Preview Core + Connector Setup** | **Done** — Stage 2A-1 Done (sync setup authority + Adobe Products Export setup); Stage 2A-2 Done (merchant Preview work surface: landing reachability, advisory read model, explicit start via admission, lifecycle, completed summary, Needs-attention worklist, contextual remediation presentation, canonical ProductVariant SKU identity, no bulk remediation). |
-| **Stage 2B — Option Mapping Remediation** | **Done** — `ManageSyncFieldOptionMappings` nested read model/UI on existing `view_sync_mappings` / `manage_sync_mappings` permissions only; authoritative persisted connector snapshot metadata on read (zero HTTP); `confirm`/`replace` retain connector external validation outside locked DB transaction; Preview findings remain historical after remediation; narrow stale/orphan option-mapping cleanup (does **not** fix Product/Variant select value integrity). Stage 3 remains pending. |
-| **Stage 3 — Live Engine** | After E11 revalidation: Live permission, ExternalRecordLink, simple + configurable Live execution, reconciliation, merchant-safe result, real Adobe create/update validation. |
+| **Stage 2B — Option Mapping Remediation** | **Done** — `ManageSyncFieldOptionMappings` nested read model/UI on existing `view_sync_mappings` / `manage_sync_mappings` permissions only; authoritative persisted connector snapshot metadata on read (zero HTTP); `confirm`/`replace` retain connector external validation outside locked DB transaction; Preview findings remain historical after remediation; narrow stale/orphan option-mapping cleanup (does **not** fix Product/Variant select value integrity). |
+| **Stage 3-0 — Live Safety, Identity & First-Live Contract** | Docs-only freeze: `run_sync_live` (tenth permission, runtime pending 3A); stale active-run lease/recovery; Preview→Live trust; shared Adobe semantic planning boundary; `ExternalRecordLink` structure; Adobe external identity; create/update/reconciliation; Live outcomes; inactive lifecycle; E14 media scope; merchant first-Live UX; Live support truth; real Adobe validation gate; Stage 3A–3E implementation sequence — **Done (docs contract)** |
+| **Stage 3A–3E — Live Engine implementation slices** | Pending — see `docs/03-DOMAIN_MODEL.md` → Live Safety, Identity & First-Live Contract (Resolved — Stage 3-0) |
 | **4C** | Remaining sync domain after Stage 3: scheduling, sync history/issues, merchant sync UX beyond mapping/Preview/Live |
 
 Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
@@ -404,7 +405,8 @@ retention jobs remain unimplemented.
 **Current coherent Magento execution stages** (historical `4C-2b-*` labels are
 not mandatory PR boundaries): Stage 1 Preview Engine → Stage 2-0 Authorization &
 Remediation contract (docs) → Stage 2A Merchant Preview Core + Connector Setup
-→ Stage 2B Option Mapping Remediation (Done) → Stage 3 Live Engine (pending). Stage 1 delivered
+→ Stage 2B Option Mapping Remediation (Done) → Stage 3-0 Live Safety contract
+(Done, docs) → Stage 3A–3E Live Engine (pending). Stage 1 delivered
 connector execution configuration persistence plus revision/snapshot rebaseline
 (revision v4). See `docs/03-DOMAIN_MODEL.md` → Magento Product Export V1
 Execution Contract and Merchant Preview Authorization & Remediation Contract.
@@ -458,7 +460,8 @@ repository workspace-RBAC matrix):**
 | Disabled account | Per role matrix (unaffected by disabled state) | No | Per role matrix |
 
 **GAP-006 overall remains Open.** Remaining scope: Task 4B-2c (discovered
-schema fields / change inspection), retention/pruning (4B-2d), Stage 3 Live Engine,
+schema fields / change inspection), retention/pruning (4B-2d), Stage 3A–3E Live
+Engine slices,
 `ExternalRecordLink`,
 connector-account credential-management/settings **edit** UI (create UI shipped).
 Workspace-scoped authorization foundation (GAP-026) repository runtime is
@@ -472,7 +475,7 @@ Distinguish carefully — do not treat every future possibility as an active GAP
 | Class | Item | Blocks Sync domain work now? |
 |---|---|---|
 | **A. Architecture blockers** | None identified against current `origin/develop` for the approved Sync Domain Rebaseline | No |
-| **B. Implementation gaps** | Live execution (Stage 3); `ExternalRecordLink`; merchant sync UX beyond connection create + mapping + Preview + Option Mapping remediation; ConnectorSchemaDiff write path/consumer; connector-account **settings edit** UI; remaining Connector UX migration / Layer C gating (GAP-025). Stage 1 Preview Engine, Stage 2A merchant Preview, and Stage 2B Option Mapping remediation are implemented. `SyncRun`/`SyncRunItem` persistence is implemented (4C-2b-1). Connector-account **create** UI is implemented. | Yes for shipping sync; docs are settled |
+| **B. Implementation gaps** | Live execution (Stage 3A–3E); `ExternalRecordLink`; merchant first-Live UX; stale active-run recovery; `run_sync_live` permission. Stage 3-0 Live Safety contract is **Done (docs)**. Stage 1 Preview Engine, Stage 2A merchant Preview, and Stage 2B Option Mapping remediation are implemented. `SyncRun`/`SyncRunItem` persistence is implemented (4C-2b-1). Connector-account **create** UI is implemented. | Yes for shipping sync; docs are settled |
 | **C. Connector-specific future verification (deferred Variant #2 / profile)** | What external contract `adobe_commerce_paas_oauth1_integration` intentionally covers; PaaS-only vs broader Magento REST-family; post-bootstrap runtime-contract/version/capability verification; Magento Open Source setup/auth compatibility; whether AccountSetup and final runtime contract must later split; whether exactly-one AccountSetup-profile invariant must ever change | **No** — deferred; not a blocker for generic Sync domain rebaseline |
 
 Do not add generic `edition` / `deployment_model` / `api_family` fields to
@@ -1115,9 +1118,10 @@ Remaining connector gaps are tracked separately under GAP-006.
   (Task 4C-2b-1).
 
 **Still absent in code (docs settled; runtime or UI missing):**
-- `run_sync_live` (**Stage 3**);
-- `ExternalRecordLink` (**Stage 3**);
-- Live execution after E11 revalidation (**Stage 3**);
+- `run_sync_live` (**Stage 3A** — normative contract frozen Stage 3-0);
+- `ExternalRecordLink` (**Stage 3A** — normative contract frozen Stage 3-0);
+- stale active-run recovery (**Stage 3A**);
+- Live execution after real Adobe validation (**Stage 3B–3E**);
 - sync execution runtime for merchant "Синхронізувати зараз" (Live);
 - scheduling beyond Discovery;
 - ownership persistence/enforcement;
