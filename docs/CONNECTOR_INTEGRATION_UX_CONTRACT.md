@@ -294,7 +294,7 @@ Remediation Contract (Resolved — Stage 2-0)**. Summary-level UI rules:
 **Implementation status:** Stage 2-0 is **docs-only**. Stage 1 Preview Engine
 (`run_sync_preview`, admission, persisted Preview runs) is **shipped**. Stage
 2A-1 is **shipped** (`manage_sync_configurations`, non-mutating existence lookup,
-Adobe Products Export Layer-B setup on `ManageAdobeProductsExportSetup`).
+Adobe Products Export Layer-B setup on `ListSyncDataSetup` + `ManageAdobeProductsExportSetup`).
 Merchant Preview result/worklist UI and remediation presenters remain **Stage
 2A-2**. Option Mapping remediation UI is **Stage 2B**.
 
@@ -302,7 +302,9 @@ Merchant Preview result/worklist UI and remediation presenters remain **Stage
 
 `manage_sync_configurations` (ninth runtime permission; **implemented Stage 2A-1**) authorizes merchant-facing mutation of SyncConfiguration-owned setup —
 including Adobe Products Export connector execution configuration (attribute set
-selection on `ManageAdobeProductsExportSetup`). It is independent from
+selection on `ManageAdobeProductsExportSetup`). Merchant discoverability for
+`manage_sync_configurations`-only actors uses `ListSyncDataSetup` navigation —
+not `ViewConnectorAccount`. It is independent from
 `manage_connector_accounts`, Mapping permissions, and `run_sync_preview`. Do not
 expose `attribute_set_id` as merchant terminology. Setup reachability uses
 `ConnectorAccount` + Products + Export + default context — not a pre-existing
