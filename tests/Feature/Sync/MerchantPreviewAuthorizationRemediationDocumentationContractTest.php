@@ -46,7 +46,7 @@ class MerchantPreviewAuthorizationRemediationDocumentationContractTest extends T
         $this->assertStringContainsString('Preview computation/runtime is shipped', $content);
         $this->assertStringContainsString('Stage 2A-2 merchant Preview work surface and remediation presentation are shipped', $content);
         $this->assertStringContainsString('Stage 2A is Done', $content);
-        $this->assertStringContainsString('Option Mapping remediation UI remains **pending Stage 2B**', $content);
+        $this->assertStringContainsString('Stage 2B Option Mapping remediation UI is shipped', $content);
         $this->assertStringContainsString('must **not** conclude that dry-run/preview computation is still absent', $content);
         $this->assertStringNotContainsString('Merchant Preview UI and remediation presentation remain pending Stage 2A', $content);
         $this->assertStringNotContainsString('including merchant Preview UI, `manage_sync_configurations` runtime permission', $content);
@@ -61,7 +61,7 @@ class MerchantPreviewAuthorizationRemediationDocumentationContractTest extends T
         $this->assertStringContainsString('Stage 1 Preview Engine is **shipped**', $content);
         $this->assertStringContainsString('Stage 2-0 merchant Preview authorization/remediation contract is **Done (docs contract)**', $content);
         $this->assertStringContainsString('Do not treat Preview computation/runtime as future work', $content);
-        $this->assertStringContainsString('Merchant Option Mapping remediation surfaces remain pending in Stage 2B', $content);
+        $this->assertStringContainsString('**Stage 2B is Done**', $content);
         $this->assertStringContainsString('**Stage 2A is Done**', $content);
     }
 
@@ -210,7 +210,7 @@ class MerchantPreviewAuthorizationRemediationDocumentationContractTest extends T
     }
 
     #[Test]
-    public function implementation_gaps_records_stage_2_0_done_and_stage_2a_done_with_2b_pending(): void
+    public function implementation_gaps_records_stage_2_0_done_stage_2a_done_and_stage_2b_done(): void
     {
         $gaps = preg_replace('/\s+/', ' ', $this->gap006Section()) ?? '';
 
@@ -220,9 +220,11 @@ class MerchantPreviewAuthorizationRemediationDocumentationContractTest extends T
         $this->assertStringContainsString('**Stage 2B — Option Mapping Remediation**', $gaps);
         $this->assertStringContainsString('Stage 2A-1 Done', $gaps);
         $this->assertStringContainsString('Stage 2A-2 Done', $gaps);
-        $this->assertStringContainsString('Stage 2B remains pending', $gaps);
+        $this->assertStringContainsString('**Done**', $gaps);
+        $this->assertStringContainsString('ManageSyncFieldOptionMappings', $gaps);
         $this->assertStringNotContainsString('| **Stage 2 — Merchant Preview** |', $gaps);
         $this->assertStringNotContainsString('Stage 2A/2B sequencing — **pending**', $gaps);
+        $this->assertStringNotContainsString('Stage 2B remains pending', $gaps);
     }
 
     #[Test]

@@ -208,7 +208,11 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
             $content,
         );
         $this->assertStringContainsString(
-            'Stage 2B** Option Mapping remediation UI',
+            '**Stage 3** Live Engine',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'Stage 2B is shipped',
             $content,
         );
         $this->assertStringNotContainsString(
