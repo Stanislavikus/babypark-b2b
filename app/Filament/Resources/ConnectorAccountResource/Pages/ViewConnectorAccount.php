@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ConnectorAccountResource\Pages;
 
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Enums\ConnectorDiscoveryRunStatus;
+use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
 use App\Filament\Resources\ConnectorAccountResource;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorConnectionCheck;
@@ -12,8 +13,10 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
 use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
+use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
 use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
+use App\Support\Connectors\ConnectorAuthorization;
 use App\Support\Connectors\ConnectorSafeMessagePresenter;
 use App\Support\Connectors\Exceptions\ConnectorAccountDisabledException;
 use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceResolutionException;
@@ -99,6 +102,10 @@ class ViewConnectorAccount extends ViewRecord
 
         if ($presentation->showDiscoveryExecution($user, $workspace) && config('connectors.discovery.manual_trigger_enabled')) {
             $actions[] = $this->makeRunDiscoveryAction();
+        }
+
+        if ($this->shouldShowAdobeExportSetupLink($user, $workspace)) {
+            $actions[] = $this->makeAdobeExportSetupAction();
         }
 
         return $actions;
@@ -301,5 +308,28 @@ class ViewConnectorAccount extends ViewRecord
                         ->send();
                 }
             });
+    }
+
+    private function shouldShowAdobeExportSetupLink(User $user, Workspace $workspace): bool
+    {
+        if (! app(ConnectorAuthorization::class)->canSafeRead($user, $workspace)) {
+            return false;
+        }
+
+        if (! $this->record instanceof ConnectorAccount) {
+            return false;
+        }
+
+        return app(AdobeProductExportSetupAuthorizationService::class)
+            ->isEligibleAdobeProductsExportSetupTarget($user, $workspace, $this->record->getKey());
+    }
+
+    private function makeAdobeExportSetupAction(): Action
+    {
+        return Action::make('openAdobeExportSetup')
+            ->label(__('sync_data_setup.adobe_products_export.link'))
+            ->url(ManageAdobeProductsExportSetup::getUrl([
+                'account' => $this->record->getKey(),
+            ]));
     }
 }

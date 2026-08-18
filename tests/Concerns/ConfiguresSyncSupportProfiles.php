@@ -20,19 +20,20 @@ trait ConfiguresSyncSupportProfiles
     {
         $container = app(Container::class);
 
+        $profiles = config('connectors.profiles', []);
+        $profiles['test_sync_support'] = [
+            'enabled' => true,
+            'connector_definition_code' => 'adobe_commerce',
+            'adapter' => TestSyncSupportConnectorAdapter::class,
+            'account_schema' => TestSyncSupportConnectorAccountSchema::class,
+            'capabilities' => [],
+            'preview_capability' => TestSyncPreviewCapability::class,
+            'field_option_mapping_validator' => TestFieldOptionMappingOptionValidator::class,
+        ];
+
         $container->instance(ConnectorProfileRegistry::class, new ConnectorProfileRegistry(
             $container,
-            [
-                'test_sync_support' => [
-                    'enabled' => true,
-                    'connector_definition_code' => 'adobe_commerce',
-                    'adapter' => TestSyncSupportConnectorAdapter::class,
-                    'account_schema' => TestSyncSupportConnectorAccountSchema::class,
-                    'capabilities' => [],
-                    'preview_capability' => TestSyncPreviewCapability::class,
-                    'field_option_mapping_validator' => TestFieldOptionMappingOptionValidator::class,
-                ],
-            ],
+            $profiles,
         ));
 
         $container->bind(

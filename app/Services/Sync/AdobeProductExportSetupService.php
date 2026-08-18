@@ -63,41 +63,41 @@ final class AdobeProductExportSetupService
         });
     }
 
-    public function configureAttributeSet(ConnectorAccount $account, int $attributeSetId): SyncConfiguration
+    public function listAvailableAttributeSets(ConnectorAccount $account): array
     {
-        if ($attributeSetId < 1) {
-            throw ConnectorExecutionConfigurationValidationException::invalidPayload(
-                'attribute_set_id must be a positive integer.',
-            );
-        }
-
-        $configuration = $this->reachabilityService->ensureProductsExportConfiguration($account);
-        $metadata = $this->metadataReader->read(
+        return $this->metadataReader->listAttributeSets(
             $account->workspace_id,
             $account->id,
-            $attributeSetId,
+        );
+    }
+
+    public function validateAttributeSetSelection(ConnectorAccount $account, int $attributeSetId): void
+    {
+        $this->assertPositiveAttributeSetId($attributeSetId);
+
+        $attributeSets = $this->metadataReader->listAttributeSets(
+            $account->workspace_id,
+            $account->id,
         );
 
-        $exists = false;
-
-        foreach ($metadata->attributeSets as $attributeSet) {
-            if (($attributeSet['attribute_set_id'] ?? null) === $attributeSetId) {
-                $exists = true;
-                break;
-            }
-        }
-
-        if (! $exists) {
+        if (! $this->attributeSetExistsInCatalogue($attributeSets, $attributeSetId)) {
             throw ConnectorExecutionConfigurationValidationException::invalidPayload(
                 'Configured Adobe attribute_set_id does not exist in the connected store.',
             );
         }
+    }
+
+    public function persistValidatedAttributeSet(ConnectorAccount $account, int $attributeSetId): SyncConfiguration
+    {
+        $this->assertPositiveAttributeSetId($attributeSetId);
 
         $adobeConfiguration = AdobeProductExportExecutionConfiguration::fromPayload([
             'attribute_set_id' => $attributeSetId,
         ]);
 
-        return DB::transaction(function () use ($account, $configuration, $adobeConfiguration): SyncConfiguration {
+        return DB::transaction(function () use ($account, $adobeConfiguration): SyncConfiguration {
+            $configuration = $this->reachabilityService->ensureProductsExportConfiguration($account);
+
             $locked = SyncConfiguration::withoutWorkspaceScope()
                 ->where('id', $configuration->id)
                 ->lockForUpdate()
@@ -109,6 +109,13 @@ final class AdobeProductExportSetupService
                 ConnectorExecutionConfiguration::fromPayload($adobeConfiguration->toPayload()),
             );
         });
+    }
+
+    public function configureAttributeSet(ConnectorAccount $account, int $attributeSetId): SyncConfiguration
+    {
+        $this->validateAttributeSetSelection($account, $attributeSetId);
+
+        return $this->persistValidatedAttributeSet($account, $attributeSetId);
     }
 
     private function hasConfiguredAttributeSet(SyncConfiguration $configuration): bool
@@ -137,8 +144,28 @@ final class AdobeProductExportSetupService
 
     private function selectedAttributeSetExists(AdobeProductExportExecutionMetadata $metadata): bool
     {
-        foreach ($metadata->attributeSets as $attributeSet) {
-            if (($attributeSet['attribute_set_id'] ?? null) === $metadata->selectedAttributeSetId) {
+        return $this->attributeSetExistsInCatalogue(
+            $metadata->attributeSets,
+            $metadata->selectedAttributeSetId,
+        );
+    }
+
+    private function assertPositiveAttributeSetId(int $attributeSetId): void
+    {
+        if ($attributeSetId < 1) {
+            throw ConnectorExecutionConfigurationValidationException::invalidPayload(
+                'attribute_set_id must be a positive integer.',
+            );
+        }
+    }
+
+    /**
+     * @param  list<array{attribute_set_id: int, attribute_set_name: string}>  $attributeSets
+     */
+    private function attributeSetExistsInCatalogue(array $attributeSets, int $attributeSetId): bool
+    {
+        foreach ($attributeSets as $attributeSet) {
+            if (($attributeSet['attribute_set_id'] ?? null) === $attributeSetId) {
                 return true;
             }
         }

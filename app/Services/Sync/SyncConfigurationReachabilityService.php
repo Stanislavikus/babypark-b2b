@@ -14,6 +14,7 @@ final class SyncConfigurationReachabilityService
     public function __construct(
         private readonly SyncConfigurationService $configurationService,
         private readonly ConnectorSyncSupportResolver $syncSupportResolver,
+        private readonly SyncConfigurationLookupService $lookupService,
     ) {}
 
     public function ensureProductsExportConfiguration(ConnectorAccount $account): SyncConfiguration
@@ -26,7 +27,7 @@ final class SyncConfigurationReachabilityService
             throw new \RuntimeException('Products export is not supported for this connector account.');
         }
 
-        $configuration = $this->findExistingProductsExportConfiguration($account);
+        $configuration = $this->lookupService->findProductsDefaultContext($account);
 
         if ($configuration === null) {
             return $this->configurationService->create($account, new CreateSyncConfigurationInput(
@@ -50,15 +51,5 @@ final class SyncConfigurationReachabilityService
                 enabledOperations: $enabledOperations,
             ),
         );
-    }
-
-    private function findExistingProductsExportConfiguration(ConnectorAccount $account): ?SyncConfiguration
-    {
-        return SyncConfiguration::withoutWorkspaceScope()
-            ->where('workspace_id', $account->workspace_id)
-            ->where('connector_account_id', $account->id)
-            ->where('data_domain', SyncDataDomain::Products)
-            ->where('external_context_key', SyncExternalContext::default()->uniquenessKey())
-            ->first();
     }
 }
