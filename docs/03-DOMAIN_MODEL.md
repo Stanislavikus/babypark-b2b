@@ -5662,7 +5662,9 @@ is frozen in **Merchant Preview Authorization & Remediation Contract (Resolved �
 Stage 2-0)** and **implemented in Stage 2A-1** runtime catalogue. **Stage 2A-2**
 implemented the merchant Preview work surface (landing reachability, advisory read
 model, explicit start, lifecycle, completed summary, Needs-attention worklist,
-contextual remediation presentation). **Stage 2A is Done.** Stage 2B remains pending.
+contextual remediation presentation). **Stage 2A is Done.** **Stage 2B is Done**
+(Option Mapping remediation UI on `ManageSyncFieldOptionMappings`). Stage 3
+remains pending.
 
 **Live authority:** do **not** add or freeze an implemented Live permission in
 4C-2a beyond the invariant that Preview authority must never silently become
@@ -6227,7 +6229,8 @@ Preview result/worklist UI is **implemented in Stage 2A-2**.
 
 Adobe `(products, export)` Preview support is declared (Stage 1). Layer-B Adobe
 Products Export setup authority and reachability are implemented in Stage
-2A-1. Merchant Preview work surface is **implemented in Stage 2A-2**.
+2A-1. Merchant Preview work surface is **implemented in Stage 2A-2**. Option
+Mapping remediation UI is **implemented in Stage 2B**.
 
 #### E8. Live authority
 
@@ -6463,10 +6466,26 @@ contextual remediation; Mapping deep links; temporal/staleness behavior; honest
 Do not build generic Sync History product, SyncIssue, scheduling, or analytics
 merely for this stage.
 
-**Stage 2B — Minimal Option Mapping Remediation**
+**Stage 2B — Minimal Option Mapping Remediation** — **Done**
 
-Option Mapping read model/UI; outer actor-aware authorization; focused exact
-option remediation for `MissingOptionMapping` and `ExternalOptionMissingOrStale`.
+Option Mapping read model/UI on `ManageSyncFieldOptionMappings`; outer
+actor-aware authorization via existing `view_sync_mappings` /
+`manage_sync_mappings` permissions only (no separate option-mapping permission).
+Focused exact option remediation for `MissingOptionMapping` and
+`ExternalOptionMissingOrStale`.
+
+Key runtime behaviors (Stage 2B):
+
+- **Read:** authoritative persisted connector snapshot metadata only — zero HTTP
+  on read (`AuthoritativeExternalOptionChoiceResolver`).
+- **Mutate:** `confirm` / `replace` retain connector external validation **outside**
+  the locked DB transaction (`FieldOptionMappingMutationService`).
+- **Preview remediation:** findings remain **historical** after remediation; current
+  actionability recomputed from current authorization + configuration state.
+- **Stale/orphan cleanup:** narrow removal of stale `FieldOptionMapping` rows whose
+  `internal_option_key` no longer exists in the field definition catalog; does
+  **not** repair Product/Variant select value integrity.
+
 Independently reviewable after 2A architecture is established.
 
 **Stage 3 — Live Engine + Real Magento Validation**
@@ -6488,7 +6507,7 @@ SyncConfiguration-owned setup had no explicit workspace authority.
 
 **Docs-only in Stage 2-0.** Runtime implementation of `manage_sync_configurations`,
 the non-mutating existence check, merchant Preview UI, and remediation
-presenters belongs to **Stage 2A** / **Stage 2B** as sequenced above.
+presenters landed in **Stage 2A** / **Stage 2B** as sequenced above.
 
 ##### Normative ninth workspace permission — `manage_sync_configurations`
 
@@ -6505,7 +6524,8 @@ automatically authorize or expose those future controls.
 **Runtime status:** normative target frozen in Stage 2-0; **runtime catalogue
 implementation landed in Stage 2A-1** (`manage_sync_configurations` ninth
 permission). Current PHP permission catalogue is **nine** permissions. **Stage 2A-2**
-shipped the merchant Preview work surface; **Stage 2A is Done.**
+shipped the merchant Preview work surface; **Stage 2A is Done.** **Stage 2B**
+shipped Option Mapping remediation on `ManageSyncFieldOptionMappings`.
 
 ##### Permission independence matrix (frozen)
 
