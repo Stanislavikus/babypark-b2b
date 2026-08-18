@@ -159,6 +159,40 @@ trait InteractsWithFieldMappingFixtures
         return $snapshot;
     }
 
+    /**
+     * @param  array<string, list<array{value: string, label: string}>>  $fieldsWithOptions
+     */
+    protected function publishAuthoritativeSnapshotWithOptions(
+        ConnectorAccount $account,
+        array $fieldsWithOptions,
+        ?\DateTimeInterface $createdAt = null,
+    ): ConnectorSchemaSnapshot {
+        $snapshot = $this->publishAuthoritativeSnapshot($account, array_keys($fieldsWithOptions), $createdAt);
+
+        foreach ($fieldsWithOptions as $externalFieldKey => $options) {
+            $optionObjects = [];
+
+            foreach ($options as $option) {
+                $optionObjects[] = (object) [
+                    'value' => $option['value'],
+                    'label' => $option['label'],
+                ];
+            }
+
+            ConnectorSchemaSnapshotField::withoutWorkspaceScope()
+                ->where('snapshot_id', $snapshot->id)
+                ->where('external_field_key', $externalFieldKey)
+                ->first()
+                ?->forceFill([
+                    'normalized_data_type' => 'select',
+                    'normalized_payload' => (object) ['options' => $optionObjects],
+                ])
+                ?->save();
+        }
+
+        return $snapshot;
+    }
+
     protected function seedFieldDefinitions(): void
     {
         $this->seed(FieldDefinitionSeeder::class);

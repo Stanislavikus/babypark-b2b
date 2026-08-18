@@ -4,11 +4,13 @@ namespace App\Filament\Pages\Sync;
 
 use App\Filament\Resources\ConnectorAccountResource;
 use App\Models\ConnectorAccount;
+use App\Models\FieldMapping;
 use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Connectors\AuthoritativeConnectorSchemaSnapshotResolver;
 use App\Services\Sync\FieldMappingAuthorizationService;
+use App\Services\Sync\FieldOptionMappingEligibilityResolver;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAuthorization;
@@ -296,6 +298,7 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
 
         $presenter = app(SyncFieldMappingRowPresenter::class);
         $labelsByKey = $this->externalLabelsByKey($readModel);
+        $mappingsByBindingId = $this->mappingsByBindingId($readModel->syncConfigurationId);
 
         $rows = [];
 
@@ -310,7 +313,16 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
                 continue;
             }
 
-            $rows[] = $this->serializeRow($row, $semanticState, $presenter, $readModel->discoveryAvailable, $labelsByKey);
+            $mapping = $mappingsByBindingId[$row->fieldBindingId] ?? null;
+
+            $rows[] = $this->serializeRow(
+                $row,
+                $semanticState,
+                $presenter,
+                $readModel->discoveryAvailable,
+                $labelsByKey,
+                $mapping,
+            );
         }
 
         $this->displayRows = $rows;
@@ -396,6 +408,18 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
     }
 
     /**
+     * @return array<string, FieldMapping>
+     */
+    protected function mappingsByBindingId(string $syncConfigurationId): array
+    {
+        return FieldMapping::withoutWorkspaceScope()
+            ->where('sync_configuration_id', $syncConfigurationId)
+            ->get()
+            ->keyBy('field_binding_id')
+            ->all();
+    }
+
+    /**
      * @param  array<string, string>  $labelsByKey
      * @return array<string, mixed>
      */
@@ -405,9 +429,20 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
         SyncFieldMappingRowPresenter $presenter,
         bool $discoveryAvailable,
         array $labelsByKey,
+        ?FieldMapping $mapping = null,
     ): array {
         $externalKey = $row->existingExternalFieldKey
             ?? ($discoveryAvailable ? $row->suggestedExternalFieldKey : null);
+
+        $optionMappingUrl = null;
+
+        if ($mapping !== null && app(FieldOptionMappingEligibilityResolver::class)->isEligibleMapping($mapping)) {
+            $optionMappingUrl = ManageSyncFieldOptionMappings::getUrl([
+                'account' => $this->accountId,
+                'configuration' => $this->configurationId,
+                'mapping' => $mapping->id,
+            ]);
+        }
 
         return [
             'field_binding_id' => $row->fieldBindingId,
@@ -423,6 +458,7 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
                 SyncFieldMappingRowState::NEEDS_ATTENTION => 'warning',
                 default => null,
             },
+            'option_mapping_url' => $optionMappingUrl,
         ];
     }
 
