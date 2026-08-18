@@ -38,15 +38,18 @@ class MerchantPreviewAuthorizationRemediationDocumentationContractTest extends T
     }
 
     #[Test]
-    public function ux_contract_distinguishes_shipped_preview_runtime_from_pending_merchant_ui(): void
+    public function ux_contract_distinguishes_shipped_preview_runtime_from_shipped_merchant_ui(): void
     {
         $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
 
         $this->assertStringContainsString('**Existing-vs-future boundary:**', $content);
         $this->assertStringContainsString('Preview computation/runtime is shipped', $content);
-        $this->assertStringContainsString('Merchant Preview UI and remediation presentation remain pending Stage 2A', $content);
+        $this->assertStringContainsString('Stage 2A-2 merchant Preview work surface and remediation presentation are shipped', $content);
+        $this->assertStringContainsString('Stage 2A is Done', $content);
         $this->assertStringContainsString('Option Mapping remediation UI remains **pending Stage 2B**', $content);
         $this->assertStringContainsString('must **not** conclude that dry-run/preview computation is still absent', $content);
+        $this->assertStringNotContainsString('Merchant Preview UI and remediation presentation remain pending Stage 2A', $content);
+        $this->assertStringNotContainsString('including merchant Preview UI, `manage_sync_configurations` runtime permission', $content);
     }
 
     #[Test]

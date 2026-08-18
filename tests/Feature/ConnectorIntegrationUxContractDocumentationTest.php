@@ -204,7 +204,19 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
             $content,
         );
         $this->assertStringContainsString(
-            'Still absent mechanisms explicitly remain future',
+            'Mechanisms that explicitly remain future include',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'Stage 2B** Option Mapping remediation UI',
+            $content,
+        );
+        $this->assertStringNotContainsString(
+            'Merchant Preview UI and remediation presentation remain pending Stage 2A',
+            $content,
+        );
+        $this->assertStringNotContainsString(
+            'including merchant Preview UI, `manage_sync_configurations` runtime permission',
             $content,
         );
         $this->assertStringContainsString(
