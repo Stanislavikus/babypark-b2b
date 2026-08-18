@@ -29,14 +29,29 @@
                 @endif
               </div>
 
-              <x-filament::button
-                tag="a"
-                :href="$target['setup_url']"
-                color="gray"
-                data-testid="sync-data-setup-open-{{ $target['account_id'] }}"
-              >
-                {{ __('sync_data_setup.page.open_setup') }}
-              </x-filament::button>
+              <div class="flex flex-wrap gap-2">
+                @if ($target['setup_action_visible'])
+                  <x-filament::button
+                    tag="a"
+                    :href="$target['setup_url']"
+                    color="gray"
+                    data-testid="sync-data-setup-open-setup-{{ $target['account_id'] }}"
+                  >
+                    {{ __('sync_data_setup.page.open_setup') }}
+                  </x-filament::button>
+                @endif
+
+                @if ($target['preview_action_visible'])
+                  <x-filament::button
+                    tag="a"
+                    :href="$target['preview_url']"
+                    color="primary"
+                    data-testid="sync-data-setup-open-preview-{{ $target['account_id'] }}"
+                  >
+                    {{ __('sync_preview.actions.open_preview') }}
+                  </x-filament::button>
+                @endif
+              </div>
             </div>
           @endforeach
         </div>

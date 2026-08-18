@@ -3,10 +3,9 @@
 namespace App\Filament\Pages\Sync;
 
 use App\Models\User;
-use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
+use App\Services\Sync\SyncDataSetupLandingService;
 use App\Support\Sync\AdobeProductExportSetup\SyncDataSetupTargetKind;
-use App\Support\Sync\AdobeProductExportSetup\SyncDataSetupTargetSummary;
-use App\Support\Workspace\Rbac\Concerns\RequiresFreshWorkspaceSyncConfigurationPermission;
+use App\Support\Workspace\Rbac\Concerns\RequiresFreshWorkspaceSyncDataSetupLandingPermission;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
@@ -14,7 +13,7 @@ use Illuminate\Support\Facades\Auth;
 
 class ListSyncDataSetup extends Page
 {
-    use RequiresFreshWorkspaceSyncConfigurationPermission;
+    use RequiresFreshWorkspaceSyncDataSetupLandingPermission;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
@@ -24,7 +23,7 @@ class ListSyncDataSetup extends Page
 
     protected string $view = 'filament.pages.sync.list-sync-data-setup';
 
-    /** @var list<array{account_id: string, platform_name: string, account_name: string, setup_usable: bool, target_label: string, setup_url: string}> */
+    /** @var list<array<string, mixed>> */
     public array $targets = [];
 
     public static function canAccess(array $parameters = []): bool
@@ -33,7 +32,7 @@ class ListSyncDataSetup extends Page
         $workspace = app(WorkspaceContext::class)->current();
 
         return $user instanceof User
-            && app(AdobeProductExportSetupAuthorizationService::class)->canAccess($user, $workspace);
+            && app(SyncDataSetupLandingService::class)->canAccessLanding($user, $workspace);
     }
 
     public static function getNavigationGroup(): ?string
@@ -61,19 +60,22 @@ class ListSyncDataSetup extends Page
         $user = Auth::user();
         abort_unless($user instanceof User, 403);
 
-        $workspace = $this->resolveSyncSetupWorkspace();
+        $workspace = $this->resolveSyncDataSetupLandingWorkspace();
 
-        $summaries = app(AdobeProductExportSetupAuthorizationService::class)
-            ->listEligibleSetupTargets($user, $workspace);
+        $summaries = app(SyncDataSetupLandingService::class)
+            ->listLandingTargets($user, $workspace);
 
         $this->targets = array_map(
-            fn (SyncDataSetupTargetSummary $summary): array => [
+            fn ($summary): array => [
                 'account_id' => $summary->accountId,
                 'platform_name' => $summary->platformName,
                 'account_name' => $summary->accountName,
                 'setup_usable' => $summary->setupUsable,
                 'target_label' => $this->presentTargetLabel($summary->targetKind),
-                'setup_url' => $this->presentSetupUrl($summary),
+                'setup_action_visible' => $summary->setupActionVisible,
+                'preview_action_visible' => $summary->previewActionVisible,
+                'setup_url' => $summary->setupUrl,
+                'preview_url' => $summary->previewUrl,
             ],
             $summaries,
         );
@@ -83,15 +85,6 @@ class ListSyncDataSetup extends Page
     {
         return match ($targetKind) {
             SyncDataSetupTargetKind::AdobeProductsExport => __('sync_data_setup.targets.adobe_products_export'),
-        };
-    }
-
-    private function presentSetupUrl(SyncDataSetupTargetSummary $summary): string
-    {
-        return match ($summary->targetKind) {
-            SyncDataSetupTargetKind::AdobeProductsExport => ManageAdobeProductsExportSetup::getUrl([
-                'account' => $summary->accountId,
-            ]),
         };
     }
 }

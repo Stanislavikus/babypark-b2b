@@ -3,6 +3,7 @@
 namespace App\Support\Sync\AdobeProductExportSetup;
 
 use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Models\ConnectorAccount;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportPreviewCapability;
@@ -23,14 +24,34 @@ final class AdobeProductExportSetupTargetEligibility
 
     public function isEligible(ConnectorAccountLayerBSetupEligibilityProjection $projection): bool
     {
-        if (! $this->syncSupportResolver->supportsConfiguration(
-            $this->accountReferenceForSupport($projection),
-            SyncDataDomain::Products,
-            SyncSemanticOperation::Export,
-        )) {
+        if (! $this->hasAdobeProductsExportPreviewProfile($projection)) {
             return false;
         }
 
+        return $this->syncSupportResolver->supportsConfiguration(
+            $this->accountReferenceForSupport($projection),
+            SyncDataDomain::Products,
+            SyncSemanticOperation::Export,
+        );
+    }
+
+    public function isPreviewEligible(ConnectorAccountLayerBSetupEligibilityProjection $projection): bool
+    {
+        if (! $this->hasAdobeProductsExportPreviewProfile($projection)) {
+            return false;
+        }
+
+        return $this->syncSupportResolver->supports(
+            $this->accountReferenceForSupport($projection),
+            SyncDataDomain::Products,
+            SyncSemanticOperation::Export,
+            SyncRunMode::Preview,
+        );
+    }
+
+    private function hasAdobeProductsExportPreviewProfile(
+        ConnectorAccountLayerBSetupEligibilityProjection $projection,
+    ): bool {
         $definition = $this->profileRegistry->profileDefinition($projection->authProfile);
 
         return $definition->previewCapabilityClass === AdobeProductExportPreviewCapability::class;
