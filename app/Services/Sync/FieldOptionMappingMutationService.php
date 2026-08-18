@@ -32,13 +32,12 @@ final class FieldOptionMappingMutationService
     ): SyncConfiguration {
         $configuration = $this->resolveConfiguration($account, $syncConfigurationId);
         $mapping = $this->bindingValidator->assertOwnedMapping($configuration, $fieldMappingId);
+        $this->bindingValidator->assertProductsConfiguration($configuration);
+        $this->internalOptionValidator->validate($mapping, $internalOptionKey);
 
         if ($this->exactMappingExists($mapping, $internalOptionKey, $externalOptionValue)) {
             return $configuration;
         }
-
-        $this->bindingValidator->assertProductsConfiguration($configuration);
-        $this->internalOptionValidator->validate($mapping, $internalOptionKey);
 
         $this->optionValidatorResolver->resolve($account)->validate(
             $account,
@@ -106,12 +105,12 @@ final class FieldOptionMappingMutationService
         $targetInternalKey = $newInternalOptionKey ?? $internalOptionKey;
         $targetExternalValue = $newExternalOptionValue ?? $externalOptionValue;
 
+        $this->bindingValidator->assertProductsConfiguration($configuration);
+        $this->internalOptionValidator->validate($mapping, $targetInternalKey);
+
         if ($targetInternalKey === $internalOptionKey && $targetExternalValue === $externalOptionValue) {
             return $configuration;
         }
-
-        $this->bindingValidator->assertProductsConfiguration($configuration);
-        $this->internalOptionValidator->validate($mapping, $targetInternalKey);
 
         $this->optionValidatorResolver->resolve($account)->validate(
             $account,

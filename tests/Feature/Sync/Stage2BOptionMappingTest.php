@@ -34,6 +34,7 @@ use App\Models\WorkspaceUser;
 use App\Services\Sync\CreateSyncConfigurationInput;
 use App\Services\Sync\FieldDefinitionInternalOptionValidator;
 use App\Services\Sync\FieldMappingMutationService;
+use App\Services\Sync\FieldOptionMappingAuthorizationService;
 use App\Services\Sync\FieldOptionMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
 use App\Support\Connectors\ConnectorProfileRegistry;
@@ -47,6 +48,7 @@ use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -61,6 +63,7 @@ use Tests\Concerns\InteractsWithFieldMappingFixtures;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
 use Tests\Support\Connectors\TestSyncSupportConnectorAccountSchema;
 use Tests\Support\Connectors\TestSyncSupportConnectorAdapter;
+use Tests\Support\Sync\CountingTestFieldOptionMappingOptionValidator;
 use Tests\Support\Sync\TestFieldOptionMappingOptionValidator;
 use Tests\Support\Sync\TestSyncPreviewCapability;
 use Tests\Support\Sync\TransactionAwareTestFieldOptionMappingOptionValidator;
@@ -365,18 +368,268 @@ class Stage2BOptionMappingTest extends TestCase
     }
 
     #[Test]
-    public function read_model_resolves_external_options_from_snapshot(): void
+    public function authoritative_external_option_search_resolves_from_snapshot(): void
     {
         [$account, $configuration, $mapping] = $this->colorMappingFixture();
+        $actor = $this->actorWithPermissions([WorkspacePermissions::VIEW_SYNC_MAPPINGS]);
+
+        $choices = app(FieldOptionMappingAuthorizationService::class)->searchExternalOptionChoices(
+            $actor,
+            $account->workspace_id,
+            $account->id,
+            $configuration->id,
+            $mapping->id,
+        );
+
+        $this->assertSame(['93' => 'Blue', '94' => 'Pink'], $choices);
+    }
+
+    #[Test]
+    public function livewire_snapshot_excludes_complete_external_option_catalog(): void
+    {
+        [$account, $configuration, $mapping] = $this->colorMappingFixture();
+        FieldOptionMapping::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'field_mapping_id' => $mapping->id,
+            'internal_option_key' => 'blue',
+            'external_option_value' => '93',
+        ]);
         $actor = $this->actorWithPermissions([WorkspacePermissions::VIEW_SYNC_MAPPINGS]);
 
         $component = Livewire::actingAs($actor)
             ->test(ManageSyncFieldOptionMappings::class, $this->optionPageParameters($account, $configuration, $mapping));
 
-        $this->assertSame(
-            ['93' => 'Blue', '94' => 'Pink'],
-            $component->instance()->externalOptionChoices,
+        $snapshotPayload = json_encode($component->snapshot);
+        $effectsPayload = json_encode($component->effects);
+
+        $this->assertStringNotContainsString('externalOptionChoices', $snapshotPayload);
+        $this->assertStringNotContainsString('"94"', $snapshotPayload);
+        $this->assertStringNotContainsString('Pink', $snapshotPayload);
+        $this->assertStringNotContainsString('"94"', $effectsPayload);
+        $this->assertStringNotContainsString('Pink', $effectsPayload);
+    }
+
+    #[Test]
+    public function external_option_choice_search_is_scoped_and_performs_zero_http(): void
+    {
+        [$account, $configuration, $mapping] = $this->colorMappingFixture();
+        Http::fake();
+        $actor = $this->actorWithPermissions([WorkspacePermissions::VIEW_SYNC_MAPPINGS]);
+
+        $choices = app(FieldOptionMappingAuthorizationService::class)->searchExternalOptionChoices(
+            $actor,
+            $account->workspace_id,
+            $account->id,
+            $configuration->id,
+            $mapping->id,
+            'Pin',
         );
+
+        $this->assertSame(['94' => 'Pink'], $choices);
+        Http::assertNothingSent();
+    }
+
+    #[Test]
+    public function orphan_exact_confirm_is_rejected_without_external_validation(): void
+    {
+        [$account, $configuration, $mapping] = $this->orphanGreenFixture();
+        $validator = $this->bindCountingValidator();
+        $service = app(FieldOptionMappingMutationService::class);
+        $revisionBefore = SyncConfiguration::withoutWorkspaceScope()->findOrFail($configuration->id)->configuration_revision;
+
+        try {
+            $service->confirm($account, $configuration->id, $mapping->id, 'green', '95');
+            $this->fail('Expected orphan exact confirm to be rejected.');
+        } catch (FieldMappingValidationException) {
+        }
+
+        $this->assertSame(0, $validator->validateCallCount);
+        $this->assertSame(
+            $revisionBefore,
+            SyncConfiguration::withoutWorkspaceScope()->findOrFail($configuration->id)->configuration_revision,
+        );
+        $this->assertDatabaseHas('field_option_mappings', [
+            'field_mapping_id' => $mapping->id,
+            'internal_option_key' => 'green',
+            'external_option_value' => '95',
+        ]);
+    }
+
+    #[Test]
+    public function orphan_exact_replace_is_rejected_without_external_validation(): void
+    {
+        [$account, $configuration, $mapping] = $this->orphanGreenFixture();
+        $validator = $this->bindCountingValidator();
+        $service = app(FieldOptionMappingMutationService::class);
+        $revisionBefore = SyncConfiguration::withoutWorkspaceScope()->findOrFail($configuration->id)->configuration_revision;
+
+        try {
+            $service->replace(
+                $account,
+                $configuration->id,
+                $mapping->id,
+                'green',
+                '95',
+                newExternalOptionValue: '95',
+            );
+            $this->fail('Expected orphan exact replace to be rejected.');
+        } catch (FieldMappingValidationException) {
+        }
+
+        $this->assertSame(0, $validator->validateCallCount);
+        $this->assertSame(
+            $revisionBefore,
+            SyncConfiguration::withoutWorkspaceScope()->findOrFail($configuration->id)->configuration_revision,
+        );
+    }
+
+    #[Test]
+    public function valid_current_exact_confirm_is_idempotent_without_external_validation(): void
+    {
+        [$account, $configuration, $mapping] = $this->colorMappingFixture();
+        $validator = $this->bindCountingValidator();
+        $service = app(FieldOptionMappingMutationService::class);
+
+        $service->confirm($account, $configuration->id, $mapping->id, 'blue', '93');
+        $revisionAfterFirst = SyncConfiguration::withoutWorkspaceScope()->findOrFail($configuration->id)->configuration_revision;
+        $this->assertSame(1, $validator->validateCallCount);
+
+        $service->confirm($account, $configuration->id, $mapping->id, 'blue', '93');
+        $revisionAfterSecond = SyncConfiguration::withoutWorkspaceScope()->findOrFail($configuration->id)->configuration_revision;
+
+        $this->assertSame(1, $validator->validateCallCount);
+        $this->assertSame($revisionAfterFirst, $revisionAfterSecond);
+    }
+
+    #[Test]
+    public function failure_notification_never_serializes_raw_exception_text(): void
+    {
+        [$account, $configuration, $mapping] = $this->colorMappingFixture();
+        $actor = $this->actorWithPermissions([WorkspacePermissions::MANAGE_SYNC_MAPPINGS]);
+        $expectedBody = __('sync_option_mappings.errors.invalid_action');
+
+        $component = Livewire::actingAs($actor)
+            ->test(ManageSyncFieldOptionMappings::class, $this->optionPageParameters($account, $configuration, $mapping))
+            ->call('confirmMapping', 'purple', '93')
+            ->assertNotified(
+                Notification::make()
+                    ->danger()
+                    ->title(__('sync_option_mappings.notifications.failed'))
+                    ->body($expectedBody),
+            );
+
+        $effectsPayload = json_encode($component->effects);
+
+        $this->assertStringNotContainsString('purple', $effectsPayload);
+        $this->assertStringNotContainsString('field definition', strtolower($effectsPayload));
+        $this->assertStringNotContainsString('Internal option is not valid', $effectsPayload);
+    }
+
+    #[Test]
+    public function external_value_unavailable_row_shows_remove_for_manage_actor(): void
+    {
+        [$account, $configuration, $mapping] = $this->colorMappingFixture();
+        FieldOptionMapping::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'field_mapping_id' => $mapping->id,
+            'internal_option_key' => 'pink',
+            'external_option_value' => '999',
+        ]);
+        $actor = $this->actorWithPermissions([WorkspacePermissions::MANAGE_SYNC_MAPPINGS]);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldOptionMappings::class, $this->optionPageParameters($account, $configuration, $mapping))
+            ->assertSeeHtml('data-testid="sync-option-mapping-remove"');
+    }
+
+    #[Test]
+    public function external_value_unavailable_remove_succeeds_without_external_validation(): void
+    {
+        [$account, $configuration, $mapping] = $this->colorMappingFixture();
+        FieldOptionMapping::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'field_mapping_id' => $mapping->id,
+            'internal_option_key' => 'pink',
+            'external_option_value' => '999',
+        ]);
+        Http::fake();
+        $validator = $this->bindCountingValidator();
+        $actor = $this->actorWithPermissions([WorkspacePermissions::MANAGE_SYNC_MAPPINGS]);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldOptionMappings::class, $this->optionPageParameters($account, $configuration, $mapping))
+            ->call('removeMapping', 'pink', '999')
+            ->assertNotified(__('sync_option_mappings.notifications.removed'));
+
+        $this->assertSame(0, $validator->validateCallCount);
+        Http::assertNothingSent();
+        $this->assertDatabaseMissing('field_option_mappings', [
+            'field_mapping_id' => $mapping->id,
+            'internal_option_key' => 'pink',
+        ]);
+    }
+
+    #[Test]
+    public function external_value_unavailable_row_hides_remove_for_view_only_actor(): void
+    {
+        [$account, $configuration, $mapping] = $this->colorMappingFixture();
+        FieldOptionMapping::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'field_mapping_id' => $mapping->id,
+            'internal_option_key' => 'pink',
+            'external_option_value' => '999',
+        ]);
+        $actor = $this->actorWithPermissions([WorkspacePermissions::VIEW_SYNC_MAPPINGS]);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldOptionMappings::class, $this->optionPageParameters($account, $configuration, $mapping))
+            ->assertDontSeeHtml('data-testid="sync-option-mapping-remove"');
+    }
+
+    #[Test]
+    public function missing_external_choices_do_not_block_removal_of_existing_correspondence(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $binding = $this->productVariantBinding('color');
+
+        FieldMapping::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'sync_configuration_id' => $configuration->id,
+            'field_binding_id' => $binding->id,
+            'external_field_key' => 'color',
+        ]);
+
+        $mapping = FieldMapping::withoutWorkspaceScope()
+            ->where('sync_configuration_id', $configuration->id)
+            ->sole();
+
+        FieldOptionMapping::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'field_mapping_id' => $mapping->id,
+            'internal_option_key' => 'blue',
+            'external_option_value' => '93',
+        ]);
+
+        Http::fake();
+        $actor = $this->actorWithPermissions([WorkspacePermissions::MANAGE_SYNC_MAPPINGS]);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldOptionMappings::class, $this->optionPageParameters($account, $configuration, $mapping))
+            ->call('removeMapping', 'blue', '93')
+            ->assertNotified(__('sync_option_mappings.notifications.removed'));
+
+        Http::assertNothingSent();
+        $this->assertDatabaseMissing('field_option_mappings', [
+            'field_mapping_id' => $mapping->id,
+            'internal_option_key' => 'blue',
+        ]);
     }
 
     #[Test]
@@ -1242,6 +1495,24 @@ class Stage2BOptionMappingTest extends TestCase
         $container = app(Container::class);
         $container->instance(ConnectorProfileRegistry::class, new ConnectorProfileRegistry($container, $profiles));
         $container->instance(TransactionAwareTestFieldOptionMappingOptionValidator::class, $validator);
+
+        return $validator;
+    }
+
+    private function bindCountingValidator(): CountingTestFieldOptionMappingOptionValidator
+    {
+        $validator = new CountingTestFieldOptionMappingOptionValidator(
+            app(FieldDefinitionInternalOptionValidator::class),
+        );
+
+        $profiles = config('connectors.profiles', []);
+        $profiles['test_sync_support'] = $this->test_sync_support_profile_config([
+            'field_option_mapping_validator' => CountingTestFieldOptionMappingOptionValidator::class,
+        ]);
+
+        $container = app(Container::class);
+        $container->instance(ConnectorProfileRegistry::class, new ConnectorProfileRegistry($container, $profiles));
+        $container->instance(CountingTestFieldOptionMappingOptionValidator::class, $validator);
 
         return $validator;
     }

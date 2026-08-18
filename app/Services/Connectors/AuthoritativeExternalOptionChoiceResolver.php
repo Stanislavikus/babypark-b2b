@@ -63,6 +63,27 @@ final class AuthoritativeExternalOptionChoiceResolver
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function searchChoices(ConnectorAccount $account, string $externalFieldKey, string $search = ''): array
+    {
+        $needle = mb_strtolower(trim($search));
+        $options = [];
+
+        foreach ($this->resolveChoices($account, $externalFieldKey) as $choice) {
+            if ($needle !== ''
+                && ! str_contains(mb_strtolower($choice->presentationLabel()), $needle)
+                && ! str_contains(mb_strtolower($choice->value), $needle)) {
+                continue;
+            }
+
+            $options[$choice->value] = $choice->presentationLabel();
+        }
+
+        return $options;
+    }
+
+    /**
      * @return list<ExternalOptionChoice>
      */
     private function extractOptions(ConnectorSchemaSnapshotField $field): array

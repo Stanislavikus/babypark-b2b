@@ -20,14 +20,6 @@ final class FieldOptionMappingSafeMessagePresenter
         }
 
         if ($exception instanceof FieldMappingValidationException) {
-            if ($this->isInvalidExternalChoice($exception)) {
-                return __('sync_option_mappings.errors.invalid_choice');
-            }
-
-            if ($this->isInvalidInternalChoice($exception)) {
-                return __('sync_option_mappings.errors.invalid_choice');
-            }
-
             return __('sync_option_mappings.errors.invalid_action');
         }
 
@@ -37,15 +29,5 @@ final class FieldOptionMappingSafeMessagePresenter
     public function report(Throwable $exception): void
     {
         report($exception);
-    }
-
-    private function isInvalidExternalChoice(FieldMappingValidationException $exception): bool
-    {
-        return str_starts_with($exception->getMessage(), "External option '");
-    }
-
-    private function isInvalidInternalChoice(FieldMappingValidationException $exception): bool
-    {
-        return str_starts_with($exception->getMessage(), "Internal option '");
     }
 }

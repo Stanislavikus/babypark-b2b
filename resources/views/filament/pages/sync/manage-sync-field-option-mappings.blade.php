@@ -119,19 +119,10 @@
                         >
                           {{ __('sync_option_mappings.actions.change') }}
                         </x-filament::button>
-
-                        @if ($row['semantic_state'] === 'mapped')
-                          <x-filament::button
-                            size="xs"
-                            color="danger"
-                            wire:click="removeMapping({{ \Illuminate\Support\Js::from($row['internal_option_key']) }}, {{ \Illuminate\Support\Js::from($row['existing_external_option_value']) }})"
-                            data-testid="sync-option-mapping-remove"
-                          >
-                            {{ __('sync_option_mappings.actions.remove') }}
-                          </x-filament::button>
-                        @endif
                       @endif
-                    @elseif ($row['semantic_state'] === 'mapped')
+                    @endif
+
+                    @if ($row['existing_external_option_value'] !== null && $row['existing_external_option_value'] !== '')
                       <x-filament::button
                         size="xs"
                         color="danger"

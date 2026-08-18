@@ -3,9 +3,11 @@
 namespace App\Services\Sync;
 
 use App\Models\ConnectorAccount;
+use App\Models\FieldMapping;
 use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Connectors\AuthoritativeExternalOptionChoiceResolver;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
 use App\Support\Sync\FieldOptionMappingReadModel\FieldOptionMappingReadModel;
@@ -18,6 +20,7 @@ final class FieldOptionMappingAuthorizationService
         private readonly WorkspaceAuthorization $workspaceAuthorization,
         private readonly FieldOptionMappingMutationService $mutationService,
         private readonly FieldOptionMappingReadModelProjector $projector,
+        private readonly AuthoritativeExternalOptionChoiceResolver $externalOptionChoiceResolver,
     ) {}
 
     public function projectReadModel(
@@ -118,6 +121,57 @@ final class FieldOptionMappingAuthorizationService
         );
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public function searchExternalOptionChoices(
+        User $actor,
+        string $workspaceId,
+        string $connectorAccountId,
+        string $syncConfigurationId,
+        string $fieldMappingId,
+        string $search = '',
+    ): array {
+        [$workspace, $account] = $this->resolveConnectorAccount($actor, $workspaceId, $connectorAccountId);
+
+        if (! $this->canRead($actor, $workspace)) {
+            throw new AuthorizationException('This action is unauthorized.');
+        }
+
+        $this->resolveSyncConfiguration($account, $syncConfigurationId);
+        $mapping = $this->resolveOwnedFieldMapping($account, $syncConfigurationId, $fieldMappingId);
+
+        return $this->externalOptionChoiceResolver->searchChoices(
+            $account,
+            (string) $mapping->external_field_key,
+            $search,
+        );
+    }
+
+    public function externalOptionLabel(
+        User $actor,
+        string $workspaceId,
+        string $connectorAccountId,
+        string $syncConfigurationId,
+        string $fieldMappingId,
+        string $externalOptionValue,
+    ): ?string {
+        [$workspace, $account] = $this->resolveConnectorAccount($actor, $workspaceId, $connectorAccountId);
+
+        if (! $this->canRead($actor, $workspace)) {
+            throw new AuthorizationException('This action is unauthorized.');
+        }
+
+        $this->resolveSyncConfiguration($account, $syncConfigurationId);
+        $mapping = $this->resolveOwnedFieldMapping($account, $syncConfigurationId, $fieldMappingId);
+
+        return $this->externalOptionChoiceResolver->labelForValue(
+            $account,
+            (string) $mapping->external_field_key,
+            $externalOptionValue,
+        );
+    }
+
     public function removeStale(
         User $actor,
         string $workspaceId,
@@ -178,6 +232,24 @@ final class FieldOptionMappingAuthorizationService
         }
 
         return $configuration;
+    }
+
+    private function resolveOwnedFieldMapping(
+        ConnectorAccount $account,
+        string $syncConfigurationId,
+        string $fieldMappingId,
+    ): FieldMapping {
+        $mapping = FieldMapping::withoutWorkspaceScope()
+            ->where('workspace_id', $account->workspace_id)
+            ->where('sync_configuration_id', $syncConfigurationId)
+            ->where('id', $fieldMappingId)
+            ->first();
+
+        if ($mapping === null) {
+            throw new AuthorizationException('This action is unauthorized.');
+        }
+
+        return $mapping;
     }
 
     private function canRead(User $actor, Workspace $workspace): bool

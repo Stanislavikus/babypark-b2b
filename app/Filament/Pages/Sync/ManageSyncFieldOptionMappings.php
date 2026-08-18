@@ -81,9 +81,6 @@ class ManageSyncFieldOptionMappings extends Page implements HasActions, HasSchem
     /** @var list<array<string, mixed>> */
     public array $staleRows = [];
 
-    /** @var array<string, string> */
-    public array $externalOptionChoices = [];
-
     public static function canAccess(array $parameters = []): bool
     {
         $user = Auth::user();
@@ -237,8 +234,11 @@ class ManageSyncFieldOptionMappings extends Page implements HasActions, HasSchem
             ->schema([
                 Select::make('external_option_value')
                     ->label($this->platformName)
-                    ->options(fn (): array => $this->externalOptionChoices)
                     ->searchable()
+                    ->getSearchResultsUsing(fn (?string $search): array => $this->searchExternalOptionChoices($search ?? ''))
+                    ->getOptionLabelUsing(fn (?string $value): ?string => $value === null || $value === ''
+                        ? null
+                        : $this->externalOptionLabel($value))
                     ->required(),
             ])
             ->action(function (array $data, array $arguments): void {
@@ -321,7 +321,6 @@ class ManageSyncFieldOptionMappings extends Page implements HasActions, HasSchem
         $this->internalFieldLabel = $readModel->internalFieldLabel;
         $this->externalFieldLabel = $readModel->externalFieldLabel;
         $this->externalChoicesResolvable = $readModel->externalChoicesResolvable;
-        $this->externalOptionChoices = $this->buildExternalOptionChoices($readModel);
 
         $this->refreshDisplayRows($readModel);
     }
@@ -381,15 +380,42 @@ class ManageSyncFieldOptionMappings extends Page implements HasActions, HasSchem
     /**
      * @return array<string, string>
      */
-    protected function buildExternalOptionChoices(FieldOptionMappingReadModel $readModel): array
+    protected function searchExternalOptionChoices(string $search): array
     {
-        $options = [];
+        $user = Auth::user();
+        abort_unless($user instanceof User, 403);
 
-        foreach ($readModel->externalChoices as $choice) {
-            $options[$choice->value] = $choice->presentationLabel();
+        try {
+            return app(FieldOptionMappingAuthorizationService::class)->searchExternalOptionChoices(
+                $user,
+                $this->resolveMappingWorkspace()->id,
+                $this->accountId,
+                $this->configurationId,
+                $this->fieldMappingId,
+                $search,
+            );
+        } catch (AuthorizationException) {
+            abort(403);
         }
+    }
 
-        return $options;
+    protected function externalOptionLabel(string $value): ?string
+    {
+        $user = Auth::user();
+        abort_unless($user instanceof User, 403);
+
+        try {
+            return app(FieldOptionMappingAuthorizationService::class)->externalOptionLabel(
+                $user,
+                $this->resolveMappingWorkspace()->id,
+                $this->accountId,
+                $this->configurationId,
+                $this->fieldMappingId,
+                $value,
+            );
+        } catch (AuthorizationException) {
+            abort(403);
+        }
     }
 
     /**
