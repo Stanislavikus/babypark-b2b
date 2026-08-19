@@ -297,6 +297,7 @@
     "workspace_access.permissions.manage_workspace_access": "Керування доступом",
     "workspace_access.permissions.manage_workspace_tax_settings": "Керування податками",
     "workspace_access.permissions.run_sync_preview": "Перегляд синхронізації (без змін)",
+    "workspace_access.permissions.run_sync_live": "Запуск синхронізації (зміни)",
     "workspace_access.permissions.manage_sync_configurations": "Налаштування синхронізації даних",
     "sync.preview.findings.missing_required_field_mapping": "Відсутнє обов'язкове зіставлення поля",
     "sync.preview.findings.missing_mapped_product_value": "Відсутнє значення зіставленого поля товару",

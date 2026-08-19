@@ -63,9 +63,16 @@ class SyncPreviewRunJob implements ShouldQueue
                 return null;
             }
 
+            $startedAt = now();
+            $jobTimeoutSeconds = (int) config('sync_runtime.live_job_timeout_seconds');
+            $maxInflightSeconds = (int) config('sync_runtime.max_inflight_external_request_seconds');
+            $writerDeadlineAt = $startedAt->copy()->addSeconds($jobTimeoutSeconds);
+
             $run->update([
                 'status' => SyncRunStatus::Running,
-                'started_at' => now(),
+                'started_at' => $startedAt,
+                'writer_deadline_at' => $writerDeadlineAt,
+                'recoverable_after' => $writerDeadlineAt->copy()->addSeconds($maxInflightSeconds),
             ]);
 
             return $run->refresh();
@@ -122,7 +129,7 @@ class SyncPreviewRunJob implements ShouldQueue
                     'workspace_id' => $run->workspace_id,
                     'sync_run_id' => $run->id,
                     'product_id' => $aggregate->productId,
-                    'outcome' => $result->outcome,
+                    'outcome' => $result->outcome->value,
                     'findings' => array_map(
                         static fn ($finding) => $finding->toArray(),
                         $result->findings,

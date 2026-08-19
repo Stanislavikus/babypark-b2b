@@ -297,6 +297,7 @@
     "workspace_access.permissions.manage_workspace_access": "Manage access",
     "workspace_access.permissions.manage_workspace_tax_settings": "Manage taxes",
     "workspace_access.permissions.run_sync_preview": "Run sync preview",
+    "workspace_access.permissions.run_sync_live": "Run sync live",
     "workspace_access.permissions.manage_sync_configurations": "Manage sync data setup",
     "sync.preview.findings.missing_required_field_mapping": "Required field mapping is missing",
     "sync.preview.findings.missing_mapped_product_value": "Mapped product field value is missing",

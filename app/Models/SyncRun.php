@@ -29,6 +29,10 @@ class SyncRun extends Model
         'configuration_snapshot',
         'started_at',
         'completed_at',
+        'queued_abandon_after',
+        'queue_dispatch_confirmed_at',
+        'writer_deadline_at',
+        'recoverable_after',
     ];
 
     protected function casts(): array
@@ -40,6 +44,10 @@ class SyncRun extends Model
             'configuration_snapshot' => 'array',
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
+            'queued_abandon_after' => 'datetime',
+            'queue_dispatch_confirmed_at' => 'datetime',
+            'writer_deadline_at' => 'datetime',
+            'recoverable_after' => 'datetime',
         ];
     }
 

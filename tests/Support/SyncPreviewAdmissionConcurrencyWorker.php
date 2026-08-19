@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Models\ConnectorAccount;
 use App\Models\SyncConfiguration;
@@ -39,8 +40,8 @@ $container->instance(ConnectorProfileRegistry::class, new ConnectorProfileRegist
 $container->bind(
     TestSyncSupportConnectorAdapter::class,
     fn (): TestSyncSupportConnectorAdapter => new TestSyncSupportConnectorAdapter([
-        [SyncDataDomain::Products, SyncSemanticOperation::Import],
-        [SyncDataDomain::Products, SyncSemanticOperation::Export],
+        [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
+        [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
     ]),
 );
 

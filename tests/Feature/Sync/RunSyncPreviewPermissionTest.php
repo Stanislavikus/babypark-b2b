@@ -27,10 +27,11 @@ class RunSyncPreviewPermissionTest extends TestCase
     }
 
     #[Test]
-    public function catalogue_contains_ninth_run_sync_preview_permission(): void
+    public function catalogue_contains_tenth_run_sync_live_permission(): void
     {
-        $this->assertCount(9, WorkspacePermissions::catalogue());
+        $this->assertCount(10, WorkspacePermissions::catalogue());
         $this->assertContains(WorkspacePermissions::RUN_SYNC_PREVIEW, WorkspacePermissions::catalogue());
+        $this->assertContains(WorkspacePermissions::RUN_SYNC_LIVE, WorkspacePermissions::catalogue());
         $this->assertContains(WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS, WorkspacePermissions::catalogue());
     }
 

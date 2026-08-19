@@ -6651,7 +6651,14 @@ Docs-only freeze before the first consequential external write. See **Live Safet
 Identity & First-Live Contract (Resolved — Stage 3-0)** below. No runtime
 implementation in this slice.
 
-**Stage 3A–3E — Live Engine implementation slices** — **Pending**
+**Stage 3A — Live Safety Foundation** — **Done**
+
+Safety foundation before the first consequential external write: `run_sync_live`
+permission, stale-active-run lease/recovery, Live outcome vocabulary,
+`ExternalRecordLink` persistence, `SyncLiveAdmissionService`, and fail-closed Live
+job shell. Adobe Products / Export / Live support remains **false**.
+
+**Stage 3B–3E — Live Engine implementation slices** — **Pending**
 
 After Stage 3-0 merges, implement in order:
 
@@ -6912,25 +6919,33 @@ slice. Normative contract for Stage 3A–3E implementation.
 | Stage 2A — Merchant Preview | **Done** |
 | Stage 2B — Option Mapping Remediation | **Done** |
 | Stage 3-0 — Live Safety, Identity & First-Live Contract | **Done (docs contract)** |
-| Stage 3A–3E — Live implementation slices | **Pending** |
+| Stage 3A — Live Safety Foundation | **Done** |
+| Stage 3B–3E — Live implementation slices | **Pending** |
 | Production Live | **NOT IMPLEMENTED** |
 
-**Current runtime (reverified):**
+**Current runtime (reverified post–Stage 3A):**
 
 - `SyncRunMode` already contains Preview + Live;
 - `SyncRun` / `SyncRunItem` persistence already exists;
 - `ConnectorSyncOperationSupport` is mode-aware;
 - Adobe Products / Export / Preview is supported;
 - Adobe Products / Export / Live is **not** supported;
-- `run_sync_live` does not exist yet;
-- `ExternalRecordLink` does not exist yet;
-- no consequential Adobe Product writer exists;
+- `run_sync_live` exists in the workspace permission catalogue (**ten** permissions);
+- `ExternalRecordLink` persistence exists (no Adobe reconciliation/use yet);
+- Live admission + fail-closed job shell exist; no consequential Adobe Product writer exists;
+- stale active-run lease/recovery exists for `sync_runs`;
 - `ProductExecutionAggregateBuilder` currently belongs to the Preview namespace but
   contains semantically reusable Product execution input;
 - Preview planner may emit an in-memory `connectorPlan` — that plan is **not** a
   Live HTTP command plan;
-- one active queued/running run per `SyncConfiguration` already exists;
-- no stale active-run recovery exists.
+- one active queued/running run per `SyncConfiguration` already exists.
+
+**Historical pre–Stage 3A baseline (Stage 3-0 contract freeze):**
+
+- catalogue remained **nine** permissions until Stage 3A;
+- `run_sync_live` did not exist yet;
+- `ExternalRecordLink` did not exist yet;
+- no stale active-run recovery existed.
 
 ##### Preview → Manual Live trust
 

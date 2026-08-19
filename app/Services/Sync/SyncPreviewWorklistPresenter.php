@@ -78,8 +78,8 @@ final class SyncPreviewWorklistPresenter
 
             $rows[] = [
                 'identity_html' => $this->identityPresenter->presentHtml($product, $product->variants),
-                'outcome_label' => $this->outcomeLabel($item->outcome),
-                'outcome_color' => $this->outcomeColor($item->outcome),
+                'outcome_label' => $this->outcomeLabel($item->previewOutcome()),
+                'outcome_color' => $this->outcomeColor($item->previewOutcome()),
                 'attention_summary' => $attentionSummary,
                 'findings' => $findings,
             ];
