@@ -88,6 +88,8 @@ class ExternalRecordLinkPersistenceMySqlTest extends TestCase
     {
         $this->assertTrue(Schema::hasTable('external_record_links'));
 
+        $this->enableMysqlTriggerCreationUnderBinaryLogging();
+
         $migration = require database_path('migrations/2026_08_19_110000_external_record_links.php');
         $reflection = new ReflectionObject($migration);
         $createFallbackTriggers = $reflection->getMethod('createMysqlSubjectXorTriggers');
@@ -161,6 +163,45 @@ class ExternalRecordLinkPersistenceMySqlTest extends TestCase
         ");
 
         $this->assertSame(0, (int) $remainingTriggers->count);
+    }
+
+    private function enableMysqlTriggerCreationUnderBinaryLogging(): void
+    {
+        $host = (string) config('database.connections.mysql.host', '127.0.0.1');
+        $port = (string) config('database.connections.mysql.port', '3306');
+        $socket = (string) config('database.connections.mysql.unix_socket', '');
+        $dsn = $socket !== ''
+            ? "mysql:unix_socket={$socket}"
+            : "mysql:host={$host};port={$port}";
+        $rootPasswordCandidates = array_values(array_unique(array_filter([
+            env('MYSQL_ROOT_PASSWORD'),
+            'rootsecret',
+            '',
+        ], static fn ($password) => $password !== null)));
+
+        foreach ($rootPasswordCandidates as $rootPassword) {
+            try {
+                $root = new \PDO(
+                    $dsn,
+                    'root',
+                    (string) $rootPassword,
+                    [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION],
+                );
+                $root->exec('SET GLOBAL log_bin_trust_function_creators = 1');
+
+                return;
+            } catch (\Throwable) {
+                // Try the next root credential candidate.
+            }
+        }
+
+        try {
+            DB::statement('SET GLOBAL log_bin_trust_function_creators = 1');
+        } catch (\Throwable $exception) {
+            $this->markTestSkipped(
+                'Could not enable log_bin_trust_function_creators for fallback trigger creation: '.$exception->getMessage(),
+            );
+        }
     }
 
     #[Test]
