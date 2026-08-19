@@ -6343,9 +6343,7 @@ substitute one-link-per-subject uniqueness.
 **Historical repository status (post–Stage 3-0 and before Stage 3A):** normative
 contract frozen; table/model were absent until Stage 3A.
 
-**Current repository status (post–Stage 3A):** `ExternalRecordLink` persistence
-foundation is implemented (`external_record_links` table/model). Adobe Live
-execution read/write and reconciliation use remain **Stage 3B+**.
+**Current repository status (post–Stage 3A):** `ExternalRecordLink` persistence foundation is implemented (`external_record_links` table/model). Adobe Live execution read/write and reconciliation use remain **Stage 3B+**.
 
 #### Adobe Magento V1 identity notes
 
