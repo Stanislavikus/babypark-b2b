@@ -3,23 +3,26 @@
 namespace App\Services\Sync;
 
 use App\Enums\SyncConfigurationOperationalState;
+use App\Enums\SyncDataDomain;
 use App\Enums\SyncRunMode;
 use App\Enums\SyncRunStatus;
 use App\Enums\SyncSemanticOperation;
-use App\Jobs\Connectors\SyncPreviewRunJob;
+use App\Jobs\Connectors\SyncLiveRunJob;
 use App\Models\ConnectorAccount;
 use App\Models\SyncRun;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
 use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
-use App\Support\Sync\Exceptions\SyncPreviewAdmissionException;
+use App\Support\Sync\Exceptions\SyncLiveAdmissionException;
+use App\Support\Sync\Exceptions\SyncRuntimeTimingConfigurationException;
 use App\Support\Sync\Preview\SyncPreviewConfigurationReadinessResolver;
 use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-final class SyncPreviewAdmissionService
+final class SyncLiveAdmissionService
 {
     public function __construct(
         private readonly WorkspaceAuthorization $authorization,
@@ -35,10 +38,9 @@ final class SyncPreviewAdmissionService
         User $actor,
         ConnectorAccount $account,
         string $syncConfigurationId,
-        SyncSemanticOperation $semanticOperation,
     ): SyncRun {
         if (DB::transactionLevel() > 0 && ! app()->environment('testing')) {
-            throw new \RuntimeException('Sync preview admission must not run inside a nested transaction.');
+            throw new \RuntimeException('Sync live admission must not run inside a nested transaction.');
         }
 
         $run = null;
@@ -48,11 +50,23 @@ final class SyncPreviewAdmissionService
             $actor,
             $account,
             $syncConfigurationId,
-            $semanticOperation,
             &$run,
             &$admissionTiming,
         ): void {
-            $admissionTiming = $this->timingResolver->resolveAdmissionTiming();
+            try {
+                $admissionTiming = $this->timingResolver->resolveAdmissionTiming();
+            } catch (SyncRuntimeTimingConfigurationException) {
+                throw SyncLiveAdmissionException::unsafeTimingConfiguration();
+            }
+
+            $lockedWorkspace = Workspace::query()
+                ->whereKey($account->workspace_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $this->authorization->allows($actor, $lockedWorkspace, WorkspacePermissions::RUN_SYNC_LIVE)) {
+                throw SyncLiveAdmissionException::notAuthorized();
+            }
 
             $configuration = $this->mutationCoordinator->lockConfiguration($account, $syncConfigurationId);
 
@@ -61,14 +75,8 @@ final class SyncPreviewAdmissionService
                 ->where('id', $account->id)
                 ->firstOrFail();
 
-            $workspace = $freshAccount->workspace()->withoutGlobalScopes()->firstOrFail();
-
-            if (! $this->authorization->allows($actor, $workspace, WorkspacePermissions::RUN_SYNC_PREVIEW)) {
-                throw SyncPreviewAdmissionException::notAuthorized();
-            }
-
             if (! $freshAccount->is_enabled) {
-                throw SyncPreviewAdmissionException::accountNotEnabled($freshAccount->id);
+                throw SyncLiveAdmissionException::accountNotEnabled($freshAccount->id);
             }
 
             if ($configuration->workspace_id !== $freshAccount->workspace_id || $configuration->connector_account_id !== $freshAccount->id) {
@@ -76,24 +84,28 @@ final class SyncPreviewAdmissionService
             }
 
             if ($configuration->operational_state !== SyncConfigurationOperationalState::Enabled) {
-                throw SyncPreviewAdmissionException::configurationNotEnabled($configuration->id);
+                throw SyncLiveAdmissionException::configurationNotEnabled($configuration->id);
             }
 
-            if (! $configuration->enabledOperationSet()->contains($semanticOperation)) {
-                throw SyncPreviewAdmissionException::operationNotEnabled($semanticOperation->value);
+            if ($configuration->data_domain !== SyncDataDomain::Products) {
+                throw SyncLiveAdmissionException::operationNotSupported();
+            }
+
+            if (! $configuration->enabledOperationSet()->contains(SyncSemanticOperation::Export)) {
+                throw SyncLiveAdmissionException::operationNotEnabled(SyncSemanticOperation::Export->value);
             }
 
             if (! $this->syncSupportResolver->supports(
                 $freshAccount,
-                $configuration->data_domain,
-                $semanticOperation,
-                SyncRunMode::Preview,
+                SyncDataDomain::Products,
+                SyncSemanticOperation::Export,
+                SyncRunMode::Live,
             )) {
-                throw SyncPreviewAdmissionException::operationNotSupported();
+                throw SyncLiveAdmissionException::operationNotSupported();
             }
 
             if (! $this->readinessResolver->resolve($freshAccount)->isReady($configuration)) {
-                throw SyncPreviewAdmissionException::attributeSetUnconfigured();
+                throw SyncLiveAdmissionException::attributeSetUnconfigured();
             }
 
             $this->activeRecoveryService->recoverStaleActiveRuns($configuration->id);
@@ -104,18 +116,30 @@ final class SyncPreviewAdmissionService
                 ->exists();
 
             if ($activeRunExists) {
-                throw SyncPreviewAdmissionException::activeRunExists($configuration->id);
+                throw SyncLiveAdmissionException::activeRunExists($configuration->id);
             }
 
-            $snapshot = $this->snapshotBuilder->build($configuration, $semanticOperation);
+            $previewEvidenceExists = SyncRun::withoutWorkspaceScope()
+                ->where('sync_configuration_id', $configuration->id)
+                ->where('mode', SyncRunMode::Preview)
+                ->where('semantic_operation', SyncSemanticOperation::Export)
+                ->where('status', SyncRunStatus::Completed)
+                ->where('configuration_revision', $configuration->configuration_revision)
+                ->exists();
+
+            if (! $previewEvidenceExists) {
+                throw SyncLiveAdmissionException::previewEvidenceMissing();
+            }
+
+            $snapshot = $this->snapshotBuilder->build($configuration, SyncSemanticOperation::Export);
 
             $run = SyncRun::withoutWorkspaceScope()->create([
                 'id' => (string) Str::uuid(),
                 'workspace_id' => $configuration->workspace_id,
                 'sync_configuration_id' => $configuration->id,
                 'configuration_revision' => $configuration->configuration_revision,
-                'mode' => SyncRunMode::Preview,
-                'semantic_operation' => $semanticOperation,
+                'mode' => SyncRunMode::Live,
+                'semantic_operation' => SyncSemanticOperation::Export,
                 'status' => SyncRunStatus::Queued,
                 'initiated_by_user_id' => $actor->id,
                 'configuration_snapshot' => $snapshot,
@@ -124,11 +148,11 @@ final class SyncPreviewAdmissionService
         });
 
         if (! $run instanceof SyncRun || $admissionTiming === null) {
-            throw new \RuntimeException('Preview run was not created during admission.');
+            throw new \RuntimeException('Live run was not created during admission.');
         }
 
         try {
-            SyncPreviewRunJob::dispatch(
+            SyncLiveRunJob::dispatch(
                 $account->workspace_id,
                 $account->id,
                 $run->id,
@@ -144,7 +168,7 @@ final class SyncPreviewAdmissionService
                     'completed_at' => now(),
                 ]);
 
-            throw SyncPreviewAdmissionException::dispatchFailed(previous: $exception);
+            throw SyncLiveAdmissionException::dispatchFailed(previous: $exception);
         }
 
         SyncRun::withoutWorkspaceScope()

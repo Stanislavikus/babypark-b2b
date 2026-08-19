@@ -9,6 +9,7 @@ use App\Models\SyncRun;
 use App\Models\SyncRunItem;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
 use App\Support\Sync\Preview\SyncPreviewConnectorCapabilityResolver;
+use App\Support\Sync\SyncRuntimeExecutionTiming;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -26,11 +27,18 @@ class SyncPreviewRunJob implements ShouldQueue
 
     public int $tries = 1;
 
+    public int $timeout;
+
+    private SyncRuntimeExecutionTiming $executionTiming;
+
     public function __construct(
         private readonly string $workspaceId,
         private readonly string $connectorAccountId,
         private readonly string $syncRunId,
+        ?SyncRuntimeExecutionTiming $executionTiming = null,
     ) {
+        $this->executionTiming = $executionTiming ?? SyncRuntimeExecutionTiming::snapshotFromCurrentConfig();
+        $this->timeout = $this->executionTiming->jobTimeoutSeconds;
         $this->onConnection('database_connectors');
         $this->onQueue('connectors');
     }
@@ -63,9 +71,14 @@ class SyncPreviewRunJob implements ShouldQueue
                 return null;
             }
 
+            $startedAt = now();
+            $leaseTimestamps = $this->executionTiming->leaseTimestampsFrom($startedAt);
+
             $run->update([
                 'status' => SyncRunStatus::Running,
-                'started_at' => now(),
+                'started_at' => $startedAt,
+                'writer_deadline_at' => $leaseTimestamps['writer_deadline_at'],
+                'recoverable_after' => $leaseTimestamps['recoverable_after'],
             ]);
 
             return $run->refresh();
@@ -122,7 +135,7 @@ class SyncPreviewRunJob implements ShouldQueue
                     'workspace_id' => $run->workspace_id,
                     'sync_run_id' => $run->id,
                     'product_id' => $aggregate->productId,
-                    'outcome' => $result->outcome,
+                    'outcome' => $result->outcome->value,
                     'findings' => array_map(
                         static fn ($finding) => $finding->toArray(),
                         $result->findings,

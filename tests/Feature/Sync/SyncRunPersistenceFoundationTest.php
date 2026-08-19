@@ -508,7 +508,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
         $this->assertSame(['selection' => ['mode' => 'all_products']], $run->configuration_snapshot);
 
         $item = SyncRunItem::withoutWorkspaceScope()->findOrFail($fixture['item']->id);
-        $this->assertSame(SyncPreviewOutcome::Ready, $item->outcome);
+        $this->assertSame(SyncPreviewOutcome::Ready, $item->previewOutcome());
         $this->assertSame([], $item->findings);
     }
 
@@ -526,10 +526,11 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function workspace_permission_catalogue_contains_ninth_permission_including_manage_sync_configurations(): void
+    public function workspace_permission_catalogue_contains_tenth_permission_including_run_sync_live(): void
     {
-        $this->assertCount(9, WorkspacePermissions::catalogue());
+        $this->assertCount(10, WorkspacePermissions::catalogue());
         $this->assertContains(WorkspacePermissions::RUN_SYNC_PREVIEW, WorkspacePermissions::catalogue());
+        $this->assertContains(WorkspacePermissions::RUN_SYNC_LIVE, WorkspacePermissions::catalogue());
     }
 
     #[Test]
@@ -564,9 +565,9 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function no_live_mutation_or_external_record_link_implementation_exists(): void
+    public function external_record_link_model_exists_without_live_reconciliation(): void
     {
-        $this->assertFalse(class_exists(ExternalRecordLink::class));
+        $this->assertTrue(class_exists(ExternalRecordLink::class));
         $this->assertTrue(class_exists(SyncPreviewAdmissionService::class));
         $this->assertTrue(class_exists(AdobeProductExportPreviewPlanner::class));
     }

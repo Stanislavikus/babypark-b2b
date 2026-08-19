@@ -43,18 +43,32 @@ class ModeAwareSyncSupportTest extends TestCase
     }
 
     #[Test]
-    public function test_sync_support_adapter_supports_configured_pairs_for_any_mode(): void
+    public function test_sync_support_adapter_requires_explicit_mode(): void
     {
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
-            [SyncDataDomain::Products, SyncSemanticOperation::Export],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
         ]);
 
         $account = $this->createConnectorAccount(null, ['auth_profile' => 'test_sync_support']);
         $resolver = app(ConnectorSyncSupportResolver::class);
 
         $this->assertTrue($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview));
-        $this->assertTrue($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live));
+        $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live));
         $this->assertTrue($resolver->supportsConfiguration($account, SyncDataDomain::Products, SyncSemanticOperation::Export));
+    }
+
+    #[Test]
+    public function test_sync_support_adapter_can_opt_into_live_support(): void
+    {
+        $this->configureSyncSupportProfile([
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live],
+        ]);
+
+        $account = $this->createConnectorAccount(null, ['auth_profile' => 'test_sync_support']);
+        $resolver = app(ConnectorSyncSupportResolver::class);
+
+        $this->assertTrue($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live));
     }
 }

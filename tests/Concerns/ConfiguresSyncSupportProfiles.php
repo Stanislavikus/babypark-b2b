@@ -3,6 +3,7 @@
 namespace Tests\Concerns;
 
 use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use Illuminate\Contracts\Container\Container;
@@ -14,10 +15,21 @@ use Tests\Support\Sync\TestSyncPreviewCapability;
 trait ConfiguresSyncSupportProfiles
 {
     /**
-     * @param  list<array{0: SyncDataDomain, 1: SyncSemanticOperation}>  $supportedPairs
+     * @param  list<array{0: SyncDataDomain, 1: SyncSemanticOperation, 2?: SyncRunMode}>  $supportedTriples
      */
-    protected function configureSyncSupportProfile(array $supportedPairs = []): void
+    protected function configureSyncSupportProfile(array $supportedTriples = []): void
     {
+        $normalizedTriples = array_map(
+            static function (array $entry): array {
+                if (count($entry) === 2) {
+                    return [$entry[0], $entry[1], SyncRunMode::Preview];
+                }
+
+                return $entry;
+            },
+            $supportedTriples,
+        );
+
         $container = app(Container::class);
 
         $profiles = config('connectors.profiles', []);
@@ -38,7 +50,7 @@ trait ConfiguresSyncSupportProfiles
 
         $container->bind(
             TestSyncSupportConnectorAdapter::class,
-            fn (): TestSyncSupportConnectorAdapter => new TestSyncSupportConnectorAdapter($supportedPairs),
+            fn (): TestSyncSupportConnectorAdapter => new TestSyncSupportConnectorAdapter($normalizedTriples),
         );
     }
 }

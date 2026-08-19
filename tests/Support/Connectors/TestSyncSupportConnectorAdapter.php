@@ -10,15 +10,15 @@ use App\Support\Connectors\ConnectorSyncOperationSupport;
 
 final class TestSyncSupportConnectorAdapter implements ConnectorAdapter, ConnectorSyncOperationSupport
 {
-    /** @var list<array{0: SyncDataDomain, 1: SyncSemanticOperation}> */
-    private array $supportedPairs = [];
+    /** @var list<array{0: SyncDataDomain, 1: SyncSemanticOperation, 2: SyncRunMode}> */
+    private array $supportedTriples = [];
 
     /**
-     * @param  list<array{0: SyncDataDomain, 1: SyncSemanticOperation}>  $supportedPairs
+     * @param  list<array{0: SyncDataDomain, 1: SyncSemanticOperation, 2: SyncRunMode}>  $supportedTriples
      */
-    public function __construct(array $supportedPairs = [])
+    public function __construct(array $supportedTriples = [])
     {
-        $this->supportedPairs = $supportedPairs;
+        $this->supportedTriples = $supportedTriples;
     }
 
     public function supports(
@@ -26,8 +26,11 @@ final class TestSyncSupportConnectorAdapter implements ConnectorAdapter, Connect
         SyncSemanticOperation $operation,
         SyncRunMode $mode,
     ): bool {
-        foreach ($this->supportedPairs as [$supportedDomain, $supportedOperation]) {
-            if ($supportedDomain === $dataDomain && $supportedOperation === $operation) {
+        foreach ($this->supportedTriples as [$supportedDomain, $supportedOperation, $supportedMode]) {
+            if ($supportedDomain === $dataDomain
+                && $supportedOperation === $operation
+                && $supportedMode === $mode
+            ) {
                 return true;
             }
         }

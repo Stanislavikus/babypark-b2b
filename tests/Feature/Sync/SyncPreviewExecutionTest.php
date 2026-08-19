@@ -101,7 +101,7 @@ class SyncPreviewExecutionTest extends TestCase
 
         $item = SyncRunItem::withoutWorkspaceScope()->where('sync_run_id', $run->id)->sole();
         $this->assertSame($product->id, $item->product_id);
-        $this->assertSame(SyncPreviewOutcome::Ready, $item->outcome);
+        $this->assertSame(SyncPreviewOutcome::Ready, $item->previewOutcome());
     }
 
     #[Test]
