@@ -315,22 +315,30 @@ yet), but should be scheduled before any payment gateway integration work starts
   when a profile adapter does not declare support). Vocabulary implemented:
   `products` + `import`/`export`. Adobe Commerce production profile remains
   fail-closed for executable sync pairs.
-- Sync Domain entities still absent: `ExternalRecordLink`, preview/live execution,
-  scheduling, sync history/issues, and merchant sync UX beyond connector
-  connection management and mapping. `SyncRun` / `SyncRunItem` persistence and revision v3
-  rebaseline are implemented (Task 4C-2b-1, Done). `FieldMapping`
-  persistence/manual confirmation and authoritative-discovery validation are
-  implemented (Task 4C-1b, Done). Canonical suggestion/read-model and
-  UI-prefill work is Task 4C-1c (4C-1c-0 docs contract frozen; 4C-1c-1
-  provider/read-model Done; 4C-1c-2a authorization contract Done; 4C-1c-2b
-  Layer B mapping UI Done, PR #139). Preview-first execution foundation
-  contract is frozen (Task 4C-2a, docs only). Magento Product Export V1
-  execution contract is frozen (Platform Product Scope Rebaseline, docs only):
-  `run_sync_preview` eighth permission (runtime catalogue eight permissions —
-  Stage 1 Done), Product execution aggregate, mode-aware support, FieldOptionMapping,
-  Preview admission/execution, connector execution configuration + revision v4
-  (Stage 1 Done). Live permission `run_sync_live`, ExternalRecordLink, and Live
-  mechanics remain Stage 3A–3E (Stage 3-0 docs contract **Done**).
+- `SyncRun` / `SyncRunItem` persistence and revision v3 rebaseline are
+  implemented (Task 4C-2b-1, Done). `FieldMapping` persistence/manual
+  confirmation and authoritative-discovery validation are implemented (Task
+  4C-1b, Done). Canonical suggestion/read-model and UI-prefill work is Task
+  4C-1c (4C-1c-0 docs contract frozen; 4C-1c-1 provider/read-model Done;
+  4C-1c-2a authorization contract Done; 4C-1c-2b Layer B mapping UI Done, PR
+  #139). Preview-first execution foundation contract is frozen (Task 4C-2a,
+  docs only). Magento Product Export V1 execution contract is frozen (Platform
+  Product Scope Rebaseline, docs only): `run_sync_preview` eighth permission
+  (runtime catalogue eight permissions — Stage 1 Done), Product execution
+  aggregate, mode-aware support, FieldOptionMapping, Preview
+  admission/execution, connector execution configuration + revision v4 (Stage
+  1 Done).
+- **Historical (pre-Stage 3A):** `ExternalRecordLink`, Live permission
+  (`run_sync_live`), Live admission/execution mechanics, stale active-run
+  recovery, scheduling, sync history/issues, and merchant Live UX beyond
+  Preview remained absent; Stage 3-0 docs contract was **Done**.
+- **Current (post-Stage 3A):** Stage 3A Live Safety foundation is **Done** —
+  `run_sync_live` (tenth permission), stale active-run lease/recovery,
+  `ExternalRecordLink` persistence foundation, `SyncLiveAdmissionService`, and
+  fail-closed `SyncLiveRunJob` shell. Adobe Products/Export/Live support
+  remains **false**; actual Adobe Product write/reconciliation and merchant
+  consequential Live exposure remain **Stage 3B–3E**. Scheduling, sync
+  history/issues, and merchant sync-run history remain absent.
 
 **Task sequence (GAP-006 remains Open until implementation lands):**
 
@@ -359,7 +367,7 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **Stage 2-0 — Merchant Preview Authorization & Remediation Contract** | Docs-only freeze: `manage_sync_configurations` (normative ninth permission; runtime pending Stage 2A); permission independence; no hidden mutation under `run_sync_preview`; non-mutating existence check (Stage 2A required); three-layer attribute-set trace; pre-admission vs completed findings; historical/current remediation split; remediation presentation semantics; Stage 2A/2B sequencing — **Done (docs contract)** |
 | **Stage 2A — Merchant Preview Core + Connector Setup** | **Done** — Stage 2A-1 Done (sync setup authority + Adobe Products Export setup); Stage 2A-2 Done (merchant Preview work surface: landing reachability, advisory read model, explicit start via admission, lifecycle, completed summary, Needs-attention worklist, contextual remediation presentation, canonical ProductVariant SKU identity, no bulk remediation). |
 | **Stage 2B — Option Mapping Remediation** | **Done** — `ManageSyncFieldOptionMappings` nested read model/UI on existing `view_sync_mappings` / `manage_sync_mappings` permissions only; authoritative persisted connector snapshot metadata on read (zero HTTP); `confirm`/`replace` retain connector external validation outside locked DB transaction; Preview findings remain historical after remediation; narrow stale/orphan option-mapping cleanup (does **not** fix Product/Variant select value integrity). |
-| **Stage 3-0 — Live Safety, Identity & First-Live Contract** | Docs-only freeze: `run_sync_live` (tenth permission, runtime pending 3A); stale active-run lease/recovery; Preview→Live trust; shared Adobe semantic planning boundary; `ExternalRecordLink` structure; Adobe external identity; create/update/reconciliation; Live outcomes; inactive lifecycle; E14 media scope; merchant first-Live UX; Live support truth; merchant consequential exposure gated on `ConnectorSyncOperationSupport(Products, Export, Live) === true` until Stage 3E flip; real Adobe validation gate; Stage 3A–3E implementation sequence — **Done (docs contract)** |
+| **Stage 3-0 — Live Safety, Identity & First-Live Contract** | Docs-only freeze: `run_sync_live` (tenth permission; **historical pre-3A:** runtime pending 3A); stale active-run lease/recovery; Preview→Live trust; shared Adobe semantic planning boundary; `ExternalRecordLink` structure; Adobe external identity; create/update/reconciliation; Live outcomes; inactive lifecycle; E14 media scope; merchant first-Live UX; Live support truth; merchant consequential exposure gated on `ConnectorSyncOperationSupport(Products, Export, Live) === true` until Stage 3E flip; real Adobe validation gate; Stage 3A–3E implementation sequence — **Done (docs contract)** |
 | **Stage 3A — Live Safety Foundation** | `run_sync_live` permission; stale-active-run lease/recovery; Live outcome vocabulary; `ExternalRecordLink` persistence; `SyncLiveAdmissionService`; Live job fail-closed shell; Preview×Live concurrency foundation — **Done** |
 | **Stage 3B–3E — Live Engine implementation slices** | Pending — Adobe Product write transport, reconciliation, merchant Live UX, support truth flip — see `docs/03-DOMAIN_MODEL.md` → Live Safety, Identity & First-Live Contract (Resolved — Stage 3-0) |
 | **4C** | Remaining sync domain after Stage 3: scheduling, sync history/issues, merchant sync UX beyond mapping/Preview/Live |
@@ -391,14 +399,18 @@ is production-operational on the Babypark pilot (dedicated
 Discovery completed 2026-08-15). `SyncRun` / `SyncRunItem` persistence and
 revision v4 rebaseline are implemented (Task 4C-2b-1; Stage 1 extends to v4).
 Preview admission and background Preview execution are implemented (Stage 1).
-Schedule, history, and `ExternalRecordLink` remain unimplemented.
-`run_sync_preview` runtime permission is implemented (Stage 1; eighth catalogue
-permission). Adobe `(products, export)` Preview support is declared; Live remains
-unsupported. Stage 2A merchant Preview UI and Stage 2A-1 `manage_sync_configurations`
-runtime permission are implemented. Stage 2B Option Mapping remediation UI is
-implemented (`ManageSyncFieldOptionMappings`). Stage 2-0 merchant Preview
-authorization/remediation contract is **Done (docs contract)**. Runtime catalogue
-is **nine** permissions (`manage_sync_configurations` landed Stage 2A-1). Connector-account **creation UI is implemented**
+Schedule and sync-run history remain unimplemented. `run_sync_preview` runtime
+permission is implemented (Stage 1; eighth catalogue permission). Adobe
+`(products, export)` Preview support is declared; Live remains unsupported
+(public support truth **false**). Stage 2A merchant Preview UI and Stage 2A-1
+`manage_sync_configurations` runtime permission are implemented. Stage 2B Option
+Mapping remediation UI is implemented (`ManageSyncFieldOptionMappings`). Stage
+2-0 merchant Preview authorization/remediation contract is **Done (docs
+contract)**. Stage 3A Live Safety foundation is **Done** — `run_sync_live`
+(tenth permission), stale active-run recovery, `ExternalRecordLink` persistence
+foundation, `SyncLiveAdmissionService`, and fail-closed `SyncLiveRunJob` shell.
+Runtime catalogue is **ten** permissions (`run_sync_live` landed Stage 3A;
+`manage_sync_configurations` landed Stage 2A-1). Connector-account **creation UI is implemented**
 (`ConnectPlatformIntegration`); credential-management/settings **edit** UI
 remains absent. Task 4B-2c (discovered schema fields / change inspection) and
 retention jobs remain unimplemented.
@@ -407,7 +419,8 @@ retention jobs remain unimplemented.
 not mandatory PR boundaries): Stage 1 Preview Engine → Stage 2-0 Authorization &
 Remediation contract (docs) → Stage 2A Merchant Preview Core + Connector Setup
 → Stage 2B Option Mapping Remediation (Done) → Stage 3-0 Live Safety contract
-(Done, docs) → Stage 3A–3E Live Engine (pending). Stage 1 delivered
+(Done, docs) → Stage 3A Live Safety foundation (Done) → Stage 3B–3E Live Engine
+(Adobe write/reconciliation/merchant exposure; pending). Stage 1 delivered
 connector execution configuration persistence plus revision/snapshot rebaseline
 (revision v4). See `docs/03-DOMAIN_MODEL.md` → Magento Product Export V1
 Execution Contract and Merchant Preview Authorization & Remediation Contract.
@@ -461,9 +474,9 @@ repository workspace-RBAC matrix):**
 | Disabled account | Per role matrix (unaffected by disabled state) | No | Per role matrix |
 
 **GAP-006 overall remains Open.** Remaining scope: Task 4B-2c (discovered
-schema fields / change inspection), retention/pruning (4B-2d), Stage 3A–3E Live
-Engine slices,
-`ExternalRecordLink`,
+schema fields / change inspection), retention/pruning (4B-2d), Stage 3B–3E Live
+Engine slices (Adobe Product write/reconciliation, merchant first-Live UX,
+support-truth flip — Stage 3A safety foundation **Done**),
 connector-account credential-management/settings **edit** UI (create UI shipped).
 Workspace-scoped authorization foundation (GAP-026) repository runtime is
 **Implemented** (GAP-026B-2) and production-activated on Babypark pilot
@@ -476,7 +489,7 @@ Distinguish carefully — do not treat every future possibility as an active GAP
 | Class | Item | Blocks Sync domain work now? |
 |---|---|---|
 | **A. Architecture blockers** | None identified against current `origin/develop` for the approved Sync Domain Rebaseline | No |
-| **B. Implementation gaps** | Live Product write execution (Stage 3B–3E); merchant first-Live UX; Adobe Live support flip. Stage 3A Live Safety foundation is **Done** (`run_sync_live`, stale active-run recovery, `ExternalRecordLink` persistence, Live admission/shell). Stage 3-0 Live Safety contract is **Done (docs)**. Stage 1 Preview Engine, Stage 2A merchant Preview, and Stage 2B Option Mapping remediation are implemented. `SyncRun`/`SyncRunItem` persistence is implemented (4C-2b-1). Connector-account **create** UI is implemented. | Yes for shipping sync; docs are settled |
+| **B. Implementation gaps** | Live Product write execution (Stage 3B–3E); merchant first-Live UX; Adobe Live support flip. Stage 3A Live Safety foundation is **Done** (`run_sync_live`, stale active-run recovery, `ExternalRecordLink` persistence, Live admission/shell). Stage 3-0 docs contract **Done**. Stage 1 Preview Engine, Stage 2A merchant Preview, and Stage 2B Option Mapping remediation are implemented. `SyncRun`/`SyncRunItem` persistence is implemented (4C-2b-1). Connector-account **create** UI is implemented. | Yes for shipping sync; docs are settled |
 | **C. Connector-specific future verification (deferred Variant #2 / profile)** | What external contract `adobe_commerce_paas_oauth1_integration` intentionally covers; PaaS-only vs broader Magento REST-family; post-bootstrap runtime-contract/version/capability verification; Magento Open Source setup/auth compatibility; whether AccountSetup and final runtime contract must later split; whether exactly-one AccountSetup-profile invariant must ever change | **No** — deferred; not a blocker for generic Sync domain rebaseline |
 
 Do not add generic `edition` / `deployment_model` / `api_family` fields to
@@ -1117,13 +1130,17 @@ Remaining connector gaps are tracked separately under GAP-006.
 - Canonical deterministic suggestion/read-model provider (Task 4C-1c-1).
 - `SyncRun` / `SyncRunItem` persistence foundation and revision v3 rebaseline
   (Task 4C-2b-1).
+- Stage 3A Live Safety foundation: `run_sync_live`, stale active-run recovery,
+  `ExternalRecordLink` persistence, `SyncLiveAdmissionService`, fail-closed
+  `SyncLiveRunJob` shell (no Adobe write, no merchant Live UI).
 
 **Still absent in code (docs settled; runtime or UI missing):**
-- `run_sync_live` (**Stage 3A** — normative contract frozen Stage 3-0);
-- `ExternalRecordLink` (**Stage 3A** — normative contract frozen Stage 3-0);
-- stale active-run recovery (**Stage 3A**);
-- Live execution after real Adobe validation (**Stage 3B–3E**);
-- sync execution runtime for merchant "Синхронізувати зараз" (Live);
+- Adobe Product write/reconciliation execution (**Stage 3B–3E**);
+- merchant consequential Live exposure / "Синхронізувати зараз" (Live) while
+  `ConnectorSyncOperationSupport(Products, Export, Live) === false` (**Stage
+  3B–3E**; Stage 3A safety shell exists without merchant UI or Adobe write);
+- `ExternalRecordLink` use by Adobe Live execution / reconciliation (**Stage
+  3B+**; persistence foundation implemented Stage 3A);
 - scheduling beyond Discovery;
 - ownership persistence/enforcement;
 - issue aggregation and bulk resolution;

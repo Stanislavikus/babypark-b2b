@@ -56,7 +56,10 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('**tenth** atomic workspace permission', $e8);
         $this->assertStringContainsString('`run_sync_live`', $e8);
-        $this->assertStringContainsString('remains **nine** permissions until Stage 3A', $e8);
+        $this->assertStringContainsString('**Historical repository status (post–Stage 3-0 and before Stage 3A):**', $e8);
+        $this->assertStringContainsString('remained **nine** permissions until Stage 3A', $e8);
+        $this->assertStringContainsString('**Current repository status (post–Stage 3A):**', $e8);
+        $this->assertStringContainsString('**ten** permissions', $e8);
 
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
         $this->assertStringContainsString('| `run_sync_live` permission | IMPLEMENTED (Stage 3A) |', $atlas);
@@ -127,7 +130,10 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('ConnectorAccount-scoped', $e9);
         $this->assertStringContainsString('**not** SyncConfiguration-scoped', $e9);
-        $this->assertStringContainsString('absent until Stage 3A', $e9);
+        $this->assertStringContainsString('**Historical repository status (post–Stage 3-0 and before Stage 3A):**', $e9);
+        $this->assertStringContainsString('were absent until Stage 3A', $e9);
+        $this->assertStringContainsString('**Current repository status (post–Stage 3A):**', $e9);
+        $this->assertStringContainsString('persistence foundation is implemented', $e9);
     }
 
     #[Test]

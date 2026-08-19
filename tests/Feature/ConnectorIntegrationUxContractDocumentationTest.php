@@ -208,7 +208,11 @@ class ConnectorIntegrationUxContractDocumentationTest extends TestCase
             $content,
         );
         $this->assertStringContainsString(
-            '**Stage 3A–3E** Live Engine implementation slices',
+            '**Stage 3B–3E** Live Engine implementation slices',
+            $content,
+        );
+        $this->assertStringContainsString(
+            '**Stage 3A** Live Safety foundation is **shipped**',
             $content,
         );
         $this->assertStringContainsString(

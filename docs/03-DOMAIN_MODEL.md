@@ -6272,8 +6272,12 @@ revocation does **not** cancel that already-admitted background command. Merchan
 result/read surfaces continue to use fresh authorization. Do not introduce generic
 cancellation in Stage 3.
 
-**Repository status (post–Stage 3-0):** normative target frozen; runtime catalogue
-remains **nine** permissions until Stage 3A.
+**Historical repository status (post–Stage 3-0 and before Stage 3A):** normative
+target frozen; runtime catalogue remained **nine** permissions until Stage 3A
+landed `run_sync_live`.
+
+**Current repository status (post–Stage 3A):** `run_sync_live` is implemented in
+the workspace permission catalogue (**ten** permissions).
 
 Canonical atomic wording follows existing RBAC vocabulary (`run_sync_*` beside
 `run_connector_discovery` / `run_sync_preview`).
@@ -6336,8 +6340,10 @@ portable to supported MySQL/SQLite or conflicts with a real known connector
 identity requirement: **STOP** before migration and report. Do not silently
 substitute one-link-per-subject uniqueness.
 
-**Repository status (post–Stage 3-0):** normative contract frozen; table/model
-absent until Stage 3A.
+**Historical repository status (post–Stage 3-0 and before Stage 3A):** normative
+contract frozen; table/model were absent until Stage 3A.
+
+**Current repository status (post–Stage 3A):** `ExternalRecordLink` persistence foundation is implemented (`external_record_links` table/model). Adobe Live execution read/write and reconciliation use remain **Stage 3B+**.
 
 #### Adobe Magento V1 identity notes
 
