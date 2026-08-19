@@ -9,7 +9,6 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspacePermission;
 use App\Services\Sync\SyncLiveAdmissionService;
-use App\Services\Sync\SyncPreviewAdmissionService;
 use App\Services\Workspace\WorkspaceAccessMutationCoordinator;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Sync\Exceptions\SyncLiveAdmissionException;
@@ -68,9 +67,9 @@ $account = ConnectorAccount::withoutWorkspaceScope()->findOrFail($connectorAccou
 $actor = User::query()->findOrFail($actorId);
 $workspace = Workspace::query()->findOrFail($workspaceId);
 $liveAdmission = app(SyncLiveAdmissionService::class);
-$previewAdmission = app(SyncPreviewAdmissionService::class);
 
 match ($mode) {
+    'config-lock-blocker' => runConfigLockBlocker($account, $configurationId, $ipcDir),
     'concurrent-live-a' => runConcurrentLiveA($account, $configurationId, $actor, $ipcDir, $liveAdmission),
     'concurrent-live-b' => runConcurrentLiveB($account, $configurationId, $actor, $ipcDir, $liveAdmission),
     'recovery-admit-a' => runRecoveryAdmitA($account, $configurationId, $actor, $ipcDir, $liveAdmission),
@@ -102,16 +101,14 @@ function waitForIpcFile(string $path, int $seconds = 60): void
     }
 }
 
-function runConcurrentLiveA(
+function runConfigLockBlocker(
     ConnectorAccount $account,
     string $configurationId,
-    User $actor,
     string $ipcDir,
-    SyncLiveAdmissionService $liveAdmission,
 ): void {
     assertIpcDir($ipcDir);
 
-    DB::transaction(function () use ($account, $configurationId, $ipcDir, $actor, $liveAdmission): void {
+    DB::transaction(function () use ($account, $configurationId, $ipcDir): void {
         SyncConfiguration::withoutWorkspaceScope()
             ->where('workspace_id', $account->workspace_id)
             ->where('connector_account_id', $account->id)
@@ -121,7 +118,7 @@ function runConcurrentLiveA(
 
         file_put_contents($ipcDir.'/lock_acquired', '1');
 
-        $deadline = time() + 30;
+        $deadline = time() + 60;
         while (time() < $deadline) {
             if (is_file($ipcDir.'/release_lock')) {
                 break;
@@ -129,12 +126,30 @@ function runConcurrentLiveA(
 
             usleep(100_000);
         }
-
-        $liveAdmission->admit($actor, $account, $configurationId);
-        file_put_contents($ipcDir.'/a_admitted', '1');
     });
 
     exit(0);
+}
+
+function runConcurrentLiveA(
+    ConnectorAccount $account,
+    string $configurationId,
+    User $actor,
+    string $ipcDir,
+    SyncLiveAdmissionService $liveAdmission,
+): void {
+    assertIpcDir($ipcDir);
+
+    file_put_contents($ipcDir.'/a_entered_admit', '1');
+
+    try {
+        $liveAdmission->admit($actor, $account, $configurationId);
+        file_put_contents($ipcDir.'/a_admitted', '1');
+        exit(0);
+    } catch (SyncLiveAdmissionException $exception) {
+        file_put_contents($ipcDir.'/a_result', 'error:'.$exception->getMessage());
+        exit(1);
+    }
 }
 
 function runConcurrentLiveB(
@@ -147,6 +162,7 @@ function runConcurrentLiveB(
     assertIpcDir($ipcDir);
 
     waitForIpcFile($ipcDir.'/lock_acquired');
+    file_put_contents($ipcDir.'/b_entered_admit', '1');
 
     try {
         $liveAdmission->admit($actor, $account, $configurationId);
@@ -165,25 +181,7 @@ function runRecoveryAdmitA(
     string $ipcDir,
     SyncLiveAdmissionService $liveAdmission,
 ): void {
-    assertIpcDir($ipcDir);
-
-    DB::transaction(function () use ($account, $configurationId, $ipcDir, $actor, $liveAdmission): void {
-        SyncConfiguration::withoutWorkspaceScope()
-            ->where('workspace_id', $account->workspace_id)
-            ->where('connector_account_id', $account->id)
-            ->where('id', $configurationId)
-            ->lockForUpdate()
-            ->firstOrFail();
-
-        file_put_contents($ipcDir.'/lock_acquired', '1');
-
-        waitForIpcFile($ipcDir.'/release_lock');
-
-        $liveAdmission->admit($actor, $account, $configurationId);
-        file_put_contents($ipcDir.'/a_admitted', '1');
-    });
-
-    exit(0);
+    runConcurrentLiveA($account, $configurationId, $actor, $ipcDir, $liveAdmission);
 }
 
 function runRecoveryAdmitB(
@@ -193,18 +191,7 @@ function runRecoveryAdmitB(
     string $ipcDir,
     SyncLiveAdmissionService $liveAdmission,
 ): void {
-    assertIpcDir($ipcDir);
-
-    waitForIpcFile($ipcDir.'/lock_acquired');
-
-    try {
-        $liveAdmission->admit($actor, $account, $configurationId);
-        file_put_contents($ipcDir.'/b_result', 'unexpected_success');
-        exit(1);
-    } catch (SyncLiveAdmissionException $exception) {
-        file_put_contents($ipcDir.'/b_result', $exception->getMessage());
-        exit(0);
-    }
+    runConcurrentLiveB($account, $configurationId, $actor, $ipcDir, $liveAdmission);
 }
 
 function runRbacRevokeLiveA(Workspace $workspace, string $liveRoleId, string $ipcDir): void

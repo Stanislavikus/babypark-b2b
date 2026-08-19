@@ -59,6 +59,21 @@ class SyncLiveSafetyConcurrencyMySqlTest extends TestCase
         $workerEnv = $this->mysqlWorkerEnvironment();
         $workerScript = base_path('tests/Support/SyncLiveSafetyConcurrencyWorker.php');
 
+        $blocker = new Process([
+            PHP_BINARY,
+            $workerScript,
+            'config-lock-blocker',
+            $account->workspace_id,
+            $account->id,
+            $configuration->id,
+            $actor->id,
+            $ipcDir,
+        ], base_path(), $workerEnv);
+        $blocker->setTimeout(120);
+        $blocker->start();
+
+        $this->waitForIpcFile($ipcDir.'/lock_acquired');
+
         $processA = new Process([
             PHP_BINARY,
             $workerScript,
@@ -72,7 +87,8 @@ class SyncLiveSafetyConcurrencyMySqlTest extends TestCase
         $processA->setTimeout(120);
         $processA->start();
 
-        $this->waitForIpcFile($ipcDir.'/lock_acquired');
+        $this->waitForIpcFile($ipcDir.'/a_entered_admit');
+        usleep(200_000);
 
         $processB = new Process([
             PHP_BINARY,
@@ -92,12 +108,14 @@ class SyncLiveSafetyConcurrencyMySqlTest extends TestCase
             usleep(50_000);
         }
 
-        $this->assertTrue($processB->isRunning(), 'Second live admission should block while configuration lock is held.');
+        $this->assertTrue($processB->isRunning(), 'Second live admission should block while workspace lock is held.');
 
         file_put_contents($ipcDir.'/release_lock', '1');
+        $blocker->wait();
         $processA->wait();
         $processB->wait();
 
+        $this->assertSame(0, $blocker->getExitCode(), $blocker->getErrorOutput());
         $this->assertSame(0, $processA->getExitCode(), $processA->getErrorOutput());
         $this->assertSame(0, $processB->getExitCode(), $processB->getErrorOutput());
         $this->assertStringContainsString('active', strtolower((string) file_get_contents($ipcDir.'/b_result')));
@@ -139,6 +157,21 @@ class SyncLiveSafetyConcurrencyMySqlTest extends TestCase
         $workerEnv = $this->mysqlWorkerEnvironment();
         $workerScript = base_path('tests/Support/SyncLiveSafetyConcurrencyWorker.php');
 
+        $blocker = new Process([
+            PHP_BINARY,
+            $workerScript,
+            'config-lock-blocker',
+            $account->workspace_id,
+            $account->id,
+            $configuration->id,
+            $actor->id,
+            $ipcDir,
+        ], base_path(), $workerEnv);
+        $blocker->setTimeout(120);
+        $blocker->start();
+
+        $this->waitForIpcFile($ipcDir.'/lock_acquired');
+
         $processA = new Process([
             PHP_BINARY,
             $workerScript,
@@ -152,7 +185,8 @@ class SyncLiveSafetyConcurrencyMySqlTest extends TestCase
         $processA->setTimeout(120);
         $processA->start();
 
-        $this->waitForIpcFile($ipcDir.'/lock_acquired');
+        $this->waitForIpcFile($ipcDir.'/a_entered_admit');
+        usleep(200_000);
 
         $processB = new Process([
             PHP_BINARY,
@@ -172,12 +206,14 @@ class SyncLiveSafetyConcurrencyMySqlTest extends TestCase
             usleep(50_000);
         }
 
-        $this->assertTrue($processB->isRunning(), 'Competing admission should block until stale recovery admission completes.');
+        $this->assertTrue($processB->isRunning(), 'Competing admission should block until first admission completes.');
 
         file_put_contents($ipcDir.'/release_lock', '1');
+        $blocker->wait();
         $processA->wait();
         $processB->wait();
 
+        $this->assertSame(0, $blocker->getExitCode(), $blocker->getErrorOutput());
         $this->assertSame(0, $processA->getExitCode(), $processA->getErrorOutput());
         $this->assertSame(0, $processB->getExitCode(), $processB->getErrorOutput());
         $this->assertFileExists($ipcDir.'/a_admitted');

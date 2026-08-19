@@ -44,12 +44,14 @@ final class SyncLiveAdmissionService
         }
 
         $run = null;
+        $admissionTiming = null;
 
         DB::transaction(function () use (
             $actor,
             $account,
             $syncConfigurationId,
             &$run,
+            &$admissionTiming,
         ): void {
             try {
                 $admissionTiming = $this->timingResolver->resolveAdmissionTiming();
@@ -145,7 +147,7 @@ final class SyncLiveAdmissionService
             ]);
         });
 
-        if (! $run instanceof SyncRun) {
+        if (! $run instanceof SyncRun || $admissionTiming === null) {
             throw new \RuntimeException('Live run was not created during admission.');
         }
 
@@ -154,6 +156,7 @@ final class SyncLiveAdmissionService
                 $account->workspace_id,
                 $account->id,
                 $run->id,
+                $admissionTiming->executionTiming,
             );
         } catch (\Throwable $exception) {
             SyncRun::withoutWorkspaceScope()

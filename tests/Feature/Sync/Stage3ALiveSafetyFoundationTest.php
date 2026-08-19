@@ -101,18 +101,14 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         $actor = $this->grantLivePermission($account->workspace);
         $this->seedCompletedPreview($account, $configuration);
 
-        $this->expectException(SyncLiveAdmissionException::class);
-        $this->expectExceptionMessage('unsafe');
+        try {
+            app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+            $this->fail('Expected unsafe timing rejection.');
+        } catch (SyncLiveAdmissionException $exception) {
+            $this->assertStringContainsString('unsafe', strtolower($exception->getMessage()));
+        }
 
-        app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
-
-        $this->assertSame(
-            0,
-            SyncRun::withoutWorkspaceScope()
-                ->where('sync_configuration_id', $configuration->id)
-                ->where('mode', SyncRunMode::Live)
-                ->count(),
-        );
+        $this->assertZeroLiveRunsForConfiguration($configuration->id);
     }
 
     #[Test]
@@ -125,10 +121,14 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         $actor = $this->grantLivePermission($account->workspace);
         $this->seedCompletedPreview($account, $configuration);
 
-        $this->expectException(SyncLiveAdmissionException::class);
-        $this->expectExceptionMessage('unsafe');
+        try {
+            app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+            $this->fail('Expected unsafe timing rejection.');
+        } catch (SyncLiveAdmissionException $exception) {
+            $this->assertStringContainsString('unsafe', strtolower($exception->getMessage()));
+        }
 
-        app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+        $this->assertZeroLiveRunsForConfiguration($configuration->id);
     }
 
     #[Test]
@@ -141,10 +141,14 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         $actor = $this->grantLivePermission($account->workspace);
         $this->seedCompletedPreview($account, $configuration);
 
-        $this->expectException(SyncLiveAdmissionException::class);
-        $this->expectExceptionMessage('unsafe');
+        try {
+            app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+            $this->fail('Expected unsafe timing rejection.');
+        } catch (SyncLiveAdmissionException $exception) {
+            $this->assertStringContainsString('unsafe', strtolower($exception->getMessage()));
+        }
 
-        app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+        $this->assertZeroLiveRunsForConfiguration($configuration->id);
     }
 
     #[Test]
@@ -157,10 +161,14 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         $actor = $this->grantLivePermission($account->workspace);
         $this->seedCompletedPreview($account, $configuration);
 
-        $this->expectException(SyncLiveAdmissionException::class);
-        $this->expectExceptionMessage('unsafe');
+        try {
+            app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+            $this->fail('Expected unsafe timing rejection.');
+        } catch (SyncLiveAdmissionException $exception) {
+            $this->assertStringContainsString('unsafe', strtolower($exception->getMessage()));
+        }
 
-        app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+        $this->assertZeroLiveRunsForConfiguration($configuration->id);
     }
 
     #[Test]
@@ -187,10 +195,70 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         $actor = $this->grantLivePermission($account->workspace);
         $this->seedCompletedPreview($account, $configuration);
 
-        $this->expectException(SyncLiveAdmissionException::class);
-        $this->expectExceptionMessage('unsafe');
+        try {
+            app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+            $this->fail('Expected unsafe timing rejection.');
+        } catch (SyncLiveAdmissionException $exception) {
+            $this->assertStringContainsString('unsafe', strtolower($exception->getMessage()));
+        }
 
-        app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+        $this->assertZeroLiveRunsForConfiguration($configuration->id);
+    }
+
+    #[Test]
+    public function live_admission_dispatches_job_with_validated_execution_timing_snapshot(): void
+    {
+        Config::set('sync_runtime.live_job_timeout_seconds', 900);
+        Config::set('sync_runtime.max_inflight_external_request_seconds', 60);
+        Config::set('sync_runtime.queued_undispatched_grace_seconds', 60);
+
+        Bus::fake();
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->grantLivePermission($account->workspace);
+        $this->seedCompletedPreview($account, $configuration);
+
+        $run = app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+
+        Config::set('sync_runtime.live_job_timeout_seconds', 30);
+        Config::set('sync_runtime.max_inflight_external_request_seconds', 5);
+
+        Bus::assertDispatched(SyncLiveRunJob::class, function (SyncLiveRunJob $job): bool {
+            return $job->timeout === 900;
+        });
+
+        $this->assertNotNull($run->queued_abandon_after);
+    }
+
+    #[Test]
+    public function preview_admission_dispatches_job_with_validated_execution_timing_snapshot(): void
+    {
+        Config::set('sync_runtime.live_job_timeout_seconds', 900);
+        Config::set('sync_runtime.max_inflight_external_request_seconds', 60);
+        Config::set('sync_runtime.queued_undispatched_grace_seconds', 60);
+
+        Bus::fake();
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->grantPreviewPermission($account->workspace);
+
+        $run = app(SyncPreviewAdmissionService::class)->admit(
+            $actor,
+            $account,
+            $configuration->id,
+            SyncSemanticOperation::Export,
+        );
+
+        Config::set('sync_runtime.live_job_timeout_seconds', 30);
+        Config::set('sync_runtime.max_inflight_external_request_seconds', 5);
+
+        Bus::assertDispatched(SyncPreviewRunJob::class, function (SyncPreviewRunJob $job): bool {
+            return $job->timeout === 900;
+        });
+
+        $this->assertNotNull($run->queued_abandon_after);
     }
 
     #[Test]
@@ -741,5 +809,16 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
     private function createSyncSupportAccount(): ConnectorAccount
     {
         return $this->createConnectorAccount(null, ['auth_profile' => 'test_sync_support']);
+    }
+
+    private function assertZeroLiveRunsForConfiguration(string $configurationId): void
+    {
+        $this->assertSame(
+            0,
+            SyncRun::withoutWorkspaceScope()
+                ->where('sync_configuration_id', $configurationId)
+                ->where('mode', SyncRunMode::Live)
+                ->count(),
+        );
     }
 }

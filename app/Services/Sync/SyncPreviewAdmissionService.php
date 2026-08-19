@@ -42,6 +42,7 @@ final class SyncPreviewAdmissionService
         }
 
         $run = null;
+        $admissionTiming = null;
 
         DB::transaction(function () use (
             $actor,
@@ -49,6 +50,7 @@ final class SyncPreviewAdmissionService
             $syncConfigurationId,
             $semanticOperation,
             &$run,
+            &$admissionTiming,
         ): void {
             $admissionTiming = $this->timingResolver->resolveAdmissionTiming();
 
@@ -121,7 +123,7 @@ final class SyncPreviewAdmissionService
             ]);
         });
 
-        if (! $run instanceof SyncRun) {
+        if (! $run instanceof SyncRun || $admissionTiming === null) {
             throw new \RuntimeException('Preview run was not created during admission.');
         }
 
@@ -130,6 +132,7 @@ final class SyncPreviewAdmissionService
                 $account->workspace_id,
                 $account->id,
                 $run->id,
+                $admissionTiming->executionTiming,
             );
         } catch (\Throwable $exception) {
             SyncRun::withoutWorkspaceScope()

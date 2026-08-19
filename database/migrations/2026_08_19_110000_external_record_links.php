@@ -47,7 +47,7 @@ return new class extends Migration
             )->references(['workspace_id', 'id'])->on('product_variants')->restrictOnDelete();
         });
 
-        if ($driver === 'mysql') {
+        if ($driver === 'mysql' && $this->mysqlSupportsNamedCheckConstraints()) {
             DB::statement('
                 ALTER TABLE external_record_links
                 ADD CONSTRAINT erl_subject_xor_check CHECK (
@@ -58,31 +58,11 @@ return new class extends Migration
         }
 
         if ($driver === 'sqlite') {
-            DB::unprepared('
-                CREATE TRIGGER erl_subject_xor_insert
-                BEFORE INSERT ON external_record_links
-                FOR EACH ROW
-                WHEN NOT (
-                    (NEW.product_id IS NULL AND NEW.product_variant_id IS NOT NULL)
-                    OR (NEW.product_id IS NOT NULL AND NEW.product_variant_id IS NULL)
-                )
-                BEGIN
-                    SELECT RAISE(ABORT, \'external_record_links subject xor violation\');
-                END;
-            ');
+            $this->createSqliteSubjectXorTriggers();
+        }
 
-            DB::unprepared('
-                CREATE TRIGGER erl_subject_xor_update
-                BEFORE UPDATE ON external_record_links
-                FOR EACH ROW
-                WHEN NOT (
-                    (NEW.product_id IS NULL AND NEW.product_variant_id IS NOT NULL)
-                    OR (NEW.product_id IS NOT NULL AND NEW.product_variant_id IS NULL)
-                )
-                BEGIN
-                    SELECT RAISE(ABORT, \'external_record_links subject xor violation\');
-                END;
-            ');
+        if ($driver === 'mysql' && ! $this->mysqlSupportsNamedCheckConstraints()) {
+            $this->createMysqlSubjectXorTriggers();
         }
     }
 
@@ -90,7 +70,7 @@ return new class extends Migration
     {
         $driver = Schema::getConnection()->getDriverName();
 
-        if ($driver === 'sqlite') {
+        if ($driver === 'sqlite' || ($driver === 'mysql' && ! $this->mysqlSupportsNamedCheckConstraints())) {
             DB::unprepared('DROP TRIGGER IF EXISTS erl_subject_xor_insert');
             DB::unprepared('DROP TRIGGER IF EXISTS erl_subject_xor_update');
         }
@@ -102,7 +82,9 @@ return new class extends Migration
                 $table->dropForeign('erl_ws_account_fk');
             });
 
-            DB::statement('ALTER TABLE external_record_links DROP CHECK erl_subject_xor_check');
+            if ($this->mysqlSupportsNamedCheckConstraints()) {
+                DB::statement('ALTER TABLE external_record_links DROP CHECK erl_subject_xor_check');
+            }
         } else {
             Schema::table('external_record_links', function (Blueprint $table) {
                 $table->dropForeign(['workspace_id', 'product_variant_id']);
@@ -112,5 +94,96 @@ return new class extends Migration
         }
 
         Schema::dropIfExists('external_record_links');
+    }
+
+    private function mysqlSupportsNamedCheckConstraints(): bool
+    {
+        if (Schema::getConnection()->getDriverName() !== 'mysql') {
+            return false;
+        }
+
+        $version = (string) DB::selectOne('SELECT VERSION() as version')->version;
+
+        if (! preg_match('/^(\d+)\.(\d+)\.(\d+)/', $version, $matches)) {
+            return false;
+        }
+
+        $major = (int) $matches[1];
+        $minor = (int) $matches[2];
+        $patch = (int) $matches[3];
+
+        if ($major > 8) {
+            return true;
+        }
+
+        if ($major < 8) {
+            return false;
+        }
+
+        if ($minor > 0) {
+            return true;
+        }
+
+        return $patch >= 16;
+    }
+
+    private function createSqliteSubjectXorTriggers(): void
+    {
+        DB::unprepared('
+            CREATE TRIGGER erl_subject_xor_insert
+            BEFORE INSERT ON external_record_links
+            FOR EACH ROW
+            WHEN NOT (
+                (NEW.product_id IS NULL AND NEW.product_variant_id IS NOT NULL)
+                OR (NEW.product_id IS NOT NULL AND NEW.product_variant_id IS NULL)
+            )
+            BEGIN
+                SELECT RAISE(ABORT, \'external_record_links subject xor violation\');
+            END;
+        ');
+
+        DB::unprepared('
+            CREATE TRIGGER erl_subject_xor_update
+            BEFORE UPDATE ON external_record_links
+            FOR EACH ROW
+            WHEN NOT (
+                (NEW.product_id IS NULL AND NEW.product_variant_id IS NOT NULL)
+                OR (NEW.product_id IS NOT NULL AND NEW.product_variant_id IS NULL)
+            )
+            BEGIN
+                SELECT RAISE(ABORT, \'external_record_links subject xor violation\');
+            END;
+        ');
+    }
+
+    private function createMysqlSubjectXorTriggers(): void
+    {
+        DB::unprepared('
+            CREATE TRIGGER erl_subject_xor_insert
+            BEFORE INSERT ON external_record_links
+            FOR EACH ROW
+            WHEN NOT (
+                (NEW.product_id IS NULL AND NEW.product_variant_id IS NOT NULL)
+                OR (NEW.product_id IS NOT NULL AND NEW.product_variant_id IS NULL)
+            )
+            BEGIN
+                SIGNAL SQLSTATE \'45000\'
+                    SET MESSAGE_TEXT = \'external_record_links subject xor violation\';
+            END
+        ');
+
+        DB::unprepared('
+            CREATE TRIGGER erl_subject_xor_update
+            BEFORE UPDATE ON external_record_links
+            FOR EACH ROW
+            WHEN NOT (
+                (NEW.product_id IS NULL AND NEW.product_variant_id IS NOT NULL)
+                OR (NEW.product_id IS NOT NULL AND NEW.product_variant_id IS NULL)
+            )
+            BEGIN
+                SIGNAL SQLSTATE \'45000\'
+                    SET MESSAGE_TEXT = \'external_record_links subject xor violation\';
+            END
+        ');
     }
 };
