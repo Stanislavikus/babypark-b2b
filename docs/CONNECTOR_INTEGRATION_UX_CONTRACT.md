@@ -379,8 +379,9 @@ Contract (Resolved — Stage 3-0)**. Summary-level UI rules:
 `docs/06-UI_DESIGN_SYSTEM.md` → Merchant First-Live interaction rules.
 
 **Implementation status:** Stage 3-0 is **docs-only**. No Live action, permission
-row, or Adobe write ships in this slice. Runtime lands in Stage 3A–3E (merchant
-first-Live action in Stage 3D).
+row, or Adobe write ships in this slice. Runtime lands in Stage 3A–3E. Stage 3D
+may implement Live UI/read model while support remains **false**; merchant
+consequential exposure waits for Stage 3E truthful support flip.
 
 ### Smallest first-Live surface
 
@@ -392,13 +393,29 @@ First manual Live admission belongs on `ManageAdobeProductsExportPreview`. Do
 `run_sync_live` (tenth normative permission; runtime pending Stage 3A) is
 independent from `run_sync_preview`, `manage_sync_configurations`, Mapping
 permissions, and connector-account permissions. Preview permission never implies
-Live authority.
+Live authority. `run_sync_live` is **authority only** — it does **not** mean
+connector/runtime currently supports Live.
+
+### Merchant consequential Live admission gates
+
+All gates are mandatory before actionable merchant consequential Live
+admission/exposure:
+
+- fresh `run_sync_live`;
+- relevant Completed current-revision Preview (`products` / `export` / Preview /
+  same `SyncConfiguration`);
+- current configuration/account readiness;
+- `ConnectorSyncOperationSupport(Products, Export, Live) === true`.
+
+Preview prerequisite is **trust/readiness** — not executable Live support.
+Stage 3D must not bypass `ConnectorSyncOperationSupport` or expose a consequential
+Live action while Live support remains **false**. Actionable merchant exposure
+happens only after Stage 3E real-Adobe validation and truthful support flip.
 
 ### Preview prerequisite
 
-After a relevant Completed current-revision Preview (`products` / `export` /
-Preview / same `SyncConfiguration`), a user with `run_sync_live` may receive an
-explicit Live action. Preview summary may guide but must **not** be described as
+When **all** admission gates are satisfied (including truthful Live support),
+Preview summary may guide merchant confirmation but must **not** be described as
 the frozen payload Live will send.
 
 ### Merchant confirmation copy

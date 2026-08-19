@@ -1810,15 +1810,24 @@ Summary rules for Stage 2A UI — prevent divergence from the contract:
 Normative detail: `docs/03-DOMAIN_MODEL.md` → **Live Safety, Identity & First-Live
 Contract (Resolved — Stage 3-0)**; `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md` §17.
 
-**Docs-only in Stage 3-0.** No Live action ships until Stage 3D runtime.
+**Docs-only in Stage 3-0.** No consequential Live action ships until Stage 3E
+truthful support flip (Stage 3D may build non-actionable UI/read model only).
 
 Summary rules for first-Live UI on `ManageAdobeProductsExportPreview`:
 
 - **Smallest surface** — first Live admission lives on the existing Adobe Products
   Export Preview page; do not turn `Інтеграції` into an execution console.
-- **Separate authority** — `run_sync_preview` never implies `run_sync_live`; Live
-  action visible only to actors with `run_sync_live` after a Completed
-  current-revision Preview exists.
+- **All gates required** — merchant consequential Live admission/exposure requires
+  fresh `run_sync_live` **and** relevant Completed current-revision Preview **and**
+  current configuration/account readiness **and**
+  `ConnectorSyncOperationSupport(Products, Export, Live) === true`. Permission and
+  Preview prerequisite alone are insufficient.
+- **Authority ≠ availability** — `run_sync_live` is authority, not connector Live
+  support. Preview is trust/readiness prerequisite, not executable Live support.
+- **Stage 3D boundary** — Stage 3D may implement Live UI/read model while support is
+  **false**, but the action must remain non-actionable for consequential execution;
+  no bypass of `ConnectorSyncOperationSupport`.
+- **Separate authority** — `run_sync_preview` never implies `run_sync_live`.
 - **Honest confirmation** — merchant copy must state this is a real external
   transfer and Product data will be re-checked immediately before write. Preview
   summary is guidance, not a frozen Live payload.

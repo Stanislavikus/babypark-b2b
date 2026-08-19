@@ -5980,15 +5980,25 @@ transaction. Do **not** keep the lock during job execution and do **not** requir
 a long-lived DB transaction for the whole planner/execution pass. Task **4C-2b**
 must still yield one coherent Product execution set without admission-time
 Product snapshots. Do **not** invent a distributed lock unless implementation
-proves DB admission insufficient. Preview-vs-Live coexistence remains deferred.
+proves DB admission insufficient.
+
+**Historical 4C-2a state:** Preview-vs-Live coexistence was intentionally deferred
+at that stage. **Current truth (Stage 3-0):** one active queued/running `SyncRun`
+per `SyncConfiguration` is mode-agnostic (Preview+Preview, Preview+Live,
+Live+Preview, Live+Live all reject a second).
 
 ##### Retry / idempotency / ExternalRecordLink
 
-Preview has no consequential mutation. 4C-2a does **not** freeze Live retry
-semantics. Before Live, `ExternalRecordLink`, operation-specific idempotency,
-retry rules, and ambiguous/unknown applied-state semantics require a separate
-Stop-and-Amend. Transport attempts are never `SyncRunItem` rows.
-`ExternalRecordLink` is not required for Preview.
+Preview has no consequential mutation.
+
+**Historical 4C-2a state:** 4C-2a did **not** freeze Live retry semantics.
+`ExternalRecordLink`, operation-specific idempotency, retry rules, and
+ambiguous/unknown applied-state semantics required a later Stop-and-Amend. That
+Stop-and-Amend is now fulfilled by **Stage 3-0** (runtime implementation remains
+Stage 3A–3E).
+
+Transport attempts are never `SyncRunItem` rows. `ExternalRecordLink` is not
+required for Preview.
 
 ##### Implementation sequencing
 
@@ -5997,7 +6007,7 @@ Stop-and-Amend. Transport attempts are never `SyncRunItem` rows.
 | **4C-2a** | This docs-only contract — Done |
 | **4C-2b** (immediate next code foundation) | May implement: revision v3; `run_sync_preview` runtime permission; `SyncRun` / `SyncRunItem` persistence; `configuration_snapshot`; run admission/concurrency foundation; pure Preview planner contract; Adobe Products/Export planner implementation + isolated regression harness. Must **not** ship: merchant Preview UI; consequential external mutation; automatic flip of `ConnectorSyncOperationSupport`. |
 | **Before first real merchant Preview** | Explicitly reconcile the operation-support boundary so the platform can truthfully represent the runtime actually available. Do not bypass `ConnectorSyncOperationSupport`. If current support vocabulary cannot represent Preview-only support safely, require a narrow Stop-and-Amend before exposure. |
-| **Before Live** | Separate contract for `ExternalRecordLink`, Live permission, Adobe Live executor, idempotency/retry, ambiguous applied-state behavior. Scheduling/history/current issues later. |
+| **Before Live** *(historical 4C-2a sequencing — prerequisite now fulfilled by Stage 3-0)* | Separate contract for `ExternalRecordLink`, Live permission, Adobe Live executor, idempotency/retry, ambiguous applied-state behavior. Scheduling/history/current issues later. **Stage 3-0 resolves this prerequisite; runtime implementation remains Stage 3A–3E.** |
 
 Fixed `all_products` is a first-slice safe Preview constraint, not a sixth
 Product Owner question. PO-1 and PO-4 remain open. PO-2, PO-3, and PO-5 remain
@@ -6650,7 +6660,7 @@ After Stage 3-0 merges, implement in order:
 | **3A — Live Safety Foundation** | `run_sync_live` permission; stale-active-run lease/recovery; Live outcome persistence; `ExternalRecordLink` persistence; `SyncLiveAdmissionService`; Live job shell (`tries = 1`, safe timeout); Preview×Live concurrency tests | remains **false** |
 | **3B — Adobe Simple Live** | Shared Adobe semantic planning boundary; child/simple external identity; GET/POST/PUT Product transport; `ExternalRecordLink` read/write; create/update/reconciliation; simple Product Live execution; applied-state classification | remains **false** |
 | **3C — Adobe Configurable Live** | Connector-owned deterministic parent SKU; child/parent/options/link command compilation; partial/ambiguous outcomes; inactive linked-variant lifecycle; configurable recovery/reconciliation | remains **false** |
-| **3D — Adobe Media + Merchant First Live** | Required E14 primary/gallery image export; merchant Live admission action on `ManageAdobeProductsExportPreview`; queued/running/result presentation; final safe merchant copy | remains **false** until real proof |
+| **3D — Adobe Media + Merchant First Live** | Required E14 primary/gallery image export; merchant Live admission **UI/read model** on `ManageAdobeProductsExportPreview` (non-actionable for consequential execution while Live support is **false**; must not bypass `ConnectorSyncOperationSupport`); queued/running/result presentation; final safe merchant copy | remains **false** |
 | **3E — Real Adobe Validation + Truth Flip** | Disposable write harness; target-version proof; correct API-contract deviations; only then flip `Adobe Products / Export / Live = true` | flip only after successful evidence |
 
 Production Live remains **NOT IMPLEMENTED** until Stage 3E completes with explicit
@@ -7019,10 +7029,29 @@ connector queue runtime.
 Smallest first-Live surface: `ManageAdobeProductsExportPreview`. Do not turn
 Integrations into an execution console.
 
-After a relevant Completed current-revision Preview, a user with `run_sync_live`
-may receive an explicit Live action.
+##### Merchant consequential Live admission gates (frozen — Stage 3-0)
 
-Merchant confirmation concept:
+Merchant consequential Live admission/exposure requires **all** relevant gates:
+
+- fresh `run_sync_live` authorization;
+- relevant Completed current-revision Preview on the same `SyncConfiguration`
+  (`products` / `export` / Preview / `Completed`);
+- current configuration/account readiness;
+- `ConnectorSyncOperationSupport(Products, Export, Live) === true`.
+
+`run_sync_live` means **authority**. It does **not** mean the connector/runtime
+currently **supports** Live. A valid Preview prerequisite means
+**trust/readiness prerequisite**. It does **not** make unsupported Live
+executable.
+
+Stage 3D may implement the Live UI/read model and internal action surface while
+support remains **false**, but the merchant Live action must remain
+**non-actionable** / **non-publicly-exposed** for consequential execution until
+Stage 3E flips truthful Live support. No Stage 3D code may bypass
+`ConnectorSyncOperationSupport`. Merchant actionable exposure happens only after
+successful Stage 3E real-Adobe validation and truthful Live support flip.
+
+Merchant confirmation concept (only when **all** gates above are satisfied):
 
 > Передати товари в Adobe Commerce?
 >

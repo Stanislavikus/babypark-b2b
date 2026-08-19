@@ -295,6 +295,100 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
     }
 
     #[Test]
+    public function historical_4c2a_deferred_live_wording_is_superseded_by_stage_3_0(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        if (! preg_match(
+            '/#### Preview-first Sync Execution Foundation Contract\n\[Resolved — Task 4C-2a\]\n\n(.*?)(?=\n### Magento Product Export V1 Execution Contract)/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate Preview-first Sync Execution Foundation Contract section');
+        }
+
+        $previewSection = $matches[1];
+
+        $this->assertStringContainsString('**Historical 4C-2a state:**', $previewSection);
+        $this->assertStringContainsString('Preview-vs-Live coexistence was intentionally deferred', $previewSection);
+        $this->assertStringContainsString('at that stage', $previewSection);
+        $this->assertStringContainsString('**Current truth (Stage 3-0):**', $previewSection);
+        $this->assertStringContainsString('now fulfilled by **Stage 3-0**', $previewSection);
+        $this->assertStringContainsString(
+            'historical 4C-2a sequencing — prerequisite now fulfilled by Stage 3-0',
+            $previewSection,
+        );
+        $this->assertStringNotContainsString(
+            'Preview-vs-Live coexistence remains deferred',
+            $previewSection,
+        );
+    }
+
+    #[Test]
+    public function run_sync_live_alone_is_insufficient_for_merchant_live_exposure(): void
+    {
+        $section = $this->stage30ContractSection();
+
+        $this->assertStringContainsString('`run_sync_live` means **authority**', $section);
+        $this->assertStringContainsString('does **not** mean the connector/runtime', $section);
+        $this->assertStringContainsString('currently **supports** Live', $section);
+        $this->assertStringContainsString('Merchant consequential Live admission/exposure requires **all** relevant gates', $section);
+    }
+
+    #[Test]
+    public function completed_preview_alone_is_insufficient_for_merchant_live_exposure(): void
+    {
+        $section = $this->stage30ContractSection();
+
+        $this->assertStringContainsString('**trust/readiness prerequisite**', $section);
+        $this->assertStringContainsString('make unsupported Live', $section);
+        $this->assertStringContainsString('executable', $section);
+    }
+
+    #[Test]
+    public function connector_sync_operation_support_live_is_mandatory_availability_gate(): void
+    {
+        $section = $this->stage30ContractSection();
+
+        $this->assertStringContainsString(
+            '`ConnectorSyncOperationSupport(Products, Export, Live) === true`',
+            $section,
+        );
+        $this->assertStringContainsString('No Stage 3D code may bypass', $section);
+        $this->assertStringContainsString('`ConnectorSyncOperationSupport`', $section);
+    }
+
+    #[Test]
+    public function stage_3d_cannot_bypass_live_false_support_truth(): void
+    {
+        $stages = $this->coherentStagesSection();
+        $section = $this->stage30ContractSection();
+
+        $this->assertStringContainsString('non-actionable', $stages);
+        $this->assertStringContainsString('must not bypass `ConnectorSyncOperationSupport`', $stages);
+        $this->assertStringContainsString('Keep Live **false** through internal implementation slices 3A–3D', $section);
+    }
+
+    #[Test]
+    public function merchant_consequential_exposure_waits_for_stage_3e_support_flip(): void
+    {
+        $section = $this->stage30ContractSection();
+
+        $this->assertStringContainsString('Merchant actionable exposure happens only after', $section);
+        $this->assertStringContainsString('successful Stage 3E real-Adobe validation', $section);
+    }
+
+    #[Test]
+    public function adobe_products_export_live_remains_false_in_current_runtime(): void
+    {
+        $section = $this->stage30ContractSection();
+        $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
+
+        $this->assertStringContainsString('Products / Export / Live = **false**', $section);
+        $this->assertStringContainsString('| Adobe Products/Export/Live support truth | CONFIRMED ABSENT (public) |', $atlas);
+    }
+
+    #[Test]
     public function ux_contract_documents_merchant_first_live_section(): void
     {
         $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
@@ -302,6 +396,8 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
         $this->assertStringContainsString('## 17. Merchant First-Live UX (Resolved — Stage 3-0)', $content);
         $this->assertStringContainsString('ManageAdobeProductsExportPreview', $content);
         $this->assertStringContainsString('Передати товари в Adobe Commerce?', $content);
+        $this->assertStringContainsString('ConnectorSyncOperationSupport(Products, Export, Live) === true', $content);
+        $this->assertStringContainsString('Stage 3D must not bypass `ConnectorSyncOperationSupport`', $content);
     }
 
     #[Test]
@@ -311,6 +407,9 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('### Merchant First-Live interaction rules (Resolved — Stage 3-0)', $content);
         $this->assertStringContainsString('no "retry failed only" action in Stage 3 V1', $content);
+        $this->assertStringContainsString('ConnectorSyncOperationSupport(Products, Export, Live) === true', $content);
+        $this->assertStringContainsString('Stage 3D may implement Live UI/read model while support is', $content);
+        $this->assertStringContainsString('**false**, but the action must remain non-actionable', $content);
     }
 
     /**

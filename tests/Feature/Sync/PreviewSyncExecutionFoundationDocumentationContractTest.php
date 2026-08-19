@@ -224,10 +224,30 @@ class PreviewSyncExecutionFoundationDocumentationContractTest extends TestCase
     {
         $section = $this->previewExecutionFoundationContractSection();
 
-        $this->assertStringContainsString('ExternalRecordLink` is not required for Preview', $section);
-        $this->assertStringContainsString('4C-2a does **not** freeze Live retry', $section);
+        $this->assertStringContainsString('`ExternalRecordLink` is not', $section);
+        $this->assertStringContainsString('required for Preview', $section);
+        $this->assertStringContainsString('**Historical 4C-2a state:**', $section);
+        $this->assertStringContainsString('4C-2a did **not** freeze Live retry', $section);
         $this->assertStringContainsString('Before Live', $section);
+        $this->assertStringContainsString('historical 4C-2a sequencing — prerequisite now fulfilled by Stage 3-0', $section);
+        $this->assertStringContainsString('Stage 3-0 resolves this prerequisite', $section);
         $this->assertStringContainsString('Separate contract for `ExternalRecordLink`', $section);
+        $this->assertStringContainsString('now fulfilled by **Stage 3-0**', $section);
+    }
+
+    #[Test]
+    public function contract_marks_preview_vs_live_coexistence_as_historical_and_superseded_by_stage_3_0(): void
+    {
+        $section = $this->previewExecutionFoundationContractSection();
+
+        $this->assertStringContainsString(
+            'Preview-vs-Live coexistence was intentionally deferred',
+            $section,
+        );
+        $this->assertStringContainsString('at that stage', $section);
+        $this->assertStringContainsString('**Current truth (Stage 3-0):**', $section);
+        $this->assertStringContainsString('mode-agnostic', $section);
+        $this->assertStringNotContainsString('Preview-vs-Live coexistence remains deferred', $section);
     }
 
     #[Test]
