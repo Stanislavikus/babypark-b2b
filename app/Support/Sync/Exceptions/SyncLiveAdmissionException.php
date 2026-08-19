@@ -50,4 +50,9 @@ final class SyncLiveAdmissionException extends RuntimeException
     {
         return new self('Live run job dispatch failed after admission.', previous: $previous);
     }
+
+    public static function unsafeTimingConfiguration(): self
+    {
+        return new self('Live execution timing configuration is unsafe and cannot admit runs.');
+    }
 }

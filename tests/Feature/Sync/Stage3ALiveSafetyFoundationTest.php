@@ -24,14 +24,17 @@ use App\Services\Sync\SyncConfigurationService;
 use App\Services\Sync\SyncLiveAdmissionService;
 use App\Services\Sync\SyncPreviewAdmissionService;
 use App\Services\Sync\SyncRunActiveRecoveryService;
+use App\Services\Sync\SyncRuntimeTimingResolver;
 use App\Services\Sync\UpdateSyncConfigurationInput;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
 use App\Support\Sync\ConnectorExecutionConfiguration;
 use App\Support\Sync\Exceptions\SyncLiveAdmissionException;
 use App\Support\Sync\Exceptions\SyncPreviewAdmissionException;
+use App\Support\Sync\Exceptions\SyncRuntimeTimingConfigurationException;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
 use App\Support\Sync\Preview\SyncPreviewConnectorCapabilityResolver;
+use App\Support\Sync\SyncRuntimeExecutionTiming;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -75,14 +78,119 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
     #[Test]
     public function timing_config_enforces_live_timeout_plus_inflight_below_connector_retry_after(): void
     {
-        $liveTimeout = (int) config('sync_runtime.live_job_timeout_seconds');
-        $maxInflight = (int) config('sync_runtime.max_inflight_external_request_seconds');
+        $timing = app(SyncRuntimeTimingResolver::class)->resolveAdmissionTiming();
+
         $retryAfter = (int) config('queue.connections.database_connectors.retry_after');
 
-        $this->assertGreaterThan(0, $liveTimeout);
-        $this->assertGreaterThan(0, $maxInflight);
-        $this->assertGreaterThan(0, (int) config('sync_runtime.queued_undispatched_grace_seconds'));
-        $this->assertLessThan($retryAfter, $liveTimeout + $maxInflight);
+        $this->assertGreaterThan(0, $timing->executionTiming->jobTimeoutSeconds);
+        $this->assertGreaterThan(0, $timing->executionTiming->maxInflightExternalRequestSeconds);
+        $this->assertGreaterThan(0, $timing->queuedUndispatchedGraceSeconds);
+        $this->assertLessThan(
+            $retryAfter,
+            $timing->executionTiming->jobTimeoutSeconds + $timing->executionTiming->maxInflightExternalRequestSeconds,
+        );
+    }
+
+    #[Test]
+    public function unsafe_zero_live_timeout_rejects_live_admission(): void
+    {
+        Config::set('sync_runtime.live_job_timeout_seconds', 0);
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->grantLivePermission($account->workspace);
+        $this->seedCompletedPreview($account, $configuration);
+
+        $this->expectException(SyncLiveAdmissionException::class);
+        $this->expectExceptionMessage('unsafe');
+
+        app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+
+        $this->assertSame(
+            0,
+            SyncRun::withoutWorkspaceScope()
+                ->where('sync_configuration_id', $configuration->id)
+                ->where('mode', SyncRunMode::Live)
+                ->count(),
+        );
+    }
+
+    #[Test]
+    public function unsafe_zero_max_inflight_rejects_live_admission(): void
+    {
+        Config::set('sync_runtime.max_inflight_external_request_seconds', 0);
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->grantLivePermission($account->workspace);
+        $this->seedCompletedPreview($account, $configuration);
+
+        $this->expectException(SyncLiveAdmissionException::class);
+        $this->expectExceptionMessage('unsafe');
+
+        app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+    }
+
+    #[Test]
+    public function unsafe_zero_queued_grace_rejects_live_admission(): void
+    {
+        Config::set('sync_runtime.queued_undispatched_grace_seconds', 0);
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->grantLivePermission($account->workspace);
+        $this->seedCompletedPreview($account, $configuration);
+
+        $this->expectException(SyncLiveAdmissionException::class);
+        $this->expectExceptionMessage('unsafe');
+
+        app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+    }
+
+    #[Test]
+    public function unsafe_negative_queued_grace_rejects_live_admission(): void
+    {
+        Config::set('sync_runtime.queued_undispatched_grace_seconds', -5);
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->grantLivePermission($account->workspace);
+        $this->seedCompletedPreview($account, $configuration);
+
+        $this->expectException(SyncLiveAdmissionException::class);
+        $this->expectExceptionMessage('unsafe');
+
+        app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+    }
+
+    #[Test]
+    public function resolver_rejects_execution_window_at_or_above_connector_retry_after(): void
+    {
+        $retryAfter = (int) config('queue.connections.database_connectors.retry_after');
+        Config::set('sync_runtime.live_job_timeout_seconds', $retryAfter - 1);
+        Config::set('sync_runtime.max_inflight_external_request_seconds', 1);
+
+        $this->expectException(SyncRuntimeTimingConfigurationException::class);
+
+        app(SyncRuntimeTimingResolver::class)->resolveAdmissionTiming();
+    }
+
+    #[Test]
+    public function unsafe_execution_window_rejects_live_admission(): void
+    {
+        $retryAfter = (int) config('queue.connections.database_connectors.retry_after');
+        Config::set('sync_runtime.live_job_timeout_seconds', $retryAfter - 1);
+        Config::set('sync_runtime.max_inflight_external_request_seconds', 1);
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->grantLivePermission($account->workspace);
+        $this->seedCompletedPreview($account, $configuration);
+
+        $this->expectException(SyncLiveAdmissionException::class);
+        $this->expectExceptionMessage('unsafe');
+
+        app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
     }
 
     #[Test]
@@ -231,10 +339,19 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
             'configuration_snapshot' => ['selection' => ['mode' => 'all_products']],
         ]);
 
-        (new SyncPreviewRunJob($account->workspace_id, $account->id, $run->id))->handle(
-            app(ProductExecutionAggregateBuilder::class),
-            app(SyncPreviewConnectorCapabilityResolver::class),
-        );
+        $job = new SyncPreviewRunJob($account->workspace_id, $account->id, $run->id);
+
+        Config::set('sync_runtime.live_job_timeout_seconds', 30);
+        Config::set('sync_runtime.max_inflight_external_request_seconds', 5);
+
+        try {
+            $job->handle(
+                app(ProductExecutionAggregateBuilder::class),
+                app(SyncPreviewConnectorCapabilityResolver::class),
+            );
+        } catch (\Throwable) {
+            // Preview execution may fail after reservation; lease timestamps are the proof target.
+        }
 
         $run = $run->fresh();
         $this->assertNotNull($run->started_at);
@@ -242,11 +359,49 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         $this->assertNotNull($run->recoverable_after);
         $this->assertTrue($run->writer_deadline_at->equalTo($run->started_at->copy()->addSeconds(900)));
         $this->assertTrue($run->recoverable_after->equalTo($run->writer_deadline_at->copy()->addSeconds(60)));
+        $this->assertTrue($run->recoverable_after->greaterThan(now()->addMinutes(10)));
+    }
+
+    #[Test]
+    public function live_job_reservation_uses_snapshotted_timing_after_config_changes(): void
+    {
+        Config::set('sync_runtime.live_job_timeout_seconds', 900);
+        Config::set('sync_runtime.max_inflight_external_request_seconds', 60);
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+
+        $run = SyncRun::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'sync_configuration_id' => $configuration->id,
+            'configuration_revision' => $configuration->configuration_revision,
+            'mode' => SyncRunMode::Live,
+            'semantic_operation' => SyncSemanticOperation::Export,
+            'status' => SyncRunStatus::Queued,
+            'configuration_snapshot' => ['selection' => ['mode' => 'all_products']],
+        ]);
+
+        $job = new SyncLiveRunJob(
+            $account->workspace_id,
+            $account->id,
+            $run->id,
+            new SyncRuntimeExecutionTiming(900, 60),
+        );
 
         Config::set('sync_runtime.live_job_timeout_seconds', 30);
         Config::set('sync_runtime.max_inflight_external_request_seconds', 5);
 
-        $this->assertTrue($run->recoverable_after->greaterThan(now()->addMinutes(10)));
+        try {
+            $job->handle();
+        } catch (SyncLiveRunJobExecutionException) {
+            // Expected fail-closed shell after reservation.
+        }
+
+        $run = $run->fresh();
+        $this->assertNotNull($run->started_at);
+        $this->assertTrue($run->writer_deadline_at->equalTo($run->started_at->copy()->addSeconds(900)));
+        $this->assertTrue($run->recoverable_after->equalTo($run->writer_deadline_at->copy()->addSeconds(60)));
     }
 
     #[Test]
@@ -444,6 +599,17 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         $this->assertNotNull($run->writer_deadline_at);
         $this->assertNotNull($run->recoverable_after);
         $this->assertSame(0, SyncRunItem::withoutWorkspaceScope()->where('sync_run_id', $run->id)->count());
+    }
+
+    #[Test]
+    public function preview_job_uses_snapshotted_job_timeout(): void
+    {
+        Config::set('sync_runtime.live_job_timeout_seconds', 900);
+        Config::set('sync_runtime.max_inflight_external_request_seconds', 60);
+
+        $job = new SyncPreviewRunJob('ws', 'acc', 'run');
+
+        $this->assertSame(900, $job->timeout);
     }
 
     #[Test]

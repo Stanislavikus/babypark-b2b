@@ -28,6 +28,7 @@ final class SyncPreviewAdmissionService
         private readonly SyncPreviewConfigurationSnapshotBuilder $snapshotBuilder,
         private readonly SyncPreviewConfigurationReadinessResolver $readinessResolver,
         private readonly SyncRunActiveRecoveryService $activeRecoveryService,
+        private readonly SyncRuntimeTimingResolver $timingResolver,
     ) {}
 
     public function admit(
@@ -49,6 +50,8 @@ final class SyncPreviewAdmissionService
             $semanticOperation,
             &$run,
         ): void {
+            $admissionTiming = $this->timingResolver->resolveAdmissionTiming();
+
             $configuration = $this->mutationCoordinator->lockConfiguration($account, $syncConfigurationId);
 
             $freshAccount = ConnectorAccount::withoutWorkspaceScope()
@@ -114,7 +117,7 @@ final class SyncPreviewAdmissionService
                 'status' => SyncRunStatus::Queued,
                 'initiated_by_user_id' => $actor->id,
                 'configuration_snapshot' => $snapshot,
-                'queued_abandon_after' => now()->addSeconds((int) config('sync_runtime.queued_undispatched_grace_seconds')),
+                'queued_abandon_after' => now()->addSeconds($admissionTiming->queuedUndispatchedGraceSeconds),
             ]);
         });
 

@@ -4,6 +4,7 @@ namespace App\Jobs\Connectors;
 
 use App\Enums\SyncRunStatus;
 use App\Models\SyncRun;
+use App\Support\Sync\SyncRuntimeExecutionTiming;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\Interruptible;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -23,14 +24,18 @@ class SyncLiveRunJob implements Interruptible, ShouldQueue
 
     public int $timeout;
 
+    private SyncRuntimeExecutionTiming $executionTiming;
+
     private bool $interrupted = false;
 
     public function __construct(
         private readonly string $workspaceId,
         private readonly string $connectorAccountId,
         private readonly string $syncRunId,
+        ?SyncRuntimeExecutionTiming $executionTiming = null,
     ) {
-        $this->timeout = (int) config('sync_runtime.live_job_timeout_seconds');
+        $this->executionTiming = $executionTiming ?? SyncRuntimeExecutionTiming::snapshotFromCurrentConfig();
+        $this->timeout = $this->executionTiming->jobTimeoutSeconds;
         $this->onConnection('database_connectors');
         $this->onQueue('connectors');
     }
@@ -70,15 +75,13 @@ class SyncLiveRunJob implements Interruptible, ShouldQueue
             }
 
             $startedAt = now();
-            $jobTimeoutSeconds = (int) config('sync_runtime.live_job_timeout_seconds');
-            $maxInflightSeconds = (int) config('sync_runtime.max_inflight_external_request_seconds');
-            $writerDeadlineAt = $startedAt->copy()->addSeconds($jobTimeoutSeconds);
+            $leaseTimestamps = $this->executionTiming->leaseTimestampsFrom($startedAt);
 
             $run->update([
                 'status' => SyncRunStatus::Running,
                 'started_at' => $startedAt,
-                'writer_deadline_at' => $writerDeadlineAt,
-                'recoverable_after' => $writerDeadlineAt->copy()->addSeconds($maxInflightSeconds),
+                'writer_deadline_at' => $leaseTimestamps['writer_deadline_at'],
+                'recoverable_after' => $leaseTimestamps['recoverable_after'],
             ]);
 
             return $run->refresh();

@@ -2,24 +2,20 @@
 
 namespace Tests\Integration\MySql;
 
-use App\Models\ExternalRecordLink;
-use App\Models\Product;
-use App\Models\ProductVariant;
-use App\Models\Workspace;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
-use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\AssertsExternalRecordLinkDatabaseContract;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\TestCase;
 
 class ExternalRecordLinkPersistenceMySqlTest extends TestCase
 {
+    use AssertsExternalRecordLinkDatabaseContract;
     use CreatesConnectorAccountFixtures;
     use RefreshDatabase;
 
@@ -46,17 +42,34 @@ class ExternalRecordLinkPersistenceMySqlTest extends TestCase
     }
 
     #[Test]
-    public function stage_3a_external_record_link_migrations_roll_back_and_reapply(): void
+    public function stage_3a_sync_run_execution_safety_migration_rolls_back_and_reapplies(): void
+    {
+        $version = DB::selectOne('SELECT VERSION() as version')->version;
+
+        $this->assertTrue(Schema::hasColumn('sync_runs', 'recoverable_after'));
+
+        Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_08_19_100000_sync_run_execution_safety.php',
+        ]);
+
+        $this->assertFalse(Schema::hasColumn('sync_runs', 'recoverable_after'));
+
+        Artisan::call('migrate');
+
+        $this->assertTrue(Schema::hasColumn('sync_runs', 'recoverable_after'));
+        $this->assertNotEmpty($version);
+    }
+
+    #[Test]
+    public function stage_3a_external_record_links_migration_rolls_back_and_reapplies(): void
     {
         $version = DB::selectOne('SELECT VERSION() as version')->version;
 
         $this->assertTrue(Schema::hasTable('external_record_links'));
 
         Artisan::call('migrate:rollback', [
-            '--step' => 1,
+            '--path' => 'database/migrations/2026_08_19_110000_external_record_links.php',
         ]);
-
-        $this->assertFalse(Schema::hasTable('external_record_links'));
 
         Artisan::call('migrate');
         $this->assertTrue(Schema::hasTable('external_record_links'));
@@ -65,85 +78,19 @@ class ExternalRecordLinkPersistenceMySqlTest extends TestCase
     }
 
     #[Test]
-    public function mysql_rejects_invalid_xor_and_duplicate_associations(): void
+    public function stage_3a_migrations_roll_back_and_reapply_in_pair(): void
     {
-        $account = $this->createConnectorAccount();
-        $product = $this->createProduct($account->workspace);
-        $variant = $this->createVariant($account->workspace, $product);
+        $version = DB::selectOne('SELECT VERSION() as version')->version;
 
-        ExternalRecordLink::withoutWorkspaceScope()->create([
-            'id' => (string) Str::uuid(),
-            'workspace_id' => $account->workspace_id,
-            'connector_account_id' => $account->id,
-            'product_id' => $product->id,
-            'external_identifier' => 'MYSQL-EXT-1',
-        ]);
+        Artisan::call('migrate:rollback', ['--step' => 2]);
 
-        ExternalRecordLink::withoutWorkspaceScope()->create([
-            'id' => (string) Str::uuid(),
-            'workspace_id' => $account->workspace_id,
-            'connector_account_id' => $account->id,
-            'product_variant_id' => $variant->id,
-            'external_identifier' => 'MYSQL-VAR-1',
-        ]);
+        $this->assertFalse(Schema::hasTable('external_record_links'));
+        $this->assertFalse(Schema::hasColumn('sync_runs', 'recoverable_after'));
 
-        try {
-            DB::table('external_record_links')->insert([
-                'id' => (string) Str::uuid(),
-                'workspace_id' => $account->workspace_id,
-                'connector_account_id' => $account->id,
-                'product_id' => $product->id,
-                'product_variant_id' => $variant->id,
-                'external_identifier' => 'BAD',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            $this->fail('Expected XOR violation.');
-        } catch (QueryException) {
-            // expected
-        }
+        Artisan::call('migrate');
 
-        try {
-            ExternalRecordLink::withoutWorkspaceScope()->create([
-                'id' => (string) Str::uuid(),
-                'workspace_id' => $account->workspace_id,
-                'connector_account_id' => $account->id,
-                'product_id' => $product->id,
-                'external_identifier' => 'MYSQL-EXT-1',
-            ]);
-            $this->fail('Expected duplicate product association rejection.');
-        } catch (QueryException) {
-            // expected
-        }
-
-        ExternalRecordLink::withoutWorkspaceScope()->create([
-            'id' => (string) Str::uuid(),
-            'workspace_id' => $account->workspace_id,
-            'connector_account_id' => $account->id,
-            'product_id' => $product->id,
-            'external_identifier' => 'MYSQL-EXT-2',
-        ]);
-    }
-
-    private function createProduct(Workspace $workspace): Product
-    {
-        return Product::withoutWorkspaceScope()->create([
-            'workspace_id' => $workspace->id,
-            'onec_guid' => (string) Str::uuid(),
-            'sku' => 'SKU-'.Str::random(8),
-            'name' => 'Product',
-            'is_active' => true,
-        ]);
-    }
-
-    private function createVariant(Workspace $workspace, Product $product): ProductVariant
-    {
-        return ProductVariant::withoutWorkspaceScope()->create([
-            'workspace_id' => $workspace->id,
-            'product_id' => $product->id,
-            'onec_guid' => (string) Str::uuid(),
-            'sku' => 'VAR-'.Str::random(8),
-            'is_active' => true,
-        ]);
+        $this->assertTrue(Schema::hasTable('external_record_links'));
+        $this->assertTrue(Schema::hasColumn('sync_runs', 'recoverable_after'));
+        $this->assertNotEmpty($version);
     }
 }

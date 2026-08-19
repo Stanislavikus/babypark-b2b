@@ -11,10 +11,12 @@ use App\Jobs\Connectors\SyncLiveRunJob;
 use App\Models\ConnectorAccount;
 use App\Models\SyncRun;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
 use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
 use App\Support\Sync\Exceptions\SyncLiveAdmissionException;
+use App\Support\Sync\Exceptions\SyncRuntimeTimingConfigurationException;
 use App\Support\Sync\Preview\SyncPreviewConfigurationReadinessResolver;
 use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +31,7 @@ final class SyncLiveAdmissionService
         private readonly SyncPreviewConfigurationSnapshotBuilder $snapshotBuilder,
         private readonly SyncPreviewConfigurationReadinessResolver $readinessResolver,
         private readonly SyncRunActiveRecoveryService $activeRecoveryService,
+        private readonly SyncRuntimeTimingResolver $timingResolver,
     ) {}
 
     public function admit(
@@ -48,18 +51,27 @@ final class SyncLiveAdmissionService
             $syncConfigurationId,
             &$run,
         ): void {
+            try {
+                $admissionTiming = $this->timingResolver->resolveAdmissionTiming();
+            } catch (SyncRuntimeTimingConfigurationException) {
+                throw SyncLiveAdmissionException::unsafeTimingConfiguration();
+            }
+
+            $lockedWorkspace = Workspace::query()
+                ->whereKey($account->workspace_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $this->authorization->allows($actor, $lockedWorkspace, WorkspacePermissions::RUN_SYNC_LIVE)) {
+                throw SyncLiveAdmissionException::notAuthorized();
+            }
+
             $configuration = $this->mutationCoordinator->lockConfiguration($account, $syncConfigurationId);
 
             $freshAccount = ConnectorAccount::withoutWorkspaceScope()
                 ->where('workspace_id', $account->workspace_id)
                 ->where('id', $account->id)
                 ->firstOrFail();
-
-            $workspace = $freshAccount->workspace()->withoutGlobalScopes()->firstOrFail();
-
-            if (! $this->authorization->allows($actor, $workspace, WorkspacePermissions::RUN_SYNC_LIVE)) {
-                throw SyncLiveAdmissionException::notAuthorized();
-            }
 
             if (! $freshAccount->is_enabled) {
                 throw SyncLiveAdmissionException::accountNotEnabled($freshAccount->id);
@@ -129,7 +141,7 @@ final class SyncLiveAdmissionService
                 'status' => SyncRunStatus::Queued,
                 'initiated_by_user_id' => $actor->id,
                 'configuration_snapshot' => $snapshot,
-                'queued_abandon_after' => now()->addSeconds((int) config('sync_runtime.queued_undispatched_grace_seconds')),
+                'queued_abandon_after' => now()->addSeconds($admissionTiming->queuedUndispatchedGraceSeconds),
             ]);
         });
 
