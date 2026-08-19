@@ -115,13 +115,13 @@ class AdobeProductExportSemanticLayerDependencyTest extends TestCase
             }
         }
 
-        if (preg_match_all('/\bSyncPreview[A-Za-z0-9_]*\b/', $contents, $syncPreviewMatches) === 1) {
+        if (preg_match_all('/\bSyncPreview[A-Za-z0-9_]*\b/', $contents, $syncPreviewMatches) > 0) {
             foreach (array_unique($syncPreviewMatches[0]) as $match) {
                 $violations[] = "SyncPreview vocabulary reference [{$match}] in {$file}";
             }
         }
 
-        if (preg_match_all('/\bSyncLive[A-Za-z0-9_]*\b/', $contents, $syncLiveMatches) === 1) {
+        if (preg_match_all('/\bSyncLive[A-Za-z0-9_]*\b/', $contents, $syncLiveMatches) > 0) {
             foreach (array_unique($syncLiveMatches[0]) as $match) {
                 $violations[] = "SyncLive vocabulary reference [{$match}] in {$file}";
             }
@@ -182,6 +182,50 @@ class AdobeProductExportSemanticLayerDependencyTest extends TestCase
             );
             $this->assertStringEndsWith('.php', $file);
         }
+    }
+
+    #[Test]
+    public function content_regex_guard_catches_multiple_sync_preview_references(): void
+    {
+        $contents = <<<'PHP'
+        <?php
+        // Synthetic fixture: multiple inline references, not use imports.
+        $first = SyncPreviewFindingCode::MissingName;
+        $second = SyncPreviewOutcome::Blocked;
+        PHP;
+
+        $violations = $this->collectSemanticLayerDependencyViolations('synthetic-fixture.php', $contents);
+
+        $this->assertNotEmpty($violations);
+        $this->assertGreaterThanOrEqual(2, count($violations));
+        $this->assertTrue(collect($violations)->contains(
+            fn (string $violation): bool => str_contains($violation, 'SyncPreviewFindingCode'),
+        ));
+        $this->assertTrue(collect($violations)->contains(
+            fn (string $violation): bool => str_contains($violation, 'SyncPreviewOutcome'),
+        ));
+    }
+
+    #[Test]
+    public function content_regex_guard_catches_multiple_sync_live_references(): void
+    {
+        $contents = <<<'PHP'
+        <?php
+        // Synthetic fixture: multiple inline references, not use imports.
+        $job = SyncLiveRunJob::class;
+        $service = SyncLiveAdmissionService::class;
+        PHP;
+
+        $violations = $this->collectSemanticLayerDependencyViolations('synthetic-fixture.php', $contents);
+
+        $this->assertNotEmpty($violations);
+        $this->assertGreaterThanOrEqual(2, count($violations));
+        $this->assertTrue(collect($violations)->contains(
+            fn (string $violation): bool => str_contains($violation, 'SyncLiveRunJob'),
+        ));
+        $this->assertTrue(collect($violations)->contains(
+            fn (string $violation): bool => str_contains($violation, 'SyncLiveAdmissionService'),
+        ));
     }
 
     #[Test]
