@@ -14,9 +14,9 @@ use Tests\Support\Sync\TestSyncPreviewCapability;
 trait ConfiguresSyncSupportProfiles
 {
     /**
-     * @param  list<array{0: SyncDataDomain, 1: SyncSemanticOperation}>  $supportedPairs
+     * @param  list<array{0: SyncDataDomain, 1: SyncSemanticOperation, 2: SyncRunMode}>  $supportedTriples
      */
-    protected function configureSyncSupportProfile(array $supportedPairs = []): void
+    protected function configureSyncSupportProfile(array $supportedTriples = []): void
     {
         $container = app(Container::class);
 
@@ -38,7 +38,7 @@ trait ConfiguresSyncSupportProfiles
 
         $container->bind(
             TestSyncSupportConnectorAdapter::class,
-            fn (): TestSyncSupportConnectorAdapter => new TestSyncSupportConnectorAdapter($supportedPairs),
+            fn (): TestSyncSupportConnectorAdapter => new TestSyncSupportConnectorAdapter($supportedTriples),
         );
     }
 }

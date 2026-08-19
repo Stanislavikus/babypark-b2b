@@ -70,7 +70,7 @@ class SyncConfigurationFoundationTest extends TestCase
     public function model_casts_are_correct(): void
     {
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
         ]);
 
         $account = $this->createSyncSupportAccount();
@@ -119,7 +119,7 @@ class SyncConfigurationFoundationTest extends TestCase
     public function duplicate_identity_for_same_account_domain_and_default_context_is_rejected(): void
     {
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
         ]);
 
         $account = $this->createSyncSupportAccount();
@@ -144,7 +144,7 @@ class SyncConfigurationFoundationTest extends TestCase
     public function default_context_cannot_bypass_uniqueness_with_null_semantics(): void
     {
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
         ]);
 
         $account = $this->createSyncSupportAccount();
@@ -411,7 +411,7 @@ class SyncConfigurationFoundationTest extends TestCase
     public function same_domain_and_default_context_on_another_account_is_allowed(): void
     {
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
         ]);
 
         $accountA = $this->createSyncSupportAccount(['name' => 'Account A']);
@@ -437,7 +437,7 @@ class SyncConfigurationFoundationTest extends TestCase
     public function same_account_and_domain_with_different_external_context_is_allowed(): void
     {
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
         ]);
 
         $account = $this->createSyncSupportAccount();
@@ -462,8 +462,8 @@ class SyncConfigurationFoundationTest extends TestCase
     public function import_only_export_only_and_both_operation_sets_are_representable(): void
     {
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
-            [SyncDataDomain::Products, SyncSemanticOperation::Export],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
         ]);
 
         $account = $this->createSyncSupportAccount();
@@ -514,8 +514,8 @@ class SyncConfigurationFoundationTest extends TestCase
     public function supported_pairs_can_be_configured_through_runtime_profile_truth(): void
     {
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
-            [SyncDataDomain::Products, SyncSemanticOperation::Export],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
         ]);
 
         $account = $this->createSyncSupportAccount();
@@ -532,7 +532,7 @@ class SyncConfigurationFoundationTest extends TestCase
     public function unsupported_domain_operation_pair_fails_closed(): void
     {
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
         ]);
 
         $account = $this->createSyncSupportAccount();
@@ -551,7 +551,7 @@ class SyncConfigurationFoundationTest extends TestCase
     public function adding_unsupported_operation_to_valid_configuration_fails_atomically(): void
     {
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
         ]);
 
         $account = $this->createSyncSupportAccount();
@@ -617,8 +617,8 @@ class SyncConfigurationFoundationTest extends TestCase
     public function semantic_mutation_increments_revision_and_no_op_does_not(): void
     {
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
-            [SyncDataDomain::Products, SyncSemanticOperation::Export],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
         ]);
 
         $account = $this->createSyncSupportAccount();

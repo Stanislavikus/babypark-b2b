@@ -6912,7 +6912,8 @@ slice. Normative contract for Stage 3A–3E implementation.
 | Stage 2A — Merchant Preview | **Done** |
 | Stage 2B — Option Mapping Remediation | **Done** |
 | Stage 3-0 — Live Safety, Identity & First-Live Contract | **Done (docs contract)** |
-| Stage 3A–3E — Live implementation slices | **Pending** |
+| Stage 3A — Live Safety Foundation | **Done** |
+| Stage 3B–3E — Live implementation slices | **Pending** |
 | Production Live | **NOT IMPLEMENTED** |
 
 **Current runtime (reverified):**
@@ -6922,15 +6923,15 @@ slice. Normative contract for Stage 3A–3E implementation.
 - `ConnectorSyncOperationSupport` is mode-aware;
 - Adobe Products / Export / Preview is supported;
 - Adobe Products / Export / Live is **not** supported;
-- `run_sync_live` does not exist yet;
-- `ExternalRecordLink` does not exist yet;
+- `run_sync_live` exists (Stage 3A) but is not auto-granted;
+- `ExternalRecordLink` persistence exists (Stage 3A foundation);
 - no consequential Adobe Product writer exists;
 - `ProductExecutionAggregateBuilder` currently belongs to the Preview namespace but
   contains semantically reusable Product execution input;
 - Preview planner may emit an in-memory `connectorPlan` — that plan is **not** a
   Live HTTP command plan;
 - one active queued/running run per `SyncConfiguration` already exists;
-- no stale active-run recovery exists.
+- stale active-run recovery exists (Stage 3A) with persisted lease boundaries.
 
 ##### Preview → Manual Live trust
 

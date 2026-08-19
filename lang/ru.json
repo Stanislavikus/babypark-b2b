@@ -297,6 +297,7 @@
     "workspace_access.permissions.manage_workspace_access": "Управление доступом",
     "workspace_access.permissions.manage_workspace_tax_settings": "Управление налогами",
     "workspace_access.permissions.run_sync_preview": "Предпросмотр синхронизации",
+    "workspace_access.permissions.run_sync_live": "Запуск синхронизации (изменения)",
     "workspace_access.permissions.manage_sync_configurations": "Настройка синхронизации данных",
     "workspace_access.errors.unauthorized": "У вас больше нет права управлять доступом. Обновите страницу.",
     "workspace_access.errors.lockout": "Это изменение нельзя выполнить, потому что после него никто не сможет управлять доступом.",

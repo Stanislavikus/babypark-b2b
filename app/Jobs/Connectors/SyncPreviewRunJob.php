@@ -9,6 +9,7 @@ use App\Models\SyncRun;
 use App\Models\SyncRunItem;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
 use App\Support\Sync\Preview\SyncPreviewConnectorCapabilityResolver;
+use App\Support\Sync\SyncRuntimeTiming;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -38,9 +39,10 @@ class SyncPreviewRunJob implements ShouldQueue
     public function handle(
         ProductExecutionAggregateBuilder $aggregateBuilder,
         SyncPreviewConnectorCapabilityResolver $capabilityResolver,
+        SyncRuntimeTiming $runtimeTiming,
     ): void {
         try {
-            $this->execute($aggregateBuilder, $capabilityResolver);
+            $this->execute($aggregateBuilder, $capabilityResolver, $runtimeTiming);
         } catch (\Throwable) {
             $this->terminalizeFailedRun();
 
@@ -51,8 +53,9 @@ class SyncPreviewRunJob implements ShouldQueue
     private function execute(
         ProductExecutionAggregateBuilder $aggregateBuilder,
         SyncPreviewConnectorCapabilityResolver $capabilityResolver,
+        SyncRuntimeTiming $runtimeTiming,
     ): void {
-        $reserved = DB::transaction(function (): ?SyncRun {
+        $reserved = DB::transaction(function () use ($runtimeTiming): ?SyncRun {
             $run = SyncRun::withoutWorkspaceScope()
                 ->where('workspace_id', $this->workspaceId)
                 ->where('id', $this->syncRunId)
@@ -63,9 +66,14 @@ class SyncPreviewRunJob implements ShouldQueue
                 return null;
             }
 
+            $startedAt = now();
+            $lease = $runtimeTiming->reservationLeaseTimestamps($startedAt);
+
             $run->update([
                 'status' => SyncRunStatus::Running,
-                'started_at' => now(),
+                'started_at' => $lease['started_at'],
+                'writer_deadline_at' => $lease['writer_deadline_at'],
+                'recoverable_after' => $lease['recoverable_after'],
             ]);
 
             return $run->refresh();
@@ -122,7 +130,7 @@ class SyncPreviewRunJob implements ShouldQueue
                     'workspace_id' => $run->workspace_id,
                     'sync_run_id' => $run->id,
                     'product_id' => $aggregate->productId,
-                    'outcome' => $result->outcome,
+                    'outcome' => $result->outcome->value,
                     'findings' => array_map(
                         static fn ($finding) => $finding->toArray(),
                         $result->findings,

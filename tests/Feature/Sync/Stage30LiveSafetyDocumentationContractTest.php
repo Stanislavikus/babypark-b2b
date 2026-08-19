@@ -43,21 +43,21 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
         $this->assertStringContainsString('Stage 2B — Option Mapping Remediation', $section);
         $this->assertStringContainsString('Stage 3-0 — Live Safety, Identity & First-Live Contract', $section);
         $this->assertStringContainsString('**Done (docs contract)**', $section);
-        $this->assertStringContainsString('Stage 3A–3E — Live implementation slices', $section);
+        $this->assertStringContainsString('Stage 3A — Live Safety Foundation', $section);
+        $this->assertStringContainsString('Stage 3B–3E — Live implementation slices', $section);
         $this->assertStringContainsString('**Pending**', $section);
     }
 
     #[Test]
-    public function run_sync_live_is_resolved_but_not_yet_implemented(): void
+    public function run_sync_live_permission_is_implemented_in_stage_3a(): void
     {
         $e8 = $this->e8Section();
 
         $this->assertStringContainsString('**tenth** atomic workspace permission', $e8);
         $this->assertStringContainsString('`run_sync_live`', $e8);
-        $this->assertStringContainsString('remains **nine** permissions until Stage 3A', $e8);
 
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
-        $this->assertStringContainsString('| `run_sync_live` permission | RESOLVED — NOT IMPLEMENTED |', $atlas);
+        $this->assertStringContainsString('| `run_sync_live` permission | IMPLEMENTED (Stage 3A) |', $atlas);
     }
 
     #[Test]
@@ -94,7 +94,7 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
         $this->assertStringContainsString('execution-lease', $e11);
         $this->assertStringContainsString('overlapping consequential writers', $e10);
         $this->assertStringContainsString('must not start a **new** consequential external request', $e11);
-        $this->assertStringContainsString('no stale active-run recovery exists', $section);
+        $this->assertStringContainsString('stale active-run recovery exists (Stage 3A)', $section);
     }
 
     #[Test]
@@ -270,7 +270,8 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
         $this->assertStringContainsString('**3E — Real Adobe Validation + Truth Flip**', $stages);
 
         $this->assertStringContainsString('**Stage 3-0 — Live Safety, Identity & First-Live Contract**', $gaps);
-        $this->assertStringContainsString('**Stage 3A–3E — Live Engine implementation slices**', $gaps);
+        $this->assertStringContainsString('**Stage 3A — Live Safety Foundation**', $gaps);
+        $this->assertStringContainsString('**Stage 3B–3E — Live Engine implementation slices**', $gaps);
     }
 
     #[Test]

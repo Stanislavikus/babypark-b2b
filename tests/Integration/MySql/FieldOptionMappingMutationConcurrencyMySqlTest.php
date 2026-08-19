@@ -3,6 +3,7 @@
 namespace Tests\Integration\MySql;
 
 use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Models\FieldMapping;
 use App\Models\FieldOptionMapping;
@@ -40,8 +41,8 @@ class FieldOptionMappingMutationConcurrencyMySqlTest extends TestCase
         $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->seedFieldDefinitions();
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
-            [SyncDataDomain::Products, SyncSemanticOperation::Export],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
         ]);
 
         $account = $this->createSyncSupportAccount();
@@ -146,8 +147,8 @@ class FieldOptionMappingMutationConcurrencyMySqlTest extends TestCase
         $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->seedFieldDefinitions();
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
-            [SyncDataDomain::Products, SyncSemanticOperation::Export],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
         ]);
 
         $account = $this->createSyncSupportAccount();

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Sync;
 
 use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Models\SyncConfiguration;
 use App\Services\Sync\FieldMappingMutationService;
@@ -31,7 +32,7 @@ class FieldMappingStaleRemoveTest extends TestCase
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seedFieldDefinitions();
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
         ]);
     }
 

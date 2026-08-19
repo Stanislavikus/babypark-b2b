@@ -3,6 +3,7 @@
 namespace Tests\Feature\Sync;
 
 use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Models\ConnectorAccount;
 use App\Models\FieldMapping;
@@ -45,7 +46,7 @@ class FieldMappingAuthorizationServiceTest extends TestCase
         $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->seedFieldDefinitions();
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
         ]);
 
         $this->authorizationService = app(FieldMappingAuthorizationService::class);

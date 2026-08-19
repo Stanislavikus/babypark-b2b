@@ -4,6 +4,7 @@ namespace Tests\Feature\Sync;
 
 use App\Enums\SyncConfigurationOperationalState;
 use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Filament\Pages\Sync\ListSyncDataSetup;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
@@ -69,17 +70,17 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
-            [SyncDataDomain::Products, SyncSemanticOperation::Export],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
         ]);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
     }
 
     #[Test]
-    public function permission_catalogue_contains_exactly_nine_permissions_with_manage_sync_configurations(): void
+    public function permission_catalogue_contains_exactly_ten_permissions_with_run_sync_live(): void
     {
-        $this->assertCount(9, WorkspacePermissions::catalogue());
+        $this->assertCount(10, WorkspacePermissions::catalogue());
         $this->assertContains(WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS, WorkspacePermissions::catalogue());
     }
 
@@ -89,7 +90,7 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
         $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->seed(WorkspaceRbacPermissionSeeder::class);
 
-        $this->assertSame(9, WorkspacePermission::query()->count());
+        $this->assertSame(10, WorkspacePermission::query()->count());
         $this->assertSame(
             1,
             WorkspacePermission::query()

@@ -9,6 +9,7 @@ use App\Enums\AttributeStorageType;
 use App\Enums\FieldObjectType;
 use App\Enums\SyncConfigurationOperationalState;
 use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Models\ConnectorAccount;
 use App\Models\FieldBinding;
@@ -61,8 +62,8 @@ class FieldMappingPersistenceTest extends TestCase
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seedFieldDefinitions();
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
-            [SyncDataDomain::Products, SyncSemanticOperation::Export],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
         ]);
     }
 

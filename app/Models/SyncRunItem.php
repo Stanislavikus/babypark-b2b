@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\SyncLiveOutcome;
 use App\Enums\SyncPreviewOutcome;
 use App\Support\Workspace\BelongsToWorkspace;
 use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids;
@@ -26,7 +27,6 @@ class SyncRunItem extends Model
     protected function casts(): array
     {
         return [
-            'outcome' => SyncPreviewOutcome::class,
             'findings' => 'array',
         ];
     }
@@ -44,5 +44,15 @@ class SyncRunItem extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function previewOutcome(): SyncPreviewOutcome
+    {
+        return SyncPreviewOutcome::from((string) $this->attributes['outcome']);
+    }
+
+    public function liveOutcome(): SyncLiveOutcome
+    {
+        return SyncLiveOutcome::from((string) $this->attributes['outcome']);
     }
 }

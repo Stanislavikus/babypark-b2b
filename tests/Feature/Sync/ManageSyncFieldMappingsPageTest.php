@@ -3,6 +3,7 @@
 namespace Tests\Feature\Sync;
 
 use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Filament\Pages\Sync\ManageSyncFieldMappings;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
@@ -55,7 +56,7 @@ class ManageSyncFieldMappingsPageTest extends TestCase
         $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->seedFieldDefinitions();
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
         ]);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));

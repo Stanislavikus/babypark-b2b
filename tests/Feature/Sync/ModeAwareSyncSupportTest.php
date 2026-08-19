@@ -43,11 +43,12 @@ class ModeAwareSyncSupportTest extends TestCase
     }
 
     #[Test]
-    public function test_sync_support_adapter_supports_configured_pairs_for_any_mode(): void
+    public function test_sync_support_adapter_supports_only_configured_mode_triples(): void
     {
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
-            [SyncDataDomain::Products, SyncSemanticOperation::Export],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live],
         ]);
 
         $account = $this->createConnectorAccount(null, ['auth_profile' => 'test_sync_support']);
@@ -55,6 +56,7 @@ class ModeAwareSyncSupportTest extends TestCase
 
         $this->assertTrue($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview));
         $this->assertTrue($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live));
+        $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Live));
         $this->assertTrue($resolver->supportsConfiguration($account, SyncDataDomain::Products, SyncSemanticOperation::Export));
     }
 }

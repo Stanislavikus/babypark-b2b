@@ -6,9 +6,9 @@ use App\Enums\SyncSemanticOperation;
 use App\Models\ConnectorAccount;
 use App\Models\SyncConfiguration;
 use App\Models\User;
-use App\Services\Sync\SyncPreviewAdmissionService;
+use App\Services\Sync\SyncLiveAdmissionService;
 use App\Support\Connectors\ConnectorProfileRegistry;
-use App\Support\Sync\Exceptions\SyncPreviewAdmissionException;
+use App\Support\Sync\Exceptions\SyncLiveAdmissionException;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +42,7 @@ $container->bind(
     fn (): TestSyncSupportConnectorAdapter => new TestSyncSupportConnectorAdapter([
         [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
         [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
+        [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live],
     ]),
 );
 
@@ -59,7 +60,7 @@ if (! $mode || ! $workspaceId || ! $connectorAccountId || ! $configurationId || 
 
 $account = ConnectorAccount::withoutWorkspaceScope()->findOrFail($connectorAccountId);
 $actor = User::query()->findOrFail($actorId);
-$service = app(SyncPreviewAdmissionService::class);
+$service = app(SyncLiveAdmissionService::class);
 
 if ($mode === 'hold-lock') {
     DB::transaction(function () use ($account, $configurationId, $ipcDir, $actor, $service): void {
@@ -88,15 +89,25 @@ if ($mode === 'hold-lock') {
 }
 
 if ($mode === 'second-admit') {
+    while (! is_file($ipcDir.'/lock_acquired')) {
+        usleep(50_000);
+    }
+
     try {
         $service->admit($actor, $account, $configurationId, SyncSemanticOperation::Export);
-        echo "unexpected success\n";
+        fwrite(STDOUT, "SECOND_ADMIT_SUCCEEDED\n");
+    } catch (SyncLiveAdmissionException $exception) {
+        if (str_contains($exception->getMessage(), 'active sync run')) {
+            fwrite(STDOUT, "ACTIVE_RUN_EXISTS\n");
+            exit(0);
+        }
+
+        fwrite(STDERR, $exception->getMessage()."\n");
         exit(1);
-    } catch (SyncPreviewAdmissionException $exception) {
-        echo $exception->getMessage()."\n";
-        exit(0);
     }
+
+    exit(0);
 }
 
-fwrite(STDERR, "Unknown mode: {$mode}\n");
+fwrite(STDERR, "Unknown worker mode: {$mode}\n");
 exit(2);

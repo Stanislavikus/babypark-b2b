@@ -21,8 +21,10 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
+use App\Services\Sync\SyncLiveAdmissionService;
 use App\Services\Sync\SyncPreviewAdmissionService;
 use App\Services\Sync\UpdateSyncConfigurationInput;
+use App\Support\Connectors\AdobePaaS\AdobeProductExportLiveWriter;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportPreviewPlanner;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
@@ -59,8 +61,8 @@ class SyncRunPersistenceFoundationTest extends TestCase
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seedFieldDefinitions();
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
-            [SyncDataDomain::Products, SyncSemanticOperation::Export],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
         ]);
     }
 
@@ -508,7 +510,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
         $this->assertSame(['selection' => ['mode' => 'all_products']], $run->configuration_snapshot);
 
         $item = SyncRunItem::withoutWorkspaceScope()->findOrFail($fixture['item']->id);
-        $this->assertSame(SyncPreviewOutcome::Ready, $item->outcome);
+        $this->assertSame(SyncPreviewOutcome::Ready, $item->previewOutcome());
         $this->assertSame([], $item->findings);
     }
 
@@ -526,9 +528,10 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function workspace_permission_catalogue_contains_ninth_permission_including_manage_sync_configurations(): void
+    public function workspace_permission_catalogue_contains_tenth_permission_including_run_sync_live(): void
     {
-        $this->assertCount(9, WorkspacePermissions::catalogue());
+        $this->assertCount(10, WorkspacePermissions::catalogue());
+        $this->assertContains(WorkspacePermissions::RUN_SYNC_LIVE, WorkspacePermissions::catalogue());
         $this->assertContains(WorkspacePermissions::RUN_SYNC_PREVIEW, WorkspacePermissions::catalogue());
     }
 
@@ -545,8 +548,8 @@ class SyncRunPersistenceFoundationTest extends TestCase
         $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview));
 
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
-            [SyncDataDomain::Products, SyncSemanticOperation::Export],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
         ]);
     }
 
@@ -564,11 +567,13 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function no_live_mutation_or_external_record_link_implementation_exists(): void
+    public function stage_3a_persists_external_record_link_without_live_writer(): void
     {
-        $this->assertFalse(class_exists(ExternalRecordLink::class));
+        $this->assertTrue(class_exists(ExternalRecordLink::class));
+        $this->assertTrue(class_exists(SyncLiveAdmissionService::class));
         $this->assertTrue(class_exists(SyncPreviewAdmissionService::class));
         $this->assertTrue(class_exists(AdobeProductExportPreviewPlanner::class));
+        $this->assertFalse(class_exists(AdobeProductExportLiveWriter::class));
     }
 
     #[Test]
@@ -648,7 +653,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
                 'workspace_id' => $account->workspace_id,
                 'sync_run_id' => $run->id,
                 'product_id' => $product->id,
-                'outcome' => SyncPreviewOutcome::Ready,
+                'outcome' => SyncPreviewOutcome::Ready->value,
                 'findings' => [],
             ]);
         }

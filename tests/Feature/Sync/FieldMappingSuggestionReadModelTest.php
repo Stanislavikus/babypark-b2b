@@ -13,6 +13,7 @@ use App\Enums\ConnectorSchemaSourceKind;
 use App\Enums\ConnectorSchemaVerificationStatus;
 use App\Enums\FieldObjectType;
 use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorDefinition;
@@ -62,8 +63,8 @@ class FieldMappingSuggestionReadModelTest extends TestCase
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seedFieldDefinitions();
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
-            [SyncDataDomain::Products, SyncSemanticOperation::Export],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
         ]);
 
         $this->tempRegistryPath = storage_path('framework/testing/canonical-registry-'.Str::random(8));

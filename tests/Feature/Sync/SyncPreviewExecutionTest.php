@@ -5,6 +5,7 @@ namespace Tests\Feature\Sync;
 use App\Enums\SyncConfigurationOperationalState;
 use App\Enums\SyncDataDomain;
 use App\Enums\SyncPreviewOutcome;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncRunStatus;
 use App\Enums\SyncSemanticOperation;
 use App\Enums\UserRole;
@@ -25,6 +26,7 @@ use App\Services\Sync\UpdateSyncConfigurationInput;
 use App\Support\Sync\ConnectorExecutionConfiguration;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
 use App\Support\Sync\Preview\SyncPreviewConnectorCapabilityResolver;
+use App\Support\Sync\SyncRuntimeTiming;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -56,8 +58,8 @@ class SyncPreviewExecutionTest extends TestCase
         $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->seedFieldDefinitions();
         $this->configureSyncSupportProfile([
-            [SyncDataDomain::Products, SyncSemanticOperation::Import],
-            [SyncDataDomain::Products, SyncSemanticOperation::Export],
+            [SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
         ]);
     }
 
@@ -94,6 +96,7 @@ class SyncPreviewExecutionTest extends TestCase
         (new SyncPreviewRunJob($account->workspace_id, $account->id, $run->id))->handle(
             app(ProductExecutionAggregateBuilder::class),
             app(SyncPreviewConnectorCapabilityResolver::class),
+            app(SyncRuntimeTiming::class),
         );
 
         $run = SyncRun::withoutWorkspaceScope()->findOrFail($run->id);
@@ -101,7 +104,7 @@ class SyncPreviewExecutionTest extends TestCase
 
         $item = SyncRunItem::withoutWorkspaceScope()->where('sync_run_id', $run->id)->sole();
         $this->assertSame($product->id, $item->product_id);
-        $this->assertSame(SyncPreviewOutcome::Ready, $item->outcome);
+        $this->assertSame(SyncPreviewOutcome::Ready, $item->previewOutcome());
     }
 
     #[Test]
@@ -124,6 +127,7 @@ class SyncPreviewExecutionTest extends TestCase
             (new SyncPreviewRunJob($account->workspace_id, $account->id, $run->id))->handle(
                 $builder,
                 app(SyncPreviewConnectorCapabilityResolver::class),
+                app(SyncRuntimeTiming::class),
             );
             $this->fail('Expected preview job to throw.');
         } catch (SyncPreviewRunJobExecutionException) {
@@ -161,6 +165,7 @@ class SyncPreviewExecutionTest extends TestCase
         (new SyncPreviewRunJob($account->workspace_id, $account->id, $run->id))->handle(
             app(ProductExecutionAggregateBuilder::class),
             app(SyncPreviewConnectorCapabilityResolver::class),
+            app(SyncRuntimeTiming::class),
         );
 
         $run = SyncRun::withoutWorkspaceScope()->findOrFail($run->id);
