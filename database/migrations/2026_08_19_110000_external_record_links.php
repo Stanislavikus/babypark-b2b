@@ -70,26 +70,25 @@ return new class extends Migration
     {
         $driver = Schema::getConnection()->getDriverName();
 
-        if ($driver === 'sqlite' || ($driver === 'mysql' && ! $this->mysqlSupportsNamedCheckConstraints())) {
+        if ($driver === 'sqlite') {
             DB::unprepared('DROP TRIGGER IF EXISTS erl_subject_xor_insert');
             DB::unprepared('DROP TRIGGER IF EXISTS erl_subject_xor_update');
-        }
 
-        if ($driver === 'mysql') {
-            Schema::table('external_record_links', function (Blueprint $table) {
-                $table->dropForeign('erl_ws_variant_fk');
-                $table->dropForeign('erl_ws_product_fk');
-                $table->dropForeign('erl_ws_account_fk');
-            });
-
-            if ($this->mysqlSupportsNamedCheckConstraints()) {
-                DB::statement('ALTER TABLE external_record_links DROP CHECK erl_subject_xor_check');
-            }
-        } else {
             Schema::table('external_record_links', function (Blueprint $table) {
                 $table->dropForeign(['workspace_id', 'product_variant_id']);
                 $table->dropForeign(['workspace_id', 'product_id']);
                 $table->dropForeign(['workspace_id', 'connector_account_id']);
+            });
+        }
+
+        if ($driver === 'mysql') {
+            DB::unprepared('DROP TRIGGER IF EXISTS erl_subject_xor_insert');
+            DB::unprepared('DROP TRIGGER IF EXISTS erl_subject_xor_update');
+
+            Schema::table('external_record_links', function (Blueprint $table) {
+                $table->dropForeign('erl_ws_variant_fk');
+                $table->dropForeign('erl_ws_product_fk');
+                $table->dropForeign('erl_ws_account_fk');
             });
         }
 
@@ -162,13 +161,14 @@ return new class extends Migration
             CREATE TRIGGER erl_subject_xor_insert
             BEFORE INSERT ON external_record_links
             FOR EACH ROW
-            WHEN NOT (
-                (NEW.product_id IS NULL AND NEW.product_variant_id IS NOT NULL)
-                OR (NEW.product_id IS NOT NULL AND NEW.product_variant_id IS NULL)
-            )
             BEGIN
-                SIGNAL SQLSTATE \'45000\'
-                    SET MESSAGE_TEXT = \'external_record_links subject xor violation\';
+                IF NOT (
+                    (NEW.product_id IS NULL AND NEW.product_variant_id IS NOT NULL)
+                    OR (NEW.product_id IS NOT NULL AND NEW.product_variant_id IS NULL)
+                ) THEN
+                    SIGNAL SQLSTATE \'45000\'
+                        SET MESSAGE_TEXT = \'external_record_links subject xor violation\';
+                END IF;
             END
         ');
 
@@ -176,13 +176,14 @@ return new class extends Migration
             CREATE TRIGGER erl_subject_xor_update
             BEFORE UPDATE ON external_record_links
             FOR EACH ROW
-            WHEN NOT (
-                (NEW.product_id IS NULL AND NEW.product_variant_id IS NOT NULL)
-                OR (NEW.product_id IS NOT NULL AND NEW.product_variant_id IS NULL)
-            )
             BEGIN
-                SIGNAL SQLSTATE \'45000\'
-                    SET MESSAGE_TEXT = \'external_record_links subject xor violation\';
+                IF NOT (
+                    (NEW.product_id IS NULL AND NEW.product_variant_id IS NOT NULL)
+                    OR (NEW.product_id IS NOT NULL AND NEW.product_variant_id IS NULL)
+                ) THEN
+                    SIGNAL SQLSTATE \'45000\'
+                        SET MESSAGE_TEXT = \'external_record_links subject xor violation\';
+                END IF;
             END
         ');
     }
