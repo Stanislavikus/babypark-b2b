@@ -22,6 +22,11 @@ final class AdobeProductExternalRecordLinkPersistenceException extends \RuntimeE
         return new self('Multiple variant-scoped ExternalRecordLink identities were found for the same subject.');
     }
 
+    public static function identityDriftDetected(): self
+    {
+        return new self('Trusted ExternalRecordLink identity drift detected during persistence.');
+    }
+
     public static function connectorAccountNotFound(ModelNotFoundException $previous): self
     {
         return new self('ConnectorAccount was not found for ExternalRecordLink persistence.', 0, $previous);

@@ -875,6 +875,77 @@ class Stage3B2AdobeSimpleCommandSafetyTest extends TestCase
     }
 
     #[Test]
+    public function persister_rejects_identity_drift_for_trusted_subject_link_without_mutation(): void
+    {
+        $persister = new AdobeProductExternalRecordLinkPersister(new AdobeProductExternalRecordLinkGuard);
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$_, $variant] = $this->createProductVariant($workspace);
+
+        $existing = ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_variant_id' => $variant->id,
+            'external_identifier' => 'OLD-SKU',
+        ]);
+
+        $desired = (new AdobeProductDesiredStateCompiler)->compileFromSemanticResult(
+            AdobeProductCommandTestFixtures::semanticResult([
+                'variant_id' => $variant->id,
+                'sku' => 'NEW-SKU',
+            ]),
+        );
+
+        try {
+            $persister->persistTrustedVariantLink(
+                $workspace->id,
+                $account->id,
+                $desired,
+            );
+            $this->fail('Expected identity drift persistence exception.');
+        } catch (AdobeProductExternalRecordLinkPersistenceException $exception) {
+            $this->assertStringContainsString('identity drift', strtolower($exception->getMessage()));
+        }
+
+        $existing->refresh();
+        $this->assertSame('OLD-SKU', $existing->external_identifier);
+        $this->assertSame(1, ExternalRecordLink::query()->count());
+        $this->assertFalse(
+            ExternalRecordLink::query()->where('external_identifier', 'NEW-SKU')->exists(),
+        );
+    }
+
+    #[Test]
+    public function persister_returns_existing_link_idempotently_when_subject_and_sku_match(): void
+    {
+        $persister = new AdobeProductExternalRecordLinkPersister(new AdobeProductExternalRecordLinkGuard);
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$_, $variant] = $this->createProductVariant($workspace);
+
+        $existing = ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_variant_id' => $variant->id,
+            'external_identifier' => 'SKU-TEST-1',
+        ]);
+
+        $desired = (new AdobeProductDesiredStateCompiler)->compileFromSemanticResult(
+            AdobeProductCommandTestFixtures::semanticResult(['variant_id' => $variant->id]),
+        );
+
+        $persisted = $persister->persistTrustedVariantLink(
+            $workspace->id,
+            $account->id,
+            $desired,
+        );
+
+        $this->assertSame($existing->id, $persisted->id);
+        $this->assertSame('SKU-TEST-1', $persisted->external_identifier);
+        $this->assertSame(1, ExternalRecordLink::query()->count());
+    }
+
+    #[Test]
     public function production_persister_normalizes_missing_connector_account_to_typed_exception(): void
     {
         $persister = new AdobeProductExternalRecordLinkPersister(new AdobeProductExternalRecordLinkGuard);

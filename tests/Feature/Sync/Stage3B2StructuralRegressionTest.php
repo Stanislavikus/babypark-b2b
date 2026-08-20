@@ -77,4 +77,19 @@ class Stage3B2StructuralRegressionTest extends TestCase
             $this->assertStringNotContainsString('AdobeProductSimpleCommandExecutor', $contents);
         }
     }
+
+    #[Test]
+    public function persister_does_not_mask_generic_throwable_as_database_failure(): void
+    {
+        $source = file_get_contents(base_path(
+            'app/Support/Connectors/AdobePaaS/Command/AdobeProductExternalRecordLinkPersister.php',
+        ));
+
+        $this->assertIsString($source);
+        $this->assertStringNotContainsString('catch (Throwable', $source);
+        $this->assertStringNotContainsString('catch (\Throwable', $source);
+        $this->assertStringContainsString('catch (AdobeProductExternalRecordLinkPersistenceException', $source);
+        $this->assertStringContainsString('catch (ModelNotFoundException', $source);
+        $this->assertStringContainsString('catch (QueryException', $source);
+    }
 }

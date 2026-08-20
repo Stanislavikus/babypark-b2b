@@ -8,7 +8,6 @@ use App\Models\ProductVariant;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
-use Throwable;
 
 final class AdobeProductExternalRecordLinkPersister implements AdobeProductExternalRecordLinkPersistence
 {
@@ -52,7 +51,13 @@ final class AdobeProductExternalRecordLinkPersister implements AdobeProductExter
                 }
 
                 if ($trustedLookup->isTrusted()) {
-                    return $trustedLookup->link;
+                    $existingLink = $trustedLookup->link;
+
+                    if ($existingLink->external_identifier !== $desiredState->sku) {
+                        throw AdobeProductExternalRecordLinkPersistenceException::identityDriftDetected();
+                    }
+
+                    return $existingLink;
                 }
 
                 $variant = ProductVariant::withoutWorkspaceScope()
@@ -77,8 +82,6 @@ final class AdobeProductExternalRecordLinkPersister implements AdobeProductExter
         } catch (ModelNotFoundException $exception) {
             throw AdobeProductExternalRecordLinkPersistenceException::connectorAccountNotFound($exception);
         } catch (QueryException $exception) {
-            throw AdobeProductExternalRecordLinkPersistenceException::databaseFailure($exception);
-        } catch (Throwable $exception) {
             throw AdobeProductExternalRecordLinkPersistenceException::databaseFailure($exception);
         }
     }
