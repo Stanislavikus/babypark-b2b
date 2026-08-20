@@ -172,14 +172,9 @@ class SyncLiveRunJob implements Interruptible, ShouldQueue
             $snapshot,
         );
 
+        $writeGate = new SyncRunConsequentialWriteGate($this->workspaceId, $this->syncRunId);
+
         foreach ($aggregates as $aggregate) {
-            $currentRun = SyncRun::withoutWorkspaceScope()
-                ->where('workspace_id', $this->workspaceId)
-                ->where('id', $this->syncRunId)
-                ->firstOrFail();
-
-            $writeGate = new SyncRunConsequentialWriteGate($currentRun);
-
             if (! $writeGate->permitsProductExecution()) {
                 $this->terminalizeFailedRun();
 

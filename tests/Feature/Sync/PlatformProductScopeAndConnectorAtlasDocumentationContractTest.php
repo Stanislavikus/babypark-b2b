@@ -498,6 +498,16 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
         return $matches[1];
     }
 
+    #[Test]
+    public function atlas_live_execution_current_state_has_no_stale_stage_3a_shell_row(): void
+    {
+        $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
+
+        $this->assertStringContainsString('| Live execution | IMPLEMENTED (Stage 3B generic orchestration', $atlas);
+        $this->assertStringNotContainsString('Live execution job shell', $atlas);
+        $this->assertStringNotContainsString('Stage 3A shell — fail-closed, no Adobe write', $atlas);
+    }
+
     /**
      * @return non-empty-string
      */

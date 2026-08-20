@@ -8,20 +8,30 @@ use App\Models\SyncRun;
 final class SyncRunConsequentialWriteGate implements SyncLiveConsequentialWriteGate
 {
     public function __construct(
-        private readonly SyncRun $run,
+        private readonly string $workspaceId,
+        private readonly string $syncRunId,
     ) {}
 
     public function permitsConsequentialWrite(): bool
     {
-        if ($this->run->status !== SyncRunStatus::Running) {
+        $run = SyncRun::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspaceId)
+            ->where('id', $this->syncRunId)
+            ->first();
+
+        if ($run === null) {
             return false;
         }
 
-        if ($this->run->writer_deadline_at === null) {
+        if ($run->status !== SyncRunStatus::Running) {
             return false;
         }
 
-        return now()->lessThan($this->run->writer_deadline_at);
+        if ($run->writer_deadline_at === null) {
+            return false;
+        }
+
+        return now()->lessThan($run->writer_deadline_at);
     }
 
     public function permitsProductExecution(): bool
