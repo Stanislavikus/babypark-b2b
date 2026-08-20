@@ -30,6 +30,7 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableParentSkuGenerator
 use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableProductCommandCoordinator;
 use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableRemoteOptionStateReader;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductAppliedStateKnowledge;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductCommandCompilationException;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductCommandRequestFactory;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductDesiredState;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductDesiredStateCompiler;
@@ -44,6 +45,7 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateClient;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateComparator;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateNormalizer;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandExecutor;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandInput;
 use App\Support\Connectors\AdobePaaS\Command\ConservativeAdobeProductOwnershipTrustPolicy;
 use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
@@ -127,6 +129,59 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
 
         $this->assertArrayHasKey('color', $desired->customAttributes);
         $this->assertSame(93, $desired->customAttributes['color']);
+    }
+
+    #[Test]
+    public function invalid_child_configurable_value_index_fails_closed_before_http(): void
+    {
+        $semantic = AdobeConfigurableCommandTestFixtures::configurableSemanticResult(
+            children: [[
+                'variant_id' => '10',
+                'sku' => 'CHILD-BLUE',
+                'color' => 'blue',
+                'color_index' => '1e3',
+            ]],
+        );
+
+        $compiler = new AdobeProductDesiredStateCompiler;
+
+        try {
+            $compiler->compileSimpleChildFromSemanticResult($semantic, '10');
+            $this->fail('Expected AdobeProductCommandCompilationException for invalid value_index.');
+        } catch (AdobeProductCommandCompilationException $exception) {
+            $this->assertStringContainsString('value_index', $exception->getMessage());
+        }
+
+        $transport = new RecordingConnectorHttpTransport(fn (): ConnectorHttpResult => new ConnectorHttpResult(500, [], '{}'));
+
+        $executor = new AdobeProductSimpleCommandExecutor(
+            new AdobeProductDesiredStateCompiler,
+            app(AdobePaaSRequestContextFactory::class),
+            new AdobeProductRemoteStateClient(
+                app(AdobePaaSRequestContextFactory::class),
+                new AdobeProductCommandRequestFactory(new OAuth1RequestSigner),
+                $transport,
+                new AdobeProductRemoteGetClassifier(new AdobeProductRemoteStateNormalizer),
+            ),
+            new AdobeProductRemoteStateComparator,
+            new AdobeProductExternalRecordLinkGuard,
+            new AdobeProductExternalRecordLinkPersister(new AdobeProductExternalRecordLinkGuard),
+            new ConservativeAdobeProductOwnershipTrustPolicy,
+        );
+
+        $result = $executor->executeSimpleChild(
+            new AdobeProductSimpleCommandInput(
+                workspaceId: (string) Str::uuid(),
+                connectorAccountId: (string) Str::uuid(),
+                semanticResult: $semantic,
+                adobeBaseCurrency: 'UAH',
+            ),
+            '10',
+        );
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
+        $this->assertSame('semantic_compilation_failed', $result->evidence->reasonCode);
+        $this->assertSame(0, $transport->sendCount);
     }
 
     #[Test]

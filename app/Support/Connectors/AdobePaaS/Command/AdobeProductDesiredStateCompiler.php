@@ -209,6 +209,8 @@ final class AdobeProductDesiredStateCompiler
      * @param  array<string, mixed>  $customAttributes
      * @param  list<array<string, mixed>>  $resolvedConfigurableValues
      * @return array<string, mixed>
+     *
+     * @throws AdobeProductCommandCompilationException
      */
     private function mergeResolvedConfigurableValues(array $customAttributes, array $resolvedConfigurableValues): array
     {
@@ -225,13 +227,13 @@ final class AdobeProductDesiredStateCompiler
             }
 
             if ($valueIndex === null || $valueIndex === '') {
-                continue;
+                throw AdobeProductCommandCompilationException::missingField('value_index');
             }
 
             $normalizedValueIndex = AdobeConfigurableValueIndexNormalizer::normalize($valueIndex);
 
             if ($normalizedValueIndex === null) {
-                continue;
+                throw AdobeProductCommandCompilationException::missingField('value_index');
             }
 
             $customAttributes[$externalFieldKey] = $normalizedValueIndex;
