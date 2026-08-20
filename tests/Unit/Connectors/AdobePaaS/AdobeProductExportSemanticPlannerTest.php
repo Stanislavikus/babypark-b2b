@@ -11,6 +11,8 @@ use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionMetadata;
 use App\Support\Connectors\AdobePaaS\Semantic\AdobeProductExportSemanticPlanner;
 use App\Support\Sync\Preview\MappedFieldValue;
 use App\Support\Sync\Preview\ProductExecutionAggregate;
+use App\Support\Sync\Preview\ProductExecutionImageInput;
+use App\Support\Sync\Preview\ProductExecutionImageStructuralState;
 use App\Support\Sync\Preview\ProductVariantExecutionSlice;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -109,6 +111,7 @@ class AdobeProductExportSemanticPlannerTest extends TestCase
                 ),
             ],
             sellableVariantCount: 1,
+            imageInput: $this->emptyImageInput(),
         );
 
         $snapshot = [
@@ -172,6 +175,7 @@ class AdobeProductExportSemanticPlannerTest extends TestCase
                 ),
             ],
             sellableVariantCount: 1,
+            imageInput: $this->emptyImageInput(),
         );
         $snapshot = $this->snapshotWithCoreMappings(includeDescription: true);
 
@@ -274,6 +278,7 @@ class AdobeProductExportSemanticPlannerTest extends TestCase
                 ),
             ],
             sellableVariantCount: 1,
+            imageInput: $this->emptyImageInput(),
         );
     }
 
@@ -294,7 +299,13 @@ class AdobeProductExportSemanticPlannerTest extends TestCase
                 $this->variantSlice('variant-2', 'SKU-2', $colorValues[1]),
             ],
             sellableVariantCount: 2,
+            imageInput: $this->emptyImageInput(),
         );
+    }
+
+    private function emptyImageInput(): ProductExecutionImageInput
+    {
+        return new ProductExecutionImageInput(ProductExecutionImageStructuralState::Valid, []);
     }
 
     private function variantSlice(string $variantId, string $sku, string $color): ProductVariantExecutionSlice

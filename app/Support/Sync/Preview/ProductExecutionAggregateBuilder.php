@@ -157,10 +157,45 @@ class ProductExecutionAggregateBuilder
                     productValues: $productValues,
                     variants: $variantSlices,
                     sellableVariantCount: $sellableVariants->count(),
+                    imageInput: $this->buildImageInput($product),
                 );
             })
             ->values()
             ->all();
+    }
+
+    private function buildImageInput(Product $product): ProductExecutionImageInput
+    {
+        $rawImages = $product->images;
+
+        if ($rawImages === null) {
+            return new ProductExecutionImageInput(ProductExecutionImageStructuralState::Valid, []);
+        }
+
+        if (! is_array($rawImages)) {
+            return new ProductExecutionImageInput(ProductExecutionImageStructuralState::Malformed, []);
+        }
+
+        $entries = [];
+
+        foreach (array_values($rawImages) as $index => $value) {
+            if (! is_string($value) || trim($value) === '') {
+                $entries[] = new ProductExecutionImageSourceEntry(
+                    declarationIndex: (int) $index,
+                    sourceReference: null,
+                    isMalformed: true,
+                );
+
+                continue;
+            }
+
+            $entries[] = new ProductExecutionImageSourceEntry(
+                declarationIndex: (int) $index,
+                sourceReference: $value,
+            );
+        }
+
+        return new ProductExecutionImageInput(ProductExecutionImageStructuralState::Valid, $entries);
     }
 
     /**

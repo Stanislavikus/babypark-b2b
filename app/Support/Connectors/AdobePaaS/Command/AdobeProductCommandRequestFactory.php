@@ -5,6 +5,8 @@ namespace App\Support\Connectors\AdobePaaS\Command;
 use App\Support\Connectors\AdobePaaS\AdobePaaSBaseUrl;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 use App\Support\Connectors\AdobePaaS\Exceptions\InvalidAdobePaaSRequestContextException;
+use App\Support\Connectors\AdobePaaS\Media\AdobeProductMediaDesiredEntry;
+use App\Support\Connectors\AdobePaaS\Media\AdobeProductRemoteMediaMetadataEntry;
 use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
 use App\Support\Connectors\OAuth1\OAuth1SigningContext;
 use GuzzleHttp\Psr7\Request;
@@ -184,6 +186,81 @@ final class AdobeProductCommandRequestFactory
             $payload,
             $signingContext,
         );
+    }
+
+    public function buildGetMediaEntry(
+        AdobePaaSRequestContext $context,
+        string $sku,
+        int $entryId,
+        OAuth1SigningContext $signingContext,
+    ): RequestInterface {
+        return $this->buildSignedRequest(
+            'GET',
+            $context,
+            '/V1/products/'.rawurlencode($sku).'/media/'.$entryId,
+            null,
+            $signingContext,
+        );
+    }
+
+    public function buildPostMediaEntry(
+        AdobePaaSRequestContext $context,
+        string $sku,
+        AdobeProductMediaDesiredEntry $desired,
+        OAuth1SigningContext $signingContext,
+    ): RequestInterface {
+        return $this->buildSignedRequest(
+            'POST',
+            $context,
+            '/V1/products/'.rawurlencode($sku).'/media',
+            $this->encodeMediaEntryPayload(null, $desired, includeContent: true),
+            $signingContext,
+        );
+    }
+
+    public function buildPutMediaEntry(
+        AdobePaaSRequestContext $context,
+        string $sku,
+        int $entryId,
+        AdobeProductMediaDesiredEntry $desired,
+        AdobeProductRemoteMediaMetadataEntry $remoteMetadata,
+        OAuth1SigningContext $signingContext,
+    ): RequestInterface {
+        return $this->buildSignedRequest(
+            'PUT',
+            $context,
+            '/V1/products/'.rawurlencode($sku).'/media/'.$entryId,
+            $this->encodeMediaEntryPayload($entryId, $desired, includeContent: false, remoteMetadata: $remoteMetadata),
+            $signingContext,
+        );
+    }
+
+    private function encodeMediaEntryPayload(
+        ?int $entryId,
+        AdobeProductMediaDesiredEntry $desired,
+        bool $includeContent,
+        ?AdobeProductRemoteMediaMetadataEntry $remoteMetadata = null,
+    ): string {
+        $entry = [
+            'id' => $entryId,
+            'media_type' => 'image',
+            'label' => $desired->label,
+            'position' => $desired->position,
+            'types' => $desired->magentoTypes(),
+            'disabled' => false,
+        ];
+
+        if ($includeContent) {
+            $entry['content'] = [
+                'base64_encoded_data' => base64_encode($desired->rawBytes),
+                'type' => $desired->mimeType,
+                'name' => $desired->filename,
+            ];
+        } elseif ($remoteMetadata !== null) {
+            $entry['file'] = $remoteMetadata->file;
+        }
+
+        return json_encode(['entry' => $entry], JSON_THROW_ON_ERROR);
     }
 
     private function buildSignedRequest(
