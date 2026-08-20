@@ -122,8 +122,8 @@ final class AdobeConfigurableCommandTestFixtures
             'label' => 'color',
             'position' => 0,
             'values' => [
-                ['value_index' => 93, 'label' => 'Blue'],
-                ['value_index' => 94, 'label' => 'Red'],
+                ['value_index' => 93],
+                ['value_index' => 94],
             ],
         ]];
     }

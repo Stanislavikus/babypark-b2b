@@ -272,7 +272,6 @@ final class AdobeProductCommandRequestFactory
         foreach ($desiredOption->values as $value) {
             $values[] = [
                 'value_index' => $value->valueIndex,
-                'label' => $value->label,
             ];
         }
 

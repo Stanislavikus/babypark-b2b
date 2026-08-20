@@ -17,7 +17,7 @@ final class AdobeConfigurableRemoteOptionStateReader
 
         $payload = json_decode($httpResult->body, true);
 
-        if (! is_array($payload)) {
+        if (! is_array($payload) || ! array_is_list($payload)) {
             return null;
         }
 
@@ -25,53 +25,16 @@ final class AdobeConfigurableRemoteOptionStateReader
 
         foreach ($payload as $entry) {
             if (! is_array($entry)) {
-                continue;
+                return null;
             }
 
-            $optionId = $entry['id'] ?? null;
-            $attributeId = $entry['attribute_id'] ?? null;
-            $label = $entry['label'] ?? null;
-            $position = $entry['position'] ?? null;
-            $valuesRaw = $entry['values'] ?? null;
+            $normalized = $this->normalizeOptionEntry($entry);
 
-            if (! is_numeric($optionId) || ! is_numeric($attributeId) || ! is_string($label) || ! is_numeric($position)) {
-                continue;
+            if ($normalized === null) {
+                return null;
             }
 
-            $values = [];
-
-            if (is_array($valuesRaw)) {
-                foreach ($valuesRaw as $valueEntry) {
-                    if (! is_array($valueEntry)) {
-                        continue;
-                    }
-
-                    $valueIndex = $valueEntry['value_index'] ?? null;
-                    $valueLabel = $valueEntry['label'] ?? null;
-
-                    if (! is_numeric($valueIndex) || ! is_string($valueLabel)) {
-                        continue;
-                    }
-
-                    $values[] = [
-                        'value_index' => (int) $valueIndex,
-                        'label' => $valueLabel,
-                    ];
-                }
-            }
-
-            usort(
-                $values,
-                static fn (array $left, array $right): int => $left['value_index'] <=> $right['value_index'],
-            );
-
-            $options[] = new AdobeConfigurableRemoteOptionState(
-                optionId: (int) $optionId,
-                attributeId: (int) $attributeId,
-                label: $label,
-                position: (int) $position,
-                values: $values,
-            );
+            $options[] = $normalized;
         }
 
         return $options;
@@ -88,7 +51,7 @@ final class AdobeConfigurableRemoteOptionStateReader
 
         $payload = json_decode($httpResult->body, true);
 
-        if (! is_array($payload)) {
+        if (! is_array($payload) || ! array_is_list($payload)) {
             return null;
         }
 
@@ -96,18 +59,82 @@ final class AdobeConfigurableRemoteOptionStateReader
 
         foreach ($payload as $entry) {
             if (! is_array($entry)) {
-                continue;
+                return null;
             }
 
             $sku = $entry['sku'] ?? null;
 
-            if (is_string($sku) && $sku !== '') {
-                $skus[] = $sku;
+            if (! is_string($sku) || $sku === '') {
+                return null;
             }
+
+            $skus[] = $sku;
         }
 
         sort($skus);
 
         return $skus;
+    }
+
+    /**
+     * @param  array<string, mixed>  $entry
+     */
+    private function normalizeOptionEntry(array $entry): ?AdobeConfigurableRemoteOptionState
+    {
+        $optionId = AdobeConfigurableValueIndexNormalizer::normalize($entry['id'] ?? null);
+
+        if ($optionId === null || $optionId === 0) {
+            return null;
+        }
+
+        $attributeId = AdobeConfigurableValueIndexNormalizer::normalize($entry['attribute_id'] ?? null);
+
+        if ($attributeId === null || $attributeId === 0) {
+            return null;
+        }
+
+        $label = $entry['label'] ?? null;
+
+        if (! is_string($label) || $label === '') {
+            return null;
+        }
+
+        $position = AdobeConfigurableValueIndexNormalizer::normalize($entry['position'] ?? null);
+
+        if ($position === null) {
+            return null;
+        }
+
+        $valuesRaw = $entry['values'] ?? null;
+
+        if (! is_array($valuesRaw)) {
+            return null;
+        }
+
+        $values = [];
+
+        foreach ($valuesRaw as $valueEntry) {
+            if (! is_array($valueEntry)) {
+                return null;
+            }
+
+            $valueIndex = AdobeConfigurableValueIndexNormalizer::normalize($valueEntry['value_index'] ?? null);
+
+            if ($valueIndex === null) {
+                return null;
+            }
+
+            $values[] = $valueIndex;
+        }
+
+        sort($values);
+
+        return new AdobeConfigurableRemoteOptionState(
+            optionId: $optionId,
+            attributeId: $attributeId,
+            label: $label,
+            position: $position,
+            values: $values,
+        );
     }
 }

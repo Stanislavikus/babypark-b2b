@@ -117,17 +117,6 @@ final class AdobeConfigurableOptionCommandExecutor
         int $consequentialWriteAttempts,
         string $reasonCode,
     ): AdobeConfigurableCommandEvidence {
-        if ($this->shouldReconcileAfterWrite($writeResult, $transportException)) {
-            return $this->unknownOrAmbiguous(
-                $reasonCode.'_inconclusive',
-                $parentSku,
-                $desiredOption,
-                $knownOptionId,
-                consequentialWriteAttempts: $consequentialWriteAttempts,
-                reconciliationGetAttempts: 0,
-            );
-        }
-
         [$optionsGetResult] = $this->remoteStateClient->getConfigurableOptions($context, $parentSku);
         $remoteOptions = $this->optionStateReader->read($optionsGetResult);
 
@@ -160,9 +149,9 @@ final class AdobeConfigurableOptionCommandExecutor
 
         $observed = $matchingByAttribute[0];
 
-        if (! $this->controlledStateMatches($desiredOption, $observed)) {
-            return $this->unknownOrAmbiguous(
-                $reasonCode.'_reconciliation_mismatch',
+        if ($this->controlledStateMatches($desiredOption, $observed)) {
+            return $this->knownApplied(
+                $reasonCode.'_reconciled',
                 $parentSku,
                 $desiredOption,
                 $observed->optionId,
@@ -171,8 +160,8 @@ final class AdobeConfigurableOptionCommandExecutor
             );
         }
 
-        return $this->knownApplied(
-            $reasonCode.'_reconciled',
+        return $this->unknownOrAmbiguous(
+            $reasonCode.'_reconciliation_mismatch',
             $parentSku,
             $desiredOption,
             $observed->optionId,
@@ -197,15 +186,17 @@ final class AdobeConfigurableOptionCommandExecutor
             return false;
         }
 
-        $desiredValues = array_map(
-            static fn (AdobeConfigurableOptionValueDesiredState $value): array => [
-                'value_index' => $value->valueIndex,
-                'label' => $value->label,
-            ],
+        $desiredIndexes = array_map(
+            static fn (AdobeConfigurableOptionValueDesiredState $value): int => $value->valueIndex,
             $desired->values,
         );
 
-        return $desiredValues === $observed->values;
+        sort($desiredIndexes);
+
+        $observedIndexes = $observed->values;
+        sort($observedIndexes);
+
+        return $desiredIndexes === $observedIndexes;
     }
 
     private function requiresDestructiveValueRemoval(
@@ -217,24 +208,13 @@ final class AdobeConfigurableOptionCommandExecutor
             $desired->values,
         );
 
-        foreach ($observed->values as $observedValue) {
-            if (! in_array($observedValue['value_index'], $desiredIndexes, true)) {
+        foreach ($observed->values as $observedIndex) {
+            if (! in_array($observedIndex, $desiredIndexes, true)) {
                 return true;
             }
         }
 
         return false;
-    }
-
-    private function shouldReconcileAfterWrite(
-        ?ConnectorHttpResult $httpResult,
-        ?ConnectorTransportException $transportException,
-    ): bool {
-        if ($transportException !== null || $httpResult === null) {
-            return true;
-        }
-
-        return $httpResult->statusCode < 200 || $httpResult->statusCode >= 300;
     }
 
     private function permitsConsequentialWrite(AdobeConfigurableCommandInput $input): bool

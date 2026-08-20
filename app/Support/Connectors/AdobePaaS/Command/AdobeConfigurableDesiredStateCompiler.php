@@ -129,17 +129,14 @@ final class AdobeConfigurableDesiredStateCompiler
                 }
 
                 $valueIndexRaw = $optionAssignment->context['value_index'] ?? null;
+                $valueIndex = AdobeConfigurableValueIndexNormalizer::normalize($valueIndexRaw);
 
-                if (! is_numeric($valueIndexRaw)) {
+                if ($valueIndex === null) {
                     throw AdobeProductCommandCompilationException::missingField('value_index');
                 }
 
-                $valueIndex = (int) $valueIndexRaw;
-                $label = $this->resolveOptionLabel($metadata, $externalFieldKey, (string) $valueIndexRaw);
-
                 $values[] = new AdobeConfigurableOptionValueDesiredState(
                     valueIndex: $valueIndex,
-                    label: $label,
                 );
             }
 
@@ -168,29 +165,15 @@ final class AdobeConfigurableDesiredStateCompiler
     ): string {
         $attribute = $metadata?->attributeByCode($externalFieldKey);
 
-        if ($attribute !== null && $attribute->code !== '') {
-            return $externalFieldKey;
-        }
-
-        return $externalFieldKey;
-    }
-
-    private function resolveOptionLabel(
-        ?AdobeProductExportExecutionMetadata $metadata,
-        string $externalFieldKey,
-        string $valueIndex,
-    ): string {
-        $attribute = $metadata?->attributeByCode($externalFieldKey);
-
         if ($attribute instanceof AdobeAttributeMetadata) {
-            $label = $attribute->options[$valueIndex] ?? null;
+            $defaultLabel = $attribute->defaultFrontendLabel;
 
-            if (is_string($label) && $label !== '') {
-                return $label;
+            if (is_string($defaultLabel) && $defaultLabel !== '') {
+                return $defaultLabel;
             }
         }
 
-        return $valueIndex;
+        return $externalFieldKey;
     }
 
     /**

@@ -115,19 +115,6 @@ final class AdobeConfigurableInactiveLinkedVariantLifecycleExecutor
                 self::DISABLED_STATUS,
             );
 
-            if ($this->shouldReconcileAfterWrite($putResult, $putTransportException)) {
-                $evidence[] = new AdobeConfigurableCommandEvidence(
-                    commandKind: 'inactive_child_lifecycle',
-                    appliedStateKnowledge: AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous,
-                    reasonCode: 'inactive_linked_child_status_put_inconclusive',
-                    subjectSku: $storedSku,
-                    variantId: $variantId,
-                    consequentialWriteAttempts: 1,
-                );
-
-                continue;
-            }
-
             $reconciliationGet = $this->remoteStateClient->getProductWithContext($context, $storedSku);
 
             if ($reconciliationGet->classification !== AdobeProductRemoteGetClassification::Found
@@ -198,14 +185,5 @@ final class AdobeConfigurableInactiveLinkedVariantLifecycleExecutor
         }
 
         return $input->consequentialWriteGate->permitsConsequentialWrite();
-    }
-
-    private function shouldReconcileAfterWrite($httpResult, $transportException): bool
-    {
-        if ($transportException !== null || $httpResult === null) {
-            return true;
-        }
-
-        return $httpResult->statusCode < 200 || $httpResult->statusCode >= 300;
     }
 }

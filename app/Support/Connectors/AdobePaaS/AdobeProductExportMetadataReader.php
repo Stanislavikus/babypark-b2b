@@ -164,6 +164,7 @@ final class AdobeProductExportMetadataReader
                     frontendInput: $current->frontendInput,
                     scope: $current->scope,
                     options: $this->fetchAttributeOptions($context, $code),
+                    defaultFrontendLabel: $current->defaultFrontendLabel,
                 );
             }
         }
@@ -192,6 +193,7 @@ final class AdobeProductExportMetadataReader
             frontendInput: $frontendInput,
             scope: $scope,
             options: $this->normalizeInlineOptions($item['options'] ?? null),
+            defaultFrontendLabel: $this->readNullableString($item, 'default_frontend_label'),
         );
     }
 
@@ -237,6 +239,7 @@ final class AdobeProductExportMetadataReader
             frontendInput: $frontendInput,
             scope: $scope,
             options: $options,
+            defaultFrontendLabel: $this->readNullableString($detail, 'default_frontend_label') ?? $current->defaultFrontendLabel,
         );
     }
 
@@ -362,6 +365,24 @@ final class AdobeProductExportMetadataReader
         }
 
         return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function readNullableString(array $item, string $key): ?string
+    {
+        $value = $item[$key] ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        return $value;
     }
 
     /**

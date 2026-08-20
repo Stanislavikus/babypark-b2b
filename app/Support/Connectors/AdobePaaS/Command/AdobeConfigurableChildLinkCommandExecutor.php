@@ -3,8 +3,6 @@
 namespace App\Support\Connectors\AdobePaaS\Command;
 
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
-use App\Support\Connectors\Transport\ConnectorHttpResult;
-use App\Support\Connectors\Transport\ConnectorTransportException;
 
 final class AdobeConfigurableChildLinkCommandExecutor
 {
@@ -42,15 +40,6 @@ final class AdobeConfigurableChildLinkCommandExecutor
             $desiredLink->childSku,
         );
 
-        if ($this->shouldReconcileAfterWrite($postResult, $postTransportException)) {
-            return $this->unknownOrAmbiguous(
-                'configurable_child_link_post_inconclusive',
-                $parentSku,
-                $desiredLink,
-                consequentialWriteAttempts: 1,
-            );
-        }
-
         [$reconciliationGetResult] = $this->remoteStateClient->getConfigurableChildren($context, $parentSku);
         $reconciledChildSkus = $this->optionStateReader->readChildSkus($reconciliationGetResult);
 
@@ -81,17 +70,6 @@ final class AdobeConfigurableChildLinkCommandExecutor
             consequentialWriteAttempts: 1,
             reconciliationGetAttempts: 1,
         );
-    }
-
-    private function shouldReconcileAfterWrite(
-        ?ConnectorHttpResult $httpResult,
-        ?ConnectorTransportException $transportException,
-    ): bool {
-        if ($transportException !== null || $httpResult === null) {
-            return true;
-        }
-
-        return $httpResult->statusCode < 200 || $httpResult->statusCode >= 300;
     }
 
     private function permitsConsequentialWrite(AdobeConfigurableCommandInput $input): bool

@@ -158,8 +158,10 @@ final class AdobeConfigurableProductCommandCoordinator
             }
         }
 
-        $lifecycleEvidence = $this->inactiveLifecycleExecutor->execute($input);
-        $evidence = array_merge($evidence, $lifecycleEvidence);
+        if ($this->allChildLinksKnownApplied($evidence, $desiredState->childLinks)) {
+            $lifecycleEvidence = $this->inactiveLifecycleExecutor->execute($input);
+            $evidence = array_merge($evidence, $lifecycleEvidence);
+        }
 
         return new AdobeConfigurableProductExecutionResult(
             outcome: $this->aggregator->aggregate($evidence),
@@ -258,6 +260,28 @@ final class AdobeConfigurableProductCommandCoordinator
 
             if ($childEvidence === null
                 || $childEvidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param  list<AdobeConfigurableCommandEvidence>  $evidence
+     * @param  list<AdobeConfigurableChildLinkDesiredState>  $requiredLinks
+     */
+    private function allChildLinksKnownApplied(array $evidence, array $requiredLinks): bool
+    {
+        foreach ($requiredLinks as $requiredLink) {
+            $linkEvidence = collect($evidence)->first(
+                static fn (AdobeConfigurableCommandEvidence $entry): bool => $entry->commandKind === 'child_link'
+                    && $entry->variantId === $requiredLink->variantId,
+            );
+
+            if ($linkEvidence === null
+                || $linkEvidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied
             ) {
                 return false;
             }

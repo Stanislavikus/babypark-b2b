@@ -228,7 +228,13 @@ final class AdobeProductDesiredStateCompiler
                 continue;
             }
 
-            $customAttributes[$externalFieldKey] = is_numeric($valueIndex) ? (int) $valueIndex : $valueIndex;
+            $normalizedValueIndex = AdobeConfigurableValueIndexNormalizer::normalize($valueIndex);
+
+            if ($normalizedValueIndex === null) {
+                continue;
+            }
+
+            $customAttributes[$externalFieldKey] = $normalizedValueIndex;
         }
 
         ksort($customAttributes);

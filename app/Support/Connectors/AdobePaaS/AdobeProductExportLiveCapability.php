@@ -27,6 +27,8 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
 
     private const string INACTIVE_ONLY_CONFIGURABLE_FAMILY_REASON = 'inactive_only_configurable_family_requires_adobe_validation';
 
+    private const string AMBIGUOUS_PARENT_IDENTITY_REASON = 'ambiguous_configurable_parent_identity_links';
+
     public function __construct(
         private readonly AdobeProductExportRunMetadataPreparer $metadataPreparer,
         private readonly AdobeStoreConfigReader $storeConfigReader,
@@ -77,6 +79,16 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
             $snapshot,
             $runContext->metadata,
         );
+
+        $ambiguousParentResult = $this->resolveAmbiguousParentIdentityResult(
+            $runContext->workspaceId,
+            $runContext->connectorAccountId,
+            (string) $aggregate->productId,
+        );
+
+        if ($ambiguousParentResult !== null) {
+            return $ambiguousParentResult;
+        }
 
         $classificationTransition = $this->resolveClassificationTransitionResult(
             $semanticResult,
@@ -169,6 +181,36 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
         }
 
         return $hasConfigurableParent && ! $hasSimpleProduct;
+    }
+
+    private function resolveAmbiguousParentIdentityResult(
+        string $workspaceId,
+        string $connectorAccountId,
+        string $productId,
+    ): ?SyncLiveProductExecutionResult {
+        if (! ctype_digit($productId)) {
+            return null;
+        }
+
+        $parentLookup = $this->linkGuard->resolveTrustedParentLinkBySubject(
+            $workspaceId,
+            $connectorAccountId,
+            (int) $productId,
+        );
+
+        if (! $parentLookup->isAmbiguous()) {
+            return null;
+        }
+
+        return new SyncLiveProductExecutionResult(
+            outcome: SyncLiveOutcome::Ambiguous,
+            findings: [
+                new SyncLiveFinding(
+                    code: self::AMBIGUOUS_PARENT_IDENTITY_REASON,
+                    subject: $productId,
+                ),
+            ],
+        );
     }
 
     private function resolveClassificationTransitionResult(
