@@ -2,6 +2,7 @@
 
 namespace App\Support\Connectors\AdobePaaS\Command;
 
+use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
 use App\Models\ProductVariant;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,12 @@ final class AdobeProductExternalRecordLinkPersister implements AdobeProductExter
         AdobeProductDesiredState $desiredState,
     ): ExternalRecordLink {
         return DB::transaction(function () use ($workspaceId, $connectorAccountId, $desiredState): ExternalRecordLink {
+            ConnectorAccount::query()
+                ->where('workspace_id', $workspaceId)
+                ->where('id', $connectorAccountId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
             if ($this->linkGuard->hasCrossSubjectCollision(
                 $workspaceId,
                 $connectorAccountId,

@@ -33,4 +33,9 @@ final class AdobeProductCommandCompilationException extends \RuntimeException
     {
         return new self('Adobe Product desired state has invalid resolved price aspect: '.$aspect);
     }
+
+    public static function unresolvedMappingBinding(string $bindingId): self
+    {
+        return new self('Adobe Product command cannot resolve external field key for mapped binding: '.$bindingId);
+    }
 }

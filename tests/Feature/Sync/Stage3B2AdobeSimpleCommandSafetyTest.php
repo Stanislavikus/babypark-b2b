@@ -118,6 +118,240 @@ class Stage3B2AdobeSimpleCommandSafetyTest extends TestCase
     }
 
     #[Test]
+    public function product_scoped_same_adobe_sku_erl_is_collision_with_zero_writes(): void
+    {
+        [$executor, $transport] = $this->executor();
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product, $variant] = $this->createProductVariant($workspace);
+        [$subjectProduct, $subjectVariant] = $this->createProductVariant($workspace);
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_identifier' => 'SKU-TEST-1',
+        ]);
+
+        $result = $executor->execute(new AdobeProductSimpleCommandInput(
+            workspaceId: $workspace->id,
+            connectorAccountId: $account->id,
+            semanticResult: AdobeProductCommandTestFixtures::semanticResult([
+                'variant_id' => $subjectVariant->id,
+            ]),
+            adobeBaseCurrency: 'UAH',
+        ));
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
+        $this->assertSame('external_record_link_collision', $result->evidence->reasonCode);
+        $this->assertSame(0, $transport->sendCount);
+    }
+
+    #[Test]
+    public function exact_current_product_variant_link_is_trusted_not_collision(): void
+    {
+        [$executor, $transport] = $this->executor(responder: fn () => new ConnectorHttpResult(
+            200,
+            [],
+            json_encode(AdobeProductCommandTestFixtures::remoteProductPayload(), JSON_THROW_ON_ERROR),
+        ));
+
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$_, $variant] = $this->createProductVariant($workspace);
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_variant_id' => $variant->id,
+            'external_identifier' => 'SKU-TEST-1',
+        ]);
+
+        $result = $executor->execute(new AdobeProductSimpleCommandInput(
+            workspaceId: $workspace->id,
+            connectorAccountId: $account->id,
+            semanticResult: AdobeProductCommandTestFixtures::semanticResult(['variant_id' => $variant->id]),
+            adobeBaseCurrency: 'UAH',
+        ));
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
+        $this->assertSame(1, $transport->sendCount);
+    }
+
+    #[Test]
+    public function ambiguous_put_with_partial_remote_state_returns_unknown_without_second_put(): void
+    {
+        [$executor, $transport] = $this->executor(responder: function (): ConnectorHttpResult {
+            static $count = 0;
+            $count++;
+
+            return match ($count) {
+                1 => new ConnectorHttpResult(
+                    200,
+                    [],
+                    json_encode(AdobeProductCommandTestFixtures::remoteProductPayload(['name' => 'Old Name']), JSON_THROW_ON_ERROR),
+                ),
+                2 => throw new ConnectorTransportException(TransportFailureReason::Timeout),
+                3 => new ConnectorHttpResult(
+                    200,
+                    [],
+                    json_encode(AdobeProductCommandTestFixtures::remoteProductPayload(['name' => 'Partial Name']), JSON_THROW_ON_ERROR),
+                ),
+                default => new ConnectorHttpResult(500, [], '{}'),
+            };
+        });
+
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$_, $variant] = $this->createProductVariant($workspace);
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_variant_id' => $variant->id,
+            'external_identifier' => 'SKU-TEST-1',
+        ]);
+
+        $result = $executor->execute(new AdobeProductSimpleCommandInput(
+            workspaceId: $workspace->id,
+            connectorAccountId: $account->id,
+            semanticResult: AdobeProductCommandTestFixtures::semanticResult(['variant_id' => $variant->id]),
+            adobeBaseCurrency: 'UAH',
+        ));
+
+        $methods = array_map(
+            static fn ($request) => $request->request->getMethod(),
+            $transport->recordedRequests,
+        );
+
+        $this->assertSame(['GET', 'PUT', 'GET'], $methods);
+        $this->assertSame(AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous, $result->appliedStateKnowledge);
+        $this->assertSame('trusted_link_put_inconclusive_reconciliation_mismatch', $result->evidence->reasonCode);
+    }
+
+    #[Test]
+    public function ambiguous_post_with_partial_remote_state_returns_unknown_without_erl_or_second_post(): void
+    {
+        [$executor, $transport] = $this->executor(responder: function (): ConnectorHttpResult {
+            static $count = 0;
+            $count++;
+
+            return match ($count) {
+                1 => new ConnectorHttpResult(
+                    404,
+                    [],
+                    AdobeProductCommandTestFixtures::trustedMissing404Body('SKU-TEST-1'),
+                ),
+                2 => throw new ConnectorTransportException(TransportFailureReason::Timeout),
+                3 => new ConnectorHttpResult(
+                    200,
+                    [],
+                    json_encode(AdobeProductCommandTestFixtures::remoteProductPayload(['name' => 'Partial Name']), JSON_THROW_ON_ERROR),
+                ),
+                default => new ConnectorHttpResult(500, [], '{}'),
+            };
+        });
+
+        $result = $executor->execute($this->defaultInput());
+
+        $methods = array_map(
+            static fn ($request) => $request->request->getMethod(),
+            $transport->recordedRequests,
+        );
+
+        $this->assertSame(['GET', 'POST', 'GET'], $methods);
+        $this->assertSame(AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous, $result->appliedStateKnowledge);
+        $this->assertSame('no_link_post_inconclusive_reconciliation_mismatch', $result->evidence->reasonCode);
+        $this->assertSame(0, ExternalRecordLink::query()->count());
+    }
+
+    #[Test]
+    public function post_4xx_reconciles_with_get_and_never_second_post(): void
+    {
+        [$executor, $transport] = $this->executor(responder: function (): ConnectorHttpResult {
+            static $count = 0;
+            $count++;
+
+            return match ($count) {
+                1 => new ConnectorHttpResult(
+                    404,
+                    [],
+                    AdobeProductCommandTestFixtures::trustedMissing404Body('SKU-TEST-1'),
+                ),
+                2 => new ConnectorHttpResult(400, [], '{"message":"Invalid product data"}'),
+                3 => new ConnectorHttpResult(
+                    200,
+                    [],
+                    json_encode(AdobeProductCommandTestFixtures::remoteProductPayload(), JSON_THROW_ON_ERROR),
+                ),
+                default => new ConnectorHttpResult(500, [], '{}'),
+            };
+        });
+
+        $result = $executor->execute($this->defaultInput());
+
+        $methods = array_map(
+            static fn ($request) => $request->request->getMethod(),
+            $transport->recordedRequests,
+        );
+
+        $this->assertSame(['GET', 'POST', 'GET'], $methods);
+        $this->assertSame(AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous, $result->appliedStateKnowledge);
+        $this->assertSame('no_link_post_inconclusive_ownership_not_proven', $result->evidence->reasonCode);
+    }
+
+    #[Test]
+    public function put_4xx_reconciles_with_get_and_never_second_put(): void
+    {
+        [$executor, $transport] = $this->executor(responder: function (): ConnectorHttpResult {
+            static $count = 0;
+            $count++;
+
+            return match ($count) {
+                1 => new ConnectorHttpResult(
+                    200,
+                    [],
+                    json_encode(AdobeProductCommandTestFixtures::remoteProductPayload(['name' => 'Old Name']), JSON_THROW_ON_ERROR),
+                ),
+                2 => new ConnectorHttpResult(409, [], '{"message":"Conflict"}'),
+                3 => new ConnectorHttpResult(
+                    200,
+                    [],
+                    json_encode(AdobeProductCommandTestFixtures::remoteProductPayload(), JSON_THROW_ON_ERROR),
+                ),
+                default => new ConnectorHttpResult(500, [], '{}'),
+            };
+        });
+
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$_, $variant] = $this->createProductVariant($workspace);
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_variant_id' => $variant->id,
+            'external_identifier' => 'SKU-TEST-1',
+        ]);
+
+        $result = $executor->execute(new AdobeProductSimpleCommandInput(
+            workspaceId: $workspace->id,
+            connectorAccountId: $account->id,
+            semanticResult: AdobeProductCommandTestFixtures::semanticResult(['variant_id' => $variant->id]),
+            adobeBaseCurrency: 'UAH',
+        ));
+
+        $methods = array_map(
+            static fn ($request) => $request->request->getMethod(),
+            $transport->recordedRequests,
+        );
+
+        $this->assertSame(['GET', 'PUT', 'GET'], $methods);
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
+        $this->assertSame('trusted_link_put_inconclusive', $result->evidence->reasonCode);
+    }
+
+    #[Test]
     public function cross_subject_same_adobe_sku_erl_is_collision_with_zero_writes(): void
     {
         [$executor, $transport] = $this->executor();
@@ -218,7 +452,7 @@ class Stage3B2AdobeSimpleCommandSafetyTest extends TestCase
 
         $this->assertSame(['GET', 'POST', 'GET'], $methods);
         $this->assertSame(AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous, $result->appliedStateKnowledge);
-        $this->assertSame('no_link_post_ambiguous_ownership_not_proven', $result->evidence->reasonCode);
+        $this->assertSame('no_link_post_inconclusive_ownership_not_proven', $result->evidence->reasonCode);
     }
 
     #[Test]
@@ -390,7 +624,7 @@ class Stage3B2AdobeSimpleCommandSafetyTest extends TestCase
 
         $this->assertSame(['GET', 'PUT', 'GET'], $methods);
         $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
-        $this->assertSame('trusted_link_put_ambiguous', $result->evidence->reasonCode);
+        $this->assertSame('trusted_link_put_inconclusive', $result->evidence->reasonCode);
     }
 
     #[Test]

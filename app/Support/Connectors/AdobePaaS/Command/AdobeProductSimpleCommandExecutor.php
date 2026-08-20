@@ -108,25 +108,17 @@ final class AdobeProductSimpleCommandExecutor
 
         [$putResult, $putTransportException] = $this->remoteStateClient->putProduct($context, $desiredState);
 
-        if ($this->isConsequentialWriteAmbiguous($putResult, $putTransportException)) {
+        if ($this->shouldReconcileAfterWrite($putResult, $putTransportException)) {
             return $this->reconcileAfterWrite(
                 $input,
                 $context,
                 $desiredState,
                 $linkedExternalSku,
                 consequentialWriteAttempts: 1,
-                reasonCode: 'trusted_link_put_ambiguous',
+                reasonCode: 'trusted_link_put_inconclusive',
                 allowLinkPersistence: false,
                 requireOwnershipForApplied: true,
                 ownershipTrustSatisfied: true,
-            );
-        }
-
-        if (! $this->isSuccessfulWriteResponse($putResult)) {
-            return $this->unknownOrAmbiguous(
-                'trusted_link_put_failed',
-                subjectSku: $linkedExternalSku,
-                consequentialWriteAttempts: 1,
             );
         }
 
@@ -168,24 +160,16 @@ final class AdobeProductSimpleCommandExecutor
 
         [$postResult, $postTransportException] = $this->remoteStateClient->postProduct($context, $desiredState);
 
-        if ($this->isConsequentialWriteAmbiguous($postResult, $postTransportException)) {
+        if ($this->shouldReconcileAfterWrite($postResult, $postTransportException)) {
             return $this->reconcileAfterWrite(
                 $input,
                 $context,
                 $desiredState,
                 $desiredState->sku,
                 consequentialWriteAttempts: 1,
-                reasonCode: 'no_link_post_ambiguous',
+                reasonCode: 'no_link_post_inconclusive',
                 allowLinkPersistence: true,
                 requireOwnershipForApplied: true,
-            );
-        }
-
-        if (! $this->isSuccessfulWriteResponse($postResult)) {
-            return $this->unknownOrAmbiguous(
-                'no_link_post_failed',
-                subjectSku: $desiredState->sku,
-                consequentialWriteAttempts: 1,
             );
         }
 
@@ -241,8 +225,8 @@ final class AdobeProductSimpleCommandExecutor
         }
 
         if (! $this->comparator->controlledStateMatches($desiredState, $reconciliationGet->observedState)) {
-            return $this->knownNotApplied(
-                $reasonCode.'_reconciliation_not_applied',
+            return $this->unknownOrAmbiguous(
+                $reasonCode.'_reconciliation_mismatch',
                 subjectSku: $sku,
                 remoteGetClassification: $reconciliationGet->classification,
                 consequentialWriteAttempts: $consequentialWriteAttempts,
@@ -296,7 +280,7 @@ final class AdobeProductSimpleCommandExecutor
         );
     }
 
-    private function isConsequentialWriteAmbiguous(
+    private function shouldReconcileAfterWrite(
         ?ConnectorHttpResult $httpResult,
         ?ConnectorTransportException $transportException,
     ): bool {
@@ -308,24 +292,7 @@ final class AdobeProductSimpleCommandExecutor
             return true;
         }
 
-        if ($httpResult->statusCode >= 500) {
-            return true;
-        }
-
-        if ($httpResult->statusCode === 429) {
-            return true;
-        }
-
-        return false;
-    }
-
-    private function isSuccessfulWriteResponse(?ConnectorHttpResult $httpResult): bool
-    {
-        if ($httpResult === null) {
-            return false;
-        }
-
-        return $httpResult->statusCode >= 200 && $httpResult->statusCode < 300;
+        return $httpResult->statusCode < 200 || $httpResult->statusCode >= 300;
     }
 
     private function responseBodyConfirmsSku(?ConnectorHttpResult $httpResult, string $expectedSku): bool

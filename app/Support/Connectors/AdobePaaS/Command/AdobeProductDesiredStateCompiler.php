@@ -41,7 +41,7 @@ final class AdobeProductDesiredStateCompiler
      *
      * @throws AdobeProductCommandCompilationException
      */
-    public function compileFromOperation(
+    private function compileFromOperation(
         AdobeProductExportSemanticOperation $operation,
         array $fieldMappings = [],
     ): AdobeProductDesiredState {
@@ -161,6 +161,10 @@ final class AdobeProductDesiredStateCompiler
                 $externalValue = $entry['external_value'] ?? null;
 
                 if (! is_string($externalFieldKey) || $externalFieldKey === '') {
+                    if ($externalValue !== null && $externalValue !== '') {
+                        throw AdobeProductCommandCompilationException::unresolvedMappingBinding((string) $bindingId);
+                    }
+
                     continue;
                 }
 

@@ -26,11 +26,19 @@ final class AdobeProductExternalRecordLinkGuard
         string $externalIdentifier,
         string $productVariantId,
     ): bool {
+        $currentVariantId = (int) $productVariantId;
+
         return ExternalRecordLink::query()
             ->where('workspace_id', $workspaceId)
             ->where('connector_account_id', $connectorAccountId)
             ->where('external_identifier', $externalIdentifier)
-            ->where('product_variant_id', '!=', $productVariantId)
+            ->where(function ($query) use ($currentVariantId): void {
+                $query->whereNotNull('product_id')
+                    ->orWhere(function ($inner) use ($currentVariantId): void {
+                        $inner->whereNotNull('product_variant_id')
+                            ->where('product_variant_id', '!=', $currentVariantId);
+                    });
+            })
             ->exists();
     }
 }

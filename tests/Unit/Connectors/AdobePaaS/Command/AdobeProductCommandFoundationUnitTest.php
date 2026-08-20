@@ -10,6 +10,7 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteGetClassification
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteGetClassifier;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateComparator;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateNormalizer;
+use App\Support\Connectors\AdobePaaS\Semantic\AdobeProductExportSemanticOperation;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorTransportException;
 use App\Support\Connectors\Transport\TransportFailureReason;
@@ -190,5 +191,112 @@ class AdobeProductCommandFoundationUnitTest extends TestCase
 
         $this->assertTrue($this->comparator->controlledStateMatches($desired, $matching));
         $this->assertFalse($this->comparator->controlledStateMatches($desired, $different));
+    }
+
+    #[Test]
+    public function comparator_ignores_unrelated_remote_custom_attributes(): void
+    {
+        $desired = new AdobeProductDesiredState(
+            productVariantId: 'variant-1',
+            sku: 'SKU-1',
+            name: 'Name',
+            attributeSetId: 4,
+            typeId: 'simple',
+            status: 1,
+            visibility: 4,
+            price: 100.0,
+            priceCurrency: 'UAH',
+            customAttributes: ['description' => 'A'],
+        );
+
+        $observedWithExtra = new AdobeProductObservedState(
+            sku: 'SKU-1',
+            name: 'Name',
+            attributeSetId: 4,
+            typeId: 'simple',
+            status: 1,
+            visibility: 4,
+            price: 100.0,
+            customAttributes: [
+                'description' => 'A',
+                'magento_default_color' => 'Blue',
+            ],
+        );
+
+        $this->assertTrue($this->comparator->controlledStateMatches($desired, $observedWithExtra));
+    }
+
+    #[Test]
+    public function comparator_detects_controlled_custom_attribute_mismatch(): void
+    {
+        $desired = new AdobeProductDesiredState(
+            productVariantId: 'variant-1',
+            sku: 'SKU-1',
+            name: 'Name',
+            attributeSetId: 4,
+            typeId: 'simple',
+            status: 1,
+            visibility: 4,
+            price: 100.0,
+            priceCurrency: 'UAH',
+            customAttributes: ['description' => 'A'],
+        );
+
+        $observedMismatch = new AdobeProductObservedState(
+            sku: 'SKU-1',
+            name: 'Name',
+            attributeSetId: 4,
+            typeId: 'simple',
+            status: 1,
+            visibility: 4,
+            price: 100.0,
+            customAttributes: ['description' => 'B'],
+        );
+
+        $this->assertFalse($this->comparator->controlledStateMatches($desired, $observedMismatch));
+    }
+
+    #[Test]
+    public function compiler_has_no_public_operation_compilation_boundary(): void
+    {
+        $reflection = new \ReflectionClass(AdobeProductDesiredStateCompiler::class);
+
+        foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+            if ($method->getDeclaringClass()->getName() !== AdobeProductDesiredStateCompiler::class) {
+                continue;
+            }
+
+            foreach ($method->getParameters() as $parameter) {
+                $type = $parameter->getType();
+
+                if ($type instanceof \ReflectionNamedType
+                    && $type->getName() === AdobeProductExportSemanticOperation::class
+                ) {
+                    $this->fail('Public API must not compile desired state directly from AdobeProductExportSemanticOperation.');
+                }
+            }
+        }
+
+        $this->assertTrue($reflection->hasMethod('compileFromSemanticResult'));
+        $this->assertTrue($reflection->getMethod('compileFromSemanticResult')->isPublic());
+    }
+
+    #[Test]
+    public function unresolved_mapping_binding_with_projected_value_fails_compilation(): void
+    {
+        $this->expectException(AdobeProductCommandCompilationException::class);
+
+        $this->compiler->compileFromSemanticResult(
+            AdobeProductCommandTestFixtures::semanticResult([
+                'mapped_variant_values' => [
+                    'binding-missing' => [
+                        'internal_code' => 'description',
+                        'internal_value' => 'Custom text',
+                        'external_value' => 'Custom text',
+                    ],
+                ],
+            ]),
+            [],
+        );
     }
 }

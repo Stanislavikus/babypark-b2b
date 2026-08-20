@@ -36,7 +36,22 @@ final class AdobeProductRemoteStateComparator
             return false;
         }
 
-        return $desired->customAttributes === $observed->customAttributes;
+        return $this->controlledCustomAttributesMatch($desired->customAttributes, $observed->customAttributes);
+    }
+
+    /**
+     * @param  array<string, mixed>  $desired
+     * @param  array<string, mixed>  $observed
+     */
+    private function controlledCustomAttributesMatch(array $desired, array $observed): bool
+    {
+        foreach ($desired as $key => $value) {
+            if (($observed[$key] ?? null) !== $value) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function pricesMatch(float $desired, float $observed): bool
