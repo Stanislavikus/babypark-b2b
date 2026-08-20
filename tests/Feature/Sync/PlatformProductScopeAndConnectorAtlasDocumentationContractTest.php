@@ -287,7 +287,11 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
         $this->assertStringContainsString('**Stage 2B — Option Mapping Remediation**', $gaps);
         $this->assertStringContainsString('**Stage 3-0 — Live Safety, Identity & First-Live Contract**', $gaps);
         $this->assertStringContainsString('**Stage 3A — Live Safety Foundation**', $gaps);
-        $this->assertStringContainsString('**Stage 3B–3E — Live Engine implementation slices**', $gaps);
+        $this->assertStringContainsString('**Stage 3B-2 — Adobe Product simple command safety foundation**', $gaps);
+        $this->assertStringContainsString('**Stage 3B (remaining) — Adobe Simple Live integration**', $gaps);
+        $this->assertStringContainsString('**Stage 3C — Adobe Configurable Live**', $gaps);
+        $this->assertStringContainsString('**Stage 3D — Adobe Media + Merchant First Live**', $gaps);
+        $this->assertStringContainsString('**Stage 3E — Real Adobe Validation + Truth Flip**', $gaps);
         $this->assertStringContainsString('Historical tracking label', $gaps);
         $this->assertStringContainsString('Not a mandatory future PR boundary', $gaps);
         $this->assertStringContainsString('Current coherent Magento execution stages', $gaps);

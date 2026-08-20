@@ -279,7 +279,9 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('**Stage 3-0 — Live Safety, Identity & First-Live Contract**', $gaps);
         $this->assertStringContainsString('**Stage 3A — Live Safety Foundation**', $gaps);
-        $this->assertStringContainsString('**Stage 3B–3E — Live Engine implementation slices**', $gaps);
+        $this->assertStringContainsString('**Stage 3B-2 — Adobe Product simple command safety foundation**', $gaps);
+        $this->assertStringContainsString('**Stage 3B (remaining) — Adobe Simple Live integration**', $gaps);
+        $this->assertStringContainsString('**Stage 3C — Adobe Configurable Live**', $gaps);
     }
 
     #[Test]

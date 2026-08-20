@@ -664,6 +664,10 @@ final class AdobeProductExportSemanticPlanner
                 $entry['is_configurable_dimension'] = true;
             }
 
+            $entry['external_field_key'] = is_string($externalFieldKey) && $externalFieldKey !== ''
+                ? $externalFieldKey
+                : null;
+
             $projected[$bindingId] = $entry;
         }
 
