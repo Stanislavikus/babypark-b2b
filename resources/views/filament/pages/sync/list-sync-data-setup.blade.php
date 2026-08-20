@@ -51,6 +51,17 @@
                     {{ __('sync_preview.actions.open_preview') }}
                   </x-filament::button>
                 @endif
+
+                @if ($target['live_action_visible'])
+                  <x-filament::button
+                    tag="a"
+                    :href="$target['live_url']"
+                    color="danger"
+                    data-testid="sync-data-setup-open-live-{{ $target['account_id'] }}"
+                  >
+                    {{ __('sync_live.actions.open_live') }}
+                  </x-filament::button>
+                @endif
               </div>
             </div>
           @endforeach
