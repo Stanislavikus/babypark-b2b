@@ -6,18 +6,27 @@ use App\Models\ExternalRecordLink;
 
 final class AdobeProductExternalRecordLinkGuard
 {
-    public function findTrustedLinkForVariant(
+    public function resolveTrustedVariantLinkBySubject(
         string $workspaceId,
         string $connectorAccountId,
         string $productVariantId,
-        string $expectedExternalIdentifier,
-    ): ?ExternalRecordLink {
-        return ExternalRecordLink::query()
+    ): AdobeProductTrustedVariantLinkLookup {
+        $links = ExternalRecordLink::withoutWorkspaceScope()
             ->where('workspace_id', $workspaceId)
             ->where('connector_account_id', $connectorAccountId)
-            ->where('product_variant_id', $productVariantId)
-            ->where('external_identifier', $expectedExternalIdentifier)
-            ->first();
+            ->where('product_variant_id', (int) $productVariantId)
+            ->whereNotNull('product_variant_id')
+            ->get();
+
+        if ($links->isEmpty()) {
+            return AdobeProductTrustedVariantLinkLookup::none();
+        }
+
+        if ($links->count() > 1) {
+            return AdobeProductTrustedVariantLinkLookup::ambiguous();
+        }
+
+        return AdobeProductTrustedVariantLinkLookup::trusted($links->first());
     }
 
     public function hasCrossSubjectCollision(
@@ -28,7 +37,7 @@ final class AdobeProductExternalRecordLinkGuard
     ): bool {
         $currentVariantId = (int) $productVariantId;
 
-        return ExternalRecordLink::query()
+        return ExternalRecordLink::withoutWorkspaceScope()
             ->where('workspace_id', $workspaceId)
             ->where('connector_account_id', $connectorAccountId)
             ->where('external_identifier', $externalIdentifier)

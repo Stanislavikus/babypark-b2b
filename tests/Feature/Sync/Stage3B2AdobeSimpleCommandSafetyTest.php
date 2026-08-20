@@ -13,6 +13,7 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductDesiredState;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductDesiredStateCompiler;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkGuard;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersistence;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersistenceException;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersister;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductObservedState;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductOwnershipTrustPolicy;
@@ -773,6 +774,136 @@ class Stage3B2AdobeSimpleCommandSafetyTest extends TestCase
         $this->assertSame(['GET', 'POST', 'GET'], $methods);
         $this->assertSame(AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous, $result->appliedStateKnowledge);
         $this->assertSame('no_link_post_reconciled_link_persistence_failed', $result->evidence->reasonCode);
+    }
+
+    #[Test]
+    public function trusted_link_with_identity_drift_returns_unknown_without_http_writes(): void
+    {
+        [$executor, $transport] = $this->executor(responder: fn () => new ConnectorHttpResult(
+            500,
+            [],
+            '{"message":"should-not-be-called"}',
+        ));
+
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$_, $variant] = $this->createProductVariant($workspace);
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_variant_id' => $variant->id,
+            'external_identifier' => 'OLD-SKU',
+        ]);
+
+        $result = $executor->execute(new AdobeProductSimpleCommandInput(
+            workspaceId: $workspace->id,
+            connectorAccountId: $account->id,
+            semanticResult: AdobeProductCommandTestFixtures::semanticResult([
+                'variant_id' => $variant->id,
+                'sku' => 'NEW-SKU',
+            ]),
+            adobeBaseCurrency: 'UAH',
+        ));
+
+        $this->assertSame(0, $transport->sendCount);
+        $this->assertSame(AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous, $result->appliedStateKnowledge);
+        $this->assertSame('linked_identity_drift_requires_adobe_validation', $result->evidence->reasonCode);
+        $this->assertSame('OLD-SKU', $result->evidence->subjectSku);
+    }
+
+    #[Test]
+    public function multiple_variant_scoped_links_for_same_subject_fail_closed_without_http(): void
+    {
+        [$executor, $transport] = $this->executor();
+
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$_, $variant] = $this->createProductVariant($workspace);
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_variant_id' => $variant->id,
+            'external_identifier' => 'SKU-A',
+        ]);
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_variant_id' => $variant->id,
+            'external_identifier' => 'SKU-B',
+        ]);
+
+        $result = $executor->execute(new AdobeProductSimpleCommandInput(
+            workspaceId: $workspace->id,
+            connectorAccountId: $account->id,
+            semanticResult: AdobeProductCommandTestFixtures::semanticResult(['variant_id' => $variant->id]),
+            adobeBaseCurrency: 'UAH',
+        ));
+
+        $this->assertSame(0, $transport->sendCount);
+        $this->assertSame(AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous, $result->appliedStateKnowledge);
+        $this->assertSame('ambiguous_variant_identity_links', $result->evidence->reasonCode);
+    }
+
+    #[Test]
+    public function guard_does_not_resolve_foreign_workspace_variant_link(): void
+    {
+        $guard = new AdobeProductExternalRecordLinkGuard;
+        $workspaceA = $this->defaultWorkspace();
+        $workspaceB = Workspace::query()->create([
+            'name' => 'Other Workspace',
+            'is_default' => false,
+        ]);
+        $accountA = $this->createConnectorAccount($workspaceA);
+        [$_, $variantA] = $this->createProductVariant($workspaceA);
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspaceA->id,
+            'connector_account_id' => $accountA->id,
+            'product_variant_id' => $variantA->id,
+            'external_identifier' => 'SKU-TEST-1',
+        ]);
+
+        $lookup = $guard->resolveTrustedVariantLinkBySubject(
+            $workspaceB->id,
+            $accountA->id,
+            (string) $variantA->id,
+        );
+
+        $this->assertTrue($lookup->isNone());
+    }
+
+    #[Test]
+    public function production_persister_normalizes_missing_connector_account_to_typed_exception(): void
+    {
+        $persister = new AdobeProductExternalRecordLinkPersister(new AdobeProductExternalRecordLinkGuard);
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$_, $variant] = $this->createProductVariant($workspace);
+
+        $desired = (new AdobeProductDesiredStateCompiler)->compileFromSemanticResult(
+            AdobeProductCommandTestFixtures::semanticResult(['variant_id' => $variant->id]),
+        );
+
+        $otherWorkspace = Workspace::query()->create([
+            'name' => 'Foreign Workspace',
+            'is_default' => false,
+        ]);
+
+        $this->expectException(AdobeProductExternalRecordLinkPersistenceException::class);
+
+        try {
+            $persister->persistTrustedVariantLink(
+                $otherWorkspace->id,
+                $account->id,
+                $desired,
+            );
+        } catch (AdobeProductExternalRecordLinkPersistenceException $exception) {
+            $this->assertStringContainsString('ConnectorAccount was not found', $exception->getMessage());
+
+            throw $exception;
+        }
     }
 
     #[Test]

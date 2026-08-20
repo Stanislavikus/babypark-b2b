@@ -19,13 +19,10 @@ final class AdobeProductDesiredStateCompiler
     ];
 
     /**
-     * @param  list<array<string, mixed>>  $fieldMappings
-     *
      * @throws AdobeProductCommandCompilationException
      */
     public function compileFromSemanticResult(
         AdobeProductExportSemanticResult $semanticResult,
-        array $fieldMappings = [],
     ): AdobeProductDesiredState {
         if ($semanticResult->hasBlockingFindings()) {
             throw AdobeProductCommandCompilationException::blockingSemanticFindings();
@@ -33,17 +30,14 @@ final class AdobeProductDesiredStateCompiler
 
         $operation = $this->extractSimpleProductOperation($semanticResult);
 
-        return $this->compileFromOperation($operation, $fieldMappings);
+        return $this->compileFromOperation($operation);
     }
 
     /**
-     * @param  list<array<string, mixed>>  $fieldMappings
-     *
      * @throws AdobeProductCommandCompilationException
      */
     private function compileFromOperation(
         AdobeProductExportSemanticOperation $operation,
-        array $fieldMappings = [],
     ): AdobeProductDesiredState {
         if ($operation->operation !== 'simple_product') {
             throw AdobeProductCommandCompilationException::unsupportedOperation($operation->operation);
@@ -110,7 +104,7 @@ final class AdobeProductDesiredStateCompiler
             visibility: $visibilityNumeric,
             price: (float) $effectiveNetPrice,
             priceCurrency: $currency,
-            customAttributes: $this->compileCustomAttributes($context, $fieldMappings),
+            customAttributes: $this->compileCustomAttributes($context),
         );
     }
 
@@ -137,12 +131,10 @@ final class AdobeProductDesiredStateCompiler
 
     /**
      * @param  array<string, mixed>  $context
-     * @param  list<array<string, mixed>>  $fieldMappings
      * @return array<string, mixed>
      */
-    private function compileCustomAttributes(array $context, array $fieldMappings): array
+    private function compileCustomAttributes(array $context): array
     {
-        $externalKeyByBindingId = $this->indexedExternalKeys($fieldMappings);
         $customAttributes = [];
 
         foreach (['mapped_product_values', 'mapped_variant_values'] as $mappedKey) {
@@ -157,7 +149,7 @@ final class AdobeProductDesiredStateCompiler
                     continue;
                 }
 
-                $externalFieldKey = $externalKeyByBindingId[$bindingId] ?? null;
+                $externalFieldKey = $entry['external_field_key'] ?? null;
                 $externalValue = $entry['external_value'] ?? null;
 
                 if (! is_string($externalFieldKey) || $externalFieldKey === '') {
@@ -183,27 +175,5 @@ final class AdobeProductDesiredStateCompiler
         ksort($customAttributes);
 
         return $customAttributes;
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $fieldMappings
-     * @return array<string, string>
-     */
-    private function indexedExternalKeys(array $fieldMappings): array
-    {
-        $indexed = [];
-
-        foreach ($fieldMappings as $mapping) {
-            $bindingId = $mapping['field_binding_id'] ?? null;
-            $externalFieldKey = $mapping['external_field_key'] ?? null;
-
-            if (! is_string($bindingId) || ! is_string($externalFieldKey) || $externalFieldKey === '') {
-                continue;
-            }
-
-            $indexed[$bindingId] = $externalFieldKey;
-        }
-
-        return $indexed;
     }
 }

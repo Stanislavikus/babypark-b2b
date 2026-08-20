@@ -10,6 +10,7 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteGetClassification
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteGetClassifier;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateComparator;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateNormalizer;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandInput;
 use App\Support\Connectors\AdobePaaS\Semantic\AdobeProductExportSemanticOperation;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorTransportException;
@@ -72,19 +73,18 @@ class AdobeProductCommandFoundationUnitTest extends TestCase
                     'internal_code' => 'sku',
                     'internal_value' => 'OVERRIDE-SKU',
                     'external_value' => 'OVERRIDE-SKU',
+                    'external_field_key' => 'sku',
                 ],
                 'binding-custom' => [
                     'internal_code' => 'description',
                     'internal_value' => 'Custom text',
                     'external_value' => 'Custom text',
+                    'external_field_key' => 'description',
                 ],
             ],
         ]);
 
-        $desired = $this->compiler->compileFromSemanticResult($result, [
-            ['field_binding_id' => 'binding-sku', 'external_field_key' => 'sku'],
-            ['field_binding_id' => 'binding-custom', 'external_field_key' => 'description'],
-        ]);
+        $desired = $this->compiler->compileFromSemanticResult($result);
 
         $this->assertSame('SKU-TEST-1', $desired->sku);
         $this->assertSame(['description' => 'Custom text'], $desired->customAttributes);
@@ -296,7 +296,33 @@ class AdobeProductCommandFoundationUnitTest extends TestCase
                     ],
                 ],
             ]),
-            [],
         );
+    }
+
+    #[Test]
+    public function desired_state_compilation_uses_semantic_external_field_key_provenance(): void
+    {
+        $desired = $this->compiler->compileFromSemanticResult(
+            AdobeProductCommandTestFixtures::semanticResult([
+                'mapped_variant_values' => [
+                    'binding-custom' => [
+                        'internal_code' => 'description',
+                        'internal_value' => 'Custom text',
+                        'external_value' => 'Custom text',
+                        'external_field_key' => 'description',
+                    ],
+                ],
+            ]),
+        );
+
+        $this->assertSame(['description' => 'Custom text'], $desired->customAttributes);
+    }
+
+    #[Test]
+    public function command_input_has_no_separate_field_mappings_authority(): void
+    {
+        $reflection = new \ReflectionClass(AdobeProductSimpleCommandInput::class);
+
+        $this->assertFalse($reflection->hasProperty('fieldMappings'));
     }
 }

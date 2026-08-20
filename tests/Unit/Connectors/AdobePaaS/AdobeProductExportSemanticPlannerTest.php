@@ -148,6 +148,39 @@ class AdobeProductExportSemanticPlannerTest extends TestCase
         $this->assertNotNull($mappedVariant);
         $this->assertSame('deny', $mappedVariant['internal_value']);
         $this->assertSame('0', $mappedVariant['external_value']);
+        $this->assertSame('backorders', $mappedVariant['external_field_key']);
+    }
+
+    #[Test]
+    public function projected_mapped_values_retain_external_field_key_from_semantic_evaluation(): void
+    {
+        $aggregate = new ProductExecutionAggregate(
+            productId: 'product-1',
+            productValues: [
+                'binding-name' => $this->mappedValue('binding-name', 'name', FieldObjectType::Product, AttributeDataType::Text, 'Simple Product'),
+                'binding-status' => $this->mappedValue('binding-status', 'status', FieldObjectType::Product, AttributeDataType::Boolean, true),
+                'binding-description' => $this->mappedValue('binding-description', 'description', FieldObjectType::Product, AttributeDataType::Text, 'Desc'),
+            ],
+            variants: [
+                new ProductVariantExecutionSlice(
+                    variantId: 'variant-1',
+                    values: [
+                        'binding-sku' => $this->mappedValue('binding-sku', 'sku', FieldObjectType::ProductVariant, AttributeDataType::Text, 'SKU-1'),
+                    ],
+                    resolvedPrice: $this->makeResolvedPrice(),
+                    priceResolutionStatus: PriceResolutionStatus::Resolved->value,
+                ),
+            ],
+            sellableVariantCount: 1,
+        );
+        $snapshot = $this->snapshotWithCoreMappings(includeDescription: true);
+
+        $result = $this->planner->evaluate($aggregate, $snapshot, $this->metadataFixture(withDescription: true));
+
+        $mappedProduct = $result->operations[0]->context['mapped_product_values']['binding-description'] ?? null;
+
+        $this->assertNotNull($mappedProduct);
+        $this->assertSame('description', $mappedProduct['external_field_key']);
     }
 
     #[Test]

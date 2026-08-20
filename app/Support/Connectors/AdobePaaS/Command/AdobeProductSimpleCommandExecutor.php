@@ -28,7 +28,6 @@ final class AdobeProductSimpleCommandExecutor
         try {
             $desiredState = $this->compiler->compileFromSemanticResult(
                 $input->semanticResult,
-                $input->fieldMappings,
             );
         } catch (AdobeProductCommandCompilationException) {
             return $this->knownNotApplied('semantic_compilation_failed');
@@ -51,23 +50,37 @@ final class AdobeProductSimpleCommandExecutor
             return $this->knownNotApplied('external_record_link_collision');
         }
 
-        $trustedLink = $this->linkGuard->findTrustedLinkForVariant(
+        $trustedLookup = $this->linkGuard->resolveTrustedVariantLinkBySubject(
             $input->workspaceId,
             $input->connectorAccountId,
             $desiredState->productVariantId,
-            $desiredState->sku,
         );
 
-        $context = $this->contextFactory->create($input->workspaceId, $input->connectorAccountId);
+        if ($trustedLookup->isAmbiguous()) {
+            return $this->unknownOrAmbiguous('ambiguous_variant_identity_links');
+        }
 
-        if ($trustedLink !== null) {
+        if ($trustedLookup->isTrusted()) {
+            $storedExternalSku = $trustedLookup->link->external_identifier;
+
+            if ($storedExternalSku !== $desiredState->sku) {
+                return $this->unknownOrAmbiguous(
+                    'linked_identity_drift_requires_adobe_validation',
+                    subjectSku: $storedExternalSku,
+                );
+            }
+
+            $context = $this->contextFactory->create($input->workspaceId, $input->connectorAccountId);
+
             return $this->executeTrustedLinkUpdate(
                 $input,
                 $context,
                 $desiredState,
-                $trustedLink->external_identifier,
+                $storedExternalSku,
             );
         }
+
+        $context = $this->contextFactory->create($input->workspaceId, $input->connectorAccountId);
 
         return $this->executeNoLinkCreate($input, $context, $desiredState);
     }

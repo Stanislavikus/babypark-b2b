@@ -5,7 +5,10 @@ namespace App\Support\Connectors\AdobePaaS\Command;
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
 use App\Models\ProductVariant;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 final class AdobeProductExternalRecordLinkPersister implements AdobeProductExternalRecordLinkPersistence
 {
@@ -21,49 +24,62 @@ final class AdobeProductExternalRecordLinkPersister implements AdobeProductExter
         string $connectorAccountId,
         AdobeProductDesiredState $desiredState,
     ): ExternalRecordLink {
-        return DB::transaction(function () use ($workspaceId, $connectorAccountId, $desiredState): ExternalRecordLink {
-            ConnectorAccount::query()
-                ->where('workspace_id', $workspaceId)
-                ->where('id', $connectorAccountId)
-                ->lockForUpdate()
-                ->firstOrFail();
+        try {
+            return DB::transaction(function () use ($workspaceId, $connectorAccountId, $desiredState): ExternalRecordLink {
+                ConnectorAccount::withoutWorkspaceScope()
+                    ->where('workspace_id', $workspaceId)
+                    ->where('id', $connectorAccountId)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-            if ($this->linkGuard->hasCrossSubjectCollision(
-                $workspaceId,
-                $connectorAccountId,
-                $desiredState->sku,
-                $desiredState->productVariantId,
-            )) {
-                throw AdobeProductExternalRecordLinkPersistenceException::collisionDetected();
-            }
+                if ($this->linkGuard->hasCrossSubjectCollision(
+                    $workspaceId,
+                    $connectorAccountId,
+                    $desiredState->sku,
+                    $desiredState->productVariantId,
+                )) {
+                    throw AdobeProductExternalRecordLinkPersistenceException::collisionDetected();
+                }
 
-            $variant = ProductVariant::query()
-                ->where('workspace_id', $workspaceId)
-                ->where('id', (int) $desiredState->productVariantId)
-                ->first();
+                $trustedLookup = $this->linkGuard->resolveTrustedVariantLinkBySubject(
+                    $workspaceId,
+                    $connectorAccountId,
+                    $desiredState->productVariantId,
+                );
 
-            if ($variant === null) {
-                throw AdobeProductExternalRecordLinkPersistenceException::variantNotFound();
-            }
+                if ($trustedLookup->isAmbiguous()) {
+                    throw AdobeProductExternalRecordLinkPersistenceException::ambiguousVariantIdentity();
+                }
 
-            $existing = $this->linkGuard->findTrustedLinkForVariant(
-                $workspaceId,
-                $connectorAccountId,
-                $desiredState->productVariantId,
-                $desiredState->sku,
-            );
+                if ($trustedLookup->isTrusted()) {
+                    return $trustedLookup->link;
+                }
 
-            if ($existing !== null) {
-                return $existing;
-            }
+                $variant = ProductVariant::withoutWorkspaceScope()
+                    ->where('workspace_id', $workspaceId)
+                    ->where('id', (int) $desiredState->productVariantId)
+                    ->first();
 
-            return ExternalRecordLink::query()->create([
-                'workspace_id' => $workspaceId,
-                'connector_account_id' => $connectorAccountId,
-                'product_id' => null,
-                'product_variant_id' => (int) $desiredState->productVariantId,
-                'external_identifier' => $desiredState->sku,
-            ]);
-        });
+                if ($variant === null) {
+                    throw AdobeProductExternalRecordLinkPersistenceException::variantNotFound();
+                }
+
+                return ExternalRecordLink::withoutWorkspaceScope()->create([
+                    'workspace_id' => $workspaceId,
+                    'connector_account_id' => $connectorAccountId,
+                    'product_id' => null,
+                    'product_variant_id' => (int) $desiredState->productVariantId,
+                    'external_identifier' => $desiredState->sku,
+                ]);
+            });
+        } catch (AdobeProductExternalRecordLinkPersistenceException $exception) {
+            throw $exception;
+        } catch (ModelNotFoundException $exception) {
+            throw AdobeProductExternalRecordLinkPersistenceException::connectorAccountNotFound($exception);
+        } catch (QueryException $exception) {
+            throw AdobeProductExternalRecordLinkPersistenceException::databaseFailure($exception);
+        } catch (Throwable $exception) {
+            throw AdobeProductExternalRecordLinkPersistenceException::databaseFailure($exception);
+        }
     }
 }
