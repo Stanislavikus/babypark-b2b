@@ -6664,17 +6664,17 @@ permission, stale-active-run lease/recovery, Live outcome vocabulary,
 `ExternalRecordLink` persistence, `SyncLiveAdmissionService`, and fail-closed Live
 job shell. Adobe Products / Export / Live support remains **false**.
 
-**Stage 3B–3E — Live Engine implementation slices** — **Pending**
+**Stage 3B–3E — Live Engine implementation slices** — **3B and 3C Done (internal); 3D–3E Pending**
 
 After Stage 3-0 merges, implement in order:
 
-| Slice | Scope | Adobe Products/Export/Live support |
-|---|---|---|
-| **3A — Live Safety Foundation** | `run_sync_live` permission; stale-active-run lease/recovery; Live outcome persistence; `ExternalRecordLink` persistence; `SyncLiveAdmissionService`; Live job shell (`tries = 1`, safe timeout); Preview×Live concurrency tests | remains **false** |
-| **3B — Adobe Simple Live** | Shared Adobe semantic planning boundary; child/simple external identity; GET/POST/PUT Product transport; `ExternalRecordLink` read/write; create/update/reconciliation; simple Product Live execution; applied-state classification | remains **false** |
-| **3C — Adobe Configurable Live** | Connector-owned deterministic parent SKU; child/parent/options/link command compilation; partial/ambiguous outcomes; inactive linked-variant lifecycle; configurable recovery/reconciliation | remains **false** |
-| **3D — Adobe Media + Merchant First Live** | Required E14 primary/gallery image export; merchant Live admission **UI/read model** on `ManageAdobeProductsExportPreview` (non-actionable for consequential execution while Live support is **false**; must not bypass `ConnectorSyncOperationSupport`); queued/running/result presentation; final safe merchant copy | remains **false** |
-| **3E — Real Adobe Validation + Truth Flip** | Disposable write harness; target-version proof; correct API-contract deviations; only then flip `Adobe Products / Export / Live = true` | flip only after successful evidence |
+| Slice | Scope | Adobe Products/Export/Live support | Current repository status |
+|---|---|---|---|
+| **3A — Live Safety Foundation** | `run_sync_live` permission; stale-active-run lease/recovery; Live outcome persistence; `ExternalRecordLink` persistence; `SyncLiveAdmissionService`; Live job shell (`tries = 1`, safe timeout); Preview×Live concurrency tests | remains **false** | **Done** |
+| **3B — Adobe Simple Live** | Shared Adobe semantic planning boundary; child/simple external identity; GET/POST/PUT Product transport; `ExternalRecordLink` read/write; create/update/reconciliation; simple Product Live execution; applied-state classification | remains **false** | **Done (internal)** |
+| **3C — Adobe Configurable Live** | Connector-owned deterministic parent SKU; child/parent/options/link command compilation; partial/ambiguous outcomes; inactive linked-variant lifecycle; configurable recovery/reconciliation | remains **false** | **Done (internal)** — production ownership trust remains conservative; fresh no-link created resources are not auto-adopted on rerun; classification-transition / inactive-only cases remain fail-closed pending Stage 3E |
+| **3D — Adobe Media + Merchant First Live** | Required E14 primary/gallery image export; merchant Live admission **UI/read model** on `ManageAdobeProductsExportPreview` (non-actionable for consequential execution while Live support is **false**; must not bypass `ConnectorSyncOperationSupport`); queued/running/result presentation; final safe merchant copy | remains **false** | **Pending** |
+| **3E — Real Adobe Validation + Truth Flip** | Disposable write harness; target-version proof; correct API-contract deviations; only then flip `Adobe Products / Export / Live = true` | flip only after successful evidence | **Pending** |
 
 Production Live remains **NOT IMPLEMENTED** until Stage 3E completes with explicit
 human authorization. No deployment without separate explicit approval.
