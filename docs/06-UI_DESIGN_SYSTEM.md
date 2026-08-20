@@ -1811,7 +1811,9 @@ Normative detail: `docs/03-DOMAIN_MODEL.md` → **Live Safety, Identity & First-
 Contract (Resolved — Stage 3-0)**; `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md` §17.
 
 **Docs-only in Stage 3-0.** No consequential Live action ships until Stage 3E
-truthful support flip (Stage 3D may build non-actionable UI/read model only).
+truthful support flip. Stage 3D-2 ships the merchant Live UI/read model while
+support remains **false**; the action must remain non-actionable for consequential
+execution until Stage 3E.
 
 Summary rules for first-Live UI on `ManageAdobeProductsExportPreview`:
 
