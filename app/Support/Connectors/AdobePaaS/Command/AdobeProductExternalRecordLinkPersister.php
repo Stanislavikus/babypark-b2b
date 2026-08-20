@@ -8,6 +8,7 @@ use App\Models\ProductVariant;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use PDOException;
 
 final class AdobeProductExternalRecordLinkPersister implements AdobeProductExternalRecordLinkPersistence
 {
@@ -82,6 +83,8 @@ final class AdobeProductExternalRecordLinkPersister implements AdobeProductExter
         } catch (ModelNotFoundException $exception) {
             throw AdobeProductExternalRecordLinkPersistenceException::connectorAccountNotFound($exception);
         } catch (QueryException $exception) {
+            throw AdobeProductExternalRecordLinkPersistenceException::databaseFailure($exception);
+        } catch (PDOException $exception) {
             throw AdobeProductExternalRecordLinkPersistenceException::databaseFailure($exception);
         }
     }

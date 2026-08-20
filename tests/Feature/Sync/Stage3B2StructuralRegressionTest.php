@@ -79,7 +79,7 @@ class Stage3B2StructuralRegressionTest extends TestCase
     }
 
     #[Test]
-    public function persister_does_not_mask_generic_throwable_as_database_failure(): void
+    public function persister_normalizes_concrete_database_failures_without_generic_throwable_masking(): void
     {
         $source = file_get_contents(base_path(
             'app/Support/Connectors/AdobePaaS/Command/AdobeProductExternalRecordLinkPersister.php',
@@ -91,5 +91,13 @@ class Stage3B2StructuralRegressionTest extends TestCase
         $this->assertStringContainsString('catch (AdobeProductExternalRecordLinkPersistenceException', $source);
         $this->assertStringContainsString('catch (ModelNotFoundException', $source);
         $this->assertStringContainsString('catch (QueryException', $source);
+        $this->assertStringContainsString('catch (PDOException', $source);
+
+        $queryExceptionPosition = strpos($source, 'catch (QueryException');
+        $pdoExceptionPosition = strpos($source, 'catch (PDOException');
+
+        $this->assertNotFalse($queryExceptionPosition);
+        $this->assertNotFalse($pdoExceptionPosition);
+        $this->assertLessThan($pdoExceptionPosition, $queryExceptionPosition);
     }
 }
