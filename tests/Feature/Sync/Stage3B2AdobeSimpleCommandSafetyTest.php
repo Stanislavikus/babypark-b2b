@@ -17,6 +17,8 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersi
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersister;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductObservedState;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductOwnershipTrustPolicy;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductParentDesiredState;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductParentObservedState;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteGetClassifier;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateClient;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateComparator;
@@ -672,6 +674,13 @@ class Stage3B2AdobeSimpleCommandSafetyTest extends TestCase
                 ): bool {
                     return $desiredState->sku === $observedState->sku;
                 }
+
+                public function canPersistNewParentLink(
+                    AdobeProductParentDesiredState $desiredState,
+                    AdobeProductParentObservedState $observedState,
+                ): bool {
+                    return false;
+                }
             },
             responder: function (): ConnectorHttpResult {
                 static $count = 0;
@@ -727,6 +736,13 @@ class Stage3B2AdobeSimpleCommandSafetyTest extends TestCase
                     AdobeProductObservedState $observedState,
                 ): bool {
                     return true;
+                }
+
+                public function canPersistNewParentLink(
+                    AdobeProductParentDesiredState $desiredState,
+                    AdobeProductParentObservedState $observedState,
+                ): bool {
+                    return false;
                 }
             },
             persister: $persister,

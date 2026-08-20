@@ -8,4 +8,9 @@ interface AdobeProductOwnershipTrustPolicy
         AdobeProductDesiredState $desiredState,
         AdobeProductObservedState $observedState,
     ): bool;
+
+    public function canPersistNewParentLink(
+        AdobeProductParentDesiredState $desiredState,
+        AdobeProductParentObservedState $observedState,
+    ): bool;
 }

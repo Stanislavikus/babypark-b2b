@@ -39,6 +39,42 @@ final class AdobeProductRemoteStateComparator
         return $this->controlledCustomAttributesMatch($desired->customAttributes, $observed->customAttributes);
     }
 
+    public function parentControlledStateMatches(
+        AdobeProductParentDesiredState $desired,
+        AdobeProductParentObservedState $observed,
+    ): bool {
+        if ($desired->sku !== $observed->sku) {
+            return false;
+        }
+
+        if ($desired->name !== $observed->name) {
+            return false;
+        }
+
+        if ($desired->attributeSetId !== $observed->attributeSetId) {
+            return false;
+        }
+
+        if ($desired->typeId !== $observed->typeId) {
+            return false;
+        }
+
+        if ($desired->status !== $observed->status) {
+            return false;
+        }
+
+        if ($desired->visibility !== $observed->visibility) {
+            return false;
+        }
+
+        return $this->controlledCustomAttributesMatch($desired->customAttributes, $observed->customAttributes);
+    }
+
+    public function productStatusMatches(int $desiredStatus, AdobeProductObservedState $observed): bool
+    {
+        return $desiredStatus === $observed->status;
+    }
+
     /**
      * @param  array<string, mixed>  $desired
      * @param  array<string, mixed>  $observed

@@ -33,6 +33,33 @@ final class AdobeProductSimpleCommandExecutor
             return $this->knownNotApplied('semantic_compilation_failed');
         }
 
+        return $this->executeDesiredState($input, $desiredState);
+    }
+
+    public function executeSimpleChild(
+        AdobeProductSimpleCommandInput $input,
+        string $variantId,
+    ): AdobeProductSimpleCommandResult {
+        if ($input->semanticResult->hasBlockingFindings()) {
+            return $this->knownNotApplied('blocking_semantic_findings');
+        }
+
+        try {
+            $desiredState = $this->compiler->compileSimpleChildFromSemanticResult(
+                $input->semanticResult,
+                $variantId,
+            );
+        } catch (AdobeProductCommandCompilationException) {
+            return $this->knownNotApplied('semantic_compilation_failed');
+        }
+
+        return $this->executeDesiredState($input, $desiredState);
+    }
+
+    private function executeDesiredState(
+        AdobeProductSimpleCommandInput $input,
+        AdobeProductDesiredState $desiredState,
+    ): AdobeProductSimpleCommandResult {
         if ($input->adobeBaseCurrency === null || $input->adobeBaseCurrency === '') {
             return $this->knownNotApplied('currency_evidence_missing');
         }

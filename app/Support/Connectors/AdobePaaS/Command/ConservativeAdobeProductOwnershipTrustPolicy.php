@@ -10,4 +10,11 @@ final class ConservativeAdobeProductOwnershipTrustPolicy implements AdobeProduct
     ): bool {
         return false;
     }
+
+    public function canPersistNewParentLink(
+        AdobeProductParentDesiredState $desiredState,
+        AdobeProductParentObservedState $observedState,
+    ): bool {
+        return false;
+    }
 }

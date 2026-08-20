@@ -3,8 +3,11 @@
 namespace App\Support\Connectors\AdobePaaS;
 
 use App\Enums\SyncLiveOutcome;
+use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableProductCommandCoordinator;
+use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableProductExecutionResult;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductAppliedStateKnowledge;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductCommandSafeEvidence;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkGuard;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandExecutor;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandInput;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandResult;
@@ -20,13 +23,17 @@ use App\Support\Sync\Preview\ProductExecutionAggregate;
 
 final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapability
 {
-    private const string CONFIGURABLE_LIVE_REASON = 'configurable_live_requires_stage_3c';
+    private const string CONFIGURABLE_CLASSIFICATION_TRANSITION_REASON = 'configurable_classification_transition_requires_adobe_validation';
+
+    private const string INACTIVE_ONLY_CONFIGURABLE_FAMILY_REASON = 'inactive_only_configurable_family_requires_adobe_validation';
 
     public function __construct(
         private readonly AdobeProductExportRunMetadataPreparer $metadataPreparer,
         private readonly AdobeStoreConfigReader $storeConfigReader,
         private readonly AdobeProductExportSemanticPlanner $semanticPlanner,
         private readonly AdobeProductSimpleCommandExecutor $commandExecutor,
+        private readonly AdobeConfigurableProductCommandCoordinator $configurableCoordinator,
+        private readonly AdobeProductExternalRecordLinkGuard $linkGuard,
     ) {}
 
     /**
@@ -71,8 +78,32 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
             $runContext->metadata,
         );
 
+        $classificationTransition = $this->resolveClassificationTransitionResult(
+            $semanticResult,
+            $runContext->workspaceId,
+            $runContext->connectorAccountId,
+            (string) $aggregate->productId,
+        );
+
+        if ($classificationTransition !== null) {
+            return $classificationTransition;
+        }
+
         if ($semanticResult->hasBlockingFindings()) {
             return $this->semanticNotApplied($semanticResult);
+        }
+
+        if ($this->isConfigurablePath($semanticResult)) {
+            $configurableResult = $this->configurableCoordinator->execute(
+                workspaceId: $runContext->workspaceId,
+                connectorAccountId: $runContext->connectorAccountId,
+                semanticResult: $semanticResult,
+                adobeBaseCurrency: $runContext->adobeBaseCurrency,
+                metadata: $runContext->metadata,
+                consequentialWriteGate: $consequentialWriteGate,
+            );
+
+            return $this->mapConfigurableResult($configurableResult, $semanticResult);
         }
 
         if (! $this->isStage3BSimplePath($semanticResult)) {
@@ -80,7 +111,7 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
                 outcome: SyncLiveOutcome::NotApplied,
                 findings: [
                     new SyncLiveFinding(
-                        code: self::CONFIGURABLE_LIVE_REASON,
+                        code: 'unsupported_semantic_product_shape',
                         subject: $aggregate->productId,
                     ),
                 ],
@@ -120,6 +151,127 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
         }
 
         return true;
+    }
+
+    private function isConfigurablePath(AdobeProductExportSemanticResult $semanticResult): bool
+    {
+        $hasConfigurableParent = false;
+        $hasSimpleProduct = false;
+
+        foreach ($semanticResult->operations as $operation) {
+            if ($operation->operation === 'configurable_parent') {
+                $hasConfigurableParent = true;
+            }
+
+            if ($operation->operation === 'simple_product') {
+                $hasSimpleProduct = true;
+            }
+        }
+
+        return $hasConfigurableParent && ! $hasSimpleProduct;
+    }
+
+    private function resolveClassificationTransitionResult(
+        AdobeProductExportSemanticResult $semanticResult,
+        string $workspaceId,
+        string $connectorAccountId,
+        string $productId,
+    ): ?SyncLiveProductExecutionResult {
+        if (! ctype_digit($productId)) {
+            return null;
+        }
+
+        $trustedParent = $this->linkGuard->resolveTrustedParentLinkBySubject(
+            $workspaceId,
+            $connectorAccountId,
+            (int) $productId,
+        );
+
+        if (! $trustedParent->isTrusted()) {
+            return null;
+        }
+
+        $hasConfigurableParent = $this->operationExists($semanticResult, 'configurable_parent');
+
+        if (! $hasConfigurableParent) {
+            return new SyncLiveProductExecutionResult(
+                outcome: SyncLiveOutcome::NotApplied,
+                findings: [
+                    new SyncLiveFinding(
+                        code: self::CONFIGURABLE_CLASSIFICATION_TRANSITION_REASON,
+                        subject: $productId,
+                    ),
+                ],
+            );
+        }
+
+        if ($semanticResult->hasBlockingFindings()) {
+            return new SyncLiveProductExecutionResult(
+                outcome: SyncLiveOutcome::NotApplied,
+                findings: [
+                    new SyncLiveFinding(
+                        code: self::INACTIVE_ONLY_CONFIGURABLE_FAMILY_REASON,
+                        subject: $productId,
+                    ),
+                ],
+            );
+        }
+
+        return null;
+    }
+
+    private function operationExists(AdobeProductExportSemanticResult $semanticResult, string $operationType): bool
+    {
+        foreach ($semanticResult->operations as $operation) {
+            if ($operation->operation === $operationType) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function mapConfigurableResult(
+        AdobeConfigurableProductExecutionResult $configurableResult,
+        AdobeProductExportSemanticResult $semanticResult,
+    ): SyncLiveProductExecutionResult {
+        $findings = [];
+
+        foreach ($configurableResult->commandEvidence as $evidence) {
+            $findings[] = new SyncLiveFinding(
+                code: 'command_evidence',
+                subject: $evidence->subjectSku ?? $evidence->variantId,
+                context: [
+                    'command_kind' => $evidence->commandKind,
+                    'reason_code' => $evidence->reasonCode,
+                    'applied_state_knowledge' => $evidence->appliedStateKnowledge->value,
+                    'variant_id' => $evidence->variantId,
+                    'attribute_id' => $evidence->attributeId,
+                    'configurable_option_id' => $evidence->configurableOptionId,
+                    'consequential_write_attempts' => $evidence->consequentialWriteAttempts,
+                    'reconciliation_get_attempts' => $evidence->reconciliationGetAttempts,
+                    'external_record_link_persisted' => $evidence->externalRecordLinkPersisted,
+                    'ownership_trust_satisfied' => $evidence->ownershipTrustSatisfied,
+                ],
+            );
+        }
+
+        if ($semanticResult->findings !== [] && $configurableResult->outcome === SyncLiveOutcome::NotApplied) {
+            foreach ($semanticResult->findings as $finding) {
+                if (! $finding->isBlocking) {
+                    $findings[] = new SyncLiveFinding(
+                        code: $finding->code,
+                        subject: $finding->subject !== '' ? $finding->subject : null,
+                        context: $finding->context,
+                    );
+                }
+            }
+        }
+
+        return new SyncLiveProductExecutionResult(
+            outcome: $configurableResult->outcome,
+            findings: $findings,
+        );
     }
 
     private function semanticNotApplied(AdobeProductExportSemanticResult $semanticResult): SyncLiveProductExecutionResult

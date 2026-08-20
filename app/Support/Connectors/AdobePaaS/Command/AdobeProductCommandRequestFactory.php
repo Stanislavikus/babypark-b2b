@@ -60,6 +60,132 @@ final class AdobeProductCommandRequestFactory
         );
     }
 
+    public function buildPostParent(
+        AdobePaaSRequestContext $context,
+        AdobeProductParentDesiredState $desiredState,
+        OAuth1SigningContext $signingContext,
+    ): RequestInterface {
+        return $this->buildSignedRequest(
+            'POST',
+            $context,
+            '/V1/products',
+            $this->encodeParentProductEnvelope($desiredState),
+            $signingContext,
+        );
+    }
+
+    public function buildPutParent(
+        AdobePaaSRequestContext $context,
+        AdobeProductParentDesiredState $desiredState,
+        OAuth1SigningContext $signingContext,
+    ): RequestInterface {
+        return $this->buildSignedRequest(
+            'PUT',
+            $context,
+            '/V1/products/'.rawurlencode($desiredState->sku),
+            $this->encodeParentProductEnvelope($desiredState),
+            $signingContext,
+        );
+    }
+
+    public function buildPutProductStatus(
+        AdobePaaSRequestContext $context,
+        string $sku,
+        int $status,
+        OAuth1SigningContext $signingContext,
+    ): RequestInterface {
+        $payload = json_encode([
+            'product' => [
+                'sku' => $sku,
+                'status' => $status,
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        return $this->buildSignedRequest(
+            'PUT',
+            $context,
+            '/V1/products/'.rawurlencode($sku),
+            $payload,
+            $signingContext,
+        );
+    }
+
+    public function buildGetConfigurableOptions(
+        AdobePaaSRequestContext $context,
+        string $parentSku,
+        OAuth1SigningContext $signingContext,
+    ): RequestInterface {
+        return $this->buildSignedRequest(
+            'GET',
+            $context,
+            '/V1/configurable-products/'.rawurlencode($parentSku).'/options/all',
+            null,
+            $signingContext,
+        );
+    }
+
+    public function buildPostConfigurableOption(
+        AdobePaaSRequestContext $context,
+        string $parentSku,
+        AdobeConfigurableOptionDesiredState $desiredOption,
+        OAuth1SigningContext $signingContext,
+    ): RequestInterface {
+        return $this->buildSignedRequest(
+            'POST',
+            $context,
+            '/V1/configurable-products/'.rawurlencode($parentSku).'/options',
+            $this->encodeConfigurableOptionPayload($desiredOption),
+            $signingContext,
+        );
+    }
+
+    public function buildPutConfigurableOption(
+        AdobePaaSRequestContext $context,
+        string $parentSku,
+        int $optionId,
+        AdobeConfigurableOptionDesiredState $desiredOption,
+        OAuth1SigningContext $signingContext,
+    ): RequestInterface {
+        return $this->buildSignedRequest(
+            'PUT',
+            $context,
+            '/V1/configurable-products/'.rawurlencode($parentSku).'/options/'.$optionId,
+            $this->encodeConfigurableOptionPayload($desiredOption),
+            $signingContext,
+        );
+    }
+
+    public function buildGetConfigurableChildren(
+        AdobePaaSRequestContext $context,
+        string $parentSku,
+        OAuth1SigningContext $signingContext,
+    ): RequestInterface {
+        return $this->buildSignedRequest(
+            'GET',
+            $context,
+            '/V1/configurable-products/'.rawurlencode($parentSku).'/children',
+            null,
+            $signingContext,
+        );
+    }
+
+    public function buildPostConfigurableChildLink(
+        AdobePaaSRequestContext $context,
+        string $parentSku,
+        string $childSku,
+        OAuth1SigningContext $signingContext,
+    ): RequestInterface {
+        $payload = json_encode(['childSku' => $childSku], JSON_THROW_ON_ERROR);
+
+        return $this->buildSignedRequest(
+            'POST',
+            $context,
+            '/V1/configurable-products/'.rawurlencode($parentSku).'/child',
+            $payload,
+            $signingContext,
+        );
+    }
+
     private function buildSignedRequest(
         string $method,
         AdobePaaSRequestContext $context,
@@ -122,6 +248,43 @@ final class AdobeProductCommandRequestFactory
         ];
 
         return json_encode(['product' => $product], JSON_THROW_ON_ERROR);
+    }
+
+    private function encodeParentProductEnvelope(AdobeProductParentDesiredState $desiredState): string
+    {
+        $product = [
+            'sku' => $desiredState->sku,
+            'name' => $desiredState->name,
+            'attribute_set_id' => $desiredState->attributeSetId,
+            'type_id' => $desiredState->typeId,
+            'status' => $desiredState->status,
+            'visibility' => $desiredState->visibility,
+            'custom_attributes' => $this->encodeCustomAttributes($desiredState->customAttributes),
+        ];
+
+        return json_encode(['product' => $product], JSON_THROW_ON_ERROR);
+    }
+
+    private function encodeConfigurableOptionPayload(AdobeConfigurableOptionDesiredState $desiredOption): string
+    {
+        $values = [];
+
+        foreach ($desiredOption->values as $value) {
+            $values[] = [
+                'value_index' => $value->valueIndex,
+                'label' => $value->label,
+            ];
+        }
+
+        $option = [
+            'attribute_id' => (string) $desiredOption->attributeId,
+            'label' => $desiredOption->label,
+            'position' => $desiredOption->position,
+            'is_use_default' => true,
+            'values' => $values,
+        ];
+
+        return json_encode(['option' => $option], JSON_THROW_ON_ERROR);
     }
 
     /**
