@@ -78,6 +78,159 @@ final class AdobeProductRemoteStateClient
         );
     }
 
+    public function getParentWithContext(
+        AdobePaaSRequestContext $context,
+        string $sku,
+    ): AdobeProductParentRemoteGetResult {
+        [$httpResult, $transportException] = $this->send(
+            $this->requestFactory->buildGet(
+                $context,
+                $sku,
+                $this->newSigningContext(),
+            ),
+        );
+
+        return $this->getClassifier->classifyParent($sku, $httpResult, $transportException);
+    }
+
+    /**
+     * @return array{0: ?ConnectorHttpResult, 1: ?ConnectorTransportException}
+     */
+    public function postParentProduct(
+        AdobePaaSRequestContext $context,
+        AdobeProductParentDesiredState $desiredState,
+    ): array {
+        return $this->send(
+            $this->requestFactory->buildPostParent(
+                $context,
+                $desiredState,
+                $this->newSigningContext(),
+            ),
+        );
+    }
+
+    /**
+     * @return array{0: ?ConnectorHttpResult, 1: ?ConnectorTransportException}
+     */
+    public function putParentProduct(
+        AdobePaaSRequestContext $context,
+        AdobeProductParentDesiredState $desiredState,
+    ): array {
+        return $this->send(
+            $this->requestFactory->buildPutParent(
+                $context,
+                $desiredState,
+                $this->newSigningContext(),
+            ),
+        );
+    }
+
+    /**
+     * @return array{0: ?ConnectorHttpResult, 1: ?ConnectorTransportException}
+     */
+    public function putProductStatus(
+        AdobePaaSRequestContext $context,
+        string $sku,
+        int $status,
+    ): array {
+        return $this->send(
+            $this->requestFactory->buildPutProductStatus(
+                $context,
+                $sku,
+                $status,
+                $this->newSigningContext(),
+            ),
+        );
+    }
+
+    /**
+     * @return array{0: ?ConnectorHttpResult, 1: ?ConnectorTransportException}
+     */
+    public function getConfigurableOptions(
+        AdobePaaSRequestContext $context,
+        string $parentSku,
+    ): array {
+        return $this->send(
+            $this->requestFactory->buildGetConfigurableOptions(
+                $context,
+                $parentSku,
+                $this->newSigningContext(),
+            ),
+        );
+    }
+
+    /**
+     * @return array{0: ?ConnectorHttpResult, 1: ?ConnectorTransportException}
+     */
+    public function postConfigurableOption(
+        AdobePaaSRequestContext $context,
+        string $parentSku,
+        AdobeConfigurableOptionDesiredState $desiredOption,
+    ): array {
+        return $this->send(
+            $this->requestFactory->buildPostConfigurableOption(
+                $context,
+                $parentSku,
+                $desiredOption,
+                $this->newSigningContext(),
+            ),
+        );
+    }
+
+    /**
+     * @return array{0: ?ConnectorHttpResult, 1: ?ConnectorTransportException}
+     */
+    public function putConfigurableOption(
+        AdobePaaSRequestContext $context,
+        string $parentSku,
+        int $optionId,
+        AdobeConfigurableOptionDesiredState $desiredOption,
+    ): array {
+        return $this->send(
+            $this->requestFactory->buildPutConfigurableOption(
+                $context,
+                $parentSku,
+                $optionId,
+                $desiredOption,
+                $this->newSigningContext(),
+            ),
+        );
+    }
+
+    /**
+     * @return array{0: ?ConnectorHttpResult, 1: ?ConnectorTransportException}
+     */
+    public function getConfigurableChildren(
+        AdobePaaSRequestContext $context,
+        string $parentSku,
+    ): array {
+        return $this->send(
+            $this->requestFactory->buildGetConfigurableChildren(
+                $context,
+                $parentSku,
+                $this->newSigningContext(),
+            ),
+        );
+    }
+
+    /**
+     * @return array{0: ?ConnectorHttpResult, 1: ?ConnectorTransportException}
+     */
+    public function postConfigurableChildLink(
+        AdobePaaSRequestContext $context,
+        string $parentSku,
+        string $childSku,
+    ): array {
+        return $this->send(
+            $this->requestFactory->buildPostConfigurableChildLink(
+                $context,
+                $parentSku,
+                $childSku,
+                $this->newSigningContext(),
+            ),
+        );
+    }
+
     /**
      * @return array{0: ?ConnectorHttpResult, 1: ?ConnectorTransportException}
      */

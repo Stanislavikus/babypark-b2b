@@ -14,4 +14,13 @@ interface AdobeProductExternalRecordLinkPersistence
         string $connectorAccountId,
         AdobeProductDesiredState $desiredState,
     ): ExternalRecordLink;
+
+    /**
+     * @throws AdobeProductExternalRecordLinkPersistenceException
+     */
+    public function persistTrustedParentLink(
+        string $workspaceId,
+        string $connectorAccountId,
+        AdobeProductParentDesiredState $desiredState,
+    ): ExternalRecordLink;
 }

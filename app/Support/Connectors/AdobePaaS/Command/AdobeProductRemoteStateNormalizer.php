@@ -70,6 +70,54 @@ final class AdobeProductRemoteStateNormalizer
     }
 
     /**
+     * @param  array<string, mixed>  $productPayload
+     */
+    public function normalizeParent(array $productPayload, string $expectedSku): ?AdobeProductParentObservedState
+    {
+        $sku = $productPayload['sku'] ?? null;
+
+        if (! is_string($sku) || $sku !== $expectedSku) {
+            return null;
+        }
+
+        $name = $productPayload['name'] ?? null;
+        $attributeSetId = $productPayload['attribute_set_id'] ?? null;
+        $typeId = $productPayload['type_id'] ?? null;
+        $status = $productPayload['status'] ?? null;
+        $visibility = $productPayload['visibility'] ?? null;
+
+        if (! is_string($name) || $name === '') {
+            return null;
+        }
+
+        if (! is_numeric($attributeSetId)) {
+            return null;
+        }
+
+        if (! is_string($typeId) || $typeId === '') {
+            return null;
+        }
+
+        if (! is_numeric($status)) {
+            return null;
+        }
+
+        if (! is_numeric($visibility)) {
+            return null;
+        }
+
+        return new AdobeProductParentObservedState(
+            sku: $sku,
+            name: $name,
+            attributeSetId: (int) $attributeSetId,
+            typeId: $typeId,
+            status: (int) $status,
+            visibility: (int) $visibility,
+            customAttributes: $this->normalizeCustomAttributes($productPayload['custom_attributes'] ?? null),
+        );
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function normalizeCustomAttributes(mixed $rawCustomAttributes): array

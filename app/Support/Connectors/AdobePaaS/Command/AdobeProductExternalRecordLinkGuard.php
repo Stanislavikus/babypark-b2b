@@ -29,6 +29,29 @@ final class AdobeProductExternalRecordLinkGuard
         return AdobeProductTrustedVariantLinkLookup::trusted($links->first());
     }
 
+    public function resolveTrustedParentLinkBySubject(
+        string $workspaceId,
+        string $connectorAccountId,
+        int $productId,
+    ): AdobeProductTrustedParentLinkLookup {
+        $links = ExternalRecordLink::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->where('connector_account_id', $connectorAccountId)
+            ->where('product_id', $productId)
+            ->whereNotNull('product_id')
+            ->get();
+
+        if ($links->isEmpty()) {
+            return AdobeProductTrustedParentLinkLookup::none();
+        }
+
+        if ($links->count() > 1) {
+            return AdobeProductTrustedParentLinkLookup::ambiguous();
+        }
+
+        return AdobeProductTrustedParentLinkLookup::trusted($links->first());
+    }
+
     public function hasCrossSubjectCollision(
         string $workspaceId,
         string $connectorAccountId,
@@ -47,6 +70,25 @@ final class AdobeProductExternalRecordLinkGuard
                         $inner->whereNotNull('product_variant_id')
                             ->where('product_variant_id', '!=', $currentVariantId);
                     });
+            })
+            ->exists();
+    }
+
+    public function hasParentSkuCrossSubjectCollision(
+        string $workspaceId,
+        string $connectorAccountId,
+        string $parentSku,
+        int $productId,
+    ): bool {
+        return ExternalRecordLink::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->where('connector_account_id', $connectorAccountId)
+            ->where('external_identifier', $parentSku)
+            ->where(function ($query) use ($productId): void {
+                $query->where(function ($inner) use ($productId): void {
+                    $inner->whereNotNull('product_id')
+                        ->where('product_id', '!=', $productId);
+                })->orWhereNotNull('product_variant_id');
             })
             ->exists();
     }

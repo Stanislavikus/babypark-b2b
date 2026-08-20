@@ -13,5 +13,6 @@ final readonly class AdobeAttributeMetadata
         public string $frontendInput,
         public string $scope,
         public array $options,
+        public ?string $defaultFrontendLabel = null,
     ) {}
 }
