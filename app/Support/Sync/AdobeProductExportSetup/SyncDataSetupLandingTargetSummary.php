@@ -12,7 +12,9 @@ final readonly class SyncDataSetupLandingTargetSummary
         public SyncDataSetupTargetKind $targetKind,
         public bool $setupActionVisible,
         public bool $previewActionVisible,
+        public bool $liveActionVisible,
         public ?string $setupUrl,
         public ?string $previewUrl,
+        public ?string $liveUrl,
     ) {}
 }

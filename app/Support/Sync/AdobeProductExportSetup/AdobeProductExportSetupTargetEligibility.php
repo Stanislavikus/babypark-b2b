@@ -49,6 +49,21 @@ final class AdobeProductExportSetupTargetEligibility
         );
     }
 
+    public function isLiveEligible(ConnectorAccountLayerBSetupEligibilityProjection $projection): bool
+    {
+        $definition = $this->profileRegistry->profileDefinition($projection->authProfile);
+
+        if ($definition->previewCapabilityClass === null) {
+            return false;
+        }
+
+        return $this->syncSupportResolver->supportsConfiguration(
+            $this->accountReferenceForSupport($projection),
+            SyncDataDomain::Products,
+            SyncSemanticOperation::Export,
+        );
+    }
+
     private function hasAdobeProductsExportPreviewProfile(
         ConnectorAccountLayerBSetupEligibilityProjection $projection,
     ): bool {
