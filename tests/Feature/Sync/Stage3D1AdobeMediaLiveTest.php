@@ -33,6 +33,7 @@ use App\Support\Connectors\AdobePaaS\AdobeProductExportLiveRunContext;
 use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableParentSkuGenerator;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductAppliedStateKnowledge;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductCommandRequestFactory;
+use App\Support\Connectors\AdobePaaS\Media\AdobeProductMediaApiLimits;
 use App\Support\Connectors\AdobePaaS\Media\AdobeProductMediaCommandEvidence;
 use App\Support\Connectors\AdobePaaS\Media\AdobeProductMediaDesiredStateBuilder;
 use App\Support\Connectors\AdobePaaS\Media\AdobeProductMediaEntryExecutor;
@@ -46,7 +47,6 @@ use App\Support\Connectors\AdobePaaS\Media\AdobeProductRemoteMediaMetadataReader
 use App\Support\Connectors\AdobePaaS\Media\AdobeProductSourceImageFetcher;
 use App\Support\Connectors\AdobePaaS\Media\AdobeProductSourceImageFetchLimits;
 use App\Support\Connectors\AdobePaaS\Media\AdobeProductSourceImageValidator;
-use App\Support\Connectors\AdobePaaS\Media\AdobeProductVerifiedSourceImage;
 use App\Support\Connectors\AdobePaaS\Semantic\AdobeProductExportSemanticResult;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
 use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
@@ -106,8 +106,9 @@ class Stage3D1AdobeMediaLiveTest extends TestCase
     #[Test]
     public function declaration_order_is_preserved_in_media_evidence(): void
     {
+        $store = $this->newMediaStore();
         [$executor, , $sourceTransport] = $this->mediaLiveExecutorStack(
-            adobeResponder: $this->emptyGalleryAdobeResponder('MEDIA-ORDER-SKU'),
+            adobeResponder: $this->mediaStoreResponder('MEDIA-ORDER-SKU', $store),
             sourceResponder: $this->sequentialSourceResponder([
                 AdobeProductMediaTestFixtures::jpegBytes(),
                 AdobeProductMediaTestFixtures::pngBytes(),
@@ -478,29 +479,31 @@ class Stage3D1AdobeMediaLiveTest extends TestCase
     }
 
     #[Test]
-    public function duplicate_local_content_is_deduplicated_in_desired_state(): void
+    public function duplicate_local_content_is_deduplicated_in_executor(): void
     {
         $bytes = AdobeProductMediaTestFixtures::jpegBytes();
-        $verified = new AdobeProductVerifiedSourceImage(
-            declarationIndex: 0,
-            role: AdobeProductMediaRole::Primary,
-            contentSha256: AdobeProductMediaTestFixtures::sha256($bytes),
-            mimeType: 'image/jpeg',
-            filename: AdobeProductMediaTestFixtures::filenameForBytes($bytes, 'jpg'),
-            rawBytes: $bytes,
-        );
-        $duplicate = new AdobeProductVerifiedSourceImage(
-            declarationIndex: 1,
-            role: AdobeProductMediaRole::Gallery,
-            contentSha256: AdobeProductMediaTestFixtures::sha256($bytes),
-            mimeType: 'image/jpeg',
-            filename: AdobeProductMediaTestFixtures::filenameForBytes($bytes, 'jpg'),
-            rawBytes: $bytes,
+        $store = $this->newMediaStore();
+        [$executor, , $sourceTransport] = $this->mediaLiveExecutorStack(
+            adobeResponder: $this->mediaStoreResponder('DEDUP-LOCAL-SKU', $store),
+            sourceResponder: fn (): ConnectorHttpResult => new ConnectorHttpResult(
+                200,
+                ['Content-Type' => ['image/jpeg']],
+                $bytes,
+            ),
         );
 
-        $entries = (new AdobeProductMediaDesiredStateBuilder)->build('Product Label', [$verified, $duplicate]);
+        $result = $this->executeMediaAfterSynchronizedCore(
+            $executor,
+            $this->aggregateWithImages([
+                'https://source.test/first.jpg',
+                'https://source.test/second-same.jpg',
+            ]),
+            'DEDUP-LOCAL-SKU',
+            label: 'Product Label',
+        );
 
-        $this->assertCount(1, $entries);
+        $this->assertSame([0], $this->mediaDeclarationIndices($result));
+        $this->assertSame(2, $sourceTransport->sendCount);
     }
 
     #[Test]
@@ -664,6 +667,314 @@ class Stage3D1AdobeMediaLiveTest extends TestCase
 
         $this->assertFalse($index->isTrusted());
         $this->assertSame('remote_media_metadata_exceeds_bounded_scan', $index->reasonCode);
+    }
+
+    #[Test]
+    public function malformed_whole_collection_yields_partial_without_http(): void
+    {
+        [$executor, $adobeTransport, $sourceTransport] = $this->mediaLiveExecutorStack(
+            adobeResponder: $this->emptyGalleryAdobeResponder('MALFORMED-COLLECTION-SKU'),
+        );
+
+        $aggregate = new ProductExecutionAggregate(
+            productId: '1',
+            productValues: [],
+            variants: [],
+            sellableVariantCount: 1,
+            imageInput: new ProductExecutionImageInput(
+                ProductExecutionImageStructuralState::Malformed,
+                [],
+            ),
+        );
+
+        $result = $this->executeMediaAfterSynchronizedCore($executor, $aggregate, 'MALFORMED-COLLECTION-SKU');
+
+        $this->assertSame(SyncLiveOutcome::Partial, $result->outcome);
+        $this->assertSame(
+            'malformed_image_collection',
+            $this->mediaEvidenceForIndex($result, 0)['reason_code'],
+        );
+        $this->assertSame(0, $sourceTransport->sendCount);
+        $this->assertSame(0, $adobeTransport->sendCount);
+    }
+
+    #[Test]
+    public function all_invalid_local_sources_perform_zero_adobe_media_reads(): void
+    {
+        [$executor, $adobeTransport, $sourceTransport] = $this->mediaLiveExecutorStack(
+            adobeResponder: $this->emptyGalleryAdobeResponder('ALL-INVALID-SKU'),
+            sourceResponder: fn (): ConnectorHttpResult => new ConnectorHttpResult(500, [], '{}'),
+        );
+
+        $result = $this->executeMediaAfterSynchronizedCore(
+            $executor,
+            $this->aggregateWithImages([
+                'https://source.test/broken-one.jpg',
+                'https://source.test/broken-two.jpg',
+            ]),
+            'ALL-INVALID-SKU',
+        );
+
+        $this->assertSame(SyncLiveOutcome::Partial, $result->outcome);
+        $this->assertSame(2, $sourceTransport->sendCount);
+        $this->assertSame(0, $adobeTransport->sendCount);
+    }
+
+    #[Test]
+    public function malformed_source_uri_rejects_without_secret_leakage(): void
+    {
+        $secretMarker = 'SECRET_LEAK_MARKER_XYZ';
+        $fetcher = new AdobeProductSourceImageFetcher(
+            new RecordingConnectorHttpTransport(
+                fn (): ConnectorHttpResult => new ConnectorHttpResult(200, [], 'never-called'),
+            ),
+            new AdobeProductSourceImageValidator,
+        );
+
+        $result = $fetcher->fetchAndValidate(
+            'https://user:'.$secretMarker.'@',
+            0,
+            AdobeProductMediaRole::Primary,
+        );
+
+        $this->assertFalse($result->accepted);
+        $this->assertSame('source_reference_invalid', $result->reasonCode);
+        $this->assertStringNotContainsString($secretMarker, $result->reasonCode);
+
+        [$executor] = $this->mediaLiveExecutorStack(
+            adobeResponder: $this->emptyGalleryAdobeResponder('URI-LEAK-SKU'),
+        );
+
+        $aggregate = new ProductExecutionAggregate(
+            productId: '1',
+            productValues: [],
+            variants: [],
+            sellableVariantCount: 1,
+            imageInput: new ProductExecutionImageInput(
+                ProductExecutionImageStructuralState::Valid,
+                [
+                    new ProductExecutionImageSourceEntry(0, 'https://user:'.$secretMarker.'@'),
+                ],
+            ),
+        );
+
+        $liveResult = $this->executeMediaAfterSynchronizedCore($executor, $aggregate, 'URI-LEAK-SKU');
+        $encoded = json_encode($liveResult->findings, JSON_THROW_ON_ERROR);
+
+        $this->assertSame(
+            'source_reference_invalid',
+            $this->mediaEvidenceForIndex($liveResult, 0)['reason_code'],
+        );
+        $this->assertStringNotContainsString($secretMarker, $encoded);
+    }
+
+    #[Test]
+    public function source_and_adobe_media_limits_are_distinct(): void
+    {
+        $this->assertSame(5.0, AdobeProductSourceImageFetchLimits::CONNECT_TIMEOUT_SECONDS);
+        $this->assertSame(20.0, AdobeProductSourceImageFetchLimits::TOTAL_TIMEOUT_SECONDS);
+        $this->assertSame(10 * 1024 * 1024, AdobeProductSourceImageFetchLimits::MAX_SOURCE_RESPONSE_BYTES);
+
+        $this->assertSame(10.0, AdobeProductMediaApiLimits::CONNECT_TIMEOUT_SECONDS);
+        $this->assertSame(60.0, AdobeProductMediaApiLimits::TOTAL_TIMEOUT_SECONDS);
+        $this->assertSame(16 * 1024 * 1024, AdobeProductMediaApiLimits::MAX_INDIVIDUAL_MEDIA_GET_RESPONSE_BYTES);
+        $this->assertSame(2 * 1024 * 1024, AdobeProductMediaApiLimits::MAX_MUTATION_RESPONSE_BYTES);
+        $this->assertNotSame(
+            AdobeProductSourceImageFetchLimits::CONNECT_TIMEOUT_SECONDS,
+            AdobeProductMediaApiLimits::CONNECT_TIMEOUT_SECONDS,
+        );
+    }
+
+    #[Test]
+    public function non_image_entries_do_not_count_toward_fifty_image_bound(): void
+    {
+        $entries = [];
+        for ($i = 1; $i <= 51; $i++) {
+            $entries[] = AdobeProductMediaTestFixtures::remoteExternalVideoMetadataEntry(
+                $i,
+                '/video-'.$i.'.mp4',
+                'Video '.$i,
+                $i,
+            );
+        }
+        $entries[] = AdobeProductMediaTestFixtures::remoteMediaMetadataEntry(900, '/only-image.jpg', 'Image', 900);
+
+        $index = (new AdobeProductRemoteMediaMetadataReader)->read(
+            AdobeProductMediaTestFixtures::remoteProductPayloadWithGallery('SKU', $entries),
+        );
+
+        $this->assertTrue($index->isTrusted());
+        $this->assertCount(1, $index->entries);
+    }
+
+    #[Test]
+    public function external_video_entries_are_ignored_by_e14_image_reconciliation(): void
+    {
+        $bytes = AdobeProductMediaTestFixtures::jpegBytes();
+        $filename = AdobeProductMediaTestFixtures::filenameForBytes($bytes, 'jpg');
+        $store = $this->newMediaStore();
+        $store->addGalleryOnlyEntry(
+            AdobeProductMediaTestFixtures::remoteExternalVideoMetadataEntry(
+                501,
+                '/'.$filename,
+                'Video Preview',
+                1,
+            ),
+        );
+
+        [$executor, $adobeTransport] = $this->mediaLiveExecutorStack(
+            adobeResponder: $this->mediaStoreResponder('IGNORE-VIDEO-SKU', $store),
+            sourceResponder: fn (): ConnectorHttpResult => new ConnectorHttpResult(
+                200,
+                ['Content-Type' => ['image/jpeg']],
+                $bytes,
+            ),
+        );
+
+        $result = $this->executeMediaAfterSynchronizedCore(
+            $executor,
+            $this->aggregateWithImages(['https://source.test/new.jpg']),
+            'IGNORE-VIDEO-SKU',
+            label: 'Product Label',
+        );
+
+        $this->assertSame(SyncLiveOutcome::Synchronized, $result->outcome);
+        $this->assertFalse($this->adobeRequestsIncludeIndividualMediaGet($adobeTransport, 501));
+        $this->assertFalse(collect($adobeTransport->recordedRequests)->contains(
+            fn (ConnectorOutboundRequest $request): bool => $request->request->getMethod() === 'PUT'
+                && str_contains((string) $request->request->getUri(), '/media/501'),
+        ));
+    }
+
+    #[Test]
+    public function external_video_same_content_does_not_become_image_update_candidate(): void
+    {
+        $bytes = AdobeProductMediaTestFixtures::jpegBytes();
+        $filename = AdobeProductMediaTestFixtures::filenameForBytes($bytes, 'jpg');
+        $store = $this->newMediaStore();
+        $store->addGalleryOnlyEntry(
+            AdobeProductMediaTestFixtures::remoteExternalVideoMetadataEntry(
+                777,
+                '/'.$filename,
+                'Same Filename Video',
+                1,
+            ),
+        );
+
+        [$executor, $adobeTransport] = $this->mediaLiveExecutorStack(
+            adobeResponder: $this->mediaStoreResponder('VIDEO-COLLISION-SKU', $store),
+            sourceResponder: fn (): ConnectorHttpResult => new ConnectorHttpResult(
+                200,
+                ['Content-Type' => ['image/jpeg']],
+                $bytes,
+            ),
+        );
+
+        $result = $this->executeMediaAfterSynchronizedCore(
+            $executor,
+            $this->aggregateWithImages(['https://source.test/local.jpg']),
+            'VIDEO-COLLISION-SKU',
+            label: 'Product Label',
+        );
+
+        $this->assertSame('media_post_reconciled', $this->mediaEvidenceForIndex($result, 0)['reason_code']);
+        $this->assertFalse($this->adobeRequestsIncludeIndividualMediaGet($adobeTransport, 777));
+        $this->assertTrue(collect($adobeTransport->recordedRequests)->contains(
+            fn (ConnectorOutboundRequest $request): bool => $request->request->getMethod() === 'POST'
+                && str_contains((string) $request->request->getUri(), '/media'),
+        ));
+    }
+
+    #[Test]
+    public function post_create_accepts_official_scalar_gallery_id_response(): void
+    {
+        $bytes = AdobeProductMediaTestFixtures::jpegBytes();
+        $store = $this->newMediaStore();
+        $store->returnScalarCreateId = true;
+        [$executor, $adobeTransport] = $this->mediaLiveExecutorStack(
+            adobeResponder: $this->mediaStoreResponder('SCALAR-POST-SKU', $store),
+            sourceResponder: fn (): ConnectorHttpResult => new ConnectorHttpResult(
+                200,
+                ['Content-Type' => ['image/jpeg']],
+                $bytes,
+            ),
+        );
+
+        $result = $this->executeMediaAfterSynchronizedCore(
+            $executor,
+            $this->aggregateWithImages(['https://source.test/scalar.jpg']),
+            'SCALAR-POST-SKU',
+            label: 'Product Label',
+        );
+
+        $postResponses = collect($adobeTransport->recordedRequests)
+            ->filter(fn (ConnectorOutboundRequest $request): bool => $request->request->getMethod() === 'POST'
+                && str_contains((string) $request->request->getUri(), '/media'));
+
+        $this->assertSame(1, $postResponses->count());
+        $this->assertSame(
+            'media_post_reconciled',
+            $this->mediaEvidenceForIndex($result, 0)['reason_code'],
+        );
+        $this->assertSame(1, $this->mediaEvidenceForIndex($result, 0)['reconciliation_get_attempts']);
+    }
+
+    #[Test]
+    public function put_reconciliation_uses_exactly_one_individual_get(): void
+    {
+        $bytes = AdobeProductMediaTestFixtures::jpegBytes();
+        $filename = AdobeProductMediaTestFixtures::filenameForBytes($bytes, 'jpg');
+        $store = $this->newMediaStore($bytes, $filename, entryId: 88, label: 'Old Label', position: 1);
+
+        [$executor, $adobeTransport] = $this->mediaLiveExecutorStack(
+            adobeResponder: $this->mediaStoreResponder('PUT-GET-COUNT-SKU', $store),
+            sourceResponder: fn (): ConnectorHttpResult => new ConnectorHttpResult(
+                200,
+                ['Content-Type' => ['image/jpeg']],
+                $bytes,
+            ),
+        );
+
+        $result = $this->executeMediaAfterSynchronizedCore(
+            $executor,
+            $this->aggregateWithImages(['https://source.test/put-count.jpg']),
+            'PUT-GET-COUNT-SKU',
+            label: 'New Label',
+        );
+
+        $this->assertSame(1, $this->mediaEvidenceForIndex($result, 0)['reconciliation_get_attempts']);
+        $this->assertGreaterThanOrEqual(1, $this->countAdobeIndividualMediaGets($adobeTransport, 'PUT-GET-COUNT-SKU'));
+    }
+
+    #[Test]
+    public function ambiguous_post_discovery_reports_actual_get_count(): void
+    {
+        $bytes = AdobeProductMediaTestFixtures::jpegBytes();
+        $store = $this->newMediaStore();
+        $store->omitCreateResponseId = true;
+        [$executor, $adobeTransport] = $this->mediaLiveExecutorStack(
+            adobeResponder: $this->mediaStoreResponder('DISCOVERY-GET-SKU', $store),
+            sourceResponder: fn (): ConnectorHttpResult => new ConnectorHttpResult(
+                200,
+                ['Content-Type' => ['image/jpeg']],
+                $bytes,
+            ),
+        );
+
+        $result = $this->executeMediaAfterSynchronizedCore(
+            $executor,
+            $this->aggregateWithImages(['https://source.test/discovery.jpg']),
+            'DISCOVERY-GET-SKU',
+            label: 'Product Label',
+        );
+
+        $this->assertSame(
+            'media_post_inconclusive_body_reconciled',
+            $this->mediaEvidenceForIndex($result, 0)['reason_code'],
+        );
+        $this->assertSame(2, $this->mediaEvidenceForIndex($result, 0)['reconciliation_get_attempts']);
+        $this->assertSame(2, $this->countAdobeProductGets($adobeTransport, 'DISCOVERY-GET-SKU'));
+        $this->assertSame(1, $this->countAdobeIndividualMediaGets($adobeTransport, 'DISCOVERY-GET-SKU'));
     }
 
     #[Test]
@@ -964,7 +1275,7 @@ class Stage3D1AdobeMediaLiveTest extends TestCase
         $store = $this->newMediaStore($bytes, $filename, entryId: 70, label: 'Product Label', position: 1);
         $store->addEntry($bytes, $filename.'-dup', entryId: 71, label: 'Product Label', position: 2);
 
-        [$executor] = $this->mediaLiveExecutorStack(
+        [$executor, , $sourceTransport] = $this->mediaLiveExecutorStack(
             adobeResponder: $this->mediaStoreResponder('STOP-WRITES-SKU', $store),
             sourceResponder: $this->sequentialSourceResponder([$bytes, AdobeProductMediaTestFixtures::pngBytes()]),
         );
@@ -979,10 +1290,13 @@ class Stage3D1AdobeMediaLiveTest extends TestCase
             label: 'Product Label',
         );
 
+        $this->assertSame(SyncLiveOutcome::Ambiguous, $result->outcome);
         $this->assertSame(
-            'prior_remote_media_ambiguity_blocked_writes',
-            $this->mediaEvidenceForIndex($result, 1)['reason_code'],
+            'ambiguous_matching_remote_media',
+            $this->mediaEvidenceForIndex($result, 0)['reason_code'],
         );
+        $this->assertSame([0], $this->mediaDeclarationIndices($result));
+        $this->assertSame(1, $sourceTransport->sendCount);
     }
 
     #[Test]
@@ -1347,6 +1661,30 @@ class Stage3D1AdobeMediaLiveTest extends TestCase
         return $finding->context;
     }
 
+    private function countAdobeProductGets(RecordingConnectorHttpTransport $transport, string $sku): int
+    {
+        return collect($transport->recordedRequests)->filter(
+            fn (ConnectorOutboundRequest $request): bool => $request->request->getMethod() === 'GET'
+                && preg_match('#/V1/products/'.preg_quote(rawurlencode($sku), '#').'$#', (string) $request->request->getUri()) === 1,
+        )->count();
+    }
+
+    private function countAdobeIndividualMediaGets(RecordingConnectorHttpTransport $transport, string $sku): int
+    {
+        return collect($transport->recordedRequests)->filter(
+            fn (ConnectorOutboundRequest $request): bool => $request->request->getMethod() === 'GET'
+                && preg_match('#/V1/products/'.preg_quote(rawurlencode($sku), '#').'/media/\d+$#', (string) $request->request->getUri()) === 1,
+        )->count();
+    }
+
+    private function adobeRequestsIncludeIndividualMediaGet(RecordingConnectorHttpTransport $transport, int $entryId): bool
+    {
+        return collect($transport->recordedRequests)->contains(
+            fn (ConnectorOutboundRequest $request): bool => $request->request->getMethod() === 'GET'
+                && str_contains((string) $request->request->getUri(), '/media/'.$entryId),
+        );
+    }
+
     private function ssrfSafeTransport(): SsrfSafeConnectorHttpTransport
     {
         return SsrfSafeConnectorHttpTransport::create(
@@ -1611,6 +1949,13 @@ final class InMemoryAdobeMediaStore
     /** @var array<int, array{file: string, label: string, position: int, types: list<string>, bytes: string, mime: string}> */
     private array $entries = [];
 
+    /** @var list<array<string, mixed>> */
+    private array $galleryOnlyEntries = [];
+
+    public bool $returnScalarCreateId = false;
+
+    public bool $omitCreateResponseId = false;
+
     private int $nextId = 200;
 
     public function addEntry(
@@ -1638,13 +1983,21 @@ final class InMemoryAdobeMediaStore
         $this->nextId = max($this->nextId, $entryId + 1);
     }
 
+    /**
+     * @param  array<string, mixed>  $galleryEntry
+     */
+    public function addGalleryOnlyEntry(array $galleryEntry): void
+    {
+        $this->galleryOnlyEntries[] = $galleryEntry;
+    }
+
     public function handle(ConnectorOutboundRequest $request, string $sku): ConnectorHttpResult
     {
         $uri = (string) $request->request->getUri();
         $method = $request->request->getMethod();
 
         if ($method === 'GET' && preg_match('#/V1/products/'.preg_quote(rawurlencode($sku), '#').'$#', $uri) === 1) {
-            $gallery = [];
+            $gallery = $this->galleryOnlyEntries;
             foreach ($this->entries as $entryId => $entry) {
                 $gallery[] = AdobeProductMediaTestFixtures::remoteMediaMetadataEntry(
                     $entryId,
@@ -1678,6 +2031,9 @@ final class InMemoryAdobeMediaStore
                     $entry['bytes'],
                     $entry['mime'],
                     basename($entry['file']),
+                    $entry['label'],
+                    $entry['position'],
+                    $entry['types'],
                 ), JSON_THROW_ON_ERROR),
             );
         }
@@ -1698,6 +2054,14 @@ final class InMemoryAdobeMediaStore
                 (int) ($entry['position'] ?? 1),
                 is_array($entry['types'] ?? null) ? $entry['types'] : ['image', 'small_image', 'thumbnail'],
             );
+
+            if ($this->omitCreateResponseId) {
+                return new ConnectorHttpResult(200, [], '{}');
+            }
+
+            if ($this->returnScalarCreateId) {
+                return new ConnectorHttpResult(200, [], json_encode($entryId, JSON_THROW_ON_ERROR));
+            }
 
             return new ConnectorHttpResult(200, [], json_encode(['entry' => ['id' => $entryId]], JSON_THROW_ON_ERROR));
         }

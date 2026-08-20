@@ -208,6 +208,29 @@ class ProductExecutionAggregateTest extends TestCase
     }
 
     #[Test]
+    public function builder_marks_associative_images_json_as_malformed(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'ASSOC-IMAGES',
+            'name' => 'Associative Images Product',
+            'is_active' => true,
+            'images' => ['primary' => 'https://cdn.example.test/primary.jpg'],
+        ]);
+
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            ['field_mappings' => []],
+        )[0];
+
+        $this->assertSame(ProductExecutionImageStructuralState::Malformed, $aggregate->imageInput->structuralState);
+        $this->assertSame([], $aggregate->imageInput->entries);
+    }
+
+    #[Test]
     public function builder_maps_product_images_preserving_declaration_order(): void
     {
         $workspace = $this->defaultWorkspace();

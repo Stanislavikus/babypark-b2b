@@ -22,6 +22,11 @@ final class AdobeProductSourceImageFetcher
     ): AdobeProductSourceImageValidationResult {
         try {
             $request = new Request('GET', $sourceReference);
+        } catch (\InvalidArgumentException) {
+            return AdobeProductSourceImageValidationResult::rejected('source_reference_invalid');
+        }
+
+        try {
             $limits = new ConnectorTransportLimits(
                 connectTimeoutSeconds: AdobeProductSourceImageFetchLimits::CONNECT_TIMEOUT_SECONDS,
                 totalTimeoutSeconds: AdobeProductSourceImageFetchLimits::TOTAL_TIMEOUT_SECONDS,

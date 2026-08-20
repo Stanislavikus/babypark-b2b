@@ -3,7 +3,6 @@
 namespace App\Support\Connectors\AdobePaaS\Media;
 
 use App\Enums\SyncLiveOutcome;
-use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportLiveRunContext;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductAppliedStateKnowledge;
@@ -34,11 +33,22 @@ final class AdobeProductMediaLiveExecutor
         SyncLiveConsequentialWriteGate $writeGate,
         bool $isConfigurablePath,
     ): SyncLiveProductExecutionResult {
-        if (! $aggregate->imageInput->hasEntries()) {
+        if ($coreResult->outcome !== SyncLiveOutcome::Synchronized) {
             return $coreResult;
         }
 
-        if ($coreResult->outcome !== SyncLiveOutcome::Synchronized) {
+        if ($aggregate->imageInput->structuralState === ProductExecutionImageStructuralState::Malformed) {
+            return $this->outcomeComposer->compose($coreResult, [
+                new AdobeProductMediaCommandEvidence(
+                    declarationIndex: 0,
+                    role: AdobeProductMediaRole::Primary,
+                    appliedStateKnowledge: AdobeProductAppliedStateKnowledge::KnownNotApplied,
+                    reasonCode: 'malformed_image_collection',
+                ),
+            ]);
+        }
+
+        if (! $aggregate->imageInput->hasEntries()) {
             return $coreResult;
         }
 
@@ -65,48 +75,22 @@ final class AdobeProductMediaLiveExecutor
             $runContext->connectorAccountId,
         );
 
-        $metadataIndex = $this->remoteStateClient->readMetadataIndexWithContext($context, $target['sku']);
-
-        if (! $metadataIndex->isTrusted()) {
-            return $this->outcomeComposer->compose($coreResult, [
-                new AdobeProductMediaCommandEvidence(
-                    declarationIndex: 0,
-                    role: AdobeProductMediaRole::Primary,
-                    appliedStateKnowledge: AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous,
-                    reasonCode: $metadataIndex->reasonCode !== ''
-                        ? $metadataIndex->reasonCode
-                        : 'remote_media_metadata_untrusted',
-                ),
-            ]);
-        }
-
-        $remoteContentIndex = $this->buildRemoteContentIndex($context, $target['sku'], $metadataIndex);
-
-        if ($remoteContentIndex === null) {
-            return $this->outcomeComposer->compose($coreResult, [
-                new AdobeProductMediaCommandEvidence(
-                    declarationIndex: 0,
-                    role: AdobeProductMediaRole::Primary,
-                    appliedStateKnowledge: AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous,
-                    reasonCode: 'remote_media_content_index_untrusted',
-                ),
-            ]);
-        }
-
         /** @var list<AdobeProductMediaCommandEvidence> $evidence */
         $evidence = [];
-        $verifiedImages = [];
-        $stopWrites = false;
+        $seenContentHashes = [];
+        $remoteIndex = null;
+        $stopSourceFetch = false;
 
         foreach ($aggregate->imageInput->entries as $sourceEntry) {
+            if ($stopSourceFetch) {
+                break;
+            }
+
             $role = $sourceEntry->isPrimary()
                 ? AdobeProductMediaRole::Primary
                 : AdobeProductMediaRole::Gallery;
 
-            if ($aggregate->imageInput->structuralState === ProductExecutionImageStructuralState::Malformed
-                || $sourceEntry->isMalformed
-                || $sourceEntry->sourceReference === null
-            ) {
+            if ($sourceEntry->isMalformed || $sourceEntry->sourceReference === null) {
                 $evidence[] = $this->localNotAppliedEvidence(
                     $sourceEntry,
                     'malformed_image_declaration',
@@ -132,82 +116,68 @@ final class AdobeProductMediaLiveExecutor
                 continue;
             }
 
-            $verifiedImages[] = $validation->verifiedImage;
-        }
+            $verifiedImage = $validation->verifiedImage;
 
-        $desiredEntries = $this->desiredStateBuilder->build($target['label'], $verifiedImages);
-
-        foreach ($desiredEntries as $desired) {
-            if ($stopWrites) {
-                $evidence[] = new AdobeProductMediaCommandEvidence(
-                    declarationIndex: $desired->declarationIndex,
-                    role: $desired->role,
-                    appliedStateKnowledge: AdobeProductAppliedStateKnowledge::KnownNotApplied,
-                    reasonCode: 'prior_remote_media_ambiguity_blocked_writes',
-                    mimeType: $desired->mimeType,
-                    contentSha256Prefix: substr($desired->contentSha256, 0, 8),
-                );
-
+            if (isset($seenContentHashes[$verifiedImage->contentSha256])) {
                 continue;
             }
+
+            $seenContentHashes[$verifiedImage->contentSha256] = true;
+
+            if ($remoteIndex === null) {
+                $metadataIndex = $this->remoteStateClient->readMetadataIndexWithContext($context, $target['sku']);
+
+                if (! $metadataIndex->isTrusted()) {
+                    $evidence[] = new AdobeProductMediaCommandEvidence(
+                        declarationIndex: $verifiedImage->declarationIndex,
+                        role: $verifiedImage->role,
+                        appliedStateKnowledge: AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous,
+                        reasonCode: $metadataIndex->reasonCode !== ''
+                            ? $metadataIndex->reasonCode
+                            : 'remote_media_metadata_untrusted',
+                        mimeType: $verifiedImage->mimeType,
+                        contentSha256Prefix: substr($verifiedImage->contentSha256, 0, 8),
+                    );
+                    $stopSourceFetch = true;
+
+                    break;
+                }
+
+                $remoteIndex = $this->remoteStateClient->buildReconciliationIndex($context, $target['sku'], $metadataIndex);
+
+                if ($remoteIndex === null) {
+                    $evidence[] = new AdobeProductMediaCommandEvidence(
+                        declarationIndex: $verifiedImage->declarationIndex,
+                        role: $verifiedImage->role,
+                        appliedStateKnowledge: AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous,
+                        reasonCode: 'remote_media_content_index_untrusted',
+                        mimeType: $verifiedImage->mimeType,
+                        contentSha256Prefix: substr($verifiedImage->contentSha256, 0, 8),
+                    );
+                    $stopSourceFetch = true;
+
+                    break;
+                }
+            }
+
+            $desired = $this->desiredStateBuilder->buildEntry($target['label'], $verifiedImage);
 
             $entryEvidence = $this->entryExecutor->execute(
                 $context,
                 $target['sku'],
                 $desired,
-                $remoteContentIndex['byHash'],
-                $remoteContentIndex['byFilename'],
+                $remoteIndex,
                 $writeGate,
             );
 
             $evidence[] = $entryEvidence;
 
             if ($entryEvidence->appliedStateKnowledge === AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous) {
-                $stopWrites = true;
+                $stopSourceFetch = true;
             }
         }
 
         return $this->outcomeComposer->compose($coreResult, $evidence);
-    }
-
-    /**
-     * @return array{
-     *     byHash: array<string, list<array{metadata: AdobeProductRemoteMediaMetadataEntry, content: AdobeProductRemoteMediaContentEntry}>>,
-     *     byFilename: array<string, AdobeProductRemoteMediaContentEntry>
-     * }|null
-     */
-    private function buildRemoteContentIndex(
-        AdobePaaSRequestContext $context,
-        string $sku,
-        AdobeProductRemoteMediaMetadataIndex $metadataIndex,
-    ): ?array {
-        $byHash = [];
-        $byFilename = [];
-
-        foreach ($metadataIndex->entries as $metadata) {
-            $content = $this->remoteStateClient->readMediaContent($context, $sku, $metadata->entryId);
-
-            if (! $content->isTrusted()) {
-                return null;
-            }
-
-            $byHash[$content->contentSha256] ??= [];
-            $byHash[$content->contentSha256][] = [
-                'metadata' => $metadata,
-                'content' => $content,
-            ];
-
-            $basename = basename($metadata->file);
-
-            if ($basename !== '') {
-                $byFilename[$basename] = $content;
-            }
-        }
-
-        return [
-            'byHash' => $byHash,
-            'byFilename' => $byFilename,
-        ];
     }
 
     private function localNotAppliedEvidence(

@@ -176,9 +176,13 @@ class ProductExecutionAggregateBuilder
             return new ProductExecutionImageInput(ProductExecutionImageStructuralState::Malformed, []);
         }
 
+        if (! array_is_list($rawImages)) {
+            return new ProductExecutionImageInput(ProductExecutionImageStructuralState::Malformed, []);
+        }
+
         $entries = [];
 
-        foreach (array_values($rawImages) as $index => $value) {
+        foreach ($rawImages as $index => $value) {
             if (! is_string($value) || trim($value) === '') {
                 $entries[] = new ProductExecutionImageSourceEntry(
                     declarationIndex: (int) $index,

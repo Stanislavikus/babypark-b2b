@@ -9,8 +9,4 @@ final class AdobeProductSourceImageFetchLimits
     public const float TOTAL_TIMEOUT_SECONDS = 20.0;
 
     public const int MAX_SOURCE_RESPONSE_BYTES = 10 * 1024 * 1024;
-
-    public const int MAX_REMOTE_MEDIA_GET_RESPONSE_BYTES = 16 * 1024 * 1024;
-
-    public const int MAX_REMOTE_METADATA_ENTRIES = 50;
 }

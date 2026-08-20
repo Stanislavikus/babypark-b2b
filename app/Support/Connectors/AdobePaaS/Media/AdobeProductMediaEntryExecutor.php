@@ -15,29 +15,24 @@ final class AdobeProductMediaEntryExecutor
         private readonly AdobeProductMediaMetadataComparator $metadataComparator,
     ) {}
 
-    /**
-     * @param  array<string, list<array{metadata: AdobeProductRemoteMediaMetadataEntry, content: AdobeProductRemoteMediaContentEntry}>>  $remoteContentIndexByHash
-     * @param  array<string, AdobeProductRemoteMediaContentEntry>  $remoteContentByFilename
-     */
     public function execute(
         AdobePaaSRequestContext $context,
         string $targetSku,
         AdobeProductMediaDesiredEntry $desired,
-        array $remoteContentIndexByHash,
-        array $remoteContentByFilename,
+        AdobeProductRemoteMediaReconciliationIndex $remoteIndex,
         SyncLiveConsequentialWriteGate $writeGate,
     ): AdobeProductMediaCommandEvidence {
-        $matches = $remoteContentIndexByHash[$desired->contentSha256] ?? [];
+        $matches = $remoteIndex->entriesByContentHash[$desired->contentSha256] ?? [];
 
         if (count($matches) > 1) {
             return $this->ambiguous($desired, 'ambiguous_matching_remote_media');
         }
 
         if (count($matches) === 1) {
-            $match = $matches[0];
+            $metadata = $matches[0];
 
-            if ($this->metadataComparator->controlledMetadataMatches($desired, $match['metadata'])) {
-                return $this->applied($desired, 'content_and_metadata_match_no_op', $match['metadata']->entryId);
+            if ($this->metadataComparator->controlledMetadataMatches($desired, $metadata)) {
+                return $this->applied($desired, 'content_and_metadata_match_no_op', $metadata->entryId);
             }
 
             if (! $writeGate->permitsConsequentialWrite()) {
@@ -47,27 +42,27 @@ final class AdobeProductMediaEntryExecutor
             [$putResult, $putTransportException] = $this->remoteStateClient->putMedia(
                 $context,
                 $targetSku,
-                $match['metadata']->entryId,
+                $metadata->entryId,
                 $desired,
-                $match['metadata'],
+                $metadata,
             );
 
             return $this->reconcileAfterMutation(
                 $context,
                 $targetSku,
                 $desired,
-                $match['metadata']->entryId,
+                $metadata->entryId,
                 consequentialWriteAttempts: 1,
                 reasonPrefix: 'media_put',
-                putResult: $putResult,
-                putTransportException: $putTransportException,
+                mutationResult: $putResult,
+                mutationTransportException: $putTransportException,
             );
         }
 
-        $filenameCollision = $remoteContentByFilename[$desired->filename] ?? null;
+        $filenameCollision = $remoteIndex->imageFilenameIndex[$desired->filename] ?? null;
 
         if ($filenameCollision !== null
-            && $filenameCollision->contentSha256 !== $desired->contentSha256
+            && $filenameCollision['contentSha256'] !== $desired->contentSha256
         ) {
             return $this->ambiguous($desired, 'filename_content_collision');
         }
@@ -98,16 +93,54 @@ final class AdobeProductMediaEntryExecutor
         ?ConnectorHttpResult $postResult,
         ?ConnectorTransportException $postTransportException,
     ): AdobeProductMediaCommandEvidence {
-        $metadataIndex = $this->remoteStateClient->readMetadataIndexWithContext($context, $targetSku);
+        $trustedEntryId = $this->parseTrustedPostResponseEntryId($postResult);
 
-        if (! $metadataIndex->isTrusted()) {
-            return $this->ambiguous($desired, 'media_post_reconciliation_metadata_untrusted', 1);
+        if ($trustedEntryId !== null) {
+            return $this->reconcileAfterMutation(
+                $context,
+                $targetSku,
+                $desired,
+                $trustedEntryId,
+                consequentialWriteAttempts: 1,
+                reasonPrefix: 'media_post',
+                mutationResult: $postResult,
+                mutationTransportException: $postTransportException,
+            );
         }
 
-        $candidateEntryId = $this->resolveCreatedEntryId($postResult, $metadataIndex, $desired);
+        $reconciliationGetAttempts = 0;
+
+        if ($postTransportException !== null
+            || $postResult === null
+            || $postResult->statusCode < 200
+            || $postResult->statusCode >= 300
+        ) {
+            $reasonPrefix = 'media_post_inconclusive';
+        } else {
+            $reasonPrefix = 'media_post_inconclusive_body';
+        }
+
+        $metadataIndex = $this->remoteStateClient->readMetadataIndexWithContext($context, $targetSku);
+        $reconciliationGetAttempts++;
+
+        if (! $metadataIndex->isTrusted()) {
+            return $this->ambiguous(
+                $desired,
+                $reasonPrefix.'_reconciliation_metadata_untrusted',
+                1,
+                $reconciliationGetAttempts,
+            );
+        }
+
+        $candidateEntryId = $this->findMetadataEntryIdByFilename($metadataIndex, $desired->filename);
 
         if ($candidateEntryId === null) {
-            return $this->ambiguous($desired, 'media_post_reconciliation_entry_unresolved', 1, 1);
+            return $this->ambiguous(
+                $desired,
+                $reasonPrefix.'_reconciliation_entry_unresolved',
+                1,
+                $reconciliationGetAttempts,
+            );
         }
 
         return $this->reconcileAfterMutation(
@@ -116,9 +149,10 @@ final class AdobeProductMediaEntryExecutor
             $desired,
             $candidateEntryId,
             consequentialWriteAttempts: 1,
-            reasonPrefix: 'media_post',
-            putResult: $postResult,
-            putTransportException: $postTransportException,
+            reasonPrefix: $reasonPrefix,
+            mutationResult: $postResult,
+            mutationTransportException: $postTransportException,
+            reconciliationGetAttemptsBeforeIndividualGet: $reconciliationGetAttempts,
         );
     }
 
@@ -129,65 +163,47 @@ final class AdobeProductMediaEntryExecutor
         int $entryId,
         int $consequentialWriteAttempts,
         string $reasonPrefix,
-        ?ConnectorHttpResult $putResult,
-        ?ConnectorTransportException $putTransportException,
+        ?ConnectorHttpResult $mutationResult,
+        ?ConnectorTransportException $mutationTransportException,
+        int $reconciliationGetAttemptsBeforeIndividualGet = 0,
     ): AdobeProductMediaCommandEvidence {
-        if ($putTransportException !== null
-            || $putResult === null
-            || $putResult->statusCode < 200
-            || $putResult->statusCode >= 300
+        if ($mutationTransportException !== null
+            || $mutationResult === null
+            || $mutationResult->statusCode < 200
+            || $mutationResult->statusCode >= 300
         ) {
             $reasonPrefix .= '_inconclusive';
         }
 
-        $content = $this->remoteStateClient->readMediaContent($context, $targetSku, $entryId);
+        $snapshot = $this->remoteStateClient->readMediaEntrySnapshot($context, $targetSku, $entryId);
+        $reconciliationGetAttempts = $reconciliationGetAttemptsBeforeIndividualGet + 1;
 
-        if (! $content->isTrusted()) {
+        if (! $snapshot->isTrusted()) {
             return $this->ambiguous(
                 $desired,
                 $reasonPrefix.'_reconciliation_content_untrusted',
                 $consequentialWriteAttempts,
-                1,
+                $reconciliationGetAttempts,
+                $entryId,
             );
         }
 
-        if ($content->contentSha256 !== $desired->contentSha256) {
+        if ($snapshot->contentSha256 !== $desired->contentSha256) {
             return $this->ambiguous(
                 $desired,
                 $reasonPrefix.'_reconciliation_content_mismatch',
                 $consequentialWriteAttempts,
-                1,
+                $reconciliationGetAttempts,
+                $entryId,
             );
         }
 
-        $metadataIndex = $this->remoteStateClient->readMetadataIndexWithContext($context, $targetSku);
-
-        if (! $metadataIndex->isTrusted()) {
-            return $this->ambiguous(
-                $desired,
-                $reasonPrefix.'_reconciliation_metadata_untrusted',
-                $consequentialWriteAttempts,
-                1,
-            );
-        }
-
-        $metadata = $this->findMetadataEntry($metadataIndex, $entryId);
-
-        if ($metadata === null) {
-            return $this->ambiguous(
-                $desired,
-                $reasonPrefix.'_reconciliation_metadata_missing',
-                $consequentialWriteAttempts,
-                1,
-            );
-        }
-
-        if (! $this->metadataComparator->controlledMetadataMatches($desired, $metadata)) {
+        if (! $this->metadataComparator->controlledMetadataMatches($desired, $snapshot->metadata)) {
             return $this->ambiguous(
                 $desired,
                 $reasonPrefix.'_reconciliation_metadata_mismatch',
                 $consequentialWriteAttempts,
-                1,
+                $reconciliationGetAttempts,
                 $entryId,
             );
         }
@@ -197,50 +213,52 @@ final class AdobeProductMediaEntryExecutor
             $reasonPrefix.'_reconciled',
             $entryId,
             $consequentialWriteAttempts,
-            1,
+            $reconciliationGetAttempts,
         );
     }
 
-    /**
-     * @param  list<AdobeProductRemoteMediaMetadataEntry>  $entries
-     */
-    private function resolveCreatedEntryId(
-        ?ConnectorHttpResult $postResult,
-        AdobeProductRemoteMediaMetadataIndex $metadataIndex,
-        AdobeProductMediaDesiredEntry $desired,
-    ): ?int {
-        if ($postResult !== null) {
-            $payload = json_decode($postResult->body, true);
-
-            if (is_array($payload)) {
-                $entry = $payload['entry'] ?? $payload;
-
-                if (is_array($entry)) {
-                    $entryId = $entry['id'] ?? null;
-
-                    if (is_int($entryId) || (is_string($entryId) && ctype_digit($entryId))) {
-                        return (int) $entryId;
-                    }
-                }
-            }
+    private function parseTrustedPostResponseEntryId(?ConnectorHttpResult $postResult): ?int
+    {
+        if ($postResult === null
+            || $postResult->statusCode < 200
+            || $postResult->statusCode >= 300
+        ) {
+            return null;
         }
 
-        foreach ($metadataIndex->entries as $entry) {
-            if ($entry->file === '/'.$desired->filename || str_ends_with($entry->file, '/'.$desired->filename)) {
-                return $entry->entryId;
+        $decoded = json_decode($postResult->body, true);
+
+        if (is_int($decoded) && $decoded >= 0) {
+            return $decoded;
+        }
+
+        if (is_string($decoded) && ctype_digit($decoded) && $decoded === (string) (int) $decoded) {
+            return (int) $decoded;
+        }
+
+        if (is_array($decoded)) {
+            $entry = $decoded['entry'] ?? $decoded;
+            $entryId = is_array($entry) ? ($entry['id'] ?? null) : null;
+
+            if (is_int($entryId) && $entryId >= 0) {
+                return $entryId;
+            }
+
+            if (is_string($entryId) && ctype_digit($entryId) && $entryId === (string) (int) $entryId) {
+                return (int) $entryId;
             }
         }
 
         return null;
     }
 
-    private function findMetadataEntry(
+    private function findMetadataEntryIdByFilename(
         AdobeProductRemoteMediaMetadataIndex $metadataIndex,
-        int $entryId,
-    ): ?AdobeProductRemoteMediaMetadataEntry {
+        string $filename,
+    ): ?int {
         foreach ($metadataIndex->entries as $entry) {
-            if ($entry->entryId === $entryId) {
-                return $entry;
+            if ($entry->file === '/'.$filename || str_ends_with($entry->file, '/'.$filename)) {
+                return $entry->entryId;
             }
         }
 

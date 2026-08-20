@@ -81,21 +81,46 @@ final class AdobeProductMediaTestFixtures
     /**
      * @return array<string, mixed>
      */
+    public static function remoteExternalVideoMetadataEntry(
+        int $id,
+        string $file,
+        string $label,
+        int $position,
+        bool $disabled = false,
+    ): array {
+        return [
+            'id' => $id,
+            'media_type' => 'external-video',
+            'file' => $file,
+            'label' => $label,
+            'position' => $position,
+            'disabled' => $disabled,
+            'types' => [],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public static function remoteMediaContentPayload(
         int $entryId,
         string $bytes,
         string $mimeType,
         string $filename,
+        string $label = 'Test Product',
+        int $position = 1,
+        array $types = ['image', 'small_image', 'thumbnail'],
+        bool $disabled = false,
     ): array {
         return [
             'entry' => [
                 'id' => $entryId,
                 'media_type' => 'image',
                 'file' => '/'.$filename,
-                'label' => 'Test Product',
-                'position' => 1,
-                'disabled' => false,
-                'types' => ['image', 'small_image', 'thumbnail'],
+                'label' => $label,
+                'position' => $position,
+                'disabled' => $disabled,
+                'types' => $types,
                 'content' => [
                     'base64_encoded_data' => base64_encode($bytes),
                     'type' => $mimeType,

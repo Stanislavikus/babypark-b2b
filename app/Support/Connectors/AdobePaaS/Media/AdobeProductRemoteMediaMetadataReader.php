@@ -19,18 +19,31 @@ final class AdobeProductRemoteMediaMetadataReader
             return AdobeProductRemoteMediaMetadataIndex::untrusted('malformed_media_gallery_entries');
         }
 
-        if (count($gallery) > AdobeProductSourceImageFetchLimits::MAX_REMOTE_METADATA_ENTRIES) {
-            return AdobeProductRemoteMediaMetadataIndex::untrusted('remote_media_metadata_exceeds_bounded_scan');
-        }
-
         $entries = [];
+        $imageEntryCount = 0;
 
         foreach ($gallery as $entry) {
             if (! is_array($entry)) {
                 return AdobeProductRemoteMediaMetadataIndex::untrusted('malformed_media_gallery_entry');
             }
 
-            $parsed = $this->parseEntry($entry);
+            $mediaType = $entry['media_type'] ?? null;
+
+            if (! is_string($mediaType) || $mediaType === '') {
+                return AdobeProductRemoteMediaMetadataIndex::untrusted('malformed_media_gallery_entry_identity');
+            }
+
+            if ($mediaType !== 'image') {
+                continue;
+            }
+
+            $imageEntryCount++;
+
+            if ($imageEntryCount > AdobeProductMediaApiLimits::MAX_IMAGE_METADATA_ENTRIES) {
+                return AdobeProductRemoteMediaMetadataIndex::untrusted('remote_media_metadata_exceeds_bounded_scan');
+            }
+
+            $parsed = $this->parseImageEntry($entry);
 
             if ($parsed === null) {
                 return AdobeProductRemoteMediaMetadataIndex::untrusted('malformed_media_gallery_entry_identity');
@@ -45,7 +58,15 @@ final class AdobeProductRemoteMediaMetadataReader
     /**
      * @param  array<string, mixed>  $entry
      */
-    private function parseEntry(array $entry): ?AdobeProductRemoteMediaMetadataEntry
+    public function parseImageEntryFromIndividualGet(array $entry): ?AdobeProductRemoteMediaMetadataEntry
+    {
+        return $this->parseImageEntry($entry);
+    }
+
+    /**
+     * @param  array<string, mixed>  $entry
+     */
+    private function parseImageEntry(array $entry): ?AdobeProductRemoteMediaMetadataEntry
     {
         $entryId = $entry['id'] ?? null;
         $mediaType = $entry['media_type'] ?? null;
@@ -59,7 +80,7 @@ final class AdobeProductRemoteMediaMetadataReader
             return null;
         }
 
-        if (! is_string($mediaType) || $mediaType === '') {
+        if ($mediaType !== 'image') {
             return null;
         }
 
