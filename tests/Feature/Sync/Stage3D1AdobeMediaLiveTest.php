@@ -978,6 +978,54 @@ class Stage3D1AdobeMediaLiveTest extends TestCase
     }
 
     #[Test]
+    public function ambiguous_post_discovery_with_multiple_filename_candidates_stops_without_individual_get(): void
+    {
+        $bytes = AdobeProductMediaTestFixtures::jpegBytes();
+        $filename = AdobeProductMediaTestFixtures::filenameForBytes($bytes, 'jpg');
+        $store = $this->newMediaStore();
+        $store->omitCreateResponseId = true;
+        $store->injectDuplicateFilenameCandidateAfterPost = true;
+        [$executor, $adobeTransport] = $this->mediaLiveExecutorStack(
+            adobeResponder: $this->mediaStoreResponder('MULTI-FILENAME-SKU', $store),
+            sourceResponder: fn (): ConnectorHttpResult => new ConnectorHttpResult(
+                200,
+                ['Content-Type' => ['image/jpeg']],
+                $bytes,
+            ),
+        );
+
+        $result = $this->executeMediaAfterSynchronizedCore(
+            $executor,
+            $this->aggregateWithImages(['https://source.test/multi-filename.jpg']),
+            'MULTI-FILENAME-SKU',
+            label: 'Product Label',
+        );
+
+        $evidence = $this->mediaEvidenceForIndex($result, 0);
+        $this->assertSame(SyncLiveOutcome::Ambiguous, $result->outcome);
+        $this->assertSame(
+            AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous->value,
+            $evidence['applied_state_knowledge'],
+        );
+        $this->assertSame('media_post_reconciliation_multiple_filename_candidates', $evidence['reason_code']);
+        $this->assertSame(1, $evidence['consequential_write_attempts']);
+        $this->assertSame(1, $evidence['reconciliation_get_attempts']);
+        $this->assertSame(0, $this->countAdobeIndividualMediaGets($adobeTransport, 'MULTI-FILENAME-SKU'));
+        $this->assertSame(1, collect($adobeTransport->recordedRequests)->filter(
+            fn (ConnectorOutboundRequest $request): bool => $request->request->getMethod() === 'POST'
+                && str_contains((string) $request->request->getUri(), '/media'),
+        )->count());
+        $this->assertFalse(collect($adobeTransport->recordedRequests)->contains(
+            fn (ConnectorOutboundRequest $request): bool => $request->request->getMethod() === 'PUT'
+                && str_contains((string) $request->request->getUri(), '/media'),
+        ));
+        $this->assertFalse(collect($adobeTransport->recordedRequests)->contains(
+            fn (ConnectorOutboundRequest $request): bool => $request->request->getMethod() === 'DELETE'
+                && str_contains((string) $request->request->getUri(), '/media'),
+        ));
+    }
+
+    #[Test]
     public function matching_remote_content_and_metadata_produces_no_op(): void
     {
         $bytes = AdobeProductMediaTestFixtures::jpegBytes();
@@ -1956,6 +2004,8 @@ final class InMemoryAdobeMediaStore
 
     public bool $omitCreateResponseId = false;
 
+    public bool $injectDuplicateFilenameCandidateAfterPost = false;
+
     private int $nextId = 200;
 
     public function addEntry(
@@ -2054,6 +2104,15 @@ final class InMemoryAdobeMediaStore
                 (int) ($entry['position'] ?? 1),
                 is_array($entry['types'] ?? null) ? $entry['types'] : ['image', 'small_image', 'thumbnail'],
             );
+
+            if ($this->injectDuplicateFilenameCandidateAfterPost) {
+                $this->galleryOnlyEntries[] = AdobeProductMediaTestFixtures::remoteMediaMetadataEntry(
+                    $entryId + 1000,
+                    '/'.$filename,
+                    'Duplicate Filename Candidate',
+                    (int) ($entry['position'] ?? 1) + 1,
+                );
+            }
 
             if ($this->omitCreateResponseId) {
                 return new ConnectorHttpResult(200, [], '{}');

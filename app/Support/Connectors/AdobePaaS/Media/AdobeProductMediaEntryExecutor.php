@@ -132,12 +132,21 @@ final class AdobeProductMediaEntryExecutor
             );
         }
 
-        $candidateEntryId = $this->findMetadataEntryIdByFilename($metadataIndex, $desired->filename);
+        $filenameCandidates = $this->findMetadataEntryIdsByFilename($metadataIndex, $desired->filename);
 
-        if ($candidateEntryId === null) {
+        if ($filenameCandidates === []) {
             return $this->ambiguous(
                 $desired,
                 $reasonPrefix.'_reconciliation_entry_unresolved',
+                1,
+                $reconciliationGetAttempts,
+            );
+        }
+
+        if (count($filenameCandidates) > 1) {
+            return $this->ambiguous(
+                $desired,
+                'media_post_reconciliation_multiple_filename_candidates',
                 1,
                 $reconciliationGetAttempts,
             );
@@ -147,7 +156,7 @@ final class AdobeProductMediaEntryExecutor
             $context,
             $targetSku,
             $desired,
-            $candidateEntryId,
+            $filenameCandidates[0],
             consequentialWriteAttempts: 1,
             reasonPrefix: $reasonPrefix,
             mutationResult: $postResult,
@@ -252,17 +261,22 @@ final class AdobeProductMediaEntryExecutor
         return null;
     }
 
-    private function findMetadataEntryIdByFilename(
+    /**
+     * @return list<int>
+     */
+    private function findMetadataEntryIdsByFilename(
         AdobeProductRemoteMediaMetadataIndex $metadataIndex,
         string $filename,
-    ): ?int {
+    ): array {
+        $matches = [];
+
         foreach ($metadataIndex->entries as $entry) {
             if ($entry->file === '/'.$filename || str_ends_with($entry->file, '/'.$filename)) {
-                return $entry->entryId;
+                $matches[] = $entry->entryId;
             }
         }
 
-        return null;
+        return $matches;
     }
 
     private function applied(
