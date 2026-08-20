@@ -11,6 +11,7 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkGuard
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandExecutor;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandInput;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandResult;
+use App\Support\Connectors\AdobePaaS\Media\AdobeProductMediaLiveExecutor;
 use App\Support\Connectors\AdobePaaS\Semantic\AdobeProductExportSemanticFinding;
 use App\Support\Connectors\AdobePaaS\Semantic\AdobeProductExportSemanticOperation;
 use App\Support\Connectors\AdobePaaS\Semantic\AdobeProductExportSemanticPlanner;
@@ -36,6 +37,7 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
         private readonly AdobeProductSimpleCommandExecutor $commandExecutor,
         private readonly AdobeConfigurableProductCommandCoordinator $configurableCoordinator,
         private readonly AdobeProductExternalRecordLinkGuard $linkGuard,
+        private readonly AdobeProductMediaLiveExecutor $mediaLiveExecutor,
     ) {}
 
     /**
@@ -115,7 +117,16 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
                 consequentialWriteGate: $consequentialWriteGate,
             );
 
-            return $this->mapConfigurableResult($configurableResult, $semanticResult);
+            $coreResult = $this->mapConfigurableResult($configurableResult, $semanticResult);
+
+            return $this->mediaLiveExecutor->executeAfterCoreProduct(
+                $aggregate,
+                $semanticResult,
+                $coreResult,
+                $runContext,
+                $consequentialWriteGate,
+                isConfigurablePath: true,
+            );
         }
 
         if (! $this->isStage3BSimplePath($semanticResult)) {
@@ -138,7 +149,16 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
             consequentialWriteGate: $consequentialWriteGate,
         ));
 
-        return $this->mapCommandResult($commandResult, $semanticResult);
+        $coreResult = $this->mapCommandResult($commandResult, $semanticResult);
+
+        return $this->mediaLiveExecutor->executeAfterCoreProduct(
+            $aggregate,
+            $semanticResult,
+            $coreResult,
+            $runContext,
+            $consequentialWriteGate,
+            isConfigurablePath: false,
+        );
     }
 
     private function isStage3BSimplePath(AdobeProductExportSemanticResult $semanticResult): bool

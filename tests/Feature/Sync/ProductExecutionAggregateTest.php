@@ -6,6 +6,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\VariantFieldValue;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
+use App\Support\Sync\Preview\ProductExecutionImageStructuralState;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -157,5 +158,130 @@ class ProductExecutionAggregateTest extends TestCase
         $this->assertNotNull($mapped);
         $this->assertSame('description', $mapped->internalCode);
         $this->assertNull($mapped->value);
+    }
+
+    #[Test]
+    public function builder_returns_empty_image_input_when_images_are_null(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'NO-IMAGES',
+            'name' => 'No Images Product',
+            'is_active' => true,
+            'images' => null,
+        ]);
+
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            ['field_mappings' => []],
+        )[0];
+
+        $this->assertSame(ProductExecutionImageStructuralState::Valid, $aggregate->imageInput->structuralState);
+        $this->assertSame([], $aggregate->imageInput->entries);
+        $this->assertFalse($aggregate->imageInput->hasEntries());
+    }
+
+    #[Test]
+    public function builder_marks_image_input_malformed_when_images_is_not_array(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'BAD-IMAGES',
+            'name' => 'Bad Images Product',
+            'is_active' => true,
+            'images' => 'not-an-array',
+        ]);
+
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            ['field_mappings' => []],
+        )[0];
+
+        $this->assertSame(ProductExecutionImageStructuralState::Malformed, $aggregate->imageInput->structuralState);
+        $this->assertSame([], $aggregate->imageInput->entries);
+    }
+
+    #[Test]
+    public function builder_marks_associative_images_json_as_malformed(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'ASSOC-IMAGES',
+            'name' => 'Associative Images Product',
+            'is_active' => true,
+            'images' => ['primary' => 'https://cdn.example.test/primary.jpg'],
+        ]);
+
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            ['field_mappings' => []],
+        )[0];
+
+        $this->assertSame(ProductExecutionImageStructuralState::Malformed, $aggregate->imageInput->structuralState);
+        $this->assertSame([], $aggregate->imageInput->entries);
+    }
+
+    #[Test]
+    public function builder_maps_product_images_preserving_declaration_order(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'WITH-IMAGES',
+            'name' => 'Images Product',
+            'is_active' => true,
+            'images' => [
+                'https://cdn.example.test/primary.jpg',
+                'https://cdn.example.test/gallery.jpg',
+            ],
+        ]);
+
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            ['field_mappings' => []],
+        )[0];
+
+        $this->assertCount(2, $aggregate->imageInput->entries);
+        $this->assertSame(0, $aggregate->imageInput->entries[0]->declarationIndex);
+        $this->assertSame('https://cdn.example.test/primary.jpg', $aggregate->imageInput->entries[0]->sourceReference);
+        $this->assertSame(1, $aggregate->imageInput->entries[1]->declarationIndex);
+        $this->assertSame('https://cdn.example.test/gallery.jpg', $aggregate->imageInput->entries[1]->sourceReference);
+    }
+
+    #[Test]
+    public function builder_marks_non_string_image_values_as_malformed_entries(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'MALFORMED-IMAGE-ENTRY',
+            'name' => 'Malformed Image Entry Product',
+            'is_active' => true,
+            'images' => ['https://cdn.example.test/valid.jpg', '', 123],
+        ]);
+
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            ['field_mappings' => []],
+        )[0];
+
+        $this->assertSame(ProductExecutionImageStructuralState::Valid, $aggregate->imageInput->structuralState);
+        $this->assertFalse($aggregate->imageInput->entries[0]->isMalformed);
+        $this->assertTrue($aggregate->imageInput->entries[1]->isMalformed);
+        $this->assertTrue($aggregate->imageInput->entries[2]->isMalformed);
+        $this->assertNull($aggregate->imageInput->entries[1]->sourceReference);
     }
 }

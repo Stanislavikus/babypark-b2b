@@ -13,6 +13,7 @@ final readonly class ProductExecutionAggregate
         public array $productValues,
         public array $variants,
         public int $sellableVariantCount,
+        public ProductExecutionImageInput $imageInput,
     ) {}
 
     public function hasSellableVariants(): bool
