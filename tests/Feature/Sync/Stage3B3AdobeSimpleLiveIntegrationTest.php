@@ -703,16 +703,25 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
 
     private function attachVariantPrice(Workspace $workspace, ProductVariant $variant, float $price): void
     {
-        $priceList = PriceList::query()->firstOrCreate(
-            ['workspace_id' => $workspace->id, 'code' => 'default'],
-            ['name' => 'Default', 'status' => PriceListStatus::Active],
+        $priceList = PriceList::withoutWorkspaceScope()->firstOrCreate(
+            [
+                'workspace_id' => $workspace->id,
+                'is_default' => true,
+            ],
+            [
+                'name' => 'Workspace Default',
+                'currency' => 'UAH',
+                'priority' => 0,
+                'status' => PriceListStatus::Active,
+            ],
         );
 
-        PriceListItem::query()->updateOrCreate(
+        PriceListItem::withoutWorkspaceScope()->updateOrCreate(
             [
                 'workspace_id' => $workspace->id,
                 'price_list_id' => $priceList->id,
                 'product_variant_id' => $variant->id,
+                'quantity_min' => 1,
             ],
             [
                 'price' => $price,
