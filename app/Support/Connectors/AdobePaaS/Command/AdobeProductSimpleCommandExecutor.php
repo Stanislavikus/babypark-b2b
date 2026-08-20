@@ -119,6 +119,14 @@ final class AdobeProductSimpleCommandExecutor
             );
         }
 
+        if (! $this->permitsConsequentialWrite($input)) {
+            return $this->knownNotApplied(
+                'writer_lease_expired_before_consequential_write',
+                subjectSku: $linkedExternalSku,
+                remoteGetClassification: $initialGet->classification,
+            );
+        }
+
         [$putResult, $putTransportException] = $this->remoteStateClient->putProduct($context, $desiredState);
 
         if ($this->shouldReconcileAfterWrite($putResult, $putTransportException)) {
@@ -166,6 +174,14 @@ final class AdobeProductSimpleCommandExecutor
         if ($initialGet->classification !== AdobeProductRemoteGetClassification::TrustedKnownMissing) {
             return $this->unknownOrAmbiguous(
                 'initial_get_untrusted',
+                subjectSku: $desiredState->sku,
+                remoteGetClassification: $initialGet->classification,
+            );
+        }
+
+        if (! $this->permitsConsequentialWrite($input)) {
+            return $this->knownNotApplied(
+                'writer_lease_expired_before_consequential_write',
                 subjectSku: $desiredState->sku,
                 remoteGetClassification: $initialGet->classification,
             );
@@ -329,6 +345,15 @@ final class AdobeProductSimpleCommandExecutor
         $sku = $product['sku'] ?? null;
 
         return is_string($sku) && $sku === $expectedSku;
+    }
+
+    private function permitsConsequentialWrite(AdobeProductSimpleCommandInput $input): bool
+    {
+        if ($input->consequentialWriteGate === null) {
+            return true;
+        }
+
+        return $input->consequentialWriteGate->permitsConsequentialWrite();
     }
 
     private function knownNotApplied(

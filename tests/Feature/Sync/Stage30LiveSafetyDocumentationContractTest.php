@@ -280,7 +280,7 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
         $this->assertStringContainsString('**Stage 3-0 — Live Safety, Identity & First-Live Contract**', $gaps);
         $this->assertStringContainsString('**Stage 3A — Live Safety Foundation**', $gaps);
         $this->assertStringContainsString('**Stage 3B-2 — Adobe Product simple command safety foundation**', $gaps);
-        $this->assertStringContainsString('**Stage 3B (remaining) — Adobe Simple Live integration**', $gaps);
+        $this->assertStringContainsString('**Stage 3B — Adobe Simple Live integration**', $gaps);
         $this->assertStringContainsString('**Stage 3C — Adobe Configurable Live**', $gaps);
     }
 
@@ -473,6 +473,35 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
     private function e9Section(): string
     {
         return $this->extractSubsection('#### E9. ExternalRecordLink structural contract', '#### Adobe Magento V1 identity notes');
+    }
+
+    #[Test]
+    public function stage_3b_current_state_is_consistent_in_implementation_gaps(): void
+    {
+        $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        $this->assertStringContainsString('**Stage 3B — Adobe Simple Live integration**', $gaps);
+        $this->assertStringContainsString('**Done (internal)**', $gaps);
+        $this->assertStringContainsString('generic `SyncLiveRunJob` orchestration', $gaps);
+        $this->assertStringContainsString('Adobe simple `live_capability` binding', $gaps);
+        $this->assertStringContainsString('**Stage 3C — Adobe Configurable Live**', $gaps);
+        $this->assertStringContainsString('merchant Live unreachable until Stage 3E', $gaps);
+
+        $this->assertStringNotContainsString('Done, unwired', $gaps);
+        $this->assertStringNotContainsString('remaining Stage 3B', $gaps);
+        $this->assertStringNotContainsString('fail-closed `SyncLiveRunJob` shell', $gaps);
+        $this->assertStringNotContainsString('Configurable Simple Live', $gaps);
+        $this->assertStringNotContainsString('Stage 3B-2 command foundation exists but is unwired', $gaps);
+    }
+
+    #[Test]
+    public function atlas_live_execution_current_state_has_no_stale_stage_3a_shell_row(): void
+    {
+        $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
+
+        $this->assertStringContainsString('| Live execution | IMPLEMENTED (Stage 3B generic orchestration', $atlas);
+        $this->assertStringNotContainsString('Live execution job shell', $atlas);
+        $this->assertStringNotContainsString('Stage 3A shell — fail-closed, no Adobe write', $atlas);
     }
 
     /**

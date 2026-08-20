@@ -6,6 +6,8 @@ use App\Enums\SyncDataDomain;
 use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectorAdapter;
+use App\Support\Connectors\AdobePaaS\AdobeProductExportLiveCapability;
+use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
@@ -28,12 +30,45 @@ class Stage3B2StructuralRegressionTest extends TestCase
     }
 
     #[Test]
-    public function sync_live_run_job_remains_fail_closed_without_adobe_command_executor(): void
+    public function sync_live_run_job_contains_no_adobe_command_executor_reference(): void
     {
         $source = file_get_contents(base_path('app/Jobs/Connectors/SyncLiveRunJob.php'));
         $this->assertIsString($source);
-        $this->assertStringContainsString('executorNotImplemented', $source);
         $this->assertStringNotContainsString('AdobeProductSimpleCommandExecutor', $source);
+        $this->assertStringNotContainsString('AdobeProductExportLiveCapability', $source);
+    }
+
+    #[Test]
+    public function adobe_profile_declares_live_capability_binding(): void
+    {
+        $definition = app(ConnectorProfileRegistry::class)->profileDefinition('adobe_commerce_paas_oauth1_integration');
+
+        $this->assertNotNull($definition->liveCapabilityClass);
+        $this->assertSame(
+            AdobeProductExportLiveCapability::class,
+            $definition->liveCapabilityClass,
+        );
+    }
+
+    #[Test]
+    public function live_capability_binding_does_not_flip_advertised_live_support(): void
+    {
+        $adapter = new AdobePaaSConnectorAdapter;
+        $account = $this->createConnectorAccount();
+
+        $this->assertFalse($adapter->supports(
+            SyncDataDomain::Products,
+            SyncSemanticOperation::Export,
+            SyncRunMode::Live,
+        ));
+
+        $resolver = app(ConnectorSyncSupportResolver::class);
+        $this->assertFalse($resolver->supports(
+            $account,
+            SyncDataDomain::Products,
+            SyncSemanticOperation::Export,
+            SyncRunMode::Live,
+        ));
     }
 
     #[Test]

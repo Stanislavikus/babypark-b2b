@@ -8,6 +8,7 @@ use App\Support\Connectors\Exceptions\DisabledConnectorProfileException;
 use App\Support\Connectors\Exceptions\InvalidConnectorProfileConfiguration;
 use App\Support\Connectors\Exceptions\UnsupportedConnectorCapabilityException;
 use App\Support\Sync\FieldOptionMappingOptionValidator;
+use App\Support\Sync\Live\SyncLiveConnectorCapability;
 use App\Support\Sync\Preview\SyncPreviewConnectorCapability;
 use Illuminate\Contracts\Container\Container;
 use ValueError;
@@ -335,6 +336,45 @@ class ConnectorProfileRegistry
             $previewCapabilityClass = $configuredPreviewCapability;
         }
 
+        $liveCapabilityClass = null;
+
+        if (array_key_exists('live_capability', $profileConfig)) {
+            $configuredLiveCapability = $profileConfig['live_capability'];
+
+            if (! is_string($configuredLiveCapability) || $configuredLiveCapability === '') {
+                throw new InvalidConnectorProfileConfiguration(
+                    sprintf(
+                        'Connector profile [%s] key [live_capability] must be a non-empty class-string.',
+                        $profileCode,
+                    ),
+                );
+            }
+
+            if (! class_exists($configuredLiveCapability)) {
+                throw new InvalidConnectorProfileConfiguration(
+                    sprintf(
+                        'Connector profile [%s] live_capability class [%s] does not exist.',
+                        $profileCode,
+                        $configuredLiveCapability,
+                    ),
+                );
+            }
+
+            if (! is_subclass_of($configuredLiveCapability, SyncLiveConnectorCapability::class)
+                && $configuredLiveCapability !== SyncLiveConnectorCapability::class) {
+                throw new InvalidConnectorProfileConfiguration(
+                    sprintf(
+                        'Connector profile [%s] live_capability class [%s] must implement %s.',
+                        $profileCode,
+                        $configuredLiveCapability,
+                        SyncLiveConnectorCapability::class,
+                    ),
+                );
+            }
+
+            $liveCapabilityClass = $configuredLiveCapability;
+        }
+
         $fieldOptionMappingValidatorClass = null;
 
         if (array_key_exists('field_option_mapping_validator', $profileConfig)) {
@@ -382,6 +422,7 @@ class ConnectorProfileRegistry
             accountSchemaClass: $accountSchemaClass,
             capabilities: $capabilities,
             previewCapabilityClass: $previewCapabilityClass,
+            liveCapabilityClass: $liveCapabilityClass,
             fieldOptionMappingValidatorClass: $fieldOptionMappingValidatorClass,
         );
     }

@@ -11,6 +11,7 @@ final readonly class ConnectorProfileDefinition
      * @param  class-string<ConnectorAccountSchema>  $accountSchemaClass
      * @param  list<ConnectorCapability>  $capabilities
      * @param  class-string|null  $previewCapabilityClass
+     * @param  class-string|null  $liveCapabilityClass
      * @param  class-string|null  $fieldOptionMappingValidatorClass
      */
     public function __construct(
@@ -21,6 +22,7 @@ final readonly class ConnectorProfileDefinition
         public string $accountSchemaClass,
         public array $capabilities,
         public ?string $previewCapabilityClass = null,
+        public ?string $liveCapabilityClass = null,
         public ?string $fieldOptionMappingValidatorClass = null,
     ) {}
 

@@ -6,8 +6,8 @@ use RuntimeException;
 
 final class SyncLiveRunJobExecutionException extends RuntimeException
 {
-    public static function executorNotImplemented(): self
+    public function __construct()
     {
-        return new self('Live sync executor is not implemented.');
+        parent::__construct('Live sync execution failed.');
     }
 }
