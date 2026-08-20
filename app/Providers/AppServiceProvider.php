@@ -11,6 +11,10 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapabilityImpl;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapabilityImpl;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersistence;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersister;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductOwnershipTrustPolicy;
+use App\Support\Connectors\AdobePaaS\Command\ConservativeAdobeProductOwnershipTrustPolicy;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspaceMembership;
@@ -39,6 +43,16 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             AdobePaaSDiscoveryCapability::class,
             AdobePaaSDiscoveryCapabilityImpl::class,
+        );
+
+        $this->app->bind(
+            AdobeProductExternalRecordLinkPersistence::class,
+            AdobeProductExternalRecordLinkPersister::class,
+        );
+
+        $this->app->bind(
+            AdobeProductOwnershipTrustPolicy::class,
+            ConservativeAdobeProductOwnershipTrustPolicy::class,
         );
 
         $this->app->bind(ConnectorAccountPersistencePort::class, ConnectorAccountSettingsService::class);

@@ -2,8 +2,19 @@
 
 namespace App\Jobs\Connectors;
 
+use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
 use App\Enums\SyncRunStatus;
+use App\Enums\SyncSemanticOperation;
+use App\Models\ConnectorAccount;
+use App\Models\Product;
+use App\Models\SyncConfiguration;
 use App\Models\SyncRun;
+use App\Models\SyncRunItem;
+use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
+use App\Support\Sync\Live\SyncLiveConnectorCapabilityResolver;
+use App\Support\Sync\Live\SyncRunConsequentialWriteGate;
+use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
 use App\Support\Sync\SyncRuntimeExecutionTiming;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\Interruptible;
@@ -12,6 +23,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class SyncLiveRunJob implements Interruptible, ShouldQueue
 {
@@ -50,10 +62,12 @@ class SyncLiveRunJob implements Interruptible, ShouldQueue
         return $this->interrupted;
     }
 
-    public function handle(): void
-    {
+    public function handle(
+        ProductExecutionAggregateBuilder $aggregateBuilder,
+        SyncLiveConnectorCapabilityResolver $capabilityResolver,
+    ): void {
         try {
-            $this->execute();
+            $this->execute($aggregateBuilder, $capabilityResolver);
         } catch (\Throwable) {
             $this->terminalizeFailedRun();
 
@@ -61,8 +75,10 @@ class SyncLiveRunJob implements Interruptible, ShouldQueue
         }
     }
 
-    private function execute(): void
-    {
+    private function execute(
+        ProductExecutionAggregateBuilder $aggregateBuilder,
+        SyncLiveConnectorCapabilityResolver $capabilityResolver,
+    ): void {
         $reserved = DB::transaction(function (): ?SyncRun {
             $run = SyncRun::withoutWorkspaceScope()
                 ->where('workspace_id', $this->workspaceId)
@@ -91,7 +107,129 @@ class SyncLiveRunJob implements Interruptible, ShouldQueue
             return;
         }
 
-        throw SyncLiveRunJobExecutionException::executorNotImplemented();
+        $run = $reserved;
+
+        if ($run->mode !== SyncRunMode::Live || $run->semantic_operation !== SyncSemanticOperation::Export) {
+            throw new \RuntimeException('Live sync run must be Products Export execution.');
+        }
+
+        $configuration = SyncConfiguration::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspaceId)
+            ->where('id', $run->sync_configuration_id)
+            ->first();
+
+        if ($configuration === null) {
+            throw SyncConfigurationNotFoundException::forId((string) $run->sync_configuration_id);
+        }
+
+        if ($configuration->workspace_id !== $this->workspaceId
+            || $configuration->connector_account_id !== $this->connectorAccountId
+            || $configuration->data_domain !== SyncDataDomain::Products
+        ) {
+            throw SyncConfigurationNotFoundException::forId((string) $run->sync_configuration_id);
+        }
+
+        $account = ConnectorAccount::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspaceId)
+            ->where('id', $this->connectorAccountId)
+            ->firstOrFail();
+
+        $snapshot = $run->configuration_snapshot ?? [];
+        $snapshot = is_array($snapshot) ? $snapshot : [];
+
+        $selection = $snapshot['selection'] ?? null;
+        $selectionMode = is_array($selection) ? ($selection['mode'] ?? null) : null;
+
+        if ($selectionMode !== 'all_products') {
+            throw new \RuntimeException('Live sync snapshot selection mode is not supported.');
+        }
+
+        $productIds = Product::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspaceId)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(static fn ($id): string => (string) $id)
+            ->all();
+
+        $aggregates = $aggregateBuilder->buildForProductIds($this->workspaceId, $productIds, $snapshot);
+        $returnedProductIds = array_map(
+            static fn ($aggregate): string => $aggregate->productId,
+            $aggregates,
+        );
+
+        $missingProductIds = array_values(array_diff($productIds, $returnedProductIds));
+
+        if ($missingProductIds !== []) {
+            throw new \RuntimeException(
+                'Product execution aggregate builder omitted requested product ids: '.implode(', ', $missingProductIds),
+            );
+        }
+
+        $capability = $capabilityResolver->resolve($account);
+        $runContext = $capability->prepareRun(
+            $this->workspaceId,
+            $this->connectorAccountId,
+            $snapshot,
+        );
+
+        foreach ($aggregates as $aggregate) {
+            $currentRun = SyncRun::withoutWorkspaceScope()
+                ->where('workspace_id', $this->workspaceId)
+                ->where('id', $this->syncRunId)
+                ->firstOrFail();
+
+            $writeGate = new SyncRunConsequentialWriteGate($currentRun);
+
+            if (! $writeGate->permitsProductExecution()) {
+                $this->terminalizeFailedRun();
+
+                return;
+            }
+
+            $result = $capability->executeProduct(
+                $aggregate,
+                $snapshot,
+                $runContext,
+                $writeGate,
+            );
+
+            DB::transaction(function () use ($run, $aggregate, $result): void {
+                SyncRunItem::withoutWorkspaceScope()->create([
+                    'id' => (string) Str::uuid(),
+                    'workspace_id' => $run->workspace_id,
+                    'sync_run_id' => $run->id,
+                    'product_id' => $aggregate->productId,
+                    'outcome' => $result->outcome->value,
+                    'findings' => array_map(
+                        static fn ($finding) => $finding->toArray(),
+                        $result->findings,
+                    ),
+                ]);
+            });
+        }
+
+        $completed = DB::transaction(function (): bool {
+            $run = SyncRun::withoutWorkspaceScope()
+                ->where('workspace_id', $this->workspaceId)
+                ->where('id', $this->syncRunId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($run === null || $run->status !== SyncRunStatus::Running) {
+                return false;
+            }
+
+            $run->update([
+                'status' => SyncRunStatus::Completed,
+                'completed_at' => now(),
+            ]);
+
+            return true;
+        });
+
+        if (! $completed) {
+            throw new \RuntimeException('Live run was not in running state during completion transition.');
+        }
     }
 
     private function terminalizeFailedRun(): void
@@ -108,6 +246,6 @@ class SyncLiveRunJob implements Interruptible, ShouldQueue
 
     private function normalizeThrowable(): \Throwable
     {
-        return new SyncLiveRunJobExecutionException('Live sync executor is not implemented.');
+        return new SyncLiveRunJobExecutionException;
     }
 }

@@ -3,6 +3,7 @@
 use App\Support\Connectors\AdobePaaS\AdobeFieldOptionMappingOptionValidator;
 use App\Support\Connectors\AdobePaaS\AdobePaaSAccountSchema;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectorAdapter;
+use App\Support\Connectors\AdobePaaS\AdobeProductExportLiveCapability;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportPreviewCapability;
 
 return [
@@ -25,6 +26,7 @@ return [
                 'account_setup',
             ],
             'preview_capability' => AdobeProductExportPreviewCapability::class,
+            'live_capability' => AdobeProductExportLiveCapability::class,
             'field_option_mapping_validator' => AdobeFieldOptionMappingOptionValidator::class,
         ],
     ],

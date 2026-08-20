@@ -10,6 +10,7 @@ use Illuminate\Contracts\Container\Container;
 use Tests\Support\Connectors\TestSyncSupportConnectorAccountSchema;
 use Tests\Support\Connectors\TestSyncSupportConnectorAdapter;
 use Tests\Support\Sync\TestFieldOptionMappingOptionValidator;
+use Tests\Support\Sync\TestSyncLiveCapability;
 use Tests\Support\Sync\TestSyncPreviewCapability;
 
 trait ConfiguresSyncSupportProfiles
@@ -40,6 +41,7 @@ trait ConfiguresSyncSupportProfiles
             'account_schema' => TestSyncSupportConnectorAccountSchema::class,
             'capabilities' => [],
             'preview_capability' => TestSyncPreviewCapability::class,
+            'live_capability' => TestSyncLiveCapability::class,
             'field_option_mapping_validator' => TestFieldOptionMappingOptionValidator::class,
         ];
 

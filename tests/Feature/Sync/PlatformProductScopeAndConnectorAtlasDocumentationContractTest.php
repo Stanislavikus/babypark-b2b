@@ -288,7 +288,7 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
         $this->assertStringContainsString('**Stage 3-0 — Live Safety, Identity & First-Live Contract**', $gaps);
         $this->assertStringContainsString('**Stage 3A — Live Safety Foundation**', $gaps);
         $this->assertStringContainsString('**Stage 3B-2 — Adobe Product simple command safety foundation**', $gaps);
-        $this->assertStringContainsString('**Stage 3B (remaining) — Adobe Simple Live integration**', $gaps);
+        $this->assertStringContainsString('**Stage 3B — Adobe Simple Live integration**', $gaps);
         $this->assertStringContainsString('**Stage 3C — Adobe Configurable Live**', $gaps);
         $this->assertStringContainsString('**Stage 3D — Adobe Media + Merchant First Live**', $gaps);
         $this->assertStringContainsString('**Stage 3E — Real Adobe Validation + Truth Flip**', $gaps);

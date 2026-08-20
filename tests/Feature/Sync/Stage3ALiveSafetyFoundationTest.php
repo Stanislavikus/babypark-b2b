@@ -32,6 +32,7 @@ use App\Support\Sync\ConnectorExecutionConfiguration;
 use App\Support\Sync\Exceptions\SyncLiveAdmissionException;
 use App\Support\Sync\Exceptions\SyncPreviewAdmissionException;
 use App\Support\Sync\Exceptions\SyncRuntimeTimingConfigurationException;
+use App\Support\Sync\Live\SyncLiveConnectorCapabilityResolver;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
 use App\Support\Sync\Preview\SyncPreviewConnectorCapabilityResolver;
 use App\Support\Sync\SyncRuntimeExecutionTiming;
@@ -461,9 +462,12 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         Config::set('sync_runtime.max_inflight_external_request_seconds', 5);
 
         try {
-            $job->handle();
+            $job->handle(
+                app(ProductExecutionAggregateBuilder::class),
+                app(SyncLiveConnectorCapabilityResolver::class),
+            );
         } catch (SyncLiveRunJobExecutionException) {
-            // Expected fail-closed shell after reservation.
+            // Lease timestamp proof is the target even when execution fails later.
         }
 
         $run = $run->fresh();
@@ -638,7 +642,7 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
     }
 
     #[Test]
-    public function live_job_shell_fails_closed_without_items(): void
+    public function live_job_completes_with_test_live_capability(): void
     {
         $account = $this->createSyncSupportAccount();
         $configuration = $this->prepareReadyConfiguration($account);
@@ -654,19 +658,16 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
             'configuration_snapshot' => ['selection' => ['mode' => 'all_products']],
         ]);
 
-        try {
-            (new SyncLiveRunJob($account->workspace_id, $account->id, $run->id))->handle();
-            $this->fail('Expected live shell failure.');
-        } catch (SyncLiveRunJobExecutionException) {
-            // expected
-        }
+        (new SyncLiveRunJob($account->workspace_id, $account->id, $run->id))->handle(
+            app(ProductExecutionAggregateBuilder::class),
+            app(SyncLiveConnectorCapabilityResolver::class),
+        );
 
         $run = $run->fresh();
-        $this->assertSame(SyncRunStatus::Failed, $run->status);
+        $this->assertSame(SyncRunStatus::Completed, $run->status);
         $this->assertNotNull($run->completed_at);
         $this->assertNotNull($run->writer_deadline_at);
         $this->assertNotNull($run->recoverable_after);
-        $this->assertSame(0, SyncRunItem::withoutWorkspaceScope()->where('sync_run_id', $run->id)->count());
     }
 
     #[Test]
