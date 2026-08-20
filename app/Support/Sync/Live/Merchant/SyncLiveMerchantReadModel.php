@@ -2,22 +2,28 @@
 
 namespace App\Support\Sync\Live\Merchant;
 
-use App\Enums\SyncLiveMerchantPageState;
+use App\Enums\SyncLiveMerchantLifecycleState;
+use App\Enums\SyncLiveMerchantSetupBarrier;
 
 final readonly class SyncLiveMerchantReadModel
 {
     public function __construct(
-        public SyncLiveMerchantPageState $pageState,
-        public bool $canManageSetup,
+        public SyncLiveMerchantLifecycleState $lifecycleState,
+        public ?SyncLiveMerchantSetupBarrier $setupBarrier,
+        public bool $liveSupportAvailable,
+        public bool $previewPrerequisiteSatisfied,
+        public bool $configurationReady,
+        public bool $blockedByActiveRun,
+        public bool $activePreviewBlocking,
         public bool $canStartLive,
+        public bool $canManageSetup,
         public bool $configurationChangedSinceRun,
         public ?string $displayedRunId,
         public ?string $configurationId,
         public ?SyncLiveMerchantResultSummary $resultSummary,
-        public bool $hasActiveRun,
+        public ?SyncLivePreviewPrerequisiteSummary $previewPrerequisiteSummary,
         public bool $currentSetupRequired,
-        public bool $hasPreviewEvidence,
+        public ?int $processedProductCount,
         public SyncLiveAdmissionReadiness $admissionReadiness,
-        public ?int $processedProductCount = null,
     ) {}
 }

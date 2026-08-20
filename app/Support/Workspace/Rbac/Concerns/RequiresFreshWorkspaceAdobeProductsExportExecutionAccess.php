@@ -29,7 +29,7 @@ trait RequiresFreshWorkspaceAdobeProductsExportExecutionAccess
         $canPreview = app(AdobeProductsExportPreviewAuthorizationService::class)
             ->canAccess($user, $workspace);
         $canLive = app(AdobeProductsExportLiveAuthorizationService::class)
-            ->canAccess($user, $workspace);
+            ->canAccessLive($user, $workspace);
 
         if (! $canPreview && ! $canLive) {
             abort(403);

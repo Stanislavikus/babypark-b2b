@@ -2,7 +2,8 @@
 
 namespace App\Filament\Pages\Sync;
 
-use App\Enums\SyncLiveMerchantPageState;
+use App\Enums\SyncLiveMerchantLifecycleState;
+use App\Enums\SyncLiveWorklistFilter;
 use App\Enums\SyncPreviewMerchantPageState;
 use App\Enums\SyncPreviewWorklistFilter;
 use App\Enums\SyncSemanticOperation;
@@ -13,9 +14,12 @@ use App\Models\Workspace;
 use App\Services\Sync\AdobeProductsExportLiveAuthorizationService;
 use App\Services\Sync\AdobeProductsExportPreviewAuthorizationService;
 use App\Services\Sync\ConnectorAccountLayerBSetupProjectionQuery;
+use App\Services\Sync\SyncActiveRunReadQuery;
 use App\Services\Sync\SyncConfigurationLookupService;
 use App\Services\Sync\SyncLiveAdmissionService;
 use App\Services\Sync\SyncLiveMerchantReadService;
+use App\Services\Sync\SyncLiveWorklistPresenter;
+use App\Services\Sync\SyncLiveWorklistQuery;
 use App\Services\Sync\SyncPreviewAdmissionService;
 use App\Services\Sync\SyncPreviewMerchantReadService;
 use App\Services\Sync\SyncPreviewWorklistPresenter;
@@ -49,6 +53,9 @@ class ManageAdobeProductsExportPreview extends Page
 
     #[Locked]
     public ?string $displayedRunId = null;
+
+    #[Locked]
+    public ?string $liveDisplayedRunId = null;
 
     #[Locked]
     public ?string $configurationId = null;
@@ -88,7 +95,17 @@ class ManageAdobeProductsExportPreview extends Page
     /** @var list<array<string, mixed>> */
     public array $worklistRows = [];
 
-    public string $livePageState = '';
+    public string $liveLifecycleState = 'none';
+
+    public ?string $liveSetupBarrier = null;
+
+    public bool $liveSupportAvailable = false;
+
+    public bool $livePreviewPrerequisiteSatisfied = false;
+
+    public bool $liveBlockedByActiveRun = false;
+
+    public bool $liveActivePreviewBlocking = false;
 
     public bool $canStartLive = false;
 
@@ -97,8 +114,6 @@ class ManageAdobeProductsExportPreview extends Page
     public bool $liveCurrentSetupRequired = false;
 
     public bool $livePollActive = false;
-
-    public bool $liveHasPreviewEvidence = false;
 
     public ?string $liveLifecycleLabel = null;
 
@@ -116,11 +131,26 @@ class ManageAdobeProductsExportPreview extends Page
 
     public ?int $liveProcessedProductCount = null;
 
+    public ?int $livePreviewReadyCount = null;
+
+    public ?int $livePreviewWarningCount = null;
+
+    public ?int $livePreviewBlockedCount = null;
+
+    /** @var list<array<string, mixed>> */
+    public array $liveWorklistRows = [];
+
     #[Url(as: 'filter')]
     public string $worklistFilter = 'needs_attention';
 
     #[Url(as: 'search')]
     public ?string $worklistSearch = '';
+
+    #[Url(as: 'live_filter')]
+    public string $liveWorklistFilter = 'needs_attention';
+
+    #[Url(as: 'live_search')]
+    public ?string $liveWorklistSearch = '';
 
     public static function canAccess(array $parameters = []): bool
     {
@@ -132,7 +162,7 @@ class ManageAdobeProductsExportPreview extends Page
         }
 
         return app(AdobeProductsExportPreviewAuthorizationService::class)->canAccess($user, $workspace)
-            || app(AdobeProductsExportLiveAuthorizationService::class)->canAccess($user, $workspace);
+            || app(AdobeProductsExportLiveAuthorizationService::class)->canAccessLive($user, $workspace);
     }
 
     public function getTitle(): string|Htmlable
@@ -178,6 +208,24 @@ class ManageAdobeProductsExportPreview extends Page
         $this->refreshWorklist();
     }
 
+    public function updatedLiveWorklistFilter(): void
+    {
+        if (! $this->liveSectionVisible) {
+            return;
+        }
+
+        $this->refreshLiveWorklist();
+    }
+
+    public function updatedLiveWorklistSearch(): void
+    {
+        if (! $this->liveSectionVisible) {
+            return;
+        }
+
+        $this->refreshLiveWorklist();
+    }
+
     public function startPreview(): void
     {
         $user = Auth::user();
@@ -191,7 +239,7 @@ class ManageAdobeProductsExportPreview extends Page
 
         $readModel = app(SyncPreviewMerchantReadService::class)->project($user, $workspace, $this->accountId);
 
-        if ($readModel->hasActiveRun || ! $readModel->canStartPreview) {
+        if ($readModel->hasActiveRun || ! $readModel->canStartPreview || $this->isBlockedByAnyActiveRun($readModel->configurationId)) {
             $this->refreshPresentation();
 
             return;
@@ -243,13 +291,13 @@ class ManageAdobeProductsExportPreview extends Page
 
         $workspace = $this->resolveAdobeProductsExportExecutionWorkspace();
 
-        if (! app(AdobeProductsExportLiveAuthorizationService::class)->canAccess($user, $workspace)) {
+        if (! app(AdobeProductsExportLiveAuthorizationService::class)->canAccessLive($user, $workspace)) {
             abort(403);
         }
 
         $readModel = app(SyncLiveMerchantReadService::class)->project($user, $workspace, $this->accountId);
 
-        if ($readModel->hasActiveRun || ! $readModel->canStartLive) {
+        if (! $readModel->canStartLive) {
             $this->refreshPresentation();
 
             return;
@@ -303,7 +351,7 @@ class ManageAdobeProductsExportPreview extends Page
         $previewAuth = app(AdobeProductsExportPreviewAuthorizationService::class);
         $liveAuth = app(AdobeProductsExportLiveAuthorizationService::class);
 
-        if (! $previewAuth->canAccess($user, $workspace) && ! $liveAuth->canAccess($user, $workspace)) {
+        if (! $previewAuth->canAccess($user, $workspace) && ! $liveAuth->canAccessLive($user, $workspace)) {
             abort(403);
         }
 
@@ -322,6 +370,8 @@ class ManageAdobeProductsExportPreview extends Page
             $this->resetLivePresentation();
         }
 
+        $this->applyCommonActiveRunGate($workspace);
+
         if (! $this->previewSectionVisible && $this->liveSectionVisible) {
             $projection = app(ConnectorAccountLayerBSetupProjectionQuery::class)
                 ->resolve($workspace->id, $this->accountId);
@@ -333,6 +383,33 @@ class ManageAdobeProductsExportPreview extends Page
             $this->platformName = $projection->platformName;
             $this->accountName = $projection->accountName;
         }
+
+        $this->pollActive = $this->pollActive
+            || $this->livePollActive
+            || $this->isBlockedByAnyActiveRun($this->configurationId);
+    }
+
+    private function applyCommonActiveRunGate(Workspace $workspace): void
+    {
+        if ($this->configurationId === null) {
+            return;
+        }
+
+        if (! $this->isBlockedByAnyActiveRun($this->configurationId)) {
+            return;
+        }
+
+        $this->canStartPreview = false;
+        $this->canStartLive = false;
+    }
+
+    private function isBlockedByAnyActiveRun(?string $configurationId): bool
+    {
+        if ($configurationId === null) {
+            return false;
+        }
+
+        return app(SyncActiveRunReadQuery::class)->isBlocked($configurationId);
     }
 
     private function refreshPreviewPresentation(User $user, Workspace $workspace): void
@@ -389,20 +466,26 @@ class ManageAdobeProductsExportPreview extends Page
     {
         $readModel = app(SyncLiveMerchantReadService::class)->project($user, $workspace, $this->accountId);
 
-        $this->livePageState = $readModel->pageState->value;
+        $this->liveLifecycleState = $readModel->lifecycleState->value;
+        $this->liveSetupBarrier = $readModel->setupBarrier?->value;
         $this->canManageSetup = $readModel->canManageSetup || $this->canManageSetup;
         $this->canStartLive = $readModel->canStartLive;
+        $this->liveSupportAvailable = $readModel->liveSupportAvailable;
+        $this->livePreviewPrerequisiteSatisfied = $readModel->previewPrerequisiteSatisfied;
+        $this->liveBlockedByActiveRun = $readModel->blockedByActiveRun;
+        $this->liveActivePreviewBlocking = $readModel->activePreviewBlocking;
         $this->liveConfigurationChangedSinceRun = $readModel->configurationChangedSinceRun;
         $this->liveCurrentSetupRequired = $readModel->currentSetupRequired;
-        $this->liveHasPreviewEvidence = $readModel->hasPreviewEvidence;
-        $this->livePollActive = in_array($readModel->pageState, [
-            SyncLiveMerchantPageState::Queued,
-            SyncLiveMerchantPageState::Running,
+        $this->liveDisplayedRunId = $readModel->displayedRunId;
+        $this->configurationId = $readModel->configurationId ?? $this->configurationId;
+        $this->livePollActive = in_array($readModel->lifecycleState, [
+            SyncLiveMerchantLifecycleState::Queued,
+            SyncLiveMerchantLifecycleState::Running,
         ], true);
 
-        $this->liveLifecycleLabel = match ($readModel->pageState) {
-            SyncLiveMerchantPageState::Queued => __('sync_live.lifecycle.queued'),
-            SyncLiveMerchantPageState::Running => __('sync_live.lifecycle.running'),
+        $this->liveLifecycleLabel = match ($readModel->lifecycleState) {
+            SyncLiveMerchantLifecycleState::Queued => __('sync_live.lifecycle.queued'),
+            SyncLiveMerchantLifecycleState::Running => __('sync_live.lifecycle.running'),
             default => null,
         };
 
@@ -413,8 +496,18 @@ class ManageAdobeProductsExportPreview extends Page
         $this->liveCompletedAtLabel = null;
         $this->liveResultAttentionStatement = null;
         $this->liveProcessedProductCount = $readModel->processedProductCount;
+        $this->livePreviewReadyCount = null;
+        $this->livePreviewWarningCount = null;
+        $this->livePreviewBlockedCount = null;
+        $this->liveWorklistRows = [];
 
-        if ($readModel->pageState === SyncLiveMerchantPageState::Completed && $readModel->resultSummary !== null) {
+        if ($readModel->previewPrerequisiteSummary !== null) {
+            $this->livePreviewReadyCount = $readModel->previewPrerequisiteSummary->readyCount;
+            $this->livePreviewWarningCount = $readModel->previewPrerequisiteSummary->warningCount;
+            $this->livePreviewBlockedCount = $readModel->previewPrerequisiteSummary->blockedCount;
+        }
+
+        if ($readModel->lifecycleState === SyncLiveMerchantLifecycleState::Completed && $readModel->resultSummary !== null) {
             $summary = $readModel->resultSummary;
             $this->liveSynchronizedCount = $summary->synchronizedCount;
             $this->liveNotAppliedCount = $summary->notAppliedCount;
@@ -433,6 +526,8 @@ class ManageAdobeProductsExportPreview extends Page
             } else {
                 $this->liveResultAttentionStatement = __('sync_live.results.all_synchronized');
             }
+
+            $this->refreshLiveWorklist();
         }
     }
 
@@ -450,16 +545,21 @@ class ManageAdobeProductsExportPreview extends Page
         $this->blockedCount = null;
         $this->completedAtLabel = null;
         $this->worklistRows = [];
+        $this->displayedRunId = null;
     }
 
     private function resetLivePresentation(): void
     {
-        $this->livePageState = '';
+        $this->liveLifecycleState = 'none';
+        $this->liveSetupBarrier = null;
         $this->canStartLive = false;
+        $this->liveSupportAvailable = false;
+        $this->livePreviewPrerequisiteSatisfied = false;
+        $this->liveBlockedByActiveRun = false;
+        $this->liveActivePreviewBlocking = false;
         $this->liveConfigurationChangedSinceRun = false;
         $this->liveCurrentSetupRequired = false;
         $this->livePollActive = false;
-        $this->liveHasPreviewEvidence = false;
         $this->liveLifecycleLabel = null;
         $this->liveResultAttentionStatement = null;
         $this->liveSynchronizedCount = null;
@@ -468,6 +568,11 @@ class ManageAdobeProductsExportPreview extends Page
         $this->liveAmbiguousCount = null;
         $this->liveCompletedAtLabel = null;
         $this->liveProcessedProductCount = null;
+        $this->livePreviewReadyCount = null;
+        $this->livePreviewWarningCount = null;
+        $this->livePreviewBlockedCount = null;
+        $this->liveWorklistRows = [];
+        $this->liveDisplayedRunId = null;
     }
 
     private function refreshWorklist(
@@ -525,5 +630,42 @@ class ManageAdobeProductsExportPreview extends Page
             $workspace,
             $items,
         );
+    }
+
+    private function refreshLiveWorklist(): void
+    {
+        $workspace = $this->resolveAdobeProductsExportExecutionWorkspace();
+        $runId = $this->liveDisplayedRunId;
+
+        if ($runId === null) {
+            $this->liveWorklistRows = [];
+
+            return;
+        }
+
+        $run = SyncRun::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
+            ->where('id', $runId)
+            ->first();
+
+        if ($run === null || ! app(SyncLiveWorklistQuery::class)->isWorklistRenderable($run)) {
+            $this->liveWorklistRows = [];
+
+            return;
+        }
+
+        $filter = SyncLiveWorklistFilter::tryFrom($this->liveWorklistFilter)
+            ?? SyncLiveWorklistFilter::NeedsAttention;
+
+        $query = app(SyncLiveWorklistQuery::class)->baseQuery($workspace, $run);
+        $query = app(SyncLiveWorklistQuery::class)->applyOutcomeFilter($query, $filter);
+        $query = app(SyncLiveWorklistQuery::class)->applySearch($query, (string) ($this->liveWorklistSearch ?? ''));
+
+        $items = $query
+            ->with(['product.variants' => fn ($variantQuery) => $variantQuery->where('is_active', true)])
+            ->orderBy('product_id')
+            ->get();
+
+        $this->liveWorklistRows = app(SyncLiveWorklistPresenter::class)->presentRows($items);
     }
 }

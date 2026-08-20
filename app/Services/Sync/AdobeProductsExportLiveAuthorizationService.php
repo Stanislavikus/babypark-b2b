@@ -18,13 +18,19 @@ final class AdobeProductsExportLiveAuthorizationService
         private readonly AdobeProductExportSetupTargetEligibility $targetEligibility,
     ) {}
 
-    public function canAccess(User $actor, Workspace $workspace): bool
+    public function canAccessLive(User $actor, Workspace $workspace): bool
     {
         return $this->workspaceAuthorization->allows(
             $actor,
             $workspace,
             WorkspacePermissions::RUN_SYNC_LIVE,
         );
+    }
+
+    /** @deprecated Use canAccessLive() */
+    public function canAccess(User $actor, Workspace $workspace): bool
+    {
+        return $this->canAccessLive($actor, $workspace);
     }
 
     public function canManageSetup(User $actor, Workspace $workspace): bool
@@ -41,7 +47,7 @@ final class AdobeProductsExportLiveAuthorizationService
         Workspace $workspace,
         string $connectorAccountId,
     ): bool {
-        if (! $this->canAccess($actor, $workspace)) {
+        if (! $this->canAccessLive($actor, $workspace)) {
             return false;
         }
 
