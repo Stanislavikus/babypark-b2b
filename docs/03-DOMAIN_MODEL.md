@@ -6664,7 +6664,9 @@ permission, stale-active-run lease/recovery, Live outcome vocabulary,
 `ExternalRecordLink` persistence, `SyncLiveAdmissionService`, and fail-closed Live
 job shell. Adobe Products / Export / Live support remains **false**.
 
-**Stage 3B–3E — Live Engine implementation slices** — **3B and 3C Done (internal); 3D-1 E14 media runtime Done (internal); normative Stage 3D Done (internal); 3E Pending**
+**Stage 3B–3E — Live Engine implementation slices** — **3B and 3C Done (internal); 3D-1 E14 media runtime Done (internal); normative Stage 3D Done (internal); Stage 3E Part 1 in progress (validation foundation); real target validation NOT YET EXECUTED**
+
+**Production ownership trust (conservative)** means: never auto-adopt a pre-existing remote Product without trusted `ExternalRecordLink`; a resource definitively created by this execution may receive `ExternalRecordLink` only after sufficient create-provenance evidence (`TrustedKnownMissing` pre-write GET + definitive POST + response SKU confirmation + reconciliation controlled-state match); ambiguous/inconclusive creation does not by itself prove ownership.
 
 After Stage 3-0 merges, implement in order:
 
@@ -6674,7 +6676,7 @@ After Stage 3-0 merges, implement in order:
 | **3B — Adobe Simple Live** | Shared Adobe semantic planning boundary; child/simple external identity; GET/POST/PUT Product transport; `ExternalRecordLink` read/write; create/update/reconciliation; simple Product Live execution; applied-state classification | remains **false** | **Done (internal)** |
 | **3C — Adobe Configurable Live** | Connector-owned deterministic parent SKU; child/parent/options/link command compilation; partial/ambiguous outcomes; inactive linked-variant lifecycle; configurable recovery/reconciliation | remains **false** | **Done (internal)** — production ownership trust remains conservative; fresh no-link created resources are not auto-adopted on rerun; classification-transition / inactive-only cases remain fail-closed pending Stage 3E |
 | **3D — Adobe Media + Merchant First Live** | Required E14 primary/gallery image export; merchant Live admission **UI/read model** on `ManageAdobeProductsExportPreview` (non-actionable for consequential execution while Live support is **false**; must not bypass `ConnectorSyncOperationSupport`); queued/running/result presentation; final safe merchant copy | remains **false** | **Done (internal)** — 3D-1 E14 media runtime + 3D-2 merchant first-Live UI/read model |
-| **3E — Real Adobe Validation + Truth Flip** | Disposable write harness; target-version proof; correct API-contract deviations; only then flip `Adobe Products / Export / Live = true` | flip only after successful evidence | **Pending** |
+| **3E — Real Adobe Validation + Truth Flip** | Disposable write harness; target-version proof; correct API-contract deviations; only then flip `Adobe Products / Export / Live = true` | flip only after successful evidence | **In progress (Part 1)** — create-provenance ownership fix + fail-closed validation harness foundation; `APP_ENV=stage3e-validation` CLI only; real writes NOT authorized; support remains **false** |
 
 Production Live remains **NOT IMPLEMENTED** until Stage 3E completes with explicit
 human authorization. No deployment without separate explicit approval.

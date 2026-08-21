@@ -384,7 +384,7 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **Stage 3D-1 — Adobe E14 media Live runtime** | **Done (internal)** — `ProductExecutionImageInput` from `products.images`; Adobe primary/gallery media Live executor wired through `AdobeProductExportLiveCapability`; verified source fetch + remote metadata/content comparison; E14 runtime consumer exists; Adobe Products/Export/Live support remains **false** |
 | **Stage 3D-2 — Merchant first-Live UI/read model** | **Done (internal)** — dual-authority `ManageAdobeProductsExportPreview`; `SyncLiveMerchantReadService`; Live worklist/result presentation; `startLive()` delegates to `SyncLiveAdmissionService`; non-actionable while Live support is **false** |
 | **Stage 3D — Adobe Media + Merchant First Live** | **Done (internal)** — 3D-1 E14 media runtime + 3D-2 merchant Live admission UI/read model (non-actionable while Live support is **false**) |
-| **Stage 3E — Real Adobe Validation + Truth Flip** | Pending — disposable write harness; target-version proof; only then flip `Adobe Products/Export/Live = true` |
+| **Stage 3E — Real Adobe Validation + Truth Flip** | **In progress (Part 1)** — ownership create-provenance fix (`AdobeProductCreateOwnershipEvidence` + conservative policy); validation harness foundation (`AdobeStage3EValidationRunner`, guards, transport decorator, media validation matrix encoded); `adobe:stage3e-validate` registered only when `APP_ENV=stage3e-validation`; real Adobe target validation and support flip remain pending |
 | **4C** | Remaining sync domain after Stage 3: scheduling, sync history/issues, merchant sync UX beyond mapping/Preview/Live |
 
 Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.

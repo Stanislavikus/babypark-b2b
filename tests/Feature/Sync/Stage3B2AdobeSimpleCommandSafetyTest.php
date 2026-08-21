@@ -9,6 +9,7 @@ use App\Models\Workspace;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductAppliedStateKnowledge;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductCommandRequestFactory;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductCreateOwnershipEvidence;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductDesiredState;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductDesiredStateCompiler;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkGuard;
@@ -671,6 +672,7 @@ class Stage3B2AdobeSimpleCommandSafetyTest extends TestCase
                 public function canPersistNewLink(
                     AdobeProductDesiredState $desiredState,
                     AdobeProductObservedState $observedState,
+                    AdobeProductCreateOwnershipEvidence $ownershipEvidence,
                 ): bool {
                     return $desiredState->sku === $observedState->sku;
                 }
@@ -678,6 +680,7 @@ class Stage3B2AdobeSimpleCommandSafetyTest extends TestCase
                 public function canPersistNewParentLink(
                     AdobeProductParentDesiredState $desiredState,
                     AdobeProductParentObservedState $observedState,
+                    AdobeProductCreateOwnershipEvidence $ownershipEvidence,
                 ): bool {
                     return false;
                 }
@@ -734,6 +737,7 @@ class Stage3B2AdobeSimpleCommandSafetyTest extends TestCase
                 public function canPersistNewLink(
                     AdobeProductDesiredState $desiredState,
                     AdobeProductObservedState $observedState,
+                    AdobeProductCreateOwnershipEvidence $ownershipEvidence,
                 ): bool {
                     return true;
                 }
@@ -741,6 +745,7 @@ class Stage3B2AdobeSimpleCommandSafetyTest extends TestCase
                 public function canPersistNewParentLink(
                     AdobeProductParentDesiredState $desiredState,
                     AdobeProductParentObservedState $observedState,
+                    AdobeProductCreateOwnershipEvidence $ownershipEvidence,
                 ): bool {
                     return false;
                 }
