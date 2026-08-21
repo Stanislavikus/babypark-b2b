@@ -6379,10 +6379,10 @@ Two valid origins exist after Stop-and-Amend:
    stores confirmed parent SKU + Magento logical `entity_id` discriminator; do **not**
    rename to `cfg-*`.
 2. **Future platform-created parent** — only after proven atomic create capability;
-   use deterministic `cfg-*` generator.
+   use deterministic `cfg-*` **connector-owned generated external identity**; do **not**
+   rename an existing merchant-confirmed parent to `cfg-*`.
 
-Existing trusted ERL always outranks `cfg-*` recomputation. Do **not** silently use
-physical `products.sku` as canonical parent identity. Canonical platform SKU is
+Existing trusted ERL always outranks `cfg-*` recomputation. Do **not** silently use physical `products.sku` as canonical parent identity. Canonical platform SKU is
 variant-level. Simple/non-configurable export uses `ProductVariant` link, not a
 synthetic Product parent link.
 
@@ -7491,9 +7491,9 @@ validation (Stage 3E).
 
 ##### Real Adobe validation gate
 
-Before support truth flips, an explicitly authorized disposable Adobe validation
-harness must prove actual target-version behavior on **linked** Products (not stock
-no-link create). At minimum: SIMPLE linked (verify/update/reconcile/disable/rerun);
+Before support truth flips, an explicitly authorized disposable Adobe smoke
+validation harness must prove actual target-version behavior on **linked** Products
+(not stock no-link create). At minimum: SIMPLE linked (verify/update/reconcile/disable/rerun);
 CONFIGURABLE linked family (child/parent/options/link/update/repeated-safe);
 TRANSPORT (validation rejection, identity collision, divergence before/after
 mutation, relevant status codes, timeout classification); entity-bound mutation
