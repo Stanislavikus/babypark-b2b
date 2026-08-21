@@ -16,6 +16,7 @@ use App\Models\SyncRun;
 use App\Models\SyncRunItem;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Connectors\ConnectorAccountLayerBSetupEligibilityProjection;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
 use App\Support\Sync\Live\Merchant\SyncLiveAdmissionReadiness;
 use App\Support\Sync\Live\Merchant\SyncLiveMerchantReadModel;
@@ -57,72 +58,33 @@ final class SyncLiveMerchantReadService
         );
         $configuration = $this->lookupService->findProductsDefaultContext($account);
         $canManageSetup = $this->authorizationService->canManageSetup($actor, $workspace);
+        $setupBarrier = $this->resolveSetupBarrier($eligibilityProjection, $configuration, $account);
+        $configurationReady = $configuration !== null && $this->configurationReady($account, $configuration);
+        $currentSetupRequired = $configuration !== null && ! $configurationReady;
 
-        if (! $eligibilityProjection->isSetupUsable()) {
-            return $this->model(
-                setupBarrier: SyncLiveMerchantSetupBarrier::AccountUnavailable,
-                configuration: $configuration,
-                account: $account,
-                canManageSetup: $canManageSetup,
-            );
-        }
+        $activeLiveRun = $configuration !== null
+            ? $this->findActiveLiveRun($workspace->id, $configuration->id)
+            : null;
+        $latestLiveRun = $configuration !== null && $activeLiveRun === null
+            ? $this->findLatestTerminalLiveRun($workspace->id, $configuration->id)
+            : null;
 
-        if ($configuration === null) {
-            return $this->model(
-                setupBarrier: SyncLiveMerchantSetupBarrier::ConfigurationAbsent,
-                configuration: null,
-                account: $account,
-                canManageSetup: $canManageSetup,
-            );
-        }
-
-        if ($configuration->operational_state === SyncConfigurationOperationalState::Paused) {
-            return $this->model(
-                setupBarrier: SyncLiveMerchantSetupBarrier::ConfigurationPaused,
-                configuration: $configuration,
-                account: $account,
-                canManageSetup: $canManageSetup,
-            );
-        }
-
-        if (! $configuration->enabledOperationSet()->contains(SyncSemanticOperation::Export)) {
-            return $this->model(
-                setupBarrier: SyncLiveMerchantSetupBarrier::ExportUnavailable,
-                configuration: $configuration,
-                account: $account,
-                canManageSetup: $canManageSetup,
-            );
-        }
-
-        $configurationReady = $this->configurationReady($account, $configuration);
-        $currentSetupRequired = ! $configurationReady;
-
-        if ($currentSetupRequired) {
-            return $this->model(
-                setupBarrier: SyncLiveMerchantSetupBarrier::ConfigurationNotReady,
-                configuration: $configuration,
-                account: $account,
-                canManageSetup: $canManageSetup,
-                currentSetupRequired: true,
-            );
-        }
-
-        $liveSupportAvailable = $this->syncSupportResolver->supports(
+        $liveSupportAvailable = $configuration !== null && $this->syncSupportResolver->supports(
             $account,
             $configuration->data_domain,
             SyncSemanticOperation::Export,
             SyncRunMode::Live,
         );
-        $previewPrerequisiteSatisfied = $this->hasPreviewEvidence($configuration);
-        $blockedByActiveRun = $this->activeRunReadQuery->isBlocked($configuration->id);
-        $activePreviewBlocking = $this->activeRunReadQuery->activePreviewBlocking($configuration->id);
-
-        $activeLiveRun = $this->findActiveLiveRun($workspace->id, $configuration->id);
+        $previewPrerequisiteSatisfied = $configuration !== null && $this->hasPreviewEvidence($configuration);
+        $blockedByActiveRun = $configuration !== null
+            && $this->activeRunReadQuery->isBlocked($workspace->id, $configuration->id);
+        $activePreviewBlocking = $configuration !== null
+            && $this->activeRunReadQuery->activePreviewBlocking($workspace->id, $configuration->id);
 
         if ($activeLiveRun !== null) {
             return $this->model(
+                setupBarrier: $setupBarrier,
                 configuration: $configuration,
-                account: $account,
                 canManageSetup: $canManageSetup,
                 lifecycleState: $activeLiveRun->status === SyncRunStatus::Running
                     ? SyncLiveMerchantLifecycleState::Running
@@ -130,51 +92,55 @@ final class SyncLiveMerchantReadService
                 displayedRun: $activeLiveRun,
                 liveSupportAvailable: $liveSupportAvailable,
                 previewPrerequisiteSatisfied: $previewPrerequisiteSatisfied,
-                configurationReady: true,
+                configurationReady: $configurationReady,
                 blockedByActiveRun: true,
                 activePreviewBlocking: false,
+                currentSetupRequired: $currentSetupRequired,
                 processedProductCount: $this->countProcessedProducts($activeLiveRun),
             );
         }
 
-        $latestLiveRun = $this->findLatestTerminalLiveRun($workspace->id, $configuration->id);
         $lifecycleState = SyncLiveMerchantLifecycleState::None;
         $displayedRun = null;
         $resultSummary = null;
+        $resultPresentationTrusted = true;
 
         if ($latestLiveRun !== null) {
             $lifecycleState = $latestLiveRun->status === SyncRunStatus::Completed
                 ? SyncLiveMerchantLifecycleState::Completed
                 : SyncLiveMerchantLifecycleState::Failed;
             $displayedRun = $latestLiveRun;
-            $resultSummary = $latestLiveRun->status === SyncRunStatus::Completed
-                ? $this->buildResultSummary($latestLiveRun)
-                : null;
+
+            if ($latestLiveRun->status === SyncRunStatus::Completed) {
+                [$resultSummary, $resultPresentationTrusted] = $this->buildValidatedResultSummary($latestLiveRun);
+            }
         }
 
         return $this->model(
+            setupBarrier: $setupBarrier,
             configuration: $configuration,
-            account: $account,
             canManageSetup: $canManageSetup,
             lifecycleState: $lifecycleState,
             displayedRun: $displayedRun,
             resultSummary: $resultSummary,
+            resultPresentationTrusted: $resultPresentationTrusted,
             liveSupportAvailable: $liveSupportAvailable,
             previewPrerequisiteSatisfied: $previewPrerequisiteSatisfied,
-            configurationReady: true,
+            configurationReady: $configurationReady,
             blockedByActiveRun: $blockedByActiveRun,
             activePreviewBlocking: $activePreviewBlocking,
+            currentSetupRequired: $currentSetupRequired,
         );
     }
 
     private function model(
         ?SyncLiveMerchantSetupBarrier $setupBarrier = null,
         ?SyncConfiguration $configuration = null,
-        ?ConnectorAccount $account = null,
         bool $canManageSetup = false,
         SyncLiveMerchantLifecycleState $lifecycleState = SyncLiveMerchantLifecycleState::None,
         ?SyncRun $displayedRun = null,
         ?SyncLiveMerchantResultSummary $resultSummary = null,
+        bool $resultPresentationTrusted = true,
         bool $liveSupportAvailable = false,
         bool $previewPrerequisiteSatisfied = false,
         bool $configurationReady = false,
@@ -229,8 +195,37 @@ final class SyncLiveMerchantReadService
             previewPrerequisiteSummary: $previewPrerequisiteSummary,
             currentSetupRequired: $currentSetupRequired,
             processedProductCount: $processedProductCount,
+            resultPresentationTrusted: $resultPresentationTrusted,
             admissionReadiness: $admissionReadiness,
         );
+    }
+
+    private function resolveSetupBarrier(
+        ConnectorAccountLayerBSetupEligibilityProjection $projection,
+        ?SyncConfiguration $configuration,
+        ConnectorAccount $account,
+    ): ?SyncLiveMerchantSetupBarrier {
+        if (! $projection->isSetupUsable()) {
+            return SyncLiveMerchantSetupBarrier::AccountUnavailable;
+        }
+
+        if ($configuration === null) {
+            return SyncLiveMerchantSetupBarrier::ConfigurationAbsent;
+        }
+
+        if ($configuration->operational_state === SyncConfigurationOperationalState::Paused) {
+            return SyncLiveMerchantSetupBarrier::ConfigurationPaused;
+        }
+
+        if (! $configuration->enabledOperationSet()->contains(SyncSemanticOperation::Export)) {
+            return SyncLiveMerchantSetupBarrier::ExportUnavailable;
+        }
+
+        if (! $this->configurationReady($account, $configuration)) {
+            return SyncLiveMerchantSetupBarrier::ConfigurationNotReady;
+        }
+
+        return null;
     }
 
     private function configurationReady(ConnectorAccount $account, SyncConfiguration $configuration): bool
@@ -291,28 +286,40 @@ final class SyncLiveMerchantReadService
             ->count();
     }
 
-    private function buildResultSummary(SyncRun $run): SyncLiveMerchantResultSummary
+    /**
+     * @return array{0: ?SyncLiveMerchantResultSummary, 1: bool}
+     */
+    private function buildValidatedResultSummary(SyncRun $run): array
     {
-        $counts = SyncRunItem::withoutWorkspaceScope()
-            ->selectRaw('outcome, COUNT(*) as aggregate')
+        $outcomes = SyncRunItem::withoutWorkspaceScope()
             ->where('workspace_id', $run->workspace_id)
             ->where('sync_run_id', $run->id)
-            ->groupBy('outcome')
-            ->pluck('aggregate', 'outcome');
+            ->pluck('outcome');
+
+        foreach ($outcomes as $outcome) {
+            if (! in_array((string) $outcome, array_column(SyncLiveOutcome::cases(), 'value'), true)) {
+                return [null, false];
+            }
+        }
+
+        $counts = $outcomes->countBy();
 
         $synchronized = (int) ($counts[SyncLiveOutcome::Synchronized->value] ?? 0);
         $notApplied = (int) ($counts[SyncLiveOutcome::NotApplied->value] ?? 0);
         $partial = (int) ($counts[SyncLiveOutcome::Partial->value] ?? 0);
         $ambiguous = (int) ($counts[SyncLiveOutcome::Ambiguous->value] ?? 0);
 
-        return new SyncLiveMerchantResultSummary(
-            synchronizedCount: $synchronized,
-            notAppliedCount: $notApplied,
-            partialCount: $partial,
-            ambiguousCount: $ambiguous,
-            needsAttentionCount: $notApplied + $partial + $ambiguous,
-            completedAtLabel: $run->completed_at?->timezone(config('app.timezone'))->format('d.m.Y H:i'),
-        );
+        return [
+            new SyncLiveMerchantResultSummary(
+                synchronizedCount: $synchronized,
+                notAppliedCount: $notApplied,
+                partialCount: $partial,
+                ambiguousCount: $ambiguous,
+                needsAttentionCount: $notApplied + $partial + $ambiguous,
+                completedAtLabel: $run->completed_at?->timezone(config('app.timezone'))->format('d.m.Y H:i'),
+            ),
+            true,
+        ];
     }
 
     private function buildPreviewPrerequisiteSummary(SyncConfiguration $configuration): ?SyncLivePreviewPrerequisiteSummary

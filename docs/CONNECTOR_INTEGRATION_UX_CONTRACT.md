@@ -388,7 +388,10 @@ write). **Stage 3D merchant first-Live UI/read model is shipped (internal)** on
 model, worklist/result presentation, and dormant `startLive()` admission path;
 merchant consequential Live action remains **non-actionable** while
 `ConnectorSyncOperationSupport(Products, Export, Live) === false`. Adobe Product
-write/reconciliation/merchant exposure waits for Stage 3E truthful support flip.
+and media Live write/reconciliation runtime is **implemented internally** through
+normative Stage 3D (3B/3C/3D-1/3D-2); advertised Live support remains **false**.
+Merchant consequential exposure and production enablement wait for Stage 3E
+real-target validation and truthful support flip.
 
 ### Smallest first-Live surface
 

@@ -19,17 +19,19 @@ final class SyncActiveRunReadQuery
             ->first();
     }
 
-    public function isBlocked(string $syncConfigurationId): bool
+    public function isBlocked(string $workspaceId, string $syncConfigurationId): bool
     {
         return SyncRun::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
             ->where('sync_configuration_id', $syncConfigurationId)
             ->whereIn('status', [SyncRunStatus::Queued, SyncRunStatus::Running])
             ->exists();
     }
 
-    public function activePreviewBlocking(string $syncConfigurationId): bool
+    public function activePreviewBlocking(string $workspaceId, string $syncConfigurationId): bool
     {
         return SyncRun::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
             ->where('sync_configuration_id', $syncConfigurationId)
             ->where('mode', SyncRunMode::Preview)
             ->whereIn('status', [SyncRunStatus::Queued, SyncRunStatus::Running])

@@ -51,9 +51,7 @@ final class AdobeProductExportSetupTargetEligibility
 
     public function isLiveEligible(ConnectorAccountLayerBSetupEligibilityProjection $projection): bool
     {
-        $definition = $this->profileRegistry->profileDefinition($projection->authProfile);
-
-        if ($definition->previewCapabilityClass === null) {
+        if (! $this->hasAdobeProductsExportPreviewProfile($projection)) {
             return false;
         }
 

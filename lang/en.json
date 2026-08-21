@@ -510,6 +510,7 @@
     "sync_live.lifecycle.failed": "The transfer could not be completed.",
     "sync_live.lifecycle.processed_products": "Processed products: :count",
     "sync_live.results.all_synchronized": "All products were synchronized.",
+    "sync_live.results.untrusted": "Unable to display this transfer result correctly.",
     "sync_live.results.needs_attention": ":count products need attention",
     "sync_live.results.ambiguous_attention": "Could not confirm the result for :count products. Do not repeat the transfer until their status is verified.",
     "sync_live.results.synchronized": "Synchronized: :count",

@@ -109,6 +109,8 @@ class ManageAdobeProductsExportPreview extends Page
 
     public bool $canStartLive = false;
 
+    public bool $liveResultPresentationTrusted = true;
+
     public bool $liveConfigurationChangedSinceRun = false;
 
     public bool $liveCurrentSetupRequired = false;
@@ -239,7 +241,7 @@ class ManageAdobeProductsExportPreview extends Page
 
         $readModel = app(SyncPreviewMerchantReadService::class)->project($user, $workspace, $this->accountId);
 
-        if ($readModel->hasActiveRun || ! $readModel->canStartPreview || $this->isBlockedByAnyActiveRun($readModel->configurationId)) {
+        if ($readModel->hasActiveRun || ! $readModel->canStartPreview || $this->isBlockedByAnyActiveRun($workspace, $readModel->configurationId)) {
             $this->refreshPresentation();
 
             return;
@@ -386,7 +388,7 @@ class ManageAdobeProductsExportPreview extends Page
 
         $this->pollActive = $this->pollActive
             || $this->livePollActive
-            || $this->isBlockedByAnyActiveRun($this->configurationId);
+            || $this->isBlockedByAnyActiveRun($workspace, $this->configurationId);
     }
 
     private function applyCommonActiveRunGate(Workspace $workspace): void
@@ -395,7 +397,7 @@ class ManageAdobeProductsExportPreview extends Page
             return;
         }
 
-        if (! $this->isBlockedByAnyActiveRun($this->configurationId)) {
+        if (! $this->isBlockedByAnyActiveRun($workspace, $this->configurationId)) {
             return;
         }
 
@@ -403,13 +405,13 @@ class ManageAdobeProductsExportPreview extends Page
         $this->canStartLive = false;
     }
 
-    private function isBlockedByAnyActiveRun(?string $configurationId): bool
+    private function isBlockedByAnyActiveRun(Workspace $workspace, ?string $configurationId): bool
     {
         if ($configurationId === null) {
             return false;
         }
 
-        return app(SyncActiveRunReadQuery::class)->isBlocked($configurationId);
+        return app(SyncActiveRunReadQuery::class)->isBlocked($workspace->id, $configurationId);
     }
 
     private function refreshPreviewPresentation(User $user, Workspace $workspace): void
@@ -474,6 +476,7 @@ class ManageAdobeProductsExportPreview extends Page
         $this->livePreviewPrerequisiteSatisfied = $readModel->previewPrerequisiteSatisfied;
         $this->liveBlockedByActiveRun = $readModel->blockedByActiveRun;
         $this->liveActivePreviewBlocking = $readModel->activePreviewBlocking;
+        $this->liveResultPresentationTrusted = $readModel->resultPresentationTrusted;
         $this->liveConfigurationChangedSinceRun = $readModel->configurationChangedSinceRun;
         $this->liveCurrentSetupRequired = $readModel->currentSetupRequired;
         $this->liveDisplayedRunId = $readModel->displayedRunId;
@@ -507,7 +510,9 @@ class ManageAdobeProductsExportPreview extends Page
             $this->livePreviewBlockedCount = $readModel->previewPrerequisiteSummary->blockedCount;
         }
 
-        if ($readModel->lifecycleState === SyncLiveMerchantLifecycleState::Completed && $readModel->resultSummary !== null) {
+        if ($readModel->lifecycleState === SyncLiveMerchantLifecycleState::Completed
+            && $readModel->resultPresentationTrusted
+            && $readModel->resultSummary !== null) {
             $summary = $readModel->resultSummary;
             $this->liveSynchronizedCount = $summary->synchronizedCount;
             $this->liveNotAppliedCount = $summary->notAppliedCount;
@@ -528,6 +533,9 @@ class ManageAdobeProductsExportPreview extends Page
             }
 
             $this->refreshLiveWorklist();
+        } elseif ($readModel->lifecycleState === SyncLiveMerchantLifecycleState::Completed
+            && ! $readModel->resultPresentationTrusted) {
+            $this->liveResultAttentionStatement = __('sync_live.results.untrusted');
         }
     }
 
@@ -553,6 +561,7 @@ class ManageAdobeProductsExportPreview extends Page
         $this->liveLifecycleState = 'none';
         $this->liveSetupBarrier = null;
         $this->canStartLive = false;
+        $this->liveResultPresentationTrusted = true;
         $this->liveSupportAvailable = false;
         $this->livePreviewPrerequisiteSatisfied = false;
         $this->liveBlockedByActiveRun = false;

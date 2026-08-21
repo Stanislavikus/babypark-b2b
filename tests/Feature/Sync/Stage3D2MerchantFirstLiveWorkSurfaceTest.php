@@ -5,11 +5,13 @@ namespace Tests\Feature\Sync;
 use App\Enums\SyncConfigurationOperationalState;
 use App\Enums\SyncDataDomain;
 use App\Enums\SyncLiveOutcome;
+use App\Enums\SyncPreviewOutcome;
 use App\Enums\SyncRunMode;
 use App\Enums\SyncRunStatus;
 use App\Enums\SyncSemanticOperation;
 use App\Filament\Pages\Sync\ListSyncDataSetup;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportPreview;
+use App\Jobs\Connectors\SyncLiveRunJob;
 use App\Models\ConnectorAccount;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -21,6 +23,7 @@ use App\Models\Workspace;
 use App\Services\Sync\CreateSyncConfigurationInput;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
+use App\Services\Sync\UpdateSyncConfigurationInput;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectorAdapter;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
 use App\Support\Sync\ConnectorExecutionConfiguration;
@@ -32,6 +35,7 @@ use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -543,13 +547,13 @@ class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
     #[Test]
     public function actionable_live_start_is_available_only_when_support_is_enabled(): void
     {
-        $this->configureSyncSupportProfile([
+        $this->configureAdobeProductsExportSyncSupportProfile([
             [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
             [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live],
         ]);
 
         $workspace = $this->defaultWorkspace();
-        $account = $this->createConnectorAccount($workspace, ['auth_profile' => 'test_sync_support']);
+        $account = $this->createConnectorAccount($workspace, ['auth_profile' => 'test_adobe_products_export_sync_support']);
         $configuration = $this->prepareReadyConfiguration($account);
         $actor = $this->actorWithPermission($workspace, WorkspacePermissions::RUN_SYNC_LIVE);
         $this->seedCompletedPreview($configuration, $actor);
@@ -561,6 +565,259 @@ class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
             ->assertSet('liveLifecycleState', 'none')
             ->assertSee('data-testid="sync-live-start"', false)
             ->assertSee('wire:confirm', false);
+    }
+
+    #[Test]
+    public function page_start_live_creates_queued_run_and_dispatches_job_when_support_enabled(): void
+    {
+        Bus::fake();
+
+        $this->configureAdobeProductsExportSyncSupportProfile([
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live],
+        ]);
+
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace, ['auth_profile' => 'test_adobe_products_export_sync_support']);
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::RUN_SYNC_LIVE);
+        $this->seedCompletedPreview($configuration, $actor);
+
+        $countBefore = SyncRun::withoutWorkspaceScope()->where('mode', SyncRunMode::Live)->count();
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->call('startLive')
+            ->assertSet('canStartLive', false);
+
+        $this->assertSame($countBefore + 1, SyncRun::withoutWorkspaceScope()->where('mode', SyncRunMode::Live)->count());
+
+        $run = SyncRun::withoutWorkspaceScope()
+            ->where('mode', SyncRunMode::Live)
+            ->latest('created_at')
+            ->first();
+
+        $this->assertNotNull($run);
+        $this->assertSame($workspace->id, $run->workspace_id);
+        $this->assertSame($configuration->id, $run->sync_configuration_id);
+        $this->assertSame(SyncRunMode::Live, $run->mode);
+        $this->assertSame(SyncSemanticOperation::Export, $run->semantic_operation);
+        $this->assertSame(SyncRunStatus::Queued, $run->status);
+
+        Bus::assertDispatched(SyncLiveRunJob::class);
+    }
+
+    #[Test]
+    public function start_live_does_not_create_second_run_when_active_run_blocks_admission(): void
+    {
+        Bus::fake();
+
+        $this->configureAdobeProductsExportSyncSupportProfile([
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live],
+        ]);
+
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace, ['auth_profile' => 'test_adobe_products_export_sync_support']);
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::RUN_SYNC_LIVE);
+        $this->seedCompletedPreview($configuration, $actor);
+
+        SyncRun::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $workspace->id,
+            'sync_configuration_id' => $configuration->id,
+            'configuration_revision' => $configuration->configuration_revision,
+            'mode' => SyncRunMode::Preview,
+            'semantic_operation' => SyncSemanticOperation::Export,
+            'status' => SyncRunStatus::Running,
+            'initiated_by_user_id' => $actor->id,
+            'configuration_snapshot' => ['field_mappings' => []],
+        ]);
+
+        $countBefore = SyncRun::withoutWorkspaceScope()->where('mode', SyncRunMode::Live)->count();
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->call('startLive')
+            ->assertSet('canStartLive', false);
+
+        $this->assertSame($countBefore, SyncRun::withoutWorkspaceScope()->where('mode', SyncRunMode::Live)->count());
+        Bus::assertNotDispatched(SyncLiveRunJob::class);
+    }
+
+    #[Test]
+    public function non_adobe_preview_profile_is_not_reachable_for_live_actor(): void
+    {
+        $this->configureGenericNonAdobePreviewProfile([
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live],
+        ]);
+
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace, ['auth_profile' => 'test_generic_non_adobe_preview']);
+        $this->prepareReadyConfiguration($account);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::RUN_SYNC_LIVE);
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertForbidden();
+
+        Livewire::actingAs($actor)
+            ->test(ListSyncDataSetup::class)
+            ->assertOk()
+            ->assertDontSee(__('sync_live.actions.open_live'))
+            ->assertDontSee('data-testid="sync-data-setup-open-live-'.$account->id.'"', false);
+    }
+
+    #[Test]
+    public function completed_live_with_preview_outcome_fails_closed_without_false_success(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::RUN_SYNC_LIVE);
+        $this->seedCompletedPreview($configuration, $actor);
+
+        $run = SyncRun::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $workspace->id,
+            'sync_configuration_id' => $configuration->id,
+            'configuration_revision' => $configuration->configuration_revision,
+            'mode' => SyncRunMode::Live,
+            'semantic_operation' => SyncSemanticOperation::Export,
+            'status' => SyncRunStatus::Completed,
+            'initiated_by_user_id' => $actor->id,
+            'configuration_snapshot' => ['field_mappings' => []],
+            'completed_at' => now(),
+        ]);
+
+        $product = $this->createProductWithVariant($workspace, 'Corrupt Product', 'CORRUPT-1', 'Brand');
+        SyncRunItem::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $workspace->id,
+            'sync_run_id' => $run->id,
+            'product_id' => $product->id,
+            'outcome' => SyncPreviewOutcome::Ready,
+            'findings' => [],
+        ]);
+
+        $component = Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertSet('liveLifecycleState', 'completed')
+            ->assertSet('liveResultPresentationTrusted', false)
+            ->assertSet('liveWorklistRows', [])
+            ->assertSee(__('sync_live.results.untrusted'))
+            ->assertDontSee('data-testid="sync-live-completed-summary"', false)
+            ->assertDontSee(__('sync_live.results.all_synchronized'));
+    }
+
+    #[Test]
+    public function historical_completed_live_remains_visible_when_configuration_is_paused(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::RUN_SYNC_LIVE);
+        $this->seedCompletedPreview($configuration, $actor);
+        $this->createCompletedLiveRun($workspace, $configuration, $actor, [
+            [SyncLiveOutcome::Synchronized, 1],
+        ]);
+
+        app(SyncConfigurationService::class)->update(
+            $account,
+            $configuration->id,
+            new UpdateSyncConfigurationInput(
+                operationalState: SyncConfigurationOperationalState::Paused,
+            ),
+        );
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertSet('liveSetupBarrier', 'configuration_paused')
+            ->assertSet('liveLifecycleState', 'completed')
+            ->assertSet('liveSynchronizedCount', 1)
+            ->assertSet('canStartLive', false)
+            ->assertSee('data-testid="sync-live-configuration-paused"', false)
+            ->assertSee('data-testid="sync-live-completed-summary"', false);
+    }
+
+    #[Test]
+    public function live_section_serialized_state_excludes_sensitive_canary_vocabulary(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::RUN_SYNC_LIVE);
+        $this->seedCompletedPreview($configuration, $actor);
+
+        $product = $this->createProductWithVariant($workspace, 'Canary Product', 'CANARY-1', 'Brand');
+        $run = SyncRun::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $workspace->id,
+            'sync_configuration_id' => $configuration->id,
+            'configuration_revision' => $configuration->configuration_revision,
+            'mode' => SyncRunMode::Live,
+            'semantic_operation' => SyncSemanticOperation::Export,
+            'status' => SyncRunStatus::Completed,
+            'initiated_by_user_id' => $actor->id,
+            'configuration_snapshot' => ['field_mappings' => []],
+            'completed_at' => now(),
+        ]);
+
+        SyncRunItem::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $workspace->id,
+            'sync_run_id' => $run->id,
+            'product_id' => $product->id,
+            'outcome' => SyncLiveOutcome::Ambiguous,
+            'findings' => [
+                (new SyncLiveFinding(code: 'ExternalRecordLink', subject: 'erl-99', context: [
+                    'reconciliation' => 'failed',
+                    'reconciliation_get_attempts' => 3,
+                    'http_status' => 500,
+                    'adobe_entity_id' => 'entity-42',
+                    'remote_media_entry_id' => 'media-77',
+                    'base_url' => 'https://secret.example.com',
+                    'store_code' => 'hidden-store',
+                    'credential' => 'secret-token',
+                    'vendor_error' => 'Adobe exploded',
+                ]))->toArray(),
+            ],
+        ]);
+
+        $component = Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertSee('Canary Product')
+            ->assertSee(__('sync_live.guidance.ambiguous'));
+
+        $rendered = $component->html();
+        $serialized = json_encode($component->instance()->all());
+        $this->assertIsString($serialized);
+
+        foreach ([
+            'ExternalRecordLink',
+            'externalrecordlink',
+            'reconciliation',
+            'reconciliation_get_attempts',
+            'http_status',
+            'adobe_entity_id',
+            'remote_media_entry_id',
+            'base_url',
+            'store_code',
+            'credential',
+            'vendor_error',
+            'secret.example.com',
+            'hidden-store',
+            'secret-token',
+            'Adobe exploded',
+            'erl-99',
+            'entity-42',
+            'media-77',
+        ] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $rendered, "Forbidden in HTML: {$forbidden}");
+            $this->assertStringNotContainsString($forbidden, $serialized, "Forbidden in Livewire state: {$forbidden}");
+        }
     }
 
     #[Test]
@@ -649,13 +906,13 @@ class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
     #[Test]
     public function stale_revision_preview_blocks_live_start_even_when_support_enabled(): void
     {
-        $this->configureSyncSupportProfile([
+        $this->configureAdobeProductsExportSyncSupportProfile([
             [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
             [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live],
         ]);
 
         $workspace = $this->defaultWorkspace();
-        $account = $this->createConnectorAccount($workspace, ['auth_profile' => 'test_sync_support']);
+        $account = $this->createConnectorAccount($workspace, ['auth_profile' => 'test_adobe_products_export_sync_support']);
         $configuration = $this->prepareReadyConfiguration($account);
         $actor = $this->actorWithPermission($workspace, WorkspacePermissions::RUN_SYNC_LIVE);
         $this->seedCompletedPreview($configuration, $actor);

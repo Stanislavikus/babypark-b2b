@@ -510,6 +510,7 @@
     "sync_live.lifecycle.failed": "Передачу не вдалося завершити.",
     "sync_live.lifecycle.processed_products": "Оброблено товарів: :count",
     "sync_live.results.all_synchronized": "Усі товари синхронізовано.",
+    "sync_live.results.untrusted": "Не вдалося коректно відобразити результат цієї передачі.",
     "sync_live.results.needs_attention": ":count товарів потребують уваги",
     "sync_live.results.ambiguous_attention": "Не вдалося підтвердити результат для :count товарів. Не повторюйте передачу, доки їхній стан не буде перевірено.",
     "sync_live.results.synchronized": "Синхронізовано: :count",

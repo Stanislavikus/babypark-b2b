@@ -493,6 +493,7 @@
     "sync_live.lifecycle.failed": "Передачу не удалось завершить.",
     "sync_live.lifecycle.processed_products": "Обработано товаров: :count",
     "sync_live.results.all_synchronized": "Все товары синхронизированы.",
+    "sync_live.results.untrusted": "Не удалось корректно отобразить результат этой передачи.",
     "sync_live.results.needs_attention": ":count товаров требуют внимания",
     "sync_live.results.ambiguous_attention": "Не удалось подтвердить результат для :count товаров. Не повторяйте передачу, пока их статус не будет проверен.",
     "sync_live.results.synchronized": "Синхронизировано: :count",

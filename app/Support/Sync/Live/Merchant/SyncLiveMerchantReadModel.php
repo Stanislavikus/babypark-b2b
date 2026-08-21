@@ -24,6 +24,7 @@ final readonly class SyncLiveMerchantReadModel
         public ?SyncLivePreviewPrerequisiteSummary $previewPrerequisiteSummary,
         public bool $currentSetupRequired,
         public ?int $processedProductCount,
+        public bool $resultPresentationTrusted,
         public SyncLiveAdmissionReadiness $admissionReadiness,
     ) {}
 }
