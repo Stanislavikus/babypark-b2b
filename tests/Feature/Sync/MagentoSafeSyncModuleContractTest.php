@@ -78,6 +78,7 @@ class MagentoSafeSyncModuleContractTest extends TestCase
         $this->assertStringContainsString("'wsrep_cluster_status'", $content);
         $this->assertStringContainsString('$temporary = $previous | 1;', $content);
         $this->assertStringContainsString('$this->setWsrepSyncWait($connection, $previous);', $content);
+        $this->assertStringContainsString('$this->resourceConnection->closeConnection();', $content);
         $this->assertStringContainsString("preg_match('/^(?:0|[1-9][0-9]*)$/', \$value)", $content);
         $this->assertStringContainsString('$integerValue > 15', $content);
         $this->assertStringNotContainsString('SET SESSION wsrep_sync_wait = 0', $content);

@@ -208,13 +208,27 @@ use Magento\Framework\DB\Adapter\AdapterInterface;
 
 final class ResourceConnection
 {
+    public const DEFAULT_CONNECTION = 'default';
+
+    public int $closeCalls = 0;
+
     public function __construct(
         private readonly AdapterInterface $connection,
+        private readonly ?\Throwable $closeFailure = null,
     ) {}
 
     public function getConnection(): AdapterInterface
     {
         return $this->connection;
+    }
+
+    public function closeConnection($resourceName = self::DEFAULT_CONNECTION): void
+    {
+        $this->closeCalls++;
+
+        if ($this->closeFailure !== null) {
+            throw $this->closeFailure;
+        }
     }
 }
 
@@ -360,7 +374,8 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $connection = new FakeAdapter([
             "SHOW VARIABLES LIKE 'wsrep_provider'" => null,
         ]);
-        $scope = new GaleraSessionScope(new ResourceConnection($connection));
+        $resourceConnection = new ResourceConnection($connection);
+        $scope = new GaleraSessionScope($resourceConnection);
         $callbackInvoked = false;
 
         $result = $scope->execute(function () use (&$callbackInvoked): string {
@@ -372,16 +387,18 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertTrue($callbackInvoked);
         $this->assertSame('ok', $result);
         $this->assertSame([], $connection->queries);
+        $this->assertSame(0, $resourceConnection->closeCalls);
     }
 
     #[Test]
     public function active_galera_with_dirty_reads_on_fails_closed_and_never_executes_callback(): void
     {
-        $scope = $this->healthyGaleraScope(new FakeAdapter([
+        $resourceConnection = new ResourceConnection(new FakeAdapter([
             "SHOW VARIABLES LIKE 'wsrep_provider'" => ['Value' => '/usr/lib/libgalera_smm.so'],
             "SHOW SESSION VARIABLES LIKE 'wsrep_on'" => ['Value' => 'ON'],
             "SHOW SESSION VARIABLES LIKE 'wsrep_dirty_reads'" => ['Value' => 'ON'],
         ]));
+        $scope = new GaleraSessionScope($resourceConnection);
         $callbackInvoked = false;
 
         try {
@@ -392,6 +409,7 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         } catch (SafeSyncReadException $exception) {
             $this->assertSame('safe_sync_causal_read_unavailable', $exception->getMessage());
             $this->assertFalse($callbackInvoked);
+            $this->assertSame(0, $resourceConnection->closeCalls);
         }
     }
 
@@ -491,7 +509,8 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
             "SHOW STATUS LIKE 'wsrep_cluster_status'" => ['Value' => 'Primary'],
             "SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'" => ['Value' => '0'],
         ]);
-        $scope = $this->healthyGaleraScope($connection);
+        $resourceConnection = new ResourceConnection($connection);
+        $scope = new GaleraSessionScope($resourceConnection);
 
         $result = $scope->execute(static fn (): string => 'verified');
 
@@ -500,6 +519,7 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
             'SET SESSION wsrep_sync_wait = 1',
             'SET SESSION wsrep_sync_wait = 0',
         ], $connection->queries);
+        $this->assertSame(0, $resourceConnection->closeCalls);
     }
 
     #[Test]
@@ -594,6 +614,7 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
     #[Test]
     public function restoration_failure_prevents_successful_result_from_escaping(): void
     {
+        $restoreFailure = new \RuntimeException('restore failed');
         $connection = new FakeAdapter([
             "SHOW VARIABLES LIKE 'wsrep_provider'" => ['Value' => '/usr/lib/libgalera_smm.so'],
             "SHOW SESSION VARIABLES LIKE 'wsrep_on'" => ['Value' => 'ON'],
@@ -603,9 +624,10 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
             "SHOW STATUS LIKE 'wsrep_cluster_status'" => ['Value' => 'Primary'],
             "SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'" => ['Value' => '2'],
         ], [
-            'SET SESSION wsrep_sync_wait = 2' => new \RuntimeException('restore failed'),
+            'SET SESSION wsrep_sync_wait = 2' => $restoreFailure,
         ]);
-        $scope = $this->healthyGaleraScope($connection);
+        $resourceConnection = new ResourceConnection($connection);
+        $scope = new GaleraSessionScope($resourceConnection);
         $callbackInvoked = false;
 
         try {
@@ -618,6 +640,48 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         } catch (SafeSyncReadException $exception) {
             $this->assertTrue($callbackInvoked);
             $this->assertSame('safe_sync_wsrep_restore_failed', $exception->getMessage());
+            $this->assertSame($restoreFailure, $exception->getPrevious());
+            $this->assertSame(1, $resourceConnection->closeCalls);
+        }
+    }
+
+    #[Test]
+    public function quarantine_failure_remains_fail_closed_and_diagnosable(): void
+    {
+        $restoreFailure = new \RuntimeException('restore failed');
+        $quarantineFailure = new \RuntimeException('close failed');
+        $connection = new FakeAdapter([
+            "SHOW VARIABLES LIKE 'wsrep_provider'" => ['Value' => '/usr/lib/libgalera_smm.so'],
+            "SHOW SESSION VARIABLES LIKE 'wsrep_on'" => ['Value' => 'ON'],
+            "SHOW SESSION VARIABLES LIKE 'wsrep_dirty_reads'" => ['Value' => 'OFF'],
+            "SHOW STATUS LIKE 'wsrep_connected'" => ['Value' => 'ON'],
+            "SHOW STATUS LIKE 'wsrep_ready'" => ['Value' => 'ON'],
+            "SHOW STATUS LIKE 'wsrep_cluster_status'" => ['Value' => 'Primary'],
+            "SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'" => ['Value' => '4'],
+        ], [
+            'SET SESSION wsrep_sync_wait = 4' => $restoreFailure,
+        ]);
+        $resourceConnection = new ResourceConnection($connection, $quarantineFailure);
+        $scope = new GaleraSessionScope($resourceConnection);
+        $callbackInvoked = false;
+
+        try {
+            $scope->execute(function () use (&$callbackInvoked): string {
+                $callbackInvoked = true;
+
+                return 'verified';
+            });
+            $this->fail('Expected quarantine failure to remain fail closed.');
+        } catch (SafeSyncReadException $exception) {
+            $this->assertTrue($callbackInvoked);
+            $this->assertSame('safe_sync_wsrep_restore_failed', $exception->getMessage());
+            $this->assertSame(1, $resourceConnection->closeCalls);
+            $this->assertInstanceOf(\RuntimeException::class, $exception->getPrevious());
+            $this->assertSame(
+                'safe_sync_wsrep_connection_quarantine_failed:RuntimeException',
+                $exception->getPrevious()?->getMessage(),
+            );
+            $this->assertSame($restoreFailure, $exception->getPrevious()?->getPrevious());
         }
     }
 

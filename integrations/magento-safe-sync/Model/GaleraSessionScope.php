@@ -41,7 +41,7 @@ final class GaleraSessionScope
             try {
                 $this->setWsrepSyncWait($connection, $previous);
             } catch (\Throwable $exception) {
-                throw SafeSyncReadException::wsrepRestoreFailed($exception);
+                $this->quarantineConnectionAfterRestoreFailure($exception);
             }
         }
     }
@@ -86,6 +86,26 @@ final class GaleraSessionScope
     private function setWsrepSyncWait(AdapterInterface $connection, int $value): void
     {
         $connection->query(sprintf('SET SESSION wsrep_sync_wait = %d', $value));
+    }
+
+    private function quarantineConnectionAfterRestoreFailure(\Throwable $restoreException): never
+    {
+        try {
+            $this->resourceConnection->closeConnection();
+        } catch (\Throwable $quarantineException) {
+            throw SafeSyncReadException::wsrepRestoreFailed(
+                new \RuntimeException(
+                    sprintf(
+                        'safe_sync_wsrep_connection_quarantine_failed:%s',
+                        $quarantineException::class,
+                    ),
+                    0,
+                    $restoreException,
+                ),
+            );
+        }
+
+        throw SafeSyncReadException::wsrepRestoreFailed($restoreException);
     }
 
     private function readOptionalVariable(AdapterInterface $connection, string $name): ?string
