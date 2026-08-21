@@ -27,6 +27,18 @@ class MagentoSafeSyncModuleContractTest extends TestCase
     }
 
     #[Test]
+    public function module_advertises_the_verified_adobe_commerce_php_range(): void
+    {
+        $composer = json_decode(
+            File::get(base_path($this->moduleBasePath.'/composer.json')),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $this->assertSame('>=8.4 <8.6', $composer['require']['php'] ?? null);
+    }
+
+    #[Test]
     public function module_webapi_routes_require_existing_authenticated_catalog_acl_resource(): void
     {
         $xml = new \SimpleXMLElement(File::get(base_path($this->moduleBasePath.'/etc/webapi.xml')));
@@ -63,8 +75,11 @@ class MagentoSafeSyncModuleContractTest extends TestCase
         $this->assertStringContainsString("'wsrep_dirty_reads'", $content);
         $this->assertStringContainsString("'wsrep_connected'", $content);
         $this->assertStringContainsString("'wsrep_ready'", $content);
+        $this->assertStringContainsString("'wsrep_cluster_status'", $content);
         $this->assertStringContainsString('$temporary = $previous | 1;', $content);
         $this->assertStringContainsString('$this->setWsrepSyncWait($connection, $previous);', $content);
+        $this->assertStringContainsString("preg_match('/^(?:0|[1-9][0-9]*)$/', \$value)", $content);
+        $this->assertStringContainsString('$integerValue > 15', $content);
         $this->assertStringNotContainsString('SET SESSION wsrep_sync_wait = 0', $content);
     }
 

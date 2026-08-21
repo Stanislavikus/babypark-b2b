@@ -48,29 +48,39 @@ final class GaleraSessionScope
 
     private function classifyWsrepSyncWait(AdapterInterface $connection): ?int
     {
-        $provider = $this->readOptionalVariable($connection, 'wsrep_provider');
+        try {
+            $provider = $this->readOptionalVariable($connection, 'wsrep_provider');
 
-        if ($provider === null || $this->isInactiveProvider($provider)) {
-            return null;
+            if ($provider === null || $this->isInactiveProvider($provider)) {
+                return null;
+            }
+
+            if (! $this->readRequiredBooleanSessionVariable($connection, 'wsrep_on')) {
+                throw SafeSyncReadException::causalReadUnavailable();
+            }
+
+            if ($this->readRequiredBooleanSessionVariable($connection, 'wsrep_dirty_reads')) {
+                throw SafeSyncReadException::causalReadUnavailable();
+            }
+
+            if (! $this->readRequiredBooleanStatus($connection, 'wsrep_connected')) {
+                throw SafeSyncReadException::causalReadUnavailable();
+            }
+
+            if (! $this->readRequiredBooleanStatus($connection, 'wsrep_ready')) {
+                throw SafeSyncReadException::causalReadUnavailable();
+            }
+
+            if (! $this->isPrimaryCluster($this->readRequiredStatusValue($connection, 'wsrep_cluster_status'))) {
+                throw SafeSyncReadException::causalReadUnavailable();
+            }
+
+            return $this->readRequiredWsrepSyncWait($connection);
+        } catch (SafeSyncReadException $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            throw SafeSyncReadException::causalReadUnavailable($exception);
         }
-
-        if (! $this->readRequiredBooleanSessionVariable($connection, 'wsrep_on')) {
-            throw SafeSyncReadException::causalReadUnavailable();
-        }
-
-        if ($this->readRequiredBooleanSessionVariable($connection, 'wsrep_dirty_reads')) {
-            throw SafeSyncReadException::causalReadUnavailable();
-        }
-
-        if (! $this->readRequiredBooleanStatus($connection, 'wsrep_connected')) {
-            throw SafeSyncReadException::causalReadUnavailable();
-        }
-
-        if (! $this->readRequiredBooleanStatus($connection, 'wsrep_ready')) {
-            throw SafeSyncReadException::causalReadUnavailable();
-        }
-
-        return $this->readRequiredIntegerSessionVariable($connection, 'wsrep_sync_wait');
     }
 
     private function setWsrepSyncWait(AdapterInterface $connection, int $value): void
@@ -106,18 +116,38 @@ final class GaleraSessionScope
         );
     }
 
-    private function readRequiredIntegerSessionVariable(AdapterInterface $connection, string $name): int
+    private function readRequiredStatusValue(AdapterInterface $connection, string $name): string
     {
         $value = $this->readOptionalShowValue(
             $connection,
-            sprintf("SHOW SESSION VARIABLES LIKE '%s'", $name),
+            sprintf("SHOW STATUS LIKE '%s'", $name),
         );
 
-        if ($value === null || ! is_numeric($value)) {
+        if ($value === null) {
             throw SafeSyncReadException::causalReadUnavailable();
         }
 
-        return (int) $value;
+        return $value;
+    }
+
+    private function readRequiredWsrepSyncWait(AdapterInterface $connection): int
+    {
+        $value = $this->readOptionalShowValue(
+            $connection,
+            "SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'",
+        );
+
+        if ($value === null || preg_match('/^(?:0|[1-9][0-9]*)$/', $value) !== 1) {
+            throw SafeSyncReadException::causalReadUnavailable();
+        }
+
+        $integerValue = (int) $value;
+
+        if ($integerValue < 0 || $integerValue > 15) {
+            throw SafeSyncReadException::causalReadUnavailable();
+        }
+
+        return $integerValue;
     }
 
     private function readOptionalShowValue(AdapterInterface $connection, string $query): ?string
@@ -159,5 +189,10 @@ final class GaleraSessionScope
             ['', 'none', 'null'],
             true,
         );
+    }
+
+    private function isPrimaryCluster(string $clusterStatus): bool
+    {
+        return strtolower(trim($clusterStatus)) === 'primary';
     }
 }

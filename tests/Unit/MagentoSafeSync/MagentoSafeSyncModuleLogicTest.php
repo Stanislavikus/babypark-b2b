@@ -429,6 +429,32 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
     }
 
     #[Test]
+    public function active_galera_with_non_primary_cluster_status_fails_closed(): void
+    {
+        $scope = $this->healthyGaleraScope(new FakeAdapter([
+            "SHOW VARIABLES LIKE 'wsrep_provider'" => ['Value' => '/usr/lib/libgalera_smm.so'],
+            "SHOW SESSION VARIABLES LIKE 'wsrep_on'" => ['Value' => 'ON'],
+            "SHOW SESSION VARIABLES LIKE 'wsrep_dirty_reads'" => ['Value' => 'OFF'],
+            "SHOW STATUS LIKE 'wsrep_connected'" => ['Value' => 'ON'],
+            "SHOW STATUS LIKE 'wsrep_ready'" => ['Value' => 'ON'],
+            "SHOW STATUS LIKE 'wsrep_cluster_status'" => ['Value' => 'Non-Primary'],
+        ]));
+        $callbackInvoked = false;
+
+        try {
+            $scope->execute(function () use (&$callbackInvoked): string {
+                $callbackInvoked = true;
+
+                return 'unreachable';
+            });
+            $this->fail('Expected non-primary cluster status to fail closed.');
+        } catch (SafeSyncReadException $exception) {
+            $this->assertSame('safe_sync_causal_read_unavailable', $exception->getMessage());
+            $this->assertFalse($callbackInvoked);
+        }
+    }
+
+    #[Test]
     public function active_galera_with_invalid_required_state_fails_closed(): void
     {
         $scope = $this->healthyGaleraScope(new FakeAdapter([
@@ -437,6 +463,7 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
             "SHOW SESSION VARIABLES LIKE 'wsrep_dirty_reads'" => ['Value' => 'OFF'],
             "SHOW STATUS LIKE 'wsrep_connected'" => ['Value' => 'ON'],
             "SHOW STATUS LIKE 'wsrep_ready'" => ['Value' => 'ON'],
+            "SHOW STATUS LIKE 'wsrep_cluster_status'" => ['Value' => 'Primary'],
             "SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'" => ['Value' => 'invalid'],
         ]));
         $callbackInvoked = false;
@@ -453,6 +480,95 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
     }
 
     #[Test]
+    public function active_galera_accepts_zero_wsrep_sync_wait_and_restores_exact_previous_value(): void
+    {
+        $connection = new FakeAdapter([
+            "SHOW VARIABLES LIKE 'wsrep_provider'" => ['Value' => '/usr/lib/libgalera_smm.so'],
+            "SHOW SESSION VARIABLES LIKE 'wsrep_on'" => ['Value' => 'ON'],
+            "SHOW SESSION VARIABLES LIKE 'wsrep_dirty_reads'" => ['Value' => 'OFF'],
+            "SHOW STATUS LIKE 'wsrep_connected'" => ['Value' => 'ON'],
+            "SHOW STATUS LIKE 'wsrep_ready'" => ['Value' => 'ON'],
+            "SHOW STATUS LIKE 'wsrep_cluster_status'" => ['Value' => 'Primary'],
+            "SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'" => ['Value' => '0'],
+        ]);
+        $scope = $this->healthyGaleraScope($connection);
+
+        $result = $scope->execute(static fn (): string => 'verified');
+
+        $this->assertSame('verified', $result);
+        $this->assertSame([
+            'SET SESSION wsrep_sync_wait = 1',
+            'SET SESSION wsrep_sync_wait = 0',
+        ], $connection->queries);
+    }
+
+    #[Test]
+    public function active_galera_accepts_upper_bound_wsrep_sync_wait_of_fifteen(): void
+    {
+        $connection = new FakeAdapter([
+            "SHOW VARIABLES LIKE 'wsrep_provider'" => ['Value' => '/usr/lib/libgalera_smm.so'],
+            "SHOW SESSION VARIABLES LIKE 'wsrep_on'" => ['Value' => 'ON'],
+            "SHOW SESSION VARIABLES LIKE 'wsrep_dirty_reads'" => ['Value' => 'OFF'],
+            "SHOW STATUS LIKE 'wsrep_connected'" => ['Value' => 'ON'],
+            "SHOW STATUS LIKE 'wsrep_ready'" => ['Value' => 'ON'],
+            "SHOW STATUS LIKE 'wsrep_cluster_status'" => ['Value' => 'Primary'],
+            "SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'" => ['Value' => '15'],
+        ]);
+        $scope = $this->healthyGaleraScope($connection);
+
+        $result = $scope->execute(static fn (): string => 'verified');
+
+        $this->assertSame('verified', $result);
+        $this->assertSame([
+            'SET SESSION wsrep_sync_wait = 15',
+            'SET SESSION wsrep_sync_wait = 15',
+        ], $connection->queries);
+    }
+
+    #[Test]
+    public function active_galera_rejects_out_of_range_wsrep_sync_wait(): void
+    {
+        $this->assertInvalidWsrepSyncWaitValueFailsClosed('16');
+    }
+
+    #[Test]
+    public function active_galera_rejects_fractional_wsrep_sync_wait(): void
+    {
+        $this->assertInvalidWsrepSyncWaitValueFailsClosed('1.5');
+    }
+
+    #[Test]
+    public function active_galera_rejects_negative_wsrep_sync_wait(): void
+    {
+        $this->assertInvalidWsrepSyncWaitValueFailsClosed('-1');
+    }
+
+    #[Test]
+    public function wsrep_probe_exception_fails_closed_and_preserves_original_cause(): void
+    {
+        $probeFailure = new \RuntimeException('forced probe failure');
+        $scope = $this->healthyGaleraScope(new FakeAdapter([
+            "SHOW VARIABLES LIKE 'wsrep_provider'" => ['Value' => '/usr/lib/libgalera_smm.so'],
+        ], fetchFailures: [
+            "SHOW SESSION VARIABLES LIKE 'wsrep_on'" => $probeFailure,
+        ]));
+        $callbackInvoked = false;
+
+        try {
+            $scope->execute(function () use (&$callbackInvoked): string {
+                $callbackInvoked = true;
+
+                return 'unreachable';
+            });
+            $this->fail('Expected wsrep probe failure to fail closed.');
+        } catch (SafeSyncReadException $exception) {
+            $this->assertFalse($callbackInvoked);
+            $this->assertSame('safe_sync_causal_read_unavailable', $exception->getMessage());
+            $this->assertSame($probeFailure, $exception->getPrevious());
+        }
+    }
+
+    #[Test]
     public function active_healthy_galera_adds_read_bit_preserves_existing_bits_and_restores_exact_previous_value(): void
     {
         $connection = new FakeAdapter([
@@ -461,6 +577,7 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
             "SHOW SESSION VARIABLES LIKE 'wsrep_dirty_reads'" => ['Value' => 'OFF'],
             "SHOW STATUS LIKE 'wsrep_connected'" => ['Value' => 'ON'],
             "SHOW STATUS LIKE 'wsrep_ready'" => ['Value' => 'ON'],
+            "SHOW STATUS LIKE 'wsrep_cluster_status'" => ['Value' => 'Primary'],
             "SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'" => ['Value' => '6'],
         ]);
         $scope = $this->healthyGaleraScope($connection);
@@ -483,6 +600,7 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
             "SHOW SESSION VARIABLES LIKE 'wsrep_dirty_reads'" => ['Value' => 'OFF'],
             "SHOW STATUS LIKE 'wsrep_connected'" => ['Value' => 'ON'],
             "SHOW STATUS LIKE 'wsrep_ready'" => ['Value' => 'ON'],
+            "SHOW STATUS LIKE 'wsrep_cluster_status'" => ['Value' => 'Primary'],
             "SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'" => ['Value' => '2'],
         ], [
             'SET SESSION wsrep_sync_wait = 2' => new \RuntimeException('restore failed'),
@@ -550,6 +668,32 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
     {
         return new GaleraSessionScope(new ResourceConnection($connection));
     }
+
+    private function assertInvalidWsrepSyncWaitValueFailsClosed(string $value): void
+    {
+        $scope = $this->healthyGaleraScope(new FakeAdapter([
+            "SHOW VARIABLES LIKE 'wsrep_provider'" => ['Value' => '/usr/lib/libgalera_smm.so'],
+            "SHOW SESSION VARIABLES LIKE 'wsrep_on'" => ['Value' => 'ON'],
+            "SHOW SESSION VARIABLES LIKE 'wsrep_dirty_reads'" => ['Value' => 'OFF'],
+            "SHOW STATUS LIKE 'wsrep_connected'" => ['Value' => 'ON'],
+            "SHOW STATUS LIKE 'wsrep_ready'" => ['Value' => 'ON'],
+            "SHOW STATUS LIKE 'wsrep_cluster_status'" => ['Value' => 'Primary'],
+            "SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'" => ['Value' => $value],
+        ]));
+        $callbackInvoked = false;
+
+        try {
+            $scope->execute(function () use (&$callbackInvoked): string {
+                $callbackInvoked = true;
+
+                return 'unreachable';
+            });
+            $this->fail('Expected invalid wsrep_sync_wait value to fail closed.');
+        } catch (SafeSyncReadException $exception) {
+            $this->assertSame('safe_sync_causal_read_unavailable', $exception->getMessage());
+            $this->assertFalse($callbackInvoked);
+        }
+    }
 }
 
 final class FakeAdapter implements AdapterInterface
@@ -560,21 +704,30 @@ final class FakeAdapter implements AdapterInterface
     /** @var array<string, \Throwable> */
     private array $queryFailures;
 
+    /** @var array<string, \Throwable> */
+    private array $fetchFailures;
+
     /** @var list<string> */
     public array $queries = [];
 
     /**
-        * @param array<string, mixed> $rows
-        * @param array<string, \Throwable> $queryFailures
-        */
-    public function __construct(array $rows, array $queryFailures = [])
+     * @param array<string, mixed> $rows
+     * @param array<string, \Throwable> $queryFailures
+     * @param array<string, \Throwable> $fetchFailures
+     */
+    public function __construct(array $rows, array $queryFailures = [], array $fetchFailures = [])
     {
         $this->rows = $rows;
         $this->queryFailures = $queryFailures;
+        $this->fetchFailures = $fetchFailures;
     }
 
     public function fetchRow($sql)
     {
+        if (isset($this->fetchFailures[$sql])) {
+            throw $this->fetchFailures[$sql];
+        }
+
         return $this->rows[$sql] ?? null;
     }
 
