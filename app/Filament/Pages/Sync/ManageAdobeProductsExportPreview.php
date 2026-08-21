@@ -194,38 +194,22 @@ class ManageAdobeProductsExportPreview extends Page
 
     public function updatedWorklistFilter(): void
     {
-        if (! $this->previewSectionVisible) {
-            return;
-        }
-
-        $this->refreshWorklist();
+        $this->refreshPresentation();
     }
 
     public function updatedWorklistSearch(): void
     {
-        if (! $this->previewSectionVisible) {
-            return;
-        }
-
-        $this->refreshWorklist();
+        $this->refreshPresentation();
     }
 
     public function updatedLiveWorklistFilter(): void
     {
-        if (! $this->liveSectionVisible) {
-            return;
-        }
-
-        $this->refreshLiveWorklist();
+        $this->refreshPresentation();
     }
 
     public function updatedLiveWorklistSearch(): void
     {
-        if (! $this->liveSectionVisible) {
-            return;
-        }
-
-        $this->refreshLiveWorklist();
+        $this->refreshPresentation();
     }
 
     public function startPreview(): void
@@ -356,6 +340,8 @@ class ManageAdobeProductsExportPreview extends Page
         if (! $previewAuth->canAccess($user, $workspace) && ! $liveAuth->canAccessLive($user, $workspace)) {
             abort(403);
         }
+
+        $this->canManageSetup = false;
 
         $this->previewSectionVisible = $previewAuth->isEligiblePreviewTarget($user, $workspace, $this->accountId);
         $this->liveSectionVisible = $liveAuth->isEligibleLiveTarget($user, $workspace, $this->accountId);
