@@ -89,7 +89,7 @@ class MagentoSafeSyncModuleContractTest extends TestCase
     {
         $content = File::get(base_path($this->moduleBasePath.'/Model/HandshakeManagement.php'));
 
-        $this->assertStringContainsString("safe_sync_module_version_unavailable", $content);
+        $this->assertStringContainsString('safe_sync_module_version_unavailable', $content);
         $this->assertStringNotContainsString("['setup_version'] ?? '0.0.0'", $content);
     }
 

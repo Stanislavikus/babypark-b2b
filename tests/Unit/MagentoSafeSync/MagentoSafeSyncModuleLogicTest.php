@@ -280,13 +280,12 @@ final class CollectionFactory
 
 namespace Tests\Unit\MagentoSafeSync;
 
+use B2BPlatform\MagentoSafeSync\Model\Data\HandshakeResponseFactory;
+use B2BPlatform\MagentoSafeSync\Model\Data\ProductReadResponseFactory;
 use B2BPlatform\MagentoSafeSync\Model\GaleraSessionScope;
 use B2BPlatform\MagentoSafeSync\Model\HandshakeManagement;
 use B2BPlatform\MagentoSafeSync\Model\ProductReadManagement;
-use B2BPlatform\MagentoSafeSync\Model\SafeSyncContract;
 use B2BPlatform\MagentoSafeSync\Model\SafeSyncReadException;
-use B2BPlatform\MagentoSafeSync\Model\Data\HandshakeResponseFactory;
-use B2BPlatform\MagentoSafeSync\Model\Data\ProductReadResponseFactory;
 use Magento\Catalog\Api\Data\ProductInterface;
 use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
@@ -775,9 +774,9 @@ final class FakeAdapter implements AdapterInterface
     public array $queries = [];
 
     /**
-     * @param array<string, mixed> $rows
-     * @param array<string, \Throwable> $queryFailures
-     * @param array<string, \Throwable> $fetchFailures
+     * @param  array<string, mixed>  $rows
+     * @param  array<string, \Throwable>  $queryFailures
+     * @param  array<string, \Throwable>  $fetchFailures
      */
     public function __construct(array $rows, array $queryFailures = [], array $fetchFailures = [])
     {
@@ -849,7 +848,7 @@ final class FakeProductCollection implements \IteratorAggregate
     private array $filteredProducts;
 
     /**
-     * @param list<FakeProduct> $products
+     * @param  list<FakeProduct>  $products
      */
     public function __construct(array $products)
     {

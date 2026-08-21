@@ -7,8 +7,11 @@ namespace B2BPlatform\MagentoSafeSync\Api\Data;
 interface ProductReadResponseInterface
 {
     public const LOGICAL_ENTITY_ID = 'logical_entity_id';
+
     public const SKU = 'sku';
+
     public const TYPE_ID = 'type_id';
+
     public const NAME = 'name';
 
     public function getLogicalEntityId(): int;

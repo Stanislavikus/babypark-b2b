@@ -7,7 +7,9 @@ namespace B2BPlatform\MagentoSafeSync\Api\Data;
 interface HandshakeResponseInterface
 {
     public const CONTRACT_VERSION = 'contract_version';
+
     public const MODULE_VERSION = 'module_version';
+
     public const SUPPORTED_OPERATION_FAMILIES = 'supported_operation_families';
 
     public function getContractVersion(): string;
@@ -24,7 +26,7 @@ interface HandshakeResponseInterface
     public function getSupportedOperationFamilies(): array;
 
     /**
-     * @param string[] $supportedOperationFamilies
+     * @param  string[]  $supportedOperationFamilies
      */
     public function setSupportedOperationFamilies(array $supportedOperationFamilies): self;
 }

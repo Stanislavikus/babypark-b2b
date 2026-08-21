@@ -10,10 +10,6 @@ interface ProductReadManagementInterface
 {
     /**
      * Performs entity-bound product verification using logical entity identity plus expected SKU.
-     *
-     * @param int $logicalEntityId
-     * @param string $expectedSku
-     * @return ProductReadResponseInterface
      */
     public function readProduct(int $logicalEntityId, string $expectedSku): ProductReadResponseInterface;
 }

@@ -15,7 +15,8 @@ final class GaleraSessionScope
 
     /**
      * @template T
-     * @param callable(): T $callback
+     *
+     * @param  callable(): T  $callback
      * @return T
      */
     public function execute(callable $callback): mixed

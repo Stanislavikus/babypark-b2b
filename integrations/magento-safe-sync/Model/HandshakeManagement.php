@@ -33,7 +33,7 @@ final class HandshakeManagement implements HandshakeManagementInterface
     }
 
     /**
-     * @param array<string, mixed> $moduleInfo
+     * @param  array<string, mixed>  $moduleInfo
      */
     private function requireModuleVersion(array $moduleInfo): string
     {
