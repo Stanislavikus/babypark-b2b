@@ -1845,6 +1845,43 @@ Summary rules for first-Live UI on `ManageAdobeProductsExportPreview`:
   in Layer A/B.
 - **No selective retry** — no "retry failed only" action in Stage 3 V1.
 
+### Per-item Live linking (Resolved — Stage 3E Stop-and-Amend)
+
+Normative detail: `docs/03-DOMAIN_MODEL.md` → **Stage 3E Stop-and-Amend — Magento
+ownership and entity-bound mutation contract**; `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md`
+§18.
+
+Linking is **per-item Live readiness/remediation** on the existing Adobe Products
+Export Preview / Live work surface — **not** `SyncLiveMerchantSetupBarrier`, not a
+Preview finding, and not a Preview HTTP lookup. Preview readiness does **not**
+imply Live applicability.
+
+Summary rules for unlinked or trust-insufficient Products in the Live surface:
+
+- **Existing Live outcome** — use `SyncLiveOutcome::NotApplied` with a
+  distinguishable merchant-safe linking reason; do **not** add a fifth Live outcome
+  or a run-level setup-barrier case for linking.
+- **Worklist placement** — unlinked Products appear in the Live worklist with
+  contextual link/reconfirmation action when the actor is authorized.
+- **No Preview mutation** — Preview remains safe/read-only; do not route linking
+  through Preview remediation or existence lookup.
+- **Informed confirmation** — before link confirmation the merchant sees a concise
+  controlled-field comparison (platform value vs current Magento value) for fields
+  the connector will own/update; action label concept: *Пов’язати з цим товаром
+  Magento* with clear explanation that subsequent synchronization may update those
+  fields. A bare checkbox alone is insufficient.
+- **Dual authority** — link confirmation requires fresh `manage_sync_configurations`
+  **and** fresh `run_sync_live` for the current Workspace; revocation of either
+  before confirmation must fail closed. Do **not** create a new permission in
+  Stage 3E.
+- **Forbidden merchant exposure** — never show `ExternalRecordLink`, Magento
+  `entity_id`, discriminator, ownership policy, reconciliation, or HTTP evidence in
+  Layer A/B.
+- **Link-first ≠ Live-ready** — merchant-confirmed link establishes ENTITY TRUST
+  but does **not** by itself make stock Magento consequential writes identity-safe;
+  exemplary Live support flip waits for proven entity-bound mutation capability
+  (Stage 3E blocker).
+
 ### Known implementation mismatch (not architectural regression)
 
 Current shipped UI has **not** been fully migrated to this contract:

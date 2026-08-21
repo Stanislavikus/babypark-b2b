@@ -216,13 +216,6 @@ final class AdobeProductSimpleCommandExecutor
 
         [$postResult, $postTransportException] = $this->remoteStateClient->postProduct($context, $desiredState);
 
-        $ownershipEvidence = $this->buildCreateOwnershipEvidence(
-            $initialGet->classification,
-            $postResult,
-            $postTransportException,
-            $desiredState->sku,
-        );
-
         if ($this->shouldReconcileAfterWrite($postResult, $postTransportException)) {
             return $this->reconcileAfterWrite(
                 $input,
@@ -233,7 +226,6 @@ final class AdobeProductSimpleCommandExecutor
                 reasonCode: 'no_link_post_inconclusive',
                 allowLinkPersistence: true,
                 requireOwnershipForApplied: true,
-                ownershipEvidence: $ownershipEvidence,
             );
         }
 
@@ -247,7 +239,6 @@ final class AdobeProductSimpleCommandExecutor
                 reasonCode: 'no_link_post_inconclusive_body',
                 allowLinkPersistence: true,
                 requireOwnershipForApplied: true,
-                ownershipEvidence: $ownershipEvidence,
             );
         }
 
@@ -260,7 +251,7 @@ final class AdobeProductSimpleCommandExecutor
             reasonCode: 'no_link_post_reconciled',
             allowLinkPersistence: true,
             requireOwnershipForApplied: true,
-            ownershipEvidence: $ownershipEvidence,
+            ownershipTrustSatisfied: false,
         );
     }
 
@@ -273,7 +264,6 @@ final class AdobeProductSimpleCommandExecutor
         string $reasonCode,
         bool $allowLinkPersistence,
         bool $requireOwnershipForApplied,
-        ?AdobeProductCreateOwnershipEvidence $ownershipEvidence = null,
         bool $ownershipTrustSatisfied = false,
     ): AdobeProductSimpleCommandResult {
         $reconciliationGet = $this->remoteStateClient->getProductWithContext($context, $sku);
@@ -304,12 +294,7 @@ final class AdobeProductSimpleCommandExecutor
         $ownershipProven = $ownershipTrustSatisfied;
 
         if ($allowLinkPersistence
-            && $ownershipEvidence !== null
-            && $this->ownershipTrustPolicy->canPersistNewLink(
-                $desiredState,
-                $reconciliationGet->observedState,
-                $ownershipEvidence,
-            )
+            && $this->ownershipTrustPolicy->canPersistNewLink($desiredState, $reconciliationGet->observedState)
         ) {
             try {
                 $this->linkPersister->persistTrustedVariantLink(
@@ -364,24 +349,6 @@ final class AdobeProductSimpleCommandExecutor
         }
 
         return $httpResult->statusCode < 200 || $httpResult->statusCode >= 300;
-    }
-
-    private function buildCreateOwnershipEvidence(
-        AdobeProductRemoteGetClassification $preWriteClassification,
-        ?ConnectorHttpResult $httpResult,
-        ?ConnectorTransportException $transportException,
-        string $expectedSku,
-    ): AdobeProductCreateOwnershipEvidence {
-        if ($transportException !== null
-            || $httpResult === null
-            || $httpResult->statusCode < 200
-            || $httpResult->statusCode >= 300
-            || ! $this->responseBodyConfirmsSku($httpResult, $expectedSku)
-        ) {
-            return AdobeProductCreateOwnershipEvidence::inconclusive($preWriteClassification);
-        }
-
-        return AdobeProductCreateOwnershipEvidence::definitiveCreate($preWriteClassification);
     }
 
     private function responseBodyConfirmsSku(?ConnectorHttpResult $httpResult, string $expectedSku): bool

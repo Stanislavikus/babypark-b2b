@@ -32,7 +32,6 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableRemoteOptionStateR
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductAppliedStateKnowledge;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductCommandCompilationException;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductCommandRequestFactory;
-use App\Support\Connectors\AdobePaaS\Command\AdobeProductCreateOwnershipEvidence;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductDesiredState;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductDesiredStateCompiler;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkGuard;
@@ -259,7 +258,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
     }
 
     #[Test]
-    public function production_conservative_parent_create_persists_erl_on_definitive_create(): void
+    public function production_conservative_parent_create_is_ambiguous_without_erl(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
@@ -280,9 +279,9 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
 
         $result = $parentExecutor->execute($this->configurableInput($workspace, $account, $product));
 
-        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
-        $this->assertTrue($result->externalRecordLinkPersisted);
-        $this->assertSame(1, ExternalRecordLink::query()->where('product_id', $product->id)->count());
+        $this->assertSame(AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous, $result->appliedStateKnowledge);
+        $this->assertStringContainsString('ownership_not_proven', $result->reasonCode);
+        $this->assertSame(0, ExternalRecordLink::query()->where('product_id', $product->id)->count());
         $this->assertGreaterThan(0, $transport->sendCount);
     }
 
@@ -391,7 +390,6 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
                 public function canPersistNewLink(
                     AdobeProductDesiredState $desiredState,
                     AdobeProductObservedState $observedState,
-                    AdobeProductCreateOwnershipEvidence $ownershipEvidence,
                 ): bool {
                     return true;
                 }
@@ -399,7 +397,6 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
                 public function canPersistNewParentLink(
                     AdobeProductParentDesiredState $desiredState,
                     AdobeProductParentObservedState $observedState,
-                    AdobeProductCreateOwnershipEvidence $ownershipEvidence,
                 ): bool {
                     return true;
                 }
@@ -743,7 +740,6 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
                 public function canPersistNewLink(
                     AdobeProductDesiredState $desiredState,
                     AdobeProductObservedState $observedState,
-                    AdobeProductCreateOwnershipEvidence $ownershipEvidence,
                 ): bool {
                     return true;
                 }
@@ -751,7 +747,6 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
                 public function canPersistNewParentLink(
                     AdobeProductParentDesiredState $desiredState,
                     AdobeProductParentObservedState $observedState,
-                    AdobeProductCreateOwnershipEvidence $ownershipEvidence,
                 ): bool {
                     return true;
                 }

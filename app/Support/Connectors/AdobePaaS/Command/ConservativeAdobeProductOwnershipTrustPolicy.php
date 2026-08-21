@@ -7,23 +7,14 @@ final class ConservativeAdobeProductOwnershipTrustPolicy implements AdobeProduct
     public function canPersistNewLink(
         AdobeProductDesiredState $desiredState,
         AdobeProductObservedState $observedState,
-        AdobeProductCreateOwnershipEvidence $ownershipEvidence,
     ): bool {
-        return $this->approvesCreateProvenance($ownershipEvidence);
+        return false;
     }
 
     public function canPersistNewParentLink(
         AdobeProductParentDesiredState $desiredState,
         AdobeProductParentObservedState $observedState,
-        AdobeProductCreateOwnershipEvidence $ownershipEvidence,
     ): bool {
-        return $this->approvesCreateProvenance($ownershipEvidence);
-    }
-
-    private function approvesCreateProvenance(AdobeProductCreateOwnershipEvidence $ownershipEvidence): bool
-    {
-        return $ownershipEvidence->preWriteClassification === AdobeProductRemoteGetClassification::TrustedKnownMissing
-            && $ownershipEvidence->writeEvidence === AdobeProductCreateWriteEvidence::DefinitiveSuccess
-            && $ownershipEvidence->responseIdentityConfirmed;
+        return false;
     }
 }
