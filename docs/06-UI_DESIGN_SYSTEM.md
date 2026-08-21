@@ -1845,10 +1845,10 @@ Summary rules for first-Live UI on `ManageAdobeProductsExportPreview`:
   in Layer A/B.
 - **No selective retry** — no "retry failed only" action in Stage 3 V1.
 
-### Per-item Live linking (Resolved — Stage 3E Stop-and-Amend)
+### Per-item Live linking (Resolved — Stage 3E docs contract)
 
 Normative detail: `docs/03-DOMAIN_MODEL.md` → **Stage 3E Stop-and-Amend — Magento
-ownership and entity-bound mutation contract**; `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md`
+ownership and entity-bound Safe Sync runtime contract**; `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md`
 §18.
 
 Linking is **per-item Live readiness/remediation** on the existing Adobe Products
@@ -1878,9 +1878,13 @@ Summary rules for unlinked or trust-insufficient Products in the Live surface:
   `entity_id`, discriminator, ownership policy, reconciliation, or HTTP evidence in
   Layer A/B.
 - **Link-first ≠ Live-ready** — merchant-confirmed link establishes ENTITY TRUST
-  but does **not** by itself make stock Magento consequential writes identity-safe;
-  exemplary Live support flip waits for proven entity-bound mutation capability
-  (Stage 3E blocker).
+  but does **not** by itself authorize consequential Live; exemplary Live support
+  flip waits for proven first-party Magento entity-bound Safe Sync component
+  (Stage 3E runtime blocker).
+- **Account readiness** — `ConnectorSyncOperationSupport` (static capability) and
+  `ConnectorLiveRuntimeReadiness` (fresh account prerequisite) are separate; cached
+  handshake is presentation-only; do not persist handshake evidence on
+  `SyncRunItem`.
 
 ### Known implementation mismatch (not architectural regression)
 

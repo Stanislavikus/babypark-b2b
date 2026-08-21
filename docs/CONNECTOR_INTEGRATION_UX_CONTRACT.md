@@ -464,18 +464,19 @@ verify → Preview when required → new all-products Live execution.
 
 ---
 
-## 18. Per-item Live linking (Resolved — Stage 3E Stop-and-Amend)
+## 18. Per-item Live linking (Resolved — Stage 3E docs contract)
 
 Normative detail: `docs/03-DOMAIN_MODEL.md` → **Stage 3E Stop-and-Amend — Magento
-ownership and entity-bound mutation contract**. Summary-level UI rules:
+ownership and entity-bound Safe Sync runtime contract**. Summary-level UI rules:
 `docs/06-UI_DESIGN_SYSTEM.md` → Per-item Live linking.
 
 **Implementation status:** Link-first runtime, ERL provenance/discriminator
-persistence, informed merchant confirmation, and atomic configurable-family
-confirmation are **not** shipped in PR #160 (docs-only Stop-and-Amend). Adobe
+persistence, informed merchant confirmation, atomic configurable-family
+confirmation, and first-party Magento entity-bound Safe Sync component are **not**
+shipped (docs contract frozen; PR #160 runtime reverted). Adobe
 Products/Export/Live advertised support remains **false**. Merchant consequential
-Live action remains non-actionable until Stage 3E truth flip after entity-bound
-mutation capability is proven.
+Live action remains non-actionable until Stage 3E runtime + real-target validation
+and truthful support flip.
 
 ### Presentation boundary
 
@@ -540,11 +541,14 @@ in Layer A/B.
 ### Link-first necessary but not sufficient
 
 Merchant-confirmed linking establishes ENTITY TRUST (logical Magento Product
-identity), not SKU trust. Pre/post discriminator verification is mandatory
-defence-in-depth for future mutation paths but is **detection**, not atomic
-enforcement under stock Magento SKU-addressed REST.
+identity via stored `entity_id` discriminator), not SKU trust. Expected SKU remains
+a mandatory equality precondition but is not identity authority. After trust exists,
+stock SKU GET must not prove verification/reconciliation/applied state.
+
+Pre-trust candidate discovery may use bounded stock SKU lookup; final confirmation
+must freshly verify exact logical entity + expected SKU.
 
 Therefore link-first + entity trust + informed confirmation are **required** but
 **not sufficient** for exemplary consequential Live. Truth flip waits for proven
-entity-bound consequential mutation capability across every advertised V1 Live
-mutation category (Stage 3E blocker).
+first-party Magento entity-bound Safe Sync component across every advertised V1 Live
+mutation category (Stage 3E runtime blocker).

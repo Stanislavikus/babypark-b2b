@@ -46,7 +46,8 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
         $this->assertStringContainsString('Stage 3A — Live Safety Foundation', $section);
         $this->assertStringContainsString('**Done**', $section);
         $this->assertStringContainsString('Stage 3B–3E — Live implementation slices', $section);
-        $this->assertStringContainsString('**Pending**', $section);
+        $this->assertStringContainsString('Stage 3E **Done (docs contract)**', $section);
+        $this->assertStringContainsString('runtime + validation **pending**', $section);
     }
 
     #[Test]
