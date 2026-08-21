@@ -17,8 +17,8 @@ final class AdobeSafeSyncRequestFactory
     ) {}
 
     public function buildHandshake(
-        AdobePaaSRequestContext $context,
-        OAuth1SigningContext $signingContext,
+        #[\SensitiveParameter] AdobePaaSRequestContext $context,
+        #[\SensitiveParameter] OAuth1SigningContext $signingContext,
     ): RequestInterface {
         return $this->buildSignedRequest(
             'GET',
@@ -30,10 +30,10 @@ final class AdobeSafeSyncRequestFactory
     }
 
     public function buildReadProduct(
-        AdobePaaSRequestContext $context,
+        #[\SensitiveParameter] AdobePaaSRequestContext $context,
         int $logicalEntityId,
         string $expectedSku,
-        OAuth1SigningContext $signingContext,
+        #[\SensitiveParameter] OAuth1SigningContext $signingContext,
     ): RequestInterface {
         return $this->buildSignedRequest(
             'GET',
@@ -49,10 +49,10 @@ final class AdobeSafeSyncRequestFactory
      */
     private function buildSignedRequest(
         string $method,
-        AdobePaaSRequestContext $context,
+        #[\SensitiveParameter] AdobePaaSRequestContext $context,
         string $endpointPath,
         array $query,
-        OAuth1SigningContext $signingContext,
+        #[\SensitiveParameter] OAuth1SigningContext $signingContext,
     ): RequestInterface {
         $absoluteUrl = $this->buildAbsoluteUrl($context, $endpointPath, $query);
         $request = new Request($method, $absoluteUrl);
@@ -72,7 +72,7 @@ final class AdobeSafeSyncRequestFactory
      * @param  array<string, string>  $query
      */
     private function buildAbsoluteUrl(
-        AdobePaaSRequestContext $context,
+        #[\SensitiveParameter] AdobePaaSRequestContext $context,
         string $endpointPath,
         array $query,
     ): string {

@@ -106,6 +106,74 @@ class AdobeSafeSyncClientTest extends TestCase
     }
 
     #[Test]
+    public function missing_module_version_fails_closed(): void
+    {
+        $client = $this->clientWithTransport(new class implements ConnectorHttpTransport
+        {
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'contract_version' => AdobeSafeSyncContract::CONTRACT_VERSION,
+                    'supported_operation_families' => [
+                        AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY,
+                    ],
+                ], JSON_THROW_ON_ERROR));
+            }
+        });
+
+        $this->expectException(AdobeSafeSyncClientException::class);
+        $this->expectExceptionMessage('Safe Sync response field `module_version` is invalid.');
+
+        $client->handshakeWithContext($this->context());
+    }
+
+    #[Test]
+    public function sentinel_module_version_fails_closed(): void
+    {
+        $client = $this->clientWithTransport(new class implements ConnectorHttpTransport
+        {
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'contract_version' => AdobeSafeSyncContract::CONTRACT_VERSION,
+                    'module_version' => '0.0.0',
+                    'supported_operation_families' => [
+                        AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY,
+                    ],
+                ], JSON_THROW_ON_ERROR));
+            }
+        });
+
+        $this->expectException(AdobeSafeSyncClientException::class);
+        $this->expectExceptionMessage('Safe Sync module version is invalid.');
+
+        $client->handshakeWithContext($this->context());
+    }
+
+    #[Test]
+    public function malformed_module_version_fails_closed(): void
+    {
+        $client = $this->clientWithTransport(new class implements ConnectorHttpTransport
+        {
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'contract_version' => AdobeSafeSyncContract::CONTRACT_VERSION,
+                    'module_version' => ' 0.1.0 ',
+                    'supported_operation_families' => [
+                        AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY,
+                    ],
+                ], JSON_THROW_ON_ERROR));
+            }
+        });
+
+        $this->expectException(AdobeSafeSyncClientException::class);
+        $this->expectExceptionMessage('Safe Sync module version is invalid.');
+
+        $client->handshakeWithContext($this->context());
+    }
+
+    #[Test]
     public function unsupported_contract_version_fails_closed(): void
     {
         $client = $this->clientWithTransport(new class implements ConnectorHttpTransport
@@ -229,6 +297,25 @@ class AdobeSafeSyncClientTest extends TestCase
             $this->assertStringNotContainsString('cs_test', $exception->getMessage());
             $this->assertStringNotContainsString('ts_test', $exception->getMessage());
             $this->assertSame('Safe Sync request failed.', $exception->getMessage());
+        }
+    }
+
+    #[Test]
+    public function public_context_taking_methods_are_marked_sensitive(): void
+    {
+        $methods = [
+            [AdobeSafeSyncClient::class, 'handshakeWithContext', 0],
+            [AdobeSafeSyncClient::class, 'readProductWithContext', 0],
+        ];
+
+        foreach ($methods as [$class, $method, $index]) {
+            $reflection = new \ReflectionMethod($class, $method);
+            $parameter = $reflection->getParameters()[$index];
+
+            $this->assertNotEmpty(
+                $parameter->getAttributes(\SensitiveParameter::class),
+                "{$class}::{$method} parameter {$parameter->getName()} must carry #[\\SensitiveParameter]",
+            );
         }
     }
 

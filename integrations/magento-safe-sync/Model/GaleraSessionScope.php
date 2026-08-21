@@ -21,7 +21,7 @@ final class GaleraSessionScope
     public function execute(callable $callback): mixed
     {
         $connection = $this->resourceConnection->getConnection();
-        $previous = $this->readWsrepSyncWait($connection);
+        $previous = $this->classifyWsrepSyncWait($connection);
 
         if ($previous === null) {
             return $callback();
@@ -46,23 +46,118 @@ final class GaleraSessionScope
         }
     }
 
-    private function readWsrepSyncWait(AdapterInterface $connection): ?int
+    private function classifyWsrepSyncWait(AdapterInterface $connection): ?int
     {
-        $row = $connection->fetchRow("SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'");
+        $provider = $this->readOptionalVariable($connection, 'wsrep_provider');
 
-        if (! is_array($row) || ! array_key_exists('Value', $row)) {
+        if ($provider === null || $this->isInactiveProvider($provider)) {
             return null;
         }
 
-        if (! is_numeric($row['Value'])) {
+        if (! $this->readRequiredBooleanSessionVariable($connection, 'wsrep_on')) {
             throw SafeSyncReadException::causalReadUnavailable();
         }
 
-        return (int) $row['Value'];
+        if ($this->readRequiredBooleanSessionVariable($connection, 'wsrep_dirty_reads')) {
+            throw SafeSyncReadException::causalReadUnavailable();
+        }
+
+        if (! $this->readRequiredBooleanStatus($connection, 'wsrep_connected')) {
+            throw SafeSyncReadException::causalReadUnavailable();
+        }
+
+        if (! $this->readRequiredBooleanStatus($connection, 'wsrep_ready')) {
+            throw SafeSyncReadException::causalReadUnavailable();
+        }
+
+        return $this->readRequiredIntegerSessionVariable($connection, 'wsrep_sync_wait');
     }
 
     private function setWsrepSyncWait(AdapterInterface $connection, int $value): void
     {
         $connection->query(sprintf('SET SESSION wsrep_sync_wait = %d', $value));
+    }
+
+    private function readOptionalVariable(AdapterInterface $connection, string $name): ?string
+    {
+        return $this->readOptionalShowValue(
+            $connection,
+            sprintf("SHOW VARIABLES LIKE '%s'", $name),
+        );
+    }
+
+    private function readRequiredBooleanSessionVariable(AdapterInterface $connection, string $name): bool
+    {
+        return $this->parseRequiredBoolean(
+            $this->readOptionalShowValue(
+                $connection,
+                sprintf("SHOW SESSION VARIABLES LIKE '%s'", $name),
+            ),
+        );
+    }
+
+    private function readRequiredBooleanStatus(AdapterInterface $connection, string $name): bool
+    {
+        return $this->parseRequiredBoolean(
+            $this->readOptionalShowValue(
+                $connection,
+                sprintf("SHOW STATUS LIKE '%s'", $name),
+            ),
+        );
+    }
+
+    private function readRequiredIntegerSessionVariable(AdapterInterface $connection, string $name): int
+    {
+        $value = $this->readOptionalShowValue(
+            $connection,
+            sprintf("SHOW SESSION VARIABLES LIKE '%s'", $name),
+        );
+
+        if ($value === null || ! is_numeric($value)) {
+            throw SafeSyncReadException::causalReadUnavailable();
+        }
+
+        return (int) $value;
+    }
+
+    private function readOptionalShowValue(AdapterInterface $connection, string $query): ?string
+    {
+        $row = $connection->fetchRow($query);
+
+        if (! is_array($row)) {
+            return null;
+        }
+
+        $value = $row['Value'] ?? $row['VALUE'] ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (! is_scalar($value)) {
+            throw SafeSyncReadException::causalReadUnavailable();
+        }
+
+        return (string) $value;
+    }
+
+    private function parseRequiredBoolean(?string $value): bool
+    {
+        $normalized = strtolower(trim((string) $value));
+
+        return match ($normalized) {
+            '1', 'on' => true,
+            '0', 'off' => false,
+            default => throw SafeSyncReadException::causalReadUnavailable(),
+        };
+    }
+
+    private function isInactiveProvider(string $provider): bool
+    {
+        return in_array(
+            strtolower(trim($provider)),
+            ['', 'none', 'null'],
+            true,
+        );
     }
 }

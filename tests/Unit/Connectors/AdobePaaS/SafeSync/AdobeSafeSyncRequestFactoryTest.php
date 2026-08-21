@@ -65,4 +65,31 @@ class AdobeSafeSyncRequestFactoryTest extends TestCase
         );
         $this->assertStringNotContainsString('/V1/products/SKU%2F1', (string) $request->getUri());
     }
+
+    #[Test]
+    public function safe_sync_request_factory_marks_secret_bearing_parameters_as_sensitive(): void
+    {
+        $methods = [
+            [AdobeSafeSyncRequestFactory::class, 'buildHandshake', [0, 1], false],
+            [AdobeSafeSyncRequestFactory::class, 'buildReadProduct', [0, 3], false],
+            [AdobeSafeSyncRequestFactory::class, 'buildSignedRequest', [1, 4], true],
+            [AdobeSafeSyncRequestFactory::class, 'buildAbsoluteUrl', [0], true],
+        ];
+
+        foreach ($methods as [$class, $method, $indexes, $isPrivate]) {
+            $reflection = new \ReflectionMethod($class, $method);
+
+            if ($isPrivate) {
+                $this->assertTrue($reflection->isPrivate(), "{$class}::{$method} must be private");
+            }
+
+            foreach ($indexes as $index) {
+                $parameter = $reflection->getParameters()[$index];
+                $this->assertNotEmpty(
+                    $parameter->getAttributes(\SensitiveParameter::class),
+                    "{$class}::{$method} parameter {$parameter->getName()} must carry #[\\SensitiveParameter]",
+                );
+            }
+        }
+    }
 }

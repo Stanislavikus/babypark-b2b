@@ -42,8 +42,6 @@ final class ProductReadManagement implements ProductReadManagementInterface
             throw SafeSyncReadException::invalidLogicalEntityId();
         }
 
-        $expectedSku = trim($expectedSku);
-
         if ($expectedSku === '') {
             throw SafeSyncReadException::invalidExpectedSku();
         }

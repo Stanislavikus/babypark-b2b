@@ -48,6 +48,7 @@ class MagentoSafeSyncModuleContractTest extends TestCase
         $this->assertStringContainsString('getIdentifierField()', $content);
         $this->assertStringContainsString('getById($logicalEntityId, false, null, true)', $content);
         $this->assertStringContainsString("addAttributeToFilter('sku'", $content);
+        $this->assertStringNotContainsString('trim($expectedSku)', $content);
         $this->assertStringNotContainsString('getLinkField()', $content);
         $this->assertStringNotContainsString('row_id', $content);
     }
@@ -57,9 +58,23 @@ class MagentoSafeSyncModuleContractTest extends TestCase
     {
         $content = File::get(base_path($this->moduleBasePath.'/Model/GaleraSessionScope.php'));
 
+        $this->assertStringContainsString("'wsrep_provider'", $content);
+        $this->assertStringContainsString("'wsrep_on'", $content);
+        $this->assertStringContainsString("'wsrep_dirty_reads'", $content);
+        $this->assertStringContainsString("'wsrep_connected'", $content);
+        $this->assertStringContainsString("'wsrep_ready'", $content);
         $this->assertStringContainsString('$temporary = $previous | 1;', $content);
         $this->assertStringContainsString('$this->setWsrepSyncWait($connection, $previous);', $content);
         $this->assertStringNotContainsString('SET SESSION wsrep_sync_wait = 0', $content);
+    }
+
+    #[Test]
+    public function handshake_version_must_come_from_authoritative_module_metadata_without_fabricated_fallback(): void
+    {
+        $content = File::get(base_path($this->moduleBasePath.'/Model/HandshakeManagement.php'));
+
+        $this->assertStringContainsString("safe_sync_module_version_unavailable", $content);
+        $this->assertStringNotContainsString("['setup_version'] ?? '0.0.0'", $content);
     }
 
     #[Test]

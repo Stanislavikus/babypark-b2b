@@ -28,7 +28,7 @@ final class AdobeSafeSyncClient
         return $this->handshakeWithContext($context);
     }
 
-    public function handshakeWithContext(AdobePaaSRequestContext $context): AdobeSafeSyncHandshake
+    public function handshakeWithContext(#[\SensitiveParameter] AdobePaaSRequestContext $context): AdobeSafeSyncHandshake
     {
         $result = $this->send(
             $this->requestFactory->buildHandshake($context, $this->newSigningContext()),
@@ -50,7 +50,7 @@ final class AdobeSafeSyncClient
     }
 
     public function readProductWithContext(
-        AdobePaaSRequestContext $context,
+        #[\SensitiveParameter] AdobePaaSRequestContext $context,
         int $logicalEntityId,
         string $expectedSku,
     ): AdobeSafeSyncVerifiedProduct {
@@ -95,6 +95,7 @@ final class AdobeSafeSyncClient
             throw new AdobeSafeSyncClientException('Safe Sync contract version is not supported.');
         }
 
+        $this->assertValidModuleVersion($moduleVersion);
         $this->assertSupportedOperationFamilies($supportedOperationFamilies);
 
         return new AdobeSafeSyncHandshake(
@@ -215,6 +216,17 @@ final class AdobeSafeSyncClient
 
         if (! in_array(AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY, $supportedOperationFamilies, true)) {
             throw new AdobeSafeSyncClientException('Safe Sync product verification family is not supported.');
+        }
+    }
+
+    private function assertValidModuleVersion(string $moduleVersion): void
+    {
+        if (
+            $moduleVersion === '0.0.0'
+            || trim($moduleVersion) !== $moduleVersion
+            || preg_match('/^[A-Za-z0-9][A-Za-z0-9.+_-]*$/', $moduleVersion) !== 1
+        ) {
+            throw new AdobeSafeSyncClientException('Safe Sync module version is invalid.');
         }
     }
 
