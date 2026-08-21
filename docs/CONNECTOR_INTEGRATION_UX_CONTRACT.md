@@ -461,3 +461,90 @@ Layer A/B.
 
 "Retry failed only" is explicitly **out** of Stage 3 V1. Recovery path: remediate /
 verify → Preview when required → new all-products Live execution.
+
+---
+
+## 18. Per-item Live linking (Resolved — Stage 3E Stop-and-Amend)
+
+Normative detail: `docs/03-DOMAIN_MODEL.md` → **Stage 3E Stop-and-Amend — Magento
+ownership and entity-bound mutation contract**. Summary-level UI rules:
+`docs/06-UI_DESIGN_SYSTEM.md` → Per-item Live linking.
+
+**Implementation status:** Link-first runtime, ERL provenance/discriminator
+persistence, informed merchant confirmation, and atomic configurable-family
+confirmation are **not** shipped in PR #160 (docs-only Stop-and-Amend). Adobe
+Products/Export/Live advertised support remains **false**. Merchant consequential
+Live action remains non-actionable until Stage 3E truth flip after entity-bound
+mutation capability is proven.
+
+### Presentation boundary
+
+Linking belongs to **per-item Live readiness/remediation** on
+`ManageAdobeProductsExportPreview` (Live worklist / item context). It is **not**:
+
+- `SyncLiveMerchantSetupBarrier`;
+- a Preview finding or Preview remediation surface;
+- a Preview HTTP lookup or existence-check mutation.
+
+Preview readiness does **not** imply Live applicability.
+
+### Unlinked Product in Live surface
+
+When a Product lacks sufficient trust for consequential Live:
+
+- outcome remains `SyncLiveOutcome::NotApplied` (no fifth Live outcome);
+- merchant-safe linking reason is distinguishable from other `NotApplied` cases;
+- item appears in the Live worklist;
+- contextual link/reconfirmation action is offered when authorized.
+
+Do **not** add a per-product case to the run-level setup barrier for linking.
+
+### Link confirmation authorization
+
+Link-confirmation mutation authority requires **both**, fresh for the current
+Workspace:
+
+- `manage_sync_configurations` — setup authority to assert synchronization
+  ownership/configuration;
+- `run_sync_live` — Live authority because the assertion authorizes future
+  consequential external mutation.
+
+Neither permission alone is sufficient. Do **not** create a new permission in
+Stage 3E. Revocation of either before confirmation must fail closed.
+
+### Informed merchant confirmation
+
+Before confirmation the merchant must see a concise controlled-field comparison:
+
+- platform value vs current Magento value for fields the connector will own/update.
+
+Merchant action concept:
+
+> Пов’язати з цим товаром Magento
+
+with clear explanation that subsequent synchronization may update those fields. A
+bare checkbox alone is insufficient.
+
+Confirmation flow must include a fresh read-only Magento GET, remote record
+classified Found, workspace + `ConnectorAccount` verification, collision checks,
+remote type compatibility, exact SKU match for simple/child subjects, explicit
+merchant confirmation, and capture of remote logical discriminator — per domain
+contract. Stale cached discovery alone may not establish trust.
+
+### Forbidden merchant exposure
+
+Do **not** expose `ExternalRecordLink`, Magento `entity_id`, discriminator,
+ownership policy, reconciliation, transport attempts, HTTP codes, or raw payloads
+in Layer A/B.
+
+### Link-first necessary but not sufficient
+
+Merchant-confirmed linking establishes ENTITY TRUST (logical Magento Product
+identity), not SKU trust. Pre/post discriminator verification is mandatory
+defence-in-depth for future mutation paths but is **detection**, not atomic
+enforcement under stock Magento SKU-addressed REST.
+
+Therefore link-first + entity trust + informed confirmation are **required** but
+**not sufficient** for exemplary consequential Live. Truth flip waits for proven
+entity-bound consequential mutation capability across every advertised V1 Live
+mutation category (Stage 3E blocker).
