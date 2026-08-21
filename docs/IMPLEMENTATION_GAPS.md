@@ -344,8 +344,8 @@ yet), but should be scheduled before any payment gateway integration work starts
   consequential-write gate; **not** exposed to merchant Live UI. Adobe
   Products/Export/Live advertised support remains **false**; **Stage 3C**
   (Configurable Live) is **Done (internal)**; **Stage 3D-1** (E14 media Live runtime) is
-  **Done (internal)**; normative **Stage 3D** (merchant first-Live UX) remains **in progress**
-  (**Stage 3D-2** pending); **Stage 3E** (real Adobe validation + truth flip) remains pending.
+  **Done (internal)**; normative **Stage 3D** (merchant first-Live UX) **Done (internal)**;
+  **Stage 3E** (real Adobe validation + truth flip) remains pending.
   Scheduling,
   sync history/issues, and merchant sync-run history remain absent.
 
@@ -382,7 +382,8 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **Stage 3B — Adobe Simple Live integration** | **Done (internal)** — generic Live capability seam (`SyncLiveConnectorCapability`, resolver, `live_capability` profile binding); `SyncLiveRunJob` orchestration; `AdobeProductExportLiveCapability`; shared run metadata preparer; `AdobeStoreConfigReader`; writer-lease consequential-write gate; fake-HTTP regression matrix; merchant Live unreachable until Stage 3E |
 | **Stage 3C — Adobe Configurable Live** | **Done (internal)** — deterministic parent SKU; child/parent/options/link command compilation; PARTIAL/AMBIGUOUS aggregation; inactive linked-variant lifecycle; classification-transition fail-closed; production ownership policy remains conservative; Adobe Products/Export/Live support remains **false** |
 | **Stage 3D-1 — Adobe E14 media Live runtime** | **Done (internal)** — `ProductExecutionImageInput` from `products.images`; Adobe primary/gallery media Live executor wired through `AdobeProductExportLiveCapability`; verified source fetch + remote metadata/content comparison; E14 runtime consumer exists; Adobe Products/Export/Live support remains **false** |
-| **Stage 3D — Adobe Media + Merchant First Live** | **In progress** — 3D-1 E14 media runtime **Done (internal)**; 3D-2 merchant Live admission UI/read model remains pending (non-actionable while Live support is **false**) |
+| **Stage 3D-2 — Merchant first-Live UI/read model** | **Done (internal)** — dual-authority `ManageAdobeProductsExportPreview`; `SyncLiveMerchantReadService`; Live worklist/result presentation; `startLive()` delegates to `SyncLiveAdmissionService`; non-actionable while Live support is **false** |
+| **Stage 3D — Adobe Media + Merchant First Live** | **Done (internal)** — 3D-1 E14 media runtime + 3D-2 merchant Live admission UI/read model (non-actionable while Live support is **false**) |
 | **Stage 3E — Real Adobe Validation + Truth Flip** | Pending — disposable write harness; target-version proof; only then flip `Adobe Products/Export/Live = true` |
 | **4C** | Remaining sync domain after Stage 3: scheduling, sync history/issues, merchant sync UX beyond mapping/Preview/Live |
 
@@ -439,7 +440,7 @@ Remediation contract (docs) → Stage 2A Merchant Preview Core + Connector Setup
 semantics (Done) → Stage 3B-2 Adobe Product simple command safety foundation
 (Done, wired) → Stage 3B Adobe Simple Live integration (Done, internal) → Stage
 3C Configurable Live (Done, internal) → Stage 3D Media + Merchant First Live (3D-1 Done
-internal; 3D-2 merchant first-Live pending) → Stage 3E
+internal; 3D-2 merchant first-Live **Done internal**) → Stage 3E
 validation + truth flip (pending). Stage 1 delivered
 connector execution configuration persistence plus revision/snapshot rebaseline
 (revision v4). See `docs/03-DOMAIN_MODEL.md` → Magento Product Export V1
@@ -494,11 +495,9 @@ repository workspace-RBAC matrix):**
 | Disabled account | Per role matrix (unaffected by disabled state) | No | Per role matrix |
 
 **GAP-006 overall remains Open.** Remaining scope: Task 4B-2c (discovered
-schema fields / change inspection), retention/pruning (4B-2d), Stage 3D-2
-merchant first-Live UX (normative Stage 3D still in progress; 3D-1 E14 media
-runtime **Done internal**), Stage 3E support-truth
+schema fields / change inspection), retention/pruning (4B-2d), Stage 3E support-truth
 flip (Stage 3A safety foundation **Done**; Stage 3B Adobe Simple Live integration
-**Done (internal)**),
+**Done (internal)**; normative Stage 3D merchant first-Live UX **Done internal**),
 connector-account credential-management/settings **edit** UI (create UI shipped).
 Workspace-scoped authorization foundation (GAP-026) repository runtime is
 **Implemented** (GAP-026B-2) and production-activated on Babypark pilot
@@ -511,7 +510,7 @@ Distinguish carefully — do not treat every future possibility as an active GAP
 | Class | Item | Blocks Sync domain work now? |
 |---|---|---|
 | **A. Architecture blockers** | None identified against current `origin/develop` for the approved Sync Domain Rebaseline | No |
-| **B. Implementation gaps** | Stage 3D-2 merchant first-Live UX (normative Stage 3D still in progress; 3D-1 E14 media runtime **Done internal**); Stage 3E Adobe Live support flip. Stage 3C Adobe Configurable Live integration **Done (internal)**. Stage 3B-1 shared Adobe semantics **Done**. Stage 3B-2 Adobe Product simple command safety foundation **Done** (wired through Stage 3B). Stage 3B Adobe Simple Live integration **Done (internal)** — generic `SyncLiveRunJob` orchestration and Adobe simple `live_capability` binding; merchant Live unreachable until Stage 3E. Stage 3A Live Safety foundation **Done** (`run_sync_live`, stale active-run recovery, `ExternalRecordLink` persistence, Live admission). Stage 3-0 docs contract **Done**. Stage 1 Preview Engine, Stage 2A merchant Preview, and Stage 2B Option Mapping remediation are implemented. `SyncRun`/`SyncRunItem` persistence is implemented (4C-2b-1). Connector-account **create** UI is implemented. | Yes for shipping sync; docs are settled |
+| **B. Implementation gaps** | Stage 3E Adobe Live support flip. Stage 3D merchant first-Live UX **Done (internal)** — 3D-1 E14 media runtime + 3D-2 merchant Live UI/read model (non-actionable while Live support is **false**). Stage 3C Adobe Configurable Live integration **Done (internal)**. Stage 3B-1 shared Adobe semantics **Done**. Stage 3B-2 Adobe Product simple command safety foundation **Done** (wired through Stage 3B). Stage 3B Adobe Simple Live integration **Done (internal)** — generic `SyncLiveRunJob` orchestration and Adobe simple `live_capability` binding; merchant consequential Live unreachable until Stage 3E support flip. Stage 3A Live Safety foundation **Done** (`run_sync_live`, stale active-run recovery, `ExternalRecordLink` persistence, Live admission). Stage 3-0 docs contract **Done**. Stage 1 Preview Engine, Stage 2A merchant Preview, and Stage 2B Option Mapping remediation are implemented. `SyncRun`/`SyncRunItem` persistence is implemented (4C-2b-1). Connector-account **create** UI is implemented. | Yes for shipping sync; docs are settled |
 | **C. Connector-specific future verification (deferred Variant #2 / profile)** | What external contract `adobe_commerce_paas_oauth1_integration` intentionally covers; PaaS-only vs broader Magento REST-family; post-bootstrap runtime-contract/version/capability verification; Magento Open Source setup/auth compatibility; whether AccountSetup and final runtime contract must later split; whether exactly-one AccountSetup-profile invariant must ever change | **No** — deferred; not a blocker for generic Sync domain rebaseline |
 
 Do not add generic `edition` / `deployment_model` / `api_family` fields to

@@ -383,10 +383,15 @@ Adobe write, or support-truth flip ships in the Stage 3-0 slice. **Stage 3A Live
 Safety foundation is shipped** — `run_sync_live` runtime permission, stale
 active-run recovery, `ExternalRecordLink` persistence foundation,
 `SyncLiveAdmissionService`, and fail-closed `SyncLiveRunJob` shell (no Adobe
-write, no merchant consequential Live UI). Adobe Product
-write/reconciliation/merchant exposure remains **Stage 3B–3E**. Stage 3D may
-implement Live UI/read model while support remains **false**; merchant
-consequential exposure waits for Stage 3E truthful support flip.
+write). **Stage 3D merchant first-Live UI/read model is shipped (internal)** on
+`ManageAdobeProductsExportPreview` — dual-authority page presence, Live read
+model, worklist/result presentation, and dormant `startLive()` admission path;
+merchant consequential Live action remains **non-actionable** while
+`ConnectorSyncOperationSupport(Products, Export, Live) === false`. Adobe Product
+and media Live write/reconciliation runtime is **implemented internally** through
+normative Stage 3D (3B/3C/3D-1/3D-2); advertised Live support remains **false**.
+Merchant consequential exposure and production enablement wait for Stage 3E
+real-target validation and truthful support flip.
 
 ### Smallest first-Live surface
 

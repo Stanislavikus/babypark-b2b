@@ -31,6 +31,10 @@ final class SyncDataSetupLandingService
             $actor,
             $workspace,
             WorkspacePermissions::RUN_SYNC_PREVIEW,
+        ) || $this->workspaceAuthorization->allows(
+            $actor,
+            $workspace,
+            WorkspacePermissions::RUN_SYNC_LIVE,
         );
     }
 
@@ -52,6 +56,15 @@ final class SyncDataSetupLandingService
         );
     }
 
+    public function canAccessLive(User $actor, Workspace $workspace): bool
+    {
+        return $this->workspaceAuthorization->allows(
+            $actor,
+            $workspace,
+            WorkspacePermissions::RUN_SYNC_LIVE,
+        );
+    }
+
     /**
      * @return list<SyncDataSetupLandingTargetSummary>
      */
@@ -63,13 +76,15 @@ final class SyncDataSetupLandingService
 
         $canSetup = $this->canAccessSetup($actor, $workspace);
         $canPreview = $this->canAccessPreview($actor, $workspace);
+        $canLive = $this->canAccessLive($actor, $workspace);
         $targets = [];
 
         foreach ($this->projectionQuery->listEligibilityForWorkspace($workspace->id) as $eligibilityProjection) {
             $setupVisible = $canSetup && $this->targetEligibility->isEligible($eligibilityProjection);
             $previewVisible = $canPreview && $this->targetEligibility->isPreviewEligible($eligibilityProjection);
+            $liveVisible = $canLive && $this->targetEligibility->isLiveEligible($eligibilityProjection);
 
-            if (! $setupVisible && ! $previewVisible) {
+            if (! $setupVisible && ! $previewVisible && ! $liveVisible) {
                 continue;
             }
 
@@ -81,10 +96,14 @@ final class SyncDataSetupLandingService
                 targetKind: SyncDataSetupTargetKind::AdobeProductsExport,
                 setupActionVisible: $setupVisible,
                 previewActionVisible: $previewVisible,
+                liveActionVisible: $liveVisible,
                 setupUrl: $setupVisible
                     ? ManageAdobeProductsExportSetup::getUrl(['account' => $eligibilityProjection->id])
                     : null,
                 previewUrl: $previewVisible
+                    ? ManageAdobeProductsExportPreview::getUrl(['account' => $eligibilityProjection->id])
+                    : null,
+                liveUrl: $liveVisible
                     ? ManageAdobeProductsExportPreview::getUrl(['account' => $eligibilityProjection->id])
                     : null,
             );

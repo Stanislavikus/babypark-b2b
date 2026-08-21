@@ -74,8 +74,10 @@ class ListSyncDataSetup extends Page
                 'target_label' => $this->presentTargetLabel($summary->targetKind),
                 'setup_action_visible' => $summary->setupActionVisible,
                 'preview_action_visible' => $summary->previewActionVisible,
+                'live_action_visible' => $summary->liveActionVisible,
                 'setup_url' => $summary->setupUrl,
                 'preview_url' => $summary->previewUrl,
+                'live_url' => $summary->liveUrl,
             ],
             $summaries,
         );
