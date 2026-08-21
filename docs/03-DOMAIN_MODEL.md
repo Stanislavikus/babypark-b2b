@@ -6670,9 +6670,9 @@ permission, stale-active-run lease/recovery, Live outcome vocabulary,
 `ExternalRecordLink` persistence, `SyncLiveAdmissionService`, and fail-closed Live
 job shell. Adobe Products / Export / Live support remains **false**.
 
-**Stage 3B–3E — Live Engine implementation slices** — **3B and 3C Done (internal); 3D-1 E14 media runtime Done (internal); normative Stage 3D Done (internal); Stage 3E IN PROGRESS — ownership/link/entity-bound-mutation Stop-and-Amend; real target validation NOT YET EXECUTED**
+**Stage 3B–3E — Live Engine implementation slices** — **3B and 3C Done (internal); 3D-1 E14 media runtime Done (internal); normative Stage 3D Done (internal); Stage 3E docs contract Done — entity-bound Safe Sync runtime contract frozen; replacement runtime + real target validation NOT YET EXECUTED**
 
-**Stage 3E Stop-and-Amend (docs correction — Magento primary-source research):** the previous [Resolved] stock no-link Product create safety and create-provenance ownership model are **invalidated**. See **Stage 3E Stop-and-Amend — Magento ownership and entity-bound mutation contract** below. PR #160 runtime from the discarded Part 1 approach is **reverted**; corrected architecture is documented first.
+**Stage 3E Stop-and-Amend (docs correction — Magento primary-source research + Security/Concurrency arbitration):** the previous [Resolved] stock no-link Product create safety and create-provenance ownership model are **invalidated**. See **Stage 3E Stop-and-Amend — Magento ownership and entity-bound Safe Sync runtime contract** below. PR #160 runtime from the discarded Part 1 approach is **reverted**; final normative contract is frozen in this docs-only PR; replacement runtime follows separately.
 
 After Stage 3-0 merges, implement in order:
 
@@ -6682,17 +6682,37 @@ After Stage 3-0 merges, implement in order:
 | **3B — Adobe Simple Live** | Shared Adobe semantic planning boundary; child/simple external identity; GET/POST/PUT Product transport; `ExternalRecordLink` read/write; create/update/reconciliation; simple Product Live execution; applied-state classification | remains **false** | **Done (internal)** — **historical no-link create assumption invalidated by Stage 3E Stop-and-Amend**; replacement link-first runtime pending |
 | **3C — Adobe Configurable Live** | Connector-owned deterministic parent SKU; child/parent/options/link command compilation; partial/ambiguous outcomes; inactive linked-variant lifecycle; configurable recovery/reconciliation | remains **false** | **Done (internal)** — existing-parent link identity clarified by Stage 3E Stop-and-Amend; cfg-* generator applies only to future proven atomic create |
 | **3D — Adobe Media + Merchant First Live** | Required E14 primary/gallery image export; merchant Live admission **UI/read model** on `ManageAdobeProductsExportPreview` (non-actionable for consequential execution while Live support is **false**; must not bypass `ConnectorSyncOperationSupport`); queued/running/result presentation; final safe merchant copy | remains **false** | **Done (internal)** — 3D-1 E14 media runtime + 3D-2 merchant first-Live UI/read model |
-| **3E — Real Adobe Validation + Truth Flip** | Merchant link-first runtime; ERL provenance/discriminator persistence; informed merchant confirmation; atomic configurable-family confirmation; entity-bound consequential mutation capability; disposable validation harness; target-version proof; only then flip `Adobe Products / Export / Live = true` | flip only after successful evidence | **IN PROGRESS — Stop-and-Amend (docs)**; replacement runtime **not** in PR #160; support remains **false** |
+| **3E — Real Adobe Validation + Truth Flip** | Merchant link-first runtime; ERL provenance/discriminator persistence; informed merchant confirmation; atomic configurable-family confirmation; first-party Magento entity-bound Safe Sync component; disposable validation harness; target-version proof; only then flip `Adobe Products / Export / Live = true` | flip only after successful evidence | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen; replacement runtime + real target validation **pending**; support remains **false** |
 
-Production Live remains **NOT IMPLEMENTED** until Stage 3E completes with explicit
-human authorization. No deployment without separate explicit approval.
+Production Live remains **NOT IMPLEMENTED** until Stage 3E runtime lands and
+completes real-target validation with explicit human authorization. No deployment
+without separate explicit approval.
 
-##### Stage 3E Stop-and-Amend — Magento ownership and entity-bound mutation contract
+##### Stage 3E Stop-and-Amend — Magento ownership and entity-bound Safe Sync runtime contract
 
-[Resolved — Stage 3E docs correction] This section corrects architecture after
-Magento primary-source research invalidated the previous stock no-link create
-and create-provenance ownership assumptions. **Docs-only in this correction.**
-Replacement runtime follows in a separate follow-on PR.
+[Resolved — Stage 3E docs contract] This section freezes the final entity-bound
+Safe Sync runtime contract after Magento primary-source research and
+Security/Concurrency arbitration. **Docs-only in this PR.** Replacement runtime follows in a separate follow-on PR. No Magento module runtime, migration, real
+Adobe write, or Live support flip in this PR.
+
+#### First-party Magento Safe Sync component (frozen)
+
+The entity-bound mutation boundary is implemented as a **separate Composer
+`magento2-module`** first-party component — not a write-only REST bridge.
+
+| Requirement | Rule |
+|---|---|
+| Boundary shape | Entity-bound **read + write** boundary for consequential Live mutations |
+| Magento core | **No** Magento core modification |
+| Product core | **No** Product-core schema changes in SaaS or Magento for this contract |
+| DB triggers | **No** DB triggers |
+| SaaS→Magento DB | **No** direct SaaS→Magento DB access path |
+| Interceptors | **No** broad/global Product interceptors |
+
+The component exposes a narrow Safe Sync seam consumed by the existing Adobe
+connector runtime (`AdobeProductRemoteStateClient`, command executors, media
+executors). Current SKU-addressed REST paths in `develop` remain superseded for
+consequential safety decisions once the component ships.
 
 #### Primary-source facts — stock no-link create is unsafe
 
@@ -6772,15 +6792,26 @@ Magento Product, not merely a reusable SKU string.
 
 For Adobe/Magento:
 
+- stored Magento logical `entity_id` (via `external_record_discriminator`) remains
+  the remote identity discriminator
 - `external_identifier` remains the merchant-visible addressing SKU
-- `external_record_discriminator` (follow-on schema) represents Magento logical
-  Product `entity_id`
+- expected SKU remains a **mandatory equality precondition** for bind/mutate
+  cycles, but is **not** identity authority
 
 If the SKU is later deleted/recreated/reassigned to another Magento logical
 Product, the old trust does **not** automatically transfer.
 
 Explicitly reject **SKU TRUST** ("whatever currently occupies this SKU is ours")
 because that would be automatic adoption after delete/recreate.
+
+**Post-trust read rule (frozen):** after a trusted `ExternalRecordLink` exists,
+stock SKU GET (`GET /V1/products/:sku`) must **not** participate in
+verification, reconciliation, or applied-state proof for consequential mutations.
+All post-bind safety reads are **entity-bound** through the first-party component.
+
+Pre-trust candidate discovery may still use bounded stock SKU lookup only to find
+link candidates; final link confirmation must freshly verify exact logical entity +
+expected SKU and reject ambiguous/conflicting logical Products.
 
 #### Follow-on ERL provenance / discriminator requirement
 
@@ -6797,39 +6828,36 @@ Current `external_record_links` schema does not yet express enough trust evidenc
 Use connector-neutral names. Do **not** add Magento-specific columns such as
 `magento_entity_id` to generic core tables. **No migration in this docs-only PR.**
 
-#### Critical stock linked-write limitation
+#### Entity-bound mutation boundary (frozen)
 
-Do **not** document merchant-confirmed link as if it makes stock Magento mutation
-identity-safe. Stock consequential mutations remain **SKU-addressed**.
+Every consequential Live mutation through the first-party component must execute
+inside one **outer transaction** with this invariant sequence:
 
-A pre-write GET verifying SKU + stored Magento logical `entity_id` is useful
-**detection** but does **not** close the TOCTOU window between GET and mutation.
-Another actor may delete/recreate/rename/reassign the SKU in that window.
+1. **Lock** the logical Product through Magento metadata
+   `getIdentifierField()` / logical `entity_id` — **not** physical `getLinkField()`
+   / `row_id`; fail closed if the logical entity is absent
+2. **Load** the entity with `getById(..., forceReload=true)`
+3. **Verify** expected stored `entity_id` **and** expected SKU equality on the
+   loaded entity; reject ambiguous/conflicting logical Products
+4. **Mutate** only that loaded entity; **no** target re-resolution by SKU
+5. **Save** through normal repository/resource pipeline
+6. **Fresh entity-bound postcondition** on the same logical entity; exact SKU must
+   remain unchanged; rollback outer transaction on any divergence
 
-Remote discriminator verification is **detection, NOT atomic enforcement**. Do not
-claim otherwise.
+**Load-bearing SKU postcondition:** Magento `Sku::beforeSave()` may silently suffix
+a duplicate SKU rather than fail closed. Post-save exact SKU equality is therefore
+**load-bearing** applied-state proof — not optional defence-in-depth.
 
-#### Body `id` is NOT an optimistic lock — FORBIDDEN
+**Create-fallback guard:** do **not** claim that a Product object carrying an ID
+makes Magento repository create fallback structurally impossible. The component's
+own locked-existence invariant must make update→create/recreate unreachable, and
+real-target validation must prove it.
 
-A Product write must **not** attempt to create an optimistic identity guard by
-sending the expected Magento Product `id` in the Product payload.
+**Body `id` is FORBIDDEN** as a REST safety mechanism (see linked-update failure
+matrix A–E below). Never send expected Magento Product `id` in REST payload as an
+optimistic identity guard.
 
-Primary-source reasoning: `ProductRepository::save()` selects by body `id` when
-supplied; it does not enforce route-SKU ↔ loaded-entity identity invariant; Product
-data including route SKU is applied to that loaded entity; Magento SKU backend may
-resolve collision by generating a modified SKU rather than failing closed; if the
-expected ID no longer exists, save logic may fall into a create path.
-
-Body `id` can cause: silent SKU rename; restoration/overwrite of a changed SKU;
-linked update degenerating into a new Product create.
-
-**Freeze:** never use body Product `id` as the stock REST safety mechanism.
-
-#### Linked-update identity failure matrix (A–E)
-
-Record to prevent future reintroduction of body-`id` as apparent safety:
-
-| Case | Outcome under stock body-ID approach |
+| Case | Outcome under stock body-ID / SKU-addressed REST |
 |---|---|
 | **A.** Expected ID exists + expected SKU still belongs to it | Ordinary expected state |
 | **B.** Expected ID exists + another Product now occupies expected SKU | May silently change SKU rather than fail closed |
@@ -6837,68 +6865,106 @@ Record to prevent future reintroduction of body-`id` as apparent safety:
 | **D.** Expected ID deleted + another Product occupies old SKU | May enter create semantics |
 | **E.** Expected ID deleted + old SKU absent | Linked "update" may silently become create |
 
-#### Pre + post discriminator verification (mandatory defence-in-depth)
+#### Content Staging (frozen)
 
-Not sufficient for atomic prevention, but **mandatory** for any future Adobe
-mutation path:
+When Content Staging is enabled on the target:
 
-**Before** consequential mutation: fresh GET; returned SKU matches trusted
-`external_identifier`; returned Magento logical ID matches stored discriminator.
+- lock **all relevant physical rows** through logical
+  `getIdentifierField()` / `entity_id`
+- **never** define logical identity with `getLinkField()` / `row_id`
+- **no** dependency on Commerce-only `VersionManager`; Magento repository/resource
+  pipeline resolves the operational version
+- real Commerce proof must include a Product with a **pending scheduled update**
 
-**After** consequential mutation / reconciliation: returned SKU still matches;
-returned Magento logical ID still matches.
+#### Galera / multi-node concurrency (frozen)
 
-Any divergence: **never** `KnownApplied`; outcome fail-closed / `Ambiguous` as
-appropriate; merchant receives re-link/reconfirmation remediation. Do **not** freeze
-a new persisted "untrusted" lifecycle status in this PR — trust is simply
-insufficient for write eligibility until reconfirmed.
+- InnoDB gap locks are **defence-in-depth only**, not cluster-wide safety
+- all critical authorization / verification / reconciliation reads **after binding**
+  are entity-bound — not SKU GET
+- critical entity-bound reads on Galera must also provide proven
+  **causal-current / read-after-write** semantics; exact low-level implementation
+  stays inside the Magento component and must be real-target validated
+- stock SKU lookup may be used **only** as pre-trust candidate discovery; final
+  link confirmation must freshly verify exact entity + expected SKU
 
-#### Stock subresource SKU-addressed limitation
+#### Safe mutation primitives (frozen)
 
-Current Stage 3 consequential subresources are SKU-addressed with no proven
-logical-product-ID binding:
+After ENTITY TRUST binding, SKU-addressed Product / media / configurable operations
+are **forbidden** for safety decisions.
 
-- Product media (`ProductAttributeMediaGalleryManagementInterface`)
-- Configurable options (`OptionRepositoryInterface`)
-- Configurable child links (`LinkManagementInterface`)
-- Product lifecycle/status through Product repository
-- Parent Product mutation
-- Child Product mutation
+| Mutation category | Required primitive |
+|---|---|
+| Product / lifecycle | Entity-loaded Product + normal repository save |
+| Media | Entity-loaded Product / media extension mechanics — **not**
+  SKU-addressed `GalleryManagement` operations |
+| Configurable options / child links | Entity-loaded parent extension attributes /
+  ID-bound Magento mechanics |
 
-A GET+discriminator check immediately before these calls still leaves a TOCTOU
-window.
+#### Rollback and EntityManager callbacks (frozen)
 
-#### Link-first necessary but not sufficient for exemplary Live
+- nested Magento transaction behavior is **intentionally reused**
+- after bridge-owned outer rollback, pending `EntityManager` callbacks for the
+  connection/entity must be **cleared**
+- this requires **one narrowly isolated Magento internal compatibility seam**; do
+  **not** claim the component uses only public `@api` contracts
+- require target-version compatibility tests for callback-pool cleanup behavior
 
-**Freeze:**
+#### Media transactional boundary (frozen)
 
-- Link-first is **required** to establish explicit merchant ownership
-- Remote discriminator is **required** to identify the exact logical remote Product
-- Pre/post verification is **required** defence-in-depth
+- media filesystem/object write is **not** transactionally rolled back with DB;
+  failed transaction may leave benign orphan storage
+- **no** destructive media DELETE/cleanup subsystem in V1
+- byte-identity reconciliation uses **entity-bound** media read with bounded
+  response size
 
-**But:** stock Magento does not provide atomic enforcement of ENTITY TRUST at the
-consequential mutation boundary. The project must **not** claim stock Magento
-linked writes are fully identity-safe merely because divergence can be detected
-afterward. A mutation that damages another remote Product and is then classified
-`Ambiguous` is still unacceptable as the final exemplary production safety model.
+#### Account readiness freeze (ConnectorSyncOperationSupport vs ConnectorLiveRuntimeReadiness)
 
-#### Entity-bound mutation capability — Stage 3E blocker
+| Concept | Meaning |
+|---|---|
+| `ConnectorSyncOperationSupport` | Static software capability — what the connector profile advertises |
+| `ConnectorLiveRuntimeReadiness` | Fresh account-specific remote prerequisite — can this account execute Live right now |
 
-Before Adobe Products / Export / Live can truthfully flip **true**, Stage 3E must
-resolve and prove a remote mutation capability where expected merchant SKU and
-expected logical Magento Product identity are validated in the **same remote
-atomic mutation boundary**.
+**V1 exclusions (frozen):** no second auth profile; no Product Magento flag; no readiness table; no persisted handshake evidence on `SyncRunItem` (business-record
+outcome only).
 
-Exact technical implementation is **not** frozen in this docs PR. A future
-first-party Magento integration component is a valid candidate **only** if it can
-prove this guarantee for every consequential operation advertised in V1 Live.
+**Handshake timing (frozen):**
 
-That capability may need entity-bound primitives for: Product update/lifecycle;
-media; configurable options; child links; future atomic create.
+- cached handshake is **presentation-only**
+- **Start Live** fresh handshake occurs **outside** the DB admission transaction
+- worker fresh handshake occurs **immediately before first consequential write**
+  after the run has its writer lease/deadline; DB-fresh
+  `SyncRunConsequentialWriteGate` is rechecked after handshake
 
-Do **not** freeze: gap-lock-only implementation; custom DB trigger; direct
-SaaS→Magento DB path; custom extension design yet. Stage 3E must research/prove
-the exact implementation next.
+Current seams to extend (runtime follow-on): `SyncLiveAdmissionService`,
+`SyncLiveRunJob`, `SyncRunConsequentialWriteGate`.
+
+#### Failure semantics (frozen)
+
+Preserve existing applied-state vocabulary:
+
+- `KnownApplied`
+- `KnownNotApplied`
+- `UnknownOrAmbiguous`
+
+**IdentityMismatch** is a **reason beneath `KnownNotApplied`**, not a new
+applied-state enum and not a persisted ERL untrusted lifecycle.
+
+- only a **bridge-authored response** may prove rollback / `KnownNotApplied`
+- transport ambiguity after a consequential attempt remains `UnknownOrAmbiguous`
+- **no** blind retry
+
+#### Auto-create (OUT of V1 — frozen)
+
+Auto-create remains **OUT of V1**. `getById` / entity missing must fail with
+**zero intended mutation**.
+
+Validation must prove repository fallback cannot turn a linked update into
+create/recreate. Future auto-create requires a separately proven atomic create
+capability — not stock POST upsert semantics.
+
+Explicitly **rejected** as ownership proofs: second GET; POST response SKU
+equality; matching reconciliation state; marker written by the same POST;
+temporary SKU + rename; tiny-race acceptance; gap lock alone; synthetic child SKU.
 
 #### Simple / child identity (preserved)
 
@@ -6979,10 +7045,20 @@ explanation that subsequent synchronization may update those fields.
 Do **not** expose: `ExternalRecordLink`, `entity_id`, discriminator, ownership
 policy, reconciliation, HTTP evidence.
 
-#### Validation harness contract (docs — runtime reverted in Stop-and-Amend)
+#### Validation harness contract (frozen — runtime pending)
 
-The Part 1 validation harness runtime is **reverted**. Settled harness requirements
-for the rebuild:
+The Part 1 validation harness runtime is **reverted**. Retain existing disposable
+harness rules and add real-target proofs for:
+
+- silent SKU suffix rollback (`Sku::beforeSave()` collision path)
+- `CallbackPool` / EntityManager callback cleanup after bridge-owned rollback
+- Content Staging scheduled-version Product with pending update
+- cross-node duplicate SKU race
+- causal cross-node entity read (Galera read-after-write)
+- repository create-fallback guard (linked update cannot become create/recreate)
+- certification / brute-force abort and transport loss around COMMIT
+
+Harness environment rules (unchanged):
 
 - dedicated validation-only environment (`APP_ENV=stage3e-validation` or equivalent)
 - disposable/non-production target; exact target hostname confirmation
@@ -7003,29 +7079,23 @@ required Stage 3E evidence exists:
 3. Informed merchant confirmation implemented
 4. Atomic configurable-family confirmation implemented
 5. Per-item Live link remediation implemented
-6. Fresh pre-write discriminator verification
-7. Post-write reconciliation verifies discriminator + SKU
+6. First-party Magento entity-bound Safe Sync component implemented
+7. Entity-bound mutation boundary real-target validated for every advertised V1 Live
+   mutation category (**detection alone does not satisfy this item**)
 8. Body Product `id` is **not** used as a safety mechanism
-9. Unsupported no-link POST/create path unreachable
-10. Real-target divergence tests (remote Product replaced before mutation; replaced/recreated around reconciliation) — fail closed, never `KnownApplied`
-11. Proven **entity-bound** consequential mutation capability for every mutation category in advertised V1 Live (**detection alone does not satisfy this item**)
-12. Simple linked behavior real-target validated
-13. Configurable linked behavior real-target validated
-14. Lifecycle behavior validated
-15. E14 media validation passes
-16. Stage 3D merchant Live surface presents linking/reconfirmation coherently
-17. No unlinked Product presented as Live-ready/actionable
-
-#### Future auto-create (deferred)
-
-Auto-create remains deferred, not rejected forever. Requires a separately proven
-atomic create capability.
-
-Explicitly **rejected** as ownership proofs: second GET; POST response SKU
-equality; matching reconciliation state; marker written by the same POST;
-temporary SKU + rename; tiny-race acceptance; gap lock alone; synthetic child SKU.
-
-No-link create stays unavailable until that future capability is proven.
+9. Unsupported no-link POST/create path unreachable; auto-create OUT of V1 proven
+10. Post-trust SKU GET excluded from verification/reconciliation/applied-state proof
+11. Content Staging scheduled-version proof passes
+12. Galera causal-current entity read proof passes
+13. CallbackPool cleanup proof passes
+14. Silent SKU suffix rollback proof passes
+15. Simple linked behavior real-target validated
+16. Configurable linked behavior real-target validated
+17. Lifecycle behavior validated
+18. E14 media validation passes
+19. Stage 3D merchant Live surface presents linking/reconfirmation coherently
+20. No unlinked Product presented as Live-ready/actionable
+21. `ConnectorLiveRuntimeReadiness` fresh handshake integrated per timing rules
 
 #### Stage status after Stop-and-Amend
 
@@ -7035,10 +7105,10 @@ No-link create stays unavailable until that future capability is proven.
 | 3B | **Done (internal)** — old stock no-link-create assumption invalidated |
 | 3C | **Done (internal)** — existing-parent link identity clarified |
 | 3D | **Done (internal)** |
-| 3E | **IN PROGRESS** — Stop-and-Amend docs; replacement runtime pending |
+| 3E docs contract | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen |
+| 3E runtime + validation | **Pending** — replacement runtime not shipped; real target validation **NOT YET EXECUTED** |
 | Adobe Products/Export/Live | **FALSE** |
 | Merchant consequential Live | **NOT EXPOSED** |
-| Real target validation | **NOT YET EXECUTED** |
 | Deployment | **NOT PERFORMED** |
 
 No Stage 3D-3. No Stage 3F. No new normative Stage.
@@ -7290,7 +7360,7 @@ slice. Normative contract for Stage 3A–3E implementation.
 | Stage 2B — Option Mapping Remediation | **Done** |
 | Stage 3-0 — Live Safety, Identity & First-Live Contract | **Done (docs contract)** |
 | Stage 3A — Live Safety Foundation | **Done** |
-| Stage 3B–3E — Live implementation slices | **Done (internal) through normative Stage 3D** — 3B/3C/3D-1/3D-2 Done (internal); Stage 3E **Pending** |
+| Stage 3B–3E — Live implementation slices | **Done (internal) through normative Stage 3D** — 3B/3C/3D-1/3D-2 Done (internal); Stage 3E **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen; runtime + validation **pending** |
 | Production Live | **NOT IMPLEMENTED** |
 
 **Current runtime (reverified post–Stage 3A):**
@@ -7382,7 +7452,7 @@ state. Do not implement one shared mutating `execute(..., dryRun=true)` path.
 **Superseded for stock Magento no-link path by Stage 3E Stop-and-Amend.** Without
 trusted `ExternalRecordLink`, **no consequential Product mutation** under stock
 Magento (no POST, no blind PUT, no adoption). See **Stage 3E Stop-and-Amend —
-Magento ownership and entity-bound mutation contract**.
+Magento ownership and entity-bound Safe Sync runtime contract**.
 
 **Historical [Resolved] no-link create (invalidated):** the prior contract assumed
 GET known-missing + POST + reconciliation could prove create ownership. Magento
@@ -7390,15 +7460,16 @@ primary-source research proved stock `POST /V1/products` is upsert-like and cann
 prove connector-created identity.
 
 **Link-first (frozen):** merchant-confirmed linking establishes ENTITY TRUST with
-fresh GET, informed confirmation, and persisted discriminator provenance (follow-on
-runtime). Linked writes require pre/post discriminator verification but stock
-Magento SKU-addressed mutations remain TOCTOU-vulnerable until entity-bound mutation
-capability is proven.
+fresh entity-bound read during confirmation, informed confirmation, and persisted
+discriminator provenance (follow-on runtime). Consequential mutations execute only
+through the first-party Magento entity-bound Safe Sync component — not stock
+SKU-addressed REST.
 
-**Existing trusted link:** GET trusted stored external identity → linked update
-semantics only when trust + discriminator checks pass → ambiguous write → GET
-reconciliation with discriminator verification → divergence fails closed, never
-`KnownApplied`. **Never** use body Product `id` as safety mechanism.
+**Existing trusted link:** entity-bound load by stored logical `entity_id` → verify
+expected SKU equality → mutate loaded entity only → entity-bound postcondition →
+exact SKU unchanged; divergence rolls back and fails closed, never `KnownApplied`.
+**Never** use body Product `id` as safety mechanism. After trust exists, stock SKU
+GET must not prove verification/reconciliation/applied state.
 
 Do not assume HTTP status alone universally proves applied state. Do not
 automatically retry a whole Product after a consequential attempt. POST/PUT may
@@ -7429,8 +7500,16 @@ Merchant consequential Live admission/exposure requires **all** relevant gates:
 - fresh `run_sync_live` authorization;
 - relevant Completed current-revision Preview on the same `SyncConfiguration`
   (`products` / `export` / Preview / `Completed`);
-- current configuration/account readiness;
+- current configuration readiness;
+- fresh `ConnectorLiveRuntimeReadiness` (account-specific remote prerequisite);
 - `ConnectorSyncOperationSupport(Products, Export, Live) === true`.
+
+`ConnectorSyncOperationSupport` is static software capability.
+`ConnectorLiveRuntimeReadiness` is fresh account-specific remote prerequisite.
+Cached handshake is presentation-only; Start Live fresh handshake occurs outside DB
+admission transaction; worker fresh handshake immediately before first consequential
+write after writer lease/deadline with DB-fresh `SyncRunConsequentialWriteGate`
+recheck. Do **not** persist handshake evidence into `SyncRunItem`.
 
 `run_sync_live` means **authority**. It does **not** mean the connector/runtime
 currently **supports** Live. A valid Preview prerequisite means
@@ -7493,11 +7572,15 @@ validation (Stage 3E).
 
 Before support truth flips, an explicitly authorized disposable Adobe smoke
 validation harness must prove actual target-version behavior on **linked** Products
-(not stock no-link create). At minimum: SIMPLE linked (verify/update/reconcile/disable/rerun);
-CONFIGURABLE linked family (child/parent/options/link/update/repeated-safe);
-TRANSPORT (validation rejection, identity collision, divergence before/after
-mutation, relevant status codes, timeout classification); entity-bound mutation
-capability proof for every advertised V1 consequential operation category.
+(not stock no-link create; auto-create OUT of V1). At minimum: SIMPLE linked
+(entity-bound verify/update/reconcile/disable/rerun); CONFIGURABLE linked family
+(child/parent/options/link/update/repeated-safe); TRANSPORT (validation rejection,
+identity collision, divergence before/after mutation, relevant status codes,
+timeout classification); entity-bound Safe Sync component proof for every advertised
+V1 consequential operation category including Content Staging scheduled version,
+Galera causal-current read, CallbackPool cleanup, silent SKU suffix rollback,
+repository create-fallback guard, and certification/BF abort + transport loss around
+COMMIT.
 
 Use disposable `B2BVAL-*` test identities. Require explicit human authorization.
 No production catalogue writes. No destructive Product DELETE for cleanup —

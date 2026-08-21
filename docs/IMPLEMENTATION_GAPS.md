@@ -345,10 +345,10 @@ yet), but should be scheduled before any payment gateway integration work starts
   Products/Export/Live advertised support remains **false**; **Stage 3C**
   (Configurable Live) is **Done (internal)**; **Stage 3D-1** (E14 media Live runtime) is
   **Done (internal)**; normative **Stage 3D** (merchant first-Live UX) **Done (internal)**;
-  **Stage 3E** (ownership/link/entity-bound-mutation Stop-and-Amend; real Adobe
-  validation + truth flip) remains in progress — stock no-link auto-create
-  invalidated; merchant link-first + entity-bound mutation capability required
-  before flip.
+  **Stage 3E** (entity-bound Safe Sync runtime contract **Done (docs contract)**;
+  replacement runtime + real Adobe validation + truth flip **pending** — stock
+  no-link auto-create invalidated; first-party Magento entity-bound component +
+  merchant link-first runtime required before flip).
   Scheduling,
   sync history/issues, and merchant sync-run history remain absent.
 
@@ -387,7 +387,7 @@ yet), but should be scheduled before any payment gateway integration work starts
 | **Stage 3D-1 — Adobe E14 media Live runtime** | **Done (internal)** — `ProductExecutionImageInput` from `products.images`; Adobe primary/gallery media Live executor wired through `AdobeProductExportLiveCapability`; verified source fetch + remote metadata/content comparison; E14 runtime consumer exists; Adobe Products/Export/Live support remains **false** |
 | **Stage 3D-2 — Merchant first-Live UI/read model** | **Done (internal)** — dual-authority `ManageAdobeProductsExportPreview`; `SyncLiveMerchantReadService`; Live worklist/result presentation; `startLive()` delegates to `SyncLiveAdmissionService`; non-actionable while Live support is **false** |
 | **Stage 3D — Adobe Media + Merchant First Live** | **Done (internal)** — 3D-1 E14 media runtime + 3D-2 merchant Live admission UI/read model (non-actionable while Live support is **false**) |
-| **Stage 3E — Real Adobe Validation + Truth Flip** | **In progress (Stop-and-Amend)** — Magento primary-source research invalidated stock no-link create and create-provenance ownership; PR #160 runtime reverted; corrected link-first + ENTITY TRUST + entity-bound mutation architecture documented; replacement runtime + validation harness rebuild pending; support remains **false** |
+| **Stage 3E — Real Adobe Validation + Truth Flip** | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen after Security/Concurrency arbitration; first-party Magento component + ENTITY TRUST + account readiness freeze documented; PR #160 runtime reverted; replacement runtime + validation harness rebuild + support flip **pending**; support remains **false** |
 | **4C** | Remaining sync domain after Stage 3: scheduling, sync history/issues, merchant sync UX beyond mapping/Preview/Live |
 
 Visual contract prototype: `docs/prototypes/task-4b0-connector-account/`.
