@@ -214,7 +214,7 @@ class Stage3D1AdobeMediaLiveTest extends TestCase
     }
 
     #[Test]
-    public function broken_gallery_does_not_suppress_core_product_success(): void
+    public function broken_gallery_does_not_run_when_core_product_is_fail_closed(): void
     {
         $this->bindCapabilityWithSourceTransport(new RecordingConnectorHttpTransport(
             fn (ConnectorOutboundRequest $request): ConnectorHttpResult => match (true) {
@@ -247,11 +247,8 @@ class Stage3D1AdobeMediaLiveTest extends TestCase
             new SyncLiveConsequentialWriteGateStub(true),
         );
 
-        $this->assertTrue(collect($result->findings)->contains(
-            static fn (SyncLiveFinding $finding): bool => $finding->code === 'command_evidence',
-        ));
-        $this->assertGreaterThan(0, $transport->sendCount);
-        $this->assertNotSame(SyncLiveOutcome::NotApplied, $result->outcome);
+        $this->assertSame(SyncLiveOutcome::NotApplied, $result->outcome);
+        $this->assertSame(0, $transport->sendCount);
     }
 
     #[Test]
