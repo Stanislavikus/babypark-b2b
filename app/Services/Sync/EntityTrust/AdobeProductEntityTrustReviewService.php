@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Sync\SyncConfigurationLookupService;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
+use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshotResolver;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeProductCandidateDiscoveryClient;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeProductEntityTrustComparisonBuilder;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeProductEntityTrustVerifiedSubject;
@@ -32,6 +33,7 @@ final class AdobeProductEntityTrustReviewService
         private readonly AdobeProductEntityTrustComparisonBuilder $comparisonBuilder,
         private readonly AdobeProductEntityTrustReviewEnvelopeService $envelopeService,
         private readonly AdobeProductCandidateDiscoveryClient $candidateDiscovery,
+        private readonly AdobeConnectorAccountTargetSnapshotResolver $targetSnapshotResolver,
     ) {}
 
     public function review(
@@ -56,14 +58,15 @@ final class AdobeProductEntityTrustReviewService
             ->where('id', $productId)
             ->firstOrFail();
 
-        $intent = $this->intentResolver->resolve($configuration, $product, $existingParentSkuHint);
+        $intent = $this->intentResolver->resolve($configuration, $product, $existingParentSkuHint, $explicitRelink);
         $context = $this->contextFactory->create($workspace->id, $account->id);
+        $targetSnapshot = $this->targetSnapshotResolver->resolve($account);
 
         if ($intent->mode === EntityTrustConfirmationMode::SimpleVariant) {
-            return $this->reviewSimple($actor, $account, $product, $intent, $context, $explicitRelink);
+            return $this->reviewSimple($actor, $account, $product, $intent, $context, $targetSnapshot, $explicitRelink);
         }
 
-        return $this->reviewConfigurable($actor, $account, $product, $intent, $context, $explicitRelink);
+        return $this->reviewConfigurable($actor, $account, $product, $intent, $context, $targetSnapshot, $explicitRelink);
     }
 
     private function reviewSimple(
@@ -72,6 +75,7 @@ final class AdobeProductEntityTrustReviewService
         Product $product,
         EntityTrustResolvedIntent $intent,
         $context,
+        $targetSnapshot,
         bool $explicitRelink,
     ): EntityTrustReviewResult {
         $desired = $intent->simpleDesiredState;
@@ -111,6 +115,8 @@ final class AdobeProductEntityTrustReviewService
                 'remote_fingerprint' => $remoteFingerprint,
             ]],
             existingParentSkuHint: null,
+            explicitRelink: $explicitRelink,
+            targetSnapshot: $targetSnapshot,
         );
 
         return new EntityTrustReviewResult(
@@ -130,6 +136,7 @@ final class AdobeProductEntityTrustReviewService
         Product $product,
         EntityTrustResolvedIntent $intent,
         $context,
+        $targetSnapshot,
         bool $explicitRelink,
     ): EntityTrustReviewResult {
         $configurable = $intent->configurableDesiredState;
@@ -201,7 +208,7 @@ final class AdobeProductEntityTrustReviewService
             ];
         }
 
-        $extraRemoteChildren = $this->candidateDiscovery->discoverExtraRemoteChildSkus(
+        $extraChildrenDiscovery = $this->candidateDiscovery->discoverExtraRemoteChildSkus(
             $context,
             $configurable->parentSku,
             $expectedChildSkus,
@@ -218,6 +225,8 @@ final class AdobeProductEntityTrustReviewService
             localFingerprint: $intent->localFingerprint,
             subjects: $envelopeSubjects,
             existingParentSkuHint: $intent->existingParentSkuHint,
+            explicitRelink: $explicitRelink,
+            targetSnapshot: $targetSnapshot,
         );
 
         return new EntityTrustReviewResult(
@@ -228,7 +237,8 @@ final class AdobeProductEntityTrustReviewService
             configurationRevision: $intent->configuration->configuration_revision,
             subjects: $subjects,
             reviewToken: $token,
-            extraRemoteChildSkus: $extraRemoteChildren,
+            extraRemoteChildSkus: $extraChildrenDiscovery->extraChildSkus,
+            extraRemoteChildrenAvailable: $extraChildrenDiscovery->isAvailable,
         );
     }
 
@@ -241,8 +251,8 @@ final class AdobeProductEntityTrustReviewService
         return new EntityTrustMediaSummary(
             declaredImageCount: $platform->declaredImageCount,
             declaredRolesSummary: $platform->declaredRolesSummary,
-            remoteImageEntryCount: 0,
-            remoteRolesSummary: 'недоступно без повного читання',
+            remoteImageEntryCount: null,
+            remoteRolesSummary: null,
         );
     }
 }

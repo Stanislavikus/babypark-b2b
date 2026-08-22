@@ -15,6 +15,9 @@ final class EntityTrustAdobeTransportResponder
     /** @var array<string, list<array{sku: string}>> */
     private array $configurableChildren = [];
 
+    /** @var array<string, int> */
+    private array $configurableChildrenStatusCodes = [];
+
     /** @var list<string> */
     public array $recordedMethods = [];
 
@@ -37,6 +40,22 @@ final class EntityTrustAdobeTransportResponder
     public function registerConfigurableChildren(string $parentSku, array $children): void
     {
         $this->configurableChildren[$parentSku] = $children;
+        unset($this->configurableChildrenStatusCodes[$parentSku]);
+    }
+
+    public function failConfigurableChildrenLookup(string $parentSku, int $statusCode = 500): void
+    {
+        $this->configurableChildrenStatusCodes[$parentSku] = $statusCode;
+        unset($this->configurableChildren[$parentSku]);
+    }
+
+    public function remapLogicalEntityId(string $sku, int $newLogicalEntityId): void
+    {
+        if (! isset($this->products[$sku])) {
+            return;
+        }
+
+        $this->products[$sku]['id'] = $newLogicalEntityId;
     }
 
     public function __invoke(ConnectorOutboundRequest $request, int $count): ConnectorHttpResult
@@ -96,6 +115,15 @@ final class EntityTrustAdobeTransportResponder
 
         if ($method === 'GET' && str_contains($uri, '/V1/configurable-products/') && str_contains($uri, '/children')) {
             $parentSku = $this->skuFromConfigurableChildrenUri($uri);
+
+            if (isset($this->configurableChildrenStatusCodes[$parentSku])) {
+                return new ConnectorHttpResult(
+                    $this->configurableChildrenStatusCodes[$parentSku],
+                    [],
+                    '{"message":"lookup failed"}',
+                );
+            }
+
             $children = $this->configurableChildren[$parentSku] ?? [];
 
             return new ConnectorHttpResult(200, [], json_encode($children, JSON_THROW_ON_ERROR));

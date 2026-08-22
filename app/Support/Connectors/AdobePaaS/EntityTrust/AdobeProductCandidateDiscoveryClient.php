@@ -78,24 +78,21 @@ final class AdobeProductCandidateDiscoveryClient
         );
     }
 
-    /**
-     * @return list<string>
-     */
     public function discoverExtraRemoteChildSkus(
         AdobePaaSRequestContext $context,
         string $parentSku,
         array $expectedChildSkus,
-    ): array {
+    ): AdobeProductExtraChildrenDiscoveryResult {
         [$childrenGetResult] = $this->remoteStateClient->getConfigurableChildren($context, $parentSku);
 
         if ($childrenGetResult === null || $childrenGetResult->statusCode !== 200) {
-            return [];
+            return new AdobeProductExtraChildrenDiscoveryResult(isAvailable: false);
         }
 
         $payload = json_decode($childrenGetResult->body, true);
 
         if (! is_array($payload)) {
-            return [];
+            return new AdobeProductExtraChildrenDiscoveryResult(isAvailable: false);
         }
 
         $remoteSkus = [];
@@ -119,7 +116,10 @@ final class AdobeProductCandidateDiscoveryClient
 
         sort($remoteSkus);
 
-        return $remoteSkus;
+        return new AdobeProductExtraChildrenDiscoveryResult(
+            isAvailable: true,
+            extraChildSkus: $remoteSkus,
+        );
     }
 
     private function extractLogicalEntityId(string $body): ?int

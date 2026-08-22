@@ -2,10 +2,17 @@
 
 namespace Tests\Integration\MySql;
 
+use App\Enums\EntityTrust\EntityTrustFailureReason;
 use App\Models\ExternalRecordLink;
+use App\Services\Connectors\ConnectorAccountSettingsService;
+use App\Services\Connectors\UpdateConnectorAccountInput;
 use App\Services\Sync\EntityTrust\AdobeProductEntityTrustConfirmationService;
 use App\Services\Sync\EntityTrust\AdobeProductEntityTrustReviewService;
+use App\Support\Connectors\AdobePaaS\AdobePaaSCredentialMapper;
+use App\Support\Connectors\CredentialMutation;
+use App\Support\Connectors\Exceptions\ConnectorAccountTargetFrozenException;
 use App\Support\Sync\EntityTrust\Exceptions\EntityTrustException;
+use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
@@ -179,6 +186,232 @@ class Stage3ER2b1MerchantEntityTrustMySqlTest extends TestCase
         $this->assertNull(
             ExternalRecordLink::withoutWorkspaceScope()->where('product_variant_id', $variantA->id)->first(),
         );
+    }
+
+    #[Test]
+    public function settings_target_change_before_confirm_causes_review_target_mismatch(): void
+    {
+        $account = $this->createConnectorAccount();
+        $this->prepareEntityTrustConfiguration($account);
+        [$product] = $this->createSimpleEntityTrustProduct($account->workspace, 'TARGET-RACE-SKU');
+        $this->responder->registerProduct('TARGET-RACE-SKU', 6001, 'simple');
+
+        $actor = $this->createEntityTrustActor($account->workspace);
+        $review = app(AdobeProductEntityTrustReviewService::class)->review(
+            $actor,
+            $account->workspace,
+            $account->id,
+            (string) $product->id,
+        );
+
+        $ipcDir = sys_get_temp_dir().'/entity-trust-target-race-'.uniqid('', true);
+        mkdir($ipcDir);
+
+        $workerScript = base_path('tests/Support/EntityTrust/EntityTrustConcurrencyWorker.php');
+        $env = $this->mysqlWorkerEnvironment();
+
+        $targetChanger = new Process([
+            PHP_BINARY,
+            $workerScript,
+            'change-target-then-release',
+            $account->workspace_id,
+            $account->id,
+            (string) $product->id,
+            $review->reviewToken,
+            (string) $actor->id,
+            $ipcDir,
+            'https://changed-target.example.com',
+        ], base_path(), $env);
+        $targetChanger->setTimeout(120);
+        $targetChanger->start();
+
+        $deadline = time() + 30;
+        while (! file_exists($ipcDir.'/target_lock_acquired') && time() < $deadline) {
+            usleep(50_000);
+        }
+
+        $this->assertFileExists($ipcDir.'/target_lock_acquired');
+
+        touch($ipcDir.'/proceed_target_change');
+        $targetChanger->wait();
+        $this->assertSame(0, $targetChanger->getExitCode(), $targetChanger->getErrorOutput());
+        $this->assertFileExists($ipcDir.'/target_changed');
+
+        try {
+            app(AdobeProductEntityTrustConfirmationService::class)->confirm(
+                $actor,
+                $account->workspace,
+                $account->id,
+                (string) $product->id,
+                $review->reviewToken,
+            );
+            $this->fail('Expected review target mismatch.');
+        } catch (EntityTrustException $exception) {
+            $this->assertSame(EntityTrustFailureReason::ReviewTargetMismatch, $exception->reason);
+        }
+
+        $this->assertSame(0, ExternalRecordLink::withoutWorkspaceScope()->where('connector_account_id', $account->id)->count());
+    }
+
+    #[Test]
+    public function confirm_before_target_change_rejects_settings_update(): void
+    {
+        $account = $this->createConnectorAccount();
+        $this->prepareEntityTrustConfiguration($account);
+        [$product, $variant] = $this->createSimpleEntityTrustProduct($account->workspace, 'CONFIRM-FIRST-SKU');
+        $this->responder->registerProduct('CONFIRM-FIRST-SKU', 6101, 'simple');
+
+        $actor = $this->createEntityTrustActor($account->workspace);
+        $review = app(AdobeProductEntityTrustReviewService::class)->review(
+            $actor,
+            $account->workspace,
+            $account->id,
+            (string) $product->id,
+        );
+
+        $ipcDir = sys_get_temp_dir().'/entity-trust-confirm-first-'.uniqid('', true);
+        mkdir($ipcDir);
+
+        $workerScript = base_path('tests/Support/EntityTrust/EntityTrustConcurrencyWorker.php');
+        $env = $this->mysqlWorkerEnvironment();
+
+        $lockHolder = new Process([
+            PHP_BINARY,
+            $workerScript,
+            'hold-account-lock',
+            $account->workspace_id,
+            $account->id,
+            (string) $product->id,
+            $review->reviewToken,
+            (string) $actor->id,
+            $ipcDir,
+        ], base_path(), $env);
+        $lockHolder->setTimeout(120);
+        $lockHolder->start();
+
+        $confirmWorker = new Process([
+            PHP_BINARY,
+            $workerScript,
+            'confirm-after-lock-release',
+            $account->workspace_id,
+            $account->id,
+            (string) $product->id,
+            $review->reviewToken,
+            (string) $actor->id,
+            $ipcDir,
+        ], base_path(), $env);
+        $confirmWorker->setTimeout(120);
+        $confirmWorker->start();
+
+        $deadline = time() + 30;
+        while (! file_exists($ipcDir.'/confirm_waiting_for_lock_release') && time() < $deadline) {
+            usleep(50_000);
+        }
+
+        $this->assertFileExists($ipcDir.'/confirm_waiting_for_lock_release');
+        $this->assertFileDoesNotExist($ipcDir.'/confirm_finished');
+
+        touch($ipcDir.'/release_account_lock');
+        $confirmWorker->wait();
+        $lockHolder->wait();
+
+        $this->assertSame(0, $confirmWorker->getExitCode(), $confirmWorker->getErrorOutput());
+        $this->assertSame('success', file_get_contents($ipcDir.'/confirm_result'));
+        $this->assertTrue(
+            ExternalRecordLink::withoutWorkspaceScope()->where('product_variant_id', $variant->id)->exists(),
+        );
+
+        $this->grantExactWorkspacePermissions($account->workspace, $actor, [
+            WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS,
+        ]);
+
+        try {
+            app(ConnectorAccountSettingsService::class)->update(
+                $actor,
+                $account->workspace,
+                $account->id,
+                UpdateConnectorAccountInput::adobePaas(
+                    baseUrl: 'https://blocked-target.example.com',
+                    storeCode: 'default',
+                    tenantContext: null,
+                    credentialMutation: CredentialMutation::keep(),
+                ),
+            );
+            $this->fail('Expected target frozen after trusted ERL persisted.');
+        } catch (ConnectorAccountTargetFrozenException) {
+            // expected
+        }
+    }
+
+    #[Test]
+    public function credential_rotation_serializes_safely_with_confirm(): void
+    {
+        $account = $this->createConnectorAccount();
+        $this->prepareEntityTrustConfiguration($account);
+        [$product, $variant] = $this->createSimpleEntityTrustProduct($account->workspace, 'CRED-RACE-SKU');
+        $this->responder->registerProduct('CRED-RACE-SKU', 7001, 'simple');
+
+        $actor = $this->createEntityTrustActor($account->workspace);
+        $this->grantExactWorkspacePermissions($account->workspace, $actor, [
+            WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS,
+        ]);
+
+        $review = app(AdobeProductEntityTrustReviewService::class)->review(
+            $actor,
+            $account->workspace,
+            $account->id,
+            (string) $product->id,
+        );
+
+        $ipcDir = sys_get_temp_dir().'/entity-trust-cred-race-'.uniqid('', true);
+        mkdir($ipcDir);
+
+        $workerScript = base_path('tests/Support/EntityTrust/EntityTrustConcurrencyWorker.php');
+        $env = $this->mysqlWorkerEnvironment();
+
+        $credentialWorker = new Process([
+            PHP_BINARY,
+            $workerScript,
+            'rotate-credentials-during-confirm',
+            $account->workspace_id,
+            $account->id,
+            (string) $product->id,
+            $review->reviewToken,
+            (string) $actor->id,
+            $ipcDir,
+        ], base_path(), $env);
+        $credentialWorker->setTimeout(120);
+        $credentialWorker->start();
+
+        $confirmWorker = new Process([
+            PHP_BINARY,
+            $workerScript,
+            'confirm-with-start-signal',
+            $account->workspace_id,
+            $account->id,
+            (string) $product->id,
+            $review->reviewToken,
+            (string) $actor->id,
+            $ipcDir,
+        ], base_path(), $env);
+        $confirmWorker->setTimeout(120);
+        $confirmWorker->start();
+
+        $confirmWorker->wait();
+        $credentialWorker->wait();
+
+        $this->assertSame(0, $confirmWorker->getExitCode(), $confirmWorker->getErrorOutput());
+        $this->assertSame(0, $credentialWorker->getExitCode(), $credentialWorker->getErrorOutput());
+        $this->assertSame('success', file_get_contents($ipcDir.'/confirm_result'));
+        $this->assertSame('success', file_get_contents($ipcDir.'/credential_result'));
+
+        $this->assertSame(
+            1,
+            ExternalRecordLink::withoutWorkspaceScope()->where('product_variant_id', $variant->id)->count(),
+        );
+
+        $account->refresh();
+        $this->assertTrue(AdobePaaSCredentialMapper::hasCompleteSet($account->credentials));
     }
 
     /**

@@ -121,10 +121,12 @@ final class AdobeProductMerchantConfirmedLinkPersister
         if ($lookup->isTrusted()) {
             $existing = $lookup->link;
 
-            if ($existing->external_record_discriminator === $discriminator
-                && $existing->external_identifier === $externalSku
-            ) {
-                return $existing;
+            if ($existing->external_record_discriminator === $discriminator) {
+                if ($existing->external_identifier === $externalSku) {
+                    return $existing;
+                }
+
+                return $this->upgradeExistingRow($existing, $externalSku, $discriminator, $actor);
             }
 
             if (! $allowRelink) {
@@ -142,6 +144,10 @@ final class AdobeProductMerchantConfirmedLinkPersister
             }
 
             if (! $allowLegacyUpgrade) {
+                throw EntityTrustException::ambiguousExistingLink();
+            }
+
+            if (! $this->isLegacyRowCompatibleForUpgrade($legacy, $externalSku, $discriminator)) {
                 throw EntityTrustException::ambiguousExistingLink();
             }
 
@@ -163,6 +169,25 @@ final class AdobeProductMerchantConfirmedLinkPersister
             'established_by_workspace_user_id' => $actor->id,
             'established_at' => now(),
         ]);
+    }
+
+    private function isLegacyRowCompatibleForUpgrade(
+        ExternalRecordLink $legacy,
+        string $externalSku,
+        string $discriminator,
+    ): bool {
+        $existingSku = $legacy->external_identifier;
+        $existingDiscriminator = $legacy->external_record_discriminator;
+
+        if (is_string($existingSku) && $existingSku !== '' && $existingSku !== $externalSku) {
+            return false;
+        }
+
+        if (is_string($existingDiscriminator) && $existingDiscriminator !== '' && $existingDiscriminator !== $discriminator) {
+            return false;
+        }
+
+        return true;
     }
 
     private function upgradeExistingRow(

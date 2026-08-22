@@ -20,6 +20,7 @@ final readonly class EntityTrustReviewResult
         public array $subjects,
         public ?string $reviewToken = null,
         public array $extraRemoteChildSkus = [],
+        public bool $extraRemoteChildrenAvailable = false,
     ) {}
 
     public function isReadyForConfirmation(): bool

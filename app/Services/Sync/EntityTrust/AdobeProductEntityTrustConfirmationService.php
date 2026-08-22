@@ -15,6 +15,8 @@ use App\Models\WorkspaceUser;
 use App\Services\Sync\SyncConfigurationLookupService;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
+use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshot;
+use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshotResolver;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeProductEntityTrustComparisonBuilder;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeProductEntityTrustVerifiedSubject;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeProductEntityTrustVerifier;
@@ -37,6 +39,7 @@ final class AdobeProductEntityTrustConfirmationService
         private readonly AdobeProductEntityTrustComparisonBuilder $comparisonBuilder,
         private readonly AdobeProductEntityTrustReviewEnvelopeService $envelopeService,
         private readonly AdobeProductMerchantConfirmedLinkPersister $merchantPersister,
+        private readonly AdobeConnectorAccountTargetSnapshotResolver $targetSnapshotResolver,
     ) {}
 
     public function confirm(
@@ -62,7 +65,7 @@ final class AdobeProductEntityTrustConfirmationService
             ->where('id', $productId)
             ->firstOrFail();
 
-        $intent = $this->intentResolver->resolve($configuration, $product, $existingParentSkuHint);
+        $intent = $this->intentResolver->resolve($configuration, $product, $existingParentSkuHint, $explicitRelink);
         $context = $this->contextFactory->create($workspace->id, $account->id);
 
         $decoded = $this->envelopeService->validate(
@@ -76,7 +79,11 @@ final class AdobeProductEntityTrustConfirmationService
             mode: $intent->mode,
             localFingerprint: $intent->localFingerprint,
             existingParentSkuHint: $intent->existingParentSkuHint,
+            explicitRelink: $explicitRelink,
         );
+
+        /** @var AdobeConnectorAccountTargetSnapshot $reviewTargetSnapshot */
+        $reviewTargetSnapshot = $decoded['_resolved_target_snapshot'];
 
         $verifiedSubjects = $this->verifyFreshRemoteSubjects($intent, $context, $decoded['subjects']);
 
@@ -85,6 +92,12 @@ final class AdobeProductEntityTrustConfirmationService
 
             if (! is_array($envelopeSubject)) {
                 throw EntityTrustException::invalidReviewEvidence();
+            }
+
+            $envelopeLogicalEntityId = $envelopeSubject['logical_entity_id'] ?? null;
+
+            if (! is_int($envelopeLogicalEntityId) || $envelopeLogicalEntityId !== $verified->logicalEntityId) {
+                throw EntityTrustException::remoteChangedSinceReview();
             }
 
             $freshFingerprint = $this->buildRemoteFingerprint($intent, $subjectKey, $verified);
@@ -103,6 +116,7 @@ final class AdobeProductEntityTrustConfirmationService
             $intent,
             $verifiedSubjects,
             $explicitRelink,
+            $reviewTargetSnapshot,
         ): array {
             $lockedWorkspace = Workspace::query()->whereKey($workspace->id)->lockForUpdate()->firstOrFail();
 
@@ -122,6 +136,12 @@ final class AdobeProductEntityTrustConfirmationService
 
             if (! $lockedAccount->is_enabled) {
                 throw EntityTrustException::accountConfigurationNotCurrent();
+            }
+
+            $currentTargetSnapshot = $this->targetSnapshotResolver->resolve($lockedAccount);
+
+            if (! $currentTargetSnapshot->equals($reviewTargetSnapshot)) {
+                throw EntityTrustException::reviewTargetMismatch();
             }
 
             $lockedConfiguration = SyncConfiguration::withoutWorkspaceScope()
@@ -163,7 +183,12 @@ final class AdobeProductEntityTrustConfirmationService
 
             $this->lockRelevantExternalRecordLinks($workspace->id, $account->id, $lockedProduct->id, $variantIds);
 
-            $freshIntent = $this->intentResolver->resolve($lockedConfiguration, $lockedProduct, $intent->existingParentSkuHint);
+            $freshIntent = $this->intentResolver->resolve(
+                $lockedConfiguration,
+                $lockedProduct,
+                $intent->existingParentSkuHint,
+                $explicitRelink,
+            );
 
             if ($freshIntent->localFingerprint !== $intent->localFingerprint) {
                 throw EntityTrustException::localChangedSinceReview();

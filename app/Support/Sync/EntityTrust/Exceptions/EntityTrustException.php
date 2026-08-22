@@ -84,4 +84,9 @@ final class EntityTrustException extends RuntimeException
     {
         return new self(EntityTrustFailureReason::RelinkReviewRequired);
     }
+
+    public static function reviewTargetMismatch(): self
+    {
+        return new self(EntityTrustFailureReason::ReviewTargetMismatch);
+    }
 }

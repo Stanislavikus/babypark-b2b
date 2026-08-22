@@ -36,6 +36,7 @@ final class AdobeProductEntityTrustIntentResolver
         SyncConfiguration $configuration,
         Product $product,
         ?string $existingParentSkuHint,
+        bool $explicitRelink = false,
     ): EntityTrustResolvedIntent {
         $snapshot = $this->snapshotBuilder->build($configuration, SyncSemanticOperation::Export);
         $aggregates = $this->aggregateBuilder->buildForProductIds(
@@ -81,6 +82,7 @@ final class AdobeProductEntityTrustIntentResolver
                 $configuration,
                 $product,
                 $existingParentSkuHint,
+                $explicitRelink,
             );
 
             $configurable = $this->compileConfigurableWithParentSku(
@@ -152,7 +154,16 @@ final class AdobeProductEntityTrustIntentResolver
         SyncConfiguration $configuration,
         Product $product,
         ?string $existingParentSkuHint,
+        bool $explicitRelink,
     ): string {
+        if ($explicitRelink) {
+            if ($existingParentSkuHint === null || trim($existingParentSkuHint) === '') {
+                throw EntityTrustException::accountConfigurationNotCurrent();
+            }
+
+            return trim($existingParentSkuHint);
+        }
+
         $trustedParent = app(AdobeProductExternalRecordLinkGuard::class)
             ->resolveTrustedParentLinkBySubject(
                 $configuration->workspace_id,

@@ -22,4 +22,5 @@ enum EntityTrustFailureReason: string
     case SafeSyncFailure = 'safe_sync_failure';
     case InvalidReviewEvidence = 'invalid_review_evidence';
     case DifferentEntityWithoutRelink = 'different_entity_without_relink';
+    case ReviewTargetMismatch = 'review_target_mismatch';
 }
