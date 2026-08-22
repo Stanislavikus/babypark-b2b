@@ -6341,7 +6341,9 @@ allowing `Product A → external X` and `Product A → external Y`. Do **not** m
 
 Legacy rows with NULL provenance are **not** grandfathered trusted. A link is trusted for Adobe `merchant_confirmed` only when the complete provenance tuple is valid. There is **no** generic DB `UNIQUE(workspace_id, connector_account_id, external_record_discriminator)` constraint; Adobe discriminator collision remains connector-aware in application guards. Existing exact-association unique constraints are unchanged.
 
-Adobe Product Live mutation is **fail-closed** until the entity-bound WRITE bridge exists (`KnownNotApplied` / `entity_bound_mutation_bridge_required` or `link_required`; zero consequential writes). Automatic ERL trust establishment from execution is impossible. **Adobe Products / Export / Live remains FALSE.** R2b merchant-confirmation persistence is not implemented in R2a.
+Adobe Product Live mutation is **fail-closed** until the entity-bound WRITE bridge exists (`KnownNotApplied` / `entity_bound_mutation_bridge_required` or `link_required`; zero consequential writes). Automatic ERL trust establishment from execution is impossible. **Adobe Products / Export / Live remains FALSE.**
+
+**Stage 3E-R2b-1 (implemented — backend only):** merchant-confirmed ENTITY TRUST review/confirm backend exists for Adobe Products. Current/prospective link readiness projection, tamper-resistant review envelope, Safe Sync entity-bound verification, and dedicated `AdobeProductMerchantConfirmedLinkPersister` are implemented. Existing configurable parent uses confirmed merchant Magento SKU (not `cfg-*` substitution). Merchant Filament/Livewire UI remains **R2b-2** follow-on. Safe Sync consequential WRITE remains pending.
 
 Do not create generic Magento parent/simple/child enum, external product role
 vocabulary, or unrestricted `internal_type`/`internal_id` polymorphism. No
@@ -6830,7 +6832,7 @@ expected SKU and reject ambiguous/conflicting logical Products.
 | `established_by_workspace_user_id` | Attributable confirmation actor |
 | `established_at` | Fresh confirmation timestamp |
 
-Legacy rows are not grandfathered trusted. No generic discriminator DB unique constraint. Adobe Product Live mutation remains fail-closed until the entity-bound WRITE bridge exists. R2b merchant-confirmation persistence is follow-on work.
+Legacy rows are not grandfathered trusted. No generic discriminator DB unique constraint. Adobe Product Live mutation remains fail-closed until the entity-bound WRITE bridge exists. **Stage 3E-R2b-1** implements merchant-confirmed trust persistence backend (review/confirm services, link readiness projection); merchant UI remains R2b-2.
 
 #### Entity-bound mutation boundary (frozen)
 

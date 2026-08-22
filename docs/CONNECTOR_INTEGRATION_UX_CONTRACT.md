@@ -513,6 +513,8 @@ Workspace:
 Neither permission alone is sufficient. Do **not** create a new permission in
 Stage 3E. Revocation of either before confirmation must fail closed.
 
+**Stage 3E-R2b-1 (implemented — backend only):** `AdobeProductEntityTrustReviewService` and `AdobeProductEntityTrustConfirmationService` enforce this dual-authority contract with fresh checks before remote HTTP and again under Workspace row lock before ERL persistence. `AdobeProductEntityTrustLinkReadinessProjector` exposes current/prospective link readiness without historical `SyncRunItem` rewriting. Merchant Filament/Livewire confirmation UI remains **R2b-2** follow-on.
+
 ### Informed merchant confirmation
 
 Before confirmation the merchant must see a concise controlled-field comparison:
