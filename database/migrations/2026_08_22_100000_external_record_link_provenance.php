@@ -34,9 +34,17 @@ return new class extends Migration
     {
         $driver = Schema::getConnection()->getDriverName();
 
-        Schema::table('external_record_links', function (Blueprint $table) {
-            $table->dropForeign('erl_established_actor_ws_fk');
-        });
+        if ($driver === 'sqlite') {
+            Schema::table('external_record_links', function (Blueprint $table) {
+                $table->dropForeign(['established_by_workspace_user_id', 'workspace_id']);
+            });
+        }
+
+        if ($driver === 'mysql') {
+            Schema::table('external_record_links', function (Blueprint $table) {
+                $table->dropForeign('erl_established_actor_ws_fk');
+            });
+        }
 
         Schema::table('external_record_links', function (Blueprint $table) {
             $table->dropColumn([

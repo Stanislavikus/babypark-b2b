@@ -22,6 +22,8 @@ use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
@@ -72,6 +74,31 @@ class Stage3ER2aTrustedErlSemanticsTest extends TestCase
         $this->assertNull($legacy->established_by_workspace_user_id);
         $this->assertNull($legacy->established_at);
         $this->assertFalse($legacy->hasMerchantConfirmedTrust());
+    }
+
+    #[Test]
+    public function sqlite_provenance_migration_rolls_back_and_reapplies_with_subject_xor_triggers(): void
+    {
+        if (Schema::getConnection()->getDriverName() !== 'sqlite') {
+            $this->markTestSkipped('SQLite-only provenance migration rollback proof.');
+        }
+
+        $this->assertProvenanceColumnsExist();
+
+        Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_08_22_100000_external_record_link_provenance.php',
+        ]);
+
+        $this->assertProvenanceColumnsAbsent();
+
+        Artisan::call('migrate');
+
+        $this->assertProvenanceColumnsExist();
+        $this->assertSqliteSubjectXorTriggersExist();
+
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        $this->assertSubjectXorInsertStillRejected($workspace, $account->id);
     }
 
     #[Test]
@@ -387,10 +414,9 @@ class Stage3ER2aTrustedErlSemanticsTest extends TestCase
     #[Test]
     public function configurable_parent_trusted_erl_fails_closed_before_http(): void
     {
-        $transport = new RecordingConnectorHttpTransport(fn () => throw new \RuntimeException('HTTP must not be called'));
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
-        [$product, $variant] = $this->createProductVariant($workspace);
+        [$product] = $this->createProductVariant($workspace);
         $actor = $this->createWorkspaceActor($workspace);
 
         ExternalRecordLink::query()->create(
@@ -419,9 +445,11 @@ class Stage3ER2aTrustedErlSemanticsTest extends TestCase
 
         $result = $executor->execute($input);
 
+        $this->assertSame('configurable_parent', $result->commandKind);
         $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
         $this->assertSame('entity_bound_mutation_bridge_required', $result->reasonCode);
-        $this->assertSame(0, $transport->sendCount);
+        $this->assertSame(0, $result->consequentialWriteAttempts);
+        $this->assertSame(0, $result->reconciliationGetAttempts);
     }
 
     #[Test]
@@ -523,5 +551,56 @@ class Stage3ER2aTrustedErlSemanticsTest extends TestCase
         ]);
 
         return [$product, $variant];
+    }
+
+    private function assertProvenanceColumnsExist(): void
+    {
+        $this->assertTrue(Schema::hasColumn('external_record_links', 'trust_origin'));
+        $this->assertTrue(Schema::hasColumn('external_record_links', 'external_record_discriminator'));
+        $this->assertTrue(Schema::hasColumn('external_record_links', 'established_by_workspace_user_id'));
+        $this->assertTrue(Schema::hasColumn('external_record_links', 'established_at'));
+    }
+
+    private function assertProvenanceColumnsAbsent(): void
+    {
+        $this->assertFalse(Schema::hasColumn('external_record_links', 'trust_origin'));
+        $this->assertFalse(Schema::hasColumn('external_record_links', 'external_record_discriminator'));
+        $this->assertFalse(Schema::hasColumn('external_record_links', 'established_by_workspace_user_id'));
+        $this->assertFalse(Schema::hasColumn('external_record_links', 'established_at'));
+    }
+
+    private function assertSqliteSubjectXorTriggersExist(): void
+    {
+        $triggerNames = collect(DB::select("
+            SELECT name
+            FROM sqlite_master
+            WHERE type = 'trigger'
+              AND tbl_name = 'external_record_links'
+              AND name IN ('erl_subject_xor_insert', 'erl_subject_xor_update')
+            ORDER BY name
+        "))->pluck('name')->values()->all();
+
+        $this->assertSame(['erl_subject_xor_insert', 'erl_subject_xor_update'], $triggerNames);
+    }
+
+    private function assertSubjectXorInsertStillRejected(Workspace $workspace, string $connectorAccountId): void
+    {
+        [$product, $variant] = $this->createProductVariant($workspace);
+
+        try {
+            DB::table('external_record_links')->insert([
+                'id' => (string) Str::uuid(),
+                'workspace_id' => $workspace->id,
+                'connector_account_id' => $connectorAccountId,
+                'product_id' => $product->id,
+                'product_variant_id' => $variant->id,
+                'external_identifier' => 'XOR-INVALID',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->fail('Expected subject XOR trigger rejection after provenance migration rollback/reapply.');
+        } catch (QueryException) {
+            // expected
+        }
     }
 }
