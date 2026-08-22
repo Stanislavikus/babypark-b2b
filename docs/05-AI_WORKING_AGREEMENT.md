@@ -1106,6 +1106,26 @@ The AI is prohibited from:
 
 ---
 
+## Production deployment authorization (Resolved — Stage 3E-OPS-0)
+
+Merge authorization and production deployment authorization are separate decisions.
+
+A user OK to merge a pull request into `develop` never implicitly authorizes production deployment.
+
+Production deployment requires a separate explicit user instruction to run the production deployment workflow.
+
+The production deployment workflow must not automatically trigger on push or merge to `develop`. It is available only through manual `workflow_dispatch`.
+
+Agent handoffs must distinguish:
+
+- **Repository merge** — code integrated into the target branch in Git;
+- **SaaS production deployment** — the hosted application updated on the production server through the deployment workflow;
+- **External connector / target deployment** — data or configuration pushed to an external system (for example Adobe Commerce, Magento, or another connector target).
+
+An agent must not claim `Deployment: NOT PERFORMED` merely because it did not personally invoke deployment if repository automation actually deployed production.
+
+---
+
 ## Final Principle
 
 The AI must help build a professional SaaS product whose enterprise-grade architecture is hidden behind a simple, understandable user experience.
