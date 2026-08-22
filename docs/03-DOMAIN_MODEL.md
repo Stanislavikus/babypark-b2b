@@ -6331,11 +6331,17 @@ These prohibit duplicate copies of the **same** correspondence while still
 allowing `Product A → external X` and `Product A → external Y`. Do **not** make
 `external_identifier` globally unique per account.
 
-**Follow-on provenance fields (Stage 3E — follow-on runtime PR, not this docs PR):**
-current schema is insufficient for ENTITY TRUST. Follow-on runtime must persist
-conceptually: `trust_origin`, `external_record_discriminator` (Adobe: Magento
-logical Product `entity_id`), `established_by_workspace_user_id`,
-`established_at`. Use connector-neutral names; no Magento-specific core columns.
+**Follow-on provenance fields (Stage 3E-R2a — implemented):**
+`external_record_links` now persists connector-neutral ENTITY TRUST provenance:
+
+- `trust_origin` — first recognized value: `merchant_confirmed`
+- `external_record_discriminator` — for Adobe: Magento logical Product `entity_id`
+- `established_by_workspace_user_id` — attributable confirmation actor (`WorkspaceUser`)
+- `established_at` — fresh confirmation timestamp
+
+Legacy rows with NULL provenance are **not** grandfathered trusted. A link is trusted for Adobe `merchant_confirmed` only when the complete provenance tuple is valid. There is **no** generic DB `UNIQUE(workspace_id, connector_account_id, external_record_discriminator)` constraint; Adobe discriminator collision remains connector-aware in application guards. Existing exact-association unique constraints are unchanged.
+
+Adobe Product Live mutation is **fail-closed** until the entity-bound WRITE bridge exists (`KnownNotApplied` / `entity_bound_mutation_bridge_required` or `link_required`; zero consequential writes). Automatic ERL trust establishment from execution is impossible. **Adobe Products / Export / Live remains FALSE.** R2b merchant-confirmation persistence is not implemented in R2a.
 
 Do not create generic Magento parent/simple/child enum, external product role
 vocabulary, or unrestricted `internal_type`/`internal_id` polymorphism. No
@@ -6815,18 +6821,16 @@ expected SKU and reject ambiguous/conflicting logical Products.
 
 #### Follow-on ERL provenance / discriminator requirement
 
-Current `external_record_links` schema does not yet express enough trust evidence.
-**Follow-on runtime PR** (not this docs PR) must persist conceptually:
+**Implemented in Stage 3E-R2a.** `external_record_links` now persists:
 
 | Field | Purpose |
 |---|---|
-| `trust_origin` | e.g. `merchant_confirmed`; future create capability may add another explicit origin later |
+| `trust_origin` | First recognized value: `merchant_confirmed` |
 | `external_record_discriminator` | For Adobe: Magento logical Product `entity_id` |
 | `established_by_workspace_user_id` | Attributable confirmation actor |
 | `established_at` | Fresh confirmation timestamp |
 
-Use connector-neutral names. Do **not** add Magento-specific columns such as
-`magento_entity_id` to generic core tables. **No migration in this docs-only PR.**
+Legacy rows are not grandfathered trusted. No generic discriminator DB unique constraint. Adobe Product Live mutation remains fail-closed until the entity-bound WRITE bridge exists. R2b merchant-confirmation persistence is follow-on work.
 
 #### Entity-bound mutation boundary (frozen)
 

@@ -27,7 +27,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('**Docs-only in this PR.**', $section);
         $this->assertStringContainsString('No Magento module runtime', $section);
-        $this->assertStringContainsString('No migration in this docs-only PR', $section);
+        $this->assertStringContainsString('**Implemented in Stage 3E-R2a.**', $section);
         $this->assertStringContainsString('Adobe Products/Export/Live | **FALSE**', $section);
         $this->assertStringContainsString('Replacement runtime follows in a separate follow-on PR', $section);
     }

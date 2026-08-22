@@ -4,8 +4,6 @@ namespace App\Support\Connectors\AdobePaaS\Command;
 
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
-use App\Models\Product;
-use App\Models\ProductVariant;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -62,22 +60,7 @@ final class AdobeProductExternalRecordLinkPersister implements AdobeProductExter
                     return $existingLink;
                 }
 
-                $variant = ProductVariant::withoutWorkspaceScope()
-                    ->where('workspace_id', $workspaceId)
-                    ->where('id', (int) $desiredState->productVariantId)
-                    ->first();
-
-                if ($variant === null) {
-                    throw AdobeProductExternalRecordLinkPersistenceException::variantNotFound();
-                }
-
-                return ExternalRecordLink::withoutWorkspaceScope()->create([
-                    'workspace_id' => $workspaceId,
-                    'connector_account_id' => $connectorAccountId,
-                    'product_id' => null,
-                    'product_variant_id' => (int) $desiredState->productVariantId,
-                    'external_identifier' => $desiredState->sku,
-                ]);
+                throw AdobeProductExternalRecordLinkPersistenceException::merchantConfirmationRequired();
             });
         } catch (AdobeProductExternalRecordLinkPersistenceException $exception) {
             throw $exception;
@@ -135,22 +118,7 @@ final class AdobeProductExternalRecordLinkPersister implements AdobeProductExter
                     return $existingLink;
                 }
 
-                $product = Product::withoutWorkspaceScope()
-                    ->where('workspace_id', $workspaceId)
-                    ->where('id', $desiredState->productId)
-                    ->first();
-
-                if ($product === null) {
-                    throw AdobeProductExternalRecordLinkPersistenceException::productNotFound();
-                }
-
-                return ExternalRecordLink::withoutWorkspaceScope()->create([
-                    'workspace_id' => $workspaceId,
-                    'connector_account_id' => $connectorAccountId,
-                    'product_id' => $desiredState->productId,
-                    'product_variant_id' => null,
-                    'external_identifier' => $desiredState->sku,
-                ]);
+                throw AdobeProductExternalRecordLinkPersistenceException::merchantConfirmationRequired();
             });
         } catch (AdobeProductExternalRecordLinkPersistenceException $exception) {
             throw $exception;
