@@ -14,7 +14,8 @@ class Stage3ER1ImplementationTruthDocumentationTest extends TestCase
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString('**Stage 3E-R1 internal read foundation is implemented**', $content);
-        $this->assertStringContainsString('ERL trust/link runtime, consequential mutation, validation harness rebuild, and support flip remain **pending**', $content);
+        $this->assertStringContainsString('**Stage 3E-R2b-1 merchant-confirmed ENTITY TRUST review/confirm backend is implemented**', $content);
+        $this->assertStringContainsString('Safe Sync consequential WRITE, validation harness rebuild, and support flip remain **pending**', $content);
         $this->assertStringContainsString('support remains **false**', $content);
     }
 

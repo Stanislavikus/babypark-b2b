@@ -9,9 +9,9 @@ use Illuminate\Contracts\Console\Kernel;
 use Tests\Support\Connectors\RecordingConnectorHttpTransport;
 use Tests\Support\Sync\EntityTrust\EntityTrustAdobeTransportResponder;
 
-require __DIR__.'/../../vendor/autoload.php';
+require __DIR__.'/../../../vendor/autoload.php';
 
-$app = require __DIR__.'/../../bootstrap/app.php';
+$app = require __DIR__.'/../../../bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
 $mode = $argv[1] ?? null;
