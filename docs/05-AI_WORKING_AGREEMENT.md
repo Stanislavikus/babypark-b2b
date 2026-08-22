@@ -1126,6 +1126,18 @@ An agent must not claim `Deployment: NOT PERFORMED` merely because it did not pe
 
 ---
 
+## Migration-aware production deployment (Resolved — Stage 3E-OPS-1)
+
+Production deployment remains manual-only per Stage 3E-OPS-0. A manually dispatched production workflow is authorized only from `refs/heads/develop` and must deploy one exact `develop` commit SHA passed explicitly to the server as `DEPLOY_SHA` (the dispatch `github.sha`).
+
+In-place production deployment enters Laravel maintenance mode before the authorized code checkout and leaves maintenance only after all required deployment steps succeed. Pending committed migrations are applied through `php artisan migrate --force` after the authorized code and build steps complete and before `php artisan queue:restart`.
+
+Failure after maintenance mode entry is fail-closed: the deployment must exit non-zero, must not be reported as success, and must not automatically restore an older Git commit or bring the application back online as though the deployment succeeded. Automatic database migration rollback is forbidden. High-risk or destructive migrations require explicit migration-specific review rather than relying on generic deployment rollback.
+
+Repository merge, SaaS production deployment, and external connector / target deployment remain separate authorization states.
+
+---
+
 ## Final Principle
 
 The AI must help build a professional SaaS product whose enterprise-grade architecture is hidden behind a simple, understandable user experience.
