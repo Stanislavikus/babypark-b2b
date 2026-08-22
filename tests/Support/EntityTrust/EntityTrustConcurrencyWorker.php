@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\DB;
 use Tests\Support\Connectors\RecordingConnectorHttpTransport;
 use Tests\Support\Sync\EntityTrust\EntityTrustAdobeTransportResponder;
 
-$basePath = dirname(__DIR__, 2);
+$basePath = dirname(__DIR__, 3);
 
 require $basePath.'/vendor/autoload.php';
 
