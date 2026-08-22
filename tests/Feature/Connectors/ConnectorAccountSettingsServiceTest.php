@@ -4,6 +4,7 @@ namespace Tests\Feature\Connectors;
 
 use App\Enums\UserRole;
 use App\Models\ConnectorAccount;
+use App\Models\ExternalRecordLink;
 use App\Models\Workspace;
 use App\Services\Connectors\ConnectorAccountSettingsResult;
 use App\Services\Connectors\ConnectorAccountSettingsService;
@@ -24,6 +25,7 @@ use App\Support\Connectors\Exceptions\ConnectorAccountNameConflict;
 use App\Support\Connectors\Exceptions\ConnectorAccountNotFoundException;
 use App\Support\Connectors\Exceptions\ConnectorAccountProfileInputMismatchException;
 use App\Support\Connectors\Exceptions\ConnectorAccountSettingsValidationException;
+use App\Support\Connectors\Exceptions\ConnectorAccountTargetFrozenException;
 use App\Support\Connectors\Exceptions\ConnectorDefinitionNotFoundException;
 use App\Support\Connectors\Exceptions\ConnectorProfileNotFoundException;
 use App\Support\Connectors\Exceptions\DisabledConnectorProfileException;
@@ -43,6 +45,9 @@ use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\Permission\Models\Permission;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
+use Tests\Concerns\CreatesMerchantConfirmedExternalRecordLinks;
+use Tests\Concerns\InteractsWithEntityTrustFixtures;
+use Tests\Concerns\InteractsWithFieldMappingFixtures;
 use Tests\TestCase;
 use Tests\Unit\Connectors\OAuth1\AssertsOAuth1SecretsSafely;
 
@@ -50,6 +55,9 @@ class ConnectorAccountSettingsServiceTest extends TestCase
 {
     use AssertsOAuth1SecretsSafely;
     use CreatesConnectorAccountFixtures;
+    use CreatesMerchantConfirmedExternalRecordLinks;
+    use InteractsWithEntityTrustFixtures;
+    use InteractsWithFieldMappingFixtures;
     use RefreshDatabase;
 
     private ConnectorAccountSettingsService $service;
@@ -64,6 +72,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspacePermissionSeeder::class);
         $this->seed(WorkspaceRbacPermissionSeeder::class);
+        $this->seedFieldDefinitions();
 
         $this->workspace = $this->defaultWorkspace();
         $this->service = app(ConnectorAccountSettingsService::class);
@@ -688,6 +697,135 @@ class ConnectorAccountSettingsServiceTest extends TestCase
                 credentialMutation: CredentialMutation::keep(),
             ),
         );
+    }
+
+    #[Test]
+    public function target_change_is_rejected_when_trusted_merchant_confirmed_links_exist(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount($this->workspace);
+        $this->prepareEntityTrustConfiguration($account);
+        [$product, $variant] = $this->createSimpleEntityTrustProduct($this->workspace, 'FREEZE-SKU');
+
+        ExternalRecordLink::withoutWorkspaceScope()->create(
+            $this->merchantConfirmedVariantLinkAttributes(
+                $this->workspace,
+                $account->id,
+                $variant,
+                'FREEZE-SKU',
+                '5001',
+                $this->createWorkspaceActor($this->workspace),
+            ),
+        );
+
+        $this->expectException(ConnectorAccountTargetFrozenException::class);
+
+        $this->service->update(
+            $admin,
+            $this->workspace,
+            $account->id,
+            UpdateConnectorAccountInput::adobePaas(
+                baseUrl: 'https://new-target.example.com',
+                storeCode: 'default',
+                tenantContext: null,
+                credentialMutation: CredentialMutation::keep(),
+            ),
+        );
+    }
+
+    #[Test]
+    public function target_change_is_allowed_without_trusted_merchant_confirmed_links(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount($this->workspace);
+
+        $result = $this->service->update(
+            $admin,
+            $this->workspace,
+            $account->id,
+            UpdateConnectorAccountInput::adobePaas(
+                baseUrl: 'https://new-target.example.com',
+                storeCode: 'store_two',
+                tenantContext: null,
+                credentialMutation: CredentialMutation::keep(),
+            ),
+        );
+
+        $this->assertSame('https://new-target.example.com', $result->baseUrl);
+        $this->assertSame('store_two', $result->storeCode);
+    }
+
+    #[Test]
+    public function credential_rotation_is_allowed_with_trusted_merchant_confirmed_links(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount($this->workspace);
+        $this->prepareEntityTrustConfiguration($account);
+        [$product, $variant] = $this->createSimpleEntityTrustProduct($this->workspace, 'ROTATE-SKU');
+
+        $link = ExternalRecordLink::withoutWorkspaceScope()->create(
+            $this->merchantConfirmedVariantLinkAttributes(
+                $this->workspace,
+                $account->id,
+                $variant,
+                'ROTATE-SKU',
+                '5101',
+                $this->createWorkspaceActor($this->workspace),
+            ),
+        );
+
+        $result = $this->service->update(
+            $admin,
+            $this->workspace,
+            $account->id,
+            UpdateConnectorAccountInput::adobePaas(
+                baseUrl: (string) $account->base_url,
+                storeCode: (string) $account->store_code,
+                tenantContext: null,
+                credentialMutation: CredentialMutation::replace(
+                    new OAuth1Credentials('ck_rot', 'cs_rot', 'at_rot', 'ts_rot'),
+                ),
+            ),
+        );
+
+        $this->assertTrue($result->hasCredentials);
+        $link->refresh();
+        $this->assertTrue($link->hasMerchantConfirmedTrust());
+        $this->assertSame('5101', $link->external_record_discriminator);
+    }
+
+    #[Test]
+    public function tenant_context_only_update_does_not_trigger_target_freeze(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount($this->workspace);
+        $this->prepareEntityTrustConfiguration($account);
+        [$product, $variant] = $this->createSimpleEntityTrustProduct($this->workspace, 'TENANT-SKU');
+
+        ExternalRecordLink::withoutWorkspaceScope()->create(
+            $this->merchantConfirmedVariantLinkAttributes(
+                $this->workspace,
+                $account->id,
+                $variant,
+                'TENANT-SKU',
+                '5201',
+                $this->createWorkspaceActor($this->workspace),
+            ),
+        );
+
+        $result = $this->service->update(
+            $admin,
+            $this->workspace,
+            $account->id,
+            UpdateConnectorAccountInput::adobePaas(
+                baseUrl: (string) $account->base_url,
+                storeCode: (string) $account->store_code,
+                tenantContext: 'tenant-updated',
+                credentialMutation: CredentialMutation::keep(),
+            ),
+        );
+
+        $this->assertSame('tenant-updated', $result->tenantContext);
     }
 }
 

@@ -35,15 +35,27 @@ final class AdobeProductRemoteStateClient
         AdobePaaSRequestContext $context,
         string $sku,
     ): AdobeProductRemoteGetResult {
-        [$httpResult, $transportException] = $this->send(
+        [$httpResult, $transportException] = $this->sendReadOnlyGetWithContext($context, $sku);
+
+        return $this->getClassifier->classify($sku, $httpResult, $transportException);
+    }
+
+    /**
+     * Read-only stock Product GET for candidate discovery and other read seams.
+     *
+     * @return array{0: ?ConnectorHttpResult, 1: ?ConnectorTransportException}
+     */
+    public function sendReadOnlyGetWithContext(
+        AdobePaaSRequestContext $context,
+        string $sku,
+    ): array {
+        return $this->send(
             $this->requestFactory->buildGet(
                 $context,
                 $sku,
                 $this->newSigningContext(),
             ),
         );
-
-        return $this->getClassifier->classify($sku, $httpResult, $transportException);
     }
 
     /**

@@ -3,17 +3,21 @@
 namespace App\Services\Connectors;
 
 use App\Enums\ConnectorAccountConnectionStatus;
+use App\Enums\ExternalRecordLinkTrustOrigin;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorDefinition;
+use App\Models\ExternalRecordLink;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Connectors\AdobePaaS\AdobePaaSCredentialMapper;
+use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshotResolver;
 use App\Support\Connectors\ConnectorAccountMutationMode;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\CredentialMutation;
 use App\Support\Connectors\Exceptions\ConnectorAccountNameConflict;
 use App\Support\Connectors\Exceptions\ConnectorAccountNotFoundException;
 use App\Support\Connectors\Exceptions\ConnectorAccountSettingsValidationException;
+use App\Support\Connectors\Exceptions\ConnectorAccountTargetFrozenException;
 use App\Support\Connectors\Exceptions\ConnectorDefinitionNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +29,7 @@ final class ConnectorAccountSettingsService implements ConnectorAccountPersisten
     public function __construct(
         private readonly ConnectorProfileRegistry $profileRegistry,
         private readonly ConnectorAccountConstraintViolationClassifier $constraintViolationClassifier,
+        private readonly AdobeConnectorAccountTargetSnapshotResolver $targetSnapshotResolver,
     ) {}
 
     public function create(
@@ -104,8 +109,6 @@ final class ConnectorAccountSettingsService implements ConnectorAccountPersisten
             throw new ConnectorAccountNotFoundException('Connector account was not found.');
         }
 
-        $this->authorizeUpdate($actor, $account, $input->credentialMutation);
-
         $schema = $this->profileRegistry->resolveAccountSchema($account->auth_profile);
         $validatedState = $schema->validate(
             $input->settings,
@@ -113,18 +116,45 @@ final class ConnectorAccountSettingsService implements ConnectorAccountPersisten
             ConnectorAccountMutationMode::Update,
         );
 
-        $credentials = $this->resolveCredentialsForUpdate($account, $input->credentialMutation);
-
         try {
-            DB::transaction(function () use ($account, $validatedState, $credentials): void {
-                $account->fill([
+            $account = DB::transaction(function () use (
+                $actor,
+                $workspace,
+                $connectorAccountId,
+                $validatedState,
+                $input,
+            ): ConnectorAccount {
+                Workspace::query()->whereKey($workspace->id)->lockForUpdate()->firstOrFail();
+
+                $lockedAccount = ConnectorAccount::withoutWorkspaceScope()
+                    ->where('workspace_id', $workspace->id)
+                    ->where('id', $connectorAccountId)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                $this->authorizeUpdate($actor, $lockedAccount, $input->credentialMutation);
+
+                if ($this->targetSnapshotResolver->wouldChangeTarget(
+                    $lockedAccount,
+                    $validatedState->baseUrl,
+                    $validatedState->storeCode,
+                ) && $this->hasTrustedMerchantConfirmedLinks($workspace->id, $lockedAccount->id)
+                ) {
+                    throw new ConnectorAccountTargetFrozenException;
+                }
+
+                $credentials = $this->resolveCredentialsForUpdate($lockedAccount, $input->credentialMutation);
+
+                $lockedAccount->fill([
                     'base_url' => $validatedState->baseUrl,
                     'store_code' => $validatedState->storeCode,
                     'tenant_context' => $validatedState->tenantContext,
                     'settings' => $validatedState->settings,
                     'credentials' => $credentials,
                 ]);
-                $account->save();
+                $lockedAccount->save();
+
+                return $lockedAccount;
             });
         } catch (QueryException $exception) {
             if ($this->constraintViolationClassifier->isActiveNameUniquenessConflict($exception)) {
@@ -140,6 +170,19 @@ final class ConnectorAccountSettingsService implements ConnectorAccountPersisten
         $account->refresh();
 
         return $this->toResult($account);
+    }
+
+    private function hasTrustedMerchantConfirmedLinks(string $workspaceId, string $connectorAccountId): bool
+    {
+        return ExternalRecordLink::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->where('connector_account_id', $connectorAccountId)
+            ->where('trust_origin', ExternalRecordLinkTrustOrigin::MerchantConfirmed->value)
+            ->whereNotNull('external_record_discriminator')
+            ->where('external_record_discriminator', '!=', '')
+            ->whereNotNull('established_by_workspace_user_id')
+            ->whereNotNull('established_at')
+            ->exists();
     }
 
     private function authorizeUpdate(User $actor, ConnectorAccount $account, CredentialMutation $credentialMutation): void
