@@ -4,13 +4,9 @@ namespace Tests\Integration\MySql;
 
 use App\Enums\EntityTrust\EntityTrustFailureReason;
 use App\Models\ExternalRecordLink;
-use App\Services\Connectors\ConnectorAccountSettingsService;
-use App\Services\Connectors\UpdateConnectorAccountInput;
 use App\Services\Sync\EntityTrust\AdobeProductEntityTrustConfirmationService;
 use App\Services\Sync\EntityTrust\AdobeProductEntityTrustReviewService;
 use App\Support\Connectors\AdobePaaS\AdobePaaSCredentialMapper;
-use App\Support\Connectors\CredentialMutation;
-use App\Support\Connectors\Exceptions\ConnectorAccountTargetFrozenException;
 use App\Support\Sync\EntityTrust\Exceptions\EntityTrustException;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
@@ -25,6 +21,7 @@ use Tests\Concerns\CreatesMerchantConfirmedExternalRecordLinks;
 use Tests\Concerns\InteractsWithEntityTrustFixtures;
 use Tests\Concerns\InteractsWithFieldMappingFixtures;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
+use Tests\Support\MySqlWorkspaceRowLockWaitProbe;
 use Tests\Support\Sync\EntityTrust\EntityTrustAdobeTransportResponder;
 use Tests\TestCase;
 
@@ -197,6 +194,10 @@ class Stage3ER2b1MerchantEntityTrustMySqlTest extends TestCase
         $this->responder->registerProduct('TARGET-RACE-SKU', 6001, 'simple');
 
         $actor = $this->createEntityTrustActor($account->workspace);
+        $this->grantExactWorkspacePermissions($account->workspace, $actor, [
+            WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS,
+        ]);
+
         $review = app(AdobeProductEntityTrustReviewService::class)->review(
             $actor,
             $account->workspace,
@@ -204,52 +205,70 @@ class Stage3ER2b1MerchantEntityTrustMySqlTest extends TestCase
             (string) $product->id,
         );
 
-        $ipcDir = sys_get_temp_dir().'/entity-trust-target-race-'.uniqid('', true);
-        mkdir($ipcDir);
-
+        $ipcDir = $this->createIpcDirectory('entity-trust-settings-wins');
         $workerScript = base_path('tests/Support/EntityTrust/EntityTrustConcurrencyWorker.php');
         $env = $this->mysqlWorkerEnvironment();
+        $newBaseUrl = 'https://changed-target.example.com';
 
-        $targetChanger = new Process([
-            PHP_BINARY,
-            $workerScript,
-            'change-target-then-release',
+        $boundary = $this->startWorker($workerScript, [
+            'hold-boundary',
             $account->workspace_id,
             $account->id,
             (string) $product->id,
             $review->reviewToken,
             (string) $actor->id,
             $ipcDir,
-            'https://changed-target.example.com',
-        ], base_path(), $env);
-        $targetChanger->setTimeout(120);
-        $targetChanger->start();
+        ], $env);
 
-        $deadline = time() + 30;
-        while (! file_exists($ipcDir.'/target_lock_acquired') && time() < $deadline) {
-            usleep(50_000);
-        }
+        $this->waitForIpcFile($ipcDir.'/boundary_lock_acquired');
 
-        $this->assertFileExists($ipcDir.'/target_lock_acquired');
+        $settings = $this->startWorker($workerScript, [
+            'settings-target-update',
+            $account->workspace_id,
+            $account->id,
+            (string) $product->id,
+            $review->reviewToken,
+            (string) $actor->id,
+            $ipcDir,
+            $newBaseUrl,
+        ], $env);
 
-        touch($ipcDir.'/proceed_target_change');
-        $targetChanger->wait();
-        $this->assertSame(0, $targetChanger->getExitCode(), $targetChanger->getErrorOutput());
-        $this->assertFileExists($ipcDir.'/target_changed');
+        $settingsLockWait = MySqlWorkspaceRowLockWaitProbe::waitForForeignWorkspaceForUpdateWait($account->workspace_id);
+        $this->assertStringContainsString('for update', strtolower($settingsLockWait['info']));
 
-        try {
-            app(AdobeProductEntityTrustConfirmationService::class)->confirm(
-                $actor,
-                $account->workspace,
-                $account->id,
-                (string) $product->id,
-                $review->reviewToken,
-            );
-            $this->fail('Expected review target mismatch.');
-        } catch (EntityTrustException $exception) {
-            $this->assertSame(EntityTrustFailureReason::ReviewTargetMismatch, $exception->reason);
-        }
+        $confirm = $this->startWorker($workerScript, [
+            'confirm-trust',
+            $account->workspace_id,
+            $account->id,
+            (string) $product->id,
+            $review->reviewToken,
+            (string) $actor->id,
+            $ipcDir,
+        ], $env);
 
+        $this->waitForIpcFile($ipcDir.'/settings_entered');
+        $this->waitForIpcFile($ipcDir.'/confirm_entered');
+        $this->assertFileDoesNotExist($ipcDir.'/settings_finished', 'Settings update must not finish while boundary lock is held.');
+        $this->assertFileDoesNotExist($ipcDir.'/confirm_finished', 'Confirm must not finish while boundary lock is held.');
+
+        $confirmLockWait = MySqlWorkspaceRowLockWaitProbe::waitForForeignWorkspaceForUpdateWait($account->workspace_id);
+        $this->assertStringContainsString('for update', strtolower($confirmLockWait['info']));
+
+        touch($ipcDir.'/release_boundary');
+
+        $boundary->wait();
+        $settings->wait();
+        $confirm->wait();
+
+        $this->assertSame(0, $boundary->getExitCode(), $boundary->getErrorOutput());
+        $this->assertSame(0, $settings->getExitCode(), $settings->getErrorOutput());
+        $this->assertSame(0, $confirm->getExitCode(), $confirm->getErrorOutput());
+        $this->assertFileExists($ipcDir.'/boundary_released');
+        $this->assertSame('success', file_get_contents($ipcDir.'/settings_result'));
+        $this->assertSame(EntityTrustFailureReason::ReviewTargetMismatch->value, file_get_contents($ipcDir.'/confirm_result'));
+
+        $account->refresh();
+        $this->assertSame($newBaseUrl, $account->base_url);
         $this->assertSame(0, ExternalRecordLink::withoutWorkspaceScope()->where('connector_account_id', $account->id)->count());
     }
 
@@ -261,7 +280,12 @@ class Stage3ER2b1MerchantEntityTrustMySqlTest extends TestCase
         [$product, $variant] = $this->createSimpleEntityTrustProduct($account->workspace, 'CONFIRM-FIRST-SKU');
         $this->responder->registerProduct('CONFIRM-FIRST-SKU', 6101, 'simple');
 
+        $originalBaseUrl = (string) $account->base_url;
         $actor = $this->createEntityTrustActor($account->workspace);
+        $this->grantExactWorkspacePermissions($account->workspace, $actor, [
+            WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS,
+        ]);
+
         $review = app(AdobeProductEntityTrustReviewService::class)->review(
             $actor,
             $account->workspace,
@@ -269,16 +293,24 @@ class Stage3ER2b1MerchantEntityTrustMySqlTest extends TestCase
             (string) $product->id,
         );
 
-        $ipcDir = sys_get_temp_dir().'/entity-trust-confirm-first-'.uniqid('', true);
-        mkdir($ipcDir);
-
+        $ipcDir = $this->createIpcDirectory('entity-trust-confirm-wins');
         $workerScript = base_path('tests/Support/EntityTrust/EntityTrustConcurrencyWorker.php');
         $env = $this->mysqlWorkerEnvironment();
 
-        $lockHolder = new Process([
-            PHP_BINARY,
-            $workerScript,
-            'hold-account-lock',
+        $boundary = $this->startWorker($workerScript, [
+            'hold-boundary',
+            $account->workspace_id,
+            $account->id,
+            (string) $product->id,
+            $review->reviewToken,
+            (string) $actor->id,
+            $ipcDir,
+        ], $env);
+
+        $this->waitForIpcFile($ipcDir.'/boundary_lock_acquired');
+
+        $confirm = $this->startWorker($workerScript, [
+            'confirm-trust',
             $account->workspace_id,
             $account->id,
             (string) $product->id,
@@ -288,65 +320,46 @@ class Stage3ER2b1MerchantEntityTrustMySqlTest extends TestCase
             '',
             '6101',
             'CONFIRM-FIRST-SKU',
-        ], base_path(), $env);
-        $lockHolder->setTimeout(120);
-        $lockHolder->start();
+        ], $env);
 
-        $confirmWorker = new Process([
-            PHP_BINARY,
-            $workerScript,
-            'confirm-after-lock-release',
+        $confirmLockWait = MySqlWorkspaceRowLockWaitProbe::waitForForeignWorkspaceForUpdateWait($account->workspace_id);
+        $this->assertStringContainsString('for update', strtolower($confirmLockWait['info']));
+        $this->waitForIpcFile($ipcDir.'/confirm_entered');
+        $this->assertFileDoesNotExist($ipcDir.'/confirm_finished', 'Confirm must not finish while boundary lock is held.');
+
+        $settings = $this->startWorker($workerScript, [
+            'settings-target-update',
             $account->workspace_id,
             $account->id,
             (string) $product->id,
             $review->reviewToken,
             (string) $actor->id,
             $ipcDir,
-            '',
-            '6101',
-            'CONFIRM-FIRST-SKU',
-        ], base_path(), $env);
-        $confirmWorker->setTimeout(120);
-        $confirmWorker->start();
+            'https://blocked-target.example.com',
+        ], $env);
 
-        $deadline = time() + 30;
-        while (! file_exists($ipcDir.'/confirm_waiting_for_lock_release') && time() < $deadline) {
-            usleep(50_000);
-        }
+        $settingsLockWait = MySqlWorkspaceRowLockWaitProbe::waitForForeignWorkspaceForUpdateWait($account->workspace_id);
+        $this->assertStringContainsString('for update', strtolower($settingsLockWait['info']));
+        $this->waitForIpcFile($ipcDir.'/settings_entered');
+        $this->assertFileDoesNotExist($ipcDir.'/settings_finished', 'Settings update must not finish while boundary lock is held.');
 
-        $this->assertFileExists($ipcDir.'/confirm_waiting_for_lock_release');
-        $this->assertFileDoesNotExist($ipcDir.'/confirm_finished');
+        touch($ipcDir.'/release_boundary');
 
-        touch($ipcDir.'/release_account_lock');
-        $confirmWorker->wait();
-        $lockHolder->wait();
+        $boundary->wait();
+        $confirm->wait();
+        $settings->wait();
 
-        $this->assertSame(0, $confirmWorker->getExitCode(), $confirmWorker->getErrorOutput());
+        $this->assertSame(0, $boundary->getExitCode(), $boundary->getErrorOutput());
+        $this->assertSame(0, $confirm->getExitCode(), $confirm->getErrorOutput());
+        $this->assertSame(0, $settings->getExitCode(), $settings->getErrorOutput());
         $this->assertSame('success', file_get_contents($ipcDir.'/confirm_result'));
+        $this->assertSame('target_frozen', file_get_contents($ipcDir.'/settings_result'));
         $this->assertTrue(
             ExternalRecordLink::withoutWorkspaceScope()->where('product_variant_id', $variant->id)->exists(),
         );
 
-        $this->grantExactWorkspacePermissions($account->workspace, $actor, [
-            WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS,
-        ]);
-
-        try {
-            app(ConnectorAccountSettingsService::class)->update(
-                $actor,
-                $account->workspace,
-                $account->id,
-                UpdateConnectorAccountInput::adobePaas(
-                    baseUrl: 'https://blocked-target.example.com',
-                    storeCode: 'default',
-                    tenantContext: null,
-                    credentialMutation: CredentialMutation::keep(),
-                ),
-            );
-            $this->fail('Expected target frozen after trusted ERL persisted.');
-        } catch (ConnectorAccountTargetFrozenException) {
-            // expected
-        }
+        $account->refresh();
+        $this->assertSame($originalBaseUrl, $account->base_url);
     }
 
     #[Test]
@@ -357,6 +370,8 @@ class Stage3ER2b1MerchantEntityTrustMySqlTest extends TestCase
         [$product, $variant] = $this->createSimpleEntityTrustProduct($account->workspace, 'CRED-RACE-SKU');
         $this->responder->registerProduct('CRED-RACE-SKU', 7001, 'simple');
 
+        $originalBaseUrl = (string) $account->base_url;
+        $originalStoreCode = (string) $account->store_code;
         $actor = $this->createEntityTrustActor($account->workspace);
         $this->grantExactWorkspacePermissions($account->workspace, $actor, [
             WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS,
@@ -369,55 +384,107 @@ class Stage3ER2b1MerchantEntityTrustMySqlTest extends TestCase
             (string) $product->id,
         );
 
-        $ipcDir = sys_get_temp_dir().'/entity-trust-cred-race-'.uniqid('', true);
-        mkdir($ipcDir);
-
+        $ipcDir = $this->createIpcDirectory('entity-trust-cred-race');
         $workerScript = base_path('tests/Support/EntityTrust/EntityTrustConcurrencyWorker.php');
         $env = $this->mysqlWorkerEnvironment();
 
-        $credentialWorker = new Process([
-            PHP_BINARY,
-            $workerScript,
-            'rotate-credentials-during-confirm',
+        $boundary = $this->startWorker($workerScript, [
+            'hold-boundary',
             $account->workspace_id,
             $account->id,
             (string) $product->id,
             $review->reviewToken,
             (string) $actor->id,
             $ipcDir,
-        ], base_path(), $env);
-        $credentialWorker->setTimeout(120);
-        $credentialWorker->start();
+        ], $env);
 
-        $confirmWorker = new Process([
-            PHP_BINARY,
-            $workerScript,
-            'confirm-with-start-signal',
+        $this->waitForIpcFile($ipcDir.'/boundary_lock_acquired');
+
+        $confirm = $this->startWorker($workerScript, [
+            'confirm-trust',
             $account->workspace_id,
             $account->id,
             (string) $product->id,
             $review->reviewToken,
             (string) $actor->id,
             $ipcDir,
-        ], base_path(), $env);
-        $confirmWorker->setTimeout(120);
-        $confirmWorker->start();
+        ], $env);
 
-        $confirmWorker->wait();
-        $credentialWorker->wait();
+        $confirmLockWait = MySqlWorkspaceRowLockWaitProbe::waitForForeignWorkspaceForUpdateWait($account->workspace_id);
+        $this->assertStringContainsString('for update', strtolower($confirmLockWait['info']));
+        $this->waitForIpcFile($ipcDir.'/confirm_entered');
+        $this->assertFileDoesNotExist($ipcDir.'/confirm_finished', 'Confirm must not finish while boundary lock is held.');
 
-        $this->assertSame(0, $confirmWorker->getExitCode(), $confirmWorker->getErrorOutput());
-        $this->assertSame(0, $credentialWorker->getExitCode(), $credentialWorker->getErrorOutput());
+        $credential = $this->startWorker($workerScript, [
+            'credential-rotate',
+            $account->workspace_id,
+            $account->id,
+            (string) $product->id,
+            $review->reviewToken,
+            (string) $actor->id,
+            $ipcDir,
+        ], $env);
+
+        $credentialLockWait = MySqlWorkspaceRowLockWaitProbe::waitForForeignWorkspaceForUpdateWait($account->workspace_id);
+        $this->assertStringContainsString('for update', strtolower($credentialLockWait['info']));
+        $this->waitForIpcFile($ipcDir.'/credential_entered');
+        $this->assertFileDoesNotExist($ipcDir.'/credential_finished', 'Credential rotation must not finish while boundary lock is held.');
+
+        touch($ipcDir.'/release_boundary');
+
+        $boundary->wait();
+        $confirm->wait();
+        $credential->wait();
+
+        $this->assertSame(0, $boundary->getExitCode(), $boundary->getErrorOutput());
+        $this->assertSame(0, $confirm->getExitCode(), $confirm->getErrorOutput());
+        $this->assertSame(0, $credential->getExitCode(), $credential->getErrorOutput());
         $this->assertSame('success', file_get_contents($ipcDir.'/confirm_result'));
         $this->assertSame('success', file_get_contents($ipcDir.'/credential_result'));
-
         $this->assertSame(
             1,
             ExternalRecordLink::withoutWorkspaceScope()->where('product_variant_id', $variant->id)->count(),
         );
 
         $account->refresh();
+        $this->assertSame($originalBaseUrl, $account->base_url);
+        $this->assertSame($originalStoreCode, $account->store_code);
         $this->assertTrue(AdobePaaSCredentialMapper::hasCompleteSet($account->credentials));
+        $this->assertSame('ck_race', $account->credentials['consumer_key'] ?? null);
+    }
+
+    /**
+     * @param  list<string>  $arguments
+     */
+    private function startWorker(string $workerScript, array $arguments, array $env): Process
+    {
+        $process = new Process(array_merge([PHP_BINARY, $workerScript], $arguments), base_path(), $env);
+        $process->setTimeout(120);
+        $process->start();
+
+        return $process;
+    }
+
+    private function createIpcDirectory(string $prefix): string
+    {
+        $ipcDir = sys_get_temp_dir().'/'.$prefix.'-'.uniqid('', true);
+
+        if (! mkdir($ipcDir) && ! is_dir($ipcDir)) {
+            $this->fail('Could not create IPC directory.');
+        }
+
+        return $ipcDir;
+    }
+
+    private function waitForIpcFile(string $path, int $seconds = 60): void
+    {
+        $deadline = time() + $seconds;
+
+        while (! file_exists($path) && time() < $deadline) {
+            usleep(50_000);
+        }
+
+        $this->assertFileExists($path, "Timed out waiting for IPC file: {$path}");
     }
 
     /**
