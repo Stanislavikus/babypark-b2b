@@ -224,6 +224,25 @@ class ExternalRecordLinkPersistenceMySqlTest extends TestCase
     }
 
     #[Test]
+    public function stage_3e_r2a_provenance_migration_rolls_back_and_reapplies(): void
+    {
+        $this->assertTrue(Schema::hasColumn('external_record_links', 'trust_origin'));
+        $this->assertTrue(Schema::hasColumn('external_record_links', 'external_record_discriminator'));
+        $this->assertTrue(Schema::hasColumn('external_record_links', 'established_by_workspace_user_id'));
+        $this->assertTrue(Schema::hasColumn('external_record_links', 'established_at'));
+
+        Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_08_22_100000_external_record_link_provenance.php',
+        ]);
+
+        $this->assertFalse(Schema::hasColumn('external_record_links', 'trust_origin'));
+
+        Artisan::call('migrate');
+
+        $this->assertTrue(Schema::hasColumn('external_record_links', 'trust_origin'));
+    }
+
+    #[Test]
     public function stage_3a_external_record_links_migration_rolls_back_and_reapplies(): void
     {
         $version = DB::selectOne('SELECT VERSION() as version')->version;

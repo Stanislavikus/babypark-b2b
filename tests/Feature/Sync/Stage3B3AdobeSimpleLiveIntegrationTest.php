@@ -34,14 +34,11 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductAppliedStateKnowledge;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductCommandRequestFactory;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductDesiredStateCompiler;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkGuard;
-use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersister;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteGetClassifier;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateClient;
-use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateComparator;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateNormalizer;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandExecutor;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandInput;
-use App\Support\Connectors\AdobePaaS\Command\ConservativeAdobeProductOwnershipTrustPolicy;
 use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorHttpTransport;
@@ -245,7 +242,7 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
     }
 
     #[Test]
-    public function live_rebuilds_fresh_product_state_and_ignores_preview_connector_plan(): void
+    public function live_rebuilds_fresh_product_state_without_consequential_writes_until_write_bridge(): void
     {
         $transport = $this->bindAdobeTransport();
         $account = $this->createConnectorAccount();
@@ -290,9 +287,10 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
             static fn (ConnectorOutboundRequest $request): bool => $request->request->getMethod() === 'PUT',
         );
 
-        $this->assertNotEmpty($putRequests);
-        $putBody = (string) $putRequests[array_key_first($putRequests)]->request->getBody();
-        $this->assertStringContainsString('250', $putBody);
+        $this->assertEmpty($putRequests);
+
+        $item = SyncRunItem::withoutWorkspaceScope()->where('sync_run_id', $run->id)->sole();
+        $this->assertSame(SyncLiveOutcome::NotApplied, $item->liveOutcome());
     }
 
     #[Test]
@@ -345,7 +343,7 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
     }
 
     #[Test]
-    public function writer_lease_denies_put_after_get_with_zero_consequential_writes(): void
+    public function legacy_link_fails_closed_before_get_with_zero_consequential_writes(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
@@ -386,9 +384,8 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
         ));
 
         $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
-        $this->assertSame('writer_lease_expired_before_consequential_write', $result->evidence->reasonCode);
-        $this->assertSame(1, $transport->sendCount);
-        $this->assertSame('GET', $transport->recordedRequests[0]->request->getMethod());
+        $this->assertSame('link_required', $result->evidence->reasonCode);
+        $this->assertSame(0, $transport->sendCount);
     }
 
     #[Test]
@@ -567,12 +564,7 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
 
         $executor = new AdobeProductSimpleCommandExecutor(
             new AdobeProductDesiredStateCompiler,
-            app(AdobePaaSRequestContextFactory::class),
-            $client,
-            new AdobeProductRemoteStateComparator,
             $linkGuard,
-            new AdobeProductExternalRecordLinkPersister($linkGuard),
-            new ConservativeAdobeProductOwnershipTrustPolicy,
         );
 
         return [$executor, $transport];
