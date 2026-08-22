@@ -285,6 +285,9 @@ class Stage3ER2b1MerchantEntityTrustMySqlTest extends TestCase
             $review->reviewToken,
             (string) $actor->id,
             $ipcDir,
+            '',
+            '6101',
+            'CONFIRM-FIRST-SKU',
         ], base_path(), $env);
         $lockHolder->setTimeout(120);
         $lockHolder->start();
@@ -299,6 +302,9 @@ class Stage3ER2b1MerchantEntityTrustMySqlTest extends TestCase
             $review->reviewToken,
             (string) $actor->id,
             $ipcDir,
+            '',
+            '6101',
+            'CONFIRM-FIRST-SKU',
         ], base_path(), $env);
         $confirmWorker->setTimeout(120);
         $confirmWorker->start();

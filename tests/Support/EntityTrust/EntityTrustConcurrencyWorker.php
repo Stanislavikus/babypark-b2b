@@ -29,6 +29,8 @@ $reviewToken = $argv[5] ?? null;
 $actorId = $argv[6] ?? null;
 $ipcDir = $argv[7] ?? null;
 $newBaseUrl = $argv[8] ?? null;
+$entityId = isset($argv[9]) ? (int) $argv[9] : null;
+$sku = $argv[10] ?? null;
 
 if (! $mode || ! $workspaceId || ! $accountId || ! $productId || ! $reviewToken || ! $actorId || ! $ipcDir) {
     fwrite(STDERR, "Missing worker arguments.\n");
@@ -40,6 +42,10 @@ $responder->registerProduct('SHARED-RACE-SKU', 3001, 'simple');
 $responder->registerProduct('SHARED-RACE-SKU-B', 3001, 'simple');
 $responder->registerProduct('TARGET-RACE-SKU', 6001, 'simple');
 $responder->registerProduct('CRED-RACE-SKU', 7001, 'simple');
+
+if (is_string($sku) && $sku !== '' && $entityId !== null) {
+    $responder->registerProduct($sku, $entityId, 'simple');
+}
 app()->instance(ConnectorHttpTransport::class, new RecordingConnectorHttpTransport(
     fn ($request, $count) => $responder($request, $count),
 ));
