@@ -9,14 +9,10 @@ MAINTENANCE_ACTIVE=0
 on_deploy_error() {
     local exit_code=$?
 
-    if [[ "$MAINTENANCE_ACTIVE" -eq 1 ]]; then
-        echo "DEPLOYMENT FAILED after maintenance mode was enabled. Manual recovery is required." >&2
-        echo "Application remains in maintenance mode." >&2
-    else
-        echo "DEPLOYMENT FAILED before maintenance mode. Manual recovery may be required." >&2
-    fi
-
-    echo "Current Git HEAD: $(git rev-parse HEAD 2>/dev/null || echo 'unknown')" >&2
+    echo "ERROR: deployment did not complete." >&2
+    echo "Maintenance state requires manual verification/recovery." >&2
+    echo "No automatic rollback or recovery was attempted." >&2
+    echo "Current HEAD: $(git rev-parse HEAD 2>/dev/null || echo 'unknown')" >&2
     echo "Authorized DEPLOY_SHA: ${DEPLOY_SHA:-not set}" >&2
     exit "$exit_code"
 }
@@ -75,6 +71,9 @@ npm run build
 php artisan migrate --force
 php artisan optimize:clear
 php artisan queue:restart
+php artisan up
+MAINTENANCE_ACTIVE=0
+trap - ERR
 
 echo "Authorized DEPLOY_SHA: ${DEPLOY_SHA}"
 echo "Deployed Git HEAD: $(git rev-parse HEAD)"
@@ -82,5 +81,3 @@ echo "Branch: $(git branch --show-current)"
 echo "Migrations: completed successfully"
 echo "Queue restart: completed"
 echo "Deployment completed."
-
-php artisan up

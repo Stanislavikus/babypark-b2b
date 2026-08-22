@@ -81,16 +81,28 @@ class ProductionDeployWorkflowContractTest extends TestCase
         $migratePosition = strpos($content, 'php artisan migrate --force');
         $queueRestartPosition = strpos($content, 'php artisan queue:restart');
         $upPosition = strpos($content, 'php artisan up');
+        $maintenanceResetPosition = strpos($content, 'MAINTENANCE_ACTIVE=0', $upPosition);
+        $trapExitPosition = strpos($content, 'trap - ERR', $upPosition);
+        $deploymentCompletedPosition = strpos($content, 'Deployment completed.');
 
         $this->assertNotFalse($maintenancePosition);
         $this->assertNotFalse($mergePosition);
         $this->assertNotFalse($migratePosition);
         $this->assertNotFalse($queueRestartPosition);
         $this->assertNotFalse($upPosition);
+        $this->assertNotFalse($maintenanceResetPosition);
+        $this->assertNotFalse($trapExitPosition);
+        $this->assertNotFalse($deploymentCompletedPosition);
 
         $this->assertLessThan($mergePosition, $maintenancePosition, 'Maintenance mode must begin before code checkout.');
         $this->assertLessThan($queueRestartPosition, $migratePosition, 'Migrations must run before queue restart.');
         $this->assertLessThan($upPosition, $queueRestartPosition, 'php artisan up must run only after queue restart on the success path.');
+        $this->assertLessThan($maintenanceResetPosition, $upPosition, 'Maintenance reset must occur only after successful php artisan up.');
+        $this->assertLessThan($deploymentCompletedPosition, $maintenanceResetPosition, 'Final deployment evidence must not be emitted before maintenance reset.');
+        $this->assertLessThan($deploymentCompletedPosition, $trapExitPosition, 'Final deployment evidence must not be emitted before leaving the guarded failure phase.');
+        $this->assertStringContainsString('ERROR: deployment did not complete.', $content);
+        $this->assertStringContainsString('Maintenance state requires manual verification/recovery.', $content);
+        $this->assertStringNotContainsString('Application remains in maintenance mode.', $content);
     }
 
     #[Test]
