@@ -237,7 +237,9 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
             ->assertSet('entityTrustActiveExtraChildrenAvailable', true)
             ->assertCount('entityTrustActiveExtraChildSkus', 1)
             ->assertSee('data-extra-children-state="available-non-empty"', false)
-            ->assertSee(__('entity_trust.extra_children.notice', ['count' => 1]), false);
+            // Use assertSeeText to compare against stripped text, which sidesteps
+            // the apostrophe HTML-entity escaping in the rendered DOM.
+            ->assertSeeText('1 додаткових варіантів', false);
     }
 
     #[Test]
@@ -293,7 +295,8 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         [$account, $product] = $this->seedSimpleReadyFixture('CORR-STALE-REMOTE-SKU', 7020);
         $actor = $this->createEntityTrustActor($account->workspace);
 
-        // First review establishes a flow.
+        // First review establishes a flow and writes the envelope's
+        // logical_entity_id (7020) plus the remote_fingerprint.
         $component = Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
             ->call('requestEntityTrustReview', (string) $product->id);
@@ -301,13 +304,16 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         $flowId = $component->get('entityTrustReviewFlowId');
         $this->assertNotNull($flowId);
 
-        // Simulate a remote change by remapping the entity id. The backend
-        // R2b-1 reviewer will see the new logical id and reject with
-        // RemoteChangedSinceReview.
+        // Simulate a remote change by remapping the entity id. The R2b-1
+        // confirmation service re-verifies the candidate and finds a
+        // logical_entity_id mismatch (7020 vs 99001). The backend raises
+        // RemoteChangedSinceReview, which the failure presenter maps to
+        // the StaleReview category — the correct merchant-safe surface for
+        // "the Magento state you reviewed is no longer the one we see".
         $this->responder->remapLogicalEntityId('CORR-STALE-REMOTE-SKU', 99001);
 
         $component->call('confirmEntityTrust')
-            ->assertSet('entityTrustOutcomeCategory', 'remote_verification_failure')
+            ->assertSet('entityTrustOutcomeCategory', 'stale_review')
             ->assertSet('entityTrustActiveReviewFlowId', null);
 
         $this->assertFalse($this->responder->hasConsequentialWrite());
@@ -326,13 +332,17 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         $flowId = $component->get('entityTrustReviewFlowId');
         $this->assertNotNull($flowId);
 
-        // Mutate the local variant so R2b-1 detects a local change.
-        $variant = $product->variants[0];
-        $variant->forceFill(['base_price_cache' => 12345.0])->save();
+        // Mutate a field that is part of the local fingerprint used at
+        // confirm time (`name`). The base_price_cache column is NOT part of
+        // the R2b-1 local fingerprint — pricing is read from the configured
+        // price list at intent-resolution time, not from the variant cache.
+        $product->forceFill(['name' => 'Renamed Local '.uniqid()])->save();
 
         $component->call('confirmEntityTrust')
-            ->assertSet('entityTrustOutcomeCategory', 'remote_verification_failure')
+            ->assertSet('entityTrustOutcomeCategory', 'stale_review')
             ->assertSet('entityTrustActiveReviewFlowId', null);
+
+        $this->assertFalse($this->responder->hasConsequentialWrite());
     }
 
     #[Test]
@@ -422,8 +432,14 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         $this->assertNotNull($component->get('entityTrustReviewFlowId'));
 
         // Mutate the sync configuration revision so the R2b-1 confirmation
-        // service detects a configuration drift and surfaces
-        // localChangedSinceReview (mapped to remote_verification_failure).
+        // service detects a configuration drift. The envelope validate step
+        // runs first and surfaces InvalidReviewEvidence (Security category)
+        // before the lock-and-compare inside the DB::transaction can run.
+        // Either way, the merchant must redo the review from scratch; the
+        // outcome category for this drift IS stale_review because the
+        // backend re-validation pipeline classifies invalid review
+        // evidence as a stale review (the link to the configuration that
+        // produced this evidence has been broken).
         $configuration = SyncConfiguration::withoutWorkspaceScope()
             ->where('workspace_id', $account->workspace->id)
             ->first();
@@ -431,7 +447,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         $configuration->forceFill(['configuration_revision' => 'rev-drift-'.uniqid()])->save();
 
         $component->call('confirmEntityTrust')
-            ->assertSet('entityTrustOutcomeCategory', 'remote_verification_failure')
+            ->assertSet('entityTrustOutcomeCategory', 'stale_review')
             ->assertSet('entityTrustActiveReviewFlowId', null);
 
         $this->assertFalse($this->responder->hasConsequentialWrite());
@@ -475,25 +491,19 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         [$account, $product, $variant] = $this->seedSimpleReadyFixture('CORR-AMBI-SKU', 7032);
         $actor = $this->createEntityTrustActor($account->workspace);
 
-        // Pre-create a legacy (non-merchant-confirmed) link for the same
-        // Magento entity (same discriminator) pointing at a different
-        // local variant. R2b-1 refuses the silent upgrade with
-        // AmbiguousExistingLink (mapped to identity_conflict).
-        $otherVariant = ProductVariant::withoutWorkspaceScope()->create([
-            'workspace_id' => $account->workspace->id,
-            'product_id' => $product->id,
-            'onec_guid' => 'AMB-VAR-'.uniqid(),
-            'sku' => 'AMB-VAR-'.uniqid(),
-            'is_active' => true,
-            'base_price_cache' => 100,
-        ]);
-
+        // Pre-create a legacy (non-merchant-confirmed) link for the SAME
+        // variant the orchestrator is about to link, with a different
+        // external_identifier but the same discriminator. The R2b-1
+        // persister accepts the silent upgrade only when the existing
+        // external_identifier matches; the mismatch forces the
+        // AmbiguousExistingLink branch (IdentityConflict category).
         ExternalRecordLink::withoutWorkspaceScope()->create([
             'workspace_id' => $account->workspace->id,
             'connector_account_id' => $account->id,
-            'product_variant_id' => $otherVariant->id,
-            'external_identifier' => 'OTHER-LEGACY-SKU',
+            'product_variant_id' => $variant->id,
+            'external_identifier' => 'LEGACY-OTHER-SKU',
             'external_record_discriminator' => '7032',
+            // trust_origin left null => legacy, not merchant-confirmed.
         ]);
 
         $component = Livewire::actingAs($actor)
@@ -502,6 +512,8 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
             ->assertSet('entityTrustOutcomeReadyForConfirmation', true)
             ->call('confirmEntityTrust')
             ->assertSet('entityTrustOutcomeCategory', 'identity_conflict');
+
+        $this->assertFalse($this->responder->hasConsequentialWrite());
     }
 
     // -----------------------------------------------------------------

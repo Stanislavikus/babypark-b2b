@@ -261,8 +261,17 @@ class ManageAdobeProductsExportPreview extends Page
             return false;
         }
 
+        // The page itself is the management surface for Adobe Products
+        // Export setup. A user with manage_sync_configurations can manage
+        // setup (preview, mappings, configuration) even without run_sync_live.
+        // The Entity Trust review/confirm surface is gated additionally by
+        // run_sync_live (enforced server-side by the orchestrator) and is
+        // hidden in the UI for users who lack it. This keeps the dual
+        // permission enforcement for the merchant-confirmation action while
+        // letting setup-only users reach the page.
         return app(AdobeProductsExportPreviewAuthorizationService::class)->canAccess($user, $workspace)
-            || app(AdobeProductsExportLiveAuthorizationService::class)->canAccessLive($user, $workspace);
+            || app(AdobeProductsExportLiveAuthorizationService::class)->canAccessLive($user, $workspace)
+            || app(AdobeProductsExportPreviewAuthorizationService::class)->canManageSetup($user, $workspace);
     }
 
     public function getTitle(): string|Htmlable
@@ -282,8 +291,14 @@ class ManageAdobeProductsExportPreview extends Page
             ->isEligiblePreviewTarget($user, $workspace, $account);
         $liveEligible = app(AdobeProductsExportLiveAuthorizationService::class)
             ->isEligibleLiveTarget($user, $workspace, $account);
+        $canManageSetup = app(AdobeProductsExportPreviewAuthorizationService::class)
+            ->canManageSetup($user, $workspace);
 
-        if (! $previewEligible && ! $liveEligible) {
+        // Allow access for setup managers so they can reach the page (and
+        // see the Entity Trust section rendered with a Security outcome for
+        // any review/confirm action — the orchestrator enforces the dual
+        // permission at the action boundary).
+        if (! $previewEligible && ! $liveEligible && ! $canManageSetup) {
             abort(403);
         }
 
@@ -435,7 +450,13 @@ class ManageAdobeProductsExportPreview extends Page
         $previewAuth = app(AdobeProductsExportPreviewAuthorizationService::class);
         $liveAuth = app(AdobeProductsExportLiveAuthorizationService::class);
 
-        if (! $previewAuth->canAccess($user, $workspace) && ! $liveAuth->canAccessLive($user, $workspace)) {
+        // Same lenient access as mount() — a setup manager can reach the
+        // page (the orchestrator will gate the actual review/confirm with
+        // Security outcomes).
+        if (! $previewAuth->canAccess($user, $workspace)
+            && ! $liveAuth->canAccessLive($user, $workspace)
+            && ! $previewAuth->canManageSetup($user, $workspace)
+        ) {
             abort(403);
         }
 

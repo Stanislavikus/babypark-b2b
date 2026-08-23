@@ -26,12 +26,17 @@ trait RequiresFreshWorkspaceAdobeProductsExportExecutionAccess
 
         $workspace = $this->resolveAdobeProductsExportExecutionWorkspace();
 
-        $canPreview = app(AdobeProductsExportPreviewAuthorizationService::class)
-            ->canAccess($user, $workspace);
-        $canLive = app(AdobeProductsExportLiveAuthorizationService::class)
-            ->canAccessLive($user, $workspace);
+        $previewAuth = app(AdobeProductsExportPreviewAuthorizationService::class);
+        $liveAuth = app(AdobeProductsExportLiveAuthorizationService::class);
 
-        if (! $canPreview && ! $canLive) {
+        // A user with manage_sync_configurations can manage setup. The page
+        // itself is the management surface; the dual-permission enforcement
+        // for the actual review/confirm lives in the orchestrator.
+        $canPreview = $previewAuth->canAccess($user, $workspace);
+        $canLive = $liveAuth->canAccessLive($user, $workspace);
+        $canManageSetup = $previewAuth->canManageSetup($user, $workspace);
+
+        if (! $canPreview && ! $canLive && ! $canManageSetup) {
             abort(403);
         }
     }
