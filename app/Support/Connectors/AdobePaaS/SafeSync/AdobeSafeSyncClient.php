@@ -4,6 +4,7 @@ namespace App\Support\Connectors\AdobePaaS\SafeSync;
 
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductAppliedStateKnowledge;
 use App\Support\Connectors\OAuth1\OAuth1SigningContext;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorHttpTransport;
@@ -67,6 +68,35 @@ final class AdobeSafeSyncClient
         return $this->parseVerifiedProduct($result, $logicalEntityId, $expectedSku);
     }
 
+    public function writeSimpleProduct(
+        string $workspaceId,
+        string $connectorAccountId,
+        int $logicalEntityId,
+        AdobeSafeSyncSimpleProductWriteRequest $payload,
+    ): AdobeSafeSyncSimpleProductWriteResult {
+        $context = $this->contextFactory->create($workspaceId, $connectorAccountId);
+
+        return $this->writeSimpleProductWithContext($context, $logicalEntityId, $payload);
+    }
+
+    public function writeSimpleProductWithContext(
+        #[\SensitiveParameter] AdobePaaSRequestContext $context,
+        int $logicalEntityId,
+        AdobeSafeSyncSimpleProductWriteRequest $payload,
+    ): AdobeSafeSyncSimpleProductWriteResult {
+        $result = $this->send(
+            $this->requestFactory->buildWriteSimpleProduct(
+                $context,
+                $logicalEntityId,
+                $payload,
+                $this->newSigningContext(),
+            ),
+            AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_MAX_RESPONSE_BYTES,
+        );
+
+        return $this->parseSimpleProductWriteResult($result, $logicalEntityId, $payload->expectedSku);
+    }
+
     private function send(RequestInterface $request, int $maxResponseBodyBytes): ConnectorHttpResult
     {
         try {
@@ -128,6 +158,50 @@ final class AdobeSafeSyncClient
         return new AdobeSafeSyncVerifiedProduct($logicalEntityId, $sku, $typeId, $name);
     }
 
+    private function parseSimpleProductWriteResult(
+        ConnectorHttpResult $result,
+        int $expectedLogicalEntityId,
+        string $expectedSku,
+    ): AdobeSafeSyncSimpleProductWriteResult {
+        $payload = $this->decodeJsonObject($result, expectedStatusCode: 200);
+
+        $logicalEntityId = $this->requireInt($payload, 'logical_entity_id');
+        $sku = $this->requireString($payload, 'sku');
+        $reasonCode = $this->requireString($payload, 'reason_code');
+        $appliedState = $this->requireString($payload, 'applied_state');
+        $postconditionVerified = $this->requireBool($payload, 'postcondition_verified');
+        $consequentialWriteAttempts = $this->requireInt($payload, 'consequential_write_attempts');
+        $warningCodes = $this->requireStringList($payload, 'warning_codes');
+
+        if ($logicalEntityId !== $expectedLogicalEntityId) {
+            throw new AdobeSafeSyncClientException('Safe Sync logical entity identity mismatch.');
+        }
+
+        if ($sku !== $expectedSku) {
+            throw new AdobeSafeSyncClientException('Safe Sync SKU mismatch.');
+        }
+
+        if (! in_array($consequentialWriteAttempts, [0, 1], true)) {
+            throw new AdobeSafeSyncClientException('Safe Sync response field `consequential_write_attempts` is invalid.');
+        }
+
+        try {
+            $knowledge = AdobeProductAppliedStateKnowledge::from($appliedState);
+        } catch (\ValueError $exception) {
+            throw new AdobeSafeSyncClientException('Safe Sync response field `applied_state` is invalid.', 0, $exception);
+        }
+
+        return new AdobeSafeSyncSimpleProductWriteResult(
+            $knowledge,
+            $reasonCode,
+            $logicalEntityId,
+            $sku,
+            $postconditionVerified,
+            $consequentialWriteAttempts,
+            $warningCodes,
+        );
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -178,6 +252,18 @@ final class AdobeSafeSyncClient
 
     /**
      * @param  array<string, mixed>  $payload
+     */
+    private function requireBool(array $payload, string $key): bool
+    {
+        if (! array_key_exists($key, $payload) || ! is_bool($payload[$key])) {
+            throw new AdobeSafeSyncClientException(sprintf('Safe Sync response field `%s` is invalid.', $key));
+        }
+
+        return $payload[$key];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
      * @return list<string>
      */
     private function requireStringList(array $payload, string $key): array
@@ -206,6 +292,7 @@ final class AdobeSafeSyncClient
     {
         $allowed = [
             AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY,
+            AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_FAMILY,
         ];
 
         foreach ($supportedOperationFamilies as $family) {

@@ -6,7 +6,6 @@ use App\Support\Connectors\Transport\ConnectorDestinationKind;
 use App\Support\Connectors\Transport\ConnectorTransportDeadline;
 use App\Support\Connectors\Transport\ConnectorTransportException;
 use App\Support\Connectors\Transport\Dns\DnsResolutionResult;
-use App\Support\Connectors\Transport\Dns\DnsResolver;
 use App\Support\Connectors\Transport\Internal\ConnectorDestinationResolverImpl;
 use App\Support\Connectors\Transport\TransportFailureReason;
 use GuzzleHttp\Psr7\Uri;
@@ -100,24 +99,5 @@ class ConnectorDestinationResolverTest extends TestCase
         $clock = new FakeMonotonicClock;
 
         return new ConnectorTransportDeadline($clock->nowNanoseconds() + 5_000_000_000, $clock);
-    }
-}
-
-/**
- * @implements array<string, DnsResolutionResult>
- */
-final class FakeDnsResolver implements DnsResolver
-{
-    /**
-     * @param  array<string, DnsResolutionResult>  $responses
-     */
-    public function __construct(private array $responses) {}
-
-    public function resolve(string $absoluteHostname, ConnectorTransportDeadline $deadline): DnsResolutionResult
-    {
-        $normalized = strtolower(rtrim($absoluteHostname, '.'));
-
-        return $this->responses[$normalized]
-            ?? DnsResolutionResult::dnsError('lookup_failed');
     }
 }

@@ -1,6 +1,6 @@
 {
     "name": "b2b-platform/magento-safe-sync",
-    "description": "First-party Magento Safe Sync read foundation for entity-bound product verification.",
+    "description": "First-party Magento Safe Sync foundation for entity-bound product verification and isolated simple product writes.",
     "type": "magento2-module",
     "license": [
         "proprietary"

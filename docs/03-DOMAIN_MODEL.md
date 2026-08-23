@@ -6680,7 +6680,7 @@ permission, stale-active-run lease/recovery, Live outcome vocabulary,
 `ExternalRecordLink` persistence, `SyncLiveAdmissionService`, and fail-closed Live
 job shell. Adobe Products / Export / Live support remains **false**.
 
-**Stage 3B–3E — Live Engine implementation slices** — **3B and 3C Done (internal); 3D-1 E14 media runtime Done (internal); normative Stage 3D Done (internal); Stage 3E docs contract Done — entity-bound Safe Sync runtime contract frozen; replacement runtime + real target validation NOT YET EXECUTED**
+**Stage 3B–3E — Live Engine implementation slices** — **3B and 3C Done (internal); 3D-1 E14 media runtime Done (internal); normative Stage 3D Done (internal); Stage 3E docs contract Done — entity-bound Safe Sync runtime contract frozen; Safe Sync read + isolated simple WRITE foundation implemented internally; runtime consumption + real target validation NOT YET EXECUTED**
 
 **Stage 3E Stop-and-Amend (docs correction — Magento primary-source research + Security/Concurrency arbitration):** the previous [Resolved] stock no-link Product create safety and create-provenance ownership model are **invalidated**. See **Stage 3E Stop-and-Amend — Magento ownership and entity-bound Safe Sync runtime contract** below. PR #160 runtime from the discarded Part 1 approach is **reverted**; final normative contract is frozen in this docs-only PR; replacement runtime follows separately.
 
@@ -6692,7 +6692,7 @@ After Stage 3-0 merges, implement in order:
 | **3B — Adobe Simple Live** | Shared Adobe semantic planning boundary; child/simple external identity; GET/POST/PUT Product transport; `ExternalRecordLink` read/write; create/update/reconciliation; simple Product Live execution; applied-state classification | remains **false** | **Done (internal)** — **historical no-link create assumption invalidated by Stage 3E Stop-and-Amend**; replacement link-first runtime pending |
 | **3C — Adobe Configurable Live** | Connector-owned deterministic parent SKU; child/parent/options/link command compilation; partial/ambiguous outcomes; inactive linked-variant lifecycle; configurable recovery/reconciliation | remains **false** | **Done (internal)** — existing-parent link identity clarified by Stage 3E Stop-and-Amend; cfg-* generator applies only to future proven atomic create |
 | **3D — Adobe Media + Merchant First Live** | Required E14 primary/gallery image export; merchant Live admission **UI/read model** on `ManageAdobeProductsExportPreview` (non-actionable for consequential execution while Live support is **false**; must not bypass `ConnectorSyncOperationSupport`); queued/running/result presentation; final safe merchant copy | remains **false** | **Done (internal)** — 3D-1 E14 media runtime + 3D-2 merchant first-Live UI/read model |
-| **3E — Real Adobe Validation + Truth Flip** | Merchant link-first runtime; ERL provenance/discriminator persistence; informed merchant confirmation; atomic configurable-family confirmation; first-party Magento entity-bound Safe Sync component; disposable validation harness; target-version proof; only then flip `Adobe Products / Export / Live = true` | flip only after successful evidence | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen; **Stage 3E-R2a** ERL provenance foundation is implemented; **Stage 3E-R2b-1** merchant-confirmed ENTITY TRUST backend is implemented; **Stage 3E-R2b-2** merchant per-item informed review/confirm UI is implemented with an opaque server-side review-flow store keeping `reviewToken` out of browser state; browser state remains presentation/input only and never identity authority; consequential WRITE bridge + real target validation remain **pending**; support remains **false** |
+| **3E — Real Adobe Validation + Truth Flip** | Merchant link-first runtime; ERL provenance/discriminator persistence; informed merchant confirmation; atomic configurable-family confirmation; first-party Magento entity-bound Safe Sync component; disposable validation harness; target-version proof; only then flip `Adobe Products / Export / Live = true` | flip only after successful evidence | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen; **Stage 3E-R1** internal read foundation is implemented; **isolated entity-bound simple Product WRITE foundation is implemented internally** and not consumed by Live runtime; **Stage 3E-R2a** ERL provenance foundation is implemented; **Stage 3E-R2b-1** merchant-confirmed ENTITY TRUST backend is implemented; **Stage 3E-R2b-2** merchant per-item informed review/confirm UI is implemented with an opaque server-side review-flow store keeping `reviewToken` out of browser state; browser state remains presentation/input only and never identity authority; configurable/media/write-consumption, real target validation, and support flip remain **pending**; support remains **false** |
 
 Production Live remains **NOT IMPLEMENTED** until Stage 3E runtime lands and
 completes real-target validation with explicit human authorization. No deployment
@@ -6702,8 +6702,12 @@ without separate explicit approval.
 
 [Resolved — Stage 3E docs contract] This section freezes the final entity-bound
 Safe Sync runtime contract after Magento primary-source research and
-Security/Concurrency arbitration. **Docs-only in this PR.** Replacement runtime follows in a separate follow-on PR. No Magento module runtime, migration, real
-Adobe write, or Live support flip in this PR.
+Security/Concurrency arbitration. The original contract landed as a
+**docs-only** slice. Current repository status now includes the standalone
+Magento Safe Sync read foundation and an isolated entity-bound simple Product
+WRITE primitive that is not consumed by Live runtime. Live support remains
+**false**; no real-target validation harness execution or deployment has
+occurred.
 
 #### First-party Magento Safe Sync component (frozen)
 
@@ -7114,7 +7118,7 @@ required Stage 3E evidence exists:
 | 3C | **Done (internal)** — existing-parent link identity clarified |
 | 3D | **Done (internal)** |
 | 3E docs contract | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen |
-| 3E runtime + validation | **Pending** — replacement runtime not shipped; real target validation **NOT YET EXECUTED** |
+| 3E runtime + validation | **Pending** — isolated simple Product WRITE foundation shipped internally; runtime consumption + real target validation **NOT YET EXECUTED** |
 | Adobe Products/Export/Live | **FALSE** |
 | Merchant consequential Live | **NOT EXPOSED** |
 | Deployment | **NOT PERFORMED** |

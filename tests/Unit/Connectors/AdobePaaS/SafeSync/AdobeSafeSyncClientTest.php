@@ -8,6 +8,8 @@ use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClient;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClientException;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncContract;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncRequestFactory;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncSimpleProductWriteCustomAttribute;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncSimpleProductWriteRequest;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
 use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
@@ -53,6 +55,56 @@ class AdobeSafeSyncClientTest extends TestCase
         );
         $this->assertStringContainsString('oauth_consumer_key="ck_test"', $transport->captured->request->getHeaderLine('Authorization'));
         $this->assertSame(AdobeSafeSyncContract::HANDSHAKE_MAX_RESPONSE_BYTES, $transport->captured->limits->maxResponseBodyBytes);
+    }
+
+    #[Test]
+    public function handshake_accepts_new_optional_simple_write_family(): void
+    {
+        $client = $this->clientWithTransport(new class implements ConnectorHttpTransport
+        {
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'contract_version' => AdobeSafeSyncContract::CONTRACT_VERSION,
+                    'module_version' => '0.2.0',
+                    'supported_operation_families' => [
+                        AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY,
+                        AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_FAMILY,
+                    ],
+                ], JSON_THROW_ON_ERROR));
+            }
+        });
+
+        $handshake = $client->handshakeWithContext($this->context());
+
+        $this->assertSame([
+            AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY,
+            AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_FAMILY,
+        ], $handshake->supportedOperationFamilies);
+    }
+
+    #[Test]
+    public function unknown_operation_family_still_fails_closed(): void
+    {
+        $client = $this->clientWithTransport(new class implements ConnectorHttpTransport
+        {
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'contract_version' => AdobeSafeSyncContract::CONTRACT_VERSION,
+                    'module_version' => '0.2.0',
+                    'supported_operation_families' => [
+                        AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY,
+                        'unexpected_family',
+                    ],
+                ], JSON_THROW_ON_ERROR));
+            }
+        });
+
+        $this->expectException(AdobeSafeSyncClientException::class);
+        $this->expectExceptionMessage('Safe Sync advertised an unknown operation family.');
+
+        $client->handshakeWithContext($this->context());
     }
 
     #[Test]
@@ -301,11 +353,87 @@ class AdobeSafeSyncClientTest extends TestCase
     }
 
     #[Test]
+    public function simple_product_write_uses_safe_sync_put_with_bounded_response_and_existing_applied_state_vocabulary(): void
+    {
+        $transport = new class implements ConnectorHttpTransport
+        {
+            public ?ConnectorOutboundRequest $captured = null;
+
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                $this->captured = $request;
+
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'applied_state' => 'known_not_applied',
+                    'reason_code' => 'safe_sync_entity_missing',
+                    'logical_entity_id' => 77,
+                    'sku' => 'SKU-77',
+                    'postcondition_verified' => false,
+                    'consequential_write_attempts' => 0,
+                    'warning_codes' => [],
+                ], JSON_THROW_ON_ERROR));
+            }
+        };
+
+        $client = $this->clientWithTransport($transport);
+        $result = $client->writeSimpleProductWithContext(
+            $this->context(),
+            77,
+            new AdobeSafeSyncSimpleProductWriteRequest(
+                expectedSku: 'SKU-77',
+                name: 'Updated Product',
+                customAttributes: [
+                    new AdobeSafeSyncSimpleProductWriteCustomAttribute('color', 'red'),
+                ],
+            ),
+        );
+
+        $this->assertSame('known_not_applied', $result->appliedStateKnowledge->value);
+        $this->assertNotNull($transport->captured);
+        $this->assertSame('PUT', $transport->captured->request->getMethod());
+        $this->assertSame(
+            'https://shop.example.com/rest/default/V1/safe-sync/products/77',
+            (string) $transport->captured->request->getUri(),
+        );
+        $this->assertSame(AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_MAX_RESPONSE_BYTES, $transport->captured->limits->maxResponseBodyBytes);
+    }
+
+    #[Test]
+    public function malformed_simple_product_write_response_fails_closed(): void
+    {
+        $client = $this->clientWithTransport(new class implements ConnectorHttpTransport
+        {
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'applied_state' => 'known_not_applied',
+                    'reason_code' => 'safe_sync_entity_missing',
+                    'logical_entity_id' => 77,
+                    'sku' => 'SKU-77',
+                    'postcondition_verified' => false,
+                    'consequential_write_attempts' => 2,
+                    'warning_codes' => [],
+                ], JSON_THROW_ON_ERROR));
+            }
+        });
+
+        $this->expectException(AdobeSafeSyncClientException::class);
+        $this->expectExceptionMessage('Safe Sync response field `consequential_write_attempts` is invalid.');
+
+        $client->writeSimpleProductWithContext(
+            $this->context(),
+            77,
+            new AdobeSafeSyncSimpleProductWriteRequest(expectedSku: 'SKU-77'),
+        );
+    }
+
+    #[Test]
     public function public_context_taking_methods_are_marked_sensitive(): void
     {
         $methods = [
             [AdobeSafeSyncClient::class, 'handshakeWithContext', 0],
             [AdobeSafeSyncClient::class, 'readProductWithContext', 0],
+            [AdobeSafeSyncClient::class, 'writeSimpleProductWithContext', 0],
         ];
 
         foreach ($methods as [$class, $method, $index]) {
