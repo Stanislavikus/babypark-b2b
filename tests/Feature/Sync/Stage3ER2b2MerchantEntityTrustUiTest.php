@@ -91,6 +91,69 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
     }
 
     #[Test]
+    public function entity_trust_forms_carry_novalidate_attribute(): void
+    {
+        // docs/05-AI_WORKING_AGREEMENT.md: every panel form must keep
+        // `novalidate` on the form element so Filament owns validation
+        // messaging instead of the browser.
+
+        // 1. Review form (simple, reviewable).
+        [$reviewAccount, $reviewProduct] = $this->seedSimpleReadyFixture('UI-NOVALIDATE-REVIEW-SKU', 5020);
+        $reviewActor = $this->createEntityTrustActor($reviewAccount->workspace);
+
+        $reviewHtml = (string) Livewire::actingAs($reviewActor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $reviewAccount->id])
+            ->assertSee('data-testid="sync-live-entity-trust-review-form"', false)
+            ->html();
+
+        $this->assertStringContainsString(
+            'novalidate',
+            $this->formTagContaining($reviewHtml, 'sync-live-entity-trust-review-form'),
+            'Entity Trust review form must carry the novalidate attribute.',
+        );
+
+        // 2. Configurable relink form.
+        [$relinkAccount, $relinkProduct, $relinkVariants, $relinkParentSku] = $this->seedConfigurableRelinkRequiredFixture();
+        $relinkActor = $this->createEntityTrustActor($relinkAccount->workspace);
+
+        $relinkHtml = (string) Livewire::actingAs($relinkActor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $relinkAccount->id])
+            ->assertSee('data-testid="sync-live-entity-trust-relink-form"', false)
+            ->html();
+
+        $this->assertStringContainsString(
+            'novalidate',
+            $this->formTagContaining($relinkHtml, 'sync-live-entity-trust-relink-form'),
+            'Configurable relink form must carry the novalidate attribute.',
+        );
+    }
+
+    private function formTagContaining(string $html, string $dataTestId): string
+    {
+        $marker = 'data-testid="'.$dataTestId.'"';
+        $markerPos = strpos($html, $marker);
+
+        if ($markerPos === false) {
+            return '';
+        }
+
+        // Walk back to the enclosing <form ...> tag.
+        $openPos = strrpos(substr($html, 0, $markerPos), '<form');
+
+        if ($openPos === false) {
+            return '';
+        }
+
+        $closePos = strpos($html, '>', $openPos);
+
+        if ($closePos === false) {
+            return '';
+        }
+
+        return substr($html, $openPos, $closePos - $openPos + 1);
+    }
+
+    #[Test]
     public function request_review_returns_safe_outcome_with_opaque_flow_id_and_no_token_leak(): void
     {
         [$account, $product] = $this->seedSimpleReadyFixture('UI-REVIEW-SKU', 5100);

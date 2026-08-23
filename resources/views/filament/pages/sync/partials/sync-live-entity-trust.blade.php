@@ -301,6 +301,7 @@
                 <div class="flex flex-col gap-2">
                   @if ($rowAvailableAction === 'review' && $entityTrustCanReviewOrConfirm)
                     <form
+                      novalidate
                       class="flex flex-col gap-1"
                       data-testid="sync-live-entity-trust-review-form"
                       data-family="{{ $rowIsConfigurable ? 'configurable' : 'simple' }}"
@@ -341,6 +342,7 @@
                   @elseif ($rowAvailableAction === 'relink' && $entityTrustCanReviewOrConfirm)
                     @if ($rowIsConfigurable)
                       <form
+                        novalidate
                         class="flex flex-col gap-1"
                         data-testid="sync-live-entity-trust-relink-form"
                         data-family="configurable"
