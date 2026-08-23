@@ -6,6 +6,7 @@ use App\Models\ConnectorAccount;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceAuthorization;
+use App\Support\Connectors\Exceptions\ConnectorProfileNotFoundException;
 use App\Support\Sync\AdobeProductExportSetup\AdobeProductExportSetupTargetEligibility;
 use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -70,6 +71,28 @@ final class AdobeProductsExportPreviewAuthorizationService
         }
 
         return $this->targetEligibility->isPreviewEligible($projection);
+    }
+
+    public function isEligibleSetupTarget(
+        User $actor,
+        Workspace $workspace,
+        string $connectorAccountId,
+    ): bool {
+        if (! $this->canManageSetup($actor, $workspace)) {
+            return false;
+        }
+
+        $projection = $this->projectionQuery->resolveEligibility($workspace->id, $connectorAccountId);
+
+        if ($projection === null) {
+            return false;
+        }
+
+        try {
+            return $this->targetEligibility->isEligible($projection);
+        } catch (ConnectorProfileNotFoundException) {
+            return false;
+        }
     }
 
     public function resolveConnectorAccount(

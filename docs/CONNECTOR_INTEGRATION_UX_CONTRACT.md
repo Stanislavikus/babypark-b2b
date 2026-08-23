@@ -10,7 +10,7 @@
 
 **Non-goal:** This contract does not itself authorize arbitrary backend work and is not the workspace-permission implementation specification beyond the approved domain authorization contract in `docs/03-DOMAIN_MODEL.md` → **Workspace access model and authorization (Resolved — Task 4C-1c-2a)** and **Preview-first Sync Execution Foundation Contract (Resolved — Task 4C-2a)** / **Merchant Preview Authorization & Remediation Contract (Resolved — Stage 2-0)**. Some underlying mechanisms are already shipped (for example `ConnectorCapability`, Discovery runtime, snapshot persistence, workspace isolation guards, Layer-B Mapping UI on `ManageSyncFieldMappings`, Mapping → Available Fields supporting reference with workspace-scoped Mapping authorization, Stage 1 Preview Engine with `run_sync_preview` and persisted zero-mutation Preview runs, Stage 2A-1 `manage_sync_configurations` runtime permission and Adobe Products Export Layer-B setup, Stage 2A-2 merchant Preview work surface and remediation presentation, **Stage 2B Option Mapping remediation UI on `ManageSyncFieldOptionMappings`**). Missing backend/runtime/security prerequisites require their own scoped tasks. Specifically, Task **4C-1c-2b** Layer-B Mapping UI and its Mapping-side Available Fields supporting path are shipped (PR #139, merge `9a4be2f`). Task **4C-2a** freezes Preview execution architecture (docs only); **`run_sync_preview` runtime and `SyncRun` Preview execution are implemented in Stage 1** (PR #145). **Stage 2-0** freezes merchant Preview authorization/remediation contract (docs only). **Stage 2A** (2A-1 + 2A-2) is **shipped** — `manage_sync_configurations`, non-mutating existence lookup, Adobe Products Export setup, merchant Preview UI, and contextual remediation presentation. **Stage 2B is shipped** — Option Mapping remediation on `ManageSyncFieldOptionMappings` using existing `view_sync_mappings` / `manage_sync_mappings` permissions only. Mechanisms that explicitly remain future include scheduling, issue aggregation/bulk resolution, sync-run history, ownership persistence/enforcement, broader Layer-C platform-support identity/gating, and **Stage 3B–3E** Live Engine implementation slices (**Stage 3A** Live Safety foundation is **shipped** — `run_sync_live`, stale active-run recovery, `ExternalRecordLink` persistence, Live admission/shell; **Stage 3-0** Live Safety contract is **Done (docs)**). Do **not** claim that historical pre-B-2 fixed `User.role` authorization satisfies this UX contract — that transitional behavior is historical evidence only under **GAP-026** / PR #102.
 
-**Existing-vs-future boundary:** This contract defines the *required UX* for synchronization, preview/dry-run, scheduling, mapping, issues, history, and bulk resolution *when those surfaces/concerns are implemented*. Normative sync domain shape is now settled in `docs/03-DOMAIN_MODEL.md` (Sync Domain Rebaseline: `SyncConfiguration` → `FieldMapping` + `SyncRun` → `SyncRunItem`, account-scoped `ExternalRecordLink`). **Preview computation/runtime is shipped** — Stage 1 Preview Engine delivers persisted zero-mutation Preview (`run_sync_preview`, admission, Preview `SyncRun` persistence). **Stage 2A-2 merchant Preview work surface and remediation presentation are shipped**; **Stage 2A is Done**. **Stage 2B Option Mapping remediation UI is shipped** on `ManageSyncFieldOptionMappings` (existing `view_sync_mappings` / `manage_sync_mappings` permissions only; authoritative persisted connector snapshot metadata on read with zero HTTP; `confirm`/`replace` retain connector external validation outside locked DB transaction; Preview findings remain historical after remediation; narrow stale/orphan option-mapping cleanup does **not** fix Product/Variant select value integrity). **Stage 3A Live Safety foundation is shipped** — `run_sync_live` runtime permission, stale active-run recovery, `ExternalRecordLink` persistence foundation, `SyncLiveAdmissionService`, and fail-closed Live job shell (no Adobe write, no merchant consequential Live UI). Merchant consequential Live execution (**Stage 3B–3E**; **Stage 3-0** docs contract **Done**), scheduling beyond Discovery, issue aggregation, bulk resolution, sync-run history, ownership persistence/enforcement, and broader merchant sync surfaces remain future implementation gaps requiring their own scoped passes before the corresponding UI ships. This contract does **not** assert that every entity or runtime mechanism exists beyond what is confirmed elsewhere in this document — but a reader must **not** conclude that dry-run/preview computation is still absent. Those platform-owned sync UX/orchestration concerns do **not** become `ConnectorCapability` cases merely because they are optional or future.
+**Existing-vs-future boundary:** This contract defines the *required UX* for synchronization, preview/dry-run, scheduling, mapping, issues, history, and bulk resolution *when those surfaces/concerns are implemented*. Normative sync domain shape is now settled in `docs/03-DOMAIN_MODEL.md` (Sync Domain Rebaseline: `SyncConfiguration` → `FieldMapping` + `SyncRun` → `SyncRunItem`, account-scoped `ExternalRecordLink`). **Preview computation/runtime is shipped** — Stage 1 Preview Engine delivers persisted zero-mutation Preview (`run_sync_preview`, admission, Preview `SyncRun` persistence). **Stage 2A-2 merchant Preview work surface and remediation presentation are shipped**; **Stage 2A is Done**. **Stage 2B Option Mapping remediation UI is shipped** on `ManageSyncFieldOptionMappings` (existing `view_sync_mappings` / `manage_sync_mappings` permissions only; authoritative persisted connector snapshot metadata on read with zero HTTP; `confirm`/`replace` retain connector external validation outside locked DB transaction; Preview findings remain historical after remediation; narrow stale/orphan option-mapping cleanup does **not** fix Product/Variant select value integrity). **Stage 3A Live Safety foundation is shipped** — `run_sync_live` runtime permission, stale active-run recovery, `ExternalRecordLink` persistence foundation, `SyncLiveAdmissionService`, and fail-closed Live job shell (no Adobe write, no merchant consequential Live UI). Merchant consequential Live execution (**Stage 3B–3E**; **Stage 3-0** docs contract **Done**) — including **Stage 3E-R2a per-item ownership/ERL-provenance rewrite and Stage 3E-R2b-1 backend link-trust services (`AdobeProductEntityTrustReviewService`, `AdobeProductEntityTrustConfirmationService`, `AdobeProductEntityTrustLinkReadinessProjector`, `AdobeProductEntityTrustAuthorizationService` dual-permission enforcement, `EntityTrustReviewEnvelopeService` 15-minute TTL envelopes, and target-snapshot binding via `ConnectorAccountSettingsService`)** and **Stage 3E-R2b-2 merchant-confirmed Filament/Livewire confirmation UI on `ManageAdobeProductsExportPreview`** (per-item readiness/remediation, opaque server-side review-flow store, exhaustive 19-case `EntityTrustFailureReason` presentation, and dual-permission Confirm/Review/Renew actions over the Stage 2-0 contract) — are **shipped**, but truthful flip of Adobe Products/Export/Live advertised support still requires: (a) the **first-party Magento entity-bound Safe Sync runtime component** for every advertised V1 Live mutation category, and (b) **real-target certification**. Until both land, merchant consequential Live action remains non-actionable and the **Magento** tile keeps the **false** truth flag for Adobe Products/Export/Live. Scheduling beyond Discovery, issue aggregation, bulk resolution, sync-run history, ownership persistence/enforcement, and broader merchant sync surfaces remain future implementation gaps requiring their own scoped passes before the corresponding UI ships. This contract does **not** assert that every entity or runtime mechanism exists beyond what is confirmed elsewhere in this document — but a reader must **not** conclude that dry-run/preview computation is still absent. Those platform-owned sync UX/orchestration concerns do **not** become `ConnectorCapability` cases merely because they are optional or future.
 
 ---
 
@@ -470,13 +470,60 @@ Normative detail: `docs/03-DOMAIN_MODEL.md` → **Stage 3E Stop-and-Amend — Ma
 ownership and entity-bound Safe Sync runtime contract**. Summary-level UI rules:
 `docs/06-UI_DESIGN_SYSTEM.md` → Per-item Live linking.
 
-**Implementation status:** Link-first runtime, ERL provenance/discriminator
-persistence, informed merchant confirmation, atomic configurable-family
-confirmation, and first-party Magento entity-bound Safe Sync component are **not**
-shipped (docs contract frozen; PR #160 runtime reverted). Adobe
-Products/Export/Live advertised support remains **false**. Merchant consequential
-Live action remains non-actionable until Stage 3E runtime + real-target validation
-and truthful support flip.
+**Implementation status:** Per-item Live linking is split across two shipped
+slices plus remaining truth-flip prerequisites.
+
+- **Stage 3E-R2a (shipped)** — per-item ownership/ERL-provenance rewrite
+  (foundation prerequisite for per-item link lifecycle and ownership
+  assertions).
+- **Stage 3E-R2b-1 (shipped — backend only)** —
+  `AdobeProductEntityTrustReviewService`,
+  `AdobeProductEntityTrustConfirmationService`,
+  `AdobeProductEntityTrustLinkReadinessProjector`, and
+  `AdobeProductEntityTrustAuthorizationService` enforce the dual-permission
+  contract (`manage_sync_configurations` **and** `run_sync_live`) with fresh
+  checks before remote HTTP and again under Workspace row lock before ERL
+  persistence. Review envelopes authenticate `explicit_relink` intent,
+  per-subject Magento `logical_entity_id` + controlled-field fingerprint, and
+  the configured Adobe target snapshot (`base_url + store_code`).
+  `ConnectorAccountSettingsService` rejects target-defining account changes
+  while trusted merchant-confirmed ERLs exist. Merchant Filament/Livewire
+  confirmation UI is delivered as **Stage 3E-R2b-2** (below).
+- **Stage 3E-R2b-2 (shipped — merchant confirmation UI)** — per-item
+  link-trust presentation and action surface on
+  `ManageAdobeProductsExportPreview` (Live worklist / item context). The
+  surface renders the `AdobeProductEntityTrustLinkReadinessProjector` output
+  (`initial_link_required` / `reconfirmation_required` /
+  `relink_review_required` / `already_confirmed` / `no_action`) and exposes
+  the dual-permission `Confirm link`, `Re-review`, and explicit `Renew link`
+  (relink) actions over the Stage 2-0 contract. All 19
+  `EntityTrustFailureReason` cases are exhaustively mapped to merchant-safe
+  copy via `EntityTrustFailureReasonPresenter`. The `reviewToken` is **never**
+  a Livewire public property: review state lives in a server-side
+  `EntityTrustReviewFlowStore` keyed by an opaque short-lived
+  `EntityTrustReviewFlowId` (10-minute TTL, single-consume on Confirm).
+  Hydrated working-set rows, family flags, and parent-SKU fields are
+  presentation/merchant-input only; product eligibility, readiness, family
+  routing, and confirm binding remain server-derived or flow-bound authority.
+  `existingParentSkuHint` merchant input is wired through
+  `EntityTrustConfirmationMode::ConfigurableExistingParent`. Comprehensive
+  R2b-2 feature tests cover authorization, readiness, review-flow security,
+  confirm, stale-flow fail-closed, conflict handling, vocabulary, and
+  configurable-family support.
+
+Truthful Adobe Products/Export/Live advertised support remains **false**.
+Both R2b slices ship the *necessary* link-trust mechanism, but they are
+**not sufficient** for the exemplary consequential Live truth flip. The flip
+still requires:
+
+- the **first-party Magento entity-bound Safe Sync runtime component** for
+  every advertised V1 Live mutation category (Stage 3E runtime blocker);
+- **real-target certification** against an Adobe Commerce instance proving
+  the full per-item Live path end-to-end.
+
+Until both prerequisites land, merchant consequential Live action remains
+non-actionable and the **Magento** tile keeps the **false** truth flag for
+Adobe Products/Export/Live.
 
 ### Presentation boundary
 
@@ -513,7 +560,21 @@ Workspace:
 Neither permission alone is sufficient. Do **not** create a new permission in
 Stage 3E. Revocation of either before confirmation must fail closed.
 
-**Stage 3E-R2b-1 (implemented — backend only):** `AdobeProductEntityTrustReviewService` and `AdobeProductEntityTrustConfirmationService` enforce this dual-authority contract with fresh checks before remote HTTP and again under Workspace row lock before ERL persistence. Review envelopes authenticate `explicit_relink` intent, per-subject Magento `logical_entity_id` + controlled-field fingerprint, and the configured Adobe target snapshot (`base_url + store_code`). `ConnectorAccountSettingsService` rejects target-defining account changes while trusted merchant-confirmed ERLs exist. `AdobeProductEntityTrustLinkReadinessProjector` exposes current/prospective link readiness without historical `SyncRunItem` rewriting. Merchant Filament/Livewire confirmation UI remains **R2b-2** follow-on.
+**Stage 3E-R2b-1 (shipped — backend) and Stage 3E-R2b-2 (shipped — merchant
+UI):** `AdobeProductEntityTrustReviewService` and
+`AdobeProductEntityTrustConfirmationService` enforce this dual-authority
+contract with fresh checks before remote HTTP and again under Workspace row
+lock before ERL persistence. Review envelopes authenticate `explicit_relink`
+intent, per-subject Magento `logical_entity_id` + controlled-field
+fingerprint, and the configured Adobe target snapshot
+(`base_url + store_code`). `ConnectorAccountSettingsService` rejects
+target-defining account changes while trusted merchant-confirmed ERLs exist.
+`AdobeProductEntityTrustLinkReadinessProjector` exposes current/prospective
+link readiness without historical `SyncRunItem` rewriting. The
+`ManageAdobeProductsExportPreview` Live area renders that readiness and
+exposes dual-permission `Confirm link` / `Re-review` / `Renew link` actions
+backed by a server-side opaque review-flow store (see
+`§18 Implementation status` above).
 
 ### Informed merchant confirmation
 

@@ -72,7 +72,7 @@ final class EntityTrustException extends RuntimeException
 
     public static function invalidReviewEvidence(): self
     {
-        return new self(EntityTrustFailureReason::ConfirmationExpiredOrInvalid);
+        return new self(EntityTrustFailureReason::InvalidReviewEvidence);
     }
 
     public static function differentEntityWithoutRelink(): self
