@@ -1272,6 +1272,7 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertSame([], $fixture['defaultConnection']->fetchHistory);
         $this->assertSame([], $fixture['defaultConnection']->queries);
         $this->assertSame([], $fixture['defaultConnection']->txEvents);
+        $this->assertSame(0, $fixture['connection']->getTransactionLevel());
     }
 
     #[Test]
@@ -1290,7 +1291,7 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
     #[Test]
     public function commit_uncertainty_returns_unknown_or_ambiguous_without_retry(): void
     {
-        $fixture = $this->simpleWriteFixture();
+        $fixture = $this->simpleWriteFixture(galeraEnabled: true);
         $fixture['connection']->commitFailure = new \RuntimeException('commit uncertain');
 
         $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', name: 'Updated Name'));
@@ -1299,6 +1300,13 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertSame('safe_sync_commit_uncertain', $result->getReasonCode());
         $this->assertSame(1, $result->getConsequentialWriteAttempts());
         $this->assertSame(1, $fixture['repository']->saveCalls);
+        $this->assertSame(['begin', 'begin', 'commit', 'commit'], $fixture['connection']->txEvents);
+        $this->assertSame(1, $fixture['connection']->getTransactionLevel());
+        $this->assertSame(0, $fixture['callbackHandler']->processCalls);
+        $this->assertSame(0, $fixture['callbackHandler']->clearCalls);
+        $this->assertSame(1, $fixture['connection']->closeCalls);
+        $this->assertSame(0, $fixture['defaultConnection']->closeCalls);
+        $this->assertSame(['SET SESSION wsrep_sync_wait = 1'], $fixture['connection']->queries);
     }
 
     #[Test]
@@ -1318,6 +1326,27 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertSame(1, $fixture['connection']->closeCalls);
         $this->assertSame(0, $fixture['defaultConnection']->closeCalls);
         $this->assertSame(['begin', 'begin', 'commit'], $fixture['connection']->txEvents);
+    }
+
+    #[Test]
+    public function galera_begin_failure_is_known_not_applied_with_zero_writes_and_exact_entity_connection_quarantine(): void
+    {
+        $fixture = $this->simpleWriteFixture(galeraEnabled: true);
+        $fixture['connection']->beginFailure = new \RuntimeException('begin failed');
+
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', name: 'Updated Name'));
+
+        $this->assertSame('known_not_applied', $result->getAppliedState());
+        $this->assertSame('safe_sync_begin_failed', $result->getReasonCode());
+        $this->assertSame(0, $result->getConsequentialWriteAttempts());
+        $this->assertSame(0, $fixture['repository']->saveCalls);
+        $this->assertSame(['begin'], $fixture['connection']->txEvents);
+        $this->assertSame(0, $fixture['connection']->getTransactionLevel());
+        $this->assertSame(1, $fixture['connection']->closeCalls);
+        $this->assertSame(0, $fixture['defaultConnection']->closeCalls);
+        $this->assertSame(0, $fixture['callbackHandler']->processCalls);
+        $this->assertSame(0, $fixture['callbackHandler']->clearCalls);
+        $this->assertSame(['SET SESSION wsrep_sync_wait = 1'], $fixture['connection']->queries);
     }
 
     #[Test]
@@ -1550,6 +1579,8 @@ final class FakeAdapter implements AdapterInterface
 
     public int $transactionLevel = 0;
 
+    public ?\Throwable $beginFailure = null;
+
     public ?\Throwable $commitFailure = null;
 
     public ?\Throwable $rollbackFailure = null;
@@ -1605,20 +1636,25 @@ final class FakeAdapter implements AdapterInterface
 
     public function beginTransaction(): void
     {
-        $this->transactionLevel++;
         $this->txEvents[] = 'begin';
+
+        if ($this->beginFailure !== null) {
+            throw $this->beginFailure;
+        }
+
+        $this->transactionLevel++;
     }
 
     public function commit(): void
     {
-        if ($this->transactionLevel > 0) {
-            $this->transactionLevel--;
-        }
-
         $this->txEvents[] = 'commit';
 
-        if ($this->commitFailure !== null && $this->transactionLevel === 0) {
+        if ($this->transactionLevel === 1 && $this->commitFailure !== null) {
             throw $this->commitFailure;
+        }
+
+        if ($this->transactionLevel > 0) {
+            $this->transactionLevel--;
         }
     }
 

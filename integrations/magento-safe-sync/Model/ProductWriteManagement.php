@@ -548,7 +548,11 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
                 $warningCodes[] = 'safe_sync_post_commit_galera_restore_failed';
                 $this->logger->error('Safe Sync uncertain-commit Galera restore failed.', ['exception' => $exception]);
             }
+
+            return $warningCodes;
         }
+
+        $this->quarantineConnection($connection);
 
         return $warningCodes;
     }
@@ -601,7 +605,21 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
         array $mutation,
     ): ProductWriteResponseInterface|array {
         $consequentialWriteAttempts = 0;
-        $connection->beginTransaction();
+
+        try {
+            $connection->beginTransaction();
+        } catch (\Throwable $exception) {
+            $this->logger->warning('Safe Sync outer transaction begin failed.', ['exception' => $exception]);
+            $this->quarantineConnection($connection);
+
+            return $this->knownNotApplied(
+                'safe_sync_begin_failed',
+                $logicalEntityId,
+                $expectedSku,
+                false,
+                0,
+            );
+        }
 
         try {
             $lockedRows = $this->fetchAll(
