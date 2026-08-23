@@ -1,8 +1,11 @@
-# 03-DOMAIN\_MODEL.md
+# 03-DOMAIN_MODEL.md
+
 
 ## Domain Model
 
+
 ### Purpose
+
 
 This document defines the core domain model of the platform.
 
@@ -10,57 +13,58 @@ The goal is to create an enterprise-grade internal architecture while keeping th
 
 The platform must feel simple in the user interface:
 
-* My company;
+- My company;
 
-* Products;
+- Products;
 
-* Product fields;
+- Product fields;
 
-* Customers;
+- Customers;
 
-* Prices;
+- Prices;
 
-* Orders;
+- Orders;
 
-* B2B catalogue;
+- B2B catalogue;
 
-* Import / Export.
+- Import / Export.
 
 Internally, the platform must remain strict, extensible and protected from hardcoded one-off logic.
 
 The domain model must support:
 
-* multi-company SaaS architecture;
+- multi-company SaaS architecture;
 
-* product data management;
+- product data management;
 
-* native B2B catalogue;
+- native B2B catalogue;
 
-* B2B storefront experience;
+- B2B storefront experience;
 
-* product variants;
+- product variants;
 
-* attribute dictionary;
+- attribute dictionary;
 
-* pricing;
+- pricing;
 
-* availability;
+- availability;
 
-* order capture;
+- order capture;
 
-* future online payments;
+- future online payments;
 
-* connector-based imports and exports;
+- connector-based imports and exports;
 
-* future billing;
+- future billing;
 
-* future marketplace and website channels.
+- future marketplace and website channels.
 
 The platform must not become a full ERP, CRM, accounting system, warehouse system, marketplace, website builder or e-commerce CMS.
 
 It may integrate with these systems.
 
 ### Core Principle
+
 
 The platform has two layers of complexity.
 
@@ -70,47 +74,47 @@ The user interface must remain extremely simple.
 
 The user should not need to understand:
 
-* tenants;
+- tenants;
 
-* aggregates;
+- aggregates;
 
-* variants;
+- variants;
 
-* attribute values;
+- attribute values;
 
-* price resolvers;
+- price resolvers;
 
-* inventory ledgers;
+- inventory ledgers;
 
-* connector mappings;
+- connector mappings;
 
-* channel projections;
+- channel projections;
 
-* payment webhooks.
+- payment webhooks.
 
 The user should understand only practical concepts:
 
-* company;
+- company;
 
-* product;
+- product;
 
-* field;
+- field;
 
-* price;
+- price;
 
-* availability;
+- availability;
 
-* customer;
+- customer;
 
-* order;
+- order;
 
-* catalogue;
+- catalogue;
 
-* import;
+- import;
 
-* export;
+- export;
 
-* payment.
+- payment.
 
 The architecture must protect the system from chaos without exposing that complexity to the user.
 
@@ -120,33 +124,34 @@ Enterprise SaaS under the hood, simple enough for a non-technical user to operat
 
 ### Domain Boundaries
 
+
 The platform should be organized around clear domain areas.
 
 Initial domain areas:
 
-* Workspace
+- Workspace
 
-* Users and Permissions
+- Users and Permissions
 
-* Product Catalogue
+- Product Catalogue
 
-* Attribute Dictionary
+- Attribute Dictionary
 
-* Pricing
+- Pricing
 
-* Availability
+- Availability
 
-* Customers
+- Customers
 
-* B2B Channel
+- B2B Channel
 
-* Orders
+- Orders
 
-* Payments
+- Payments
 
-* Connectors and Mappings
+- Connectors and Mappings
 
-* Billing
+- Billing
 
 These are domain boundaries, not necessarily separate microservices.
 
@@ -156,21 +161,22 @@ The architecture should keep domain boundaries clear so that future extraction o
 
 ## Workspace Context
 
+
 A Workspace is the technical SaaS boundary.
 
 Every company using the platform owns one workspace.
 
 In the user interface, this may be shown as:
 
-* My Company
+- My Company
 
-* Company
+- Company
 
-* Business
+- Business
 
 In code and database design, tenant isolation should be based on:
 
-* workspace\_id
+- workspace_id
 
 The term tenant should not be used in the user interface.
 
@@ -178,79 +184,81 @@ It may be used only in technical architecture discussions where necessary.
 
 ### Workspace
 
+
 A workspace represents one isolated business account.
 
 A workspace owns:
 
-* products;
+- products;
 
-* product variants;
+- product variants;
 
-* product fields;
+- product fields;
 
-* categories;
+- categories;
 
-* customers;
+- customers;
 
-* customer groups;
+- customer groups;
 
-* price lists;
+- price lists;
 
-* availability records;
+- availability records;
 
-* B2B channels;
+- B2B channels;
 
-* orders;
+- orders;
 
-* payments;
+- payments;
 
-* connectors;
+- connectors;
 
-* mappings;
+- mappings;
 
-* users;
+- users;
 
-* settings.
+- settings.
 
-All business data must be scoped by workspace\_id.
+All business data must be scoped by workspace_id.
 
 No product, order, customer, price, mapping, connector account or payment should exist without clear workspace ownership, unless it is a global platform reference entity.
 
 Examples of workspace-owned entities:
 
-* products
+- products
 
-* product\_variants
+- product_variants
 
-* categories
+- categories
 
-* customers
+- customers
 
-* orders
+- orders
 
-* payments
+- payments
 
-* price\_lists
+- price_lists
 
-* connector\_accounts
+- connector_accounts
 
-* field\_mappings
+- field_mappings
 
 Examples of global platform entities:
 
-* system attribute definitions;
+- system attribute definitions;
 
-* platform attribute library records;
+- platform attribute library records;
 
-* connector definitions;
+- connector definitions;
 
-* country codes;
+- country codes;
 
-* currency codes;
+- currency codes;
 
-* unit definitions.
+- unit definitions.
 
 ### Workspace Isolation
+
 
 The MVP should use single-database tenancy.
 
@@ -258,29 +266,30 @@ This keeps DevOps complexity low.
 
 However, single-database tenancy requires strict discipline.
 
-Every workspace-owned table must include workspace\_id.
+Every workspace-owned table must include workspace_id.
 
-Every query that reads or writes workspace data must be scoped by workspace\_id.
+Every query that reads or writes workspace data must be scoped by workspace_id.
 
 The application should enforce workspace scoping through:
 
-* model scopes;
+- model scopes;
 
-* repositories;
+- repositories;
 
-* service layer checks;
+- service layer checks;
 
-* authorization policies;
+- authorization policies;
 
-* tests for tenant data leakage.
+- tests for tenant data leakage.
 
-The platform must avoid relying on developers to manually remember where workspace\_id = ... in every query.
+The platform must avoid relying on developers to manually remember where workspace_id = ... in every query.
 
 Low-level queries and background jobs must be especially careful.
 
 Any background job that processes workspace data must carry explicit workspace context.
 
 ## Users and Permissions Context
+
 
 Users are people who access the platform.
 
@@ -290,13 +299,13 @@ The relationship between users and workspaces should be explicit.
 
 Core entities:
 
-* User
+- User
 
-* WorkspaceUser
+- WorkspaceUser
 
-* Role
+- Role
 
-* Permission
+- Permission
 
 ### Workspace access model and authorization (Resolved — Task 4C-1c-2a, 2026-08-13)
 
@@ -307,57 +316,41 @@ migration mechanics, UUID team columns, a custom Role model, or the final
 
 **Authorization source of truth**
 
-* **Atomic permissions** are the authorization source of truth.
-
-* **Job-title / role names** (`User.role`, `UserRole` enum values such as
+- **Atomic permissions** are the authorization source of truth.
+- **Job-title / role names** (`User.role`, `UserRole` enum values such as
   Merchandiser, Admin, Director, Manager, …) have **no authorization semantics**
   in the target model.
-
-* Policies, gates, and services must **not** grant a capability merely because
+- Policies, gates, and services must **not** grant a capability merely because
   `User.role === Merchandiser|Admin|Director|…`.
-
-* Authorization is evaluated for **User × Workspace**, never globally for the
+- Authorization is evaluated for **User × Workspace**, never globally for the
   User alone.
-
-* Cross-workspace permission leakage is a **critical failure**.
-
-* Future **`WorkspaceUser`** **/ workspace membership** is the ownership boundary
+- Cross-workspace permission leakage is a **critical failure**.
+- Future **`WorkspaceUser` / workspace membership** is the ownership boundary
   for role and permission assignments inside a workspace.
 
 **Workspace roles / access profiles**
 
-* A workspace **role / access profile** is a workspace-owned, merchant-configurable
+- A workspace **role / access profile** is a workspace-owned, merchant-configurable
   **named bundle of atomic permissions**.
-
-* A workspace membership authorized with effective **`manage_workspace_access`** may create/name/manage workspace **Roles / Access profiles** using business-owned labels.
-
-* **Platform-provided roles** are onboarding / default **templates only** — they
+- A workspace membership authorized with effective **`manage_workspace_access`** may create/name/manage workspace **Roles / Access profiles** using business-owned labels.
+- **Platform-provided roles** are onboarding / default **templates only** — they
   are not job taxonomy and carry no authorization semantics by name alone.
-
-* One workspace membership may receive **multiple roles**, with **additive**
+- One workspace membership may receive **multiple roles**, with **additive**
   effective permissions.
-
-* **Direct per-user permission overrides** are **deferred** in the first
+- **Direct per-user permission overrides** are **deferred** in the first
   implementation slice. Unique access is expressed through custom and/or multiple
   workspace roles instead.
 
 **Access-model composition:**
 
-* Atomic permissions are the authorization source of truth.
-
-* Workspace roles/access profiles are merchant-owned named bundles of those atomic permissions.
-
-* The underlying authorization model is component-based; merchant-facing default templates are persona/task-oriented for usability.
-
-* Platform-provided role names are onboarding templates only and have no authorization semantics.
-
-* A workspace may rename templates, create custom roles, and assign multiple roles to one membership.
-
-* Effective permissions in the first implementation are additive: union(all assigned workspace-role permissions).
-
-* Absence of a permission means deny.
-
-* There is no explicit deny/mute precedence in the first RBAC foundation.
+- Atomic permissions are the authorization source of truth.
+- Workspace roles/access profiles are merchant-owned named bundles of those atomic permissions.
+- The underlying authorization model is component-based; merchant-facing default templates are persona/task-oriented for usability.
+- Platform-provided role names are onboarding templates only and have no authorization semantics.
+- A workspace may rename templates, create custom roles, and assign multiple roles to one membership.
+- Effective permissions in the first implementation are additive: union(all assigned workspace-role permissions).
+- Absence of a permission means deny.
+- There is no explicit deny/mute precedence in the first RBAC foundation.
 
 **Deferred**
 
@@ -380,72 +373,58 @@ management. They are part of the frozen minimum permission vocabulary below.
 
 **Frozen permission vocabulary (minimum workspace RBAC slice)**
 
-| Permission                      | Authority                                                                                                                                                   |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `view_connector_accounts`       | Safe Layer A/B `ConnectorAccount` read only; no decrypted credentials/settings secrets.                                                                     |
-| `run_connector_discovery`       | Manual discovery and the safe read surface necessary to follow its progress/result.                                                                         |
-| `manage_connector_accounts`     | Create/manage account settings and credentials, disable/archive where supported, run connection check; also permits safe account read and manual discovery. |
-| `view_sync_mappings`            | Read the mapping surface for a `SyncConfiguration` (effective mappings, suggestions, discovery-unavailable read-only state).                                |
-| `manage_sync_mappings`          | Mutate confirmed mappings through the approved mutation service. Inherently includes the same mapping read surface as `view_sync_mappings`.                 |
-| `manage_workspace_access`       | Manage workspace Roles / Access profiles and role assignments for memberships.                                                                              |
-| `manage_workspace_tax_settings` | Manage workspace tax-settings surfaces governed by workspace tax authorization.                                                                             |
+| Permission | Authority |
+|---|---|
+| `view_connector_accounts` | Safe Layer A/B `ConnectorAccount` read only; no decrypted credentials/settings secrets. |
+| `run_connector_discovery` | Manual discovery and the safe read surface necessary to follow its progress/result. |
+| `manage_connector_accounts` | Create/manage account settings and credentials, disable/archive where supported, run connection check; also permits safe account read and manual discovery. |
+| `view_sync_mappings` | Read the mapping surface for a `SyncConfiguration` (effective mappings, suggestions, discovery-unavailable read-only state). |
+| `manage_sync_mappings` | Mutate confirmed mappings through the approved mutation service. Inherently includes the same mapping read surface as `view_sync_mappings`. |
+| `manage_workspace_access` | Manage workspace Roles / Access profiles and role assignments for memberships. |
+| `manage_workspace_tax_settings` | Manage workspace tax-settings surfaces governed by workspace tax authorization. |
 
 **Permission independence (frozen):**
 
-* `manage_connector_accounts` **does not** imply `view_sync_mappings` or
+- `manage_connector_accounts` **does not** imply `view_sync_mappings` or
   `manage_sync_mappings`.
-
-* `view_sync_mappings` / `manage_sync_mappings` **do not** imply connector
+- `view_sync_mappings` / `manage_sync_mappings` **do not** imply connector
   settings/credentials management.
-
-* `manage_workspace_access` **does not** automatically imply connector, mapping,
+- `manage_workspace_access` **does not** automatically imply connector, mapping,
   product, price, order, or other business permissions.
-
-* No job-title name may substitute for any permission above.
+- No job-title name may substitute for any permission above.
 
 Mapping-specific rules:
 
-* `manage_sync_mappings` grants mutation authority and inherently permits the
+- `manage_sync_mappings` grants mutation authority and inherently permits the
   same mapping read surface.
-
-* Possessing mapping permissions **never** grants credential, settings, base URL,
+- Possessing mapping permissions **never** grants credential, settings, base URL,
   or auth-profile access.
-
-* **No particular named role**, including Merchandiser, is normatively entitled to
+- **No particular named role**, including Merchandiser, is normatively entitled to
   any permission in this vocabulary.
 
 **Workspace access administration (capability-based)**
 
-* A workspace membership with effective **`manage_workspace_access`** may manage
+- A workspace membership with effective **`manage_workspace_access`** may manage
   workspace **Roles / Access profiles** and their membership assignments.
-
-* Users/logins receive **one or more roles** for that workspace.
-
-* Role names are **business-owned labels**, not predefined job taxonomy.
-
-* Absence or temporary replacement is handled by assigning an **additional
+- Users/logins receive **one or more roles** for that workspace.
+- Role names are **business-owned labels**, not predefined job taxonomy.
+- Absence or temporary replacement is handled by assigning an **additional
   role**, not by changing application code or hardcoding job-title exceptions.
-
-* Do **not** expose technical Spatie terminology (`Permission`, `Role` model
+- Do **not** expose technical Spatie terminology (`Permission`, `Role` model
   names, pivot tables, team resolver, etc.) to merchants.
 
 **Anti-lockout invariant (Resolved — security)**
 
-* Every active workspace must have at least one active membership with effective
+- Every active workspace must have at least one active membership with effective
   `manage_workspace_access`.
-
-* Initial workspace creation/bootstrap must establish at least one such membership.
-
-* Changing, deleting, deactivating memberships, role assignments, or role
+- Initial workspace creation/bootstrap must establish at least one such membership.
+- Changing, deleting, deactivating memberships, role assignments, or role
   definitions must be rejected if the resulting state would leave zero active
   memberships with effective `manage_workspace_access`.
-
-* This invariant must be enforced transactionally in the future write service.
-
-* Exact physical representation (`WorkspaceUser` schema, Spatie team mechanics,
+- This invariant must be enforced transactionally in the future write service.
+- Exact physical representation (`WorkspaceUser` schema, Spatie team mechanics,
   `owner_user_id`, protected role IDs, etc.) is **not** resolved in 4C-1c-2a.
-
-* Platform-support/recovery mechanics are a separate future operational/security
+- Platform-support/recovery mechanics are a separate future operational/security
   decision and must **not** silently bypass tenant authorization.
 
 **Historical note (superseded by GAP-026B — do not treat as current truth)**
@@ -459,7 +438,7 @@ That transitional state is historical evidence only.
 satisfied; production authority cutover completed; Task 4C-1c-2b Layer-B Mapping
 UI shipped on `WorkspaceAuthorization` / `WorkspaceUser` RBAC (PR #139).
 
-### Workspace RBAC physical architecture \[Resolved — GAP-026-0, 2026-08-13]
+### Workspace RBAC physical architecture [Resolved — GAP-026-0, 2026-08-13]
 
 Freeze custom workspace RBAC, not Spatie Teams.
 
@@ -484,38 +463,33 @@ Spatie Teams is not the authoritative tenant-scoping mechanism.
 
 Reason to freeze normatively:
 
-* workspace role assignment must be structurally scoped to a concrete membership;
-
-* explicit workspace identity is required for authorization;
-
-* cross-workspace role assignment must be impossible at DB level;
-
-* target model forbids direct user permission overrides.
+- workspace role assignment must be structurally scoped to a concrete membership;
+- explicit workspace identity is required for authorization;
+- cross-workspace role assignment must be impossible at DB level;
+- target model forbids direct user permission overrides.
 
 **Minimum physical tables (first slice)**
 
 `workspace_users` — minimum schema:
 
-| Column         | Type / constraint             |
-| -------------- | ----------------------------- |
-| `id`           | UUID PK                       |
-| `workspace_id` | UUID NOT NULL                 |
-| `user_id`      | BIGINT UNSIGNED NOT NULL      |
-| `is_active`    | BOOLEAN NOT NULL DEFAULT true |
-| `created_at`   | timestamp                     |
-| `updated_at`   | timestamp                     |
+| Column | Type / constraint |
+|---|---|
+| `id` | UUID PK |
+| `workspace_id` | UUID NOT NULL |
+| `user_id` | BIGINT UNSIGNED NOT NULL |
+| `is_active` | BOOLEAN NOT NULL DEFAULT true |
+| `created_at` | timestamp |
+| `updated_at` | timestamp |
 
 Constraints:
 
-* `UNIQUE (workspace_id, user_id)`
-
-* `UNIQUE (id, workspace_id)`
+- `UNIQUE (workspace_id, user_id)`
+- `UNIQUE (id, workspace_id)`
 
 Parent FK (RESTRICT):
 
-* `workspace_users.workspace_id` → `workspaces.id` ON DELETE RESTRICT
-
-* `workspace_users.user_id` → `users.id` ON DELETE RESTRICT
+- `workspace_users.workspace_id` → `workspaces.id` ON DELETE RESTRICT
+- `workspace_users.user_id` → `users.id` ON DELETE RESTRICT
 
 Do **not** add in first slice: `deleted_at`, `invited_at`, `activated_at`,
 `deactivated_at`. Invitation/deactivation history/soft-delete lifecycle is not
@@ -540,46 +514,37 @@ row participates in anti-lockout. Do not add `workspaces.is_active` in GAP-026.
 
 `workspace_roles` — minimum schema:
 
-| Column         | Type / constraint                                    |
-| -------------- | ---------------------------------------------------- |
-| `id`           | UUID PK                                              |
-| `workspace_id` | UUID NOT NULL                                        |
-| `name`         | string NOT NULL                                      |
+| Column | Type / constraint |
+|---|---|
+| `id` | UUID PK |
+| `workspace_id` | UUID NOT NULL |
+| `name` | string NOT NULL |
 | `template_key` | nullable stable ASCII key, provenance/bootstrap only |
-| `created_at`   | timestamp                                            |
-| `updated_at`   | timestamp                                            |
+| `created_at` | timestamp |
+| `updated_at` | timestamp |
 
 Constraints:
 
-* `UNIQUE (workspace_id, name)`
-
-* `UNIQUE (workspace_id, template_key)`
-
-* `UNIQUE (id, workspace_id)`
+- `UNIQUE (workspace_id, name)`
+- `UNIQUE (workspace_id, template_key)`
+- `UNIQUE (id, workspace_id)`
 
 Parent FK (RESTRICT):
 
-* `workspace_roles.workspace_id` → `workspaces.id` ON DELETE RESTRICT
+- `workspace_roles.workspace_id` → `workspaces.id` ON DELETE RESTRICT
 
 `template_key`:
 
-* carries no authorization semantics;
-
-* non-null `template_key` is the stable template/bootstrap identity inside one
+- carries no authorization semantics;
+- non-null `template_key` is the stable template/bootstrap identity inside one
   workspace;
-
-* exists only for stable platform-template/bootstrap provenance and idempotency;
-
-* custom merchant-created roles may have NULL;
-
-* multiple NULL values remain valid;
-
-* merchant rename of `name` never changes `template_key`;
-
-* bootstrap/idempotency must resolve platform template roles by stable key, not
+- exists only for stable platform-template/bootstrap provenance and idempotency;
+- custom merchant-created roles may have NULL;
+- multiple NULL values remain valid;
+- merchant rename of `name` never changes `template_key`;
+- bootstrap/idempotency must resolve platform template roles by stable key, not
   mutable display name;
-
-* role `name` remains merchant-owned and freely renameable.
+- role `name` remains merchant-owned and freely renameable.
 
 If implementation research shows `template_key` is unnecessary for
 deterministic/idempotent bootstrap, implementation must STOP and report before
@@ -587,9 +552,9 @@ deleting it from the documented model rather than silently changing the contract
 
 `workspace_permissions` — global platform reference catalogue:
 
-| Column | Type / constraint      |
-| ------ | ---------------------- |
-| `id`   | UUID PK                |
+| Column | Type / constraint |
+|---|---|
+| `id` | UUID PK |
 | `code` | string NOT NULL UNIQUE |
 
 Permissions are platform-defined, seeded/version-controlled, not merchant-created,
@@ -599,39 +564,34 @@ the target authoritative catalogue.
 
 `workspace_user_roles`:
 
-| Column              | Notes               |
-| ------------------- | ------------------- |
-| `workspace_id`      | tenant guard column |
-| `workspace_user_id` | FK to membership    |
-| `workspace_role_id` | FK to role          |
+| Column | Notes |
+|---|---|
+| `workspace_id` | tenant guard column |
+| `workspace_user_id` | FK to membership |
+| `workspace_role_id` | FK to role |
 
 Constraints:
 
-* `UNIQUE (workspace_user_id, workspace_role_id)`
-
-* FK `(workspace_user_id, workspace_id)` → `workspace_users(id, workspace_id)`
-
-* FK `(workspace_role_id, workspace_id)` → `workspace_roles(id, workspace_id)`
+- `UNIQUE (workspace_user_id, workspace_role_id)`
+- FK `(workspace_user_id, workspace_id)` → `workspace_users(id, workspace_id)`
+- FK `(workspace_role_id, workspace_id)` → `workspace_roles(id, workspace_id)`
 
 Both composite FKs share the same child `workspace_id`. Membership from workspace A
-
-* role from workspace B is structurally unrepresentable.
++ role from workspace B is structurally unrepresentable.
 
 `workspace_role_permissions`:
 
-| Column                    | Notes                               |
-| ------------------------- | ----------------------------------- |
-| `workspace_id`            | deliberately redundant tenant guard |
-| `workspace_role_id`       | FK to role                          |
-| `workspace_permission_id` | FK to permission                    |
+| Column | Notes |
+|---|---|
+| `workspace_id` | deliberately redundant tenant guard |
+| `workspace_role_id` | FK to role |
+| `workspace_permission_id` | FK to permission |
 
 Constraints:
 
-* `UNIQUE (workspace_role_id, workspace_permission_id)`
-
-* FK `(workspace_role_id, workspace_id)` → `workspace_roles(id, workspace_id)`
-
-* FK `workspace_permission_id` → `workspace_permissions(id)`
+- `UNIQUE (workspace_role_id, workspace_permission_id)`
+- FK `(workspace_role_id, workspace_id)` → `workspace_roles(id, workspace_id)`
+- FK `workspace_permission_id` → `workspace_permissions(id)`
 
 Supporting indexes required for MySQL composite FKs must be documented in
 implementation migrations (composite FK child columns indexed per MySQL 8 rules).
@@ -650,15 +610,11 @@ bypass anti-lockout coordination.
 
 Use RESTRICT / equivalent guarded deletion semantics for at least:
 
-* `users` → `workspace_users`
-
-* `workspace_users` → `workspace_user_roles`
-
-* `workspace_roles` → `workspace_user_roles`
-
-* `workspace_roles` → `workspace_role_permissions`
-
-* `workspace_permissions` → `workspace_role_permissions`
+- `users` → `workspace_users`
+- `workspace_users` → `workspace_user_roles`
+- `workspace_roles` → `workspace_user_roles`
+- `workspace_roles` → `workspace_role_permissions`
+- `workspace_permissions` → `workspace_role_permissions`
 
 Workspace-parent deletion itself is outside GAP-026 and must not be used to invent
 a tenant-deletion lifecycle.
@@ -700,12 +656,10 @@ interface WorkspaceAuthorization
 Exact PHP interface/class packaging may follow code conventions later, but the
 security boundary is frozen:
 
-* `Workspace` is a mandatory argument.
-
-* No authorization API overload may silently derive its `Workspace` from
+- `Workspace` is a mandatory argument.
+- No authorization API overload may silently derive its `Workspace` from
   `WorkspaceContext`.
-
-* `WorkspaceContext` may continue to exist for data/UI scoping, but it is not the
+- `WorkspaceContext` may continue to exist for data/UI scoping, but it is not the
   authorization authority.
 
 Do not change `WorkspaceContext` implementation in 026A merely because
@@ -716,15 +670,15 @@ single-default-workspace MVP shortcut.
 
 Amend the frozen minimum catalogue from six to seven:
 
-| Permission                      | Authority                                                                                                                                                   |
-| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `view_connector_accounts`       | Safe Layer A/B `ConnectorAccount` read only; no decrypted credentials/settings secrets.                                                                     |
-| `run_connector_discovery`       | Manual discovery and the safe read surface necessary to follow its progress/result.                                                                         |
-| `manage_connector_accounts`     | Create/manage account settings and credentials, disable/archive where supported, run connection check; also permits safe account read and manual discovery. |
-| `view_sync_mappings`            | Read the mapping surface for a `SyncConfiguration`.                                                                                                         |
-| `manage_sync_mappings`          | Mutate confirmed mappings through the approved mutation service.                                                                                            |
-| `manage_workspace_access`       | Manage workspace Roles / Access profiles and role assignments for memberships.                                                                              |
-| `manage_workspace_tax_settings` | Manage workspace tax-settings surfaces governed by workspace tax authorization.                                                                             |
+| Permission | Authority |
+|---|---|
+| `view_connector_accounts` | Safe Layer A/B `ConnectorAccount` read only; no decrypted credentials/settings secrets. |
+| `run_connector_discovery` | Manual discovery and the safe read surface necessary to follow its progress/result. |
+| `manage_connector_accounts` | Create/manage account settings and credentials, disable/archive where supported, run connection check; also permits safe account read and manual discovery. |
+| `view_sync_mappings` | Read the mapping surface for a `SyncConfiguration`. |
+| `manage_sync_mappings` | Mutate confirmed mappings through the approved mutation service. |
+| `manage_workspace_access` | Manage workspace Roles / Access profiles and role assignments for memberships. |
+| `manage_workspace_tax_settings` | Manage workspace tax-settings surfaces governed by workspace tax authorization. |
 
 `manage_workspace_tax_settings` is not a new invented capability: it already exists
 in production authorization and the current permission seeder.
@@ -747,13 +701,10 @@ It **MUST NOT** materialize `WorkspaceUser` / `WorkspaceRole` /
 
 026A may implement and test:
 
-* legacy-state preflight service;
-
-* deterministic/idempotent backfill service;
-
-* template-role construction logic;
-
-* anti-lockout coordinator;
+- legacy-state preflight service;
+- deterministic/idempotent backfill service;
+- template-role construction logic;
+- anti-lockout coordinator;
 
 but these services are **not** executed against production legacy users as part of
 026A activation.
@@ -766,11 +717,10 @@ authoritative.
 
 Reason 026A does not execute production legacy assignment:
 
-* current `UserResource` still exposes staff `User` hard-delete, legacy `role`, and
+- current `UserResource` still exposes staff `User` hard-delete, legacy `role`, and
   `is_active` mutation — creating authoritative `WorkspaceUser` rows early would
   let a non-authoritative shadow membership graph drift before 026B;
-
-* once `WorkspaceUser` rows exist, frozen `users` → `workspace_users` ON DELETE
+- once `WorkspaceUser` rows exist, frozen `users` → `workspace_users` ON DELETE
   RESTRICT changes hard-delete behavior while legacy User lifecycle guards are not
   yet cut over.
 
@@ -798,13 +748,10 @@ sequencing, etc.) are implementation-level and must preserve this ordering.
 
 Current `User` lifecycle can still:
 
-* create staff `Users`;
-
-* change legacy `role`;
-
-* change `is_active`;
-
-* hard-delete `Users` (via `UserResource`).
+- create staff `Users`;
+- change legacy `role`;
+- change `is_active`;
+- hard-delete `Users` (via `UserResource`).
 
 Once `WorkspaceUser` rows exist, frozen `users` → `workspace_users` ON DELETE
 RESTRICT changes hard-delete behavior.
@@ -824,24 +771,18 @@ fail-closed verification of:
 1. exactly one row exists in `workspaces`;
 2. that same row is the exactly-one row with `is_default = true`;
 3. at least one active legacy staff `User` exists with:
-
-   * `customer_id IS NULL`
-
-   * AND `users.is_active = true`
-
-   * AND `role IN (Admin, Director)`
+   - `customer_id IS NULL`
+   - AND `users.is_active = true`
+   - AND `role IN (Admin, Director)`
 
 Reason:
 
-* historical application has no membership data from which multiple existing
+- historical application has no membership data from which multiple existing
   workspaces can be assigned safely;
-
-* assigning all staff to additional workspaces would be privilege escalation;
-
-* leaving another workspace without an effective `manage_workspace_access` holder
+- assigning all staff to additional workspaces would be privilege escalation;
+- leaving another workspace without an effective `manage_workspace_access` holder
   violates anti-lockout;
-
-* inactive Admin/Director does not satisfy active-membership semantics.
+- inactive Admin/Director does not satisfy active-membership semantics.
 
 If any precondition fails: STOP → report actual counts/state → do not infer
 memberships → do not auto-promote a different legacy role → do not reactivate a
@@ -867,13 +808,13 @@ disable their workspace membership.
 Initial role/permission backfill — preserve current effective connector/tax
 behavior and do **not** grant new Mapping capability:
 
-| Legacy role                      | Granted permissions                                                                                                                           |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Admin / Director                 | `view_connector_accounts`, `run_connector_discovery`, `manage_connector_accounts`, `manage_workspace_tax_settings`, `manage_workspace_access` |
-| Merchandiser                     | `view_connector_accounts`, `run_connector_discovery`                                                                                          |
-| Manager / Programmer / Warehouse | none of these seven permissions                                                                                                               |
-| `view_sync_mappings`             | assigned to nobody                                                                                                                            |
-| `manage_sync_mappings`           | assigned to nobody                                                                                                                            |
+| Legacy role | Granted permissions |
+|---|---|
+| Admin / Director | `view_connector_accounts`, `run_connector_discovery`, `manage_connector_accounts`, `manage_workspace_tax_settings`, `manage_workspace_access` |
+| Merchandiser | `view_connector_accounts`, `run_connector_discovery` |
+| Manager / Programmer / Warehouse | none of these seven permissions |
+| `view_sync_mappings` | assigned to nobody |
+| `manage_sync_mappings` | assigned to nobody |
 
 `manage_workspace_access` is the one bootstrap capability required to satisfy the
 already-Resolved anti-lockout invariant. Do not describe it as a generic "Admin
@@ -895,13 +836,10 @@ per-user overrides.
 
 Before any production backfill/cutover, inspect existing Spatie assignment tables:
 
-* `roles`
-
-* `model_has_roles`
-
-* `model_has_permissions`
-
-* `role_has_permissions`
+- `roles`
+- `model_has_roles`
+- `model_has_permissions`
+- `role_has_permissions`
 
 Expected application baseline currently has no known role/direct-permission
 assignment write path, but production DB must not be assumed clean from source
@@ -937,28 +875,24 @@ different surviving administrator.
 
 For global User deactivation/deletion after authorization cutover:
 
-* determine all affected workspace memberships;
-
-* lock those workspace rows in deterministic `workspace_id` order;
-
-* evaluate anti-lockout in every workspace before commit.
+- determine all affected workspace memberships;
+- lock those workspace rows in deterministic `workspace_id` order;
+- evaluate anti-lockout in every workspace before commit.
 
 `lockForUpdate()` concurrency correctness must ultimately be verified on MySQL 8,
 not inferred from SQLite.
 
 Phase timing:
 
-* In 026A, physical tables, models, `WorkspaceAuthorization`, preflight/backfill
+- In 026A, physical tables, models, `WorkspaceAuthorization`, preflight/backfill
   **machinery**, and anti-lockout coordinator may be implemented and tested, but
   legacy production authorization/write paths are not cut over and production legacy
   `WorkspaceUser` / role assignments are **not** materialized.
-
-* 026B begins with fail-closed production preflight → current-state legacy backfill
+- 026B begins with fail-closed production preflight → current-state legacy backfill
   → anti-lockout validation → authorization cutover, then connector/tax/mapping
   policy cutover, Access/Roles UI, and `User` lifecycle protection in the same
   cutover window.
-
-* Before 026B becomes authoritative, it must revalidate anti-lockout against
+- Before 026B becomes authoritative, it must revalidate anti-lockout against
   current production state; route every newly authoritative access mutation through
   the coordinator; protect global `User.is_active` / hard-delete paths that could
   invalidate effective access.
@@ -968,29 +902,24 @@ populate or authorize workspace RBAC in production.
 
 **Platform plane and cabinet boundaries**
 
-* `PlatformAdminAuthorization` remains outside GAP-026 workspace RBAC.
-
-* Workspace permissions can never grant platform-global authority over connector
+- `PlatformAdminAuthorization` remains outside GAP-026 workspace RBAC.
+- Workspace permissions can never grant platform-global authority over connector
   definitions/canonical registry/platform governance.
-
-* Current Admin / Programmer `UserRole` checks in that platform plane remain
+- Current Admin / Programmer `UserRole` checks in that platform plane remain
   transitional legacy, not a newly approved permanent authorization design. Their
   eventual replacement requires a separate platform-authorization decision.
-
-* `/cabinet` is outside GAP-026. Its authenticated principal is `Customer`, not
+- `/cabinet` is outside GAP-026. Its authenticated principal is `Customer`, not
   workspace staff `User`. Do not mix customer/cabinet authorization into workspace
   staff RBAC.
 
-### Workspace RBAC authority cutover \[Resolved — GAP-026B-0, 2026-08-13]
+### Workspace RBAC authority cutover [Resolved — GAP-026B-0, 2026-08-13]
 
 GAP-026B changes workspace authorization **only for explicitly cut-over domains**
 from the transitional combination of:
 
-* `User.role`
-
-* `WorkspaceMembership`
-
-* global Spatie permissions
+- `User.role`
+- `WorkspaceMembership`
+- global Spatie permissions
 
 to the authoritative evaluation path:
 
@@ -1010,24 +939,22 @@ governance are already RBAC-complete.
 
 **Cut-over domains (026B only)**
 
-| Domain                                                     | Authoritative after cutover                             |
-| ---------------------------------------------------------- | ------------------------------------------------------- |
-| `ConnectorAccount` read / discovery / management           | workspace permissions via `WorkspaceAuthorization`      |
-| Connector safe presentation / merchant Integrations gating | effective workspace permissions (not `User.role`)       |
-| Workspace tax settings                                     | `manage_workspace_tax_settings` on explicit `Workspace` |
-| Mapping read / mutation seam                               | `view_sync_mappings` / `manage_sync_mappings`           |
-| Merchant Access / Roles (existing memberships only)        | `manage_workspace_access`                               |
+| Domain | Authoritative after cutover |
+|---|---|
+| `ConnectorAccount` read / discovery / management | workspace permissions via `WorkspaceAuthorization` |
+| Connector safe presentation / merchant Integrations gating | effective workspace permissions (not `User.role`) |
+| Workspace tax settings | `manage_workspace_tax_settings` on explicit `Workspace` |
+| Mapping read / mutation seam | `view_sync_mappings` / `manage_sync_mappings` |
+| Merchant Access / Roles (existing memberships only) | `manage_workspace_access` |
 
 **ConnectorAccount permission matrix (exclusive authority after cutover)**
 
 Safe `ConnectorAccount` read — allowed when effective workspace permissions
 contain **at least one** of:
 
-* `view_connector_accounts`
-
-* `run_connector_discovery`
-
-* `manage_connector_accounts`
+- `view_connector_accounts`
+- `run_connector_discovery`
+- `manage_connector_accounts`
 
 Reason: `run_connector_discovery` necessarily includes the safe read required to
 observe its progress/result; `manage_connector_accounts` includes safe read and
@@ -1035,22 +962,18 @@ discovery. Role names do **not** contribute.
 
 Discovery control — visible/eligible when:
 
-* `run_connector_discovery` **OR** `manage_connector_accounts`
+- `run_connector_discovery` **OR** `manage_connector_accounts`
 
 Actual manual execution additionally requires existing account runtime eligibility
 (for example `is_enabled`).
 
 Management — **only** `manage_connector_accounts` for:
 
-* create account;
-
-* settings changes;
-
-* credential replace/remove;
-
-* connection check;
-
-* disable/archive where supported.
+- create account;
+- settings changes;
+- credential replace/remove;
+- connection check;
+- disable/archive where supported.
 
 After 026B authority cutover, legacy labels Admin, Director, Merchandiser, Manager,
 Programmer, Warehouse, and legacy Spatie grants have **no** connector authorization
@@ -1078,15 +1001,11 @@ A pre-lock hydrated `User` object is **not** authorization truth.
 `WorkspaceAuthorization` must evaluate all effective Workspace authority inputs from
 persistence:
 
-* global `users.is_active`;
-
-* `workspace_users.is_active`;
-
-* explicit `Workspace` ownership;
-
-* current `WorkspaceRole` assignments;
-
-* current canonical `WorkspacePermission` assignments.
+- global `users.is_active`;
+- `workspace_users.is_active`;
+- explicit `Workspace` ownership;
+- current `WorkspaceRole` assignments;
+- current canonical `WorkspacePermission` assignments.
 
 GAP-026B-2 implementation **must** evaluate those authority inputs through one
 database-backed effective-permission projection/query rather than trusting
@@ -1103,19 +1022,14 @@ Connector authorization remains scoped to the explicit `Workspace` and the exist
 Authorization is a point-in-time post-lock authorization snapshot inside the enqueue
 transaction.
 
-* If revocation/deactivation commits **before** the authoritative post-lock authorization
+- If revocation/deactivation commits **before** the authoritative post-lock authorization
   snapshot → fail closed.
-
-* If it commits **after** that snapshot, GAP-026B-2 does **not** require another
+- If it commits **after** that snapshot, GAP-026B-2 does **not** require another
   initiating-actor authorization check before the enqueue transaction commits.
-
-* The already-authorized in-flight enqueue transaction may complete.
-
-* Already queued/running Connector work is **not** retroactively cancelled.
-
-* Connector jobs do **not** re-authorize the initiating `User` at execution time.
-
-* Results/side effects remain workspace-owned; later merchant visibility remains governed
+- The already-authorized in-flight enqueue transaction may complete.
+- Already queued/running Connector work is **not** retroactively cancelled.
+- Connector jobs do **not** re-authorize the initiating `User` at execution time.
+- Results/side effects remain workspace-owned; later merchant visibility remains governed
   by live workspace authorization.
 
 Do **not** call this “authorized as of transaction commit”; no shared serialization lock
@@ -1128,11 +1042,9 @@ Future cancellation-on-revocation remains a new Stop-and-Amend.
 Connector dispatch must **not** acquire the `Workspace` anti-lockout row mutex merely
 to serialize against `User` deactivation.
 
-* Preserve existing per-`ConnectorAccount` dispatch serialization.
-
-* Do **not** add a `User`-row mutex.
-
-* Do **not** couple Connector dispatch to Access anti-lockout locking in GAP-026B-2.
+- Preserve existing per-`ConnectorAccount` dispatch serialization.
+- Do **not** add a `User`-row mutex.
+- Do **not** couple Connector dispatch to Access anti-lockout locking in GAP-026B-2.
 
 The architectural reason is lock-domain separation and per-account granularity — not a
 presumed environment-specific lock-wait default.
@@ -1147,27 +1059,21 @@ must receive the restricted safe projection regardless of legacy `User.role`.
 The safe-only projection must continue excluding at least the existing
 sensitive/configuration attributes:
 
-* `credentials`
-
-* `settings`
-
-* `base_url`
-
-* `store_code`
-
-* `tenant_context`
-
-* `auth_profile`
+- `credentials`
+- `settings`
+- `base_url`
+- `store_code`
+- `tenant_context`
+- `auth_profile`
 
 and management-only connection-check state/relations where currently protected.
 
 The restriction must happen **before** sensitive state becomes part of merchant-facing
 Livewire/Filament record state — not merely through visual hiding.
 
-* A legacy Admin label must **not** widen presentation if effective workspace
+- A legacy Admin label must **not** widen presentation if effective workspace
   permissions are read-only.
-
-* A legacy Merchandiser label must **not** restrict presentation if the membership
+- A legacy Merchandiser label must **not** restrict presentation if the membership
   legitimately has `manage_connector_accounts`.
 
 **026B repository status (post-B-2):** `ConnectorAccountCapabilityPresentation`
@@ -1220,14 +1126,13 @@ explicit `Workspace` before persistence.
 
 GAP-026B introduces authorization for Mapping, but **not** Mapping UI.
 
-| Operation        | Required permission                                |
-| ---------------- | -------------------------------------------------- |
-| Mapping read     | `view_sync_mappings` **OR** `manage_sync_mappings` |
-| Mapping mutation | `manage_sync_mappings`                             |
+| Operation | Required permission |
+|---|---|
+| Mapping read | `view_sync_mappings` **OR** `manage_sync_mappings` |
+| Mapping mutation | `manage_sync_mappings` |
 
-* `manage_connector_accounts` does **not** imply either Mapping permission.
-
-* Mapping permissions do **not** imply Connector settings/credential access.
+- `manage_connector_accounts` does **not** imply either Mapping permission.
+- Mapping permissions do **not** imply Connector settings/credential access.
 
 Keep existing `FieldMapping` domain mutation/read machinery free of `User`/role policy
 logic. Authorization belongs at an outer application/policy seam receiving `User` +
@@ -1242,43 +1147,30 @@ merely for GAP-026B. Task **4C-1c-2b** shipped the first merchant Mapping UI (PR
 026B introduces a minimal merchant-facing workspace access area using ordinary
 business vocabulary:
 
-* **Доступ**
-
-  * **Користувачі**
-
-  * **Ролі** / **Профілі доступу**
+- **Доступ**
+  - **Користувачі**
+  - **Ролі** / **Профілі доступу**
 
 No Spatie/RBAC/pivot/team terminology in merchant UI.
 
-**Users / memberships — 026B supports (existing** **`WorkspaceUser`** **only)**
+**Users / memberships — 026B supports (existing `WorkspaceUser` only)**
 
-* list existing members;
-
-* display active/inactive membership state;
-
-* display assigned access roles/profiles;
-
-* assign one or more existing roles;
-
-* remove role assignments;
-
-* deactivate membership;
-
-* reactivate membership.
+- list existing members;
+- display active/inactive membership state;
+- display assigned access roles/profiles;
+- assign one or more existing roles;
+- remove role assignments;
+- deactivate membership;
+- reactivate membership.
 
 **Roles — 026B supports**
 
-* list roles;
-
-* create merchant custom role;
-
-* rename role;
-
-* edit role's canonical seven-permission bundle;
-
-* show number of assigned memberships;
-
-* delete a role only when unused and when the operation passes all integrity rules.
+- list roles;
+- create merchant custom role;
+- rename role;
+- edit role's canonical seven-permission bundle;
+- show number of assigned memberships;
+- delete a role only when unused and when the operation passes all integrity rules.
 
 All authoritative writes that can affect `manage_workspace_access` must route through
 `WorkspaceAccessMutationCoordinator`. `manage_workspace_access` is required for every
@@ -1294,15 +1186,11 @@ GAP-026B does **NOT** create or attach new `WorkspaceUser` memberships.
 
 026B does **not** implement:
 
-* invite employee;
-
-* attach an existing `User` to another `Workspace`;
-
-* create a `Workspace` membership;
-
-* membership hard-delete;
-
-* multi-workspace onboarding.
+- invite employee;
+- attach an existing `User` to another `Workspace`;
+- create a `Workspace` membership;
+- membership hard-delete;
+- multi-workspace onboarding.
 
 The Access screen must **not** present a functional Add user / Invite user action.
 
@@ -1320,19 +1208,13 @@ behavior. Removal is owned by **GAP-027**.
 
 The following mutations must route through `WorkspaceAccessMutationCoordinator`:
 
-* assign role to membership;
-
-* remove role assignment;
-
-* activate membership;
-
-* deactivate membership;
-
-* create role if its permission state participates in authoritative access;
-
-* edit role permission bundle;
-
-* delete role.
+- assign role to membership;
+- remove role assignment;
+- activate membership;
+- deactivate membership;
+- create role if its permission state participates in authoritative access;
+- edit role permission bundle;
+- delete role.
 
 The coordinator remains an integrity boundary, **not** actor authorization.
 
@@ -1341,36 +1223,26 @@ Authoritative sequence:
 1. optional preliminary authorization for early rejection only (non-authoritative fast-fail/UX);
 2. `WorkspaceAccessMutationCoordinator` acquires the explicit `Workspace` row mutex;
 3. inside the locked transaction:
-
-   * freshly reload the requesting `User` from persistence by stable ID;
-
-   * fresh actor authorization against the locked explicit `Workspace` using the reloaded `User`;
-
-   * freshly resolve/revalidate mutable membership/role targets against the locked `Workspace`;
-
-   * perform the mutation;
+   - freshly reload the requesting `User` from persistence by stable ID;
+   - fresh actor authorization against the locked explicit `Workspace` using the reloaded `User`;
+   - freshly resolve/revalidate mutable membership/role targets against the locked `Workspace`;
+   - perform the mutation;
 4. fresh effective-holder query;
 5. reject/rollback if zero holders.
 
 Normative requirements:
 
-* post-lock actor authorization is **mandatory**;
-
-* any pre-lock authorization is optional fast-fail only and is **not** authoritative for mutation execution;
-
-* do not reuse a pre-lock hydrated `User` as authorization truth;
-
-* **post-B-2 repository implementation:** authoritative `WorkspaceAuthorization`
+- post-lock actor authorization is **mandatory**;
+- any pre-lock authorization is optional fast-fail only and is **not** authoritative for mutation execution;
+- do not reuse a pre-lock hydrated `User` as authorization truth;
+- **post-B-2 repository implementation:** authoritative `WorkspaceAuthorization`
   evaluates effective permissions from persistence via one database-backed projection
   (including `users.is_active`, `workspace_users.is_active`, ownership, role assignments,
   and canonical permission assignments — not from the supplied Eloquent `User` instance);
-
-* Access post-lock fresh `User` reload by stable ID remains required and must **not** be
+- Access post-lock fresh `User` reload by stable ID remains required and must **not** be
   removed merely because the central authorization query becomes DB-backed;
-
-* membership/role identity and mutable target state relevant to the mutation must be freshly resolved/revalidated after the `Workspace` lock;
-
-* this applies the same TOCTOU principle already frozen for consequential Tax writes to Access/Roles mutations.
+- membership/role identity and mutable target state relevant to the mutation must be freshly resolved/revalidated after the `Workspace` lock;
+- this applies the same TOCTOU principle already frozen for consequential Tax writes to Access/Roles mutations.
 
 Do **not** merge actor authorization into `WorkspaceAccessMutationCoordinator`.
 
@@ -1378,57 +1250,43 @@ Do **not** merge actor authorization into `WorkspaceAccessMutationCoordinator`.
 
 `User.role` — after backfill/cutover:
 
-* changing `User.role` **MUST NOT** synchronize, create, delete, or replace
+- changing `User.role` **MUST NOT** synchronize, create, delete, or replace
   `WorkspaceRole` assignments;
-
-* it may remain used by unrelated legacy/GAP-027/platform surfaces temporarily;
-
-* for domains cut over by 026B, `User.role` has **zero** authorization effect.
+- it may remain used by unrelated legacy/GAP-027/platform surfaces temporarily;
+- for domains cut over by 026B, `User.role` has **zero** authorization effect.
 
 `customer_id` — not Workspace RBAC authority. Changing it must not implicitly create/
 delete `WorkspaceUser` membership or rewrite role assignments in GAP-026B.
 
 **Reactivation** (`users.is_active`: false → true):
 
-* does not recreate/reset roles or membership state;
-
-* existing `WorkspaceUser` membership state remains as stored.
+- does not recreate/reset roles or membership state;
+- existing `WorkspaceUser` membership state remains as stored.
 
 **Global deactivation** (`users.is_active`: true → false):
 
-* must use a guarded lifecycle service;
-
-* because 026B forbids membership creation, the set of existing memberships is stable
+- must use a guarded lifecycle service;
+- because 026B forbids membership creation, the set of existing memberships is stable
   enough for the already-Resolved algorithm:
-
-  * discover all existing `WorkspaceUser` memberships for the `User`;
-
-  * acquire corresponding `Workspace` row locks in deterministic `workspace_id` order;
-
-  * update global `User` active state in the guarded transaction;
-
-  * run fresh anti-lockout validation for every affected workspace;
-
-  * rollback if any workspace would have zero effective `manage_workspace_access`
+  - discover all existing `WorkspaceUser` memberships for the `User`;
+  - acquire corresponding `Workspace` row locks in deterministic `workspace_id` order;
+  - update global `User` active state in the guarded transaction;
+  - run fresh anti-lockout validation for every affected workspace;
+  - rollback if any workspace would have zero effective `manage_workspace_access`
     holders.
-
-* Workspace access mutations already serialize on their `Workspace` row, so role/
+- Workspace access mutations already serialize on their `Workspace` row, so role/
   permission/membership activation changes serialize against this deactivation path.
-
-* Do **not** introduce a new `User`-row mutex in GAP-026B while membership creation
+- Do **not** introduce a new `User`-row mutex in GAP-026B while membership creation
   is forbidden.
 
 **Hard delete (first cutover behavior)**
 
-* `User` with ≥1 `WorkspaceUser` membership → hard delete **denied** → deactivate
+- `User` with ≥1 `WorkspaceUser` membership → hard delete **denied** → deactivate
   instead.
-
-* Do **not** weaken `users` → `workspace_users` ON DELETE RESTRICT.
-
-* A `User` with no `WorkspaceUser` membership may retain current legacy hard-delete
+- Do **not** weaken `users` → `workspace_users` ON DELETE RESTRICT.
+- A `User` with no `WorkspaceUser` membership may retain current legacy hard-delete
   behavior unless another existing invariant forbids it.
-
-* Do **not** introduce destructive membership cleanup in 026B.
+- Do **not** introduce destructive membership cleanup in 026B.
 
 Current `UserResource` exposes `is_active`, `role` mutation, and hard `DeleteAction` —
 these are real migration seams.
@@ -1447,15 +1305,12 @@ blocker forces a new Stop-and-Amend.
 The **first production deployment** that contains GAP-026B-2 authority-switching
 code must **itself** be the one-time maintenance-window cutover deployment.
 
-* GAP-026B-2 must **not** be delivered through ordinary recurring deployment and then
+- GAP-026B-2 must **not** be delivered through ordinary recurring deployment and then
   exposed to merchant traffic pending a later EXECUTE.
-
-* Merchant traffic remains blocked from B-2 deployment through successful EXECUTE →
+- Merchant traffic remains blocked from B-2 deployment through successful EXECUTE →
   fresh anti-lockout validation → smoke verification.
-
-* Pre-EXECUTE B-2 authority must **never** fall back to legacy roles.
-
-* Recovery is reconciliation/completion of the cutover while traffic remains blocked,
+- Pre-EXECUTE B-2 authority must **never** fall back to legacy roles.
+- Recovery is reconciliation/completion of the cutover while traffic remains blocked,
   not authority fallback.
 
 **Required one-time sequence (frozen ordering)**
@@ -1476,13 +1331,10 @@ code must **itself** be the one-time maintenance-window cutover deployment.
 
 If any step from preflight through smoke verification fails:
 
-* application remains unavailable for merchant writes;
-
-* no partial authority fallback;
-
-* no role-based Connector/Tax/Mapping fallback;
-
-* investigate/reconcile before traffic resumes.
+- application remains unavailable for merchant writes;
+- no partial authority fallback;
+- no role-based Connector/Tax/Mapping fallback;
+- investigate/reconcile before traffic resumes.
 
 Existing resolved cutover order must remain:
 
@@ -1496,27 +1348,21 @@ across GAP-026B-1 and GAP-026B-2:
 
 **CHECK-ONLY (GAP-026B-1)**
 
-* May exist and run in a B-1-only release.
-
-* Performs no RBAC assignments or production legacy membership/role materialization.
-
-* Reports structured A-2 preflight state.
-
-* May run before maintenance for advance diagnostics.
+- May exist and run in a B-1-only release.
+- Performs no RBAC assignments or production legacy membership/role materialization.
+- Reports structured A-2 preflight state.
+- May run before maintenance for advance diagnostics.
 
 **EXECUTE (GAP-026B-2 only)**
 
-* Must **not** exist as an executable production mode in a release that does not also
+- Must **not** exist as an executable production mode in a release that does not also
   contain GAP-026B-2 authority-switching runtime code.
-
-* B-1-only EXECUTE is **forbidden by slice placement**, not by operator confirmation.
-
-* Requires application maintenance mode / explicitly quiesced merchant-write
+- B-1-only EXECUTE is **forbidden by slice placement**, not by operator confirmation.
+- Requires application maintenance mode / explicitly quiesced merchant-write
   environment; refuses to proceed otherwise; re-runs fresh preflight itself; invokes
   existing transactional backfill machinery; performs fresh post-backfill anti-lockout
   validation; fails non-zero on any unsafe state.
-
-* Production legacy assignment materialization is structurally unavailable until the
+- Production legacy assignment materialization is structurally unavailable until the
   release also carries GAP-026B-2 authority code.
 
 Do **not** introduce `--confirm-maintenance-window`, persistent environment activation
@@ -1546,9 +1392,9 @@ cutover**.
 
 **GAP-026B implementation split (frozen)**
 
-| Slice                                             | Future runtime scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **GAP-026B-1 — Access & Cutover Machinery**       | Guarded cutover command/service: **CHECK-ONLY mode only** (diagnostics; no RBAC assignment/materialization). Access/Roles application write services; existing-membership role assignment/removal; membership activate/deactivate; role create/rename/permission edit/safe unused-role delete; merchant Access/Roles UI; global `User` deactivation integrity service; hard-delete guard; CHECK-ONLY cutover/runbook tests. **Explicitly no** connector/tax policy authority switch. **B-1-only release must not ship an executable production EXECUTE mode** — no production legacy membership/role backfill in a B-1-only deployment.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Slice | Future runtime scope |
+|---|---|
+| **GAP-026B-1 — Access & Cutover Machinery** | Guarded cutover command/service: **CHECK-ONLY mode only** (diagnostics; no RBAC assignment/materialization). Access/Roles application write services; existing-membership role assignment/removal; membership activate/deactivate; role create/rename/permission edit/safe unused-role delete; merchant Access/Roles UI; global `User` deactivation integrity service; hard-delete guard; CHECK-ONLY cutover/runbook tests. **Explicitly no** connector/tax policy authority switch. **B-1-only release must not ship an executable production EXECUTE mode** — no production legacy membership/role backfill in a B-1-only deployment. |
 | **GAP-026B-2 — Authority & Presentation Cutover** | **Done / production-activated (2026-08-14).** EXECUTE mode of the guarded cutover command/service (production legacy assignment materialization). `ConnectorAccountPolicy` migration; remove legacy `WorkspaceMembership` from connector authority paths; permission-based safe Connector presentation; merchant Integrations/catalog gating migration; tax authorization migration + write-time reauthorization; Mapping authorization seam; DB-fresh `WorkspaceAuthorization` effective-permission evaluation (persistence-backed authority inputs, not hydrated `User` state); Connector post-lock dispatch authorization freshness; accepted asynchronous revocation boundary (post-snapshot enqueue is not retroactively cancelled); explicit no-`Workspace`-row-mutex / no-`User`-row-mutex rule for Connector dispatch; cross-workspace + safe-state + Livewire serialization regressions; EXECUTE cutover/runbook tests. Reference-environment maintenance-window cutover completed 2026-08-14. Layer B mapping UI (4C-1c-2b) shipped in PR #139 after B-2 production EXECUTE. |
 
 This separates repository implementation readiness from environment production
@@ -1558,39 +1404,23 @@ activation.
 
 Do **not** silently absorb into GAP-026B:
 
-* new `WorkspaceUser` creation/onboarding;
-
-* invitations;
-
-* membership hard-delete;
-
-* multi-workspace selector UX;
-
-* whole-admin permission vocabulary;
-
-* whole-admin policies;
-
-* `canAccessPanel` rewrite;
-
-* `strictAuthorization`;
-
-* `PlatformAdminAuthorization` redesign;
-
-* `/cabinet` authorization;
-
-* Spatie package/table removal;
-
-* direct per-user permission overrides;
-
-* deny/muting;
-
-* workspace suspension;
-
-* Field Browser Layer-C redesign;
-
-* Mapping UI itself;
-
-* sync execution/scheduling authorization.
+- new `WorkspaceUser` creation/onboarding;
+- invitations;
+- membership hard-delete;
+- multi-workspace selector UX;
+- whole-admin permission vocabulary;
+- whole-admin policies;
+- `canAccessPanel` rewrite;
+- `strictAuthorization`;
+- `PlatformAdminAuthorization` redesign;
+- `/cabinet` authorization;
+- Spatie package/table removal;
+- direct per-user permission overrides;
+- deny/muting;
+- workspace suspension;
+- Field Browser Layer-C redesign;
+- Mapping UI itself;
+- sync execution/scheduling authorization.
 
 These remain in GAP-025 / GAP-027 / later explicitly resolved work.
 
@@ -1607,6 +1437,7 @@ GAP-027; this is transitional and must not be represented as completed RBAC. Cur
 
 ## Product Catalogue Context
 
+
 The Product Catalogue is the core of the platform.
 
 It manages product identity, product variants, categories, media and product field values.
@@ -1615,19 +1446,20 @@ The user should feel that they are managing simple products.
 
 Internally, the platform must distinguish between:
 
-* product;
+- product;
 
-* product variant;
+- product variant;
 
-* product fields;
+- product fields;
 
-* prices;
+- prices;
 
-* availability;
+- availability;
 
-* channel projections.
+- channel projections.
 
 ### Product
+
 
 A Product is the general product card.
 
@@ -1635,13 +1467,13 @@ It represents the shared product identity and common information.
 
 Examples:
 
-* Stroller Anex IQ
+- Stroller Anex IQ
 
-* Car Seat Cybex Solution
+- Car Seat Cybex Solution
 
-* Baby Bottle Philips Avent
+- Baby Bottle Philips Avent
 
-* Office Chair Model X
+- Office Chair Model X
 
 A product may have one or more variants.
 
@@ -1651,25 +1483,25 @@ The user should not be forced to understand variants during basic product creati
 
 A product may contain common information such as:
 
-* workspace;
+- workspace;
 
-* product type;
+- product type;
 
-* category;
+- category;
 
-* product name;
+- product name;
 
-* description;
+- description;
 
-* brand;
+- brand;
 
-* status;
+- status;
 
-* primary image;
+- primary image;
 
-* product URL;
+- product URL;
 
-* common attribute values.
+- common attribute values.
 
 The product should not directly contain every possible product field as database columns.
 
@@ -1677,49 +1509,50 @@ Extensible product data should be stored through the Attribute Dictionary and at
 
 ### ProductVariant
 
+
 A ProductVariant is the concrete sellable unit.
 
 It represents the thing that can be priced, stocked and ordered.
 
 Examples:
 
-* stroller Anex IQ, black color;
+- stroller Anex IQ, black color;
 
-* stroller Anex IQ, grey color;
+- stroller Anex IQ, grey color;
 
-* T-shirt, size M, blue;
+- T-shirt, size M, blue;
 
-* same product with a different SKU or GTIN;
+- same product with a different SKU or GTIN;
 
-* same model with a different package quantity.
+- same model with a different package quantity.
 
 A product variant may contain:
 
-* workspace;
+- workspace;
 
-* product;
+- product;
 
-* SKU / article number;
+- SKU / article number;
 
-* GTIN / EAN;
+- GTIN / EAN;
 
-* variant status;
+- variant status;
 
-* base price cache;
+- base price cache;
 
-* sale price cache;
+- sale price cache;
 
-* cost price cache;
+- cost price cache;
 
-* currency;
+- currency;
 
-* available quantity cache;
+- available quantity cache;
 
-* availability status;
+- availability status;
 
-* primary image;
+- primary image;
 
-* default variant flag.
+- default variant flag.
 
 For MVP, each product should have one automatically created default variant.
 
@@ -1729,19 +1562,19 @@ This gives the user a simple product experience while keeping the architecture r
 
 ### Product and Variant Rule
 
+
 The platform must follow this rule:
 
-* Product = shared product card and common information.
+- Product = shared product card and common information.
 
-* ProductVariant = sellable SKU-level unit.
+- ProductVariant = sellable SKU-level unit.
 
 Pricing and availability should usually belong to the variant level.
 
 This avoids future problems when one product has several sellable versions with different SKU, price or stock.
 
 ### Platform Product Capability Baseline
-
-\[Resolved]
+[Resolved]
 
 The platform is a universal multi-tenant SaaS e-commerce Product Data Platform. It is not defined by a tiny fixed field list, a named customer, a first connected commerce account, or the first Magento connector.
 
@@ -1749,29 +1582,18 @@ Reference clients validate the platform; they do not define the platform.
 
 The platform must support heterogeneous e-commerce catalogues across product verticals. Illustrative examples only — not a closed enum and not encoded as generic Product-core logic:
 
-* apparel;
-
-* footwear;
-
-* electronics;
-
-* home/furniture;
-
-* toys;
-
-* beauty;
-
-* automotive parts;
-
-* industrial products;
-
-* food/non-food packaged goods;
-
-* sports;
-
-* specialty retail;
-
-* B2B supplies.
+- apparel;
+- footwear;
+- electronics;
+- home/furniture;
+- toys;
+- beauty;
+- automotive parts;
+- industrial products;
+- food/non-food packaged goods;
+- sports;
+- specialty retail;
+- B2B supplies.
 
 #### Product + Variant is a first-class invariant
 
@@ -1786,15 +1608,11 @@ Product variants may differ by merchant-defined option dimensions such as color,
 
 The architecture must not assume:
 
-* one Product = one SKU;
-
-* one Product = one price;
-
-* one Product = one inventory quantity;
-
-* one Product = one image;
-
-* one Product = one external record.
+- one Product = one SKU;
+- one Product = one price;
+- one Product = one inventory quantity;
+- one Product = one image;
+- one Product = one external record.
 
 Where domain ownership places SKU/GTIN/price/inventory/media on variants, connector execution must respect that model.
 
@@ -1808,9 +1626,8 @@ Product → 0..N ProductVariants
 
 Zero variants does not mean Magento configurable. Magento Product Export V1 execution semantics distinguish:
 
-* ordinary non-variant / single-sellable-unit Product → Magento simple;
-
-* Product with meaningful option variants → Magento configurable family.
+- ordinary non-variant / single-sellable-unit Product → Magento simple;
+- Product with meaningful option variants → Magento configurable family.
 
 #### Configurable / variant product families are mandatory
 
@@ -1838,15 +1655,11 @@ Do not treat current Adobe rows in `docs/data/canonical_product_field_mappings.c
 
 The Product Data Platform conceptually supports rich Product assets including at least:
 
-* images;
-
-* video;
-
-* product manuals / instructions;
-
-* documents / PDFs;
-
-* certificates / technical documents where applicable.
+- images;
+- video;
+- product manuals / instructions;
+- documents / PDFs;
+- certificates / technical documents where applicable.
 
 The architecture must allow both Product-level assets and Variant-specific assets where business semantics require them.
 
@@ -1858,21 +1671,14 @@ This section defines required conceptual extensibility, not a new persistence sc
 
 Required semantic concerns to preserve or explicitly leave extensible:
 
-* asset type;
-
-* product/variant association;
-
-* ordering;
-
-* primary/role;
-
-* locale where relevant;
-
-* external/source reference;
-
-* importability;
-
-* exportability.
+- asset type;
+- product/variant association;
+- ordering;
+- primary/role;
+- locale where relevant;
+- external/source reference;
+- importability;
+- exportability.
 
 The target architecture must remain capable of evolving from the current minimal representation toward first-class Product/Variant assets without forcing connector-specific media fields into Product core.
 
@@ -1896,11 +1702,9 @@ Do not assume one language or one storefront scope as permanent Product semantic
 
 Preserve compatibility with:
 
-* localized product content (JSONB translation objects for `is_localizable = true`; MVP UI shows the primary workspace language);
-
-* multi-store / store-view external contexts (`SyncConfiguration.external_context` is connector-owned, not Product-core columns);
-
-* channel-specific presentation.
+- localized product content (JSONB translation objects for `is_localizable = true`; MVP UI shows the primary workspace language);
+- multi-store / store-view external contexts (`SyncConfiguration.external_context` is connector-owned, not Product-core columns);
+- channel-specific presentation.
 
 Do not invent another localization persistence system here.
 
@@ -1912,39 +1716,41 @@ Examples: platform video asset; platform instruction/document asset; bundle/kit 
 
 ### Product Type
 
+
 A ProductType defines an internal template for product structure.
 
 In the user interface, this may be called:
 
-* Product Type
+- Product Type
 
-* Тип товара
+- Тип товара
 
 For MVP, the default product type is:
 
-* Basic Product
+- Basic Product
 
-* Обычный товар
+- Обычный товар
 
 The user should not be forced to choose or configure product types in MVP.
 
 Product types may later define:
 
-* which fields are shown;
+- which fields are shown;
 
-* which fields are recommended;
+- which fields are recommended;
 
-* which fields are required for a channel;
+- which fields are required for a channel;
 
-* whether variants are enabled;
+- whether variants are enabled;
 
-* which fields are product-level;
+- which fields are product-level;
 
-* which fields are variant-level.
+- which fields are variant-level.
 
 Product types should remain mostly invisible until the business needs them.
 
 ### Category
+
 
 Categories are workspace-owned.
 
@@ -1952,17 +1758,17 @@ For MVP, the platform should support a simple category tree inside each workspac
 
 A category may contain:
 
-* workspace;
+- workspace;
 
-* parent category;
+- parent category;
 
-* name;
+- name;
 
-* slug;
+- slug;
 
-* sort order;
+- sort order;
 
-* status.
+- status.
 
 The platform should not introduce global taxonomy in MVP. See **Product classification model** below for how this relates to the separate, not-yet-built Standard Category concept.
 
@@ -1972,15 +1778,16 @@ This keeps the platform simple for small businesses that already think in their 
 
 ### Media
 
+
 Media assets should be reusable.
 
 Initial media entities:
 
-* MediaAsset
+- MediaAsset
 
-* ProductMedia
+- ProductMedia
 
-* VariantMedia
+- VariantMedia
 
 A media asset may belong to a workspace.
 
@@ -1990,9 +1797,9 @@ For MVP, this can be simple.
 
 The first version may support:
 
-* primary product image;
+- primary product image;
 
-* additional product images later.
+- additional product images later.
 
 Media handling should not become a full DAM system in MVP.
 
@@ -2016,15 +1823,16 @@ The Field Dictionary manages field metadata definitions, distinct from the stora
 
 ### Hybrid Field Storage Implementation
 
+
 To balance high performance with infinite extensibility, the platform utilizes a hybrid storage engine:
 
-* **Column-Backed Fields:** Core operational and transaction-critical fields (name, sku, gtin, status, cached prices and quantities on Product/Variant; name, tax\_number, credit\_limit on Customer) are kept as standard database columns for indexing, rapid sorting, and foreign key integrity.
+- **Column-Backed Fields:** Core operational and transaction-critical fields (name, sku, gtin, status, cached prices and quantities on Product/Variant; name, tax_number, credit_limit on Customer) are kept as standard database columns for indexing, rapid sorting, and foreign key integrity.
 
-* **Relation-Backed Fields:** Fields that are really a reference to another entity (e.g. Customer's `default_price_list`) are Eloquent relations, not scalar columns or dynamic values.
+- **Relation-Backed Fields:** Fields that are really a reference to another entity (e.g. Customer's `default_price_list`) are Eloquent relations, not scalar columns or dynamic values.
 
-* **Dynamic Fields:** Extensible, tenant-specific properties (e.g., color, material on Product; a custom segment field on Customer) are stored in Entity-Attribute-Value (EAV) structures, one typed table per bound entity — never a single shared polymorphic table (see Domain Decisions, "Attribute value storage").
+- **Dynamic Fields:** Extensible, tenant-specific properties (e.g., color, material on Product; a custom segment field on Customer) are stored in Entity-Attribute-Value (EAV) structures, one typed table per bound entity — never a single shared polymorphic table (see Domain Decisions, "Attribute value storage").
 
-* **The Registry Rule:** The Field Dictionary tracks all available fields via two
+- **The Registry Rule:** The Field Dictionary tracks all available fields via two
   cooperating entities — `FieldDefinition` (what the field means) and
   `FieldBinding` (what entity it's attached to and how it's physically stored).
   Every `FieldBinding` must define its `storage_type` (**column, relation, or
@@ -2035,80 +1843,58 @@ To balance high performance with infinite extensibility, the platform utilizes a
 
 ### Core Entity: FieldDefinition
 
-*(renamed from* *`AttributeDefinition`; table renamed from* *`attribute_definitions`* *to* *`field_definitions`)*
+*(renamed from `AttributeDefinition`; table renamed from `attribute_definitions` to `field_definitions`)*
 
 Defines the semantic meaning, data type, and governance level of a field —
 **entity-agnostic**. Does not know which entity (Product, Variant, Customer,
 ...) it is attached to, or how it is stored — that is `FieldBinding`'s job.
 
-* id (UUID)
-
-* workspace\_id (UUID, nullable for system/platform-wide definitions)
-
-* code (String/Slug, immutable)
-
-* data\_type (Enum): text, long\_text, number, decimal, money, boolean, date, select, multi\_select,
+- id (UUID)
+- workspace_id (UUID, nullable for system/platform-wide definitions)
+- code (String/Slug, immutable)
+- data_type (Enum): text, long_text, number, decimal, money, boolean, date, select, multi_select,
   image, url, computed
-
-* scope (Enum): system, platform\_library, workspace\_custom
-
-* localized\_labels (JSONB)
-
-* description (Text, nullable)
-
-* validation\_rules (JSONB, nullable)
-
-* is\_localizable (Boolean)
-
-* is\_multi\_value (Boolean)
-
-* status (Enum): active, archived
+- scope (Enum): system, platform_library, workspace_custom
+- localized_labels (JSONB)
+- description (Text, nullable)
+- validation_rules (JSONB, nullable)
+- is_localizable (Boolean)
+- is_multi_value (Boolean)
+- status (Enum): active, archived
 
 ### Core Entity: FieldBinding
 
-*(new entity; table* *`field_bindings`)*
+*(new entity; table `field_bindings`)*
 
 Defines what entity a `FieldDefinition` applies to, and how its value is
-physically stored for that entity. **One binding = exactly one** **`object_type`.**
+physically stored for that entity. **One binding = exactly one `object_type`.**
 A field that applies to both Product and ProductVariant (e.g. a field that can
 be set at product level and overridden per variant) is represented as **two
-separate** **`FieldBinding`** **rows** on the same `FieldDefinition` — there is no
+separate `FieldBinding` rows** on the same `FieldDefinition` — there is no
 `both` value and no null/undefined level for entities (like Customer) that
 have no variant-equivalent concept. This replaces the previous
 `AttributeDefinition.value_level` enum (`product | variant | both`), which is
 removed, not carried forward.
 
-* id (UUID)
-
-* workspace\_id (UUID, nullable for system/platform-wide bindings — mirrors
+- id (UUID)
+- workspace_id (UUID, nullable for system/platform-wide bindings — mirrors
   `FieldDefinition.workspace_id` nullability rule)
-
-* field\_definition\_id (UUID, FK → field\_definitions)
-
-* object\_type (Enum): product, product\_variant, customer *(future: order, supplier, ...
+- field_definition_id (UUID, FK → field_definitions)
+- object_type (Enum): product, product_variant, customer *(future: order, supplier, ...
   added only when a real feature needs them — see UI direction in Domain Decisions)*
-
-* storage\_type (Enum): column, relation, dynamic
-
-* storage\_path (String, nullable): e.g. `product_variants.barcode_ean`,
+- storage_type (Enum): column, relation, dynamic
+- storage_path (String, nullable): e.g. `product_variants.barcode_ean`,
   `customers.credit_limit`, `Customer.defaultPriceList` (relation accessor);
   null only for `storage_type: dynamic`
-
-* field\_group (String, stable snake\_case code: basic\_information, identifiers, pricing,
-  availability, images\_media, descriptions, characteristics, b2b, seo, logistics, internal);
+- field_group (String, stable snake_case code: basic_information, identifiers, pricing,
+  availability, images_media, descriptions, characteristics, b2b, seo, logistics, internal);
   UI labels for groups are translated via Laravel lang/config files, not stored per-binding
-
-* is\_required (Boolean)
-
-* is\_filterable (Boolean)
-
-* is\_sortable (Boolean)
-
-* visibility\_settings (JSONB): e.g. {"admin": true, "b2b": false, "channels": {}}
-
-* sort\_order (Integer)
-
-* status (Enum): active, archived — allows deprecating a binding independently
+- is_required (Boolean)
+- is_filterable (Boolean)
+- is_sortable (Boolean)
+- visibility_settings (JSONB): e.g. {"admin": true, "b2b": false, "channels": {}}
+- sort_order (Integer)
+- status (Enum): active, archived — allows deprecating a binding independently
   of its `FieldDefinition` (e.g. a field stays defined but is unbound from a
   retired entity type)
 
@@ -2119,230 +1905,244 @@ not expressible as a single database constraint across separate value tables.
 
 ### Strict Architectural Rules for Localization and Values
 
-* **JSONB Storage Mandate:** If a `FieldDefinition` has is\_localizable = true, the application and database must store its values strictly within a **JSONB structure** inside the dynamic value tables or column entries. Flat string overwrites are prohibited.
 
-* **Separated Value Tables — one per bound entity type, never polymorphic:**
+- **JSONB Storage Mandate:** If a `FieldDefinition` has is_localizable = true, the application and database must store its values strictly within a **JSONB structure** inside the dynamic value tables or column entries. Flat string overwrites are prohibited.
 
-  * `product_field_values` *(renamed from* *`product_attribute_values`)*:
+- **Separated Value Tables — one per bound entity type, never polymorphic:**
+
+  - `product_field_values` *(renamed from `product_attribute_values`)*:
     `id`, `workspace_id`, `product_id` (FK → products), `field_binding_id`
-    (FK → field\_bindings, **not** `field_definition_id` — see rationale below),
+    (FK → field_bindings, **not** `field_definition_id` — see rationale below),
     `value_text`, `value_num`, `value_jsonb`.
     Unique index: (`workspace_id`, `product_id`, `field_binding_id`).
-
-  * `variant_field_values` *(renamed from* *`variant_attribute_values`)*:
-    `id`, `workspace_id`, `variant_id` (FK → product\_variants), `field_binding_id`,
+  - `variant_field_values` *(renamed from `variant_attribute_values`)*:
+    `id`, `workspace_id`, `variant_id` (FK → product_variants), `field_binding_id`,
     `value_text`, `value_num`, `value_jsonb`.
     Unique index: (`workspace_id`, `variant_id`, `field_binding_id`).
-
-  * `customer_field_values` *(new)*:
+  - `customer_field_values` *(new)*:
     `id`, `workspace_id`, `customer_id` (FK → customers), `field_binding_id`,
     `value_text`, `value_num`, `value_jsonb`.
     Unique index: (`workspace_id`, `customer_id`, `field_binding_id`).
 
-  **Why** **`field_binding_id`, not** **`field_definition_id`:** a raw value row must
+  **Why `field_binding_id`, not `field_definition_id`:** a raw value row must
   unambiguously resolve to one `object_type` and one `storage_type`. Referencing
   `field_definition_id` directly would allow (in theory) a `customer_field_values`
   row to reference a binding whose `object_type` is `product` — referencing
-  `field_binding_id` and enforcing the object\_type match at the write-path
+  `field_binding_id` and enforcing the object_type match at the write-path
   level closes that hole. This does not reopen the "no polymorphic value
   table" decision — each value table still serves exactly one entity type; it
   only changes which column the FK points to.
 
-* **Multi-value fields** (`is_multi_value = true` on `FieldDefinition`) store
+- **Multi-value fields** (`is_multi_value = true` on `FieldDefinition`) store
   their value as a JSON array inside `value_jsonb` on the single value row for
   that binding — not as multiple rows. This is the existing convention,
   unchanged by this renaming.
 
-* **Only** **`storage_type: dynamic`** **bindings may have value rows.** A `FieldBinding`
+- **Only `storage_type: dynamic` bindings may have value rows.** A `FieldBinding`
   with `storage_type: column` or `relation` must never have a corresponding
   row in any `*_field_values` table — its value lives at `storage_path` on the
   entity itself. Write-path code must validate this before insert.
 
-* Write Routing: If is\_localizable is true, strings are formatted as language dictionaries and committed to value\_jsonb. If false, data goes to value\_text or value\_num based on the configuration.
+- Write Routing: If is_localizable is true, strings are formatted as language dictionaries and committed to value_jsonb. If false, data goes to value_text or value_num based on the configuration.
 
 ### Anti-Duplication and Smart Import Layer
 
+
 To power the Anti-Duplication Wizard and prevent users or sloppy import spreadsheets from generating redundant fields (e.g., creating "Цвет", "Color", and "Колір" as three separate definitions), the dictionary includes a tenant-isolated synonym registry.
 
-* Entity: workspace\_import\_aliases
+- Entity: workspace_import_aliases
 
-* id (UUID): Primary key.
+- id (UUID): Primary key.
 
-* workspace\_id (UUID): Binds the alias scope to a specific tenant.
+- workspace_id (UUID): Binds the alias scope to a specific tenant.
 
-* field\_binding\_id (UUID) *(renamed from* *`attribute_definition_id`)*: Foreign
+- field_binding_id (UUID) *(renamed from `attribute_definition_id`)*: Foreign
   key to the specific `FieldBinding` this alias resolves to — not just the
   `FieldDefinition` — because the same raw external column name (e.g. "Назва")
   is ambiguous between Product and Customer at the definition level, and is
   only unambiguous once resolved to a specific entity binding.
 
-* alias\_name (String): Normalized string token (e.g., колор, цвет, colour).
+- alias_name (String): Normalized string token (e.g., колор, цвет, colour).
 
-* source (String, nullable): Import/connector origin of this alias (e.g. "1c",
-  "google\_sheets"), for future Connector Foundation (GAP-006) disambiguation.
+- source (String, nullable): Import/connector origin of this alias (e.g. "1c",
+  "google_sheets"), for future Connector Foundation (GAP-006) disambiguation.
   Null means manually registered / source-agnostic — do not store "manual" as a literal value.
 
-* Validation Rule: Before the system creates a new custom field, the Anti-Duplication Wizard checks the input name against existing code entries, localized\_labels, and workspace\_import\_aliases (scoped to the relevant object\_type). If a match is found, the system blocks creation and suggests mapping to the existing field instead.
+- Validation Rule: Before the system creates a new custom field, the Anti-Duplication Wizard checks the input name against existing code entries, localized_labels, and workspace_import_aliases (scoped to the relevant object_type). If a match is found, the system blocks creation and suggests mapping to the existing field instead.
 
 ### Computed Fields Operational Boundary
 
-Fields registered with data\_type = 'computed' (such as margin\_percentage or b2b\_readiness\_status) represent derived calculations.
 
-* **No Physical Persistence Rule:** The platform is strictly forbidden from allocating physical rows or strings within `product_field_values`, `variant_field_values`, or `customer_field_values` for computed types.
+Fields registered with data_type = 'computed' (such as margin_percentage or b2b_readiness_status) represent derived calculations.
 
-* **Runtime Execution:** These properties must be calculated dynamically on-the-fly inside the application layer (Runtime Services) or handled via native database virtual columns (Virtual Generated Columns / Read Views). This eliminates data staleness when base prices or stock variables change.
+- **No Physical Persistence Rule:** The platform is strictly forbidden from allocating physical rows or strings within `product_field_values`, `variant_field_values`, or `customer_field_values` for computed types.
+
+- **Runtime Execution:** These properties must be calculated dynamically on-the-fly inside the application layer (Runtime Services) or handled via native database virtual columns (Virtual Generated Columns / Read Views). This eliminates data staleness when base prices or stock variables change.
+
 
 ## Pricing Context
+
 
 The pricing architecture manages complex B2B financial relationships, multi-tier wholesale discounts, and currency isolation, while maintaining flattened caches for instant catalog indexing.
 
 ### Core Entity: PriceList
 
+
 Defines a distinct pricing layer within a workspace.
 
-* id (UUID): Primary key.
+- id (UUID): Primary key.
 
-* workspace\_id (UUID): Tenant owner.
+- workspace_id (UUID): Tenant owner.
 
-* name (String): Internal title (e.g., "Wholesale Base", "VIP Tier Gold", "Default Retail").
+- name (String): Internal title (e.g., "Wholesale Base", "VIP Tier Gold", "Default Retail").
 
-* currency (String): Three-letter ISO currency code (e.g., USD, EUR, UAH).
+- currency (String): Three-letter ISO currency code (e.g., USD, EUR, UAH).
 
-* is\_default (Boolean): Flag indicating if this list applies to unauthenticated or standard guests.
+- is_default (Boolean): Flag indicating if this list applies to unauthenticated or standard guests.
 
-* priority (Integer): Evaluation weight utilized by the resolver when a customer matches multiple lists.
+- priority (Integer): Evaluation weight utilized by the resolver when a customer matches multiple lists.
 
-* status (Enum): active, inactive.
+- status (Enum): active, inactive.
 
 ### Core Entity: PriceListItem (B2B Volume Tiers)
 
+
 Defines the concrete price matrix rules. Volume tier support is a core architectural requirement for the Wholesale platform and is embedded directly into the schema.
 
-* id (UUID): Primary key.
+- id (UUID): Primary key.
 
-* workspace\_id (UUID): Tenant owner.
+- workspace_id (UUID): Tenant owner.
 
-* price\_list\_id (UUID): Parent price list relationship.
+- price_list_id (UUID): Parent price list relationship.
 
-* product\_variant\_id (bigint, matching the existing product\_variants primary key): Link to the concrete sellable SKU unit.
+- product_variant_id (bigint, matching the existing product_variants primary key): Link to the concrete sellable SKU unit.
 
-* quantity\_min (Integer): The minimum quantity threshold required to unlock this price point. Defaults to 1 for standard single-item pricing.
+- quantity_min (Integer): The minimum quantity threshold required to unlock this price point. Defaults to 1 for standard single-item pricing.
 
-* price (Decimal): The flat base price for this quantity tier before customer-specific discounts.
+- price (Decimal): The flat base price for this quantity tier before customer-specific discounts.
 
-* sale\_price (Decimal, Nullable): Promotional temporary price overriding the standard tier price.
+- sale_price (Decimal, Nullable): Promotional temporary price overriding the standard tier price.
 
-* valid\_from (Timestamp, Nullable): Time lock activation.
+- valid_from (Timestamp, Nullable): Time lock activation.
 
-* valid\_until (Timestamp, Nullable): Time lock expiration.
+- valid_until (Timestamp, Nullable): Time lock expiration.
 
-* status (Enum): active, suspended.
+- status (Enum): active, suspended.
 
 ### Tier Matrix Structure Logic
 
-Multi-level pricing operates by declaring multiple PriceListItem entries pointing to the same product\_variant\_id within the same price\_list\_id, differentiated strictly by their quantity\_min thresholds:
 
-* Entry 1: product\_variant\_id: X, quantity\_min: 1, price: 100.00 (Applies to purchases of 1 to 9 items)
+Multi-level pricing operates by declaring multiple PriceListItem entries pointing to the same product_variant_id within the same price_list_id, differentiated strictly by their quantity_min thresholds:
 
-* Entry 2: product\_variant\_id: X, quantity\_min: 10, price: 90.00 (Applies to purchases of 10 to 49 items)
+- Entry 1: product_variant_id: X, quantity_min: 1, price: 100.00 (Applies to purchases of 1 to 9 items)
 
-* Entry 3: product\_variant\_id: X, quantity\_min: 50, price: 80.00 (Applies to purchases of 50+ items)
+- Entry 2: product_variant_id: X, quantity_min: 10, price: 90.00 (Applies to purchases of 10 to 49 items)
+
+- Entry 3: product_variant_id: X, quantity_min: 50, price: 80.00 (Applies to purchases of 50+ items)
 
 ### Domain Service: PriceResolver
 
+
 The PriceResolver component is responsible for evaluating final contractual pricing in real-time. It accepts a VariantID, a CustomerID, and an intended Quantity.
 
-* It identifies the target PriceList assigned to the customer or falls back to the workspace default list.
+- It identifies the target PriceList assigned to the customer or falls back to the workspace default list.
 
-* It fetches all PriceListItem rows matching the target variant and price list.
+- It fetches all PriceListItem rows matching the target variant and price list.
 
-* It filters out records that fall outside of valid\_from / valid\_until windows or are marked as inactive.
+- It filters out records that fall outside of valid_from / valid_until windows or are marked as inactive.
 
-* It isolates the specific row where the requested Quantity satisfies the tier condition: Quantity >= quantity\_min, selecting the highest matching quantity\_min row.
+- It isolates the specific row where the requested Quantity satisfies the tier condition: Quantity >= quantity_min, selecting the highest matching quantity_min row.
 
-* It applies any overlaying adjustments from the PricingRule or CustomerGroup percentage matrices to return the final net price.
+- It applies any overlaying adjustments from the PricingRule or CustomerGroup percentage matrices to return the final net price.
 
-### Runtime Computed Metrics: margin\_percentage
+### Runtime Computed Metrics: margin_percentage
+
 
 Margin calculation is an operational tool for managers and must never be stored as static data.
 
-* **Calculation Flow:** margin\_percentage is calculated exclusively at runtime by evaluating the variant's active price or sale\_price resolved from the system against its internal cost\_price\_cache.
+- **Calculation Flow:** margin_percentage is calculated exclusively at runtime by evaluating the variant's active price or sale_price resolved from the system against its internal cost_price_cache.
 
-* **Formula:** Margin % = ((Price - Cost Price) / Price) \* 100
+- **Formula:** Margin % = ((Price - Cost Price) / Price) * 100
 
-* **Visibility Boundary:** This calculation occurs entirely inside backend services. The output is stripped from responses directed at public or B2B storefront layers, rendering exclusively for authenticated workspace managers with elevated permissions.
+- **Visibility Boundary:** This calculation occurs entirely inside backend services. The output is stripped from responses directed at public or B2B storefront layers, rendering exclusively for authenticated workspace managers with elevated permissions.
 
 ## Availability Context
+
 
 Availability coordinates physical warehouse balances, cross-dock allocations, and checkout reservations to deliver a reliable stock picture while avoiding double sales during high-concurrency cart activities.
 
 ### Operational Inventory Cache
 
+
 To prevent heavy query calculations during search indexing and bulk storefront views, the ProductVariant table carries operational counters:
 
-* available\_quantity\_cache (Integer): The physical balance recorded in the system.
+- available_quantity_cache (Integer): The physical balance recorded in the system.
 
-* availability\_status (Enum): in\_stock, low\_stock, out\_of\_stock, pre\_order.
+- availability_status (Enum): in_stock, low_stock, out_of_stock, pre_order.
 
 ### Core Entity: InventoryRecord
 
+
 The transaction ledger tracking all raw inventory updates.
 
-* id (UUID): Primary key.
+- id (UUID): Primary key.
 
-* workspace\_id (UUID): Tenant isolation key.
+- workspace_id (UUID): Tenant isolation key.
 
-* product\_variant\_id (bigint, matching the existing product\_variants primary key): Target variant link.
+- product_variant_id (bigint, matching the existing product_variants primary key): Target variant link.
 
-* source\_type (Enum): manual\_adjustment, bulk\_import, connector\_sync, order\_allocation.
+- source_type (Enum): manual_adjustment, bulk_import, connector_sync, order_allocation.
 
-* source\_reference\_id (String, Nullable): Tracks the originating document ID (e.g., 1C document number or import job log reference).
+- source_reference_id (String, Nullable): Tracks the originating document ID (e.g., 1C document number or import job log reference).
 
-* quantity\_change (Integer): Signed integer representing the stock movement (e.g., +150, -12).
+- quantity_change (Integer): Signed integer representing the stock movement (e.g., +150, -12).
 
-* resulting\_quantity (Integer): Snapshot of the historical balance immediately following this entry.
+- resulting_quantity (Integer): Snapshot of the historical balance immediately following this entry.
 
-* reason (String, Nullable): Auditor notes.
+- reason (String, Nullable): Auditor notes.
 
 ### Core Entity: InventoryReservation (Overbooking Protection Layer)
 
+
 To guarantee an accurate storefront availability snapshot and protect checkout flows from race conditions (where multiple clients try to buy the last 3 items simultaneously), the system implements a soft-reservation layer.
 
-* id (UUID): Primary key.
+- id (UUID): Primary key.
 
-* workspace\_id (UUID): Tenant scope.
+- workspace_id (UUID): Tenant scope.
 
-* order\_id (bigint, Nullable, matching the existing orders primary key): Present if the reservation is bound to a pending order undergoing processing.
+- order_id (bigint, Nullable, matching the existing orders primary key): Present if the reservation is bound to a pending order undergoing processing.
 
-* order\_item\_id (bigint, Nullable, matching the existing order\_items primary key): Link to the precise item row.
+- order_item_id (bigint, Nullable, matching the existing order_items primary key): Link to the precise item row.
 
-* product\_variant\_id (bigint, matching the existing product\_variants primary key): The reserved item link.
+- product_variant_id (bigint, matching the existing product_variants primary key): The reserved item link.
 
-* quantity (Integer): Number of units locked by this reservation.
+- quantity (Integer): Number of units locked by this reservation.
 
-* status (Enum): pending (active lock), confirmed (converted to physical deduction), expired (lock invalidated).
+- status (Enum): pending (active lock), confirmed (converted to physical deduction), expired (lock invalidated).
 
-* created\_at (Timestamp): Record initiation time.
+- created_at (Timestamp): Record initiation time.
 
-* expires\_at (Timestamp): Time-To-Live (TTL) timestamp. Reservations are strictly time-bound (e.g., a system configuration of 15 minutes for cart checkouts or 48 hours for pending invoice bank wire verifications).
+- expires_at (Timestamp): Time-To-Live (TTL) timestamp. Reservations are strictly time-bound (e.g., a system configuration of 15 minutes for cart checkouts or 48 hours for pending invoice bank wire verifications).
 
 ### Net Availability Calculation Logic
 
+
 When the platform displays stock numbers to a customer on the B2B storefront or evaluates if a checkout can proceed, it asks the AvailabilityResolver for the net sellable inventory.
 
-* **The Formula:** Net Sellable Stock = available\_quantity\_cache - SUM(InventoryReservation.quantity Where status = 'pending' AND expires\_at > CurrentTime)
+- **The Formula:** Net Sellable Stock = available_quantity_cache - SUM(InventoryReservation.quantity Where status = 'pending' AND expires_at > CurrentTime)
 
-* **Cleanup Management:** Expired reservations are treated as non-existent by the formula. An automated system cron service periodically updates pending records past their expires\_at mark to expired, freeing unpurchased quantities back to the general public pool.
+- **Cleanup Management:** Expired reservations are treated as non-existent by the formula. An automated system cron service periodically updates pending records past their expires_at mark to expired, freeing unpurchased quantities back to the general public pool.
 
 ## Customers Context
+
 
 The platform uses Customer as the main B2B customer entity.
 
 In the user interface, customers are shown as:
 
-* Customers
+- Customers
 
-* Клиенты
+- Клиенты
 
 The platform should not use Contractor as the main user-facing term.
 
@@ -2352,33 +2152,34 @@ For example, a 1C connector may map an external contractor to the platform Custo
 
 ### Customer
 
+
 A customer represents a person or business that may view a B2B catalogue, receive prices and place orders.
 
 A customer may contain:
 
-* workspace;
+- workspace;
 
-* name;
+- name;
 
-* email;
+- email;
 
-* phone;
+- phone;
 
-* company name;
+- company name;
 
-* tax number;
+- tax number;
 
-* customer group;
+- customer group;
 
-* status;
+- status;
 
-* notes;
+- notes;
 
-* default price list;
+- default price list;
 
-* billing address;
+- billing address;
 
-* shipping address.
+- shipping address.
 
 For MVP, the customer model may be simple.
 
@@ -2386,23 +2187,25 @@ A future version may support multiple contacts per customer.
 
 ### CustomerGroup and Access
 
+
 A customer group may define:
 
-* default price list;
+- default price list;
 
-* discount;
+- discount;
 
-* visibility rules;
+- visibility rules;
 
-* catalogue access;
+- catalogue access;
 
-* payment terms;
+- payment terms;
 
-* future delivery terms.
+- future delivery terms.
 
 For MVP, customer groups may mainly support pricing and B2B access.
 
 ## B2B Channel Context
+
 
 B2B is the first native sales channel.
 
@@ -2416,67 +2219,68 @@ This is important for small businesses that previously worked only with Google S
 
 ### B2BChannel
 
+
 A B2BChannel represents one customer-facing B2B catalogue or storefront configuration.
 
 It may contain:
 
-* workspace;
+- workspace;
 
-* name;
+- name;
 
-* slug;
+- slug;
 
-* public URL;
+- public URL;
 
-* access mode;
+- access mode;
 
-* default price list;
+- default price list;
 
-* default customer group;
+- default customer group;
 
-* visibility mode;
+- visibility mode;
 
-* default display mode;
+- default display mode;
 
-* customer display mode switching flag;
+- customer display mode switching flag;
 
-* category navigation settings;
+- category navigation settings;
 
-* search settings;
+- search settings;
 
-* sorting settings;
+- sorting settings;
 
-* filter settings;
+- filter settings;
 
-* cart settings;
+- cart settings;
 
-* order settings;
+- order settings;
 
-* future payment settings;
+- future payment settings;
 
-* status;
+- status;
 
-* settings.
+- settings.
 
 Possible access modes:
 
-* public catalogue with visible prices;
+- public catalogue with visible prices;
 
-* public catalogue with hidden prices;
+- public catalogue with hidden prices;
 
-* invitation-only catalogue;
+- invitation-only catalogue;
 
-* login-required catalogue;
+- login-required catalogue;
 
-* customer-specific catalogue.
+- customer-specific catalogue.
 
 Possible display modes:
 
-* grid
+- grid
 
-* list
+- list
 
-* table
+- table
 
 MVP may implement a simpler access mode first.
 
@@ -2484,27 +2288,21 @@ The model should not block future access modes or display modes.
 
 ### B2B Catalogue Projection — Resolved
 
+
 A B2B catalogue is not a copied product table.
 
 It is a runtime projection built from shared workspace data. The projection never duplicates product identity — it composes eligibility, pricing, availability, and presentation over the same `Product` / `ProductVariant` models used elsewhere.
 
-**Projection inputs and their code mapping (verified on** **`develop`, PR #58–66):**
+**Projection inputs and their code mapping (verified on `develop`, PR #58–66):**
 
-* **Products and variants** — `App\Models\Product`, `App\Models\ProductVariant`. Catalog eligibility requires `products.is_active = true` and at least one active variant. Enforced by `App\Support\Pricing\CustomerPricingScope::applyProductScope()`.
-
-* **Categories** — `App\Models\Category`. Used for navigation, filtering, and sort in `App\Services\Pricing\CustomerCatalogQuery`.
-
-* **Price list** — `App\Models\PriceList`. Assigned per customer via `Customer.default_price_list_id`; fallback to workspace default via `CustomerPricingScope::priceListIdFor()`.
-
-* **Pricing / tier rules** — `App\Models\PriceListItem` quantity tiers resolved by `App\Services\Pricing\PriceResolver`. VAT defaults from `App\Services\Pricing\WorkspaceTaxDefaults`. Resolver output is wrapped in `App\Services\Pricing\Resolution\PriceResolutionResult` with three statuses (`App\Services\Pricing\Resolution\PriceResolutionStatus`: Resolved, Unavailable, ConfigurationError).
-
-* **Availability** — net sellable stock via `App\Services\Availability\AvailabilityResolver::netAvailable()`. Stock badges use `ProductVariant::badgeFromQty()` with the category's `stock_display_threshold`.
-
-* **Visibility** — product list scope in `CustomerCatalogQuery` + `CustomerPricingScope::applyProductScope()`. **Decoupled from price availability** (PR #62): products without a resolvable price remain in the catalogue with `CatalogProductDisplayState::PriceUnavailable`, not hidden.
-
-* **Presentation** — per-row projection via `App\Support\CatalogRowData` → `App\Support\Pricing\CatalogRowProjection`, using `App\Enums\CatalogProductDisplayState` (five cases). Customer-facing price labels via `App\Enums\PriceDisplayMode`, `App\Services\Pricing\PriceDisplayModeResolver`, and `App\Services\Pricing\PriceDisplayPresenter`.
-
-* **Channel / storefront settings** — the `B2BChannel` entity described elsewhere in this document is **not implemented yet**. MVP cabinet (`App\Livewire\Cabinet\Catalog`) and Preview as Customer (`App\Filament\Resources\CustomerResource\Pages\PreviewAsCustomer`) use workspace-level defaults (`Workspace.default_vat_rate`, `Workspace.default_price_display_mode`) and page-level UI settings instead.
+- **Products and variants** — `App\Models\Product`, `App\Models\ProductVariant`. Catalog eligibility requires `products.is_active = true` and at least one active variant. Enforced by `App\Support\Pricing\CustomerPricingScope::applyProductScope()`.
+- **Categories** — `App\Models\Category`. Used for navigation, filtering, and sort in `App\Services\Pricing\CustomerCatalogQuery`.
+- **Price list** — `App\Models\PriceList`. Assigned per customer via `Customer.default_price_list_id`; fallback to workspace default via `CustomerPricingScope::priceListIdFor()`.
+- **Pricing / tier rules** — `App\Models\PriceListItem` quantity tiers resolved by `App\Services\Pricing\PriceResolver`. VAT defaults from `App\Services\Pricing\WorkspaceTaxDefaults`. Resolver output is wrapped in `App\Services\Pricing\Resolution\PriceResolutionResult` with three statuses (`App\Services\Pricing\Resolution\PriceResolutionStatus`: Resolved, Unavailable, ConfigurationError).
+- **Availability** — net sellable stock via `App\Services\Availability\AvailabilityResolver::netAvailable()`. Stock badges use `ProductVariant::badgeFromQty()` with the category's `stock_display_threshold`.
+- **Visibility** — product list scope in `CustomerCatalogQuery` + `CustomerPricingScope::applyProductScope()`. **Decoupled from price availability** (PR #62): products without a resolvable price remain in the catalogue with `CatalogProductDisplayState::PriceUnavailable`, not hidden.
+- **Presentation** — per-row projection via `App\Support\CatalogRowData` → `App\Support\Pricing\CatalogRowProjection`, using `App\Enums\CatalogProductDisplayState` (five cases). Customer-facing price labels via `App\Enums\PriceDisplayMode`, `App\Services\Pricing\PriceDisplayModeResolver`, and `App\Services\Pricing\PriceDisplayPresenter`.
+- **Channel / storefront settings** — the `B2BChannel` entity described elsewhere in this document is **not implemented yet**. MVP cabinet (`App\Livewire\Cabinet\Catalog`) and Preview as Customer (`App\Filament\Resources\CustomerResource\Pages\PreviewAsCustomer`) use workspace-level defaults (`Workspace.default_vat_rate`, `Workspace.default_price_display_mode`) and page-level UI settings instead.
 
 The platform may use helper tables or caches for performance.
 
@@ -2514,29 +2312,23 @@ The B2B channel must always use the shared product model, shared pricing model a
 
 **Implemented (verified via PR #58–66):**
 
-* Price resolution: `App\Services\Pricing\PriceResolver`, `App\Services\Pricing\Resolution\PriceResolutionResult` (Resolved / Unavailable / ConfigurationError).
-
-* Product/variant eligibility independent of price availability: `App\Support\Pricing\CustomerPricingScope::applyProductScope()`.
-
-* Workspace-level tax defaults: `App\Services\Pricing\WorkspaceTaxDefaults`.
-
-* Display mode (net/gross primary): `App\Enums\PriceDisplayMode`, `App\Services\Pricing\PriceDisplayPresenter`, `App\Services\Pricing\PriceDisplayModeResolver`.
-
-* Per-product display projection: `App\Support\CatalogRowData`, `App\Enums\CatalogProductDisplayState`.
-
-* Shared catalogue query for cabinet and admin preview: `App\Services\Pricing\CustomerCatalogQuery`.
+- Price resolution: `App\Services\Pricing\PriceResolver`, `App\Services\Pricing\Resolution\PriceResolutionResult` (Resolved / Unavailable / ConfigurationError).
+- Product/variant eligibility independent of price availability: `App\Support\Pricing\CustomerPricingScope::applyProductScope()`.
+- Workspace-level tax defaults: `App\Services\Pricing\WorkspaceTaxDefaults`.
+- Display mode (net/gross primary): `App\Enums\PriceDisplayMode`, `App\Services\Pricing\PriceDisplayPresenter`, `App\Services\Pricing\PriceDisplayModeResolver`.
+- Per-product display projection: `App\Support\CatalogRowData`, `App\Enums\CatalogProductDisplayState`.
+- Shared catalogue query for cabinet and admin preview: `App\Services\Pricing\CustomerCatalogQuery`.
 
 **Not yet implemented, deliberately open (does not block this decision):**
 
-* Customer group / segment-level product selection rules — GAP-010.
-
-* `PricingRule` overlays on top of resolved `PriceListItem` tiers — GAP-010.
-
-* `B2BChannel` entity and channel-specific visibility configuration — future; MVP uses workspace defaults and cabinet routes directly.
+- Customer group / segment-level product selection rules — GAP-010.
+- `PricingRule` overlays on top of resolved `PriceListItem` tiers — GAP-010.
+- `B2BChannel` entity and channel-specific visibility configuration — future; MVP uses workspace defaults and cabinet routes directly.
 
 This decision is closed and must not be reopened without a documentation-level decision.
 
 ### Audience Resolution — Resolved
+
 
 "Audience resolution" means: given a specific `Customer`, what products appear in their catalogue and how each row is displayed. Today this is a fixed, code-enforced pipeline — not a configurable rules engine.
 
@@ -2552,6 +2344,7 @@ This decision is closed and must not be reopened without a documentation-level d
 This decision is closed and must not be reopened without a documentation-level decision.
 
 ### Native B2B Storefront
+
 
 The native B2B catalogue may work as a simple storefront for each workspace.
 
@@ -2569,23 +2362,23 @@ The B2B storefront is a native sales channel on top of the Product Data Platform
 
 For a small business, the ideal flow is:
 
-* Import products from Excel or Google Sheets.
+- Import products from Excel or Google Sheets.
 
-* Organize products into workspace categories.
+- Organize products into workspace categories.
 
-* Publish the B2B storefront.
+- Publish the B2B storefront.
 
-* Share the catalogue link with customers.
+- Share the catalogue link with customers.
 
-* Customers browse products as cards, list or table.
+- Customers browse products as cards, list or table.
 
-* Customers search, sort and filter products.
+- Customers search, sort and filter products.
 
-* Customers add products to cart.
+- Customers add products to cart.
 
-* Customers submit an order.
+- Customers submit an order.
 
-* In the future, customers may pay online through a connected payment gateway.
+- In the future, customers may pay online through a connected payment gateway.
 
 This gives a small merchant a focused product sales space without building a separate website, using a marketplace or paying marketplace commissions.
 
@@ -2595,37 +2388,38 @@ It should not become a full website builder.
 
 ### B2B Storefront Views
 
+
 A B2BChannel should support storefront presentation settings.
 
 The storefront is not a separate product database.
 
 It is a customer-facing view over shared workspace data:
 
-* products;
+- products;
 
-* variants;
+- variants;
 
-* categories;
+- categories;
 
-* prices;
+- prices;
 
-* availability;
+- availability;
 
-* customer access rules;
+- customer access rules;
 
-* visibility rules;
+- visibility rules;
 
-* payment settings;
+- payment settings;
 
-* channel settings.
+- channel settings.
 
 A B2B storefront may support several display modes:
 
-* grid view for visual browsing;
+- grid view for visual browsing;
 
-* table view for fast B2B ordering;
+- table view for fast B2B ordering;
 
-* list view for compact browsing.
+- list view for compact browsing.
 
 The display mode should be stored as a channel setting.
 
@@ -2641,29 +2435,29 @@ Marketplace taxonomy mapping should remain part of connector/channel mapping, no
 
 A B2BChannel may contain settings such as:
 
-* default display mode;
+- default display mode;
 
-* whether customers can switch display mode;
+- whether customers can switch display mode;
 
-* default sort order;
+- default sort order;
 
-* enabled filters;
+- enabled filters;
 
-* category navigation enabled;
+- category navigation enabled;
 
-* search enabled;
+- search enabled;
 
-* show images;
+- show images;
 
-* show availability;
+- show availability;
 
-* show prices;
+- show prices;
 
-* allow cart;
+- allow cart;
 
-* allow order submission;
+- allow order submission;
 
-* future payment enabled.
+- future payment enabled.
 
 These settings must not duplicate product data.
 
@@ -2671,41 +2465,43 @@ They only control how shared product data is presented to customers.
 
 ### B2B Visibility Rules
 
+
 Visibility may be controlled by:
 
-* product status;
+- product status;
 
-* variant status;
+- variant status;
 
-* category;
+- category;
 
-* customer group;
+- customer group;
 
-* customer-specific rules;
+- customer-specific rules;
 
-* price list;
+- price list;
 
-* availability;
+- availability;
 
-* channel configuration.
+- channel configuration.
 
 For MVP, visibility may be simple.
 
 Initial rule:
 
-* show active products that are enabled for B2B and have enough required data for B2B publication.
+- show active products that are enabled for B2B and have enough required data for B2B publication.
 
 Future rules may support more complex customer-specific visibility.
 
 ### Admin Product Views
 
+
 The admin product area should support different views over the same product data.
 
 Initial admin views may include:
 
-* table view;
+- table view;
 
-* card view.
+- card view.
 
 Table view is useful for managing many products quickly.
 
@@ -2717,109 +2513,117 @@ Switching between table and card view must not create separate product records o
 
 The admin product area should support:
 
-* category filtering;
+- category filtering;
 
-* status filtering;
+- status filtering;
 
-* availability filtering;
+- availability filtering;
 
-* price sorting;
+- price sorting;
 
-* search by product name, SKU or GTIN.
+- search by product name, SKU or GTIN.
 
 The goal is to let the user manage many products simply, even if the workspace has hundreds or thousands of items.
 
 ## Orders Context
 
+
 Orders serve as permanent legal and operational documents within the ecosystem. Once submitted, an order detaches from volatile catalog entities, embedding static snapshots of names, SKUs, and prices to preserve historical business ledgers.
 
 ### Core Entity: Order
 
+
 The parent document tracking fulfillment progress.
 
-* id (bigint): Primary key (Laravel auto-increment, matching the existing orders table).
+- id (bigint): Primary key (Laravel auto-increment, matching the existing orders table).
 
-* workspace\_id (UUID): Tenant isolation key.
+- workspace_id (UUID): Tenant isolation key.
 
-* customer\_id (UUID): The associated B2B client account.
+- customer_id (UUID): The associated B2B client account.
 
-* order\_number (String): Human-readable alphanumeric code generated sequentially per workspace.
+- order_number (String): Human-readable alphanumeric code generated sequentially per workspace.
 
-* order\_status (Enum): Core state track (draft, pending, confirmed, processing, completed, cancelled).
+- order_status (Enum): Core state track (draft, pending, confirmed, processing, completed, cancelled).
 
-* payment\_status (Enum): Financial state track (unpaid, awaiting\_payment, paid, failed, refunded).
+- payment_status (Enum): Financial state track (unpaid, awaiting_payment, paid, failed, refunded).
 
-* external\_sync\_status (Enum): ERP state track (not\_queued, queued, synced, failed).
+- external_sync_status (Enum): ERP state track (not_queued, queued, synced, failed).
 
-* currency (String): ISO code matching the purchase contract currency.
+- currency (String): ISO code matching the purchase contract currency.
 
-* subtotal, discount\_total, grand\_total (Decimal).
+- subtotal, discount_total, grand_total (Decimal).
 
-* shipping\_address\_snapshot (JSONB): Flattened delivery criteria.
+- shipping_address_snapshot (JSONB): Flattened delivery criteria.
 
-* requires\_attention (Boolean): Operational flag raised when stock exceptions or sync errors require human review.
+- requires_attention (Boolean): Operational flag raised when stock exceptions or sync errors require human review.
 
 ### Core Entity: WorkspaceOrderStatusMatrix
 
+
 To prevent rigid code paths and allow different workspaces to govern their own unique order lifecycles, state progression rules are externalized into a configuration matrix entity.
 
-* id (UUID): Primary key.
+- id (UUID): Primary key.
 
-* workspace\_id (UUID): Unique tenant owner. One matrix configuration map exists per workspace.
+- workspace_id (UUID): Unique tenant owner. One matrix configuration map exists per workspace.
 
-* allowed\_transitions\_json (**JSONB**): A map defining valid step-by-step pathways for order\_status.
+- allowed_transitions_json (**JSONB**): A map defining valid step-by-step pathways for order_status.
 
-* Example Layout: {"pending": \["confirmed", "cancelled"], "confirmed": \["processing", "cancelled"], "processing": \["completed"]}. If an API request or user action attempts a state change not explicitly listed here, the state machine rejects the update.
+- Example Layout: {"pending": ["confirmed", "cancelled"], "confirmed": ["processing", "cancelled"], "processing": ["completed"]}. If an API request or user action attempts a state change not explicitly listed here, the state machine rejects the update.
 
-* payment\_triggers\_json (**JSONB**): A behavior map declaring automatic cross-lifecycle state triggers.
+- payment_triggers_json (**JSONB**): A behavior map declaring automatic cross-lifecycle state triggers.
 
-* Example Layout: {"on\_payment\_status\_paid": {"update\_order\_status\_to": "confirmed"}}. This map tells the PaymentWebhookHandler or billing core how to automatically update the parent order\_status without hardcoded system rules.
+- Example Layout: {"on_payment_status_paid": {"update_order_status_to": "confirmed"}}. This map tells the PaymentWebhookHandler or billing core how to automatically update the parent order_status without hardcoded system rules.
 
 ### Detailed Lifecycle Definitions
 
+
 The platform enforces a strict separation between operational fulfillment tracking and financial settlement states:
 
-### 1. Order Status Lifecycle (order\_status)
+### 1. Order Status Lifecycle (order_status)
 
-* draft: The order is being constructed inside the management back-office and is invisible to the customer storefront.
 
-* pending: The customer has submitted the order. It is awaiting manager approval, inventory confirmation, or the receipt of payment credentials.
+- draft: The order is being constructed inside the management back-office and is invisible to the customer storefront.
 
-* confirmed: The order is verified valid, pricing terms are locked, and inventory is officially approved for allocation.
+- pending: The customer has submitted the order. It is awaiting manager approval, inventory confirmation, or the receipt of payment credentials.
 
-* processing: Items are being picked, packed, or prepped for courier dispatch at the warehouse.
+- confirmed: The order is verified valid, pricing terms are locked, and inventory is officially approved for allocation.
 
-* completed: Items have been handed over to the client, and tracking documents are finalized. This is an end state.
+- processing: Items are being picked, packed, or prepped for courier dispatch at the warehouse.
 
-* cancelled: The order is voided. Any associated active soft reservations are deleted, and completed inventory allocations are rolled back via reversing InventoryRecord entries.
+- completed: Items have been handed over to the client, and tracking documents are finalized. This is an end state.
 
-### 2. Payment Status Lifecycle (payment\_status)
+- cancelled: The order is voided. Any associated active soft reservations are deleted, and completed inventory allocations are rolled back via reversing InventoryRecord entries.
 
-* unpaid: No transactional activity has occurred. Default state for newly generated invoice terms.
+### 2. Payment Status Lifecycle (payment_status)
 
-* awaiting\_payment: The checkout gateway link has been active or an invoice document has been delivered, and the system is waiting for webhook confirmations or manual wire inputs.
 
-* paid: The financial total has been secured in full.
+- unpaid: No transactional activity has occurred. Default state for newly generated invoice terms.
 
-* failed: The payment gateway processing timed out, was rejected by the clearing house, or encountered insufficient customer funds.
+- awaiting_payment: The checkout gateway link has been active or an invoice document has been delivered, and the system is waiting for webhook confirmations or manual wire inputs.
 
-* refunded: Capital was returned to the buyer.
+- paid: The financial total has been secured in full.
+
+- failed: The payment gateway processing timed out, was rejected by the clearing house, or encountered insufficient customer funds.
+
+- refunded: Capital was returned to the buyer.
 
 ### Core Entity: OrderItem
 
+
 Represents individual product entries bound to an order.
 
-* id, order\_id, product\_id, product\_variant\_id (bigint, matching the existing orders/products/product\_variants primary keys).
+- id, order_id, product_id, product_variant_id (bigint, matching the existing orders/products/product_variants primary keys).
 
-* quantity (Integer): Total requested units.
+- quantity (Integer): Total requested units.
 
-* price\_snapshot, discount\_snapshot, total (Decimal).
+- price_snapshot, discount_snapshot, total (Decimal).
 
-* product\_name\_snapshot, sku\_snapshot, gtin\_snapshot (String): The Data Immutability Shield. During creation, these fields copy text and code literals directly from the product catalog. If a merchant later deletes the product or edits its title, this item remains untouched, preserving the exact state of the historical transaction.
+- product_name_snapshot, sku_snapshot, gtin_snapshot (String): The Data Immutability Shield. During creation, these fields copy text and code literals directly from the product catalog. If a merchant later deletes the product or edits its title, this item remains untouched, preserving the exact state of the historical transaction.
 
-* stock\_warning\_status (Boolean): Computed during item assembly. If quantity exceeds the net sellable stock pool, this flag marks as true. It acts as a visual alert for back-office managers, highlighting potential fulfillment issues without throwing hard validation errors that block order entry.
+- stock_warning_status (Boolean): Computed during item assembly. If quantity exceeds the net sellable stock pool, this flag marks as true. It acts as a visual alert for back-office managers, highlighting potential fulfillment issues without throwing hard validation errors that block order entry.
 
 ## Payments Context
+
 
 Payments are not part of the MVP UI by default.
 
@@ -2829,37 +2633,39 @@ Payment support is important for small merchants who want to sell directly from 
 
 The platform should support two business realities:
 
-* B2B companies may work through invoice and bank transfer.
+- B2B companies may work through invoice and bank transfer.
 
-* Small businesses may want online payment through payment gateways.
+- Small businesses may want online payment through payment gateways.
 
 The model should support both without turning the MVP into a payment platform.
 
 ### Invoice and Bank Transfer
 
+
 For many B2B businesses, payment may mean:
 
-* generate invoice;
+- generate invoice;
 
-* send invoice to customer;
+- send invoice to customer;
 
-* customer pays by bank transfer;
+- customer pays by bank transfer;
 
-* external ERP/accounting system reconciles payment.
+- external ERP/accounting system reconciles payment.
 
 In this case, the platform may only need:
 
-* invoice generation later;
+- invoice generation later;
 
-* order payment status;
+- order payment status;
 
-* optional invoice file;
+- optional invoice file;
 
-* external sync to ERP/accounting.
+- external sync to ERP/accounting.
 
 This should not require online card payment integration.
 
 ### Payment Gateway Integration
+
 
 For small businesses, future online payment may be a strong sales feature.
 
@@ -2869,19 +2675,19 @@ The platform should not collect or store card numbers.
 
 The payment flow should be:
 
-* Customer chooses to pay.
+- Customer chooses to pay.
 
-* Platform creates a payment request with the configured gateway.
+- Platform creates a payment request with the configured gateway.
 
-* Gateway returns a hosted payment URL, payment link or QR code.
+- Gateway returns a hosted payment URL, payment link or QR code.
 
-* Customer pays on the gateway page.
+- Customer pays on the gateway page.
 
-* Gateway sends webhook to the platform.
+- Gateway sends webhook to the platform.
 
-* Platform updates payment status.
+- Platform updates payment status.
 
-* Platform may update order status according to workspace rules.
+- Platform may update order status according to workspace rules.
 
 Payment gateway UI is not required for MVP.
 
@@ -2889,35 +2695,36 @@ The domain model should allow it later.
 
 ### Small Merchant Online Sales Flow
 
+
 The domain model should support a future small merchant sales flow.
 
 Example:
 
-* Merchant imports products from Google Sheets.
+- Merchant imports products from Google Sheets.
 
-* Platform creates products, variants and categories.
+- Platform creates products, variants and categories.
 
-* Merchant publishes B2B storefront.
+- Merchant publishes B2B storefront.
 
-* Customer opens the storefront.
+- Customer opens the storefront.
 
-* Customer browses products by category, card view, list view or table view.
+- Customer browses products by category, card view, list view or table view.
 
-* Customer adds products to cart.
+- Customer adds products to cart.
 
-* Customer submits order.
+- Customer submits order.
 
-* If online payment is enabled, platform creates a payment request.
+- If online payment is enabled, platform creates a payment request.
 
-* Payment gateway returns hosted payment URL or QR code.
+- Payment gateway returns hosted payment URL or QR code.
 
-* Customer pays on the gateway page.
+- Customer pays on the gateway page.
 
-* Gateway sends webhook to the platform.
+- Gateway sends webhook to the platform.
 
-* Platform updates payment status.
+- Platform updates payment status.
 
-* Platform may confirm the order according to workspace rules.
+- Platform may confirm the order according to workspace rules.
 
 The platform must not collect or store card numbers.
 
@@ -2927,47 +2734,48 @@ This allows small businesses to sell directly from the B2B storefront without fo
 
 ### Payment
 
+
 A Payment represents a payment attempt or transaction related to an order.
 
 A payment may contain:
 
-* workspace;
+- workspace;
 
-* order;
+- order;
 
-* gateway name;
+- gateway name;
 
-* gateway account;
+- gateway account;
 
-* external transaction ID;
+- external transaction ID;
 
-* amount;
+- amount;
 
-* currency;
+- currency;
 
-* status;
+- status;
 
-* payment URL;
+- payment URL;
 
-* paid at;
+- paid at;
 
-* failed at;
+- failed at;
 
-* raw gateway reference;
+- raw gateway reference;
 
-* created at.
+- created at.
 
 Initial payment statuses:
 
-* pending
+- pending
 
-* successful
+- successful
 
-* failed
+- failed
 
-* cancelled
+- cancelled
 
-* refunded
+- refunded
 
 Refund support may be postponed.
 
@@ -2977,23 +2785,24 @@ The model should only store references needed for reconciliation, status trackin
 
 ### PaymentGatewayAccount
 
+
 A future PaymentGatewayAccount may represent the workspace payment configuration.
 
 It may contain:
 
-* workspace;
+- workspace;
 
-* gateway name;
+- gateway name;
 
-* status;
+- status;
 
-* public configuration;
+- public configuration;
 
-* encrypted credentials;
+- encrypted credentials;
 
-* webhook secret;
+- webhook secret;
 
-* settings.
+- settings.
 
 Payment credentials must be stored securely.
 
@@ -3003,43 +2812,45 @@ The domain model should not block adding it later.
 
 ### Payment Status vs Order Status
 
+
 Payment status and order status are separate.
 
 Examples:
 
-* an order may be pending while payment status is unpaid;
+- an order may be pending while payment status is unpaid;
 
-* an order may be pending while payment status is awaiting\_payment;
+- an order may be pending while payment status is awaiting_payment;
 
-* an order may become confirmed after payment becomes paid;
+- an order may become confirmed after payment becomes paid;
 
-* an order may remain confirmed but unpaid if the business works by invoice and bank transfer;
+- an order may remain confirmed but unpaid if the business works by invoice and bank transfer;
 
-* a failed payment should not automatically cancel the order unless the workspace configures that behavior.
+- a failed payment should not automatically cancel the order unless the workspace configures that behavior.
 
 Order status changes after payment should be controlled by workspace settings.
 
 ## Connectors and Mappings Context
 
+
 Connectors allow the platform to exchange data with external systems.
 
 Examples:
 
-* Excel;
+- Excel;
 
-* CSV;
+- CSV;
 
-* Google Sheets;
+- Google Sheets;
 
-* ERP / 1C;
+- ERP / 1C;
 
-* website import;
+- website import;
 
-* marketplace feed;
+- marketplace feed;
 
-* API;
+- API;
 
-* future supplier feeds.
+- future supplier feeds.
 
 Connectors must not define the core domain model.
 
@@ -3051,19 +2862,13 @@ The platform core must not adapt itself to each connector through hardcoded fiel
 
 Table `connector_definitions`:
 
-* id (UUID)
-
-* code (string, unique, immutable after creation)
-
-* name (string)
-
-* direction (enum: import | export | both) — **coarse platform-level envelope only**
-
-* status (enum: draft | active | deprecated)
-
-* notes (text, nullable)
-
-* created\_at / updated\_at
+- id (UUID)
+- code (string, unique, immutable after creation)
+- name (string)
+- direction (enum: import | export | both) — **coarse platform-level envelope only**
+- status (enum: draft | active | deprecated)
+- notes (text, nullable)
+- created_at / updated_at
 
 `ConnectorDefinition.direction` describes the platform catalog envelope for a
 connector type (import-capable, export-capable, or both). It is **not**
@@ -3074,16 +2879,12 @@ boundary (see Sync Domain Rebaseline below). Do not reuse this enum/type as
 `SyncConfiguration` capability state.
 
 Rules:
-
-* `code` is immutable once set.
-
-* Hard delete is forbidden once any reference exists (schema sources,
+- `code` is immutable once set.
+- Hard delete is forbidden once any reference exists (schema sources,
   future ConnectorAccount rows); use `deprecated` instead.
-
-* `draft` definitions are not offered in production connector workflows
+- `draft` definitions are not offered in production connector workflows
   (Task 4B onward).
-
-* `status: active` requires at least one `connector_schema_sources` row
+- `status: active` requires at least one `connector_schema_sources` row
   with `is_primary: true`, `schema_scope: global`, and
   `verification_status: verified`. This prevents an administrator from
   activating an empty platform — exactly the invisible/incomplete state
@@ -3096,7 +2897,7 @@ Examples of `code`: `google_merchant`, `shopify`, `adobe_commerce`,
 Registry mapping/channel-decision channels (e.g. `schema_org`) may have no
 runtime ConnectorDefinition at all, and some ConnectorDefinitions (e.g.
 `csv`) have no global product-field schema in the Registry. The Field
-Matrix (06-UI\_DESIGN\_SYSTEM.md) derives its columns from Registry channel
+Matrix (06-UI_DESIGN_SYSTEM.md) derives its columns from Registry channel
 values actually present in `mappings.csv`/`channel_decisions.csv`;
 ConnectorDefinition metadata only enriches a column when its `code`
 happens to match that Registry channel value. The two concepts must never
@@ -3106,16 +2907,12 @@ be treated as identical.
 
 Table `connector_schema_sources`:
 
-* id (UUID)
-
-* connector\_definition\_id (FK → connector\_definitions)
-
-* code (string, unique within the connector)
-
-* label (string)
-
-* source\_kind (enum: api\_schema | official\_web\_doc | repository\_code |
-  repository\_document | account\_api | static\_registry | manual\_import)
+- id (UUID)
+- connector_definition_id (FK → connector_definitions)
+- code (string, unique within the connector)
+- label (string)
+- source_kind (enum: api_schema | official_web_doc | repository_code |
+  repository_document | account_api | static_registry | manual_import)
   — this is a compatible superset of the Registry's existing `source_kind`
   vocabulary (`canonical_product_field_sources.csv`): it reuses the same
   names where semantics coincide (`api_schema`, `official_web_doc`,
@@ -3128,22 +2925,16 @@ Table `connector_schema_sources`:
 Invariants (enforced at the application level, not by a database
 constraint that would also forbid multiple non-primary rows):
 
-* `code` is immutable after creation.
-
-* Unique: `(connector_definition_id, code)`.
-
-* If `source_kind: account_api`, then `schema_scope` must be `account`,
+- `code` is immutable after creation.
+- Unique: `(connector_definition_id, code)`.
+- If `source_kind: account_api`, then `schema_scope` must be `account`,
   `acquisition_mode` must be `live_fetch`, and `endpoint_path` must not be
   null.
-
-* If `schema_scope: global`, then `endpoint_path` must be null.
-
-* If `verification_status: verified`, then `last_verified_at` must not be
+- If `schema_scope: global`, then `endpoint_path` must be null.
+- If `verification_status: verified`, then `last_verified_at` must not be
   null.
-
-* `reference_url`, when present, must be a valid absolute URL.
-
-* At most one `is_primary: true` row per
+- `reference_url`, when present, must be a valid absolute URL.
+- At most one `is_primary: true` row per
   `(connector_definition_id, schema_scope)`. Enforced by: an application
   service that, within a DB transaction, locks the parent
   `ConnectorDefinition` row and atomically unsets any previous primary in
@@ -3151,41 +2942,30 @@ constraint that would also forbid multiple non-primary rows):
   on `(connector_definition_id, schema_scope, is_primary)`, which would
   also forbid multiple `is_primary: false` rows. A feature test must cover
   this transition.
-
-* acquisition\_mode (enum: remote\_static | live\_fetch | bundled\_file | manual)
-
-* schema\_scope (enum: global | account)
-
-* reference\_url (string, nullable) — for `schema_scope: global` sources
+- acquisition_mode (enum: remote_static | live_fetch | bundled_file | manual)
+- schema_scope (enum: global | account)
+- reference_url (string, nullable) — for `schema_scope: global` sources
   only, this is the documentation/schema reference URL. For
   `schema_scope: account` sources, `reference_url` holds the URL of the
   *official documentation describing the endpoint*, never a specific
   client's store base URL — the actual per-store base URL belongs to
   `ConnectorAccount` (Task 4B), not here.
-
-* endpoint\_path (string, nullable) — e.g. `/V1/products/attributes`, only
+- endpoint_path (string, nullable) — e.g. `/V1/products/attributes`, only
   meaningful when `schema_scope: account`.
-
-* schema\_version (string, nullable)
-
-* is\_primary (boolean) — see invariants below for the exact uniqueness rule.
-
-* verification\_status (enum: verified | stale | broken | unverified)
-
-* last\_verified\_at (nullable timestamp)
-
-* notes (text, nullable)
-
-* sort\_order (integer)
-
-* created\_at / updated\_at
+- schema_version (string, nullable)
+- is_primary (boolean) — see invariants below for the exact uniqueness rule.
+- verification_status (enum: verified | stale | broken | unverified)
+- last_verified_at (nullable timestamp)
+- notes (text, nullable)
+- sort_order (integer)
+- created_at / updated_at
 
 Example — Adobe Commerce, two rows:
 
-| label                    | source\_kind | acquisition\_mode | schema\_scope | reference\_url                                                        | endpoint\_path          | is\_primary |
-| ------------------------ | ------------ | ----------------- | ------------- | --------------------------------------------------------------------- | ----------------------- | ----------- |
-| Admin REST API reference | api\_schema  | remote\_static    | global        | adobe-commerce.redoc.ly/...                                           | null                    | true        |
-| Live account attributes  | account\_api | live\_fetch       | account       | experienceleague.adobe.com/.../products-api (docs about the endpoint) | /V1/products/attributes | true        |
+| label | source_kind | acquisition_mode | schema_scope | reference_url | endpoint_path | is_primary |
+|---|---|---|---|---|---|---|
+| Admin REST API reference | api_schema | remote_static | global | adobe-commerce.redoc.ly/... | null | true |
+| Live account attributes | account_api | live_fetch | account | experienceleague.adobe.com/.../products-api (docs about the endpoint) | /V1/products/attributes | true |
 
 Both rows may be `is_primary: true` simultaneously because they have
 different `schema_scope` values (global vs account) — the uniqueness rule
@@ -3209,15 +2989,11 @@ domain services after terminal connection checks and discovery runs.
 
 `ConnectorAccount` does **not** contain:
 
-* global platform metadata (that is `ConnectorDefinition`);
-
-* immutable schema history (that is snapshots/diffs — see below);
-
-* `FieldMapping` rows (Task 4C);
-
-* raw vendor response bodies by default;
-
-* credentials on `ConnectorDefinition`, `ConnectorSchemaSource`, or snapshots.
+- global platform metadata (that is `ConnectorDefinition`);
+- immutable schema history (that is snapshots/diffs — see below);
+- `FieldMapping` rows (Task 4C);
+- raw vendor response bodies by default;
+- credentials on `ConnectorDefinition`, `ConnectorSchemaSource`, or snapshots.
 
 #### Boundary vs legacy `SyncLog`
 
@@ -3232,26 +3008,19 @@ workspace ownership.
 
 **Current account overview** (`ConnectorAccount` row) answers:
 
-* Чи підключення працює зараз?
-
-* Коли його востаннє перевіряли?
-
-* Коли востаннє успішно отримували поля?
-
-* Що користувач має зробити зараз?
+- Чи підключення працює зараз?
+- Коли його востаннє перевіряли?
+- Коли востаннє успішно отримували поля?
+- Що користувач має зробити зараз?
 
 **Operational history** (`ConnectorConnectionCheck`, `ConnectorDiscoveryRun`,
 snapshots, diffs) answers:
 
-* Коли проблема з’явилась?
-
-* Чи була вона тимчасовою?
-
-* Хто запускав перевірку?
-
-* Чи відновилось підключення?
-
-* Який snapshot створено?
+- Коли проблема з’явилась?
+- Чи була вона тимчасовою?
+- Хто запускав перевірку?
+- Чи відновилось підключення?
+- Який snapshot створено?
 
 The list UI must read the **current projection** on `ConnectorAccount`. It must
 not recompute “last event” with an expensive history query per row. History rows
@@ -3259,30 +3028,30 @@ are append-only after terminal state (`running → succeeded | failed | cancelle
 
 #### Physical schema — `connector_accounts` (Resolved)
 
-| Column                         | Type               | Notes                                                                                                  |
-| ------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------ |
-| `id`                           | UUID PK            | <br />                                                                                                 |
-| `workspace_id`                 | UUID FK            | Required from first migration; `BelongsToWorkspace`                                                    |
-| `connector_definition_id`      | UUID FK            | → `connector_definitions`                                                                              |
-| `name`                         | string             | Merchant-facing display name                                                                           |
-| `auth_profile`                 | string             | Stable code, e.g. `adobe_commerce_paas_oauth1_integration`, `adobe_commerce_saas_ims_server_to_server` |
-| `base_url`                     | string nullable    | PaaS store origin; SSRF-validated; normalized (scheme/https, no trailing slash)                        |
-| `store_code`                   | string nullable    | PaaS REST store-view segment                                                                           |
-| `tenant_context`               | string nullable    | SaaS tenant/API path segment when not encoded in `base_url`                                            |
-| `is_enabled`                   | boolean            | Disabled accounts retain history but do not schedule discovery                                         |
-| `settings`                     | JSON               | Non-secret deployment options only                                                                     |
-| `credentials`                  | TEXT               | Laravel `encrypted:array` — never indexed or searched                                                  |
-| `connection_status`            | enum               | `untested`, `connected`, `attention_required`, `temporarily_unavailable`, `disabled`                   |
-| `last_checked_at`              | timestamp nullable | <br />                                                                                                 |
-| `last_successful_check_at`     | timestamp nullable | <br />                                                                                                 |
-| `last_discovery_at`            | timestamp nullable | <br />                                                                                                 |
-| `last_successful_discovery_at` | timestamp nullable | <br />                                                                                                 |
-| `last_error_cause`             | enum nullable      | See dual-axis errors                                                                                   |
-| `last_error_actionability`     | enum nullable      | See dual-axis errors                                                                                   |
-| `last_error_message_key`       | string nullable    | Translation key, not raw vendor text                                                                   |
-| `last_error_at`                | timestamp nullable | <br />                                                                                                 |
-| `deleted_at`                   | timestamp nullable | Soft delete; history retained per retention policy                                                     |
-| `created_at` / `updated_at`    | timestamps         | <br />                                                                                                 |
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID FK | Required from first migration; `BelongsToWorkspace` |
+| `connector_definition_id` | UUID FK | → `connector_definitions` |
+| `name` | string | Merchant-facing display name |
+| `auth_profile` | string | Stable code, e.g. `adobe_commerce_paas_oauth1_integration`, `adobe_commerce_saas_ims_server_to_server` |
+| `base_url` | string nullable | PaaS store origin; SSRF-validated; normalized (scheme/https, no trailing slash) |
+| `store_code` | string nullable | PaaS REST store-view segment |
+| `tenant_context` | string nullable | SaaS tenant/API path segment when not encoded in `base_url` |
+| `is_enabled` | boolean | Disabled accounts retain history but do not schedule discovery |
+| `settings` | JSON | Non-secret deployment options only |
+| `credentials` | TEXT | Laravel `encrypted:array` — never indexed or searched |
+| `connection_status` | enum | `untested`, `connected`, `attention_required`, `temporarily_unavailable`, `disabled` |
+| `last_checked_at` | timestamp nullable | |
+| `last_successful_check_at` | timestamp nullable | |
+| `last_discovery_at` | timestamp nullable | |
+| `last_successful_discovery_at` | timestamp nullable | |
+| `last_error_cause` | enum nullable | See dual-axis errors |
+| `last_error_actionability` | enum nullable | See dual-axis errors |
+| `last_error_message_key` | string nullable | Translation key, not raw vendor text |
+| `last_error_at` | timestamp nullable | |
+| `deleted_at` | timestamp nullable | Soft delete; history retained per retention policy |
+| `created_at` / `updated_at` | timestamps | |
 
 **Uniqueness (Resolved):** `(workspace_id, connector_definition_id, name)` among
 non-deleted rows. A workspace may hold **multiple accounts** for the same
@@ -3293,9 +3062,8 @@ Implement this as a DB-level constraint via a driver-conditional generated colum
 `active_name_uniqueness_key`, using the same technique already established by
 `FieldFoundationMigrator::addWorkspaceUniquenessKey()`:
 
-* active row (`deleted_at IS NULL`): `active_name_uniqueness_key = name`;
-
-* soft-deleted row: `active_name_uniqueness_key = NULL`.
+- active row (`deleted_at IS NULL`): `active_name_uniqueness_key = name`;
+- soft-deleted row: `active_name_uniqueness_key = NULL`.
 
 Unique index: `(workspace_id, connector_definition_id, active_name_uniqueness_key)`.
 
@@ -3322,26 +3090,26 @@ vendor-specific; generic tables remain free of Adobe-only columns.
 
 Append-only history of connection test attempts.
 
-| Column                    | Type                        | Notes                                                                                                                                                |
-| ------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`                      | UUID PK                     | <br />                                                                                                                                               |
-| `workspace_id`            | UUID FK                     | <br />                                                                                                                                               |
-| `connector_account_id`    | UUID FK                     | <br />                                                                                                                                               |
-| `trigger`                 | enum                        | `manual`, `scheduled`, `before_discovery`                                                                                                            |
-| `initiated_by_user_id`    | unsigned bigint FK nullable | Null for scheduled; matches `users.id` (bigint, not UUID)                                                                                            |
-| `status`                  | enum                        | `running`, `succeeded`, `failed`                                                                                                                     |
-| `cause_category`          | enum nullable               | `authentication`, `authorization`, `configuration`, `rate_limit`, `vendor_unavailable`, `network`, `schema_validation`, `data_validation`, `unknown` |
-| `actionability`           | enum nullable               | `user_action_required`, `automatic_retry`, `workspace_admin_required`, `support_required`                                                            |
-| `error_code`              | string nullable             | Internal stable code                                                                                                                                 |
-| `http_status`             | smallint nullable           | <br />                                                                                                                                               |
-| `user_message_key`        | string nullable             | e.g. `connectors.errors.invalid_credentials`                                                                                                         |
-| `safe_message_parameters` | JSON nullable               | Non-secret interpolation params                                                                                                                      |
-| `technical_summary`       | string nullable             | Redacted, length-capped                                                                                                                              |
-| `vendor_request_id`       | string nullable             | Support reference when not secret                                                                                                                    |
-| `started_at`              | timestamp                   | <br />                                                                                                                                               |
-| `finished_at`             | timestamp nullable          | <br />                                                                                                                                               |
-| `duration_ms`             | unsigned int nullable       | <br />                                                                                                                                               |
-| `created_at`              | timestamp                   | Immutable after terminal state                                                                                                                       |
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID FK | |
+| `connector_account_id` | UUID FK | |
+| `trigger` | enum | `manual`, `scheduled`, `before_discovery` |
+| `initiated_by_user_id` | unsigned bigint FK nullable | Null for scheduled; matches `users.id` (bigint, not UUID) |
+| `status` | enum | `running`, `succeeded`, `failed` |
+| `cause_category` | enum nullable | `authentication`, `authorization`, `configuration`, `rate_limit`, `vendor_unavailable`, `network`, `schema_validation`, `data_validation`, `unknown` |
+| `actionability` | enum nullable | `user_action_required`, `automatic_retry`, `workspace_admin_required`, `support_required` |
+| `error_code` | string nullable | Internal stable code |
+| `http_status` | smallint nullable | |
+| `user_message_key` | string nullable | e.g. `connectors.errors.invalid_credentials` |
+| `safe_message_parameters` | JSON nullable | Non-secret interpolation params |
+| `technical_summary` | string nullable | Redacted, length-capped |
+| `vendor_request_id` | string nullable | Support reference when not secret |
+| `started_at` | timestamp | |
+| `finished_at` | timestamp nullable | |
+| `duration_ms` | unsigned int nullable | |
+| `created_at` | timestamp | Immutable after terminal state |
 
 **Concurrency:** at most one `running` check per account (application lock).
 **No** secrets, Authorization headers, or raw response bodies.
@@ -3351,64 +3119,54 @@ Append-only history of connection test attempts.
 Append-only history of schema discovery executions against one
 `connector_schema_source`.
 
-| Column                                                                | Type                        | Notes                                                                                                                                                                                                                                                                                                                                                                                    |
-| --------------------------------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id`                                                                  | UUID PK                     | <br />                                                                                                                                                                                                                                                                                                                                                                                   |
-| `workspace_id`                                                        | UUID FK                     | <br />                                                                                                                                                                                                                                                                                                                                                                                   |
-| `connector_account_id`                                                | UUID FK                     | <br />                                                                                                                                                                                                                                                                                                                                                                                   |
-| `connector_schema_source_id`                                          | UUID FK                     | <br />                                                                                                                                                                                                                                                                                                                                                                                   |
-| `trigger`                                                             | enum                        | `manual`, `scheduled`, `after_connection_check`                                                                                                                                                                                                                                                                                                                                          |
-| `initiated_by_user_id`                                                | unsigned bigint FK nullable | Null for scheduled; matches `users.id` (bigint, not UUID)                                                                                                                                                                                                                                                                                                                                |
-| `status`                                                              | enum                        | `queued`, `running`, `succeeded`, `failed`, `cancelled`                                                                                                                                                                                                                                                                                                                                  |
-| `execution_attempts`                                                  | unsigned tinyint, default 0 | Counts claimed full-discovery execution slots, not individual HTTP page requests. One discovery execution may issue up to 50 HTTP page requests; this counter is atomically incremented exactly once, before page 1, at the start of each complete paginated execution attempt, and is capped at 3. Conservative over-counting after a crash is acceptable; under-counting is forbidden. |
-| `retry_until_at`                                                      | timestamp nullable          | Absolute deadline from initial dispatch, shared by the job's `retryUntil()` and persisted for deterministic stale-row recovery.                                                                                                                                                                                                                                                          |
-| `next_attempt_at`                                                     | timestamp nullable          | Guards against the database queue driver's own `retry_after`-based redelivery bypassing the intended backoff delay.                                                                                                                                                                                                                                                                      |
-| `started_at`                                                          | timestamp nullable          | Null while `status: queued`                                                                                                                                                                                                                                                                                                                                                              |
-| `finished_at`                                                         | timestamp nullable          | Set only on terminal state (`succeeded`/`failed`/`cancelled`)                                                                                                                                                                                                                                                                                                                            |
-| `duration_ms`                                                         | unsigned int nullable       | <br />                                                                                                                                                                                                                                                                                                                                                                                   |
-| `fields_received`                                                     | unsigned int nullable       | Count of raw Magento list items received across all pages, including service-only attributes excluded from normalization. Must be `>= fields_normalized` on success.                                                                                                                                                                                                                     |
-| `fields_normalized`                                                   | unsigned int nullable       | Count of merchant-facing attributes that were normalized into `ConnectorSchemaSnapshotField` rows. Equals `ConnectorSchemaSnapshot.field_count` on success.                                                                                                                                                                                                                              |
-| `added_count` / `changed_count` / `removed_count` / `unchanged_count` | unsigned int nullable       | Populated when diff computed                                                                                                                                                                                                                                                                                                                                                             |
-| `cause_category` / `actionability` / `error_code` / `http_status`     | nullable                    | Same vocabulary as checks                                                                                                                                                                                                                                                                                                                                                                |
-| `user_message_key` / `technical_summary` / `vendor_request_id`        | nullable                    | <br />                                                                                                                                                                                                                                                                                                                                                                                   |
-| `snapshot_id`                                                         | UUID FK nullable            | Set only on full success                                                                                                                                                                                                                                                                                                                                                                 |
-| `previous_snapshot_id`                                                | UUID FK nullable            | For diff context                                                                                                                                                                                                                                                                                                                                                                         |
-| `created_at`                                                          | timestamp                   | <br />                                                                                                                                                                                                                                                                                                                                                                                   |
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID FK | |
+| `connector_account_id` | UUID FK | |
+| `connector_schema_source_id` | UUID FK | |
+| `trigger` | enum | `manual`, `scheduled`, `after_connection_check` |
+| `initiated_by_user_id` | unsigned bigint FK nullable | Null for scheduled; matches `users.id` (bigint, not UUID) |
+| `status` | enum | `queued`, `running`, `succeeded`, `failed`, `cancelled` |
+| `execution_attempts` | unsigned tinyint, default 0 | Counts claimed full-discovery execution slots, not individual HTTP page requests. One discovery execution may issue up to 50 HTTP page requests; this counter is atomically incremented exactly once, before page 1, at the start of each complete paginated execution attempt, and is capped at 3. Conservative over-counting after a crash is acceptable; under-counting is forbidden. |
+| `retry_until_at` | timestamp nullable | Absolute deadline from initial dispatch, shared by the job's `retryUntil()` and persisted for deterministic stale-row recovery. |
+| `next_attempt_at` | timestamp nullable | Guards against the database queue driver's own `retry_after`-based redelivery bypassing the intended backoff delay. |
+| `started_at` | timestamp nullable | Null while `status: queued` |
+| `finished_at` | timestamp nullable | Set only on terminal state (`succeeded`/`failed`/`cancelled`) |
+| `duration_ms` | unsigned int nullable | |
+| `fields_received` | unsigned int nullable | Count of raw Magento list items received across all pages, including service-only attributes excluded from normalization. Must be `>= fields_normalized` on success. |
+| `fields_normalized` | unsigned int nullable | Count of merchant-facing attributes that were normalized into `ConnectorSchemaSnapshotField` rows. Equals `ConnectorSchemaSnapshot.field_count` on success. |
+| `added_count` / `changed_count` / `removed_count` / `unchanged_count` | unsigned int nullable | Populated when diff computed |
+| `cause_category` / `actionability` / `error_code` / `http_status` | nullable | Same vocabulary as checks |
+| `user_message_key` / `technical_summary` / `vendor_request_id` | nullable | |
+| `snapshot_id` | UUID FK nullable | Set only on full success |
+| `previous_snapshot_id` | UUID FK nullable | For diff context |
+| `created_at` | timestamp | |
 
 **Rules:**
 
-* Failed or incomplete pagination **does not** publish a canonical snapshot.
-
-* `partial` is not a terminal success state for snapshot publication.
-
-* Latest successful snapshot for account+source is resolved via indexed query,
+- Failed or incomplete pagination **does not** publish a canonical snapshot.
+- `partial` is not a terminal success state for snapshot publication.
+- Latest successful snapshot for account+source is resolved via indexed query,
   not by mutating prior snapshots.
 
 #### Retry contract (Resolved)
 
-* Maximum vendor-execution attempts: 3 total (initial + 2 retries).
-
-* Base retry delays: 60s before the first retry, 300s before the second.
-
-* Jitter: equal jitter — actual delay = ceil(base / 2) + random(0, floor(base / 2)).
-
-* `retry_until_at` = dispatch time + 60 minutes.
-
-* Mechanism: the job uses the persisted `retry_until_at` via its own
+- Maximum vendor-execution attempts: 3 total (initial + 2 retries).
+- Base retry delays: 60s before the first retry, 300s before the second.
+- Jitter: equal jitter — actual delay = ceil(base / 2) + random(0, floor(base / 2)).
+- `retry_until_at` = dispatch time + 60 minutes.
+- Mechanism: the job uses the persisted `retry_until_at` via its own
   `retryUntil()`; a classified-retryable failure records `next_attempt_at`
   and calls `release($delay)` manually — the numeric queue `$tries`
   property is not the business attempt counter, `execution_attempts` is.
-
-* HTTP-client-level automatic retries: 0 (all retry logic lives at the
+- HTTP-client-level automatic retries: 0 (all retry logic lives at the
   job/persistence layer, not inside the HTTP client).
-
-* 429 responses respect `Retry-After`, capped at 300 seconds (mirrors the
+- 429 responses respect `Retry-After`, capped at 300 seconds (mirrors the
   connection-check pattern).
-
-* Retryable failure classes: timeout, connection reset, HTTP 408, HTTP
+- Retryable failure classes: timeout, connection reset, HTTP 408, HTTP
   429, HTTP 5xx.
-
-* Non-retryable: HTTP 401, 403, 404; any schema-validation, pagination-
+- Non-retryable: HTTP 401, 403, 404; any schema-validation, pagination-
   limit, or response-size classification (these are terminal outcomes,
   not transient failures).
 
@@ -3416,18 +3174,12 @@ Append-only history of schema discovery executions against one
 
 Before a discovery run row is created, the dispatch service resolves
 exactly one `ConnectorSchemaSource` for the target account, using:
-
-* `connector_definition_id` = the account's own `connector_definition_id`;
-
-* `schema_scope` = `Account`;
-
-* `source_kind` = `AccountApi`;
-
-* `acquisition_mode` = `LiveFetch`;
-
-* `is_primary` = `true`;
-
-* `endpoint_path` is a non-null, non-empty **relative** API path — no scheme,
+- `connector_definition_id` = the account's own `connector_definition_id`;
+- `schema_scope` = `Account`;
+- `source_kind` = `AccountApi`;
+- `acquisition_mode` = `LiveFetch`;
+- `is_primary` = `true`;
+- `endpoint_path` is a non-null, non-empty **relative** API path — no scheme,
   host, user, password, or port; no query or fragment; no `.`/`..` traversal
   segment; normalized to exactly one leading slash. The host always comes from
   the account's own base URL, never from `endpoint_path` itself.
@@ -3435,33 +3187,29 @@ exactly one `ConnectorSchemaSource` for the target account, using:
 Exactly one matching row → dispatch proceeds and the resolved
 `connector_schema_source_id` is persisted on the new run row. **Zero or
 more than one matching row is a pre-dispatch configuration failure — no
-`ConnectorDiscoveryRun`** **row is created, and no HTTP call is made.** This
+`ConnectorDiscoveryRun` row is created, and no HTTP call is made.** This
 is not a value of `connector_discovery_runs.error_code`, because the
 required, non-nullable `connector_schema_source_id` column makes it
 physically impossible to persist a run without a resolved source.
 
 **Pre-dispatch source-resolution failure UX (Resolved):**
 
-* the dispatch service throws `ConnectorDiscoverySourceResolutionException`,
+- the dispatch service throws `ConnectorDiscoverySourceResolutionException`,
   carrying an internal `reason` of `missing` or `ambiguous` (not exposed to
   the end user — used only for logging);
-
-* the single safe translation key shown to the user in both cases, without
+- the single safe translation key shown to the user in both cases, without
   distinguishing missing from ambiguous (distinguishing them in the UI would
   leak internal source-configuration detail):
   `connectors.errors.discovery_source_unavailable`;
-
-* this is surfaced as a **pre-render disabled state** on the manual-trigger
+- this is surfaced as a **pre-render disabled state** on the manual-trigger
   action, alongside the other four disabled states from discovery Scope 8
   (bringing the total to five user-facing disabled states: four feature states
   plus source unavailable — the deployment activation gate is **hidden**, not
   disabled, and is not counted here);
-
-* what gets logged for support: workspace ID, connector account ID, connector
+- what gets logged for support: workspace ID, connector account ID, connector
   definition ID, and the match count (0 or the actual count for ambiguous) —
   never credentials, the full `endpoint_path`/URL, or other settings;
-
-* the actual HTTP fetch must use the **persisted**
+- the actual HTTP fetch must use the **persisted**
   `ConnectorSchemaSource.endpoint_path` value — never a hardcoded Adobe path.
   This is a hard requirement, not an implementation detail left implicit.
 
@@ -3483,18 +3231,15 @@ below).
 Do not describe discovery (or connection-check) execution as "two
 transactions." The verified persistence layer uses distinct phases:
 
-* **Phase A — dispatch-time reservation** (inside `executeManual()`'s own
+- **Phase A — dispatch-time reservation** (inside `executeManual()`'s own
   `DB::transaction()` in the dispatch service, mirroring
   `ConnectorConnectionCheckDispatchService::executeManual()`);
-
-* **Phase B — execution-slot reservation** (a separate transaction, inside the
+- **Phase B — execution-slot reservation** (a separate transaction, inside the
   job/persistence layer, mirroring `reserveExecutionSlot()` in
   `ConnectorConnectionCheckPersistence`);
-
-* **Phase C — vendor execution** (paginated HTTP + normalization + hashing),
+- **Phase C — vendor execution** (paginated HTTP + normalization + hashing),
   entirely outside any database transaction;
-
-* **Phase D — terminal finalization**, itself potentially one of several
+- **Phase D — terminal finalization**, itself potentially one of several
   distinct transacted methods depending on outcome (success via
   `finalizeAfterVendorAttempt()`, lifecycle failure via `writeLifecycleFailure()`,
   stored-vendor-classification terminal write via
@@ -3505,8 +3250,8 @@ transactions." The verified persistence layer uses distinct phases:
   `ConnectorConnectionCheckPersistence`'s actual distinct methods, not a single
   generic "Transaction B."
 
-Active-run uniqueness per (connector\_account\_id,
-connector\_schema\_source\_id) pair is an **application-level invariant**
+Active-run uniqueness per (connector_account_id,
+connector_schema_source_id) pair is an **application-level invariant**
 — enforced by the dispatch service's locked lookup-then-create logic
 (mirroring connection-check), not by any database constraint. The new
 index accelerates this lookup; it does not enforce uniqueness by itself.
@@ -3515,34 +3260,27 @@ index accelerates this lookup; it does not enforce uniqueness by itself.
 
 The "latest successful snapshot" for no-change comparison and current-
 snapshot linking is the row with the greatest `(created_at, id)` pair,
-ordered `created_at DESC, id DESC`, for the same (connector\_account\_id,
-connector\_schema\_source\_id) pair.
+ordered `created_at DESC, id DESC`, for the same (connector_account_id,
+connector_schema_source_id) pair.
 
 #### Deterministic pagination-success contract (Resolved)
 
-* pages are fetched sequentially starting at `currentPage=1`;
-
-* every request uses `searchCriteria[pageSize]=200` explicitly;
-
-* the response's `items` must be a JSON list; `total_count` must be a
+- pages are fetched sequentially starting at `currentPage=1`;
+- every request uses `searchCriteria[pageSize]=200` explicitly;
+- the response's `items` must be a JSON list; `total_count` must be a
   non-negative integer and must remain identical across every page of
   the same run;
-
-* if `total_count > 10,000`, the run fails before any further page is
+- if `total_count > 10,000`, the run fails before any further page is
   fetched;
-
-* an empty page received before the accumulated count reaches
+- an empty page received before the accumulated count reaches
   `total_count` is a terminal `discovery_incomplete_pagination` result —
   not a retry condition;
-
-* if the final accumulated field count does not exactly equal the
+- if the final accumulated field count does not exactly equal the
   stable `total_count`, the run fails — never publishes a snapshot for a
   mismatched count;
-
-* a 51st page request is never issued, regardless of what `total_count`
+- a 51st page request is never issued, regardless of what `total_count`
   claims;
-
-* a snapshot is published only when the accumulated count exactly equals
+- a snapshot is published only when the accumulated count exactly equals
   the stable `total_count` and normalization/hashing succeeded with no
   `schema_validation` failure.
 
@@ -3556,15 +3294,15 @@ mean "queue-only"; it means "not a vendor/transport/schema outcome").
 Mirrors `ConnectorConnectionCheckLifecycleErrorCode`'s exact scope and
 actionability choices:
 
-| Code                                          | Cause           | Actionability              | Message key                          | Technical summary                                |
-| --------------------------------------------- | --------------- | -------------------------- | ------------------------------------ | ------------------------------------------------ |
-| `discovery_dispatch_failed`                   | `unknown`       | `support_required`         | `connectors.errors.discovery_failed` | `queue_dispatch_failed`                          |
-| `discovery_job_failed`                        | `unknown`       | `support_required`         | `connectors.errors.discovery_failed` | `queue_job_failed`                               |
-| `discovery_attempts_exhausted_without_result` | `unknown`       | `support_required`         | `connectors.errors.discovery_failed` | `vendor_attempt_budget_exhausted_without_result` |
-| `discovery_account_disabled_before_execution` | `configuration` | `workspace_admin_required` | `connectors.errors.account_disabled` | `account_disabled_before_execution`              |
-| `discovery_source_invalid_before_execution`   | `configuration` | `support_required`         | `connectors.errors.discovery_failed` | `source_invalid_before_execution`                |
+| Code | Cause | Actionability | Message key | Technical summary |
+|---|---|---|---|---|
+| `discovery_dispatch_failed` | `unknown` | `support_required` | `connectors.errors.discovery_failed` | `queue_dispatch_failed` |
+| `discovery_job_failed` | `unknown` | `support_required` | `connectors.errors.discovery_failed` | `queue_job_failed` |
+| `discovery_attempts_exhausted_without_result` | `unknown` | `support_required` | `connectors.errors.discovery_failed` | `vendor_attempt_budget_exhausted_without_result` |
+| `discovery_account_disabled_before_execution` | `configuration` | `workspace_admin_required` | `connectors.errors.account_disabled` | `account_disabled_before_execution` |
+| `discovery_source_invalid_before_execution` | `configuration` | `support_required` | `connectors.errors.discovery_failed` | `source_invalid_before_execution` |
 
-**`discovery_attempts_exhausted_without_result`** **never overwrites the
+**`discovery_attempts_exhausted_without_result` never overwrites the
 account projection** — it means retries were exhausted *without any
 persisted vendor result at all* (mirrors
 `ConnectorConnectionCheckLifecycleErrorCode::AttemptsExhaustedWithoutResult`'s
@@ -3590,25 +3328,25 @@ to discovery result persistence on `connector_discovery_runs.error_code`.
 Discovery additionally defines exactly three discovery-specific result codes
 (no connection-check equivalent to reuse):
 
-| Code                                                                       | Cause               | Actionability      | Message key                          | Technical summary           |
-| -------------------------------------------------------------------------- | ------------------- | ------------------ | ------------------------------------ | --------------------------- |
+| Code | Cause | Actionability | Message key | Technical summary |
+|---|---|---|---|---|
 | `DiscoveryPaginationLimitExceeded = 'discovery_pagination_limit_exceeded'` | `schema_validation` | `support_required` | `connectors.errors.discovery_failed` | `pagination_limit_exceeded` |
-| `DiscoveryIncompletePagination = 'discovery_incomplete_pagination'`        | `schema_validation` | `support_required` | `connectors.errors.discovery_failed` | `incomplete_pagination`     |
-| `DiscoverySchemaValidationFailed = 'discovery_schema_validation_failed'`   | `schema_validation` | `support_required` | `connectors.errors.discovery_failed` | `schema_validation_failed`  |
+| `DiscoveryIncompletePagination = 'discovery_incomplete_pagination'` | `schema_validation` | `support_required` | `connectors.errors.discovery_failed` | `incomplete_pagination` |
+| `DiscoverySchemaValidationFailed = 'discovery_schema_validation_failed'` | `schema_validation` | `support_required` | `connectors.errors.discovery_failed` | `schema_validation_failed` |
 
-**Shared** **`automatic_retry`** **result codes (verbatim reuse):** exactly these six
+**Shared `automatic_retry` result codes (verbatim reuse):** exactly these six
 shared cases retain `AutomaticRetry` actionability in discovery — no more, no
 fewer (same grouped match arm as
 `ConnectorConnectionCheckErrorCode::actionability()`):
 
-| Code                           | String value                      | Cause                | Actionability     | Message key                             |
-| ------------------------------ | --------------------------------- | -------------------- | ----------------- | --------------------------------------- |
-| `AdobeRequestTimeout`          | `adobe_request_timeout`           | `network`            | `automatic_retry` | `connectors.errors.timeout`             |
-| `AdobeRateLimited`             | `adobe_rate_limited`              | `rate_limit`         | `automatic_retry` | `connectors.errors.rate_limited`        |
-| `AdobeVendorUnavailable`       | `adobe_vendor_unavailable`        | `vendor_unavailable` | `automatic_retry` | `connectors.errors.vendor_unavailable`  |
-| `TransportDnsResolutionFailed` | `transport_dns_resolution_failed` | `network`            | `automatic_retry` | `connectors.errors.network_unavailable` |
-| `TransportTimeout`             | `transport_timeout`               | `network`            | `automatic_retry` | `connectors.errors.network_unavailable` |
-| `TransportConnectionFailed`    | `transport_connection_failed`     | `network`            | `automatic_retry` | `connectors.errors.network_unavailable` |
+| Code | String value | Cause | Actionability | Message key |
+|---|---|---|---|---|
+| `AdobeRequestTimeout` | `adobe_request_timeout` | `network` | `automatic_retry` | `connectors.errors.timeout` |
+| `AdobeRateLimited` | `adobe_rate_limited` | `rate_limit` | `automatic_retry` | `connectors.errors.rate_limited` |
+| `AdobeVendorUnavailable` | `adobe_vendor_unavailable` | `vendor_unavailable` | `automatic_retry` | `connectors.errors.vendor_unavailable` |
+| `TransportDnsResolutionFailed` | `transport_dns_resolution_failed` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
+| `TransportTimeout` | `transport_timeout` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
+| `TransportConnectionFailed` | `transport_connection_failed` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
 
 HTTP 5xx / gateway outcomes map to the existing `AdobeVendorUnavailable` case —
 discovery does **not** define a separate gateway-specific code.
@@ -3624,7 +3362,6 @@ term, not inventing a competing one.
 implementation and tests cannot disagree on an overlapping case (e.g.
 `total_count=10,000`, 50 pages fetched, only 9,900 items received —
 which would trigger *both* candidate rules under an unordered reading):
-
 1. if `total_count > 10,000` at any point, before fetching further pages
    → `DiscoveryPaginationLimitExceeded`, checked first;
 2. after the 50th page, if the accumulated count is still less than
@@ -3639,38 +3376,31 @@ which would trigger *both* candidate rules under an unordered reading):
 
 #### Account projection mapping after discovery (Resolved)
 
-* any terminal vendor outcome (success or failure) updates
+- any terminal vendor outcome (success or failure) updates
   `ConnectorAccount.last_discovery_at`;
-
-* success additionally sets `last_successful_discovery_at`, sets
+- success additionally sets `last_successful_discovery_at`, sets
   `connection_status = Connected`, and clears all four `last_error_*`
   fields;
-
-* a **result-level** (`ConnectorDiscoveryRunErrorCode`) outcome whose
+- a **result-level** (`ConnectorDiscoveryRunErrorCode`) outcome whose
   actionability is `automatic_retry` — meaning a real, persisted vendor
   result exists and was classified retryable — sets
   `connection_status = TemporarilyUnavailable` if it remains the terminal
   state once retries are exhausted;
-
-* **`discovery_attempts_exhausted_without_result`** **(the lifecycle code) by
-  itself never changes** **`connection_status`** — it means no persisted
+- **`discovery_attempts_exhausted_without_result` (the lifecycle code) by
+  itself never changes `connection_status`** — it means no persisted
   vendor result exists at all, so there is nothing retryable to reflect;
   this keeps it consistent with "lifecycle codes never overwrite the
   projection";
-
-* a result whose actionability is `user_action_required`,
+- a result whose actionability is `user_action_required`,
   `workspace_admin_required`, or `support_required` sets
   `connection_status = AttentionRequired` and writes the four
   `last_error_*` fields from that result;
-
-* a lifecycle-only failure (dispatch/job-failed) does not by itself
+- a lifecycle-only failure (dispatch/job-failed) does not by itself
   change `connection_status`;
-
-* `discovery_account_disabled_before_execution` never changes the
+- `discovery_account_disabled_before_execution` never changes the
   projection (the account is already disabled);
-
-* the projection is updated **only if this run is the newest run for
-  the account by** **`(created_at, id) DESC`** — a stale/delayed terminal
+- the projection is updated **only if this run is the newest run for
+  the account by `(created_at, id) DESC`** — a stale/delayed terminal
   write from an older run must never overwrite a newer run's result.
 
 **Worker-activation gate (reference environment):** closed 2026-08-15 — Supervisor program
@@ -3684,19 +3414,19 @@ confirmed worker `RUNNING` state — see `07-TECH_STACK.md`.
 
 Immutable successful normalized schema capture.
 
-| Column                       | Type             | Notes                                                                                         |
-| ---------------------------- | ---------------- | --------------------------------------------------------------------------------------------- |
-| `id`                         | UUID PK          | <br />                                                                                        |
-| `workspace_id`               | UUID FK          | <br />                                                                                        |
-| `connector_account_id`       | UUID FK          | <br />                                                                                        |
-| `connector_schema_source_id` | UUID FK          | <br />                                                                                        |
-| `discovery_run_id`           | UUID FK          | Producing run                                                                                 |
-| `previous_snapshot_id`       | UUID FK nullable | Chain                                                                                         |
-| `schema_version`             | string nullable  | From source/account context                                                                   |
-| `field_count`                | unsigned int     | Count of normalized snapshot fields only (`fields_normalized`), never the raw received total. |
-| `canonical_hash`             | char(64)         | Hash of ordered normalized field hashes                                                       |
-| `captured_at`                | timestamp        | Vendor-normalized capture instant                                                             |
-| `created_at`                 | timestamp        | Append-only                                                                                   |
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID FK | |
+| `connector_account_id` | UUID FK | |
+| `connector_schema_source_id` | UUID FK | |
+| `discovery_run_id` | UUID FK | Producing run |
+| `previous_snapshot_id` | UUID FK nullable | Chain |
+| `schema_version` | string nullable | From source/account context |
+| `field_count` | unsigned int | Count of normalized snapshot fields only (`fields_normalized`), never the raw received total. |
+| `canonical_hash` | char(64) | Hash of ordered normalized field hashes |
+| `captured_at` | timestamp | Vendor-normalized capture instant |
+| `created_at` | timestamp | Append-only |
 
 If `canonical_hash` equals previous snapshot, a new run may still append a snapshot
 for audit, but UI labels the outcome **«Без змін»** rather than implying field churn.
@@ -3708,22 +3438,22 @@ for audit, but UI labels the outcome **«Без змін»** rather than implyin
 Normalized field state inside one snapshot. **No** `previous_value` / `current_value`
 columns — diffs are separate entities.
 
-| Column                 | Type                  | Notes                          |
-| ---------------------- | --------------------- | ------------------------------ |
-| `id`                   | UUID PK               | <br />                         |
-| `workspace_id`         | UUID FK               | <br />                         |
-| `snapshot_id`          | UUID FK               | <br />                         |
-| `external_field_key`   | string                | Adobe: `attribute_code`        |
-| `external_label`       | string nullable       | <br />                         |
-| `normalized_data_type` | string                | Connector-neutral type code    |
-| `is_required`          | boolean nullable      | <br />                         |
-| `is_multi_value`       | boolean nullable      | <br />                         |
-| `is_localizable`       | boolean nullable      | <br />                         |
-| `external_scope`       | string nullable       | <br />                         |
-| `normalized_payload`   | JSON                  | Whitelisted metadata + options |
-| `canonical_hash`       | char(64)              | Per-field deterministic hash   |
-| `sort_order`           | unsigned int nullable | <br />                         |
-| `created_at`           | timestamp             | <br />                         |
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID FK | |
+| `snapshot_id` | UUID FK | |
+| `external_field_key` | string | Adobe: `attribute_code` |
+| `external_label` | string nullable | |
+| `normalized_data_type` | string | Connector-neutral type code |
+| `is_required` | boolean nullable | |
+| `is_multi_value` | boolean nullable | |
+| `is_localizable` | boolean nullable | |
+| `external_scope` | string nullable | |
+| `normalized_payload` | JSON | Whitelisted metadata + options |
+| `canonical_hash` | char(64) | Per-field deterministic hash |
+| `sort_order` | unsigned int nullable | |
+| `created_at` | timestamp | |
 
 Unique: `(snapshot_id, external_field_key)`.
 
@@ -3755,30 +3485,28 @@ Confirmed upstream service contracts (Magento 2.4 `AttributeInterface`,
 `backend_type`, `validation_rules[]`, `is_unique`, `default_value`, `note`, and
 other standard properties — but v1 maps only the subset in the table below.
 
-| Canonical field        | Adobe source (list response)                                    | Conversion rule                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ---------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `external_field_key`   | `attribute_code`                                                | direct copy, no transformation                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `external_label`       | `default_frontend_label`                                        | direct copy. `frontend_labels[]` (per-store labels) are **not** captured anywhere in v1 — not in this field, not in `normalized_payload`. Per-store label capture is deferred to a future version; capturing it now without a defined localization consumer would be premature scope                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `normalized_data_type` | `frontend_input`                                                | mapped through this exact, closed lookup table for v1 — genuinely connector-neutral values, not raw Magento/Adobe terms (per the existing "Connector-neutral type code" note on this column): `text`→`text`, `textarea`→`long_text`, `texteditor`→`long_text`, `date`→`date`, `datetime`→`datetime`, `boolean`→`boolean`, `select`→`select`, `multiselect`→`multi_select`, `price`→`money`, `media_image`→`image`, `gallery`→`image_collection`, `weight`→`number`. `weight` was confirmed as a real `frontend_input` value via a real-store discovery smoke test (see PR history) and added as `number` — the first, and currently only, entry in this v1 vocabulary representing a plain decimal number without a currency. Any `frontend_input` value not in this table terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed` — never guessed, never passed through unmapped. Explicitly **not** derived from `backend_type` (Magento's internal DB storage type is a different concept from the merchant-facing input type). This discovery-level vocabulary is not required to match the future `FieldDefinition`/Field Dictionary vocabulary exactly — reconciling the two (e.g. how `datetime` or `image_collection` map onto whatever Task 4C's import model uses) is that later task's own decision; discovery must not lose information just because a downstream consumer doesn't exist yet |
-| `is_required`          | `is_required`                                                   | `true`/`false` → direct copy; missing or `null` → `null` (per the canonical value-type contract's own `is_required: boolean or null` — never defaulted to `false`, since an unknown value is not the same claim as "confirmed optional"); any other type terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `is_multi_value`       | derived                                                         | `true` when `frontend_input` is `multiselect` or `gallery` (both represent a collection of values, per the `normalized_data_type` mapping above — `gallery`'s `image_collection` type is definitionally multi-value), else `false`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `is_localizable`       | derived from `scope`                                            | `global`→`false`, `website`→`false`, `store`→`true`. This is a v1 approximation: it reflects "capable of varying by store view," not a verified match to this project's specific JSONB-language-dictionary localization model — `website`-scoped values are intentionally treated as non-localizable in v1 since website-level variation is not the same concept as language localization. Document this distinction explicitly: the boolean must not imply more than it means                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `external_scope`       | `scope` (the REST-visible string field on the attribute object) | normalized to the closed lowercase vocabulary `global`/`website`/`store`; any other value terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `normalized_payload`   | whitelist, closed for v1                                        | exactly: normalized `options[]` (per the already-Resolved option-normalization rule, sourced from the list response's own `options[]`) for `select`/`multiselect` types only, producing `{"options":[...]}` (empty list allowed: `{"options":[]}`); for all other `normalized_data_type` values, `normalized_payload` is always `{}` — vendor-supplied `options` on a non-selectable type are ignored, not copied. `validation_rules`, `note`, `is_unique`, `default_value` are explicitly **excluded from v1** — not because they're unimportant, but because their exact shape/reliability on the list endpoint hasn't been verified against this project's actual pilot Adobe instance; adding them later is a new versioned decision, not a silent addition                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `sort_order`           | `position`                                                      | Adobe REST `ProductAttributeInterface` (extending `Magento\Catalog\Api\Data\EavAttributeInterface`) exposes the attribute ordering value as `position`. A JSON integer `>= 0` is copied directly into canonical `sort_order`; missing or `null` becomes `null`; any non-integer value — including a numeric string like `"10"`, since the canonical contract forbids coercing a numeric string into a number — or a negative integer terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed`. Never derived from page, array, database-insertion, or response order. A vendor extension field literally named `sort_order`, if one happens to be present, is not used in v1 — only `position` is read. **If the real pilot instance's actual response lacks a** **`position`** **field, stop and report the exact Adobe Commerce version, endpoint, and a redacted literal response item — do not silently fall back to any other field name, including** **`sort_order`.** This would signal a version/module drift from the documented service contract, not a reason to guess                                                                                                                                                                                                                                                                                                                         |
+| Canonical field | Adobe source (list response) | Conversion rule |
+|---|---|---|
+| `external_field_key` | `attribute_code` | direct copy, no transformation |
+| `external_label` | `default_frontend_label` | direct copy. `frontend_labels[]` (per-store labels) are **not** captured anywhere in v1 — not in this field, not in `normalized_payload`. Per-store label capture is deferred to a future version; capturing it now without a defined localization consumer would be premature scope |
+| `normalized_data_type` | `frontend_input` | mapped through this exact, closed lookup table for v1 — genuinely connector-neutral values, not raw Magento/Adobe terms (per the existing "Connector-neutral type code" note on this column): `text`→`text`, `textarea`→`long_text`, `texteditor`→`long_text`, `date`→`date`, `datetime`→`datetime`, `boolean`→`boolean`, `select`→`select`, `multiselect`→`multi_select`, `price`→`money`, `media_image`→`image`, `gallery`→`image_collection`, `weight`→`number`. `weight` was confirmed as a real `frontend_input` value via a real-store discovery smoke test (see PR history) and added as `number` — the first, and currently only, entry in this v1 vocabulary representing a plain decimal number without a currency. Any `frontend_input` value not in this table terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed` — never guessed, never passed through unmapped. Explicitly **not** derived from `backend_type` (Magento's internal DB storage type is a different concept from the merchant-facing input type). This discovery-level vocabulary is not required to match the future `FieldDefinition`/Field Dictionary vocabulary exactly — reconciling the two (e.g. how `datetime` or `image_collection` map onto whatever Task 4C's import model uses) is that later task's own decision; discovery must not lose information just because a downstream consumer doesn't exist yet |
+| `is_required` | `is_required` | `true`/`false` → direct copy; missing or `null` → `null` (per the canonical value-type contract's own `is_required: boolean or null` — never defaulted to `false`, since an unknown value is not the same claim as "confirmed optional"); any other type terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed` |
+| `is_multi_value` | derived | `true` when `frontend_input` is `multiselect` or `gallery` (both represent a collection of values, per the `normalized_data_type` mapping above — `gallery`'s `image_collection` type is definitionally multi-value), else `false` |
+| `is_localizable` | derived from `scope` | `global`→`false`, `website`→`false`, `store`→`true`. This is a v1 approximation: it reflects "capable of varying by store view," not a verified match to this project's specific JSONB-language-dictionary localization model — `website`-scoped values are intentionally treated as non-localizable in v1 since website-level variation is not the same concept as language localization. Document this distinction explicitly: the boolean must not imply more than it means |
+| `external_scope` | `scope` (the REST-visible string field on the attribute object) | normalized to the closed lowercase vocabulary `global`/`website`/`store`; any other value terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed` |
+| `normalized_payload` | whitelist, closed for v1 | exactly: normalized `options[]` (per the already-Resolved option-normalization rule, sourced from the list response's own `options[]`) for `select`/`multiselect` types only, producing `{"options":[...]}` (empty list allowed: `{"options":[]}`); for all other `normalized_data_type` values, `normalized_payload` is always `{}` — vendor-supplied `options` on a non-selectable type are ignored, not copied. `validation_rules`, `note`, `is_unique`, `default_value` are explicitly **excluded from v1** — not because they're unimportant, but because their exact shape/reliability on the list endpoint hasn't been verified against this project's actual pilot Adobe instance; adding them later is a new versioned decision, not a silent addition |
+| `sort_order` | `position` | Adobe REST `ProductAttributeInterface` (extending `Magento\Catalog\Api\Data\EavAttributeInterface`) exposes the attribute ordering value as `position`. A JSON integer `>= 0` is copied directly into canonical `sort_order`; missing or `null` becomes `null`; any non-integer value — including a numeric string like `"10"`, since the canonical contract forbids coercing a numeric string into a number — or a negative integer terminates the whole vendor execution attempt with `DiscoverySchemaValidationFailed`. Never derived from page, array, database-insertion, or response order. A vendor extension field literally named `sort_order`, if one happens to be present, is not used in v1 — only `position` is read. **If the real pilot instance's actual response lacks a `position` field, stop and report the exact Adobe Commerce version, endpoint, and a redacted literal response item — do not silently fall back to any other field name, including `sort_order`.** This would signal a version/module drift from the documented service contract, not a reason to guess |
 
 #### Discovery eligibility before normalization (v1)
 
 Before `AdobePaaSAttributeNormalizer` runs, each raw list item is classified as
 one of:
 
-* **merchant-facing discoverable attribute** — normalized, hashed, and persisted;
-
-* **Magento internal/service-only attribute without** **`frontend_input`** — counted
+- **merchant-facing discoverable attribute** — normalized, hashed, and persisted;
+- **Magento internal/service-only attribute without `frontend_input`** — counted
   as received, excluded from normalization and the canonical hash, and not a
   schema-validation failure;
-
-* **unknown or malformed merchant-facing attribute** — fails the whole vendor
+- **unknown or malformed merchant-facing attribute** — fails the whole vendor
   execution attempt via the existing schema-validation contract.
 
 A raw item may be excluded as service-only **only when all** of the following
@@ -3822,38 +3550,30 @@ count is zero, and no per-page skip logging occurs.
 
 #### Missing/null/empty handling (v1)
 
-* `attribute_code` missing, `null`, or empty string → terminates the whole
+- `attribute_code` missing, `null`, or empty string → terminates the whole
   vendor execution attempt with `DiscoverySchemaValidationFailed` (this is the
   field-hash primary key, it cannot be defaulted or absent);
-
-* `external_label` missing or `null` → the canonical field is `null`;
+- `external_label` missing or `null` → the canonical field is `null`;
   `external_label` present as an empty string → preserved as an empty string
   (distinct from `null`, per the already-Resolved canonical contract);
-
-* `frontend_input` missing → terminates the whole vendor execution attempt
+- `frontend_input` missing → terminates the whole vendor execution attempt
   with `DiscoverySchemaValidationFailed` (load-bearing for
   `normalized_data_type`, cannot be defaulted);
-
-* `frontend_input` present as `null` → service-only skip **only** when the
+- `frontend_input` present as `null` → service-only skip **only** when the
   eligibility rule above matches; otherwise terminates the whole vendor execution
   attempt with `DiscoverySchemaValidationFailed`;
-
-* `is_required` missing or `null` → canonical `null` (never defaulted to
+- `is_required` missing or `null` → canonical `null` (never defaulted to
   `false`);
-
-* `scope` missing or `null` → terminates the whole vendor execution attempt
+- `scope` missing or `null` → terminates the whole vendor execution attempt
   with `DiscoverySchemaValidationFailed` (no safe default for a value that
   determines `is_localizable`);
-
-* on a `select`/`multiselect` field: `options` missing or `null` → terminates
+- on a `select`/`multiselect` field: `options` missing or `null` → terminates
   the whole vendor execution attempt with `DiscoverySchemaValidationFailed`;
   `options` present as an empty list `[]` → valid, produces
   `normalized_payload: {"options":[]}`;
-
-* on a non-selectable type, any `options` value present is ignored (not an
+- on a non-selectable type, any `options` value present is ignored (not an
   error);
-
-* `sort_order` missing or `null` → canonical `null` (not an error).
+- `sort_order` missing or `null` → canonical `null` (not an error).
 
 #### Whole-attempt schema-validation semantics (v1)
 
@@ -3866,16 +3586,12 @@ are intentionally skipped without failing the attempt.
 
 On such a failure:
 
-* no `ConnectorSchemaSnapshot` row is published;
-
-* no `ConnectorSchemaSnapshotField` rows are published;
-
-* the terminal result code is `DiscoverySchemaValidationFailed`
+- no `ConnectorSchemaSnapshot` row is published;
+- no `ConnectorSchemaSnapshotField` rows are published;
+- the terminal result code is `DiscoverySchemaValidationFailed`
   (`discovery_schema_validation_failed`);
-
-* actionability is `support_required`;
-
-* the outcome is **non-retryable** (not `automatic_retry`).
+- actionability is `support_required`;
+- the outcome is **non-retryable** (not `automatic_retry`).
 
 This applies uniformly to every rule in this section that terminates the
 whole vendor execution attempt with `DiscoverySchemaValidationFailed`, including
@@ -3904,17 +3620,14 @@ merchant-facing canonical schema, or explicitly deferred per the
 
 #### Raw value type validation (v1)
 
-* mapped Adobe string properties must arrive as JSON strings — no
+- mapped Adobe string properties must arrive as JSON strings — no
   int/bool/float-to-string coercion is performed;
-
-* `attribute_code` and `frontend_input` are required, non-empty strings;
+- `attribute_code` and `frontend_input` are required, non-empty strings;
   any other type or an empty string is a whole-attempt failure;
-
-* `default_frontend_label`: missing/`null` → canonical `null`; a string
+- `default_frontend_label`: missing/`null` → canonical `null`; a string
   (including `""`) is preserved as-is; any other type is a whole-attempt
   failure;
-
-* selectable `options` must be decoded as a genuine JSON list — after
+- selectable `options` must be decoded as a genuine JSON list — after
   decoding the response with `json_decode(..., associative: false)`, a
   JSON list `[...]` becomes a plain PHP list array (PHP:
   `array_is_list()` true regardless of the `associative` flag, since
@@ -3923,26 +3636,20 @@ merchant-facing canonical schema, or explicitly deferred per the
   array, and is rejected as a whole-attempt failure — this distinction
   is only reliable because the response is decoded with
   `associative: false` throughout, never `true`;
-
-* each option row must decode as `\stdClass` (a JSON object); any other
+- each option row must decode as `\stdClass` (a JSON object); any other
   shape — including a PHP array, which cannot occur here under
   `associative: false` decoding unless the raw JSON itself was a nested
   array where an object was expected — is a whole-attempt failure;
-
-* option `value` is required and must be a string (empty string valid);
+- option `value` is required and must be a string (empty string valid);
   any other type or absence is a whole-attempt failure;
-
-* option `label`: missing/`null` → canonical `null`; a string (including
+- option `label`: missing/`null` → canonical `null`; a string (including
   `" "` and `""`) is preserved as-is; any other type is a whole-attempt
   failure;
-
-* unknown keys inside an option row are ignored and never persisted;
-
-* on a non-selectable type, any raw `options` value is ignored
+- unknown keys inside an option row are ignored and never persisted;
+- on a non-selectable type, any raw `options` value is ignored
   completely, even if malformed — malformed data in a field this
   contract doesn't read is not a validation failure;
-
-* no scalar coercion occurs anywhere in this normalizer — a value must
+- no scalar coercion occurs anywhere in this normalizer — a value must
   already be the exact expected raw type, or the field/attempt fails.
 
 #### Placeholder select options (v1)
@@ -3982,47 +3689,31 @@ trailing newline after the JSON document.
 
 The canonical field object contains exactly:
 
-* `external_field_key`
-
-* `external_label`
-
-* `normalized_data_type`
-
-* `is_required`
-
-* `is_multi_value`
-
-* `is_localizable`
-
-* `external_scope`
-
-* `normalized_payload`
-
-* `sort_order`
+- `external_field_key`
+- `external_label`
+- `normalized_data_type`
+- `is_required`
+- `is_multi_value`
+- `is_localizable`
+- `external_scope`
+- `normalized_payload`
+- `sort_order`
 
 Identifiers, workspace/snapshot foreign keys, timestamps, request metadata,
 pagination position, and the hash column itself are excluded.
 
 **The canonical field object's value types are fixed:**
 
-* `external_field_key`: UTF-8 string;
-
-* `external_label`: UTF-8 string or `null`;
-
-* `normalized_data_type`: UTF-8 string;
-
-* `is_required`: boolean or `null`;
-
-* `is_multi_value`: boolean or `null`;
-
-* `is_localizable`: boolean or `null`;
-
-* `external_scope`: UTF-8 string or `null`;
-
-* `normalized_payload`: JSON object, subject to the container and
+- `external_field_key`: UTF-8 string;
+- `external_label`: UTF-8 string or `null`;
+- `normalized_data_type`: UTF-8 string;
+- `is_required`: boolean or `null`;
+- `is_multi_value`: boolean or `null`;
+- `is_localizable`: boolean or `null`;
+- `external_scope`: UTF-8 string or `null`;
+- `normalized_payload`: JSON object, subject to the container and
   whitelist rules elsewhere in this section;
-
-* `sort_order`: non-negative integer or `null`.
+- `sort_order`: non-negative integer or `null`.
 
 Adapters must normalize values to these exact types before hashing.
 Boolean fields must be encoded as JSON `true`/`false`/`null`, never as
@@ -4060,16 +3751,13 @@ objects themselves are forbidden canonical input.
 
 Canonical container kinds are explicit and must survive normalization:
 
-* `normalized_payload` is always a JSON object. When it has no keys, its
+- `normalized_payload` is always a JSON object. When it has no keys, its
   canonical encoding is `{}`, never `[]`.
-
-* `options` is always a JSON list. When it has no items, its canonical
+- `options` is always a JSON list. When it has no items, its canonical
   encoding is `[]`, never `{}`.
-
-* a JSON list is a zero-based contiguous sequence; a JSON object is a
+- a JSON list is a zero-based contiguous sequence; a JSON object is a
   string-keyed map;
-
-* the canonicalizer must not infer an empty object's kind from an empty
+- the canonicalizer must not infer an empty object's kind from an empty
   PHP array — before `json_encode()`, an empty object must be represented
   as `(object)[]` or an equivalent explicit object node, since PHP's
   `json_encode([])` produces `[]` while `json_encode((object)[])`
@@ -4077,23 +3765,16 @@ Canonical container kinds are explicit and must survive normalization:
 
 Canonical serialization rules:
 
-* top-level keys are always present; unknown top-level values are `null`;
-
-* object keys are recursively sorted using locale-independent bytewise order;
-
-* decoded string values are preserved exactly — no trimming, lowercasing, or
+- top-level keys are always present; unknown top-level values are `null`;
+- object keys are recursively sorted using locale-independent bytewise order;
+- decoded string values are preserved exactly — no trimming, lowercasing, or
   Unicode normalization;
-
-* invalid UTF-8 and unsupported values fail with `schema_validation`; they are
+- invalid UTF-8 and unsupported values fail with `schema_validation`; they are
   never silently replaced;
-
-* vendor identifiers and option values are normalized to strings;
-
-* `normalized_payload` contains only adapter-approved whitelisted metadata;
-
-* optional null-valued keys inside `normalized_payload` are omitted;
-
-* JSON list (array) element order is preserved by the canonical serializer
+- vendor identifiers and option values are normalized to strings;
+- `normalized_payload` contains only adapter-approved whitelisted metadata;
+- optional null-valued keys inside `normalized_payload` are omitted;
+- JSON list (array) element order is preserved by the canonical serializer
   as-is — canonicalization only sorts object keys, never reorders arrays.
   Before serialization, every collection whose vendor order is not
   semantically meaningful must already be normalized by its adapter using
@@ -4114,9 +3795,8 @@ pagination/fetch order does not — they are not the same kind of ordering.
 
 Each normalized option is an object containing exactly:
 
-* `value`: non-null UTF-8 string;
-
-* `label`: UTF-8 string or `null`.
+- `value`: non-null UTF-8 string;
+- `label`: UTF-8 string or `null`.
 
 Option values must be unique by bytewise comparison after normalization.
 Duplicate values fail with `schema_validation`. After uniqueness
@@ -4184,20 +3864,20 @@ runtime from the presence of these entities. Diff computation remains Task
 
 #### Physical schema — `connector_schema_diffs` (Resolved)
 
-| Column                       | Type             | Notes                                               |
-| ---------------------------- | ---------------- | --------------------------------------------------- |
-| `id`                         | UUID PK          | <br />                                              |
-| `workspace_id`               | UUID FK          | Required from first migration                       |
-| `connector_account_id`       | UUID FK          | Composite guard with `workspace_id`                 |
-| `connector_schema_source_id` | UUID FK          | Same source as both endpoint snapshots              |
-| `from_snapshot_id`           | UUID FK nullable | Null only for a true baseline diff                  |
-| `to_snapshot_id`             | UUID FK          | Resulting snapshot; one canonical diff per snapshot |
-| `is_first_snapshot`          | boolean          | True exactly when `from_snapshot_id` is null        |
-| `added_count`                | unsigned int     | <br />                                              |
-| `changed_count`              | unsigned int     | <br />                                              |
-| `removed_count`              | unsigned int     | <br />                                              |
-| `unchanged_count`            | unsigned int     | <br />                                              |
-| `created_at`                 | timestamp        | Immutable, append-only; no `updated_at`             |
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID FK | Required from first migration |
+| `connector_account_id` | UUID FK | Composite guard with `workspace_id` |
+| `connector_schema_source_id` | UUID FK | Same source as both endpoint snapshots |
+| `from_snapshot_id` | UUID FK nullable | Null only for a true baseline diff |
+| `to_snapshot_id` | UUID FK | Resulting snapshot; one canonical diff per snapshot |
+| `is_first_snapshot` | boolean | True exactly when `from_snapshot_id` is null |
+| `added_count` | unsigned int | |
+| `changed_count` | unsigned int | |
+| `removed_count` | unsigned int | |
+| `unchanged_count` | unsigned int | |
+| `created_at` | timestamp | Immutable, append-only; no `updated_at` |
 
 Unique: `(to_snapshot_id)` — each resulting snapshot has at most one canonical diff.
 `discovery_run_id` is intentionally **not** stored here — it is available via
@@ -4213,17 +3893,17 @@ portably.
 
 #### Physical schema — `connector_schema_diff_items` (Resolved)
 
-| Column                     | Type             | Notes                                   |
-| -------------------------- | ---------------- | --------------------------------------- |
-| `id`                       | UUID PK          | <br />                                  |
-| `workspace_id`             | UUID FK          | Required from first migration           |
-| `connector_schema_diff_id` | UUID FK          | Composite guard with `workspace_id`     |
-| `change_type`              | enum             | `added`, `removed`, `changed`           |
-| `external_field_key`       | string           | Connector field key                     |
-| `before_snapshot_field_id` | UUID FK nullable | Required for `removed`/`changed`        |
-| `after_snapshot_field_id`  | UUID FK nullable | Required for `added`/`changed`          |
-| `changed_paths`            | JSON nullable    | JSON array; `changed` items only        |
-| `created_at`               | timestamp        | Immutable, append-only; no `updated_at` |
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID FK | Required from first migration |
+| `connector_schema_diff_id` | UUID FK | Composite guard with `workspace_id` |
+| `change_type` | enum | `added`, `removed`, `changed` |
+| `external_field_key` | string | Connector field key |
+| `before_snapshot_field_id` | UUID FK nullable | Required for `removed`/`changed` |
+| `after_snapshot_field_id` | UUID FK nullable | Required for `added`/`changed` |
+| `changed_paths` | JSON nullable | JSON array; `changed` items only |
+| `created_at` | timestamp | Immutable, append-only; no `updated_at` |
 
 Unique: `(connector_schema_diff_id, external_field_key)`.
 Index: `(connector_schema_diff_id, change_type)`.
@@ -4234,19 +3914,14 @@ Task 4B-1 provides columns, casts, relationships, FK integrity, and factories on
 and must not add model observers/events that pretend to replace that future domain
 service):
 
-* `added`: `before_snapshot_field_id = null`, `after_snapshot_field_id != null`,
+- `added`: `before_snapshot_field_id = null`, `after_snapshot_field_id != null`,
   `changed_paths = null`;
-
-* `removed`: `before_snapshot_field_id != null`, `after_snapshot_field_id = null`,
+- `removed`: `before_snapshot_field_id != null`, `after_snapshot_field_id = null`,
   `changed_paths = null`;
-
-* `changed`: both field FKs required, `changed_paths` is a non-empty JSON array;
-
-* `external_field_key` must match the referenced before/after fields;
-
-* referenced fields must belong to the diff's corresponding endpoint snapshots;
-
-* all parent references satisfy the documented composite workspace guards.
+- `changed`: both field FKs required, `changed_paths` is a non-empty JSON array;
+- `external_field_key` must match the referenced before/after fields;
+- referenced fields must belong to the diff's corresponding endpoint snapshots;
+- all parent references satisfy the documented composite workspace guards.
 
 Both tables follow the same append-only, immutable-after-creation discipline as
 `ConnectorConnectionCheck`/`ConnectorDiscoveryRun`/snapshots.
@@ -4267,12 +3942,12 @@ Example keys: `connectors.errors.invalid_credentials`,
 
 ### Task 4B vs Task 4C boundary (Resolved)
 
-| Task               | Scope                                                                                                                                                                                                         |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **4B-0** (this PR) | Stop-and-Amend docs + visual contract only                                                                                                                                                                    |
-| **4B-1**           | Migrations/domain foundation for `ConnectorAccount` + history tables                                                                                                                                          |
-| **4B-2**           | Adobe live discovery, snapshots, diffs, operational UI                                                                                                                                                        |
-| **4C**             | Sync Domain mapping slice: `FieldMapping` suggestions, confidence, confirmation, manual resolution against discovered `external_field_key` identity (owned by `SyncConfiguration` per Sync Domain Rebaseline) |
+| Task | Scope |
+|---|---|
+| **4B-0** (this PR) | Stop-and-Amend docs + visual contract only |
+| **4B-1** | Migrations/domain foundation for `ConnectorAccount` + history tables |
+| **4B-2** | Adobe live discovery, snapshots, diffs, operational UI |
+| **4C** | Sync Domain mapping slice: `FieldMapping` suggestions, confidence, confirmation, manual resolution against discovered `external_field_key` identity (owned by `SyncConfiguration` per Sync Domain Rebaseline) |
 
 Task 4B snapshots are **input** to Task 4C. Discovery must **not** auto-create
 `FieldMapping` rows. Canonical Adobe mapping rows in
@@ -4281,13 +3956,13 @@ evidence knowledge only — not account schema and not workspace mapping state.
 
 ### Retention (Resolved initial policy)
 
-| Data                                | Retention                  |
-| ----------------------------------- | -------------------------- |
-| Connection checks / failed attempts | 90 days                    |
-| Discovery run metadata              | 12 months                  |
-| Successful normalized snapshots     | Last 30 per account+source |
-| Latest successful snapshot          | Always retained            |
-| Raw vendor payload                  | Not stored by default      |
+| Data | Retention |
+|---|---|
+| Connection checks / failed attempts | 90 days |
+| Discovery run metadata | 12 months |
+| Successful normalized snapshots | Last 30 per account+source |
+| Latest successful snapshot | Always retained |
+| Raw vendor payload | Not stored by default |
 
 Diff summaries are retained only while their endpoint snapshots are retained —
 a diff must never outlive the snapshot it describes as `latest`, and must never
@@ -4311,17 +3986,17 @@ documented pruning order (old snapshots deleted before their producing/eligible
 runs, older snapshots pruned while newer ones may still chain-reference them)
 impossible at the DB level.
 
-| FK                                                                                               | Behavior                         | Why                                                                                                                                                                                                              |
-| ------------------------------------------------------------------------------------------------ | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `connector_discovery_runs.snapshot_id`                                                           | `restrictOnDelete()` (composite) | **Not** `nullOnDelete()` — MySQL requires every column in a composite FK to be nullable for `SET NULL`, and `workspace_id` is `NOT NULL`, so the constraint cannot even be created. See pruning exception below. |
-| `connector_discovery_runs.previous_snapshot_id`                                                  | `restrictOnDelete()` (composite) | Same MySQL composite-FK-with-NOT-NULL-column restriction                                                                                                                                                         |
-| `connector_schema_snapshots.previous_snapshot_id`                                                | `restrictOnDelete()` (composite) | Same restriction                                                                                                                                                                                                 |
-| `connector_schema_snapshots.discovery_run_id`                                                    | `restrictOnDelete()` (composite) | Producing-run link; pruning order deletes snapshots before their run becomes eligible, so this never blocks correct-order pruning                                                                                |
-| `connector_schema_diffs.from_snapshot_id` / `.to_snapshot_id`                                    | `restrictOnDelete()` (composite) | Per Зміна 3 — pruning service deletes diffs before their endpoint snapshots                                                                                                                                      |
-| `connector_schema_diff_items.before_snapshot_field_id` / `.after_snapshot_field_id`              | `restrictOnDelete()` (composite) | Same reasoning — items deleted before fields                                                                                                                                                                     |
-| `connector_schema_snapshot_fields.snapshot_id`                                                   | `restrictOnDelete()` (composite) | Per pruning order, fields are deleted before their own snapshot by the pruning service, not by cascade                                                                                                           |
-| All `connector_account_id` / `connector_schema_source_id` / `connector_definition_id` references | `restrictOnDelete()`             | Consistent with `connector_schema_sources.connector_definition_id`'s existing precedent — global/parent metadata is never silently orphaned                                                                      |
-| `initiated_by_user_id` (checks, runs)                                                            | `nullOnDelete()`                 | Single-column FK, no composite — audit-log semantics, history survives user deletion                                                                                                                             |
+| FK | Behavior | Why |
+|---|---|---|
+| `connector_discovery_runs.snapshot_id` | `restrictOnDelete()` (composite) | **Not** `nullOnDelete()` — MySQL requires every column in a composite FK to be nullable for `SET NULL`, and `workspace_id` is `NOT NULL`, so the constraint cannot even be created. See pruning exception below. |
+| `connector_discovery_runs.previous_snapshot_id` | `restrictOnDelete()` (composite) | Same MySQL composite-FK-with-NOT-NULL-column restriction |
+| `connector_schema_snapshots.previous_snapshot_id` | `restrictOnDelete()` (composite) | Same restriction |
+| `connector_schema_snapshots.discovery_run_id` | `restrictOnDelete()` (composite) | Producing-run link; pruning order deletes snapshots before their run becomes eligible, so this never blocks correct-order pruning |
+| `connector_schema_diffs.from_snapshot_id` / `.to_snapshot_id` | `restrictOnDelete()` (composite) | Per Зміна 3 — pruning service deletes diffs before their endpoint snapshots |
+| `connector_schema_diff_items.before_snapshot_field_id` / `.after_snapshot_field_id` | `restrictOnDelete()` (composite) | Same reasoning — items deleted before fields |
+| `connector_schema_snapshot_fields.snapshot_id` | `restrictOnDelete()` (composite) | Per pruning order, fields are deleted before their own snapshot by the pruning service, not by cascade |
+| All `connector_account_id` / `connector_schema_source_id` / `connector_definition_id` references | `restrictOnDelete()` | Consistent with `connector_schema_sources.connector_definition_id`'s existing precedent — global/parent metadata is never silently orphaned |
+| `initiated_by_user_id` (checks, runs) | `nullOnDelete()` | Single-column FK, no composite — audit-log semantics, history survives user deletion |
 
 **Pruning exception (narrow, deliberate):** snapshot/run records are immutable
 operational history, except that the three nullable archival pointer columns above
@@ -4341,20 +4016,17 @@ These are **not** database constraints and are **not** implemented by Task 4B-1 
 they are the contract the future discovery/diff computation service (4B-2) must
 satisfy and be tested against:
 
-* For every discovery run, snapshot, and diff, the selected
+- For every discovery run, snapshot, and diff, the selected
   `connector_schema_source.connector_definition_id` must equal the related
   `connector_account.connector_definition_id`. An account for one platform must
   never discover or diff a schema source owned by another platform definition.
-
-* If `connector_discovery_runs.snapshot_id` is non-null, the referenced
+- If `connector_discovery_runs.snapshot_id` is non-null, the referenced
   `connector_schema_snapshots.discovery_run_id` must equal that run's own `id`,
   and both rows' `connector_account_id`/`connector_schema_source_id` must match.
-
-* If `connector_schema_diffs.from_snapshot_id` and `.to_snapshot_id` are both
+- If `connector_schema_diffs.from_snapshot_id` and `.to_snapshot_id` are both
   non-null, both referenced snapshots must belong to the same
   `connector_account_id` and `connector_schema_source_id` as the diff itself.
-
-* For `connector_schema_diff_items`, `before_snapshot_field_id` must belong to the
+- For `connector_schema_diff_items`, `before_snapshot_field_id` must belong to the
   diff's `from_snapshot_id`, and `after_snapshot_field_id` must belong to the
   diff's `to_snapshot_id` — not merely to *some* snapshot.
 
@@ -4370,20 +4042,15 @@ eligible means both older than 12 months **and** not the producing run of any
 still-retained snapshot.
 
 Indexes (Resolved):
-
-* `connector_connection_checks`: `(connector_account_id, created_at)`
-
-* `connector_discovery_runs`: `(connector_account_id, created_at)`
-
-* `connector_schema_snapshots`: `(connector_account_id, connector_schema_source_id, created_at)`
+- `connector_connection_checks`: `(connector_account_id, created_at)`
+- `connector_discovery_runs`: `(connector_account_id, created_at)`
+- `connector_schema_snapshots`: `(connector_account_id, connector_schema_source_id, created_at)`
 
 Supported and tested in this task: MySQL, SQLite.
 
 Generated column syntax:
-
-* MySQL:  `VARCHAR(255) AS (...) VIRTUAL`
-
-* SQLite: `TEXT GENERATED ALWAYS AS (...) VIRTUAL`
+- MySQL:  `VARCHAR(255) AS (...) VIRTUAL`
+- SQLite: `TEXT GENERATED ALWAYS AS (...) VIRTUAL`
 
 `config/database.php` retains Laravel's standard `pgsql` connection template, but
 Task 4B-1 does not introduce or claim a PostgreSQL migration contract because no
@@ -4400,10 +4067,8 @@ capabilities must fail before enqueue with a stable internal error — never wit
 fallback adapter.
 
 Minimum read capabilities through Task 4B-2c:
-
-* `connection_check` — prove auth and permission for the next capability
-
-* `schema_discovery` — paginated fetch and normalization of external product-attribute metadata
+- `connection_check` — prove auth and permission for the next capability
+- `schema_discovery` — paginated fetch and normalization of external product-attribute metadata
 
 Write/import/export and FieldMapping are out of scope until Task 4C+.
 
@@ -4418,15 +4083,12 @@ which optional connector abilities exist today (`ConnectionCheck`,
 `ConnectorProfileRegistry::requireCapability()` are the callable checks.
 
 **Rules:**
-
-* UI must gate **connector-capability-dependent** surfaces on `supports()` for
+- UI must gate **connector-capability-dependent** surfaces on `supports()` for
   the real enum case — no parallel UI-only connector-capability flags.
-
-* A new **connector-specific/runtime** ability requires a new
+- A new **connector-specific/runtime** ability requires a new
   `ConnectorCapability` case in its own scoping pass **before** UI that depends
   on that ability ships; UI must not invent interim connector-capability flags.
-
-* Connector-capability-gated sections appear only when `supports()` is true —
+- Connector-capability-gated sections appear only when `supports()` is true —
   never present-by-default with per-connector hiding.
 
 **Governing invariant:** a feature must become a `ConnectorCapability` only
@@ -4506,19 +4168,15 @@ UX contract is tracked under GAP-025 — not an architectural regression.
 #### Credential and settings classification (Resolved)
 
 Every profile field maps to exactly one storage boundary:
-
 1. typed `connector_accounts` column,
 2. non-secret `settings` JSON,
 3. encrypted `credentials` (`encrypted:array`),
 4. ephemeral token cache (IMS/SaaS only, later).
 
 Adobe PaaS (`adobe_commerce_paas_oauth1_integration`):
-
-* `base_url`, `store_code`, optional `tenant_context` → typed columns
-
-* OAuth consumer/access token material → `credentials`
-
-* other non-secret options → `settings`
+- `base_url`, `store_code`, optional `tenant_context` → typed columns
+- OAuth consumer/access token material → `credentials`
+- other non-secret options → `settings`
 
 Adobe SaaS profile field placement remains documented in the runtime proposal
 until IMS discovery parity is confirmed; reusing `store_code` for the `Store`
@@ -4538,28 +4196,25 @@ especially `view_connector_accounts`, `run_connector_discovery`, and
 
 **ConnectorAccount capability evaluation (frozen):**
 
-| Capability                                                                               | Effective when membership has                                                                 |
-| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Capability | Effective when membership has |
+|---|---|
 | Safe `ConnectorAccount` view (Layer A/B read; no decrypted credentials/settings secrets) | `view_connector_accounts` **OR** `run_connector_discovery` **OR** `manage_connector_accounts` |
-| Manual discovery trigger + safe progress/result read surface                             | `run_connector_discovery` **OR** `manage_connector_accounts`                                  |
-| Connection check                                                                         | `manage_connector_accounts`                                                                   |
-| Create / settings / credential mutation / disable / archive                              | `manage_connector_accounts`                                                                   |
+| Manual discovery trigger + safe progress/result read surface | `run_connector_discovery` **OR** `manage_connector_accounts` |
+| Connection check | `manage_connector_accounts` |
+| Create / settings / credential mutation / disable / archive | `manage_connector_accounts` |
 
 **Security boundaries (unchanged):**
 
-* Decrypted credentials must never appear in API resources, logs, events, queue
+- Decrypted credentials must never appear in API resources, logs, events, queue
   payloads, or exception reports.
-
-* Discovery dispatch goes through policy and an application service, never a direct
+- Discovery dispatch goes through policy and an application service, never a direct
   Filament/Eloquent action; it records `initiated_by_user_id`, trigger, and a
   history row, and respects the same account-level lock/overlap/rate-limit rules
   as any other trigger.
-
-* When a user lacks credential/settings mutation permission, the UI shows a safe
+- When a user lacks credential/settings mutation permission, the UI shows a safe
   recommendation to contact a colleague with access-management authority — it does
   not expose the underlying restriction as a raw permission error.
-
-* Scheduled discovery remains a system-initiated operation; configuring it
+- Scheduled discovery remains a system-initiated operation; configuring it
   (enabling/disabling, changing schedule) is outside the manual-discovery
   permission slice and requires its own future workspace-permission decision when
   scheduling ships.
@@ -4592,16 +4247,16 @@ in one round trip. A two-stage check (lighter probe first) is only added later
 if field testing shows the attribute-list endpoint is blocked while a lighter
 endpoint passes.
 
-| Vendor signal                                                                   | HTTP               | Cause                | Actionability          | User message key                                    |
-| ------------------------------------------------------------------------------- | ------------------ | -------------------- | ---------------------- | --------------------------------------------------- |
-| Invalid/revoked token or consumer key                                           | 401                | `authentication`     | `user_action_required` | `connectors.errors.invalid_credentials`             |
-| OAuth signature/nonce/timestamp                                                 | 401                | `authentication`     | `user_action_required` | `connectors.errors.invalid_signature`               |
-| Authenticated, ACL denied on attributes                                         | 403                | `authorization`      | `user_action_required` | `connectors.errors.insufficient_permissions`        |
-| Invalid base URL/store/path, or unsupported endpoint on an otherwise valid host | 404                | `configuration`      | `user_action_required` | `connectors.errors.invalid_or_unsupported_endpoint` |
-| Timeout                                                                         | 408 / curl timeout | `network`            | `automatic_retry`      | `connectors.errors.timeout`                         |
-| Rate limited                                                                    | 429                | `rate_limit`         | `automatic_retry`      | `connectors.errors.rate_limited`                    |
-| 5xx / gateway                                                                   | 5xx                | `vendor_unavailable` | `automatic_retry`      | `connectors.errors.vendor_unavailable`              |
-| JSON/schema mismatch                                                            | 200 + bad body     | `schema_validation`  | `support_required`     | `connectors.errors.unexpected_response`             |
+| Vendor signal | HTTP | Cause | Actionability | User message key |
+|---|---|---|---|---|
+| Invalid/revoked token or consumer key | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| OAuth signature/nonce/timestamp | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_signature` |
+| Authenticated, ACL denied on attributes | 403 | `authorization` | `user_action_required` | `connectors.errors.insufficient_permissions` |
+| Invalid base URL/store/path, or unsupported endpoint on an otherwise valid host | 404 | `configuration` | `user_action_required` | `connectors.errors.invalid_or_unsupported_endpoint` |
+| Timeout | 408 / curl timeout | `network` | `automatic_retry` | `connectors.errors.timeout` |
+| Rate limited | 429 | `rate_limit` | `automatic_retry` | `connectors.errors.rate_limited` |
+| 5xx / gateway | 5xx | `vendor_unavailable` | `automatic_retry` | `connectors.errors.vendor_unavailable` |
+| JSON/schema mismatch | 200 + bad body | `schema_validation` | `support_required` | `connectors.errors.unexpected_response` |
 
 A single HTTP 404 from the connection-check URL does not, by itself, reveal
 whether the base path, store code, endpoint, Adobe module/version, or
@@ -4627,62 +4282,62 @@ protected-REST error responses, connection-check execution uses HTTP-status-only
 fallback for 401/403. The identifier vocabulary below is retained for enum
 completeness and future use if Adobe exposes a reliable extraction path.
 
-| Adobe identifier            | HTTP | Cause            | Actionability          | Message key                                         |
-| --------------------------- | ---- | ---------------- | ---------------------- | --------------------------------------------------- |
-| `timestamp_refused`         | 400  | `authentication` | `user_action_required` | `connectors.errors.invalid_signature`               |
-| `signature_method_rejected` | 400  | `authentication` | `user_action_required` | `connectors.errors.invalid_signature`               |
-| `nonce_used`                | 401  | `authentication` | `user_action_required` | `connectors.errors.invalid_signature`               |
-| `signature_invalid`         | 401  | `authentication` | `user_action_required` | `connectors.errors.invalid_signature`               |
-| `consumer_key_rejected`     | 401  | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials`             |
-| `token_used`                | 401  | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials`             |
-| `token_expired`             | 401  | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials`             |
-| `token_revoke`              | 401  | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials`             |
-| `token_rejected`            | 401  | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials`             |
-| `verifier_invalid`          | 401  | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials`             |
-| `consumer_key_invalid`      | 403  | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials`             |
-| `permission_unknown`        | 403  | `authorization`  | `user_action_required` | `connectors.errors.insufficient_permissions`        |
-| `permission_denied`         | 403  | `authorization`  | `user_action_required` | `connectors.errors.insufficient_permissions`        |
-| `method_not_allowed`        | 405  | `configuration`  | `user_action_required` | `connectors.errors.invalid_or_unsupported_endpoint` |
-| `version_rejected`          | 400  | `unknown`        | `support_required`     | `connectors.errors.connection_check_failed`         |
-| `parameter_absent`          | 400  | `unknown`        | `support_required`     | `connectors.errors.connection_check_failed`         |
-| `parameter_rejected`        | 400  | `unknown`        | `support_required`     | `connectors.errors.connection_check_failed`         |
+| Adobe identifier | HTTP | Cause | Actionability | Message key |
+|---|---|---|---|---|
+| `timestamp_refused` | 400 | `authentication` | `user_action_required` | `connectors.errors.invalid_signature` |
+| `signature_method_rejected` | 400 | `authentication` | `user_action_required` | `connectors.errors.invalid_signature` |
+| `nonce_used` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_signature` |
+| `signature_invalid` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_signature` |
+| `consumer_key_rejected` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| `token_used` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| `token_expired` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| `token_revoke` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| `token_rejected` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| `verifier_invalid` | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| `consumer_key_invalid` | 403 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
+| `permission_unknown` | 403 | `authorization` | `user_action_required` | `connectors.errors.insufficient_permissions` |
+| `permission_denied` | 403 | `authorization` | `user_action_required` | `connectors.errors.insufficient_permissions` |
+| `method_not_allowed` | 405 | `configuration` | `user_action_required` | `connectors.errors.invalid_or_unsupported_endpoint` |
+| `version_rejected` | 400 | `unknown` | `support_required` | `connectors.errors.connection_check_failed` |
+| `parameter_absent` | 400 | `unknown` | `support_required` | `connectors.errors.connection_check_failed` |
+| `parameter_rejected` | 400 | `unknown` | `support_required` | `connectors.errors.connection_check_failed` |
 
 #### HTTP-status fallback table (Task 4B-2a-2b)
 
 Extends the B7 table above for statuses B7 does not enumerate. B7 rows are
 unchanged.
 
-| HTTP result                                                | Mapping                                                                                    |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `200` + valid Adobe list shape                             | success                                                                                    |
-| `200` + invalid JSON or wrong shape                        | B7 row: `schema_validation`/`support_required`/`unexpected_response`                       |
-| other `2xx`                                                | `schema_validation`/`support_required`/`connectors.errors.unexpected_response`             |
-| `3xx`                                                      | `configuration`/`user_action_required`/`connectors.errors.invalid_or_unsupported_endpoint` |
-| `400`/`401`/`403`/`405` with a recognized Adobe identifier | per Adobe OAuth identifier table                                                           |
-| `400` unrecognized                                         | `unknown`/`support_required`/`connectors.errors.connection_check_failed`                   |
-| `401` unrecognized                                         | B7 row: `authentication`/`user_action_required`/`invalid_credentials`                      |
-| `403` unrecognized                                         | B7 row: `authorization`/`user_action_required`/`insufficient_permissions`                  |
-| `404`                                                      | B7 row: exact single-category mapping                                                      |
-| `405` without a recognized OAuth identifier                | `configuration`/`user_action_required`/`connectors.errors.invalid_or_unsupported_endpoint` |
-| `408`                                                      | B7 row: `network`/`automatic_retry`/`connectors.errors.timeout`                            |
-| `429`                                                      | B7 row: `rate_limit`/`automatic_retry`/`connectors.errors.rate_limited`                    |
-| `5xx`                                                      | B7 row: `vendor_unavailable`/`automatic_retry`/`connectors.errors.vendor_unavailable`      |
-| any other `4xx`                                            | `unknown`/`support_required`/`connectors.errors.connection_check_failed`                   |
+| HTTP result | Mapping |
+|---|---|
+| `200` + valid Adobe list shape | success |
+| `200` + invalid JSON or wrong shape | B7 row: `schema_validation`/`support_required`/`unexpected_response` |
+| other `2xx` | `schema_validation`/`support_required`/`connectors.errors.unexpected_response` |
+| `3xx` | `configuration`/`user_action_required`/`connectors.errors.invalid_or_unsupported_endpoint` |
+| `400`/`401`/`403`/`405` with a recognized Adobe identifier | per Adobe OAuth identifier table |
+| `400` unrecognized | `unknown`/`support_required`/`connectors.errors.connection_check_failed` |
+| `401` unrecognized | B7 row: `authentication`/`user_action_required`/`invalid_credentials` |
+| `403` unrecognized | B7 row: `authorization`/`user_action_required`/`insufficient_permissions` |
+| `404` | B7 row: exact single-category mapping |
+| `405` without a recognized OAuth identifier | `configuration`/`user_action_required`/`connectors.errors.invalid_or_unsupported_endpoint` |
+| `408` | B7 row: `network`/`automatic_retry`/`connectors.errors.timeout` |
+| `429` | B7 row: `rate_limit`/`automatic_retry`/`connectors.errors.rate_limited` |
+| `5xx` | B7 row: `vendor_unavailable`/`automatic_retry`/`connectors.errors.vendor_unavailable` |
+| any other `4xx` | `unknown`/`support_required`/`connectors.errors.connection_check_failed` |
 
 #### Transport-failure mapping (Task 4B-2a-2b)
 
-| `TransportFailureReason`     | Cause               | Actionability          | Message key                                         |
-| ---------------------------- | ------------------- | ---------------------- | --------------------------------------------------- |
-| `InvalidDestination`         | `configuration`     | `user_action_required` | `connectors.errors.invalid_or_unsupported_endpoint` |
-| `UnsafeDestination`          | `configuration`     | `user_action_required` | `connectors.errors.invalid_or_unsupported_endpoint` |
-| `DnsResolutionFailed`        | `network`           | `automatic_retry`      | `connectors.errors.network_unavailable`             |
-| `Timeout`                    | `network`           | `automatic_retry`      | `connectors.errors.network_unavailable`             |
-| `ConnectionFailed`           | `network`           | `automatic_retry`      | `connectors.errors.network_unavailable`             |
-| `TlsVerificationFailed`      | `network`           | `support_required`     | `connectors.errors.tls_verification_failed`         |
-| `ResponseSizeExceeded`       | `schema_validation` | `support_required`     | `connectors.errors.unexpected_response`             |
-| `ChildProcessProtocolFailed` | `unknown`           | `support_required`     | `connectors.errors.connection_check_failed`         |
-| `ChildProcessCleanupFailed`  | `unknown`           | `support_required`     | `connectors.errors.connection_check_failed`         |
-| `OtherTransportFailure`      | `unknown`           | `support_required`     | `connectors.errors.connection_check_failed`         |
+| `TransportFailureReason` | Cause | Actionability | Message key |
+|---|---|---|---|
+| `InvalidDestination` | `configuration` | `user_action_required` | `connectors.errors.invalid_or_unsupported_endpoint` |
+| `UnsafeDestination` | `configuration` | `user_action_required` | `connectors.errors.invalid_or_unsupported_endpoint` |
+| `DnsResolutionFailed` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
+| `Timeout` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
+| `ConnectionFailed` | `network` | `automatic_retry` | `connectors.errors.network_unavailable` |
+| `TlsVerificationFailed` | `network` | `support_required` | `connectors.errors.tls_verification_failed` |
+| `ResponseSizeExceeded` | `schema_validation` | `support_required` | `connectors.errors.unexpected_response` |
+| `ChildProcessProtocolFailed` | `unknown` | `support_required` | `connectors.errors.connection_check_failed` |
+| `ChildProcessCleanupFailed` | `unknown` | `support_required` | `connectors.errors.connection_check_failed` |
+| `OtherTransportFailure` | `unknown` | `support_required` | `connectors.errors.connection_check_failed` |
 
 `DestinationRequestMismatch` and `TransportConfigurationException` propagate
 uncaught (internal wiring/deployment defects, not connection-check outcomes).
@@ -4720,29 +4375,22 @@ Transport: `transport_invalid_destination`, `transport_unsafe_destination`,
 `status` is `queued`; set when the worker begins HTTP work).
 
 Additional queue-lifecycle columns on `connector_connection_checks`:
-
-* `execution_attempts` (unsigned tinyint, default `0`) — counts **claimed
+- `execution_attempts` (unsigned tinyint, default `0`) — counts **claimed
   vendor-execution slots**, not confirmed HTTP calls; atomically incremented
   before each vendor call, capped at 3; conservative over-counting is
   acceptable, under-counting is not.
-
-* `retry_until_at` — absolute 15-minute deadline from dispatch, shared by the
+- `retry_until_at` — absolute 15-minute deadline from dispatch, shared by the
   job's `retryUntil()` and persisted on the row for deterministic stale-row
   recovery.
-
-* `next_attempt_at` — guards against the database queue driver's independent
+- `next_attempt_at` — guards against the database queue driver's independent
   `retry_after` redelivery bypassing an Adobe-mandated `Retry-After` or
   classified backoff delay.
 
 Time semantics:
-
-* `created_at` — operator requested / enqueued
-
-* `started_at` — worker began external work (null while `queued`)
-
-* `finished_at` — terminal
-
-* `duration_ms` — cumulative HTTP/work duration across attempts (hrtime-based,
+- `created_at` — operator requested / enqueued
+- `started_at` — worker began external work (null while `queued`)
+- `finished_at` — terminal
+- `duration_ms` — cumulative HTTP/work duration across attempts (hrtime-based,
   summed per attempt), excludes queue wait
 
 #### `ConnectorConnectionCheckLifecycleErrorCode` (queue/infrastructure only)
@@ -4750,12 +4398,12 @@ Time semantics:
 Never mixed into `ConnectorConnectionCheckErrorCode` (Adobe OAuth/HTTP/transport).
 Lifecycle codes never change `connector_accounts` projection.
 
-| Code                                                 | Cause           | Actionability              | Message key                                 | Technical summary                                |
-| ---------------------------------------------------- | --------------- | -------------------------- | ------------------------------------------- | ------------------------------------------------ |
-| `connection_check_dispatch_failed`                   | `unknown`       | `support_required`         | `connectors.errors.connection_check_failed` | `queue_dispatch_failed`                          |
-| `connection_check_job_failed`                        | `unknown`       | `support_required`         | `connectors.errors.connection_check_failed` | `queue_job_failed`                               |
-| `connection_check_attempts_exhausted_without_result` | `unknown`       | `support_required`         | `connectors.errors.connection_check_failed` | `vendor_attempt_budget_exhausted_without_result` |
-| `connection_check_account_disabled_before_execution` | `configuration` | `workspace_admin_required` | `connectors.errors.account_disabled`        | `account_disabled_before_execution`              |
+| Code | Cause | Actionability | Message key | Technical summary |
+|---|---|---|---|---|
+| `connection_check_dispatch_failed` | `unknown` | `support_required` | `connectors.errors.connection_check_failed` | `queue_dispatch_failed` |
+| `connection_check_job_failed` | `unknown` | `support_required` | `connectors.errors.connection_check_failed` | `queue_job_failed` |
+| `connection_check_attempts_exhausted_without_result` | `unknown` | `support_required` | `connectors.errors.connection_check_failed` | `vendor_attempt_budget_exhausted_without_result` |
+| `connection_check_account_disabled_before_execution` | `configuration` | `workspace_admin_required` | `connectors.errors.account_disabled` | `account_disabled_before_execution` |
 
 **Vendor-result precedence:** when a real vendor classification is already
 persisted on a row (intermediate retry persistence), that classification is the
@@ -4764,20 +4412,19 @@ recovery — lifecycle codes never overwrite it.
 
 #### Authorization and projection
 
-* `ConnectorAccountPolicy::runConnectionCheck()` — dedicated ability; **management-only**
+- `ConnectorAccountPolicy::runConnectionCheck()` — dedicated ability; **management-only**
   via `manage_connector_accounts` through `ConnectorAuthorization` /
   `WorkspaceAuthorization` (not discovery-only or safe-read tiers). Dispatch uses
   `Gate::forUser($actor)->authorize('runConnectionCheck', $account)`.
+- Account projection mapping on terminal **vendor** outcomes:
 
-* Account projection mapping on terminal **vendor** outcomes:
-
-| Terminal vendor outcome                                                      | `connection_status`                                 |
-| ---------------------------------------------------------------------------- | --------------------------------------------------- |
-| `Succeeded`                                                                  | `Connected` (clears all four `last_error_*` fields) |
-| Failure, `AutomaticRetry`, attempts exhausted                                | `TemporarilyUnavailable`                            |
-| Failure, `UserActionRequired` / `WorkspaceAdminRequired` / `SupportRequired` | `AttentionRequired`                                 |
-| Lifecycle/infrastructure failure                                             | **unchanged**                                       |
-| Disabled account (before execution)                                          | **unchanged**                                       |
+| Terminal vendor outcome | `connection_status` |
+|---|---|
+| `Succeeded` | `Connected` (clears all four `last_error_*` fields) |
+| Failure, `AutomaticRetry`, attempts exhausted | `TemporarilyUnavailable` |
+| Failure, `UserActionRequired` / `WorkspaceAdminRequired` / `SupportRequired` | `AttentionRequired` |
+| Lifecycle/infrastructure failure | **unchanged** |
+| Disabled account (before execution) | **unchanged** |
 
 On any terminal vendor failure, also write `last_error_cause`,
 `last_error_actionability`, `last_error_message_key`, and `last_error_at`.
@@ -4812,30 +4459,22 @@ ConnectorAccount
                       └─1:N─ SyncRunItem
 ```
 
-* `SyncRun` belongs to `SyncConfiguration`.
-
-* `SyncRun` is **not** a child of `FieldMapping`.
-
-* `FieldMapping` and `SyncRun` are siblings owned by `SyncConfiguration`.
-
-* `ExternalRecordLink` remains a separate **account-scoped** external-identity
+- `SyncRun` belongs to `SyncConfiguration`.
+- `SyncRun` is **not** a child of `FieldMapping`.
+- `FieldMapping` and `SyncRun` are siblings owned by `SyncConfiguration`.
+- `ExternalRecordLink` remains a separate **account-scoped** external-identity
   concept (not SyncConfiguration-scoped).
 
 Do **not** introduce speculative entities merely for symmetry. Unless current
 repository evidence creates a real requirement, the following remain out of
 scope for this rebaseline:
 
-* `MappingSet`;
-
-* persistent `SyncIssue` lifecycle;
-
-* `ExternalFieldIdentity` entity;
-
-* transport-operation entity/DSL;
-
-* readiness-state entity/enum;
-
-* generic edition/deployment-model entities.
+- `MappingSet`;
+- persistent `SyncIssue` lifecycle;
+- `ExternalFieldIdentity` entity;
+- transport-operation entity/DSL;
+- readiness-state entity/enum;
+- generic edition/deployment-model entities.
 
 ### SyncConfiguration — identity and responsibility
 
@@ -4871,9 +4510,8 @@ Direction/import/export is **not** part of SyncConfiguration identity.
 A SyncConfiguration may enable one or more semantic operations supported by
 the connected runtime contract:
 
-* import;
-
-* export.
+- import;
+- export.
 
 One domain/context configuration may therefore conceptually enable import
 only, export only, or both. Merchant UI may expose two operation checkboxes;
@@ -4888,22 +4526,15 @@ capability truth.
 
 #### SyncConfiguration owns conceptually
 
-* `data_domain`;
-
-* `external_context`;
-
-* independently enabled semantic operations supported by runtime-contract
+- `data_domain`;
+- `external_context`;
+- independently enabled semantic operations supported by runtime-contract
   capability truth;
-
-* selection scope;
-
-* effective FieldMappings;
-
-* schedule state/policy;
-
-* enabled / paused operational state;
-
-* stable comparable configuration revision.
+- selection scope;
+- effective FieldMappings;
+- schedule state/policy;
+- enabled / paused operational state;
+- stable comparable configuration revision.
 
 Exact database columns are not prescribed unless current repository
 conventions make a representation unavoidable.
@@ -4936,19 +4567,13 @@ plan. The correspondence itself is direction-neutral.
 
 The minimum FieldMapping does **not** require:
 
-* external JSON/payload access paths;
-
-* REST/GraphQL endpoint names;
-
-* immutable `ConnectorSchemaSnapshotField` IDs as long-lived mapping identity;
-
-* schema-source namespace/source FK merely as future insurance;
-
-* per-field authority/ownership;
-
-* one generic persisted transformation assumed valid for both import/export;
-
-* connector transport/cardinality mechanics.
+- external JSON/payload access paths;
+- REST/GraphQL endpoint names;
+- immutable `ConnectorSchemaSnapshotField` IDs as long-lived mapping identity;
+- schema-source namespace/source FK merely as future insurance;
+- per-field authority/ownership;
+- one generic persisted transformation assumed valid for both import/export;
+- connector transport/cardinality mechanics.
 
 #### Transformation semantics
 
@@ -4965,10 +4590,10 @@ Internal domain target resolution and external connector transport are
 orthogonal responsibilities. Keep conceptually distinct:
 
 A. **Internal platform/domain target** — e.g. canonical field binding, pricing
-domain, availability/inventory domain, media/domain-owned concepts.
+   domain, availability/inventory domain, media/domain-owned concepts.
 
 B. **External connector transport** — how the external system actually
-reads/writes/executes the semantic intent.
+   reads/writes/executes the semantic intent.
 
 Do **not** create one universal `handler` abstraction that spans both
 boundaries. Descriptive names such as DomainTarget / DomainTargetHandler or
@@ -4990,15 +4615,13 @@ account/domain context.
 
 Reverified repository facts:
 
-* `ConnectorDiscoverySourceResolver` selects exactly one source matching all of
+- `ConnectorDiscoverySourceResolver` selects exactly one source matching all of
   `schema_scope = Account`, `source_kind = AccountApi`,
   `acquisition_mode = LiveFetch`, `is_primary = true`, and fails on zero or
   multiple matches.
-
-* The Adobe `admin_rest_api` global/RemoteStatic source does not participate in
+- The Adobe `admin_rest_api` global/RemoteStatic source does not participate in
   this account discovery contract.
-
-* `ConnectorSchemaSnapshotField` uniqueness is `(snapshot_id, external_field_key)`.
+- `ConnectorSchemaSnapshotField` uniqueness is `(snapshot_id, external_field_key)`.
 
 Therefore: do **not** add schema-source/namespace persistence to FieldMapping
 merely as hypothetical future insurance.
@@ -5007,9 +4630,8 @@ merely as hypothetical future insurance.
 
 Discovery answers:
 
-* what logical external fields actually exist for **this** connected account now;
-
-* what normalized schema metadata describes them
+- what logical external fields actually exist for **this** connected account now;
+- what normalized schema metadata describes them
   (including the already-established normalized data-type/scope vocabulary).
 
 Mappings must survive immutable snapshot replacement by reconciling their
@@ -5044,8 +4666,7 @@ persisted.” `external_field_key` itself is intentionally connector-local
 external logical identity and may be persisted.
 
 #### FieldMapping first persistence contract
-
-\[Resolved — Task 4C-1a, 2026-08-12]
+[Resolved — Task 4C-1a, 2026-08-12]
 
 This section freezes the **minimum physical and lifecycle contract** for the
 first FieldMapping implementation slice (Task 4C-1b). It does **not** authorize
@@ -5053,12 +4674,12 @@ migrations, models, services, or UI — documentation only.
 
 ##### First-slice scope
 
-| Dimension         | First slice (4C-1b)                             | Explicitly deferred                                                                                                                                |
-| ----------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `data_domain`     | `products` only                                 | pricing, availability/inventory, media, categories, customer, connector-only technical concepts                                                    |
-| Internal target   | `FieldBinding` only (`field_binding_id`)        | `target_type` / `target_id` / `target_kind` polymorphic targets; pricing-domain, availability-domain, media-relation, or category-relation targets |
-| `FieldObjectType` | `product`, `product_variant`                    | `customer` and any future object types                                                                                                             |
-| Persistence       | Effective **confirmed** workspace mappings only | Suggestion candidates, confidence, `suggestion_source`, ephemeral prefill state                                                                    |
+| Dimension | First slice (4C-1b) | Explicitly deferred |
+|---|---|---|
+| `data_domain` | `products` only | pricing, availability/inventory, media, categories, customer, connector-only technical concepts |
+| Internal target | `FieldBinding` only (`field_binding_id`) | `target_type` / `target_id` / `target_kind` polymorphic targets; pricing-domain, availability-domain, media-relation, or category-relation targets |
+| `FieldObjectType` | `product`, `product_variant` | `customer` and any future object types |
+| Persistence | Effective **confirmed** workspace mappings only | Suggestion candidates, confidence, `suggestion_source`, ephemeral prefill state |
 
 Do not add polymorphic target columns “for future universality” in this slice.
 Domain-owned non-`FieldBinding` targets require a separate internal domain-target
@@ -5067,14 +4688,14 @@ is finalized.
 
 ##### Minimum physical schema — `field_mappings`
 
-| Column                      | Type            | Notes                                |
-| --------------------------- | --------------- | ------------------------------------ |
-| `id`                        | UUID PK         | <br />                               |
-| `workspace_id`              | UUID NOT NULL   | Workspace-owned row                  |
-| `sync_configuration_id`     | UUID NOT NULL   | Owned child of `SyncConfiguration`   |
-| `field_binding_id`          | UUID NOT NULL   | Internal semantic target             |
-| `external_field_key`        | string NOT NULL | Stable external **logical** identity |
-| `created_at` / `updated_at` | timestamps      | <br />                               |
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID NOT NULL | Workspace-owned row |
+| `sync_configuration_id` | UUID NOT NULL | Owned child of `SyncConfiguration` |
+| `field_binding_id` | UUID NOT NULL | Internal semantic target |
+| `external_field_key` | string NOT NULL | Stable external **logical** identity |
+| `created_at` / `updated_at` | timestamps | |
 
 **Not in the minimum table** (unless a separate, already-Resolved invariant
 requires otherwise): `direction`, `operation`, `import_enabled`, `export_enabled`,
@@ -5090,10 +4711,10 @@ transport schema, or connector runtime operation descriptor.
 
 `field_mappings` is an owned child of `SyncConfiguration`.
 
-| FK edge                                                                           | Behavior             | Rationale                                                                                                                                                                                |
-| --------------------------------------------------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `(workspace_id, sync_configuration_id)` → `sync_configurations(workspace_id, id)` | `ON DELETE CASCADE`  | Mapping has no standalone meaning after its parent configuration is removed. Task 4C-0 already established the workspace-aware parent key `(workspace_id, id)` on `sync_configurations`. |
-| `field_binding_id` → `field_bindings.id`                                          | `ON DELETE RESTRICT` | Prevent silent disappearance of confirmed mappings when an internal target row is physically deleted.                                                                                    |
+| FK edge | Behavior | Rationale |
+|---|---|---|
+| `(workspace_id, sync_configuration_id)` → `sync_configurations(workspace_id, id)` | `ON DELETE CASCADE` | Mapping has no standalone meaning after its parent configuration is removed. Task 4C-0 already established the workspace-aware parent key `(workspace_id, id)` on `sync_configurations`. |
+| `field_binding_id` → `field_bindings.id` | `ON DELETE RESTRICT` | Prevent silent disappearance of confirmed mappings when an internal target row is physically deleted. |
 
 **Field Foundation governance precedent:** within the same subsystem,
 `field_bindings.field_definition_id` uses `cascadeOnDelete()` against
@@ -5171,35 +4792,30 @@ UNIQUE(sync_configuration_id, external_field_key)
 
 Meaning:
 
-* one internal semantic concept → at most one external logical field;
-
-* one external logical field → at most one internal semantic target;
-
-* import and export may share one direction-neutral correspondence — do not
+- one internal semantic concept → at most one external logical field;
+- one external logical field → at most one internal semantic target;
+- import and export may share one direction-neutral correspondence — do not
   split mappings merely because both operations are enabled on the same
   configuration.
 
-**Adversarial check (reverified against** **`origin/develop`** **baseline
+**Adversarial check (reverified against `origin/develop` baseline
 `12b5b9de5cfaeff482c0d6a267cef5f4168ab72e`):** no confirmed repository case
 was found where the first `products` + `FieldBinding` slice requires
 1 internal → N external or N internal → 1 external **semantic** FieldMapping
 cardinality inside one `SyncConfiguration`.
 
-* Canonical registry rows such as
+- Canonical registry rows such as
   `custom_attributes[attribute_code=description].value` describe **connector
   transport representation** for adapter/runtime interpretation — not a second
   external logical identity in account discovery (`external_field_key` =
   `description` in normalized snapshots).
-
-* `price`, `availability`, `image`, and `category` Adobe rows point at
+- `price`, `availability`, `image`, and `category` Adobe rows point at
   pricing/availability/media/category domain targets — explicitly **outside**
   this first slice.
-
-* The same internal code may appear in multiple **channel** registry rows
+- The same internal code may appear in multiple **channel** registry rows
   (Google, Shopify, Adobe, …), but each maps to a different connected account /
   `SyncConfiguration` — not a violation of per-configuration 1:1.
-
-* `workspace_import_aliases` is file/header import memory — a separate concern
+- `workspace_import_aliases` is file/header import memory — a separate concern
   (see boundary below).
 
 Fan-out, merge, and split semantics remain deferred until a verified product
@@ -5224,14 +4840,14 @@ suggestion state; confirmed `field_mappings` row = effective configuration state
 
 **Implementation sequencing:**
 
-| Slice                     | Scope                                                                                                                                              |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **4C-1a** (this contract) | Docs-only Stop-and-Amend — Done                                                                                                                    |
-| **4C-1b**                 | `field_mappings` persistence + manual/explicit confirmation mutation service + authoritative-discovery validation + revision v2 integration — Done |
-| **4C-1c-0**               | Docs-only suggestion/read-model Stop-and-Amend — see \[Resolved — Task 4C-1c-0] below                                                              |
-| **4C-1c-1**               | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (no DB/migration scope) — Done             |
-| **4C-1c-2a**              | Workspace access / authorization contract — docs-only Stop-and-Amend (this decision) — Done                                                        |
-| **4C-1c-2b**              | Layer B mapping UI after workspace-scoped authorization foundation exists                                                                          |
+| Slice | Scope |
+|---|---|
+| **4C-1a** (this contract) | Docs-only Stop-and-Amend — Done |
+| **4C-1b** | `field_mappings` persistence + manual/explicit confirmation mutation service + authoritative-discovery validation + revision v2 integration — Done |
+| **4C-1c-0** | Docs-only suggestion/read-model Stop-and-Amend — see [Resolved — Task 4C-1c-0] below |
+| **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (no DB/migration scope) — Done |
+| **4C-1c-2a** | Workspace access / authorization contract — docs-only Stop-and-Amend (this decision) — Done |
+| **4C-1c-2b** | Layer B mapping UI after workspace-scoped authorization foundation exists |
 
 Do not build a production CSV loader, second canonical registry, or suggestion
 engine in 4C-1a/4C-1b/4C-1c-0.
@@ -5265,11 +4881,11 @@ need.
 
 **Lifecycle when discovery changes:**
 
-| Event                                                                              | Behavior                                                                                                           |
-| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Confirm against missing / failed discovery                                         | Reject                                                                                                             |
-| Confirm against key absent from authoritative snapshot                             | Reject                                                                                                             |
-| New immutable snapshot published; previously mapped key still present              | Mapping remains valid (reconciled by stable `external_field_key`)                                                  |
+| Event | Behavior |
+|---|---|
+| Confirm against missing / failed discovery | Reject |
+| Confirm against key absent from authoritative snapshot | Reject |
+| New immutable snapshot published; previously mapped key still present | Mapping remains valid (reconciled by stable `external_field_key`) |
 | Previously mapped `external_field_key` disappears from new authoritative discovery | Row **retained**; readiness becomes unresolved / remediation-required; **no** automatic silent delete or remapping |
 
 Validity against current discovery is **derived** at evaluation time — no
@@ -5280,20 +4896,18 @@ proves otherwise.
 
 Write-time requirements for create/update of confirmed mappings:
 
-| Check                               | Rule                                                  |
-| ----------------------------------- | ----------------------------------------------------- |
-| `FieldBinding.status`               | Must be `active`                                      |
-| `FieldBinding.object_type`          | Must be `product` or `product_variant` for this slice |
-| Associated `FieldDefinition.status` | Must be `active`                                      |
-| Workspace eligibility               | Global or same-workspace binding only (see above)     |
+| Check | Rule |
+|---|---|
+| `FieldBinding.status` | Must be `active` |
+| `FieldBinding.object_type` | Must be `product` or `product_variant` for this slice |
+| Associated `FieldDefinition.status` | Must be `active` |
+| Workspace eligibility | Global or same-workspace binding only (see above) |
 
 If a mapped binding (or its definition) is later **archived**:
 
-* existing `field_mappings` row is **retained**;
-
-* readiness becomes unresolved / remediation-required;
-
-* no silent delete.
+- existing `field_mappings` row is **retained**;
+- readiness becomes unresolved / remediation-required;
+- no silent delete.
 
 Physical deletion of a referenced `FieldBinding` remains blocked by
 `ON DELETE RESTRICT` while mappings exist. Physical deletion of a parent
@@ -5375,8 +4989,7 @@ interpretation — not mandatory generic persisted transformation on the
 correspondence row.
 
 #### FieldOptionMapping persistence contract
-
-\[Resolved — Stage 1 Preview Engine, 2026-08-17]
+[Resolved — Stage 1 Preview Engine, 2026-08-17]
 
 Narrow Stage-1 addition for Adobe configurable products. This is **not** a global
 canonical option registry and **not** transport state.
@@ -5388,21 +5001,21 @@ FieldMapping
   └── 0..N FieldOptionMappings
 ```
 
-| Question                                                              | Owner                |
-| --------------------------------------------------------------------- | -------------------- |
-| Which internal semantic field ↔ which external field?                 | `FieldMapping`       |
+| Question | Owner |
+|---|---|
+| Which internal semantic field ↔ which external field? | `FieldMapping` |
 | Which internal stable option ↔ which external connector option value? | `FieldOptionMapping` |
 
 ##### Minimum physical schema — `field_option_mappings`
 
-| Column                      | Type            | Notes                                                        |
-| --------------------------- | --------------- | ------------------------------------------------------------ |
-| `id`                        | UUID PK         | <br />                                                       |
-| `workspace_id`              | UUID NOT NULL   | Workspace-owned row                                          |
-| `field_mapping_id`          | UUID NOT NULL   | Child of exactly one `FieldMapping`                          |
-| `internal_option_key`       | string NOT NULL | Stable internal option code — never translated display label |
-| `external_option_value`     | string NOT NULL | Opaque connector option value/identity                       |
-| `created_at` / `updated_at` | timestamps      | <br />                                                       |
+| Column | Type | Notes |
+|---|---|---|
+| `id` | UUID PK | |
+| `workspace_id` | UUID NOT NULL | Workspace-owned row |
+| `field_mapping_id` | UUID NOT NULL | Child of exactly one `FieldMapping` |
+| `internal_option_key` | string NOT NULL | Stable internal option code — never translated display label |
+| `external_option_value` | string NOT NULL | Opaque connector option value/identity |
+| `created_at` / `updated_at` | timestamps | |
 
 Minimum uniqueness:
 
@@ -5440,15 +5053,12 @@ Do **not** call `save()` directly from UI/controller code.
 
 Initial mutation operations:
 
-* confirm/upsert exact correspondence;
-
-* replace external correspondence;
-
-* remove correspondence.
+- confirm/upsert exact correspondence;
+- replace external correspondence;
+- remove correspondence.
 
 #### Canonical FieldMapping suggestion/read-model contract
-
-\[Resolved — Task 4C-1c-0, 2026-08-12]
+[Resolved — Task 4C-1c-0, 2026-08-12]
 
 This section freezes the **smallest deterministic contract** for Task 4C-1c
 before application implementation: canonical suggestion qualification,
@@ -5477,34 +5087,25 @@ The first implementation slice is **canonical deterministic suggestions only**.
 
 Explicitly **deferred** (may be separately scoped later):
 
-* fuzzy-name matching;
-
-* AI/LLM suggestions;
-
-* Levenshtein/scored similarity;
-
-* `workspace_import_aliases` as connector suggestion evidence;
-
-* automatic learning from prior merchant confirmations;
-
-* additional discovery-only guessing.
+- fuzzy-name matching;
+- AI/LLM suggestions;
+- Levenshtein/scored similarity;
+- `workspace_import_aliases` as connector suggestion evidence;
+- automatic learning from prior merchant confirmations;
+- additional discovery-only guessing.
 
 ##### C. Registry channel matching
 
 For the first canonical provider:
 
-* an **exact equality** between `ConnectorDefinition.code` and registry
+- an **exact equality** between `ConnectorDefinition.code` and registry
   `channel` permits lookup of registry knowledge for that account;
-
-* this is an **optional exact match**, not an assertion that the two namespaces
+- this is an **optional exact match**, not an assertion that the two namespaces
   are identical sets;
-
-* no matching registry channel → **no canonical suggestion**, not an error;
-
-* do **not** add `registry_channel` to `ConnectorAccount`, `ConnectorDefinition`,
+- no matching registry channel → **no canonical suggestion**, not an error;
+- do **not** add `registry_channel` to `ConnectorAccount`, `ConnectorDefinition`,
   or `ConnectorProfileDefinition` in this slice;
-
-* do **not** hardcode `adobe_commerce` inside the generic provider.
+- do **not** hardcode `adobe_commerce` inside the generic provider.
 
 **Normative rule:** registry `channel` namespace ≠ `ConnectorDefinition.code`
 namespace. Equality is evaluated per connected account only when codes happen to
@@ -5513,15 +5114,13 @@ match; neither namespace is defined by the other.
 **Non-normative current-baseline evidence only** (may change as connectors are
 added; do not treat as permanent `[Resolved]` invariants):
 
-* registry channels observed in `canonical_product_field_mappings.csv` on current
+- registry channels observed in `canonical_product_field_mappings.csv` on current
   `develop` include `adobe_commerce`, `google_merchant`, `rozetka`, `schema_org`,
   `shopify`;
-
-* `ConnectorDefinition.code` values on current `develop` also include codes
+- `ConnectorDefinition.code` values on current `develop` also include codes
   without matching registry channel rows (e.g. `1c`, `csv`, `google_sheets`,
   `bigcommerce`);
-
-* registry channels without a matching `ConnectorDefinition.code` on current
+- registry channels without a matching `ConnectorDefinition.code` on current
   `develop` include `schema_org` and `rozetka`.
 
 ##### D. Runtime/schema version
@@ -5554,10 +5153,10 @@ single authoritative account snapshot.
 
 Therefore:
 
-| Registry `external_field`                             | Snapshot `external_field_key` | First-slice result                              |
-| ----------------------------------------------------- | ----------------------------- | ----------------------------------------------- |
-| `sku`                                                 | `sku`                         | eligible evidence                               |
-| `custom_attributes[attribute_code=description].value` | `description`                 | **not** an automatic high-confidence suggestion |
+| Registry `external_field` | Snapshot `external_field_key` | First-slice result |
+|---|---|---|
+| `sku` | `sku` | eligible evidence |
+| `custom_attributes[attribute_code=description].value` | `description` | **not** an automatic high-confidence suggestion |
 
 Reverified Adobe example in `canonical_product_field_mappings.csv`: `description`
 → `custom_attributes[attribute_code=description].value` describes connector
@@ -5579,22 +5178,17 @@ For the first slice, confidence is a **qualification gate**, not a numeric score
 
 Do **not** introduce:
 
-* percentage confidence;
-
-* arbitrary threshold;
-
-* high / medium / low persisted states;
-
-* DB columns;
-
-* fuzzy score.
+- percentage confidence;
+- arbitrary threshold;
+- high / medium / low persisted states;
+- DB columns;
+- fuzzy score.
 
 Semantics:
 
-* candidate satisfies **every** deterministic high-confidence condition → provider
+- candidate satisfies **every** deterministic high-confidence condition → provider
   may return it as a prefill suggestion;
-
-* anything else → **no** prefill suggestion.
+- anything else → **no** prefill suggestion.
 
 A richer confidence taxonomy requires its own demonstrated need.
 
@@ -5619,10 +5213,8 @@ suggestion-set 1:1 invariant (§G.2) are satisfied.
 10. for this internal `field_binding_id`, there is **exactly one** resulting
     semantic candidate after §G.1–§G.2;
 11. candidate does **not** violate existing per-configuration 1:1 mappings:
-
-    * internal target already mapped → effective mapping wins;
-
-    * external key already consumed by another effective mapping → do not suggest
+    - internal target already mapped → effective mapping wins;
+    - external key already consumed by another effective mapping → do not suggest
       it.
 
 Fail closed to “no suggestion” on ambiguity. Do **not** invent fallback to
@@ -5644,26 +5236,19 @@ For a canonical mapping row with `internal_code = X`, high-confidence
 4. **Canonical scope** — canonical field `scope` must describe a
    `FieldDefinition`-backed **global** canonical field (`system` or
    `platform_library`).
-5. **Resolve** **`FieldDefinition`** — exactly one row where:
-
-   * `workspace_id IS NULL`;
-
-   * `code = X` (canonical `internal_code`);
-
-   * actual definition `scope` equals canonical registry `scope`;
-
-   * definition `status = active`.
+5. **Resolve `FieldDefinition`** — exactly one row where:
+   - `workspace_id IS NULL`;
+   - `code = X` (canonical `internal_code`);
+   - actual definition `scope` equals canonical registry `scope`;
+   - definition `status = active`.
 6. **Workspace-custom same-code exclusion** — workspace-scoped definitions that
    merely reuse the same `code` are **not** canonical suggestion targets in this
    first slice.
-7. **Resolve** **`FieldBinding`** — active binding on that definition whose
+7. **Resolve `FieldBinding`** — active binding on that definition whose
    `object_type` matches canonical `binding_strategy`:
-
-   * `product` → `product` binding;
-
-   * `product_variant` → `product_variant` binding;
-
-   * `product_and_variant_two_bindings` → each matching `product` / `product_variant`
+   - `product` → `product` binding;
+   - `product_variant` → `product_variant` binding;
+   - `product_and_variant_two_bindings` → each matching `product` / `product_variant`
      binding may be evaluated separately as its own internal target.
 8. **Uniqueness** — fail closed if the canonical-field → definition → binding
    chain is not unique for the internal target under evaluation.
@@ -5708,15 +5293,14 @@ construction** (4C-1c-1).
 
 **4C-1b (mutation) — unchanged:**
 
-* confirm/replace with no authoritative discovery → **reject**.
+- confirm/replace with no authoritative discovery → **reject**.
 
 **4C-1c-1 (read-model projection) — renderable without discovery:**
 
 The projection must remain buildable when:
 
-* primary discovery source is missing or ambiguous; or
-
-* no successful authoritative snapshot exists.
+- primary discovery source is missing or ambiguous; or
+- no successful authoritative snapshot exists.
 
 **One resolution attempt per projection:**
 
@@ -5731,12 +5315,12 @@ This extends the already-corrected 4C-1b temporal-consistency principle.
 
 **Discovery-unavailable first-slice behavior:**
 
-| State                                  | Behavior                                                                              |
-| -------------------------------------- | ------------------------------------------------------------------------------------- |
-| No usable authoritative snapshot       | no canonical suggestions; no discovered external choices                              |
-| Existing effective `FieldMapping` rows | retain and project unchanged                                                          |
-| Current discovery validity             | cannot be proven → derived needs-attention / discovery-unavailable presentation state |
-| Persistence                            | **no** persistence changes                                                            |
+| State | Behavior |
+|---|---|
+| No usable authoritative snapshot | no canonical suggestions; no discovered external choices |
+| Existing effective `FieldMapping` rows | retain and project unchanged |
+| Current discovery validity | cannot be proven → derived needs-attention / discovery-unavailable presentation state |
+| Persistence | **no** persistence changes |
 
 Do **not** delete or replace an existing `FieldMapping` merely because discovery
 is unavailable. Do **not** expose raw resolver exceptions, schema-source
@@ -5747,15 +5331,11 @@ persisted availability/status column or new DB enum in this slice.
 
 Building suggestions/read-model **must not**:
 
-* insert/update/delete `field_mappings`;
-
-* update `configuration_revision`;
-
-* mutate `SyncConfiguration`;
-
-* update discovery state;
-
-* write suggestion/confidence state anywhere.
+- insert/update/delete `field_mappings`;
+- update `configuration_revision`;
+- mutate `SyncConfiguration`;
+- update discovery state;
+- write suggestion/confidence state anywhere.
 
 Only explicit confirmation calls the existing `FieldMappingMutationService`.
 
@@ -5763,17 +5343,13 @@ Only explicit confirmation calls the existing `FieldMappingMutationService`.
 
 For every internal row:
 
-* effective confirmed mapping exists → show effective mapping; **never**
+- effective confirmed mapping exists → show effective mapping; **never**
   replace/prefill over it;
-
-* if its binding/definition becomes archived or its `external_field_key`
+- if its binding/definition becomes archived or its `external_field_key`
   disappears from current discovery:
-
-  * retain effective `FieldMapping`;
-
-  * derived remediation-required/readiness problem;
-
-  * **no** automatic replacement/remap.
+  - retain effective `FieldMapping`;
+  - derived remediation-required/readiness problem;
+  - **no** automatic replacement/remap.
 
 ##### K. Read-model boundary
 
@@ -5781,26 +5357,19 @@ For every internal row:
 
 It may combine:
 
-* eligible internal `FieldBinding` / `FieldDefinition`;
-
-* existing effective `FieldMapping`;
-
-* high-confidence suggestion, if any;
-
-* authoritative discovered field presentation metadata (when discovery resolved);
-
-* derived mapped / suggested / unresolved / needs-attention / discovery-unavailable
+- eligible internal `FieldBinding` / `FieldDefinition`;
+- existing effective `FieldMapping`;
+- high-confidence suggestion, if any;
+- authoritative discovered field presentation metadata (when discovery resolved);
+- derived mapped / suggested / unresolved / needs-attention / discovery-unavailable
   presentation state.
 
 When discovery is unavailable (§H), the read-model still renders:
 
-* existing effective mappings remain visible;
-
-* no canonical suggestions;
-
-* no discovered external field choices;
-
-* derived discovery-unavailable / needs-attention state only.
+- existing effective mappings remain visible;
+- no canonical suggestions;
+- no discovered external field choices;
+- derived discovery-unavailable / needs-attention state only.
 
 It must **not** become a new persistence entity.
 
@@ -5811,11 +5380,9 @@ schema-source terminology, or other Layer C/D data to merchant UI.
 
 Retain/reuse existing read architecture:
 
-* snapshot persistence remains reusable;
-
-* workspace/account/snapshot ownership-chain validation remains reusable;
-
-* existing field query/read-model/presenter architecture may be reused
+- snapshot persistence remains reusable;
+- workspace/account/snapshot ownership-chain validation remains reusable;
+- existing field query/read-model/presenter architecture may be reused
   (`ViewConnectorSchemaSnapshot`, `ConnectorSchemaFieldPresenter`).
 
 This does **not** freeze current merchant authorization/navigation gating.
@@ -5833,11 +5400,11 @@ after merchant copy is made Layer-B compliant.
 
 ##### M. 4C-1c implementation slicing
 
-| Slice        | Scope                                                                                                                                                       |
-| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **4C-1c-0**  | Docs-only suggestion/read-model Stop-and-Amend — this contract                                                                                              |
-| **4C-1c-1**  | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (**no** DB/migration scope) — Done                  |
-| **4C-1c-2a** | Workspace access / authorization contract — docs-only Stop-and-Amend — Done                                                                                 |
+| Slice | Scope |
+|---|---|
+| **4C-1c-0** | Docs-only suggestion/read-model Stop-and-Amend — this contract |
+| **4C-1c-1** | Canonical deterministic suggestion provider + transient registry/discovery/effective-mapping read-model (**no** DB/migration scope) — Done |
+| **4C-1c-2a** | Workspace access / authorization contract — docs-only Stop-and-Amend — Done |
 | **4C-1c-2b** | Layer B mapping UI: high-confidence prefill + manual choice + explicit confirmation through 4C-1b service — after workspace-scoped authorization foundation |
 
 Do **not** create `SyncRun`, Preview, scheduling, selection persistence,
@@ -5848,25 +5415,19 @@ Do **not** create `SyncRun`, Preview, scheduling, selection persistence,
 Mapping is **Layer B** (`CONNECTOR_INTEGRATION_UX_CONTRACT.md`, Layer B —
 Налаштування даних).
 
-* do **not** embed mapping controls into the current **Інтеграції** /
+- do **not** embed mapping controls into the current **Інтеграції** /
   Connector Account Overview merely because that page exists;
-
-* do **not** establish a new top-level navigation IA in this task;
-
-* mapping belongs to a specific **`SyncConfiguration`** — no arbitrary "first
+- do **not** establish a new top-level navigation IA in this task;
+- mapping belongs to a specific **`SyncConfiguration`** — no arbitrary "first
   configuration" selection;
-
-* 4C-1c-2b must use the approved **concept-first matrix**:
+- 4C-1c-2b must use the approved **concept-first matrix**:
   merchant-facing row is **internal concept first**, **external system field
   second**, **simple state third**;
-
-* raw snapshot, discovery, schema source, canonical registry internals and
+- raw snapshot, discovery, schema source, canonical registry internals and
   transport paths are **forbidden** in merchant UI;
-
-* high-confidence suggestion may be visually prefilled, but merchant confirmation
+- high-confidence suggestion may be visually prefilled, but merchant confirmation
   is still **explicit**;
-
-* no-discovery state remains renderable and read-only as already resolved in the
+- no-discovery state remains renderable and read-only as already resolved in the
   suggestion/read-model contract.
 
 Mapping mutation authorization is frozen by **Workspace access model and
@@ -5882,8 +5443,7 @@ that contract; do not widen fixed `User.role` checks as a workaround.
 create a second registry/loader in 4C-1c.
 
 #### Preview-first Sync Execution Foundation Contract
-
-\[Resolved — Task 4C-2a]
+[Resolved — Task 4C-2a]
 
 This section freezes the **minimum architecture** required before the first
 Preview foundation implementation (`SyncRun`, `SyncRunItem`, Preview
@@ -5895,12 +5455,12 @@ identity, retry/idempotency, and ambiguous applied-state semantics.
 
 ##### First implementation target (frozen)
 
-| Dimension                  | First slice (4C-2b foundation) | Explicitly deferred                                                |
-| -------------------------- | ------------------------------ | ------------------------------------------------------------------ |
-| `data_domain`              | `products` only                | prices, inventory, categories, media, and other domains            |
-| `semantic_operation`       | `export` only                  | import (creates its own separate `SyncRun` when later implemented) |
-| Connector / profile target | Adobe PaaS                     | other connectors/profiles                                          |
-| Execution mode             | `preview` only                 | `live` (separate Stop-and-Amend)                                   |
+| Dimension | First slice (4C-2b foundation) | Explicitly deferred |
+|---|---|---|
+| `data_domain` | `products` only | prices, inventory, categories, media, and other domains |
+| `semantic_operation` | `export` only | import (creates its own separate `SyncRun` when later implemented) |
+| Connector / profile target | Adobe PaaS | other connectors/profiles |
+| Execution mode | `preview` only | `live` (separate Stop-and-Amend) |
 
 This does **not** close the broader Product Owner question about eventual MVP
 domain breadth (PO-1 remains open).
@@ -5930,9 +5490,8 @@ it creates its own separate `SyncRun`.
 
 Domain modes:
 
-* `preview`
-
-* `live`
+- `preview`
+- `live`
 
 Only **Preview** is executable in the first implementation. The existence of a
 `live` enum/domain value must **not** make Live reachable.
@@ -5951,13 +5510,10 @@ Meaning: all `Product` records belonging to the `SyncConfiguration` workspace.
 
 This is:
 
-* deliberate;
-
-* Preview-only;
-
-* not merchant-configurable;
-
-* not a permanent platform rule.
+- deliberate;
+- Preview-only;
+- not merchant-configurable;
+- not a permanent platform rule.
 
 Do **not** silently narrow selection by `is_active`, mapping completeness,
 channel eligibility, or warning/blocker state. Those affect evaluation/outcome,
@@ -5974,15 +5530,12 @@ membership and Product field data are **not** admission-time snapshotted.
 
 For the first Preview slice:
 
-* the effective Product execution set is resolved when the run **begins
+- the effective Product execution set is resolved when the run **begins
   execution**, under the fixed `all_products` predicate and workspace boundary;
-
-* a Product created after admission but before execution begins **may** belong
+- a Product created after admission but before execution begins **may** belong
   to the run;
-
-* `queued` status does **not** promise an admission-time catalogue snapshot;
-
-* once execution begins resolving/evaluating its Product set, the run must
+- `queued` status does **not** promise an admission-time catalogue snapshot;
+- once execution begins resolving/evaluating its Product set, the run must
   **not** silently expand because new Products are created later.
 
 Task **4C-2b** must choose a mechanism that yields one coherent execution set
@@ -6024,11 +5577,9 @@ is a fingerprint of the **complete** configuration-owned revision state for the
 `SyncConfiguration`, not of one `SyncRun`. Therefore revision-v3 `enabled_operations`
 must contain the complete canonical enabled-operation set:
 
-* deduplicated;
-
-* canonically sorted per `SyncOperationSet` / revision-hasher contract;
-
-* independent of the `semantic_operation` selected for any particular `SyncRun`.
+- deduplicated;
+- canonically sorted per `SyncOperationSet` / revision-hasher contract;
+- independent of the `semantic_operation` selected for any particular `SyncRun`.
 
 The JSON example above with `"enabled_operations": ["export"]` is a valid
 **first-slice example only**. A future configuration with both import and export
@@ -6047,22 +5598,18 @@ revision that silently omits another enabled operation.
 Preserve one `SyncRun` = one explicit semantic operation. These are different
 dimensions:
 
-* `configuration.enabled_operations` — full enabled set on the configuration;
-
-* `run.semantic_operation` — the single operation this run executes.
+- `configuration.enabled_operations` — full enabled set on the configuration;
+- `run.semantic_operation` — the single operation this run executes.
 
 Selection is included because revision represents effective execution
 configuration, not merely mutable DB columns.
 
 `configuration_revision` tracks the full configuration-owned revision state:
 
-* enabled operations;
-
-* operational state;
-
-* selection contract;
-
-* field mappings.
+- enabled operations;
+- operational state;
+- selection contract;
+- field mappings.
 
 It does **not** prove Product catalogue membership or field data are unchanged.
 Product data freshness is a distinct concern. Do **not** invent a persisted
@@ -6087,22 +5634,18 @@ mutation but not compared against run history.
 
 Freeze new atomic permission:
 
-| Permission         | Authority                                                                                                                                        |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Permission | Authority |
+|---|---|
 | `run_sync_preview` | Execute a non-consequential Preview for an eligible `SyncConfiguration` and access the safe progress/result surface required for that execution. |
 
 Properties:
 
-* independent from Connector, Mapping, Access, and Tax permissions;
-
-* no existing permission implies it;
-
-* it implies none of them;
-
-* **no automatic legacy grant** to Owner, Admin, Director, Merchandiser,
+- independent from Connector, Mapping, Access, and Tax permissions;
+- no existing permission implies it;
+- it implies none of them;
+- **no automatic legacy grant** to Owner, Admin, Director, Merchandiser,
   Integration manager, or any legacy role/profile merely because of job title;
-
-* existing roles gain it only through deliberate access configuration.
+- existing roles gain it only through deliberate access configuration.
 
 **Normative eighth permission:** this docs-only contract introduced a normative
 **eighth** atomic workspace permission (`run_sync_preview`; historical runtime
@@ -6132,24 +5675,20 @@ Stop-and-Amend.
 
 Current repository truth (reverified):
 
-* `AdobePaaSConnectorAdapter` does **not** implement
+- `AdobePaaSConnectorAdapter` does **not** implement
   `ConnectorSyncOperationSupport`;
-
-* `ConnectorSyncSupportResolver` therefore remains **fail-closed** for Adobe
+- `ConnectorSyncSupportResolver` therefore remains **fail-closed** for Adobe
   `(products, export)` support advertisement.
 
 Freeze:
 
-* the presence of an internal Adobe Products/Export Preview planner is **not**,
+- the presence of an internal Adobe Products/Export Preview planner is **not**,
   by itself, sufficient to advertise the semantic operation as supported;
-
-* do **not** flip `ConnectorSyncOperationSupport(products, export)` merely
+- do **not** flip `ConnectorSyncOperationSupport(products, export)` merely
   because planner code later exists;
-
-* before any real merchant Preview can become reachable, the application must
+- before any real merchant Preview can become reachable, the application must
   have a truthful support boundary for that runtime stage;
-
-* if implementation discovers that current `ConnectorSyncOperationSupport` cannot
+- if implementation discovers that current `ConnectorSyncOperationSupport` cannot
   truthfully represent “Preview supported, Live not yet supported”, that requires
   a narrow Stop-and-Amend instead of stretching its meaning.
 
@@ -6170,43 +5709,29 @@ generic orchestration
 
 Connector/profile owns:
 
-* Adobe-specific export payload construction;
-
-* transformation;
-
-* required external shape;
-
-* operation-specific validation.
+- Adobe-specific export payload construction;
+- transformation;
+- required external shape;
+- operation-specific validation.
 
 Core owns:
 
-* authorization;
-
-* admission;
-
-* selection;
-
-* immutable configuration input;
-
-* Product iteration;
-
-* run/item lifecycle;
-
-* normalized outcomes;
-
-* persistence.
+- authorization;
+- admission;
+- selection;
+- immutable configuration input;
+- Product iteration;
+- run/item lifecycle;
+- normalized outcomes;
+- persistence.
 
 Preview planner must:
 
-* perform **no** mutating HTTP call;
-
-* create **no** `ExternalRecordLink`;
-
-* write **no** external record;
-
-* mutate **no** `Product`;
-
-* mutate **no** `FieldMapping`.
+- perform **no** mutating HTTP call;
+- create **no** `ExternalRecordLink`;
+- write **no** external record;
+- mutate **no** `Product`;
+- mutate **no** `FieldMapping`.
 
 Do **not** implement one shared `execute(..., dryRun=true)` where safety
 depends only on a flag. Do **not** define a universal transport DSL.
@@ -6252,10 +5777,9 @@ Freeze non-secret `SyncRun.configuration_snapshot`.
 
 **Revision vs snapshot (frozen):**
 
-* `configuration_revision` — fingerprint of the full configuration-owned
+- `configuration_revision` — fingerprint of the full configuration-owned
   revision state that admitted this run;
-
-* `configuration_snapshot` — immutable **run-effective** configuration-owned
+- `configuration_snapshot` — immutable **run-effective** configuration-owned
   semantic input consumed by this specific run under that revision.
 
 `configuration_snapshot` is **not** a complete serialized `SyncConfiguration`
@@ -6285,37 +5809,24 @@ Conceptual payload (first-slice example):
 
 Must contain **no**:
 
-* credentials;
-
-* access tokens;
-
-* secret connector settings;
-
-* raw HTTP diagnostics;
-
-* raw vendor failures;
-
-* Product payload snapshot;
-
-* Product catalogue membership list;
-
-* Product field-value snapshots;
-
-* the full `enabled_operations` set;
-
-* `operational_state`.
+- credentials;
+- access tokens;
+- secret connector settings;
+- raw HTTP diagnostics;
+- raw vendor failures;
+- Product payload snapshot;
+- Product catalogue membership list;
+- Product field-value snapshots;
+- the full `enabled_operations` set;
+- `operational_state`.
 
 First-slice `configuration_snapshot` contains run-effective planner inputs:
 
-* `data_domain`;
-
-* requested `semantic_operation`;
-
-* `external_context`;
-
-* selection predicate;
-
-* `field_mappings`.
+- `data_domain`;
+- requested `semantic_operation`;
+- `external_context`;
+- selection predicate;
+- `field_mappings`.
 
 It is **not** required to contain the full `enabled_operations` set or
 `operational_state` — those are admission/configuration-state facts, not planner
@@ -6333,20 +5844,20 @@ It is semantic configuration evidence, not the connector transport plan.
 
 Minimum later schema:
 
-| Column                      | Contract                                            |
-| --------------------------- | --------------------------------------------------- |
-| `id`                        | UUID PK                                             |
-| `workspace_id`              | required                                            |
-| `sync_configuration_id`     | required                                            |
-| `configuration_revision`    | required                                            |
-| `mode`                      | `preview` / `live` domain; Preview executable first |
-| `semantic_operation`        | explicit one-operation-per-run                      |
-| `status`                    | `queued` / `running` / `completed` / `failed`       |
-| `initiated_by_user_id`      | nullable                                            |
-| `configuration_snapshot`    | canonical safe JSON                                 |
-| `started_at`                | nullable                                            |
-| `completed_at`              | nullable                                            |
-| `created_at` / `updated_at` | project convention                                  |
+| Column | Contract |
+|---|---|
+| `id` | UUID PK |
+| `workspace_id` | required |
+| `sync_configuration_id` | required |
+| `configuration_revision` | required |
+| `mode` | `preview` / `live` domain; Preview executable first |
+| `semantic_operation` | explicit one-operation-per-run |
+| `status` | `queued` / `running` / `completed` / `failed` |
+| `initiated_by_user_id` | nullable |
+| `configuration_snapshot` | canonical safe JSON |
+| `started_at` | nullable |
+| `completed_at` | nullable |
+| `created_at` / `updated_at` | project convention |
 
 Lifecycle:
 
@@ -6373,15 +5884,15 @@ flag.
 First domain is Products. Do **not** introduce `internal_record_type` /
 `internal_record_id`. Use typed `product_id`.
 
-| Column                      | Contract                                |
-| --------------------------- | --------------------------------------- |
-| `id`                        | UUID PK                                 |
-| `workspace_id`              | required                                |
-| `sync_run_id`               | required                                |
-| `product_id`                | typed `Product` FK                      |
-| `outcome`                   | Preview outcome                         |
-| `findings`                  | canonical safe historical findings JSON |
-| `created_at` / `updated_at` | project convention                      |
+| Column | Contract |
+|---|---|
+| `id` | UUID PK |
+| `workspace_id` | required |
+| `sync_run_id` | required |
+| `product_id` | typed `Product` FK |
+| `outcome` | Preview outcome |
+| `findings` | canonical safe historical findings JSON |
+| `created_at` / `updated_at` | project convention |
 
 Each `SyncRunItem` is immutable historical/audit evidence of what that execution
 evaluated and concluded for one `Product`. It records outcome/findings against
@@ -6415,11 +5926,11 @@ historical-run retention rather than silently inheriting cascade deletion.
 
 Freeze only:
 
-| Outcome   | Merchant concept |
-| --------- | ---------------- |
-| `ready`   | готові           |
-| `warning` | потребує уваги   |
-| `blocked` | неможливо        |
+| Outcome | Merchant concept |
+|---|---|
+| `ready` | готові |
+| `warning` | потребує уваги |
+| `blocked` | неможливо |
 
 Do **not** add `excluded` in 4C-2a. With fixed `all_products` selection and no
 configurable filtering/exclusion mechanism, there is no truthful first-slice
@@ -6434,13 +5945,10 @@ Do **not** freeze Live outcomes in 4C-2a.
 `SyncRunItem.findings` may contain zero or more normalized findings. Minimum
 semantic structure:
 
-* stable normalized code;
-
-* semantic subject where relevant;
-
-* merchant-safe message key;
-
-* whitelisted safe context.
+- stable normalized code;
+- semantic subject where relevant;
+- merchant-safe message key;
+- whitelisted safe context.
 
 No raw exception text, HTTP response, credentials, or vendor diagnostics.
 
@@ -6494,12 +6002,12 @@ required for Preview.
 
 ##### Implementation sequencing
 
-| Slice                                                                                     | Scope                                                                                                                                                                                                                                                                                                                                                                                                            |
-| ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **4C-2a**                                                                                 | This docs-only contract — Done                                                                                                                                                                                                                                                                                                                                                                                   |
-| **4C-2b** (immediate next code foundation)                                                | May implement: revision v3; `run_sync_preview` runtime permission; `SyncRun` / `SyncRunItem` persistence; `configuration_snapshot`; run admission/concurrency foundation; pure Preview planner contract; Adobe Products/Export planner implementation + isolated regression harness. Must **not** ship: merchant Preview UI; consequential external mutation; automatic flip of `ConnectorSyncOperationSupport`. |
-| **Before first real merchant Preview**                                                    | Explicitly reconcile the operation-support boundary so the platform can truthfully represent the runtime actually available. Do not bypass `ConnectorSyncOperationSupport`. If current support vocabulary cannot represent Preview-only support safely, require a narrow Stop-and-Amend before exposure.                                                                                                         |
-| **Before Live** *(historical 4C-2a sequencing — prerequisite now fulfilled by Stage 3-0)* | Separate contract for `ExternalRecordLink`, Live permission, Adobe Live executor, idempotency/retry, ambiguous applied-state behavior. Scheduling/history/current issues later. **Stage 3-0 resolves this prerequisite; runtime implementation remains Stage 3A–3E.**                                                                                                                                            |
+| Slice | Scope |
+|---|---|
+| **4C-2a** | This docs-only contract — Done |
+| **4C-2b** (immediate next code foundation) | May implement: revision v3; `run_sync_preview` runtime permission; `SyncRun` / `SyncRunItem` persistence; `configuration_snapshot`; run admission/concurrency foundation; pure Preview planner contract; Adobe Products/Export planner implementation + isolated regression harness. Must **not** ship: merchant Preview UI; consequential external mutation; automatic flip of `ConnectorSyncOperationSupport`. |
+| **Before first real merchant Preview** | Explicitly reconcile the operation-support boundary so the platform can truthfully represent the runtime actually available. Do not bypass `ConnectorSyncOperationSupport`. If current support vocabulary cannot represent Preview-only support safely, require a narrow Stop-and-Amend before exposure. |
+| **Before Live** *(historical 4C-2a sequencing — prerequisite now fulfilled by Stage 3-0)* | Separate contract for `ExternalRecordLink`, Live permission, Adobe Live executor, idempotency/retry, ambiguous applied-state behavior. Scheduling/history/current issues later. **Stage 3-0 resolves this prerequisite; runtime implementation remains Stage 3A–3E.** |
 
 Fixed `all_products` is a first-slice safe Preview constraint, not a sixth
 Product Owner question. PO-1 and PO-4 remain open. PO-2, PO-3, and PO-5 remain
@@ -6512,8 +6020,7 @@ Execution Contract** below: Stage 1 Preview Engine → Stage 2 Merchant Preview 
 Stage 3 Live Engine.
 
 ### Magento Product Export V1 Execution Contract
-
-\[Resolved — Platform Product Scope Rebaseline]
+[Resolved — Platform Product Scope Rebaseline]
 
 This section freezes Magento Product Export V1 remaining architecture so further
 implementation proceeds in three coherent stages. It does **not** duplicate
@@ -6522,23 +6029,15 @@ Task 4C-2a.
 **Explicitly inherited unchanged from Preview-first Sync Execution Foundation
 Contract (Resolved — Task 4C-2a):**
 
-* Preview zero consequential mutation;
-
-* one SyncRun = one semantic operation;
-
-* SyncRunItem = Product;
-
-* `all_products` first selection;
-
-* `configuration_revision` / snapshot boundary;
-
-* one active run per SyncConfiguration;
-
-* short admission transaction;
-
-* no ExternalRecordLink during Preview;
-
-* normalized ready/warning/blocked Preview outcomes.
+- Preview zero consequential mutation;
+- one SyncRun = one semantic operation;
+- SyncRunItem = Product;
+- `all_products` first selection;
+- `configuration_revision` / snapshot boundary;
+- one active run per SyncConfiguration;
+- short admission transaction;
+- no ExternalRecordLink during Preview;
+- normalized ready/warning/blocked Preview outcomes.
 
 Magento does not define the generic Product model. Magento V1 must support the
 platform's normal simple / non-variant Product and configurable / multi-variant
@@ -6598,17 +6097,15 @@ not change SyncRunItem = Product.
 
 Magento Product Export V1 must support:
 
-* simple products;
-
-* configurable / multi-variant products;
+- simple products;
+- configurable / multi-variant products;
 
 corresponding to the platform's normal Product/Variant model.
 
 Platform `Product → 0..N ProductVariants` does not itself select Magento configurable. Magento execution maps:
 
-* ordinary non-variant / single-sellable-unit Product → simple;
-
-* Product with meaningful option variants → configurable family.
+- ordinary non-variant / single-sellable-unit Product → simple;
+- Product with meaningful option variants → configurable family.
 
 Zero variants does not mean configurable. Do not invent a Magento-only fake default variant.
 
@@ -6617,15 +6114,11 @@ DONE definition must not exclude multi-variant Products.
 
 Explicitly OUT unless separately justified:
 
-* Magento bundle;
-
-* grouped;
-
-* virtual;
-
-* downloadable;
-
-* gift-card-specific semantics.
+- Magento bundle;
+- grouped;
+- virtual;
+- downloadable;
+- gift-card-specific semantics.
 
 These vendor product types must not contaminate generic Product core.
 
@@ -6654,13 +6147,13 @@ current producer requires it. Document only as a watch-item.
 Reject accidental equivalence: platform ProductType == Adobe `attribute_set_id`.
 Adobe `attribute_set_id` is not a generic Product field.
 
-| Concern                                     | Owner                                                                                                                                                                                                                                                                                       |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Semantic owner                              | Connector / Adobe profile — vendor attribute-set identity                                                                                                                                                                                                                                   |
-| Persistence owner                           | SyncConfiguration-owned connector execution configuration                                                                                                                                                                                                                                   |
-| Revision participation                      | Yes — part of `configuration_revision` when present                                                                                                                                                                                                                                         |
-| `configuration_snapshot` participation      | Yes — run-effective connector execution configuration                                                                                                                                                                                                                                       |
-| Merchant/default behavior                   | Connected-account default / discovered attribute set; merchant does not edit it as a Product field                                                                                                                                                                                          |
+| Concern | Owner |
+|---|---|
+| Semantic owner | Connector / Adobe profile — vendor attribute-set identity |
+| Persistence owner | SyncConfiguration-owned connector execution configuration |
+| Revision participation | Yes — part of `configuration_revision` when present |
+| `configuration_snapshot` participation | Yes — run-effective connector execution configuration |
+| Merchant/default behavior | Connected-account default / discovered attribute set; merchant does not edit it as a Product field |
 | Future multiple attribute-set compatibility | Additional SyncConfiguration-owned connector configuration or connector-owned mapping; not ProductType and not FieldDefinition. A later connector-owned mapping from Product classification/type to Adobe attribute sets is allowed if that becomes the correct generalized Adobe behavior. |
 
 **First Magento V1 shape:** one SyncConfiguration resolves one Adobe attribute-set context/default for its run. Heterogeneous Products must not silently receive an invalid attribute set. Preview must block/report a Product when the selected Adobe configuration cannot represent its required mapped attributes. Future multiple-attribute-set support remains possible through connector-owned configuration/mapping.
@@ -6689,17 +6182,12 @@ execution_mode
 
 Requirements:
 
-* unsupported pair/mode fails closed;
-
-* Preview never implies Live;
-
-* Preview and Live support are independent;
-
-* planner existence alone never advertises Live;
-
-* connector/profile owns declared support;
-
-* generic core understands semantic support without Adobe branching.
+- unsupported pair/mode fails closed;
+- Preview never implies Live;
+- Preview and Live support are independent;
+- planner existence alone never advertises Live;
+- connector/profile owns declared support;
+- generic core understands semantic support without Adobe branching.
 
 Exact implementation API remains implementation-owned unless a later
 architectural contradiction appears.
@@ -6758,18 +6246,18 @@ Mapping remediation UI is **implemented in Stage 2B**.
 
 [Resolved — Stage 3-0] Freeze the **tenth** atomic workspace permission:
 
-| Permission      | Authority                                                                                                                                                      |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Permission | Authority |
+|---|---|
 | `run_sync_live` | Execute consequential Live synchronization for an eligible SyncConfiguration and access the merchant-safe progress/result surface required for that execution. |
 
 **Independence (frozen):**
 
-| Permission                                              | Does **not** imply `run_sync_live`          |
-| ------------------------------------------------------- | ------------------------------------------- |
-| `run_sync_preview`                                      | yes — Preview permission != Live permission |
-| `manage_sync_configurations`                            | yes                                         |
-| `view_sync_mappings` / `manage_sync_mappings`           | yes                                         |
-| `view_connector_accounts` / `manage_connector_accounts` | yes                                         |
+| Permission | Does **not** imply `run_sync_live` |
+|---|---|
+| `run_sync_preview` | yes — Preview permission != Live permission |
+| `manage_sync_configurations` | yes |
+| `view_sync_mappings` / `manage_sync_mappings` | yes |
+| `view_connector_accounts` / `manage_connector_accounts` | yes |
 
 No role/job-title name implies Live authority. Absence means deny.
 
@@ -6796,21 +6284,17 @@ Canonical atomic wording follows existing RBAC vocabulary (`run_sync_*` beside
 
 #### E9. ExternalRecordLink structural contract
 
-\[Resolved — Stage 3-0] Minimum generic architecture necessary for safe Live. This
+[Resolved — Stage 3-0] Minimum generic architecture necessary for safe Live. This
 is connector-neutral. Do not freeze Magento product-type roles as platform
 ExternalRecordLink vocabulary.
 
 `ExternalRecordLink` is a separate external-identity concept:
 
-* workspace-safe;
-
-* ConnectorAccount-scoped;
-
-* **not** SyncConfiguration-scoped;
-
-* independent from transport attempts;
-
-* explicit trusted correspondence between an internal business record and an
+- workspace-safe;
+- ConnectorAccount-scoped;
+- **not** SyncConfiguration-scoped;
+- independent from transport attempts;
+- explicit trusted correspondence between an internal business record and an
   external record identity.
 
 Products V1 may distinguish structurally: `Product`, `ProductVariant`. Prefer
@@ -6818,15 +6302,15 @@ typed workspace-aware FKs over an unrestricted polymorphic framework.
 
 **Candidate first physical shape:**
 
-| Column                 | Notes                           |
-| ---------------------- | ------------------------------- |
-| `id`                   | UUID PK                         |
-| `workspace_id`         | tenant scope                    |
-| `connector_account_id` | account scope                   |
-| `product_id`           | nullable                        |
-| `product_variant_id`   | nullable                        |
-| `external_identifier`  | connector-owned identity string |
-| `timestamps`           | <br />                          |
+| Column | Notes |
+|---|---|
+| `id` | UUID PK |
+| `workspace_id` | tenant scope |
+| `connector_account_id` | account scope |
+| `product_id` | nullable |
+| `product_variant_id` | nullable |
+| `external_identifier` | connector-owned identity string |
+| `timestamps` | |
 
 Require: exactly one of `product_id` / `product_variant_id` is non-null. Require
 workspace-safe composite FKs. No CASCADE behavior may silently forget external
@@ -6850,13 +6334,10 @@ allowing `Product A → external X` and `Product A → external Y`. Do **not** m
 **Follow-on provenance fields (Stage 3E-R2a — implemented):**
 `external_record_links` now persists connector-neutral ENTITY TRUST provenance:
 
-* `trust_origin` — first recognized value: `merchant_confirmed`
-
-* `external_record_discriminator` — for Adobe: Magento logical Product `entity_id`
-
-* `established_by_workspace_user_id` — attributable confirmation actor (`WorkspaceUser`)
-
-* `established_at` — fresh confirmation timestamp
+- `trust_origin` — first recognized value: `merchant_confirmed`
+- `external_record_discriminator` — for Adobe: Magento logical Product `entity_id`
+- `established_by_workspace_user_id` — attributable confirmation actor (`WorkspaceUser`)
+- `established_at` — fresh confirmation timestamp
 
 Legacy rows with NULL provenance are **not** grandfathered trusted. A link is trusted for Adobe `merchant_confirmed` only when the complete provenance tuple is valid. There is **no** generic DB `UNIQUE(workspace_id, connector_account_id, external_record_discriminator)` constraint; Adobe discriminator collision remains connector-aware in application guards. Existing exact-association unique constraints are unchanged.
 
@@ -6887,25 +6368,18 @@ ExternalRecordLink vocabulary.
 
 Adobe Commerce REST configurable-product identities include:
 
-* simple product;
-
-* configurable parent;
-
-* simple child;
-
-* parent configurable SKU;
-
-* child simple SKUs;
-
-* numeric resource IDs;
-
-* external option/value identities.
+- simple product;
+- configurable parent;
+- simple child;
+- parent configurable SKU;
+- child simple SKUs;
+- numeric resource IDs;
+- external option/value identities.
 
 **Adobe child/simple (frozen — Stage 3-0):**
 
-* external identity = canonical mapped `ProductVariant` SKU;
-
-* `ExternalRecordLink` subject = `ProductVariant`.
+- external identity = canonical mapped `ProductVariant` SKU;
+- `ExternalRecordLink` subject = `ProductVariant`.
 
 **Adobe configurable parent (frozen — Stage 3-0; amended Stage 3E Stop-and-Amend):**
 
@@ -6928,39 +6402,27 @@ authorize Magento role names as platform ExternalRecordLink columns.
 
 #### E10. Live safety — hard invariants NOW
 
-\[Resolved — Stage 3-0] invariants:
+[Resolved — Stage 3-0] invariants:
 
-* ambiguous consequential mutation is never blindly retried;
-
-* transport retry != business idempotency != job retry != business re-execution !=
+- ambiguous consequential mutation is never blindly retried;
+- transport retry != business idempotency != job retry != business re-execution !=
   reconciliation;
-
-* `KNOWN_NOT_APPLIED`, `KNOWN_APPLIED`, `UNKNOWN_OR_AMBIGUOUS` are semantically
+- `KNOWN_NOT_APPLIED`, `KNOWN_APPLIED`, `UNKNOWN_OR_AMBIGUOUS` are semantically
   distinct applied-state knowledge; transport/HTTP failure does **not**
   automatically mean `KNOWN_NOT_APPLIED`;
-
-* Preview authority never authorizes Live;
-
-* connector owns vendor-specific interpretation;
-
-* result persistence must remain merchant-safe and secret-safe;
-
-* Live must have a reconciliation strategy where the external API permits it;
-
-* automatic retry policy must be operation-specific;
-
-* Live job retry: **none automatically** (`tries = 1`);
-
-* at most one queued/running `SyncRun` per `SyncConfiguration` — **mode-agnostic**
+- Preview authority never authorizes Live;
+- connector owns vendor-specific interpretation;
+- result persistence must remain merchant-safe and secret-safe;
+- Live must have a reconciliation strategy where the external API permits it;
+- automatic retry policy must be operation-specific;
+- Live job retry: **none automatically** (`tries = 1`);
+- at most one queued/running `SyncRun` per `SyncConfiguration` — **mode-agnostic**
   (Preview+Preview, Preview+Live, Live+Preview, Live+Live all reject a second);
-
-* stale active-run recovery is **required** before Adobe Live support may be
+- stale active-run recovery is **required** before Adobe Live support may be
   advertised — execution-lease/runtime-window model; recovery must prevent
   overlapping consequential writers;
-
-* historical Preview `connectorPlan` is **not** a Live write script;
-
-* selective "retry failed only" is **out** of Stage 3 V1.
+- historical Preview `connectorPlan` is **not** a Live write script;
+- selective "retry failed only" is **out** of Stage 3 V1.
 
 #### E10.1 Live Product outcomes (frozen — Stage 3-0)
 
@@ -6973,12 +6435,12 @@ remain `ready` / `warning` / `blocked` — do **not** reuse them for Live.
 
 **Live Product outcomes (frozen):**
 
-| Outcome        | Meaning                                                                                                                   |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Outcome | Meaning |
+|---|---|
 | `SYNCHRONIZED` | Desired external Product state confirmed for every intended operation (create/update/reconciled/no-op where appropriate). |
-| `NOT_APPLIED`  | No intended consequential operation applied; includes current validation block or known external rejection.               |
-| `PARTIAL`      | At least one intended operation is `KNOWN_APPLIED`; at least one is `KNOWN_NOT_APPLIED`; no unresolved `UNKNOWN` remains. |
-| `AMBIGUOUS`    | At least one intended operation remains `UNKNOWN_OR_AMBIGUOUS`.                                                           |
+| `NOT_APPLIED` | No intended consequential operation applied; includes current validation block or known external rejection. |
+| `PARTIAL` | At least one intended operation is `KNOWN_APPLIED`; at least one is `KNOWN_NOT_APPLIED`; no unresolved `UNKNOWN` remains. |
+| `AMBIGUOUS` | At least one intended operation remains `UNKNOWN_OR_AMBIGUOUS`. |
 
 `AMBIGUOUS` outranks `PARTIAL`. Do **not** create item-level `FAILED`. Run/job
 lifecycle failure belongs to `SyncRun.status`. The database outcome column already
@@ -6993,7 +6455,7 @@ insufficient.
 
 #### E11. Live safety — mechanics NOT over-frozen
 
-\[Resolved — Stage 3-0 for stale-run safety model; other mechanics remain
+[Resolved — Stage 3-0 for stale-run safety model; other mechanics remain
 revalidation-sensitive]
 
 **Now frozen (Stage 3-0):** stale active-run recovery uses an execution-lease /
@@ -7011,25 +6473,17 @@ reconciliation-first behavior for identities whose prior applied state might be
 unknown.
 
 Do not pretend exact algorithms for the following are already proven. They remain
-revalidation-sensitive rather than falsely \[Resolved]:
+revalidation-sensitive rather than falsely [Resolved]:
 
-* POST vs PUT;
-
-* create-vs-update decision;
-
-* read-after-write;
-
-* ambiguous timeout reconciliation;
-
-* 429 handling;
-
-* record-level partial failure;
-
-* safe re-execution;
-
-* batch semantics;
-
-* exact Adobe mutation endpoint sequence for configurable Products.
+- POST vs PUT;
+- create-vs-update decision;
+- read-after-write;
+- ambiguous timeout reconciliation;
+- 429 handling;
+- record-level partial failure;
+- safe re-execution;
+- batch semantics;
+- exact Adobe mutation endpoint sequence for configurable Products.
 
 Before Stage 3B+ Live implementation, revalidate these mechanics against actual
 Adobe API behavior, Preview runtime lessons, and real connector test evidence.
@@ -7046,15 +6500,11 @@ store-view-scoped.
 
 **Magento V1 freeze:**
 
-* single/default store context only;
-
-* `SyncConfiguration.external_context` records that default/empty context;
-
-* multiple store views are out of Magento V1;
-
-* localized/store-scoped value fan-out is out of Magento V1;
-
-* SyncRunItem remains Product — one Product may still require multiple vendor
+- single/default store context only;
+- `SyncConfiguration.external_context` records that default/empty context;
+- multiple store views are out of Magento V1;
+- localized/store-scoped value fan-out is out of Magento V1;
+- SyncRunItem remains Product — one Product may still require multiple vendor
   operations inside that one default context (parent + children + options +
   media), which does not change business-record cardinality.
 
@@ -7062,23 +6512,22 @@ PO-2 remains open for later merchant-configurable independent contexts.
 
 #### E13. Deactivation / removal semantics
 
-| Internal event                                   | Magento V1 behavior                                                                                                                                                     |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Product.is_active` becomes false                | Disable/unpublish the corresponding Adobe product(s) (`status` disabled). Do not delete the external resource.                                                          |
-| Product becomes unavailable (stock/availability) | Availability domain; do not map to Adobe deletion. Include AvailabilityResolver values only when the operation consumes them.                                           |
-| Product is later hard-deleted                    | Hard-delete propagation is **outside V1**. Do not silently delete Adobe resources. Blocked/manual reconciliation. `SyncRunItem → Product` remains `ON DELETE RESTRICT`. |
-| Variant is deactivated                           | Disable the corresponding Adobe child simple when a child link exists. Do not delete.                                                                                   |
-| Variant is removed                               | Do not delete the Adobe child in V1. Disable if linked; leave ExternalRecordLink for reconciliation.                                                                    |
+| Internal event | Magento V1 behavior |
+|---|---|
+| `Product.is_active` becomes false | Disable/unpublish the corresponding Adobe product(s) (`status` disabled). Do not delete the external resource. |
+| Product becomes unavailable (stock/availability) | Availability domain; do not map to Adobe deletion. Include AvailabilityResolver values only when the operation consumes them. |
+| Product is later hard-deleted | Hard-delete propagation is **outside V1**. Do not silently delete Adobe resources. Blocked/manual reconciliation. `SyncRunItem → Product` remains `ON DELETE RESTRICT`. |
+| Variant is deactivated | Disable the corresponding Adobe child simple when a child link exists. Do not delete. |
+| Variant is removed | Do not delete the Adobe child in V1. Disable if linked; leave ExternalRecordLink for reconciliation. |
 
 Do not silently map internal lifecycle to destructive Adobe deletion.
 
 **Semantic separation (frozen — Stage 3-0):**
 
-* **Active execution input:** active/sellable variants used for normal Product
+- **Active execution input:** active/sellable variants used for normal Product
   projection and simple/configurable classification (Preview aggregate semantics
   unchanged).
-
-* **Live lifecycle input:** enough inactive linked-variant information to disable
+- **Live lifecycle input:** enough inactive linked-variant information to disable
   already-existing Adobe children safely.
 
 Stage 3 must **not** change Preview semantics so inactive variants become
@@ -7122,39 +6571,23 @@ can be sent.
 
 Observable V1 DONE requires at minimum:
 
-* account setup works;
-
-* connection check works;
-
-* schema discovery works;
-
-* mapping setup works;
-
-* SyncConfiguration becomes merchant-reachable;
-
-* Preview works;
-
-* Preview performs zero consequential mutation;
-
-* Product-level results are understandable;
-
-* simple Product export works;
-
-* multi-variant/configurable Product export works;
-
-* external identities are preserved safely;
-
-* re-running does not blindly duplicate;
-
-* ambiguous consequential failures are handled safely;
-
-* deactivation behavior is defined;
-
-* store-context behavior is defined;
-
-* merchant receives understandable result;
-
-* real Adobe Commerce create/update validation succeeds.
+- account setup works;
+- connection check works;
+- schema discovery works;
+- mapping setup works;
+- SyncConfiguration becomes merchant-reachable;
+- Preview works;
+- Preview performs zero consequential mutation;
+- Product-level results are understandable;
+- simple Product export works;
+- multi-variant/configurable Product export works;
+- external identities are preserved safely;
+- re-running does not blindly duplicate;
+- ambiguous consequential failures are handled safely;
+- deactivation behavior is defined;
+- store-context behavior is defined;
+- merchant receives understandable result;
+- real Adobe Commerce create/update validation succeeds.
 
 Media requirements follow E14.
 
@@ -7222,16 +6655,13 @@ Focused exact option remediation for `MissingOptionMapping` and
 
 Key runtime behaviors (Stage 2B):
 
-* **Read:** authoritative persisted connector snapshot metadata only — zero HTTP
+- **Read:** authoritative persisted connector snapshot metadata only — zero HTTP
   on read (`AuthoritativeExternalOptionChoiceResolver`).
-
-* **Mutate:** `confirm` / `replace` retain connector external validation **outside**
+- **Mutate:** `confirm` / `replace` retain connector external validation **outside**
   the locked DB transaction (`FieldOptionMappingMutationService`).
-
-* **Preview remediation:** findings remain **historical** after remediation; current
+- **Preview remediation:** findings remain **historical** after remediation; current
   actionability recomputed from current authorization + configuration state.
-
-* **Stale/orphan cleanup:** narrow removal of stale `FieldOptionMapping` rows whose
+- **Stale/orphan cleanup:** narrow removal of stale `FieldOptionMapping` rows whose
   `internal_option_key` no longer exists in the field definition catalog; does
   **not** repair Product/Variant select value integrity.
 
@@ -7256,13 +6686,13 @@ job shell. Adobe Products / Export / Live support remains **false**.
 
 After Stage 3-0 merges, implement in order:
 
-| Slice                                       | Scope                                                                                                                                                                                                                                                                                                                  | Adobe Products/Export/Live support  | Current repository status                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **3A — Live Safety Foundation**             | `run_sync_live` permission; stale-active-run lease/recovery; Live outcome persistence; `ExternalRecordLink` persistence; `SyncLiveAdmissionService`; Live job shell (`tries = 1`, safe timeout); Preview×Live concurrency tests                                                                                        | remains **false**                   | **Done**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| **3B — Adobe Simple Live**                  | Shared Adobe semantic planning boundary; child/simple external identity; GET/POST/PUT Product transport; `ExternalRecordLink` read/write; create/update/reconciliation; simple Product Live execution; applied-state classification                                                                                    | remains **false**                   | **Done (internal)** — **historical no-link create assumption invalidated by Stage 3E Stop-and-Amend**; replacement link-first runtime pending                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| **3C — Adobe Configurable Live**            | Connector-owned deterministic parent SKU; child/parent/options/link command compilation; partial/ambiguous outcomes; inactive linked-variant lifecycle; configurable recovery/reconciliation                                                                                                                           | remains **false**                   | **Done (internal)** — existing-parent link identity clarified by Stage 3E Stop-and-Amend; cfg-\* generator applies only to future proven atomic create                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| **3D — Adobe Media + Merchant First Live**  | Required E14 primary/gallery image export; merchant Live admission **UI/read model** on `ManageAdobeProductsExportPreview` (non-actionable for consequential execution while Live support is **false**; must not bypass `ConnectorSyncOperationSupport`); queued/running/result presentation; final safe merchant copy | remains **false**                   | **Done (internal)** — 3D-1 E14 media runtime + 3D-2 merchant first-Live UI/read model                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| **3E — Real Adobe Validation + Truth Flip** | Merchant link-first runtime; ERL provenance/discriminator persistence; informed merchant confirmation; atomic configurable-family confirmation; first-party Magento entity-bound Safe Sync component; disposable validation harness; target-version proof; only then flip `Adobe Products / Export / Live = true`      | flip only after successful evidence | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen; **Stage 3E-R2a** ERL provenance foundation is implemented; **Stage 3E-R2b-1** merchant-confirmed ENTITY TRUST backend is implemented; **Stage 3E-R2b-2** merchant per-item informed review/confirm UI is implemented with an opaque server-side review-flow store keeping `reviewToken` out of browser state; browser state remains presentation/input only and never identity authority; consequential WRITE bridge + real target validation remain **pending**; support remains **false** |
+| Slice | Scope | Adobe Products/Export/Live support | Current repository status |
+|---|---|---|---|
+| **3A — Live Safety Foundation** | `run_sync_live` permission; stale-active-run lease/recovery; Live outcome persistence; `ExternalRecordLink` persistence; `SyncLiveAdmissionService`; Live job shell (`tries = 1`, safe timeout); Preview×Live concurrency tests | remains **false** | **Done** |
+| **3B — Adobe Simple Live** | Shared Adobe semantic planning boundary; child/simple external identity; GET/POST/PUT Product transport; `ExternalRecordLink` read/write; create/update/reconciliation; simple Product Live execution; applied-state classification | remains **false** | **Done (internal)** — **historical no-link create assumption invalidated by Stage 3E Stop-and-Amend**; replacement link-first runtime pending |
+| **3C — Adobe Configurable Live** | Connector-owned deterministic parent SKU; child/parent/options/link command compilation; partial/ambiguous outcomes; inactive linked-variant lifecycle; configurable recovery/reconciliation | remains **false** | **Done (internal)** — existing-parent link identity clarified by Stage 3E Stop-and-Amend; cfg-* generator applies only to future proven atomic create |
+| **3D — Adobe Media + Merchant First Live** | Required E14 primary/gallery image export; merchant Live admission **UI/read model** on `ManageAdobeProductsExportPreview` (non-actionable for consequential execution while Live support is **false**; must not bypass `ConnectorSyncOperationSupport`); queued/running/result presentation; final safe merchant copy | remains **false** | **Done (internal)** — 3D-1 E14 media runtime + 3D-2 merchant first-Live UI/read model |
+| **3E — Real Adobe Validation + Truth Flip** | Merchant link-first runtime; ERL provenance/discriminator persistence; informed merchant confirmation; atomic configurable-family confirmation; first-party Magento entity-bound Safe Sync component; disposable validation harness; target-version proof; only then flip `Adobe Products / Export / Live = true` | flip only after successful evidence | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen; **Stage 3E-R2a** ERL provenance foundation is implemented; **Stage 3E-R2b-1** merchant-confirmed ENTITY TRUST backend is implemented; **Stage 3E-R2b-2** merchant per-item informed review/confirm UI is implemented with an opaque server-side review-flow store keeping `reviewToken` out of browser state; browser state remains presentation/input only and never identity authority; consequential WRITE bridge + real target validation remain **pending**; support remains **false** |
 
 Production Live remains **NOT IMPLEMENTED** until Stage 3E runtime lands and
 completes real-target validation with explicit human authorization. No deployment
@@ -7270,7 +6700,7 @@ without separate explicit approval.
 
 ##### Stage 3E Stop-and-Amend — Magento ownership and entity-bound Safe Sync runtime contract
 
-\[Resolved — Stage 3E docs contract] This section freezes the final entity-bound
+[Resolved — Stage 3E docs contract] This section freezes the final entity-bound
 Safe Sync runtime contract after Magento primary-source research and
 Security/Concurrency arbitration. **Docs-only in this PR.** Replacement runtime follows in a separate follow-on PR. No Magento module runtime, migration, real
 Adobe write, or Live support flip in this PR.
@@ -7280,14 +6710,14 @@ Adobe write, or Live support flip in this PR.
 The entity-bound mutation boundary is implemented as a **separate Composer
 `magento2-module`** first-party component — not a write-only REST bridge.
 
-| Requirement     | Rule                                                                    |
-| --------------- | ----------------------------------------------------------------------- |
-| Boundary shape  | Entity-bound **read + write** boundary for consequential Live mutations |
-| Magento core    | **No** Magento core modification                                        |
-| Product core    | **No** Product-core schema changes in SaaS or Magento for this contract |
-| DB triggers     | **No** DB triggers                                                      |
-| SaaS→Magento DB | **No** direct SaaS→Magento DB access path                               |
-| Interceptors    | **No** broad/global Product interceptors                                |
+| Requirement | Rule |
+|---|---|
+| Boundary shape | Entity-bound **read + write** boundary for consequential Live mutations |
+| Magento core | **No** Magento core modification |
+| Product core | **No** Product-core schema changes in SaaS or Magento for this contract |
+| DB triggers | **No** DB triggers |
+| SaaS→Magento DB | **No** direct SaaS→Magento DB access path |
+| Interceptors | **No** broad/global Product interceptors |
 
 The component exposes a narrow Safe Sync seam consumed by the existing Adobe
 connector runtime (`AdobeProductRemoteStateClient`, command executors, media
@@ -7315,7 +6745,7 @@ Therefore:
 GET missing + POST 2xx + response SKU match + post-write state match
 ```
 
-does **not** prove this connector created the Product. The previous \[Resolved]
+does **not** prove this connector created the Product. The previous [Resolved]
 no-link-create contract is **invalidated**.
 
 #### No-link stock Magento rule (frozen)
@@ -7328,20 +6758,17 @@ NO consequential Product mutation
 
 Under stock Magento specifically:
 
-* **NO** `POST /V1/products`;
-
-* **NO** blind PUT;
-
-* **NO** automatic adoption;
-
-* **NO** create disguised through an update path.
+- **NO** `POST /V1/products`;
+- **NO** blind PUT;
+- **NO** automatic adoption;
+- **NO** create disguised through an update path.
 
 Remote reads may be performed only for merchant remediation / link discovery.
 
-| Remote read outcome | Behavior                                                                                                      |
-| ------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Remote **Found**    | Potential merchant-confirmed link candidate; **no mutation** before confirmation                              |
-| Remote **Missing**  | `KnownNotApplied`; zero Product write; merchant-safe message that remote Product is not available for linking |
+| Remote read outcome | Behavior |
+|---|---|
+| Remote **Found** | Potential merchant-confirmed link candidate; **no mutation** before confirmation |
+| Remote **Missing** | `KnownNotApplied`; zero Product write; merchant-safe message that remote Product is not available for linking |
 
 Future automatic creation remains **deferred** behind a separately proven remote
 create capability. Do **not** declare auto-create permanently impossible.
@@ -7354,27 +6781,17 @@ attributable; anchored to the exact remote logical Product.
 
 Minimum confirmation contract:
 
-* Fresh read-only Magento GET during the confirmation flow
-
-* Remote record classified **Found**
-
-* Workspace + `ConnectorAccount` explicitly verified
-
-* No existing ambiguous/trusted ERL conflict
-
-* Cross-subject collision check passes
-
-* Remote type compatible with intended platform subject
-
-* For simple/child: remote SKU **exactly** equals canonical `ProductVariant` SKU
-
-* Merchant sees safe desired-vs-observed controlled-field comparison
-
-* Merchant explicitly confirms
-
-* Remote logical discriminator captured
-
-* Confirmation provenance persisted
+- Fresh read-only Magento GET during the confirmation flow
+- Remote record classified **Found**
+- Workspace + `ConnectorAccount` explicitly verified
+- No existing ambiguous/trusted ERL conflict
+- Cross-subject collision check passes
+- Remote type compatible with intended platform subject
+- For simple/child: remote SKU **exactly** equals canonical `ProductVariant` SKU
+- Merchant sees safe desired-vs-observed controlled-field comparison
+- Merchant explicitly confirms
+- Remote logical discriminator captured
+- Confirmation provenance persisted
 
 No stale cached discovery alone may establish trust.
 
@@ -7385,12 +6802,10 @@ Magento Product, not merely a reusable SKU string.
 
 For Adobe/Magento:
 
-* stored Magento logical `entity_id` (via `external_record_discriminator`) remains
+- stored Magento logical `entity_id` (via `external_record_discriminator`) remains
   the remote identity discriminator
-
-* `external_identifier` remains the merchant-visible addressing SKU
-
-* expected SKU remains a **mandatory equality precondition** for bind/mutate
+- `external_identifier` remains the merchant-visible addressing SKU
+- expected SKU remains a **mandatory equality precondition** for bind/mutate
   cycles, but is **not** identity authority
 
 If the SKU is later deleted/recreated/reassigned to another Magento logical
@@ -7412,12 +6827,12 @@ expected SKU and reject ambiguous/conflicting logical Products.
 
 **Implemented in Stage 3E-R2a.** `external_record_links` now persists:
 
-| Field                              | Purpose                                        |
-| ---------------------------------- | ---------------------------------------------- |
-| `trust_origin`                     | First recognized value: `merchant_confirmed`   |
-| `external_record_discriminator`    | For Adobe: Magento logical Product `entity_id` |
-| `established_by_workspace_user_id` | Attributable confirmation actor                |
-| `established_at`                   | Fresh confirmation timestamp                   |
+| Field | Purpose |
+|---|---|
+| `trust_origin` | First recognized value: `merchant_confirmed` |
+| `external_record_discriminator` | For Adobe: Magento logical Product `entity_id` |
+| `established_by_workspace_user_id` | Attributable confirmation actor |
+| `established_at` | Fresh confirmation timestamp |
 
 Legacy rows are not grandfathered trusted. No generic discriminator DB unique constraint. Adobe Product Live mutation remains fail-closed until the entity-bound WRITE bridge exists. **Stage 3E-R2b-1** implements merchant-confirmed trust persistence backend (review/confirm services, link readiness projection), and **Stage 3E-R2b-2** implements the merchant per-item confirmation UI on `ManageAdobeProductsExportPreview`. The browser never receives `reviewToken`; Livewire state is presentation/input only, while server-side re-projection plus the opaque review-flow store remain authoritative.
 
@@ -7446,44 +6861,38 @@ makes Magento repository create fallback structurally impossible. The component'
 own locked-existence invariant must make update→create/recreate unreachable, and
 real-target validation must prove it.
 
-**Body** **`id`** **is FORBIDDEN** as a REST safety mechanism (see linked-update failure
+**Body `id` is FORBIDDEN** as a REST safety mechanism (see linked-update failure
 matrix A–E below). Never send expected Magento Product `id` in REST payload as an
 optimistic identity guard.
 
-| Case                                                                  | Outcome under stock body-ID / SKU-addressed REST |
-| --------------------------------------------------------------------- | ------------------------------------------------ |
-| **A.** Expected ID exists + expected SKU still belongs to it          | Ordinary expected state                          |
-| **B.** Expected ID exists + another Product now occupies expected SKU | May silently change SKU rather than fail closed  |
-| **C.** Expected ID exists + its SKU changed elsewhere                 | May rename it back / alter identity              |
-| **D.** Expected ID deleted + another Product occupies old SKU         | May enter create semantics                       |
-| **E.** Expected ID deleted + old SKU absent                           | Linked "update" may silently become create       |
+| Case | Outcome under stock body-ID / SKU-addressed REST |
+|---|---|
+| **A.** Expected ID exists + expected SKU still belongs to it | Ordinary expected state |
+| **B.** Expected ID exists + another Product now occupies expected SKU | May silently change SKU rather than fail closed |
+| **C.** Expected ID exists + its SKU changed elsewhere | May rename it back / alter identity |
+| **D.** Expected ID deleted + another Product occupies old SKU | May enter create semantics |
+| **E.** Expected ID deleted + old SKU absent | Linked "update" may silently become create |
 
 #### Content Staging (frozen)
 
 When Content Staging is enabled on the target:
 
-* lock **all relevant physical rows** through logical
+- lock **all relevant physical rows** through logical
   `getIdentifierField()` / `entity_id`
-
-* **never** define logical identity with `getLinkField()` / `row_id`
-
-* **no** dependency on Commerce-only `VersionManager`; Magento repository/resource
+- **never** define logical identity with `getLinkField()` / `row_id`
+- **no** dependency on Commerce-only `VersionManager`; Magento repository/resource
   pipeline resolves the operational version
-
-* real Commerce proof must include a Product with a **pending scheduled update**
+- real Commerce proof must include a Product with a **pending scheduled update**
 
 #### Galera / multi-node concurrency (frozen)
 
-* InnoDB gap locks are **defence-in-depth only**, not cluster-wide safety
-
-* all critical authorization / verification / reconciliation reads **after binding**
+- InnoDB gap locks are **defence-in-depth only**, not cluster-wide safety
+- all critical authorization / verification / reconciliation reads **after binding**
   are entity-bound — not SKU GET
-
-* critical entity-bound reads on Galera must also provide proven
+- critical entity-bound reads on Galera must also provide proven
   **causal-current / read-after-write** semantics; exact low-level implementation
   stays inside the Magento component and must be real-target validated
-
-* stock SKU lookup may be used **only** as pre-trust candidate discovery; final
+- stock SKU lookup may be used **only** as pre-trust candidate discovery; final
   link confirmation must freshly verify exact entity + expected SKU
 
 #### Safe mutation primitives (frozen)
@@ -7491,41 +6900,36 @@ When Content Staging is enabled on the target:
 After ENTITY TRUST binding, SKU-addressed Product / media / configurable operations
 are **forbidden** for safety decisions.
 
-| Mutation category                            | Required primitive                                          |
-| -------------------------------------------- | ----------------------------------------------------------- |
-| Product / lifecycle                          | Entity-loaded Product + normal repository save              |
-| Media                                        | Entity-loaded Product / media extension mechanics — **not** |
-| SKU-addressed `GalleryManagement` operations | <br />                                                      |
-| Configurable options / child links           | Entity-loaded parent extension attributes /                 |
-| ID-bound Magento mechanics                   | <br />                                                      |
+| Mutation category | Required primitive |
+|---|---|
+| Product / lifecycle | Entity-loaded Product + normal repository save |
+| Media | Entity-loaded Product / media extension mechanics — **not**
+  SKU-addressed `GalleryManagement` operations |
+| Configurable options / child links | Entity-loaded parent extension attributes /
+  ID-bound Magento mechanics |
 
 #### Rollback and EntityManager callbacks (frozen)
 
-* nested Magento transaction behavior is **intentionally reused**
-
-* after bridge-owned outer rollback, pending `EntityManager` callbacks for the
+- nested Magento transaction behavior is **intentionally reused**
+- after bridge-owned outer rollback, pending `EntityManager` callbacks for the
   connection/entity must be **cleared**
-
-* this requires **one narrowly isolated Magento internal compatibility seam**; do
+- this requires **one narrowly isolated Magento internal compatibility seam**; do
   **not** claim the component uses only public `@api` contracts
-
-* require target-version compatibility tests for callback-pool cleanup behavior
+- require target-version compatibility tests for callback-pool cleanup behavior
 
 #### Media transactional boundary (frozen)
 
-* media filesystem/object write is **not** transactionally rolled back with DB;
+- media filesystem/object write is **not** transactionally rolled back with DB;
   failed transaction may leave benign orphan storage
-
-* **no** destructive media DELETE/cleanup subsystem in V1
-
-* byte-identity reconciliation uses **entity-bound** media read with bounded
+- **no** destructive media DELETE/cleanup subsystem in V1
+- byte-identity reconciliation uses **entity-bound** media read with bounded
   response size
 
 #### Account readiness freeze (ConnectorSyncOperationSupport vs ConnectorLiveRuntimeReadiness)
 
-| Concept                         | Meaning                                                                              |
-| ------------------------------- | ------------------------------------------------------------------------------------ |
-| `ConnectorSyncOperationSupport` | Static software capability — what the connector profile advertises                   |
+| Concept | Meaning |
+|---|---|
+| `ConnectorSyncOperationSupport` | Static software capability — what the connector profile advertises |
 | `ConnectorLiveRuntimeReadiness` | Fresh account-specific remote prerequisite — can this account execute Live right now |
 
 **V1 exclusions (frozen):** no second auth profile; no Product Magento flag; no readiness table; no persisted handshake evidence on `SyncRunItem` (business-record
@@ -7533,11 +6937,9 @@ outcome only).
 
 **Handshake timing (frozen):**
 
-* cached handshake is **presentation-only**
-
-* **Start Live** fresh handshake occurs **outside** the DB admission transaction
-
-* worker fresh handshake occurs **immediately before first consequential write**
+- cached handshake is **presentation-only**
+- **Start Live** fresh handshake occurs **outside** the DB admission transaction
+- worker fresh handshake occurs **immediately before first consequential write**
   after the run has its writer lease/deadline; DB-fresh
   `SyncRunConsequentialWriteGate` is rechecked after handshake
 
@@ -7548,20 +6950,16 @@ Current seams to extend (runtime follow-on): `SyncLiveAdmissionService`,
 
 Preserve existing applied-state vocabulary:
 
-* `KnownApplied`
+- `KnownApplied`
+- `KnownNotApplied`
+- `UnknownOrAmbiguous`
 
-* `KnownNotApplied`
-
-* `UnknownOrAmbiguous`
-
-**IdentityMismatch** is a **reason beneath** **`KnownNotApplied`**, not a new
+**IdentityMismatch** is a **reason beneath `KnownNotApplied`**, not a new
 applied-state enum and not a persisted ERL untrusted lifecycle.
 
-* only a **bridge-authored response** may prove rollback / `KnownNotApplied`
-
-* transport ambiguity after a consequential attempt remains `UnknownOrAmbiguous`
-
-* **no** blind retry
+- only a **bridge-authored response** may prove rollback / `KnownNotApplied`
+- transport ambiguity after a consequential attempt remains `UnknownOrAmbiguous`
+- **no** blind retry
 
 #### Auto-create (OUT of V1 — frozen)
 
@@ -7583,9 +6981,8 @@ No synthetic child SKU.
 
 For a confirmed simple/child link:
 
-* `external_identifier` = canonical `ProductVariant` SKU
-
-* remote discriminator = confirmed Magento logical Product ID
+- `external_identifier` = canonical `ProductVariant` SKU
+- remote discriminator = confirmed Magento logical Product ID
 
 #### Configurable parent identity (frozen — two valid origins)
 
@@ -7635,9 +7032,8 @@ to the run-level setup barrier.
 
 Link-confirmation mutation authority requires **both**:
 
-* fresh `manage_sync_configurations`
-
-* fresh `run_sync_live`
+- fresh `manage_sync_configurations`
+- fresh `run_sync_live`
 
 for the current `Workspace`. Setup authority asserts synchronization
 ownership/configuration; Live authority asserts authorization for future
@@ -7662,36 +7058,24 @@ policy, reconciliation, HTTP evidence.
 The Part 1 validation harness runtime is **reverted**. Retain existing disposable
 harness rules and add real-target proofs for:
 
-* silent SKU suffix rollback (`Sku::beforeSave()` collision path)
-
-* `CallbackPool` / EntityManager callback cleanup after bridge-owned rollback
-
-* Content Staging scheduled-version Product with pending update
-
-* cross-node duplicate SKU race
-
-* causal cross-node entity read (Galera read-after-write)
-
-* repository create-fallback guard (linked update cannot become create/recreate)
-
-* certification / brute-force abort and transport loss around COMMIT
+- silent SKU suffix rollback (`Sku::beforeSave()` collision path)
+- `CallbackPool` / EntityManager callback cleanup after bridge-owned rollback
+- Content Staging scheduled-version Product with pending update
+- cross-node duplicate SKU race
+- causal cross-node entity read (Galera read-after-write)
+- repository create-fallback guard (linked update cannot become create/recreate)
+- certification / brute-force abort and transport loss around COMMIT
 
 Harness environment rules (unchanged):
 
-* dedicated validation-only environment (`APP_ENV=stage3e-validation` or equivalent)
-
-* disposable/non-production target; exact target hostname confirmation
-
-* no credentials on CLI; credentials through existing encrypted `ConnectorAccount`
-
-* explicit real-write acknowledgement; validation-only command surface absent from
+- dedicated validation-only environment (`APP_ENV=stage3e-validation` or equivalent)
+- disposable/non-production target; exact target hostname confirmation
+- no credentials on CLI; credentials through existing encrypted `ConnectorAccount`
+- explicit real-write acknowledgement; validation-only command surface absent from
   normal production
-
-* safe evidence only; no raw request/response bodies or secrets
-
-* `B2BVAL-*` validation variant SKU namespace where appropriate
-
-* production configurable parent generator only where the production path requires it
+- safe evidence only; no raw request/response bodies or secrets
+- `B2BVAL-*` validation variant SKU namespace where appropriate
+- production configurable parent generator only where the production path requires it
 
 #### Live truth-flip gate (expanded)
 
@@ -7723,23 +7107,22 @@ required Stage 3E evidence exists:
 
 #### Stage status after Stop-and-Amend
 
-| Stage                       | Status                                                                                     |
-| --------------------------- | ------------------------------------------------------------------------------------------ |
-| 3A                          | **Done**                                                                                   |
-| 3B                          | **Done (internal)** — old stock no-link-create assumption invalidated                      |
-| 3C                          | **Done (internal)** — existing-parent link identity clarified                              |
-| 3D                          | **Done (internal)**                                                                        |
-| 3E docs contract            | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen                  |
-| 3E runtime + validation     | **Pending** — replacement runtime not shipped; real target validation **NOT YET EXECUTED** |
-| Adobe Products/Export/Live  | **FALSE**                                                                                  |
-| Merchant consequential Live | **NOT EXPOSED**                                                                            |
-| Deployment                  | **NOT PERFORMED**                                                                          |
+| Stage | Status |
+|---|---|
+| 3A | **Done** |
+| 3B | **Done (internal)** — old stock no-link-create assumption invalidated |
+| 3C | **Done (internal)** — existing-parent link identity clarified |
+| 3D | **Done (internal)** |
+| 3E docs contract | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen |
+| 3E runtime + validation | **Pending** — replacement runtime not shipped; real target validation **NOT YET EXECUTED** |
+| Adobe Products/Export/Live | **FALSE** |
+| Merchant consequential Live | **NOT EXPOSED** |
+| Deployment | **NOT PERFORMED** |
 
 No Stage 3D-3. No Stage 3F. No new normative Stage.
 
 #### Merchant Preview Authorization & Remediation Contract
-
-\[Resolved — Stage 2-0]
+[Resolved — Stage 2-0]
 
 This section freezes the minimum authorization, setup, temporal, and remediation
 contract required before merchant-facing Preview UI is implemented. It resolves
@@ -7753,8 +7136,8 @@ presenters landed in **Stage 2A** / **Stage 2B** as sequenced above.
 
 ##### Normative ninth workspace permission — `manage_sync_configurations`
 
-| Permission                   | Authority                                                                                                             |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Permission | Authority |
+|---|---|
 | `manage_sync_configurations` | Merchant-facing mutation of SyncConfiguration-owned Layer-B setup state through approved application/domain services. |
 
 First concrete Stage 2A use: Adobe Products Export → connector execution
@@ -7774,13 +7157,13 @@ shipped Option Mapping remediation on `ManageSyncFieldOptionMappings`.
 These authority axes are independent. No permission implies another unless a
 future contract explicitly changes the matrix.
 
-| Permission                   | Owns                                                                                                                                                                                   | Does **not** grant                                                                                   |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `manage_connector_accounts`  | Connection setup, credentials, connector account settings, enable/disable/archive, management-only connection checks                                                                   | SyncConfiguration mutation, Mapping mutation, Preview execution                                      |
-| `manage_sync_configurations` | SyncConfiguration-owned Layer-B setup mutations (e.g. connector execution configuration, enabled operations, selection, external context when exposed)                                 | Connector credentials/settings mutation, FieldMapping/FieldOptionMapping mutation, Preview execution |
-| `view_sync_mappings`         | Read-only Mapping remediation/reference surface                                                                                                                                        | Mapping mutation, SyncConfiguration mutation, Preview execution                                      |
-| `manage_sync_mappings`       | FieldMapping and child FieldOptionMapping mutation                                                                                                                                     | Unrelated SyncConfiguration setup, connector account management, Preview execution                   |
-| `run_sync_preview`           | Entering merchant Preview surface; starting/restarting Preview; safe queued/running/completed Preview result; minimum run-relevant setup **read** projection (§ Safe read vs mutation) | SyncConfiguration mutation, Mapping mutation, connector account management                           |
+| Permission | Owns | Does **not** grant |
+|---|---|---|
+| `manage_connector_accounts` | Connection setup, credentials, connector account settings, enable/disable/archive, management-only connection checks | SyncConfiguration mutation, Mapping mutation, Preview execution |
+| `manage_sync_configurations` | SyncConfiguration-owned Layer-B setup mutations (e.g. connector execution configuration, enabled operations, selection, external context when exposed) | Connector credentials/settings mutation, FieldMapping/FieldOptionMapping mutation, Preview execution |
+| `view_sync_mappings` | Read-only Mapping remediation/reference surface | Mapping mutation, SyncConfiguration mutation, Preview execution |
+| `manage_sync_mappings` | FieldMapping and child FieldOptionMapping mutation | Unrelated SyncConfiguration setup, connector account management, Preview execution |
+| `run_sync_preview` | Entering merchant Preview surface; starting/restarting Preview; safe queued/running/completed Preview result; minimum run-relevant setup **read** projection (§ Safe read vs mutation) | SyncConfiguration mutation, Mapping mutation, connector account management |
 
 Do **not** introduce `view_sync_configurations` merely for symmetry in Stage 2.
 
@@ -7792,11 +7175,9 @@ FieldOptionMapping uses the same Mapping authority boundary as FieldMapping. Do
 An actor with `run_sync_preview` may read the minimum merchant-safe run-relevant
 setup projection needed to:
 
-* understand what Preview will check;
-
-* understand that required setup is incomplete;
-
-* understand that another authorized user must complete setup.
+- understand what Preview will check;
+- understand that required setup is incomplete;
+- understand that another authorized user must complete setup.
 
 That does **not** turn Preview permission into generic SyncConfiguration
 management access. No sensitive connector-account configuration, credentials,
@@ -7824,17 +7205,12 @@ to determine "setup required" vs "setup exists" **without** calling either
 
 A merchant action authorized only by `run_sync_preview` must **not**:
 
-* create a `SyncConfiguration`;
-
-* enable an operation;
-
-* alter `external_context` or selection;
-
-* persist connector execution configuration;
-
-* choose or auto-save an Adobe attribute set;
-
-* call an `ensure*()` helper whose observable result performs any of those
+- create a `SyncConfiguration`;
+- enable an operation;
+- alter `external_context` or selection;
+- persist connector execution configuration;
+- choose or auto-save an Adobe attribute set;
+- call an `ensure*()` helper whose observable result performs any of those
   mutations.
 
 When setup mutation seams are reached from merchant UI in Stage 2A, the outer
@@ -7961,8 +7337,8 @@ Verified: no Filament/Livewire surface references `ProductFieldValue::` or
 FieldBinding-driven dynamic inputs. `NO_EDIT_SURFACE` is the correct, **dominant**
 current actionability for most Product/Variant-data findings — not an edge case.
 
-Merchant UI may provide *\[Відкрити товар]* for context but must not show
-*\[Виправити]* unless the destination can actually edit the affected value. Do not
+Merchant UI may provide *[Відкрити товар]* for context but must not show
+*[Виправити]* unless the destination can actually edit the affected value. Do not
 solve this gap by creating a second Product editor. Do not tell the merchant to
 fix values in 1C/Magento/another source unless configuration establishes that
 authority.
@@ -7977,8 +7353,7 @@ area/actionability answers where/how the actor can deal with it — orthogonal
 dimensions.
 
 ### Live Safety, Identity & First-Live Contract
-
-\[Resolved — Stage 3-0]
+[Resolved — Stage 3-0]
 
 **Docs-only in Stage 3-0.** No runtime implementation, migration, permission row,
 `ExternalRecordLink` table, Adobe write, Live support flip, or deploy in this
@@ -7986,63 +7361,47 @@ slice. Normative contract for Stage 3A–3E implementation.
 
 ##### Current baseline truth (frozen)
 
-| Stage                                                   | Status                                                                                                                                                                                                 |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Stage 1 — Preview Engine                                | **Done**                                                                                                                                                                                               |
-| Stage 2A — Merchant Preview                             | **Done**                                                                                                                                                                                               |
-| Stage 2B — Option Mapping Remediation                   | **Done**                                                                                                                                                                                               |
-| Stage 3-0 — Live Safety, Identity & First-Live Contract | **Done (docs contract)**                                                                                                                                                                               |
-| Stage 3A — Live Safety Foundation                       | **Done**                                                                                                                                                                                               |
-| Stage 3B–3E — Live implementation slices                | **Done (internal) through normative Stage 3D** — 3B/3C/3D-1/3D-2 Done (internal); Stage 3E **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen; runtime + validation **pending** |
-| Production Live                                         | **NOT IMPLEMENTED**                                                                                                                                                                                    |
+| Stage | Status |
+|---|---|
+| Stage 1 — Preview Engine | **Done** |
+| Stage 2A — Merchant Preview | **Done** |
+| Stage 2B — Option Mapping Remediation | **Done** |
+| Stage 3-0 — Live Safety, Identity & First-Live Contract | **Done (docs contract)** |
+| Stage 3A — Live Safety Foundation | **Done** |
+| Stage 3B–3E — Live implementation slices | **Done (internal) through normative Stage 3D** — 3B/3C/3D-1/3D-2 Done (internal); Stage 3E **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen; runtime + validation **pending** |
+| Production Live | **NOT IMPLEMENTED** |
 
 **Current runtime (reverified post–Stage 3A):**
 
-* `SyncRunMode` already contains Preview + Live;
-
-* `SyncRun` / `SyncRunItem` persistence already exists;
-
-* `ConnectorSyncOperationSupport` is mode-aware;
-
-* Adobe Products / Export / Preview is supported;
-
-* Adobe Products / Export / Live is **not** supported;
-
-* `run_sync_live` exists in the workspace permission catalogue (**ten** permissions);
-
-* `ExternalRecordLink` persistence exists (no Adobe reconciliation/use yet);
-
-* Live admission + fail-closed job shell exist; no consequential Adobe Product writer exists;
-
-* stale active-run lease/recovery exists for `sync_runs`;
-
-* `ProductExecutionAggregateBuilder` currently belongs to the Preview namespace but
+- `SyncRunMode` already contains Preview + Live;
+- `SyncRun` / `SyncRunItem` persistence already exists;
+- `ConnectorSyncOperationSupport` is mode-aware;
+- Adobe Products / Export / Preview is supported;
+- Adobe Products / Export / Live is **not** supported;
+- `run_sync_live` exists in the workspace permission catalogue (**ten** permissions);
+- `ExternalRecordLink` persistence exists (no Adobe reconciliation/use yet);
+- Live admission + fail-closed job shell exist; no consequential Adobe Product writer exists;
+- stale active-run lease/recovery exists for `sync_runs`;
+- `ProductExecutionAggregateBuilder` currently belongs to the Preview namespace but
   contains semantically reusable Product execution input;
-
-* Preview planner may emit an in-memory `connectorPlan` — that plan is **not** a
+- Preview planner may emit an in-memory `connectorPlan` — that plan is **not** a
   Live HTTP command plan;
-
-* one active queued/running run per `SyncConfiguration` already exists.
+- one active queued/running run per `SyncConfiguration` already exists.
 
 **Historical pre–Stage 3A baseline (Stage 3-0 contract freeze):**
 
-* catalogue remained **nine** permissions until Stage 3A;
-
-* `run_sync_live` did not exist yet;
-
-* `ExternalRecordLink` did not exist yet;
-
-* no stale active-run recovery existed.
+- catalogue remained **nine** permissions until Stage 3A;
+- `run_sync_live` did not exist yet;
+- `ExternalRecordLink` did not exist yet;
+- no stale active-run recovery existed.
 
 ##### Preview → Manual Live trust
 
 A first manual Live requires a relevant Preview that:
 
-* belongs to the same `SyncConfiguration`;
-
-* is Products / Export / Preview / `Completed`;
-
-* was created from **current** `configuration_revision`.
+- belongs to the same `SyncConfiguration`;
+- is Products / Export / Preview / `Completed`;
+- was created from **current** `configuration_revision`.
 
 Do **not** require arbitrary Preview-age TTL, Product-wide revision, or zero
 blocked Product rows. A Completed current-revision Preview may contain
@@ -8103,7 +7462,7 @@ trusted `ExternalRecordLink`, **no consequential Product mutation** under stock
 Magento (no POST, no blind PUT, no adoption). See **Stage 3E Stop-and-Amend —
 Magento ownership and entity-bound Safe Sync runtime contract**.
 
-**Historical \[Resolved] no-link create (invalidated):** the prior contract assumed
+**Historical [Resolved] no-link create (invalidated):** the prior contract assumed
 GET known-missing + POST + reconciliation could prove create ownership. Magento
 primary-source research proved stock `POST /V1/products` is upsert-like and cannot
 prove connector-created identity.
@@ -8146,16 +7505,12 @@ Integrations into an execution console.
 
 Merchant consequential Live admission/exposure requires **all** relevant gates:
 
-* fresh `run_sync_live` authorization;
-
-* relevant Completed current-revision Preview on the same `SyncConfiguration`
+- fresh `run_sync_live` authorization;
+- relevant Completed current-revision Preview on the same `SyncConfiguration`
   (`products` / `export` / Preview / `Completed`);
-
-* current configuration readiness;
-
-* fresh `ConnectorLiveRuntimeReadiness` (account-specific remote prerequisite);
-
-* `ConnectorSyncOperationSupport(Products, Export, Live) === true`.
+- current configuration readiness;
+- fresh `ConnectorLiveRuntimeReadiness` (account-specific remote prerequisite);
+- `ConnectorSyncOperationSupport(Products, Export, Live) === true`.
 
 `ConnectorSyncOperationSupport` is static software capability.
 `ConnectorLiveRuntimeReadiness` is fresh account-specific remote prerequisite.
@@ -8211,9 +7566,8 @@ reconciliation prevents blind duplicate create.
 
 Current Adobe support truth remains:
 
-* Products / Export / Preview = **true**
-
-* Products / Export / Live = **false**
+- Products / Export / Preview = **true**
+- Products / Export / Live = **false**
 
 Keep Live **false** through internal implementation slices 3A–3D. Flip to **true**
 only when advertised V1 is coherent for: simple + configurable Products;
@@ -8268,25 +7622,18 @@ knowledge**. It is not workspace mapping state.
 
 Its role may include, as supported by current repository contract:
 
-* high-confidence suggestions;
-
-* requirement/evidence knowledge;
-
-* known mapping recommendations;
-
-* known transformation recommendations where applicable.
+- high-confidence suggestions;
+- requirement/evidence knowledge;
+- known mapping recommendations;
+- known transformation recommendations where applicable.
 
 It is **not**:
 
-* an account schema;
-
-* a complete external field catalog;
-
-* a substitute for live account discovery;
-
-* merchant-confirmed workspace mapping;
-
-* a reason to pre-author one row for every account-specific custom attribute.
+- an account schema;
+- a complete external field catalog;
+- a substitute for live account discovery;
+- merchant-confirmed workspace mapping;
+- a reason to pre-author one row for every account-specific custom attribute.
 
 Preserve three distinct layers:
 
@@ -8303,12 +7650,11 @@ default-mapping registry.
 Verification aid only (reverified against current `origin/develop` HEAD; counts
 may grow without changing the architectural conclusion):
 
-* `canonical_product_field_mappings.csv`: 35 rows total
+- `canonical_product_field_mappings.csv`: 35 rows total
   (`adobe_commerce` 6, `google_merchant` 13, `rozetka` 1, `schema_org` 10,
   `shopify` 5). Of the 6 `adobe_commerce` rows, 5 have
   `requirement_level = undecided`.
-
-* Current Magento discovery fixture: 106 received attributes / 102 normalized
+- Current Magento discovery fixture: 106 received attributes / 102 normalized
   snapshot fields.
 
 Conclusion: the canonical registry is sparse platform knowledge, not a complete
@@ -8358,11 +7704,10 @@ This is required so readiness can be **derived** rather than persisted.
 
 Example:
 
-* current configuration revision = 12, last relevant successful preview
+- current configuration revision = 12, last relevant successful preview
   revision = 11 → current configuration has not been successfully previewed
   after its latest change;
-
-* both = 12 → preview corresponds to the current configuration state.
+- both = 12 → preview corresponds to the current configuration state.
 
 Do not prescribe integer/hash/revision storage implementation here. Require
 only: stable comparable configuration revision + revision recorded on each
@@ -8372,9 +7717,9 @@ SyncRun.
 
 A. **Transport operation** — one connector/external operation/request.
 B. **Semantic operation unit** — one intended external semantic mutation/read
-unit, possibly finer-grained than a product/business record.
+   unit, possibly finer-grained than a product/business record.
 C. **Business-record outcome** — merchant/business execution result represented
-by `SyncRunItem`.
+   by `SyncRunItem`.
 
 `SyncRunItem` represents business-record outcome. It must never be defined as
 one HTTP request, one connector batch, or one transport attempt.
@@ -8398,25 +7743,18 @@ Preview and Live are distinct result semantics.
 
 **Preview:**
 
-* performs no consequential external mutation;
-
-* predicts/readies what would happen;
-
-* may produce blockers/warnings/exclusions/predicted outcomes;
-
-* cannot be “partially applied”;
-
-* cannot have “unknown applied state”;
-
-* must never imply that an external write actually occurred.
+- performs no consequential external mutation;
+- predicts/readies what would happen;
+- may produce blockers/warnings/exclusions/predicted outcomes;
+- cannot be “partially applied”;
+- cannot have “unknown applied state”;
+- must never imply that an external write actually occurred.
 
 **Live:**
 
-* performs actual external execution;
-
-* records what actually happened;
-
-* may contain success, known failure, partial application,
+- performs actual external execution;
+- records what actually happened;
+- may contain success, known failure, partial application,
   unknown/ambiguous applied state, or skipped/not-attempted where applicable.
 
 Do not define one flat semantic outcome vocabulary pretending preview/live are
@@ -8431,12 +7769,12 @@ merchant history is a Product Owner decision.
 Distinguish explicitly:
 
 A. **Outside run selection** — record does not belong to this run's
-query/filter/selection scope → no SyncRunItem is required merely to say it
-was unselected.
-B. **Inside run scope, intentionally not executed** → skipped / not\_attempted
-semantics may apply.
+   query/filter/selection scope → no SyncRunItem is required merely to say it
+   was unselected.
+B. **Inside run scope, intentionally not executed** → skipped / not_attempted
+   semantics may apply.
 C. **Inside run scope and evaluated/executed** → predicted outcome for Preview;
-actual outcome for Live.
+   actual outcome for Live.
 
 Do not classify every unselected catalog record as skipped. Do not create huge
 result histories merely for records that never belonged to the run scope.
@@ -8449,10 +7787,9 @@ evidence.
 
 Do **not** claim:
 
-* current issues = non-success rows from the latest live run
+- current issues = non-success rows from the latest live run
   (incremental/delta runs may not reevaluate every selected record);
-
-* stable issue identity alone is sufficient to derive current issue state.
+- stable issue identity alone is sufficient to derive current issue state.
 
 #### Stable normalized issue identity
 
@@ -8523,15 +7860,11 @@ configuration revision.
 
 Prefer deriving readiness from:
 
-* current SyncConfiguration state;
-
-* validation state;
-
-* current configuration revision;
-
-* relevant Preview/Live run state;
-
-* configuration revision recorded on that run.
+- current SyncConfiguration state;
+- validation state;
+- current configuration revision;
+- relevant Preview/Live run state;
+- configuration revision recorded on that run.
 
 Persist only state that cannot be reliably reconstructed. The
 `SyncRun.configuration_revision` invariant above is required for this
@@ -8541,12 +7874,11 @@ derivation.
 
 Current repository baseline (reverified):
 
-* `ConnectorProfile` is the existing extension point and currently couples
+- `ConnectorProfile` is the existing extension point and currently couples
   account setup + runtime adapter 1:1
   (example: `adobe_commerce_paas_oauth1_integration` →
   `AdobePaaSAccountSchema` → `AdobePaaSConnectorAdapter`).
-
-* `ConnectorProfileRegistry::resolveAccountSetupProfile()` requires exactly one
+- `ConnectorProfileRegistry::resolveAccountSetupProfile()` requires exactly one
   enabled AccountSetup-capable profile per ConnectorDefinition and fails on
   ambiguity.
 
@@ -8563,21 +7895,16 @@ as “is this PaaS / on-prem / Open Source?”
 Deferred connector-specific verification before a second real runtime variant
 (not a blocker for this Sync domain rebaseline):
 
-* what external contract the existing AdobePaaS profile actually intends to
+- what external contract the existing AdobePaaS profile actually intends to
   cover according to current repo docs/config/tests;
-
-* whether it is intentionally PaaS-only or represents a broader traditional
+- whether it is intentionally PaaS-only or represents a broader traditional
   Adobe/Magento REST-family implementation;
-
-* exact authoritative post-bootstrap mechanism for verifying supported runtime
+- exact authoritative post-bootstrap mechanism for verifying supported runtime
   contract/version/capabilities;
-
-* Magento Open Source setup/auth compatibility;
-
-* whether AccountSetup and final runtime contract remain one profile or later
+- Magento Open Source setup/auth compatibility;
+- whether AccountSetup and final runtime contract remain one profile or later
   require separate resolution/binding;
-
-* whether existing exactly-one AccountSetup-profile invariant must ever change.
+- whether existing exactly-one AccountSetup-profile invariant must ever change.
 
 Do not add generic fields for symmetry such as `edition`, `deployment_model`,
 or `api_family` to generic sync domain entities. Do not make optional external
@@ -8586,13 +7913,13 @@ and do not invent an authoritative REST/GraphQL metadata endpoint.
 
 ### Superseded concepts
 
-| Earlier concept                                                                        | Current normative status                                                                                                 |
-| -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `ImportJob` / `ExportJob` / `SyncJob` as primary sync entities                         | Superseded by `SyncConfiguration` → `SyncRun` → `SyncRunItem`                                                            |
-| FieldMapping as directional execution plan with mandatory bidirectional transformation | Superseded: semantic correspondence only; transformation operation-aware if needed                                       |
-| FieldMapping.direction / per-field authority as mandatory minimum sync state           | Superseded for the minimum model; domain-level ownership default remains a Product Owner question if bidirectional ships |
-| Persisted readiness flags (`preview_ok`, `schedule_eligible`, …)                       | Superseded by derived readiness from configuration revision + run revision                                               |
-| Persistent `SyncIssue` as default current-issue store                                  | Deferred                                                                                                                 |
+| Earlier concept | Current normative status |
+|---|---|
+| `ImportJob` / `ExportJob` / `SyncJob` as primary sync entities | Superseded by `SyncConfiguration` → `SyncRun` → `SyncRunItem` |
+| FieldMapping as directional execution plan with mandatory bidirectional transformation | Superseded: semantic correspondence only; transformation operation-aware if needed |
+| FieldMapping.direction / per-field authority as mandatory minimum sync state | Superseded for the minimum model; domain-level ownership default remains a Product Owner question if bidirectional ships |
+| Persisted readiness flags (`preview_ok`, `schedule_eligible`, …) | Superseded by derived readiness from configuration revision + run revision |
+| Persistent `SyncIssue` as default current-issue store | Deferred |
 
 Spreadsheet/file import may still use a specialized import flow later; it must
 not redefine the connector sync domain relationship above.
@@ -8620,21 +7947,22 @@ here.
 
 ## Billing Context
 
+
 Billing and subscription are important for SaaS but not central to the first product domain model.
 
 For now, Billing should be treated as a separate future context.
 
 It may later include:
 
-* subscription plan;
+- subscription plan;
 
-* usage limits;
+- usage limits;
 
-* invoices;
+- invoices;
 
-* payment provider for platform subscription;
+- payment provider for platform subscription;
 
-* feature access.
+- feature access.
 
 For MVP, access may be controlled through simple workspace plan flags or middleware.
 
@@ -8642,39 +7970,40 @@ Billing must not pollute product, order, attribute, pricing, payment or availabi
 
 ### Domain Services
 
+
 Some business logic should live in domain services instead of being scattered across controllers.
 
 Initial domain services may include:
 
-* ProductCreator
+- ProductCreator
 
-* DefaultVariantCreator
+- DefaultVariantCreator
 
-* AttributeValueWriter
+- AttributeValueWriter
 
-* PriceResolver
+- PriceResolver
 
-* AvailabilityResolver
+- AvailabilityResolver
 
-* B2BPublicationChecker
+- B2BPublicationChecker
 
-* B2BCatalogueProjector
+- B2BCatalogueProjector
 
-* B2BStorefrontPresenter
+- B2BStorefrontPresenter
 
-* OrderCreator
+- OrderCreator
 
-* OrderSnapshotBuilder
+- OrderSnapshotBuilder
 
-* StockWarningEvaluator
+- StockWarningEvaluator
 
-* PaymentRequestCreator
+- PaymentRequestCreator
 
-* PaymentWebhookHandler
+- PaymentWebhookHandler
 
-* FieldMappingResolver
+- FieldMappingResolver
 
-* ImportHeaderNormalizer
+- ImportHeaderNormalizer
 
 These services should express business meaning.
 
@@ -8682,21 +8011,22 @@ They should not become generic utility dumping grounds.
 
 ### Product Creation Flow
 
+
 The simplest product creation flow should be:
 
-* User enters product name.
+- User enters product name.
 
-* Platform creates Product.
+- Platform creates Product.
 
-* Platform assigns default Product Type.
+- Platform assigns default Product Type.
 
-* Platform creates default ProductVariant.
+- Platform creates default ProductVariant.
 
-* Platform generates internal SKU or internal identifier if needed.
+- Platform generates internal SKU or internal identifier if needed.
 
-* Product appears immediately in the product table.
+- Product appears immediately in the product table.
 
-* User may enrich product data later.
+- User may enrich product data later.
 
 The user should feel that product creation is instant and simple.
 
@@ -8704,17 +8034,18 @@ The architecture quietly prepares the deeper structure.
 
 ### B2B Publication Flow
 
+
 B2B publication should check only what is required for B2B.
 
 Minimum checks:
 
-* product is active;
+- product is active;
 
-* product has product name;
+- product has product name;
 
-* variant has price or pricing mode;
+- variant has price or pricing mode;
 
-* variant has availability or availability mode.
+- variant has availability or availability mode.
 
 Images and descriptions may be recommended but should not block publication by default.
 
@@ -8724,35 +8055,36 @@ Readiness should appear only when the user is trying to publish, export or fix s
 
 ### B2B Storefront Flow
 
+
 The basic B2B storefront flow should be:
 
-* User imports or creates products.
+- User imports or creates products.
 
-* Platform creates products and default variants.
+- Platform creates products and default variants.
 
-* User organizes products into workspace categories.
+- User organizes products into workspace categories.
 
-* User enables B2B channel.
+- User enables B2B channel.
 
-* Platform creates a customer-facing storefront URL.
+- Platform creates a customer-facing storefront URL.
 
-* Customer opens the storefront.
+- Customer opens the storefront.
 
-* Customer browses categories.
+- Customer browses categories.
 
-* Customer switches between grid, list or table view if enabled.
+- Customer switches between grid, list or table view if enabled.
 
-* Customer searches, sorts or filters products.
+- Customer searches, sorts or filters products.
 
-* Customer adds product variants to cart.
+- Customer adds product variants to cart.
 
-* Customer submits order.
+- Customer submits order.
 
-* Platform creates order and order item snapshots.
+- Platform creates order and order item snapshots.
 
-* Platform sends notification.
+- Platform sends notification.
 
-* Future: customer may pay through hosted gateway payment.
+- Future: customer may pay through hosted gateway payment.
 
 The storefront must remain a sales channel over product data.
 
@@ -8760,39 +8092,41 @@ It must not become a separate e-commerce CMS.
 
 ### Order Creation Flow
 
+
 A B2B order creation flow should be:
 
-* Customer opens B2B catalogue.
+- Customer opens B2B catalogue.
 
-* Platform resolves visible products.
+- Platform resolves visible products.
 
-* Platform resolves customer price.
+- Platform resolves customer price.
 
-* Platform resolves availability.
+- Platform resolves availability.
 
-* Customer adds variants to cart.
+- Customer adds variants to cart.
 
-* Customer submits order.
+- Customer submits order.
 
-* Platform creates order.
+- Platform creates order.
 
-* Platform creates order items with snapshots.
+- Platform creates order items with snapshots.
 
-* Platform evaluates stock warnings.
+- Platform evaluates stock warnings.
 
-* Platform sets initial order status and payment status.
+- Platform sets initial order status and payment status.
 
-* Platform sends notification.
+- Platform sends notification.
 
-* If payment is enabled, order may receive payment status awaiting\_payment.
+- If payment is enabled, order may receive payment status awaiting_payment.
 
-* If connector is enabled, order may be queued for external sync.
+- If connector is enabled, order may be queued for external sync.
 
 Order creation must not depend on external systems being available.
 
 If ERP sync fails, the order should still exist in the platform with sync status failed.
 
 ### Data Ownership Rules
+
 
 The platform must follow clear ownership rules.
 
@@ -8840,73 +8174,74 @@ Billing owns SaaS subscription logic.
 
 ### MVP Domain Scope
 
+
 The MVP domain model should include:
 
-* Workspace;
+- Workspace;
 
-* User;
+- User;
 
-* WorkspaceUser;
+- WorkspaceUser;
 
-* Product;
+- Product;
 
-* ProductVariant with hidden default variant;
+- ProductVariant with hidden default variant;
 
-* ProductType with hidden default Basic Product;
+- ProductType with hidden default Basic Product;
 
-* Category tree inside workspace;
+- Category tree inside workspace;
 
-* FieldDefinition / FieldBinding *(renamed from AttributeDefinition; see Field
+- FieldDefinition / FieldBinding *(renamed from AttributeDefinition; see Field
   Dictionary Context above)*;
 
-* ProductFieldValue / VariantFieldValue *(renamed from ProductAttributeValue /
+- ProductFieldValue / VariantFieldValue *(renamed from ProductAttributeValue /
   VariantAttributeValue)* / CustomerFieldValue *(new — cross-object scope)*;
 
-* MediaAsset / primary image;
+- MediaAsset / primary image;
 
-* Customer;
+- Customer;
 
-* CustomerGroup;
+- CustomerGroup;
 
-* PriceList;
+- PriceList;
 
-* PriceListItem or simple ProductPrice;
+- PriceListItem or simple ProductPrice;
 
-* cached variant prices;
+- cached variant prices;
 
-* cached variant availability;
+- cached variant availability;
 
-* basic inventory / availability records where needed;
+- basic inventory / availability records where needed;
 
-* B2BChannel;
+- B2BChannel;
 
-* B2B storefront settings;
+- B2B storefront settings;
 
-* B2B display modes as configuration;
+- B2B display modes as configuration;
 
-* B2B visibility settings;
+- B2B visibility settings;
 
-* Order;
+- Order;
 
-* OrderItem with snapshots;
+- OrderItem with snapshots;
 
-* order status;
+- order status;
 
-* payment status field;
+- payment status field;
 
-* optional Payment placeholder;
+- optional Payment placeholder;
 
-* ConnectorDefinition;
+- ConnectorDefinition;
 
-* ConnectorAccount;
+- ConnectorAccount;
 
-* SyncConfiguration;
+- SyncConfiguration;
 
-* FieldMapping;
+- FieldMapping;
 
-* SyncRun / SyncRunItem;
+- SyncRun / SyncRunItem;
 
-* ExternalRecordLink.
+- ExternalRecordLink.
 
 Historical note: earlier drafts listed `ImportJob` / `ExportJob` / `SyncJob`
 here. Those names are superseded by the Sync Domain Rebaseline above and are
@@ -8914,147 +8249,148 @@ not current MVP sync entities.
 
 The MVP should not include:
 
-* database-per-tenant;
+- database-per-tenant;
 
-* global marketplace taxonomy;
+- global marketplace taxonomy;
 
-* advanced product type builder;
+- advanced product type builder;
 
-* complex variant UI;
+- complex variant UI;
 
-* complex price engine;
+- complex price engine;
 
-* full WMS and multi-warehouse logistics routing;
+- full WMS and multi-warehouse logistics routing;
 
-* full warehouse management;
+- full warehouse management;
 
-* accounting;
+- accounting;
 
-* full payment gateway UI;
+- full payment gateway UI;
 
-* full billing system;
+- full billing system;
 
-* advanced workflow engine;
+- advanced workflow engine;
 
-* marketplace connector complexity;
+- marketplace connector complexity;
 
-* full DAM system;
+- full DAM system;
 
-* website builder features;
+- website builder features;
 
-* theme builder;
+- theme builder;
 
-* blog/CMS pages;
+- blog/CMS pages;
 
-* platform-wide marketplace search.
+- platform-wide marketplace search.
 
 ### Recommended Table Direction
+
 
 The implementation may use names similar to the following.
 
 Workspace and users:
 
-* workspaces
+- workspaces
 
-* users
+- users
 
-* workspace\_users
+- workspace_users
 
-* roles
+- roles
 
-* permissions
+- permissions
 
 Catalogue:
 
-* products
+- products
 
-* product\_variants
+- product_variants
 
-* product\_types
+- product_types
 
-* categories
+- categories
 
-* media\_assets
+- media_assets
 
-* product\_media
+- product_media
 
-* variant\_media
+- variant_media
 
 Fields *(renamed from "Attributes")*:
 
-* field\_definitions *(renamed from attribute\_definitions)*
+- field_definitions *(renamed from attribute_definitions)*
 
-* field\_bindings *(new)*
+- field_bindings *(new)*
 
-* workspace\_import\_aliases
+- workspace_import_aliases
 
-* product\_field\_values *(renamed from product\_attribute\_values)*
+- product_field_values *(renamed from product_attribute_values)*
 
-* variant\_field\_values *(renamed from variant\_attribute\_values)*
+- variant_field_values *(renamed from variant_attribute_values)*
 
-* customer\_field\_values *(new)*
+- customer_field_values *(new)*
 
 Pricing:
 
-* price\_lists
+- price_lists
 
-* price\_list\_items
+- price_list_items
 
-* customer\_groups
+- customer_groups
 
-* pricing\_rules
+- pricing_rules
 
 Availability:
 
-* inventory\_records
+- inventory_records
 
-* inventory\_reservations
+- inventory_reservations
 
 B2B:
 
-* b2b\_channels
+- b2b_channels
 
-* b2b\_visibility\_rules later or simplified settings in MVP
+- b2b_visibility_rules later or simplified settings in MVP
 
 Customers:
 
-* customers
+- customers
 
-* customer\_contacts later
+- customer_contacts later
 
 Orders:
 
-* orders
+- orders
 
-* order\_items
+- order_items
 
 Payments:
 
-* payments
+- payments
 
-* payment\_gateway\_accounts later
+- payment_gateway_accounts later
 
 Connectors:
 
-* connector\_definitions
+- connector_definitions
 
-* connector\_accounts
+- connector_accounts
 
-* field\_mappings
+- field_mappings
 
-* import\_jobs
+- import_jobs
 
-* export\_jobs
+- export_jobs
 
-* sync\_jobs
+- sync_jobs
 
 Billing later:
 
-* plans
+- plans
 
-* subscriptions
+- subscriptions
 
-* usage\_records
+- usage_records
 
 This table direction is not the final migration plan.
 
@@ -9063,6 +8399,7 @@ It defines the domain shape.
 Exact migrations should be written during implementation.
 
 ## Domain Decisions
+
 
 The following section records domain-level decisions. Items marked **Resolved** are closed and must not be reopened without a documentation-level decision. Items without **Resolved** remain open and must be finalized before the relevant implementation starts.
 
@@ -9089,11 +8426,9 @@ This decision is closed and must not be reopened without a documentation-level d
 The platform uses separate isolated tables per bound entity type — this
 constraint itself is **not reopened**:
 
-* `product_field_values` *(renamed from* *`product_attribute_values`)* for product-level dynamic fields;
-
-* `variant_field_values` *(renamed from* *`variant_attribute_values`)* for variant-level dynamic fields;
-
-* `customer_field_values` *(new)* for customer-level dynamic fields.
+- `product_field_values` *(renamed from `product_attribute_values`)* for product-level dynamic fields;
+- `variant_field_values` *(renamed from `variant_attribute_values`)* for variant-level dynamic fields;
+- `customer_field_values` *(new)* for customer-level dynamic fields.
 
 A unified polymorphic value table across entity types is strictly forbidden by the Storage Split Mandate in `04-ARCHITECTURE_PRINCIPLES.md`. This section is retained to preserve the historical decision and its rationale; for full current field/table definitions, see "Field Dictionary Context" above and "Field Foundation (cross-object fields)" below.
 
@@ -9105,22 +8440,18 @@ This decision is closed and must not be reopened without a documentation-level d
 
 The platform uses a hybrid field storage model:
 
-* System/core operational fields (name, brand, category, sku, gtin, status, cost\_price,
-  etc. on Product/Variant; name, tax\_number, credit\_limit on Customer) remain column-backed or
+- System/core operational fields (name, brand, category, sku, gtin, status, cost_price,
+  etc. on Product/Variant; name, tax_number, credit_limit on Customer) remain column-backed or
   relation-backed, for indexing, sorting and FK integrity.
-
-* Dynamic/custom/tenant-specific fields are stored in `product_field_values` /
+- Dynamic/custom/tenant-specific fields are stored in `product_field_values` /
   `variant_field_values` / `customer_field_values`.
-
-* Every field, regardless of storage location, is registered in `field_definitions` with one or
+- Every field, regardless of storage location, is registered in `field_definitions` with one or
   more `field_bindings`, each tracking its own `storage_type` (`column | relation | dynamic`) and,
   for column/relation bindings, its `storage_path`.
-
-* `computed` is a `data_type`, never a `storage_type`; computed fields have no physical
+- `computed` is a `data_type`, never a `storage_type`; computed fields have no physical
   persistence (see Computed Fields Operational Boundary), and in MVP are limited to
   system-defined read-only fields — merchants cannot create custom computed fields.
-
-* Dynamic value tables store only `value_text`, `value_num`, `value_jsonb`. Boolean values use
+- Dynamic value tables store only `value_text`, `value_num`, `value_jsonb`. Boolean values use
   `value_num` (0/1) with an explicit convention; date values use `value_text` in ISO-8601 or
   `value_jsonb`. Adding dedicated `value_boolean` / `value_date` columns requires a separate,
   explicit documentation-level decision.
@@ -9132,7 +8463,7 @@ present in the original Product/Variant-only version of this decision.
 
 This decision is closed and must not be reopened without a documentation-level decision.
 
-### Workspace\_id minimum rollout scope for Product Fields Foundation
+### Workspace_id minimum rollout scope for Product Fields Foundation
 
 **Resolved.** *(Table names below updated to Field Foundation naming; the
 historical migration order and rationale are unchanged.)*
@@ -9140,19 +8471,13 @@ historical migration order and rationale are unchanged.)*
 The combined Workspace Foundation Lite + Product Fields Foundation implementation task must add
 `workspace_id` to, at minimum:
 
-* `products`
-
-* `product_variants`
-
-* `categories`
-
-* `field_definitions` *(renamed from* *`attribute_definitions`)*
-
-* `product_field_values` *(renamed from* *`product_attribute_values`)*
-
-* `variant_field_values` *(renamed from* *`variant_attribute_values`)*
-
-* `workspace_import_aliases`
+- `products`
+- `product_variants`
+- `categories`
+- `field_definitions` *(renamed from `attribute_definitions`)*
+- `product_field_values` *(renamed from `product_attribute_values`)*
+- `variant_field_values` *(renamed from `variant_attribute_values`)*
+- `workspace_import_aliases`
 
 Any new tables created by the Field Foundation migration (`field_bindings`,
 `customer_field_values`) must include `workspace_id` from their first
@@ -9177,65 +8502,54 @@ unchanged.)*
 
 The initial `field_definitions` seed for Product Fields Foundation (Phase 1) registers only
 System Attributes whose storage is verified stable on `develop` today and whose storage path
-does not contradict the documented object\_type/binding.
+does not contradict the documented object_type/binding.
 
 Product-level Phase 1 seed:
 
-* `internal_product_id` — storage\_path: `products.id`, data\_type: number. Note: 02 describes
+- `internal_product_id` — storage_path: `products.id`, data_type: number. Note: 02 describes
   this attribute as a UUID; the current implementation uses a Laravel auto-increment integer
   primary key, not a UUID. This mismatch is documented here and does not block Phase 1; it may
   be revisited separately.
-
-* `name` — storage\_path: `products.name` (shared FieldDefinition with Customer binding)
-
-* `brand` — storage\_path: `products.brand`
-
-* `category` — storage\_type: relation, storage\_path: `products.category_id`
-
-* `description` — storage\_path: `products.description`
-
-* `status` — storage\_path: `products.is_active`; interim convention:
+- `name` — storage_path: `products.name` (shared FieldDefinition with Customer binding)
+- `brand` — storage_path: `products.brand`
+- `category` — storage_type: relation, storage_path: `products.category_id`
+- `description` — storage_path: `products.description`
+- `status` — storage_path: `products.is_active`; interim convention:
   `is_active=true → active`, `is_active=false → archived`; `draft` is not distinguishable until
   a real product lifecycle status field exists.
-
-* `url` — storage\_path: `products.url` (added via a dedicated migration after
+- `url` — storage_path: `products.url` (added via a dedicated migration after
   the base `products` table was created; column renamed per DEC-008).
 
 Variant-level Phase 1 seed:
 
-* `sku` — storage\_path: `product_variants.sku`; canonical. The duplicate `products.sku` column
+- `sku` — storage_path: `product_variants.sku`; canonical. The duplicate `products.sku` column
   is legacy and is not used as a storage path; tracked as backlog technical debt.
-
-* `gtin` — storage\_path: `product_variants.barcode_ean`; canonical. The duplicate
+- `gtin` — storage_path: `product_variants.barcode_ean`; canonical. The duplicate
   `products.barcode_ean` column is legacy and is not used as a storage path; tracked as backlog
   technical debt.
 
 Explicitly excluded from Phase 1 seed, with no placeholder record created:
 
-* `price`, `sale_price`, `cost_price` — deferred to Pricing MVP Foundation (GAP-001). `price`
+- `price`, `sale_price`, `cost_price` — deferred to Pricing MVP Foundation (GAP-001). `price`
   and `cost_price` are jointly required by the `margin_percentage` computed field and must be
   resolved together, with the correct `FieldBinding.object_type` (product vs variant), once
   PriceResolver-backed storage exists.
   `cost_price` currently physically exists only on `products` (added via a dedicated later
   migration), while 02 classifies it as belonging to the `product_variant` object type — this
   mismatch is intentionally not resolved by registering it prematurely.
-
-* `availability` — deferred to Availability Foundation (GAP-002).
-
-* `image` — deferred. Current `products.images` (JSON) is product-level legacy storage; 02
+- `availability` — deferred to Availability Foundation (GAP-002).
+- `image` — deferred. Current `products.images` (JSON) is product-level legacy storage; 02
   classifies `image` as belonging to the `product_variant` object type. Registering it now would
-  lock in an object\_type mismatch. Deferred until product/variant media storage is explicitly
+  lock in an object_type mismatch. Deferred until product/variant media storage is explicitly
   resolved.
-
-* `unit` — deferred. Current `products.unit` is product-level; 02 classifies `unit` as belonging
+- `unit` — deferred. Current `products.unit` is product-level; 02 classifies `unit` as belonging
   to the `product_variant` object type. Same class of mismatch as `image`; deferred until
   explicitly resolved.
-
-* `condition` — deferred. No physical storage column exists for `condition` anywhere in the
+- `condition` — deferred. No physical storage column exists for `condition` anywhere in the
   current schema (verified: absent from both `products` and `product_variants`).
 
-*(Note: "02 classifies X as belonging to the* *`product_variant`* *object type" reflects the
-Field Foundation renaming of 02-ATTRIBUTE\_DICTIONARY.md's former "Variant-Level" terminology —
+*(Note: "02 classifies X as belonging to the `product_variant` object type" reflects the
+Field Foundation renaming of 02-ATTRIBUTE_DICTIONARY.md's former "Variant-Level" terminology —
 see that document's Assignment Level Rules section.)*
 
 Existing `products` columns not covered above (`barcode_box`,
@@ -9289,10 +8603,10 @@ The PriceResolver must evaluate prices in the following priority order:
 2. CustomerGroup PricingRule or discount, if configured for the customer's assigned CustomerGroup;
 3. PriceList explicitly assigned to the customer;
 4. PriceList assigned through the customer's CustomerGroup;
-5. Default workspace PriceList where is\_default = true;
+5. Default workspace PriceList where is_default = true;
 6. Cached variant base price on ProductVariant as a final fallback.
 
-Within a PriceList, PriceListItem tier resolution must select the highest valid quantity\_min that is less than or equal to the requested quantity, while respecting status, valid\_from and valid\_until.
+Within a PriceList, PriceListItem tier resolution must select the highest valid quantity_min that is less than or equal to the requested quantity, while respecting status, valid_from and valid_until.
 
 The highest-priority applicable rule wins.
 
@@ -9306,15 +8620,11 @@ For MVP, the operational availability read source for storefront and checkout fl
 
 `available_quantity_cache` is maintained through controlled inventory update flows and `InventoryRecord` entries.
 
-* `available_quantity_cache` is the fast read path for storefront, catalogue projection and checkout evaluation.
-
-* `InventoryRecord` is the append-only ledger for stock movements such as manual adjustment, bulk import, connector sync and order allocation.
-
-* `AvailabilityResolver` calculates net sellable stock by subtracting active unexpired `InventoryReservation` rows from `available_quantity_cache`.
-
-* External connector sync must update availability through the inventory update flow and `InventoryRecord`; connectors must not bypass the availability domain by writing directly to the cache column.
-
-* Multi-warehouse and multi-location stock are excluded from MVP.
+- `available_quantity_cache` is the fast read path for storefront, catalogue projection and checkout evaluation.
+- `InventoryRecord` is the append-only ledger for stock movements such as manual adjustment, bulk import, connector sync and order allocation.
+- `AvailabilityResolver` calculates net sellable stock by subtracting active unexpired `InventoryReservation` rows from `available_quantity_cache`.
+- External connector sync must update availability through the inventory update flow and `InventoryRecord`; connectors must not bypass the availability domain by writing directly to the cache column.
+- Multi-warehouse and multi-location stock are excluded from MVP.
 
 This decision is closed and must not be changed without a documentation-level decision.
 
@@ -9343,35 +8653,30 @@ This decision is closed and must not be reopened without a documentation-level d
 Any operation that reads current stock/availability in order to decide whether a reservation
 can be created, and then writes that reservation, must do so as a single atomic unit:
 
-* Wrapped in `DB::transaction()`.
-
-* The relevant `ProductVariant` / stock row must be locked with `lockForUpdate()` for the
+- Wrapped in `DB::transaction()`.
+- The relevant `ProductVariant` / stock row must be locked with `lockForUpdate()` for the
   duration of the check-then-write.
-
-* Deadlock retry must be used (Laravel's built-in `DB::transaction($closure, $attempts)`
+- Deadlock retry must be used (Laravel's built-in `DB::transaction($closure, $attempts)`
   parameter), not a hand-rolled retry loop.
-
-* When more than one row must be locked in the same transaction (e.g. variant + an existing
+- When more than one row must be locked in the same transaction (e.g. variant + an existing
   reservation row), rows must be locked in a single, consistent order (e.g. always by primary
   key ascending) to avoid deadlocks between concurrent transactions locking the same rows in
   different orders.
 
 This responsibility is split cleanly between two kinds of components:
 
-* **Resolvers are read-only display/query services.** `AvailabilityResolver` and
+- **Resolvers are read-only display/query services.** `AvailabilityResolver` and
   `PriceResolver` never mutate state. Their normal public read methods are safe for catalogue,
   admin, and storefront display, but their result must **not** be used as the final authority
   for a write operation (e.g. "resolver said 3 available, so create the reservation") unless the
   writer service has already opened the transaction and acquired the required row locks first.
-
-* **Writers own the lock and the write-safe calculation.** A dedicated `ReservationCreator`
+- **Writers own the lock and the write-safe calculation.** A dedicated `ReservationCreator`
   (and, symmetrically, `ReservationConfirmer` / `ReservationReleaser`) is the only code path
   allowed to create, confirm, or expire a reservation. Each of these performs its own final
   availability check *inside* the same transaction that holds the row lock and writes the
   reservation — it does not trust a value read earlier by `AvailabilityResolver` outside that
   transaction.
-
-* **No controller, Livewire component, or Filament action may mutate stock or reservation
+- **No controller, Livewire component, or Filament action may mutate stock or reservation
   quantities directly.** All such mutations go through the writer services above.
 
 This decision is closed and must not be reopened without a documentation-level decision.
@@ -9384,35 +8689,30 @@ This decision is closed and must not be reopened without a documentation-level d
 close to, but not identical to, the entities documented above. Availability Foundation
 (implementation task) evolves them rather than replacing them from scratch:
 
-* `Stock` (`variant_id`, `warehouse_name`, `quantity`, `reserved`, `expected_date`,
+- `Stock` (`variant_id`, `warehouse_name`, `quantity`, `reserved`, `expected_date`,
   `expected_quantity`) becomes the source that populates `available_quantity_cache` on
   `ProductVariant`. `expected_date` / `expected_quantity` are kept as-is — they already serve
   the "очікується поставка" (incoming stock) need identified separately, and map directly to
   merchant-facing delivery-date display without needing any new field.
-
-* `Reservation` (`contractor_id`, `variant_id`, `quantity`, `status`, `expires_at`) is already
+- `Reservation` (`contractor_id`, `variant_id`, `quantity`, `status`, `expires_at`) is already
   structurally equivalent to the documented `InventoryReservation` — including the TTL field.
   It requires, at minimum: `workspace_id` (per the same rollout pattern used in Product Fields
   Foundation), and `order_id` / `order_item_id` (nullable) to link a reservation to the order it
   protects, per the documented `InventoryReservation` shape. The existing table/model name
   (`Reservation`, not `InventoryReservation`) may be kept as-is; this document's use of
   "InventoryReservation" refers to the concept, not a mandated class/table rename.
-
-* **`Stock.reserved`** **must not remain a second, independent source of reservation truth once
-  `InventoryReservation`** **(i.e. the evolved** **`Reservation`** **model) is active.** Availability
+- **`Stock.reserved` must not remain a second, independent source of reservation truth once
+  `InventoryReservation` (i.e. the evolved `Reservation` model) is active.** Availability
   Foundation must either deprecate `Stock.reserved`, treat it as a derived/cache field
   maintained only by the reservation writer services (never updated independently elsewhere),
   or explicitly migrate away from it. Net availability must never subtract both
   `Stock.reserved` and active `InventoryReservation` rows in the same calculation — that would
   double-count reserved quantity and under-report real availability.
-
-* `InventoryRecord` (the append-only stock movement ledger) does not exist yet and must be
+- `InventoryRecord` (the append-only stock movement ledger) does not exist yet and must be
   created new in Availability Foundation — there is no existing model to evolve for this one.
-
-* `AvailabilityResolver` does not exist as a formal service class yet and must be created new,
+- `AvailabilityResolver` does not exist as a formal service class yet and must be created new,
   implementing the documented net-availability formula.
-
-* `AdminAvailabilityPresenter` may remain as an admin/UI presentation adapter — it does not need
+- `AdminAvailabilityPresenter` may remain as an admin/UI presentation adapter — it does not need
   to be deleted. It must no longer calculate availability directly from
   `stocks.quantity - stocks.reserved` itself; instead it delegates the actual net-availability
   calculation to `AvailabilityResolver`, then formats the result into merchant-facing
@@ -9433,30 +8733,25 @@ However, unlike the Availability mapping above, `Price` must **not** simply be r
 requires an intermediate `PriceList` grouping so that pricing scales to new customers without
 manual per-customer row configuration:
 
-* Existing `Price` rows migrate into `PriceListItem` rows that belong to a customer-specific or
+- Existing `Price` rows migrate into `PriceListItem` rows that belong to a customer-specific or
   workspace-default `PriceList` — the `PriceList` / assignment layer is the primary structure
   going forward, not a compatibility shim bolted onto direct `contractor_id` pricing.
-
-* `min_quantity` on the existing `Price` model maps directly onto `PriceListItem.quantity_min` —
+- `min_quantity` on the existing `Price` model maps directly onto `PriceListItem.quantity_min` —
   this existing field is not wasted, it becomes the tier threshold field.
-
-* `recommended_retail_price` (РРЦ) is an informational/reference price shown to the customer for
+- `recommended_retail_price` (РРЦ) is an informational/reference price shown to the customer for
   context (e.g. to help them see their own resale potential). It is never treated as the
   resolved sale price, and it is never derived from or mixed into `PriceResolver`'s output. This
   follows the general commerce principle that a recommended/reference price and an actual
   transactional price are different concepts serving different purposes, and must not share a
   calculation path.
-
-* `PriceResolver` priority order remains exactly as already Resolved elsewhere in this document
+- `PriceResolver` priority order remains exactly as already Resolved elsewhere in this document
   (customer-specific rule → customer group rule → assigned price list → default workspace price
   list → cached variant fallback) — this patch does not change that order, only clarifies how
   existing data maps onto it.
-
-* No promotions, cart-level rules, multi-year contracts, or channel-stacked pricing are in MVP
+- No promotions, cart-level rules, multi-year contracts, or channel-stacked pricing are in MVP
   scope for Pricing Foundation. `PriceListItem.sale_price` (already documented) covers simple
   time-boxed promotional pricing; nothing more elaborate is needed yet.
-
-* Existing `Price` data must not be deleted or dropped during Pricing Foundation until migration
+- Existing `Price` data must not be deleted or dropped during Pricing Foundation until migration
   counts, resolver output, and representative before/after examples are verified and explicitly
   reported — the same safe-migration discipline already used for the legacy
   `product_variants.attributes` migration in Product Fields Foundation.
@@ -9471,10 +8766,9 @@ This decision is closed and must not be reopened without a documentation-level d
 per-price-list or per-customer data — a manufacturer's suggested retail price does not logically
 vary by which customer is asking. `ProductVariant` gains:
 
-* `recommended_retail_price_cache` (Decimal, nullable): reference/informational price shown to
+- `recommended_retail_price_cache` (Decimal, nullable): reference/informational price shown to
   customers for context. Never treated as the resolved sale price.
-
-* `base_price_cache` (Decimal, nullable): the final fallback tier of the documented
+- `base_price_cache` (Decimal, nullable): the final fallback tier of the documented
   `PriceResolver` priority, used only when no `PriceListItem` matches for either the customer's
   assigned list or the workspace default list.
 
@@ -9542,15 +8836,12 @@ This decision is closed and must not be reopened without a documentation-level d
 
 Canonical reservation statuses are:
 
-* `pending` — active soft reservation / temporary hold, counted against net availability while
+- `pending` — active soft reservation / temporary hold, counted against net availability while
   not expired.
-
-* `confirmed` — reservation was converted into a permanent stock deduction.
-
-* `cancelled` — reservation was explicitly released because the order/cart/manual process was
+- `confirmed` — reservation was converted into a permanent stock deduction.
+- `cancelled` — reservation was explicitly released because the order/cart/manual process was
   cancelled.
-
-* `expired` — reservation was released automatically after TTL.
+- `expired` — reservation was released automatically after TTL.
 
 `pending`, not `active`, is the canonical name for an active soft hold — this document's earlier
 use of "active" (and the pre-existing `ReservationStatus::Active` enum case in code) is renamed
@@ -9582,28 +8873,22 @@ fulfill orders, or stock inventory" — deliberately not limited to warehouses).
 
 In MVP:
 
-* `stocks` are linked to `inventory_locations` via `inventory_location_id`, replacing the
+- `stocks` are linked to `inventory_locations` via `inventory_location_id`, replacing the
   previous free-text `warehouse_name` column.
-
-* Existing `stocks.warehouse_name` values are migrated into `inventory_locations.name` records
+- Existing `stocks.warehouse_name` values are migrated into `inventory_locations.name` records
   (one location row per distinct existing name).
-
-* `available_quantity_cache` on `ProductVariant` remains a variant-level aggregate across all
+- `available_quantity_cache` on `ProductVariant` remains a variant-level aggregate across all
   locations — `AvailabilityResolver` returns aggregate variant availability, not per-location
   availability.
-
-* `InventoryReservation` (the `reservations` table) remains variant-level and does not allocate
+- `InventoryReservation` (the `reservations` table) remains variant-level and does not allocate
   a specific location.
-
-* `InventoryRecord` may store `inventory_location_id` (nullable) and `location_name_snapshot`
+- `InventoryRecord` may store `inventory_location_id` (nullable) and `location_name_snapshot`
   (nullable, historical label as it was named at the time of the event — not a live lookup) for
   audit purposes, in addition to the fields already documented (`source_type`,
   `source_reference_id`, `quantity_change`, `resulting_quantity`, `reason`).
-
-* Merchant-facing UI must not expose WMS terminology, location-routing logic, or any new
+- Merchant-facing UI must not expose WMS terminology, location-routing logic, or any new
   location-selection screens.
-
-* Pickup-point selection, per-location checkout allocation, per-location reservation, and
+- Pickup-point selection, per-location checkout allocation, per-location reservation, and
   location-aware delivery rules are explicitly future, separate work — not part of this task.
 
 This decision is closed and must not be reopened without a documentation-level decision.
@@ -9620,14 +8905,10 @@ and `order_items.id`.
 
 Availability Foundation (and any future Pricing Foundation work referencing the same columns)
 therefore uses bigint foreign keys for:
-
-* `inventory_records.product_variant_id`
-
-* `reservations.variant_id`
-
-* `reservations.order_id`
-
-* `reservations.order_item_id`
+- `inventory_records.product_variant_id`
+- `reservations.variant_id`
+- `reservations.order_id`
+- `reservations.order_item_id`
 
 Only `workspace_id` and `inventory_location_id` are UUID foreign keys in this and future
 Availability/Pricing work.
@@ -9644,33 +8925,33 @@ This decision is closed and must not be reopened without a documentation-level d
 
 The MVP B2B storefront domain must support:
 
-* category navigation;
+- category navigation;
 
-* search;
+- search;
 
-* sorting;
+- sorting;
 
-* table view;
+- table view;
 
-* grid/card view;
+- grid/card view;
 
-* cart;
+- cart;
 
-* order submission.
+- order submission.
 
 The MVP must not include:
 
-* website themes;
+- website themes;
 
-* full page builder;
+- full page builder;
 
-* CMS pages;
+- CMS pages;
 
-* blog;
+- blog;
 
-* marketplace-style seller discovery;
+- marketplace-style seller discovery;
 
-* advanced storefront customization.
+- advanced storefront customization.
 
 These capabilities belong to B2BChannel settings and storefront presentation rules.
 
@@ -9685,7 +8966,7 @@ This decision is closed and must not be changed without a documentation-level de
 **Naming note, checked against this document's existing content:** this document already has a
 `### Product Type` section describing `ProductType` as an internal template controlling which
 fields are shown/recommended/required for a product's structure (hidden in MVP, default "Basic
-Product"). **The new concept introduced here is deliberately named** **`Merchant Type`, not
+Product"). **The new concept introduced here is deliberately named `Merchant Type`, not
 `Type`, to avoid colliding with that existing, unrelated concept.** `Merchant Type` does not
 control fields, variants, required attributes, readiness rules, or attribute suggestions —
 that remains `ProductType`'s role, unchanged by this patch.
@@ -9695,13 +8976,12 @@ Attribute Sets, and commercetools' Product Types all converge on the same patter
 classification eventually involves **four** distinct, independently-purposed concepts — not a
 replacement of what already exists, but an addition alongside it:
 
-* **Merchant/Catalogue Category** (`categories`, already exists, unchanged): the existing
+- **Merchant/Catalogue Category** (`categories`, already exists, unchanged): the existing
   workspace-owned navigation tree. Per the already-Resolved "Category" and "B2B storefront
   category" decisions elsewhere in this document, this remains workspace-owned, and the
   platform continues to not require a global taxonomy for storefront navigation in MVP. **This
   patch does not change that decision.**
-
-* **Standard Category** (new concept, not yet implemented, not required for MVP): a
+- **Standard Category** (new concept, not yet implemented, not required for MVP): a
   standardized taxonomy node (Google Product Taxonomy / Shopify's open-source Standard Product
   Taxonomy — both freely available, ~10,000 categories), used for *readiness/export/attribute-
   suggestion* purposes only — not storefront navigation. This is what unlocks category-specific
@@ -9711,15 +8991,13 @@ replacement of what already exists, but an addition alongside it:
   Merchant/Catalogue Category, not replace it, and will most naturally live in the
   connector/channel-mapping layer already anticipated for marketplace taxonomy mapping (GAP-006),
   not as a change to the core `categories` table.
-
-* **Merchant Type** (new, free-form, optional — inspired by Shopify's custom "product type"
+- **Merchant Type** (new, free-form, optional — inspired by Shopify's custom "product type"
   field, distinct from this document's existing `ProductType` template concept as explained
   above): an unstructured internal label a merchant can set for their own organization, with no
   taxonomy backing and no attribute-unlocking behavior. Suggested future storage name:
   `products.merchant_type` or `products.custom_type` — deliberately not a generic `type` column,
   to keep it unambiguous in code as well as in docs.
-
-* **Tags** (new, free-form, optional, multiple per product): the loosest layer, for filtering/
+- **Tags** (new, free-form, optional, multiple per product): the loosest layer, for filtering/
   collections on top of Merchant/Catalogue Category — never a substitute for it.
 
 **When Standard Category is eventually built** (not now), it becomes mandatory for product
@@ -9771,13 +9049,13 @@ entities such as Order or Supplier) requires a cross-object foundation. This is
 new scope, not a reopening of the "Attribute storage model" decision above.
 
 **Chosen architecture — Option C (shared field registry, separate typed value
-storage), rejecting both Option A (generalize** **`AttributeDefinition`** **via an
-`entity_type`** **column) and Option B (a fully separate, parallel
-`CustomerAttributeDefinition`** **mechanism).**
+storage), rejecting both Option A (generalize `AttributeDefinition` via an
+`entity_type` column) and Option B (a fully separate, parallel
+`CustomerAttributeDefinition` mechanism).**
 
 For the full, current field lists of `FieldDefinition`, `FieldBinding`, and the
 three `*_field_values` tables — including `workspace_id` placement, the
-"one binding = one object\_type" rule replacing `value_level`, and the exact
+"one binding = one object_type" rule replacing `value_level`, and the exact
 value-table structure — see **"Field Dictionary Context"** earlier in this
 document. This section does not repeat those definitions; it records the
 decision rationale, what was rejected and why, and the sequencing.
@@ -9794,15 +9072,13 @@ near-identical, independently-drifting mechanisms instead of one shared
 registry.
 
 **Evidence used, honestly scoped:**
-
-* Shopify's `MetafieldDefinition.ownerType` confirms **object-scoped field
+- Shopify's `MetafieldDefinition.ownerType` confirms **object-scoped field
   definitions** as a real, shipped pattern — but Shopify itself uses one
   definition entity with an owner-type field, not a separate
   `FieldDefinition`/`FieldBinding` table split. The two-table split is this
   platform's own architectural choice (for value-table type-safety in
   Postgres/Laravel), not a literal copy of Shopify's implementation.
-
-* HubSpot's Properties UI (one page, object selector) and Data Sync field
+- HubSpot's Properties UI (one page, object selector) and Data Sync field
   mappings (`direction`, "Always use X" conflict rule) are useful product UX
   evidence for bidirectional ownership questions — but they do **not** force
   mandatory per-field `direction`/`authority` persistence onto this platform's
@@ -9818,28 +9094,25 @@ Connector Foundation (GAP-006).
 
 Current normative sync entities (minimum):
 
-* `SyncConfiguration` — account + data\_domain + external\_context; owns enabled
+- `SyncConfiguration` — account + data_domain + external_context; owns enabled
   semantic operations, selection, schedule state, effective mappings, and
   stable configuration revision.
-
-* `FieldMapping` — direction-neutral semantic correspondence
+- `FieldMapping` — direction-neutral semantic correspondence
   (`internal target` ↔ `external logical identity`) owned by
   SyncConfiguration. For Field Foundation-backed targets, reference
   `field_binding_id` (not a bare field code). Minimum FieldMapping does **not**
   require mandatory `direction`, per-field `authority`, snapshot-field FK
   identity, schema-source namespace, or one bidirectional transformation.
-
-* `SyncRun` / `SyncRunItem` — historical preview/live execution evidence for a
+- `SyncRun` / `SyncRunItem` — historical preview/live execution evidence for a
   SyncConfiguration revision; SyncRunItem is business-record outcome, not a
   transport attempt.
-
-* `ExternalRecordLink` — account-scoped external record id ↔ internal
+- `ExternalRecordLink` — account-scoped external record id ↔ internal
   Product/Customer/PriceList id, used for safe upsert instead of fuzzy/
   name-based matching. Not SyncConfiguration-scoped.
 
 Historical / deferred (not minimum sync domain):
 
-* Earlier draft placed mandatory `FieldMapping.direction` /
+- Earlier draft placed mandatory `FieldMapping.direction` /
   `FieldMapping.authority` and a `FieldSyncOverride` entity here. Per-field
   authority and per-record/field override workflow remain **deferred** until a
   verified product requirement exists. Domain-level ownership wording for
@@ -9918,6 +9191,7 @@ column name can be ambiguous across entity types (e.g. Product vs Customer).
 
 ### Billing scope
 
+
 Billing is a future context.
 
 The MVP may use simple workspace plan flags.
@@ -9925,6 +9199,7 @@ The MVP may use simple workspace plan flags.
 Full subscription billing should not block product, B2B and order MVP.
 
 ## Final Principle
+
 
 The domain model must make the platform powerful without making the product feel complicated.
 
@@ -9940,20 +9215,22 @@ The architecture must support future growth without forcing enterprise complexit
 
 ### CustomerGroup
 
+
 A CustomerGroup groups customers for pricing and visibility.
 
-* retail
+- retail
 
-* wholesale
+- wholesale
 
-* VIP
+- VIP
 
-* distributor
+- distributor
 
-* partner
+- partner
 
 A customer group may be connected to a price list, a discount rule, B2B visibility rules, and an access mode. For MVP, customer groups may remain simple.
 
 ### PricingRule
+
 
 A PricingRule represents a pricing adjustment layered on top of the resolved PriceListItem tier (customer discount, customer group discount, fixed customer price, margin-based adjustment, future quantity-based rule). The MVP does not need a complex pricing engine, but pricing logic must remain isolated inside the PriceResolver service rather than scattered across controllers. The result of price resolution should be stored as a snapshot in order items.
