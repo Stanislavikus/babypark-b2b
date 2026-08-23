@@ -476,6 +476,15 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     // -----------------------------------------------------------------
 
     #[Test]
+    public function invalid_review_evidence_factory_returns_invalid_review_evidence_reason(): void
+    {
+        $this->assertSame(
+            EntityTrustFailureReason::InvalidReviewEvidence,
+            EntityTrustException::invalidReviewEvidence()->reason,
+        );
+    }
+
+    #[Test]
     public function stale_remote_review_returns_remote_changed_failure_category(): void
     {
         [$account, $product] = $this->seedSimpleReadyFixture('CORR-STALE-REMOTE-SKU', 7020);

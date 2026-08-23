@@ -506,7 +506,7 @@ class Stage3ER2b1MerchantEntityTrustTest extends TestCase
             );
             $this->fail('Expected relink intent mismatch failure.');
         } catch (EntityTrustException $exception) {
-            $this->assertSame(EntityTrustFailureReason::ConfirmationExpiredOrInvalid, $exception->reason);
+            $this->assertSame(EntityTrustFailureReason::InvalidReviewEvidence, $exception->reason);
         }
     }
 
@@ -537,7 +537,7 @@ class Stage3ER2b1MerchantEntityTrustTest extends TestCase
             );
             $this->fail('Expected invalid envelope version failure.');
         } catch (EntityTrustException $exception) {
-            $this->assertSame(EntityTrustFailureReason::ConfirmationExpiredOrInvalid, $exception->reason);
+            $this->assertSame(EntityTrustFailureReason::InvalidReviewEvidence, $exception->reason);
         }
     }
 
