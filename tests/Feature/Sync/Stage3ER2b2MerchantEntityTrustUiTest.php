@@ -220,7 +220,7 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
     #[Test]
     public function relink_flow_uses_explicit_relink_path_and_passes_parent_sku_hint(): void
     {
-        [$account, $product,, $parentSku] = $this->seedConfigurableReadyFixture();
+        [$account, $product,, $parentSku] = $this->seedConfigurableRelinkRequiredFixture();
         $actor = $this->createEntityTrustActor($account->workspace);
 
         // The merchant sets the parent SKU hint through the livewire state
@@ -229,9 +229,11 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
         // is the entire point of the R2b-2 relink UX contract.
         Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertSet('entityTrustWorkingSet.0.available_action', 'relink')
             ->set("entityTrustRelinkParentSkuByProduct.{$product->id}", $parentSku)
             ->call('requestEntityTrustRelink', (string) $product->id)
-            ->assertSet('entityTrustReviewIsConfigurable', true);
+            ->assertSet('entityTrustReviewIsConfigurable', true)
+            ->assertSet('entityTrustOutcomeReadyForConfirmation', true);
     }
 
     #[Test]
@@ -409,6 +411,37 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
         ]);
 
         return [$account, $product, $variants, 'MERCHANT-PARENT-SKU'];
+    }
+
+    /**
+     * @return array{0: ConnectorAccount, 1: Product, 2: list<ProductVariant>, 3: string}
+     */
+    private function seedConfigurableRelinkRequiredFixture(): array
+    {
+        [$account, $product, $variants, $parentSku] = $this->seedConfigurableReadyFixture();
+
+        ExternalRecordLink::withoutWorkspaceScope()->create(
+            $this->merchantConfirmedParentLinkAttributes(
+                $account->workspace,
+                $account->id,
+                $product,
+                $parentSku,
+                '7777',
+                $this->createWorkspaceActor($account->workspace),
+            ),
+        );
+        ExternalRecordLink::withoutWorkspaceScope()->create(
+            $this->merchantConfirmedParentLinkAttributes(
+                $account->workspace,
+                $account->id,
+                $product,
+                'UI-OTHER-PARENT',
+                '7778',
+                $this->createWorkspaceActor($account->workspace),
+            ),
+        );
+
+        return [$account, $product, $variants, $parentSku];
     }
 
     /**
