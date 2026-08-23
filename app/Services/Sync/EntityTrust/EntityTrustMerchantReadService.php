@@ -24,7 +24,7 @@ final class EntityTrustMerchantReadService
     /**
      * @return list<array{
      *     product_id: string,
-     *     product_name: string,
+     *     productName: string,
      *     primary_sku: ?string,
      *     readiness: EntityTrustReadinessStatus,
      *     readiness_value: string,
@@ -52,7 +52,7 @@ final class EntityTrustMerchantReadService
     /**
      * @return array{
      *     product_id: string,
-     *     product_name: string,
+     *     productName: string,
      *     primary_sku: ?string,
      *     readiness: EntityTrustReadinessStatus,
      *     readiness_value: string,
@@ -70,7 +70,7 @@ final class EntityTrustMerchantReadService
 
         return [
             'product_id' => $item->productId,
-            'product_name' => $item->productName,
+            'productName' => $item->productName,
             'primary_sku' => $item->primarySku,
             'readiness' => $item->status,
             'readiness_value' => $item->status->value,

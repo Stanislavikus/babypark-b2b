@@ -223,10 +223,15 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
         [$account, $product,, $parentSku] = $this->seedConfigurableReadyFixture();
         $actor = $this->createEntityTrustActor($account->workspace);
 
+        // The merchant sets the parent SKU hint through the livewire state
+        // (bound by the form input). The Livewire method itself takes only
+        // the product id and reads the hint from the bound property — this
+        // is the entire point of the R2b-2 relink UX contract.
         Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->call('requestEntityTrustRelink', (string) $product->id, $parentSku)
-            ->assertSet('entityTrustRelinkParentSku', $parentSku);
+            ->set('entityTrustRelinkParentSku', $parentSku)
+            ->call('requestEntityTrustRelink', (string) $product->id)
+            ->assertSet('entityTrustReviewIsConfigurable', true);
     }
 
     #[Test]

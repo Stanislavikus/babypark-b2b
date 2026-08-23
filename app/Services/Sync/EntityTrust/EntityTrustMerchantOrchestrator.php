@@ -46,12 +46,12 @@ final class EntityTrustMerchantOrchestrator
         Workspace $workspace,
         ConnectorAccount $account,
         Product $product,
+        bool $isConfigurableFamily,
         bool $explicitRelink = false,
         ?string $existingParentSkuHint = null,
     ): EntityTrustMerchantOutcome {
         $productName = (string) $product->name;
         $primarySku = $product->variants[0]?->sku ?? null;
-        $isConfigurable = $this->guessIsConfigurable($product);
 
         try {
             $this->authorization->assertReviewOrConfirm($actor, $workspace);
@@ -73,7 +73,7 @@ final class EntityTrustMerchantOrchestrator
                 $product,
                 $productName,
                 $primarySku,
-                $isConfigurable,
+                $isConfigurableFamily,
                 $result,
                 $explicitRelink,
             );
@@ -85,7 +85,7 @@ final class EntityTrustMerchantOrchestrator
                 $product,
                 $productName,
                 $primarySku,
-                $isConfigurable,
+                $isConfigurableFamily,
                 $exception->reason,
             );
         } catch (AuthorizationException $exception) {
@@ -96,7 +96,7 @@ final class EntityTrustMerchantOrchestrator
                 $product,
                 $productName,
                 $primarySku,
-                $isConfigurable,
+                $isConfigurableFamily,
                 EntityTrustFailureReason::Unauthorized,
             );
         } catch (Throwable $exception) {
@@ -113,7 +113,7 @@ final class EntityTrustMerchantOrchestrator
                 $product,
                 $productName,
                 $primarySku,
-                $isConfigurable,
+                $isConfigurableFamily,
                 EntityTrustFailureReason::SafeSyncFailure,
             );
         }
@@ -124,15 +124,22 @@ final class EntityTrustMerchantOrchestrator
         Workspace $workspace,
         ConnectorAccount $account,
         Product $product,
-        string $newMagentoParentSku,
+        bool $isConfigurableFamily,
+        ?string $newMagentoParentSku,
     ): EntityTrustMerchantOutcome {
+        // For simple products the merchant does not (and must not) supply a
+        // Magento parent SKU; for configurable products the hint is mandatory
+        // when the trusted parent ERL is missing or when the relink is explicit.
+        $hint = $isConfigurableFamily ? $newMagentoParentSku : null;
+
         return $this->requestReview(
             $actor,
             $workspace,
             $account,
             $product,
+            isConfigurableFamily: $isConfigurableFamily,
             explicitRelink: true,
-            existingParentSkuHint: $newMagentoParentSku,
+            existingParentSkuHint: $hint,
         );
     }
 
@@ -141,11 +148,11 @@ final class EntityTrustMerchantOrchestrator
         Workspace $workspace,
         ConnectorAccount $account,
         Product $product,
+        bool $isConfigurableFamily,
         string $reviewFlowId,
     ): EntityTrustMerchantOutcome {
         $productName = (string) $product->name;
         $primarySku = $product->variants[0]?->sku ?? null;
-        $isConfigurable = $this->guessIsConfigurable($product);
 
         try {
             $this->authorization->assertReviewOrConfirm($actor, $workspace);
@@ -167,7 +174,7 @@ final class EntityTrustMerchantOrchestrator
                     $product,
                     $productName,
                     $primarySku,
-                    $isConfigurable,
+                    $isConfigurableFamily,
                     EntityTrustFailureReason::ConfirmationExpiredOrInvalid,
                     reviewFlowId: null,
                 );
@@ -190,7 +197,7 @@ final class EntityTrustMerchantOrchestrator
                 $product,
                 $productName,
                 $primarySku,
-                $isConfigurable,
+                $isConfigurableFamily,
                 $result->status,
             );
         } catch (EntityTrustException $exception) {
@@ -201,7 +208,7 @@ final class EntityTrustMerchantOrchestrator
                 $product,
                 $productName,
                 $primarySku,
-                $isConfigurable,
+                $isConfigurableFamily,
                 $exception->reason,
                 reviewFlowId: null,
             );
@@ -213,7 +220,7 @@ final class EntityTrustMerchantOrchestrator
                 $product,
                 $productName,
                 $primarySku,
-                $isConfigurable,
+                $isConfigurableFamily,
                 EntityTrustFailureReason::Unauthorized,
                 reviewFlowId: null,
             );
@@ -231,7 +238,7 @@ final class EntityTrustMerchantOrchestrator
                 $product,
                 $productName,
                 $primarySku,
-                $isConfigurable,
+                $isConfigurableFamily,
                 EntityTrustFailureReason::SafeSyncFailure,
                 reviewFlowId: null,
             );
@@ -276,7 +283,7 @@ final class EntityTrustMerchantOrchestrator
 
         return new EntityTrustMerchantOutcome(
             product_id: (string) $product->id,
-            product_name: $productName,
+            productName: $productName,
             primary_sku: $primarySku,
             is_configurable_family: $isConfigurable,
             reason: $result->status,
@@ -306,7 +313,7 @@ final class EntityTrustMerchantOrchestrator
 
         return new EntityTrustMerchantOutcome(
             product_id: (string) $product->id,
-            product_name: $productName,
+            productName: $productName,
             primary_sku: $primarySku,
             is_configurable_family: $isConfigurable,
             reason: $reason,
@@ -337,7 +344,7 @@ final class EntityTrustMerchantOrchestrator
 
         return new EntityTrustMerchantOutcome(
             product_id: (string) $product->id,
-            product_name: $productName,
+            productName: $productName,
             primary_sku: $primarySku,
             is_configurable_family: $isConfigurable,
             reason: $reason,
@@ -358,27 +365,6 @@ final class EntityTrustMerchantOrchestrator
             || ! $this->workspaceAuthorization->allows($actor, $workspace, 'run_sync_live')) {
             throw EntityTrustException::unauthorized();
         }
-    }
-
-    private function guessIsConfigurable(Product $product): bool
-    {
-        $variants = $product->variants ?? null;
-
-        if (! is_iterable($variants)) {
-            return false;
-        }
-
-        $count = 0;
-
-        foreach ($variants as $variant) {
-            $count++;
-
-            if ($count > 1) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

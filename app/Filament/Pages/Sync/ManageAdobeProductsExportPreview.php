@@ -3,6 +3,7 @@
 namespace App\Filament\Pages\Sync;
 
 use App\Enums\EntityTrust\EntityTrustFailureReason;
+use App\Enums\EntityTrust\EntityTrustReadinessStatus;
 use App\Enums\SyncLiveMerchantLifecycleState;
 use App\Enums\SyncLiveWorklistFilter;
 use App\Enums\SyncPreviewMerchantPageState;
@@ -159,8 +160,30 @@ class ManageAdobeProductsExportPreview extends Page
     #[Locked]
     public ?string $entityTrustReviewFlowId = null;
 
-    #[Locked]
+    /**
+     * Merchant-typed parent Magento SKU hint used by a configurable Relink
+     * Review. Bound to the relink input via wire:model.live. Cleared by
+     * reviewEntityTrustReview and resetEntityTrustActiveReviewState. Not
+     * locked: the merchant must be able to type into the input.
+     */
     public ?string $entityTrustRelinkParentSku = null;
+
+    /**
+     * Merchant-typed parent Magento SKU hint used by an InitialLinkRequired
+     * Review on a configurable family. Server-side authoritative intent
+     * decides whether this hint is actually applied. Bound to the initial
+     * parent input via wire:model.live. Not locked: the merchant must be
+     * able to type into the input.
+     */
+    public ?string $entityTrustInitialLinkParentSku = null;
+
+    /**
+     * Authoritative R2b-1 family flag for the active product, lifted from
+     * the working set row. Required by the orchestrator to choose between
+     * SimpleVariant and ConfigurableExistingParent paths without relying on
+     * a guessed heuristic. Cleared on every reset.
+     */
+    public bool $entityTrustReviewIsConfigurable = false;
 
     /** @var list<array<string, mixed>> */
     public array $entityTrustWorkingSet = [];
@@ -463,23 +486,70 @@ class ManageAdobeProductsExportPreview extends Page
 
     public function requestEntityTrustReview(string $productId): void
     {
+        $row = $this->findEntityTrustWorkingSetRow($productId);
+
+        // If the actor has lost the working set (e.g. a stale review from
+        // before a refresh) we still call into the orchestrator with
+        // authoritative defaults: simple family, no hint. The orchestrator
+        // surfaces an Unauthorized / stale-review failure if the actor is no
+        // longer entitled, which is the correct merchant-safe behavior.
+        $isConfigurable = (bool) ($row['is_configurable_family'] ?? false);
+        $readiness = (string) ($row['readiness_value'] ?? '');
+
+        // For an InitialLinkRequired review on a configurable family the
+        // merchant may have supplied an existing Magento parent SKU. R2b-1
+        // requires that hint; without it the resolver fails closed. We
+        // forward whatever the merchant typed (or null) — never a made-up
+        // value. If a trusted parent already supplies the authoritative SKU
+        // the hint is ignored by the intent resolver, so this never asks the
+        // merchant to provide a meaningless replacement.
+        $hint = null;
+        if ($isConfigurable && $readiness === EntityTrustReadinessStatus::InitialLinkRequired->value) {
+            $hint = $this->entityTrustInitialLinkParentSku;
+        }
+
+        $this->entityTrustReviewIsConfigurable = $isConfigurable;
+        $this->entityTrustRelinkParentSku = null;
+
         $this->dispatchEntityTrustOrchestrator(
-            function (EntityTrustMerchantOrchestrator $orchestrator, User $user, Workspace $workspace, ConnectorAccount $account, Product $product): EntityTrustMerchantOutcome {
-                return $orchestrator->requestReview($user, $workspace, $account, $product);
+            function (EntityTrustMerchantOrchestrator $orchestrator, User $user, Workspace $workspace, ConnectorAccount $account, Product $product) use ($isConfigurable, $hint): EntityTrustMerchantOutcome {
+                return $orchestrator->requestReview(
+                    $user,
+                    $workspace,
+                    $account,
+                    $product,
+                    isConfigurableFamily: $isConfigurable,
+                    explicitRelink: false,
+                    existingParentSkuHint: $hint,
+                );
             },
             $productId,
-            entityTrustRelinkParentSku: null,
         );
     }
 
-    public function requestEntityTrustRelink(string $productId, string $newMagentoParentSku): void
+    public function requestEntityTrustRelink(string $productId): void
     {
+        $row = $this->findEntityTrustWorkingSetRow($productId);
+        $isConfigurable = (bool) ($row['is_configurable_family'] ?? false);
+
+        $merchantSuppliedParentSku = $isConfigurable
+            ? $this->entityTrustRelinkParentSku
+            : null;
+
+        $this->entityTrustReviewIsConfigurable = $isConfigurable;
+
         $this->dispatchEntityTrustOrchestrator(
-            function (EntityTrustMerchantOrchestrator $orchestrator, User $user, Workspace $workspace, ConnectorAccount $account, Product $product) use ($newMagentoParentSku): EntityTrustMerchantOutcome {
-                return $orchestrator->requestRelink($user, $workspace, $account, $product, $newMagentoParentSku);
+            function (EntityTrustMerchantOrchestrator $orchestrator, User $user, Workspace $workspace, ConnectorAccount $account, Product $product) use ($isConfigurable, $merchantSuppliedParentSku): EntityTrustMerchantOutcome {
+                return $orchestrator->requestRelink(
+                    $user,
+                    $workspace,
+                    $account,
+                    $product,
+                    isConfigurableFamily: $isConfigurable,
+                    newMagentoParentSku: $merchantSuppliedParentSku,
+                );
             },
             $productId,
-            entityTrustRelinkParentSku: $newMagentoParentSku,
         );
     }
 
@@ -494,6 +564,10 @@ class ManageAdobeProductsExportPreview extends Page
 
             return;
         }
+
+        // Lift the family flag from the active review state so the
+        // orchestrator never has to re-derive it from a heuristic.
+        $isConfigurable = $this->entityTrustReviewIsConfigurable;
 
         $user = Auth::user();
         abort_unless($user instanceof User, 403);
@@ -528,7 +602,8 @@ class ManageAdobeProductsExportPreview extends Page
             $workspace,
             $account,
             $product,
-            $flowId,
+            isConfigurableFamily: $isConfigurable,
+            reviewFlowId: $flowId,
         );
 
         $this->applyEntityTrustOutcome($outcome, previousFlowId: $flowId);
@@ -552,7 +627,6 @@ class ManageAdobeProductsExportPreview extends Page
     private function dispatchEntityTrustOrchestrator(
         Closure $callback,
         string $productId,
-        ?string $entityTrustRelinkParentSku,
     ): void {
         $user = Auth::user();
         abort_unless($user instanceof User, 403);
@@ -588,7 +662,6 @@ class ManageAdobeProductsExportPreview extends Page
             // Unauthorized outcome through the orchestrator so the merchant
             // gets a copy-keyed Security category, not an HTTP abort.
             $this->entityTrustProductId = $product->id;
-            $this->entityTrustRelinkParentSku = $entityTrustRelinkParentSku;
             $this->applyEntityTrustOutcome(
                 $this->makeUnauthorizedOutcomeForNoAccount((string) $product->id),
                 previousFlowId: null,
@@ -598,7 +671,6 @@ class ManageAdobeProductsExportPreview extends Page
         }
 
         $this->entityTrustProductId = $product->id;
-        $this->entityTrustRelinkParentSku = $entityTrustRelinkParentSku;
 
         $outcome = $callback(
             app(EntityTrustMerchantOrchestrator::class),
@@ -611,6 +683,26 @@ class ManageAdobeProductsExportPreview extends Page
         $this->applyEntityTrustOutcome($outcome, previousFlowId: null);
     }
 
+    /**
+     * Find a working set row for the given product. Returns an empty array
+     * (not null) when the row is not present, so the caller can read fields
+     * with `??` defaults. The working set is the only authoritative source
+     * of `is_configurable_family` and the readiness value at the moment a
+     * review/relink is requested.
+     *
+     * @return array<string, mixed>
+     */
+    private function findEntityTrustWorkingSetRow(string $productId): array
+    {
+        foreach ($this->entityTrustWorkingSet as $row) {
+            if (($row['product_id'] ?? null) === $productId) {
+                return $row;
+            }
+        }
+
+        return [];
+    }
+
     private function makeUnauthorizedOutcomeForNoAccount(string $productId): EntityTrustMerchantOutcome
     {
         $presenter = app(EntityTrustFailureReasonPresenter::class);
@@ -619,7 +711,7 @@ class ManageAdobeProductsExportPreview extends Page
 
         return new EntityTrustMerchantOutcome(
             product_id: $productId,
-            product_name: '',
+            productName: '',
             primary_sku: null,
             is_configurable_family: false,
             reason: EntityTrustFailureReason::Unauthorized,
@@ -646,7 +738,7 @@ class ManageAdobeProductsExportPreview extends Page
         $this->entityTrustOutcomeLabel = __($outcome->label_key);
         $this->entityTrustOutcomeExplanation = __($outcome->explanation_key);
         $this->entityTrustOutcomeAction = $outcome->available_action;
-        $this->entityTrustOutcomeProductName = $outcome->product_name;
+        $this->entityTrustOutcomeProductName = $outcome->productName;
         $this->entityTrustOutcomePrimarySku = $outcome->primary_sku;
         $this->entityTrustOutcomeIsConfigurable = $outcome->is_configurable_family;
         $this->entityTrustOutcomeAvailableAction = $outcome->available_action;
@@ -697,7 +789,6 @@ class ManageAdobeProductsExportPreview extends Page
         foreach ($outcome->subjects as $subject) {
             $rows[] = [
                 'role' => $subject->role,
-                'subject_key' => $subject->subject_key,
                 'expected_sku' => $subject->expected_sku,
                 'magento_type_label' => __($subject->magento_type_label),
                 'platform_name' => $subject->platform_name,
@@ -705,7 +796,6 @@ class ManageAdobeProductsExportPreview extends Page
                 'declared_roles_summary' => $subject->declared_roles_summary,
                 'field_comparisons' => array_map(
                     static fn ($c): array => [
-                        'field_key' => $c->field_key,
                         'label' => $c->label,
                         'platform_value' => $c->platform_value,
                         'remote_value' => $c->remote_value,
@@ -781,6 +871,8 @@ class ManageAdobeProductsExportPreview extends Page
         $this->entityTrustProductId = null;
         $this->entityTrustReviewFlowId = null;
         $this->entityTrustRelinkParentSku = null;
+        $this->entityTrustInitialLinkParentSku = null;
+        $this->entityTrustReviewIsConfigurable = false;
 
         $this->entityTrustOutcomeCategory = null;
         $this->entityTrustOutcomeLabel = null;

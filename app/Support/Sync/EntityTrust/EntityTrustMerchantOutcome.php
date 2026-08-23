@@ -28,7 +28,7 @@ final readonly class EntityTrustMerchantOutcome
      */
     public function __construct(
         public string $product_id,
-        public string $product_name,
+        public string $productName,
         public ?string $primary_sku,
         public bool $is_configurable_family,
         public EntityTrustFailureReason $reason,

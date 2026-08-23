@@ -3,8 +3,10 @@
   Per-item Live Linking inside the Live area of ManageAdobeProductsExportPreview.
 
   Truthfully shows the per-Product Entity Trust readiness and lets the merchant:
-    1. Start a fresh review (simple variant, or configurable with parent SKU hint)
-    2. Start an explicit relink to a different Magento parent
+    1. Start a fresh review (simple variant, or configurable with optional parent
+       SKU hint when a trusted parent is not yet known)
+    2. Start an explicit relink to a different Magento parent (configurable
+       with parent SKU input; simple as a separate action with no SKU input)
     3. Confirm a successful review (opaque flow id; no real token ever in DOM)
     4. Cancel a stale review
 
@@ -123,6 +125,21 @@
                       {{ $subject['magento_type_label'] }}
                     </td>
                     <td colspan="3" class="px-2 py-1">
+                      @if (! is_null($subject['declared_image_count']) || ! is_null($subject['declared_roles_summary']))
+                        <p
+                          class="mb-1 text-xs text-gray-500 dark:text-gray-400"
+                          data-testid="sync-live-entity-trust-subject-media-summary"
+                        >
+                          @if ($subject['declared_image_count'] === 0 && empty($subject['declared_roles_summary']))
+                            {{ __('entity_trust.subjects.media_summary.empty') }}
+                          @else
+                            {{ __('entity_trust.subjects.media_summary.label', [
+                                'count' => (int) ($subject['declared_image_count'] ?? 0),
+                                'roles' => (string) ($subject['declared_roles_summary'] ?? '—'),
+                            ]) }}
+                          @endif
+                        </p>
+                      @endif
                       @if (count($subject['field_comparisons']) > 0)
                         <table class="w-full">
                           <tbody>
@@ -157,17 +174,36 @@
           </div>
         @endif
 
-        @if ($entityTrustActiveExtraChildrenAvailable && count($entityTrustActiveExtraChildSkus) > 0)
+        @if ($entityTrustActiveExtraChildrenAvailable)
+          @if (count($entityTrustActiveExtraChildSkus) > 0)
+            <div
+              class="rounded border border-warning-300 bg-warning-50 p-2 text-xs text-warning-800 dark:border-warning-700 dark:bg-warning-950/30 dark:text-warning-200"
+              data-testid="sync-live-entity-trust-extra-children"
+              data-extra-children-state="available-non-empty"
+            >
+              {{ __('entity_trust.extra_children.notice', ['count' => count($entityTrustActiveExtraChildSkus)]) }}
+              <ul class="mt-1 list-disc pl-4">
+                @foreach ($entityTrustActiveExtraChildSkus as $extraChildSku)
+                  <li>{{ $extraChildSku }}</li>
+                @endforeach
+              </ul>
+            </div>
+          @else
+            <div
+              class="rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-700 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-200"
+              data-testid="sync-live-entity-trust-extra-children"
+              data-extra-children-state="available-empty"
+            >
+              {{ __('entity_trust.extra_children.empty_notice') }}
+            </div>
+          @endif
+        @else
           <div
-            class="rounded border border-warning-300 bg-warning-50 p-2 text-xs text-warning-800 dark:border-warning-700 dark:bg-warning-950/30 dark:text-warning-200"
+            class="rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-400"
             data-testid="sync-live-entity-trust-extra-children"
+            data-extra-children-state="unavailable"
           >
-            {{ __('entity_trust.extra_children.notice', ['count' => count($entityTrustActiveExtraChildSkus)]) }}
-            <ul class="mt-1 list-disc pl-4">
-              @foreach ($entityTrustActiveExtraChildSkus as $extraChildSku)
-                <li>{{ $extraChildSku }}</li>
-              @endforeach
-            </ul>
+            {{ __('entity_trust.extra_children.unavailable_notice') }}
           </div>
         @endif
 
@@ -232,16 +268,24 @@
         </thead>
         <tbody>
           @forelse ($entityTrustWorkingSet as $row)
+            @php
+              $rowIsConfigurable = (bool) ($row['is_configurable_family'] ?? false);
+              $rowReadiness = (string) ($row['readiness_value'] ?? '');
+              $rowAvailableAction = (string) ($row['available_action'] ?? 'none');
+              $showInitialParentInput = $rowIsConfigurable
+                  && $rowReadiness === \App\Enums\EntityTrust\EntityTrustReadinessStatus::InitialLinkRequired->value
+                  && $rowAvailableAction === 'review';
+            @endphp
             <tr
               class="border-b border-gray-100 align-top dark:border-gray-800"
               data-testid="sync-live-entity-trust-row"
               data-product-id="{{ $row['product_id'] }}"
               data-readiness="{{ $row['readiness_value'] }}"
-              data-configurable="{{ $row['is_configurable_family'] ? '1' : '0' }}"
+              data-configurable="{{ $rowIsConfigurable ? '1' : '0' }}"
             >
               <td class="px-3 py-3" data-testid="sync-live-entity-trust-row-product">
                 <div class="space-y-1">
-                  <p class="font-medium text-gray-900 dark:text-gray-100">{{ $row['product_name'] }}</p>
+                  <p class="font-medium text-gray-900 dark:text-gray-100">{{ $row['productName'] }}</p>
                   @if (! empty($row['primary_sku']))
                     <p class="text-xs text-gray-500 dark:text-gray-400">{{ $row['primary_sku'] }}</p>
                   @endif
@@ -255,42 +299,99 @@
               </td>
               <td class="px-3 py-3" data-testid="sync-live-entity-trust-row-actions">
                 <div class="flex flex-col gap-2">
-                  @if ($row['available_action'] === 'review' && $entityTrustCanReviewOrConfirm)
-                    <x-filament::button
-                      size="xs"
-                      wire:click="requestEntityTrustReview('{{ $row['product_id'] }}')"
-                      color="primary"
-                      data-testid="sync-live-entity-trust-action-review"
-                    >
-                      {{ __('entity_trust.actions.review') }}
-                    </x-filament::button>
-                  @elseif ($row['available_action'] === 'relink' && $entityTrustCanReviewOrConfirm)
+                  @if ($rowAvailableAction === 'review' && $entityTrustCanReviewOrConfirm)
                     <form
                       class="flex flex-col gap-1"
-                      data-testid="sync-live-entity-trust-relink-form"
-                      wire:submit.prevent="requestEntityTrustRelink('{{ $row['product_id'] }}', $event.target.querySelector('[data-relink-sku]').value)"
+                      data-testid="sync-live-entity-trust-review-form"
+                      data-family="{{ $rowIsConfigurable ? 'configurable' : 'simple' }}"
+                      wire:submit.prevent="requestEntityTrustReview('{{ $row['product_id'] }}')"
                     >
-                      <label class="text-xs text-gray-500 dark:text-gray-400">
-                        {{ __('entity_trust.actions.relink_label') }}
-                      </label>
-                      <input
-                        type="text"
-                        name="newMagentoParentSku"
-                        data-relink-sku
-                        data-testid="sync-live-entity-trust-relink-input"
-                        class="rounded border-gray-300 text-xs dark:border-gray-700 dark:bg-gray-900"
-                        placeholder="{{ __('entity_trust.actions.relink_placeholder') }}"
-                        required
-                      />
+                      @if ($showInitialParentInput)
+                        <label
+                          for="entity-trust-initial-parent-sku-{{ $row['product_id'] }}"
+                          class="text-xs text-gray-500 dark:text-gray-400"
+                          data-testid="sync-live-entity-trust-initial-parent-label"
+                        >
+                          {{ __('entity_trust.actions.initial_parent_label') }}
+                        </label>
+                        <input
+                          id="entity-trust-initial-parent-sku-{{ $row['product_id'] }}"
+                          type="text"
+                          wire:model.live="entityTrustInitialLinkParentSku"
+                          data-testid="sync-live-entity-trust-initial-parent-input"
+                          class="rounded border-gray-300 text-xs dark:border-gray-700 dark:bg-gray-900"
+                          placeholder="{{ __('entity_trust.actions.initial_parent_placeholder') }}"
+                        />
+                        <p
+                          class="text-xs text-gray-500 dark:text-gray-400"
+                          data-testid="sync-live-entity-trust-initial-parent-help"
+                        >
+                          {{ __('entity_trust.actions.initial_parent_help') }}
+                        </p>
+                      @endif
                       <x-filament::button
                         size="xs"
                         type="submit"
-                        color="warning"
-                        data-testid="sync-live-entity-trust-action-relink"
+                        color="primary"
+                        data-testid="sync-live-entity-trust-action-review"
                       >
-                        {{ __('entity_trust.actions.relink') }}
+                        {{ __('entity_trust.actions.review') }}
                       </x-filament::button>
                     </form>
+                  @elseif ($rowAvailableAction === 'relink' && $entityTrustCanReviewOrConfirm)
+                    @if ($rowIsConfigurable)
+                      <form
+                        class="flex flex-col gap-1"
+                        data-testid="sync-live-entity-trust-relink-form"
+                        data-family="configurable"
+                        wire:submit.prevent="requestEntityTrustRelink('{{ $row['product_id'] }}')"
+                      >
+                        <label
+                          for="entity-trust-relink-sku-{{ $row['product_id'] }}"
+                          class="text-xs text-gray-500 dark:text-gray-400"
+                        >
+                          {{ __('entity_trust.actions.relink_label') }}
+                        </label>
+                        <input
+                          id="entity-trust-relink-sku-{{ $row['product_id'] }}"
+                          type="text"
+                          wire:model.live="entityTrustRelinkParentSku"
+                          data-testid="sync-live-entity-trust-relink-input"
+                          class="rounded border-gray-300 text-xs dark:border-gray-700 dark:bg-gray-900"
+                          placeholder="{{ __('entity_trust.actions.relink_placeholder') }}"
+                          required
+                        />
+                        <x-filament::button
+                          size="xs"
+                          type="submit"
+                          color="warning"
+                          data-testid="sync-live-entity-trust-action-relink"
+                        >
+                          {{ __('entity_trust.actions.relink') }}
+                        </x-filament::button>
+                      </form>
+                    @else
+                      <div
+                        class="flex flex-col gap-1"
+                        data-testid="sync-live-entity-trust-relink-simple"
+                        data-family="simple"
+                      >
+                        <p
+                          class="text-xs text-gray-500 dark:text-gray-400"
+                          data-testid="sync-live-entity-trust-relink-simple-help"
+                        >
+                          {{ __('entity_trust.actions.relink_simple_help') }}
+                        </p>
+                        <x-filament::button
+                          size="xs"
+                          wire:click="requestEntityTrustRelink('{{ $row['product_id'] }}')"
+                          color="warning"
+                          data-testid="sync-live-entity-trust-action-relink"
+                        >
+                          {{ __('entity_trust.actions.relink_simple') }}
+                        </x-filament::button>
+                      </div>
+                    @endif
                   @else
                     <p class="text-xs text-gray-500 dark:text-gray-400">
                       {{ __('entity_trust.working_set.no_action') }}
