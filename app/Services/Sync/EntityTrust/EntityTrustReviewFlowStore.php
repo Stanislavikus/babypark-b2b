@@ -18,7 +18,8 @@ use Illuminate\Support\Facades\Cache;
  * and Product that created it; stale or mismatched retrievals fail closed.
  *
  * No database table, no new migration. The cache is the Laravel configured
- * cache store (file/redis/database) with a namespaced key prefix.
+ * cache store with a namespaced key prefix. Production must use a lock-capable
+ * shared backend (for this project: `database`).
  */
 final class EntityTrustReviewFlowStore
 {
@@ -33,8 +34,9 @@ final class EntityTrustReviewFlowStore
     /**
      * The lock key used to serialize concurrent consume() callers. Separate
      * from the data key so the lock TTL can be tight (5s) while the payload
-     * TTL stays at 10 min. Any backend that supports Illuminate\Cache\LockProvider
-     * (file, redis, memcached, database, array) is acceptable.
+     * TTL stays at 10 min. This is intended for lock-capable shared backends
+     * such as database/redis/file; in-memory test stores are not a production
+     * concurrency guarantee.
      */
     private const int CONSUME_LOCK_TTL_SECONDS = 5;
 
@@ -51,6 +53,7 @@ final class EntityTrustReviewFlowStore
         string $productId,
         string $reviewToken,
         EntityTrustConfirmationMode $mode,
+        bool $isConfigurableFamily,
         ?string $existingParentSkuHint,
         bool $explicitRelink,
     ): string {
@@ -63,6 +66,7 @@ final class EntityTrustReviewFlowStore
             productId: $productId,
             reviewToken: $reviewToken,
             mode: $mode,
+            isConfigurableFamily: $isConfigurableFamily,
             existingParentSkuHint: $existingParentSkuHint,
             explicitRelink: $explicitRelink,
         );

@@ -22,6 +22,7 @@ final readonly class EntityTrustReviewFlowPayload
         public string $productId,
         public string $reviewToken,
         public EntityTrustConfirmationMode $mode,
+        public bool $isConfigurableFamily,
         public ?string $existingParentSkuHint,
         public bool $explicitRelink,
     ) {}

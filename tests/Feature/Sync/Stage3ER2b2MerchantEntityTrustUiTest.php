@@ -229,7 +229,7 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
         // is the entire point of the R2b-2 relink UX contract.
         Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->set('entityTrustRelinkParentSku', $parentSku)
+            ->set("entityTrustRelinkParentSkuByProduct.{$product->id}", $parentSku)
             ->call('requestEntityTrustRelink', (string) $product->id)
             ->assertSet('entityTrustReviewIsConfigurable', true);
     }
@@ -301,7 +301,7 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
     }
 
     #[Test]
-    public function flow_store_consume_is_single_use_and_validates_binding(): void
+    public function flow_store_is_single_use_after_successful_consume(): void
     {
         [$account, $product] = $this->seedSimpleReadyFixture('UI-FLOWSTORE-SKU', 5270);
         $actor = $this->createEntityTrustActor($account->workspace);
@@ -316,6 +316,7 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
             (string) $product->id,
             'test-token',
             EntityTrustConfirmationMode::SimpleVariant,
+            false,
             null,
             false,
         );
@@ -327,8 +328,8 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
         $second = $store->consume($actor, $workspace, $account->id, (string) $product->id, $flowId);
         $this->assertNull($second);
 
-        $mismatched = $store->consume($actor, $workspace, $account->id, 'wrong-product', $flowId);
-        $this->assertNull($mismatched);
+        $replayed = $store->consume($actor, $workspace, $account->id, 'wrong-product', $flowId);
+        $this->assertNull($replayed);
     }
 
     #[Test]

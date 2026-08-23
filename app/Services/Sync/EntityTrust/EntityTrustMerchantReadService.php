@@ -50,6 +50,38 @@ final class EntityTrustMerchantReadService
     }
 
     /**
+     * Re-project a single product row from the current server-side working set.
+     * Returns null when the product is not currently part of the actor/account
+     * projection, so the caller can fail closed without trusting browser state.
+     *
+     * @return array{
+     *     product_id: string,
+     *     productName: string,
+     *     primary_sku: ?string,
+     *     readiness: EntityTrustReadinessStatus,
+     *     readiness_value: string,
+     *     is_configurable_family: bool,
+     *     ready_label: string,
+     *     ready_explanation: string,
+     *     available_action: string,
+     * }|null
+     */
+    public function resolveWorkingSetRow(
+        User $actor,
+        Workspace $workspace,
+        ConnectorAccount $account,
+        string $productId,
+    ): ?array {
+        foreach ($this->workingSet($actor, $workspace, $account) as $row) {
+            if (($row['product_id'] ?? null) === $productId) {
+                return $row;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * @return array{
      *     product_id: string,
      *     productName: string,

@@ -502,6 +502,9 @@ slices plus remaining truth-flip prerequisites.
   a Livewire public property: review state lives in a server-side
   `EntityTrustReviewFlowStore` keyed by an opaque short-lived
   `EntityTrustReviewFlowId` (10-minute TTL, single-consume on Confirm).
+  Hydrated working-set rows, family flags, and parent-SKU fields are
+  presentation/merchant-input only; product eligibility, readiness, family
+  routing, and confirm binding remain server-derived or flow-bound authority.
   `existingParentSkuHint` merchant input is wired through
   `EntityTrustConfirmationMode::ConfigurableExistingParent`. Comprehensive
   R2b-2 feature tests cover authorization, readiness, review-flow security,

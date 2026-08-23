@@ -160,28 +160,15 @@ class ManageAdobeProductsExportPreview extends Page
     #[Locked]
     public ?string $entityTrustReviewFlowId = null;
 
-    /**
-     * Merchant-typed parent Magento SKU hint used by a configurable Relink
-     * Review. Bound to the relink input via wire:model.live. Cleared by
-     * reviewEntityTrustReview and resetEntityTrustActiveReviewState. Not
-     * locked: the merchant must be able to type into the input.
-     */
-    public ?string $entityTrustRelinkParentSku = null;
+    /** @var array<string, ?string> */
+    public array $entityTrustRelinkParentSkuByProduct = [];
+
+    /** @var array<string, ?string> */
+    public array $entityTrustInitialLinkParentSkuByProduct = [];
 
     /**
-     * Merchant-typed parent Magento SKU hint used by an InitialLinkRequired
-     * Review on a configurable family. Server-side authoritative intent
-     * decides whether this hint is actually applied. Bound to the initial
-     * parent input via wire:model.live. Not locked: the merchant must be
-     * able to type into the input.
-     */
-    public ?string $entityTrustInitialLinkParentSku = null;
-
-    /**
-     * Authoritative R2b-1 family flag for the active product, lifted from
-     * the working set row. Required by the orchestrator to choose between
-     * SimpleVariant and ConfigurableExistingParent paths without relying on
-     * a guessed heuristic. Cleared on every reset.
+     * Presentation-only flag for the currently displayed review result.
+     * The server must not trust this hydrated property for confirm routing.
      */
     public bool $entityTrustReviewIsConfigurable = false;
 
@@ -256,13 +243,13 @@ class ManageAdobeProductsExportPreview extends Page
     {
         $user = Auth::user();
         $workspace = app(WorkspaceContext::class)->current();
+        $accountId = isset($parameters['account']) ? (string) $parameters['account'] : null;
 
         if (! $user instanceof User) {
             return false;
         }
 
-        return app(AdobeProductsExportPreviewAuthorizationService::class)->canAccess($user, $workspace)
-            || app(AdobeProductsExportLiveAuthorizationService::class)->canAccessLive($user, $workspace);
+        return static::canAccessManagementSurface($user, $workspace, $accountId);
     }
 
     public function getTitle(): string|Htmlable
@@ -278,12 +265,7 @@ class ManageAdobeProductsExportPreview extends Page
         $workspace = $this->resolveAdobeProductsExportExecutionWorkspace();
         $this->accountId = $account;
 
-        $previewEligible = app(AdobeProductsExportPreviewAuthorizationService::class)
-            ->isEligiblePreviewTarget($user, $workspace, $account);
-        $liveEligible = app(AdobeProductsExportLiveAuthorizationService::class)
-            ->isEligibleLiveTarget($user, $workspace, $account);
-
-        if (! $previewEligible && ! $liveEligible) {
+        if (! static::canAccessManagementSurface($user, $workspace, $account)) {
             abort(403);
         }
 
@@ -435,11 +417,12 @@ class ManageAdobeProductsExportPreview extends Page
         $previewAuth = app(AdobeProductsExportPreviewAuthorizationService::class);
         $liveAuth = app(AdobeProductsExportLiveAuthorizationService::class);
 
-        if (! $previewAuth->canAccess($user, $workspace) && ! $liveAuth->canAccessLive($user, $workspace)) {
+        if (! static::canAccessManagementSurface($user, $workspace, $this->accountId)) {
             abort(403);
         }
 
-        $this->canManageSetup = false;
+        $this->canManageSetup = $previewAuth->canManageSetup($user, $workspace)
+            || $liveAuth->canManageSetup($user, $workspace);
 
         $this->previewSectionVisible = $previewAuth->isEligiblePreviewTarget($user, $workspace, $this->accountId);
         $this->liveSectionVisible = $liveAuth->isEligibleLiveTarget($user, $workspace, $this->accountId);
@@ -458,7 +441,17 @@ class ManageAdobeProductsExportPreview extends Page
 
         $this->applyCommonActiveRunGate($workspace);
 
-        if (! $this->previewSectionVisible && $this->liveSectionVisible) {
+        if (! $this->previewSectionVisible && ! $this->liveSectionVisible && $this->canManageSetup) {
+            $projection = app(ConnectorAccountLayerBSetupProjectionQuery::class)
+                ->resolve($workspace->id, $this->accountId);
+
+            if ($projection === null) {
+                abort(403);
+            }
+
+            $this->platformName = $projection->platformName;
+            $this->accountName = $projection->accountName;
+        } elseif (! $this->previewSectionVisible && $this->liveSectionVisible) {
             $projection = app(ConnectorAccountLayerBSetupProjectionQuery::class)
                 ->resolve($workspace->id, $this->accountId);
 
@@ -486,33 +479,25 @@ class ManageAdobeProductsExportPreview extends Page
 
     public function requestEntityTrustReview(string $productId): void
     {
-        $row = $this->findEntityTrustWorkingSetRow($productId);
-
-        // If the actor has lost the working set (e.g. a stale review from
-        // before a refresh) we still call into the orchestrator with
-        // authoritative defaults: simple family, no hint. The orchestrator
-        // surfaces an Unauthorized / stale-review failure if the actor is no
-        // longer entitled, which is the correct merchant-safe behavior.
-        $isConfigurable = (bool) ($row['is_configurable_family'] ?? false);
-        $readiness = (string) ($row['readiness_value'] ?? '');
-
-        // For an InitialLinkRequired review on a configurable family the
-        // merchant may have supplied an existing Magento parent SKU. R2b-1
-        // requires that hint; without it the resolver fails closed. We
-        // forward whatever the merchant typed (or null) — never a made-up
-        // value. If a trusted parent already supplies the authoritative SKU
-        // the hint is ignored by the intent resolver, so this never asks the
-        // merchant to provide a meaningless replacement.
-        $hint = null;
-        if ($isConfigurable && $readiness === EntityTrustReadinessStatus::InitialLinkRequired->value) {
-            $hint = $this->entityTrustInitialLinkParentSku;
-        }
-
-        $this->entityTrustReviewIsConfigurable = $isConfigurable;
-        $this->entityTrustRelinkParentSku = null;
-
         $this->dispatchEntityTrustOrchestrator(
-            function (EntityTrustMerchantOrchestrator $orchestrator, User $user, Workspace $workspace, ConnectorAccount $account, Product $product) use ($isConfigurable, $hint): EntityTrustMerchantOutcome {
+            function (
+                EntityTrustMerchantOrchestrator $orchestrator,
+                User $user,
+                Workspace $workspace,
+                ConnectorAccount $account,
+                Product $product,
+                array $projectedRow
+            ): EntityTrustMerchantOutcome {
+                $isConfigurable = (bool) ($projectedRow['is_configurable_family'] ?? false);
+                $readiness = (string) ($projectedRow['readiness_value'] ?? '');
+                $hint = null;
+
+                if ($isConfigurable && $readiness === EntityTrustReadinessStatus::InitialLinkRequired->value) {
+                    $hint = $this->entityTrustInitialLinkParentSkuByProduct[(string) $product->id] ?? null;
+                }
+
+                $this->entityTrustReviewIsConfigurable = $isConfigurable;
+
                 return $orchestrator->requestReview(
                     $user,
                     $workspace,
@@ -529,17 +514,22 @@ class ManageAdobeProductsExportPreview extends Page
 
     public function requestEntityTrustRelink(string $productId): void
     {
-        $row = $this->findEntityTrustWorkingSetRow($productId);
-        $isConfigurable = (bool) ($row['is_configurable_family'] ?? false);
-
-        $merchantSuppliedParentSku = $isConfigurable
-            ? $this->entityTrustRelinkParentSku
-            : null;
-
-        $this->entityTrustReviewIsConfigurable = $isConfigurable;
-
         $this->dispatchEntityTrustOrchestrator(
-            function (EntityTrustMerchantOrchestrator $orchestrator, User $user, Workspace $workspace, ConnectorAccount $account, Product $product) use ($isConfigurable, $merchantSuppliedParentSku): EntityTrustMerchantOutcome {
+            function (
+                EntityTrustMerchantOrchestrator $orchestrator,
+                User $user,
+                Workspace $workspace,
+                ConnectorAccount $account,
+                Product $product,
+                array $projectedRow
+            ): EntityTrustMerchantOutcome {
+                $isConfigurable = (bool) ($projectedRow['is_configurable_family'] ?? false);
+                $merchantSuppliedParentSku = $isConfigurable
+                    ? ($this->entityTrustRelinkParentSkuByProduct[(string) $product->id] ?? null)
+                    : null;
+
+                $this->entityTrustReviewIsConfigurable = $isConfigurable;
+
                 return $orchestrator->requestRelink(
                     $user,
                     $workspace,
@@ -564,10 +554,6 @@ class ManageAdobeProductsExportPreview extends Page
 
             return;
         }
-
-        // Lift the family flag from the active review state so the
-        // orchestrator never has to re-derive it from a heuristic.
-        $isConfigurable = $this->entityTrustReviewIsConfigurable;
 
         $user = Auth::user();
         abort_unless($user instanceof User, 403);
@@ -602,7 +588,6 @@ class ManageAdobeProductsExportPreview extends Page
             $workspace,
             $account,
             $product,
-            isConfigurableFamily: $isConfigurable,
             reviewFlowId: $flowId,
         );
 
@@ -650,11 +635,13 @@ class ManageAdobeProductsExportPreview extends Page
             ->with('variants')
             ->first();
 
-        if ($product === null) {
-            $this->entityTrustErrorTitle = __('entity_trust.errors.product_not_found');
-            $this->refreshEntityTrustPresentation($user, $workspace);
+        if ($product === null || $account === null) {
+            if ($product === null) {
+                $this->entityTrustErrorTitle = __('entity_trust.errors.product_not_found');
+                $this->refreshEntityTrustPresentation($user, $workspace);
 
-            return;
+                return;
+            }
         }
 
         if ($account === null) {
@@ -670,6 +657,25 @@ class ManageAdobeProductsExportPreview extends Page
             return;
         }
 
+        if (! app(AdobeProductEntityTrustAuthorizationService::class)->canReviewOrConfirm($user, $workspace)) {
+            $this->entityTrustProductId = $product->id;
+            $this->applyEntityTrustOutcome(
+                $this->makeUnauthorizedOutcomeForNoAccount((string) $product->id),
+                previousFlowId: null,
+            );
+
+            return;
+        }
+
+        $projectedRow = $this->resolveProjectedEntityTrustRow($user, $workspace, $account, $productId);
+
+        if ($projectedRow === null) {
+            $this->entityTrustErrorTitle = __('entity_trust.errors.product_not_found');
+            $this->refreshEntityTrustPresentation($user, $workspace);
+
+            return;
+        }
+
         $this->entityTrustProductId = $product->id;
 
         $outcome = $callback(
@@ -678,29 +684,10 @@ class ManageAdobeProductsExportPreview extends Page
             $workspace,
             $account,
             $product,
+            $projectedRow,
         );
 
         $this->applyEntityTrustOutcome($outcome, previousFlowId: null);
-    }
-
-    /**
-     * Find a working set row for the given product. Returns an empty array
-     * (not null) when the row is not present, so the caller can read fields
-     * with `??` defaults. The working set is the only authoritative source
-     * of `is_configurable_family` and the readiness value at the moment a
-     * review/relink is requested.
-     *
-     * @return array<string, mixed>
-     */
-    private function findEntityTrustWorkingSetRow(string $productId): array
-    {
-        foreach ($this->entityTrustWorkingSet as $row) {
-            if (($row['product_id'] ?? null) === $productId) {
-                return $row;
-            }
-        }
-
-        return [];
     }
 
     private function makeUnauthorizedOutcomeForNoAccount(string $productId): EntityTrustMerchantOutcome
@@ -741,6 +728,7 @@ class ManageAdobeProductsExportPreview extends Page
         $this->entityTrustOutcomeProductName = $outcome->productName;
         $this->entityTrustOutcomePrimarySku = $outcome->primary_sku;
         $this->entityTrustOutcomeIsConfigurable = $outcome->is_configurable_family;
+        $this->entityTrustReviewIsConfigurable = $outcome->is_configurable_family;
         $this->entityTrustOutcomeAvailableAction = $outcome->available_action;
         $this->entityTrustOutcomeIsConfirmation = $this->isConfirmationReason($outcome->reason);
         $this->entityTrustOutcomeIsStale = $outcome->category->value === 'stale_review';
@@ -858,6 +846,37 @@ class ManageAdobeProductsExportPreview extends Page
             ->workingSet($user, $workspace, $account);
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function resolveProjectedEntityTrustRow(
+        User $user,
+        Workspace $workspace,
+        ConnectorAccount $account,
+        string $productId,
+    ): ?array {
+        return app(EntityTrustMerchantReadService::class)
+            ->resolveWorkingSetRow($user, $workspace, $account, $productId);
+    }
+
+    private static function canAccessManagementSurface(User $user, Workspace $workspace, ?string $accountId): bool
+    {
+        $previewAuth = app(AdobeProductsExportPreviewAuthorizationService::class);
+        $liveAuth = app(AdobeProductsExportLiveAuthorizationService::class);
+        $canManageSetup = $previewAuth->canManageSetup($user, $workspace)
+            || $liveAuth->canManageSetup($user, $workspace);
+
+        if ($previewAuth->canAccess($user, $workspace) || $liveAuth->canAccessLive($user, $workspace)) {
+            return true;
+        }
+
+        if ($accountId === null) {
+            return $canManageSetup;
+        }
+
+        return $canManageSetup;
+    }
+
     private function resetEntityTrustPresentation(): void
     {
         $this->entityTrustWorkingSet = [];
@@ -868,11 +887,16 @@ class ManageAdobeProductsExportPreview extends Page
 
     private function resetEntityTrustActiveReviewState(): void
     {
+        $activeProductId = $this->entityTrustProductId;
+
         $this->entityTrustProductId = null;
         $this->entityTrustReviewFlowId = null;
-        $this->entityTrustRelinkParentSku = null;
-        $this->entityTrustInitialLinkParentSku = null;
         $this->entityTrustReviewIsConfigurable = false;
+
+        if ($activeProductId !== null) {
+            unset($this->entityTrustRelinkParentSkuByProduct[$activeProductId]);
+            unset($this->entityTrustInitialLinkParentSkuByProduct[$activeProductId]);
+        }
 
         $this->entityTrustOutcomeCategory = null;
         $this->entityTrustOutcomeLabel = null;

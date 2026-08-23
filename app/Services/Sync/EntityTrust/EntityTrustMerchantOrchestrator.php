@@ -148,7 +148,6 @@ final class EntityTrustMerchantOrchestrator
         Workspace $workspace,
         ConnectorAccount $account,
         Product $product,
-        bool $isConfigurableFamily,
         string $reviewFlowId,
     ): EntityTrustMerchantOutcome {
         $productName = (string) $product->name;
@@ -174,7 +173,7 @@ final class EntityTrustMerchantOrchestrator
                     $product,
                     $productName,
                     $primarySku,
-                    $isConfigurableFamily,
+                    false,
                     EntityTrustFailureReason::ConfirmationExpiredOrInvalid,
                     reviewFlowId: null,
                 );
@@ -197,7 +196,7 @@ final class EntityTrustMerchantOrchestrator
                 $product,
                 $productName,
                 $primarySku,
-                $isConfigurableFamily,
+                $payload->isConfigurableFamily,
                 $result->status,
             );
         } catch (EntityTrustException $exception) {
@@ -208,7 +207,7 @@ final class EntityTrustMerchantOrchestrator
                 $product,
                 $productName,
                 $primarySku,
-                $isConfigurableFamily,
+                false,
                 $exception->reason,
                 reviewFlowId: null,
             );
@@ -220,7 +219,7 @@ final class EntityTrustMerchantOrchestrator
                 $product,
                 $productName,
                 $primarySku,
-                $isConfigurableFamily,
+                false,
                 EntityTrustFailureReason::Unauthorized,
                 reviewFlowId: null,
             );
@@ -238,7 +237,7 @@ final class EntityTrustMerchantOrchestrator
                 $product,
                 $productName,
                 $primarySku,
-                $isConfigurableFamily,
+                false,
                 EntityTrustFailureReason::SafeSyncFailure,
                 reviewFlowId: null,
             );
@@ -274,6 +273,7 @@ final class EntityTrustMerchantOrchestrator
                 (string) $product->id,
                 $result->reviewToken,
                 $result->mode,
+                $isConfigurable,
                 existingParentSkuHint: $this->extractParentSkuHint($result),
                 explicitRelink: $explicitRelink,
             );

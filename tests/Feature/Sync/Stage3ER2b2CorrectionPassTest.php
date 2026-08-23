@@ -3,8 +3,7 @@
 namespace Tests\Feature\Sync;
 
 use App\Enums\EntityTrust\EntityTrustConfirmationMode;
-use App\Enums\EntityTrust\EntityTrustFailureReason;
-use App\Enums\EntityTrust\EntityTrustReadinessStatus;
+use App\Enums\UserRole;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportPreview;
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
@@ -13,15 +12,16 @@ use App\Models\ProductVariant;
 use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Sync\EntityTrust\AdobeProductEntityTrustConfirmationService;
-use App\Services\Sync\EntityTrust\AdobeProductEntityTrustReviewService;
+use App\Services\Connectors\ConnectorAccountSettingsService;
+use App\Services\Connectors\UpdateConnectorAccountInput;
 use App\Services\Sync\EntityTrust\EntityTrustReviewFlowStore;
-use App\Support\Sync\EntityTrust\Exceptions\EntityTrustException;
+use App\Support\Connectors\CredentialMutation;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
+use Illuminate\Cache\Repository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
@@ -90,7 +90,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     }
 
     #[Test]
-    public function missing_run_sync_live_permission_blocks_review_with_security_outcome(): void
+    public function missing_run_sync_live_permission_keeps_entity_trust_non_actionable_even_if_a_livewire_action_is_crafted(): void
     {
         [$account, $product] = $this->seedSimpleReadyFixture('CORR-LIVEONLY-MISSING-SKU', 7002);
         $actor = User::factory()->create(['is_active' => true]);
@@ -100,8 +100,12 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
 
         Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertOk()
+            ->assertSet('entityTrustSectionVisible', false)
+            ->assertSet('entityTrustCanReviewOrConfirm', false)
             ->call('requestEntityTrustReview', (string) $product->id)
             ->assertSet('entityTrustOutcomeCategory', 'security')
+            ->assertSet('entityTrustReviewFlowId', null)
             ->assertSet('entityTrustOutcomeReadyForConfirmation', false);
 
         $this->assertFalse($this->responder->hasConsequentialWrite());
@@ -136,6 +140,26 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         $this->assertFalse($this->responder->hasConsequentialWrite());
     }
 
+    #[Test]
+    public function manage_sync_configurations_only_actor_can_reach_the_management_page_but_cannot_mutate_entity_trust(): void
+    {
+        [$account, $product] = $this->seedSimpleReadyFixture('CORR-SETUP-PAGE-SKU', 7004);
+        $actor = User::factory()->create(['is_active' => true]);
+        $this->grantExactWorkspacePermissions($account->workspace, $actor, [
+            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+        ]);
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertOk()
+            ->assertSet('entityTrustSectionVisible', false)
+            ->assertSet('entityTrustCanReviewOrConfirm', false)
+            ->call('requestEntityTrustReview', (string) $product->id)
+            ->assertSet('entityTrustOutcomeCategory', 'security')
+            ->assertSet('entityTrustReviewFlowId', null)
+            ->assertSet('entityTrustOutcomeReadyForConfirmation', false);
+    }
+
     // -----------------------------------------------------------------
     // Configurable initial review -> confirm family (Fix #1, #8)
     // -----------------------------------------------------------------
@@ -148,7 +172,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
 
         $component = Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->set('entityTrustInitialLinkParentSku', $parentSku)
+            ->set("entityTrustInitialLinkParentSkuByProduct.{$product->id}", $parentSku)
             ->call('requestEntityTrustReview', (string) $product->id);
 
         $component
@@ -199,7 +223,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
 
         $component
             ->assertSet('entityTrustReviewIsConfigurable', false)
-            ->assertSet('entityTrustRelinkParentSku', null);
+            ->assertSet("entityTrustRelinkParentSkuByProduct.{$product->id}", null);
     }
 
     #[Test]
@@ -210,12 +234,61 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
 
         $component = Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->set('entityTrustRelinkParentSku', $parentSku)
+            ->set("entityTrustRelinkParentSkuByProduct.{$product->id}", $parentSku)
             ->call('requestEntityTrustRelink', (string) $product->id);
 
         $component
             ->assertSet('entityTrustReviewIsConfigurable', true)
-            ->assertSet('entityTrustRelinkParentSku', $parentSku);
+            ->assertSet("entityTrustRelinkParentSkuByProduct.{$product->id}", $parentSku);
+    }
+
+    #[Test]
+    public function parent_sku_inputs_are_scoped_per_product_row(): void
+    {
+        $account = $this->createConnectorAccount();
+        $this->prepareConfigurableEntityTrustConfiguration($account);
+
+        [$productA, $variantsA] = $this->createConfigurableEntityTrustProduct($account->workspace, 'CORR-CFG-A', 'CORR-PARENT-A');
+        [$productB, $variantsB] = $this->createConfigurableEntityTrustProduct($account->workspace, 'CORR-CFG-B', 'CORR-PARENT-B');
+
+        $this->responder->registerProduct('CORR-PARENT-A', 9701, 'configurable');
+        $this->responder->registerProduct('CORR-PARENT-B', 9702, 'configurable');
+
+        foreach ($variantsA as $i => $variant) {
+            $this->responder->registerProduct($variant->sku, 9710 + $i, 'simple');
+        }
+
+        foreach ($variantsB as $i => $variant) {
+            $this->responder->registerProduct($variant->sku, 9720 + $i, 'simple');
+        }
+
+        $this->responder->registerConfigurableChildren('CORR-PARENT-A', [
+            ['sku' => $variantsA[0]->sku, 'id' => 9710, 'type_id' => 'simple'],
+            ['sku' => $variantsA[1]->sku, 'id' => 9711, 'type_id' => 'simple'],
+        ]);
+        $this->responder->registerConfigurableChildren('CORR-PARENT-B', [
+            ['sku' => $variantsB[0]->sku, 'id' => 9720, 'type_id' => 'simple'],
+            ['sku' => $variantsB[1]->sku, 'id' => 9721, 'type_id' => 'simple'],
+        ]);
+
+        $actor = $this->createEntityTrustActor($account->workspace);
+
+        $component = Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->set("entityTrustInitialLinkParentSkuByProduct.{$productA->id}", 'CORR-PARENT-A')
+            ->set("entityTrustInitialLinkParentSkuByProduct.{$productB->id}", 'CORR-PARENT-B')
+            ->call('requestEntityTrustReview', (string) $productA->id)
+            ->assertSet('entityTrustOutcomeReadyForConfirmation', true)
+            ->assertSet("entityTrustInitialLinkParentSkuByProduct.{$productA->id}", 'CORR-PARENT-A')
+            ->assertSet("entityTrustInitialLinkParentSkuByProduct.{$productB->id}", 'CORR-PARENT-B')
+            ->call('cancelEntityTrustFlow');
+
+        $component
+            ->assertSet("entityTrustInitialLinkParentSkuByProduct.{$productA->id}", null)
+            ->assertSet("entityTrustInitialLinkParentSkuByProduct.{$productB->id}", 'CORR-PARENT-B')
+            ->call('requestEntityTrustReview', (string) $productB->id)
+            ->assertSet('entityTrustOutcomeReadyForConfirmation', true)
+            ->assertSet('entityTrustOutcomeProductName', $productB->name);
     }
 
     // -----------------------------------------------------------------
@@ -230,14 +303,13 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
 
         $component = Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->set('entityTrustInitialLinkParentSku', $parentSku)
+            ->set("entityTrustInitialLinkParentSkuByProduct.{$product->id}", $parentSku)
             ->call('requestEntityTrustReview', (string) $product->id);
 
         $component
             ->assertSet('entityTrustActiveExtraChildrenAvailable', true)
             ->assertCount('entityTrustActiveExtraChildSkus', 1)
-            ->assertSee('data-extra-children-state="available-non-empty"', false)
-            ->assertSee(__('entity_trust.extra_children.notice', ['count' => 1]), false);
+            ->assertSee('data-extra-children-state="available-non-empty"', false);
     }
 
     #[Test]
@@ -254,7 +326,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
 
         $component = Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->set('entityTrustInitialLinkParentSku', $parentSku)
+            ->set("entityTrustInitialLinkParentSkuByProduct.{$product->id}", $parentSku)
             ->call('requestEntityTrustReview', (string) $product->id);
 
         $component
@@ -274,7 +346,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
 
         $component = Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->set('entityTrustInitialLinkParentSku', $parentSku)
+            ->set("entityTrustInitialLinkParentSkuByProduct.{$product->id}", $parentSku)
             ->call('requestEntityTrustReview', (string) $product->id);
 
         $component
@@ -307,7 +379,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         $this->responder->remapLogicalEntityId('CORR-STALE-REMOTE-SKU', 99001);
 
         $component->call('confirmEntityTrust')
-            ->assertSet('entityTrustOutcomeCategory', 'remote_verification_failure')
+            ->assertSet('entityTrustOutcomeCategory', 'stale_review')
             ->assertSet('entityTrustActiveReviewFlowId', null);
 
         $this->assertFalse($this->responder->hasConsequentialWrite());
@@ -326,12 +398,13 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         $flowId = $component->get('entityTrustReviewFlowId');
         $this->assertNotNull($flowId);
 
-        // Mutate the local variant so R2b-1 detects a local change.
-        $variant = $product->variants[0];
-        $variant->forceFill(['base_price_cache' => 12345.0])->save();
+        // Mutate a field that participates in the local fingerprint. This path
+        // reaches the canonical R2b-1 LocalChangedSinceReview branch rather
+        // than envelope-level InvalidReviewEvidence validation.
+        $product->forceFill(['name' => 'CORR-STALE-LOCAL-SKU-DRIFT'])->save();
 
         $component->call('confirmEntityTrust')
-            ->assertSet('entityTrustOutcomeCategory', 'remote_verification_failure')
+            ->assertSet('entityTrustOutcomeCategory', 'stale_review')
             ->assertSet('entityTrustActiveReviewFlowId', null);
     }
 
@@ -368,41 +441,29 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         [$account, $product] = $this->seedSimpleReadyFixture('CORR-MISMATCH-SKU', 7023);
         $actor = $this->createEntityTrustActor($account->workspace);
 
-        // First review establishes a real flow for THIS product. We then
-        // manually overwrite the same flow id with a payload bound to a
-        // different product, so the consume() binding check fails closed.
         $component = Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
             ->call('requestEntityTrustReview', (string) $product->id);
 
-        $flowId = $component->get('entityTrustReviewFlowId');
-        $this->assertNotNull($flowId);
+        $this->assertNotNull($component->get('entityTrustReviewFlowId'));
 
-        $otherProduct = Product::withoutWorkspaceScope()->create([
-            'workspace_id' => $account->workspace->id,
-            'onec_guid' => 'OTHER-'.uniqid(),
-            'sku' => 'OTHER-'.uniqid(),
-            'name' => 'Other',
-            'is_active' => true,
-        ]);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
-        // Replace the issued flow with one bound to a foreign product, so
-        // binding check on consume() returns null and the orchestrator
-        // surfaces stale_review / confirmation_expired_or_invalid.
-        app(EntityTrustReviewFlowStore::class)->discard($flowId);
-        app(EntityTrustReviewFlowStore::class)->issue(
-            $actor,
+        app(ConnectorAccountSettingsService::class)->update(
+            $admin,
             $account->workspace,
             $account->id,
-            (string) $otherProduct->id,
-            'foreign-token',
-            EntityTrustConfirmationMode::SimpleVariant,
-            null,
-            false,
+            UpdateConnectorAccountInput::adobePaas(
+                baseUrl: 'https://target-shift.example.test',
+                storeCode: (string) $account->store_code,
+                tenantContext: $account->tenant_context,
+                credentialMutation: CredentialMutation::keep(),
+            ),
         );
 
         $component->call('confirmEntityTrust')
-            ->assertSet('entityTrustOutcomeCategory', 'stale_review');
+            ->assertSet('entityTrustOutcomeCategory', 'stale_review')
+            ->assertSet('entityTrustActiveReviewFlowId', null);
     }
 
     // -----------------------------------------------------------------
@@ -421,17 +482,16 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
 
         $this->assertNotNull($component->get('entityTrustReviewFlowId'));
 
-        // Mutate the sync configuration revision so the R2b-1 confirmation
-        // service detects a configuration drift and surfaces
-        // localChangedSinceReview (mapped to remote_verification_failure).
+        // Mutate the real default-context configuration revision after review.
         $configuration = SyncConfiguration::withoutWorkspaceScope()
             ->where('workspace_id', $account->workspace->id)
+            ->where('connector_account_id', $account->id)
             ->first();
         $this->assertNotNull($configuration);
         $configuration->forceFill(['configuration_revision' => 'rev-drift-'.uniqid()])->save();
 
         $component->call('confirmEntityTrust')
-            ->assertSet('entityTrustOutcomeCategory', 'remote_verification_failure')
+            ->assertSet('entityTrustOutcomeCategory', 'stale_review')
             ->assertSet('entityTrustActiveReviewFlowId', null);
 
         $this->assertFalse($this->responder->hasConsequentialWrite());
@@ -475,23 +535,12 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         [$account, $product, $variant] = $this->seedSimpleReadyFixture('CORR-AMBI-SKU', 7032);
         $actor = $this->createEntityTrustActor($account->workspace);
 
-        // Pre-create a legacy (non-merchant-confirmed) link for the same
-        // Magento entity (same discriminator) pointing at a different
-        // local variant. R2b-1 refuses the silent upgrade with
-        // AmbiguousExistingLink (mapped to identity_conflict).
-        $otherVariant = ProductVariant::withoutWorkspaceScope()->create([
-            'workspace_id' => $account->workspace->id,
-            'product_id' => $product->id,
-            'onec_guid' => 'AMB-VAR-'.uniqid(),
-            'sku' => 'AMB-VAR-'.uniqid(),
-            'is_active' => true,
-            'base_price_cache' => 100,
-        ]);
-
+        // Mirror the canonical R2b-1 setup: same local variant, same
+        // discriminator, different legacy external identifier.
         ExternalRecordLink::withoutWorkspaceScope()->create([
             'workspace_id' => $account->workspace->id,
             'connector_account_id' => $account->id,
-            'product_variant_id' => $otherVariant->id,
+            'product_variant_id' => $variant->id,
             'external_identifier' => 'OTHER-LEGACY-SKU',
             'external_record_discriminator' => '7032',
         ]);
@@ -545,28 +594,28 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     }
 
     #[Test]
-    public function foreign_account_review_uses_only_the_visible_working_set(): void
+    public function out_of_projection_product_review_fails_closed(): void
     {
         [$account, $product] = $this->seedSimpleReadyFixture('CORR-FOREIGN-ACC-SKU', 7041);
         $actor = $this->createEntityTrustActor($account->workspace);
 
-        // The Livewire does not see a working set row for a product that
-        // belongs to a different account's configuration, so the review
-        // is rejected with a security outcome (the orchestrator's
-        // fresh-dual-permission + not-in-working-set path).
-        $foreignProduct = Product::withoutWorkspaceScope()->create([
+        $inactiveProduct = Product::withoutWorkspaceScope()->create([
             'workspace_id' => $account->workspace->id,
-            'onec_guid' => 'FOREIGN-'.uniqid(),
-            'sku' => 'FOREIGN-'.uniqid(),
-            'name' => 'Foreign',
-            'is_active' => true,
+            'onec_guid' => 'INACTIVE-'.uniqid(),
+            'sku' => 'INACTIVE-'.uniqid(),
+            'name' => 'Inactive',
+            'is_active' => false,
         ]);
 
-        Livewire::actingAs($actor)
+        $component = Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->call('requestEntityTrustReview', (string) $foreignProduct->id)
-            ->assertSet('entityTrustOutcomeReadyForConfirmation', false);
+            ->call('requestEntityTrustReview', (string) $inactiveProduct->id);
 
+        $component
+            ->assertSet('entityTrustOutcomeReadyForConfirmation', false)
+            ->assertSet('entityTrustOutcomeCategory', null);
+
+        $this->assertNotNull($component->get('entityTrustErrorTitle'));
         $this->assertFalse($this->responder->hasConsequentialWrite());
     }
 
@@ -575,7 +624,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     // -----------------------------------------------------------------
 
     #[Test]
-    public function concurrent_consume_atomicity_only_one_consumer_receives_payload(): void
+    public function lock_contention_fails_closed_and_consumed_flows_are_single_use(): void
     {
         [$account, $product] = $this->seedSimpleReadyFixture('CORR-ATOMIC-SKU', 7050);
         $actor = $this->createEntityTrustActor($account->workspace);
@@ -590,9 +639,9 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         config(['cache.default' => 'file']);
         config(['cache.stores.file' => ['driver' => 'file', 'path' => $cacheDir]]);
         $this->app->forgetInstance(\Illuminate\Contracts\Cache\Repository::class);
-        $this->app->forgetInstance(\Illuminate\Cache\Repository::class);
+        $this->app->forgetInstance(Repository::class);
         $this->app->forgetInstance(EntityTrustReviewFlowStore::class);
-        $this->app->singleton(\Illuminate\Contracts\Cache\Repository::class, fn () => \Illuminate\Support\Facades\Cache::store('file'));
+        $this->app->singleton(\Illuminate\Contracts\Cache\Repository::class, fn () => Cache::store('file'));
 
         $store = app(EntityTrustReviewFlowStore::class);
         $workspace = $account->workspace;
@@ -604,6 +653,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
             (string) $product->id,
             'atomic-test-token',
             EntityTrustConfirmationMode::SimpleVariant,
+            false,
             null,
             false,
         );
@@ -612,7 +662,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         // first consume() from succeeding. The cache lock provider is the
         // same one used by consume() — this is a deterministic proof
         // that the lock is the single point of arbitration.
-        $lock = \Illuminate\Support\Facades\Cache::store('file')
+        $lock = Cache::store('file')
             ->lock('entity_trust_review_flow_lock:entity_trust_review_flow:'.$flowId, 5);
         $this->assertTrue($lock->get(), 'Competitor must acquire the lock to set up the test.');
 
@@ -633,13 +683,53 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         $this->assertNull($replay, 'A consumed flow id must never be replayed.');
 
         // Cleanup.
-        \Illuminate\Support\Facades\Cache::store('file')->flush();
+        Cache::store('file')->flush();
         @rmdir($cacheDir);
     }
 
     // -----------------------------------------------------------------
     // Token security (Fix #8)
     // -----------------------------------------------------------------
+
+    #[Test]
+    public function valid_unconsumed_flow_fails_closed_on_binding_mismatch_before_any_successful_consume(): void
+    {
+        [$account, $productA] = $this->seedSimpleReadyFixture('CORR-FLOW-A-SKU', 7055);
+        [, $productB] = $this->seedSimpleReadyFixture('CORR-FLOW-B-SKU', 7056);
+        $actor = $this->createEntityTrustActor($account->workspace);
+
+        $flowId = app(EntityTrustReviewFlowStore::class)->issue(
+            $actor,
+            $account->workspace,
+            $account->id,
+            (string) $productA->id,
+            'binding-test-token',
+            EntityTrustConfirmationMode::SimpleVariant,
+            false,
+            null,
+            false,
+        );
+
+        $payload = app(EntityTrustReviewFlowStore::class)->consume(
+            $actor,
+            $account->workspace,
+            $account->id,
+            (string) $productB->id,
+            $flowId,
+        );
+
+        $this->assertNull($payload);
+
+        $replay = app(EntityTrustReviewFlowStore::class)->consume(
+            $actor,
+            $account->workspace,
+            $account->id,
+            (string) $productA->id,
+            $flowId,
+        );
+
+        $this->assertNull($replay);
+    }
 
     #[Test]
     public function review_token_and_internal_keys_never_appear_in_html_or_dehydrated_state(): void
@@ -649,16 +739,61 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
 
         $component = Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->set('entityTrustInitialLinkParentSku', $parentSku)
+            ->set("entityTrustInitialLinkParentSkuByProduct.{$product->id}", $parentSku)
             ->call('requestEntityTrustReview', (string) $product->id);
 
         $dom = (string) $component->html();
         $serialized = json_encode($component->snapshot, JSON_THROW_ON_ERROR);
 
-        foreach (['reviewToken', 'explicitRelink', 'explicit_relink', 'subject_key', 'field_key'] as $forbidden) {
+        foreach ([
+            'reviewToken',
+            'explicitRelink',
+            'explicit_relink',
+            'logical_entity_id',
+            'entity_id',
+            'external_record_discriminator',
+            'remote_fingerprint',
+            'subject_key',
+            'field_key',
+            'target_snapshot',
+            'raw_payload',
+        ] as $forbidden) {
             $this->assertStringNotContainsString($forbidden, $dom, "HTML must not contain '{$forbidden}'.");
             $this->assertStringNotContainsString($forbidden, $serialized, "Dehydrated state must not contain '{$forbidden}'.");
         }
+    }
+
+    #[Test]
+    public function remote_media_unknown_is_not_rendered_as_store_media(): void
+    {
+        [$account, $product,, $parentSku] = $this->seedConfigurableReadyFixture();
+        $actor = $this->createEntityTrustActor($account->workspace);
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->set("entityTrustInitialLinkParentSkuByProduct.{$product->id}", $parentSku)
+            ->call('requestEntityTrustReview', (string) $product->id)
+            ->assertDontSee('Media on store', false)
+            ->assertDontSee('Медіа в магазині', false)
+            ->assertDontSee('Медиа в магазине', false);
+    }
+
+    #[Test]
+    public function successful_confirmation_copy_does_not_claim_the_product_is_ready_for_live_transfer(): void
+    {
+        [$account, $product] = $this->seedSimpleReadyFixture('CORR-SUCCESS-COPY-SKU', 7057);
+        $actor = $this->createEntityTrustActor($account->workspace);
+
+        $component = Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->call('requestEntityTrustReview', (string) $product->id)
+            ->call('confirmEntityTrust')
+            ->assertSet('entityTrustOutcomeCategory', 'success');
+
+        $component->assertDontSee('ready to transfer', false)
+            ->assertDontSee('готов к передаче', false)
+            ->assertDontSee('готовий до передачі', false)
+            ->assertSee(__('entity_trust.failure.confirmation_completed.explanation'), false);
     }
 
     #[Test]
@@ -669,11 +804,11 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
 
         Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->set('entityTrustInitialLinkParentSku', $parentSku)
+            ->set("entityTrustInitialLinkParentSkuByProduct.{$product->id}", $parentSku)
             ->call('requestEntityTrustReview', (string) $product->id)
             ->call('confirmEntityTrust')
             ->call('requestEntityTrustRelink', (string) $product->id)
-            ->set('entityTrustRelinkParentSku', $parentSku)
+            ->set("entityTrustRelinkParentSkuByProduct.{$product->id}", $parentSku)
             ->call('requestEntityTrustRelink', (string) $product->id)
             ->call('cancelEntityTrustFlow');
 

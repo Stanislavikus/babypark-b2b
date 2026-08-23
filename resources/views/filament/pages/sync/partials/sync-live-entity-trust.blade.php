@@ -131,9 +131,9 @@
                           data-testid="sync-live-entity-trust-subject-media-summary"
                         >
                           @if ($subject['declared_image_count'] === 0 && empty($subject['declared_roles_summary']))
-                            {{ __('entity_trust.subjects.media_summary.empty') }}
+                            {{ __('entity_trust.subjects.platform_media_summary.empty') }}
                           @else
-                            {{ __('entity_trust.subjects.media_summary.label', [
+                            {{ __('entity_trust.subjects.platform_media_summary.label', [
                                 'count' => (int) ($subject['declared_image_count'] ?? 0),
                                 'roles' => (string) ($subject['declared_roles_summary'] ?? '—'),
                             ]) }}
@@ -317,7 +317,7 @@
                         <input
                           id="entity-trust-initial-parent-sku-{{ $row['product_id'] }}"
                           type="text"
-                          wire:model.live="entityTrustInitialLinkParentSku"
+                          wire:model.live="entityTrustInitialLinkParentSkuByProduct.{{ $row['product_id'] }}"
                           data-testid="sync-live-entity-trust-initial-parent-input"
                           class="rounded border-gray-300 text-xs dark:border-gray-700 dark:bg-gray-900"
                           placeholder="{{ __('entity_trust.actions.initial_parent_placeholder') }}"
@@ -355,7 +355,7 @@
                         <input
                           id="entity-trust-relink-sku-{{ $row['product_id'] }}"
                           type="text"
-                          wire:model.live="entityTrustRelinkParentSku"
+                          wire:model.live="entityTrustRelinkParentSkuByProduct.{{ $row['product_id'] }}"
                           data-testid="sync-live-entity-trust-relink-input"
                           class="rounded border-gray-300 text-xs dark:border-gray-700 dark:bg-gray-900"
                           placeholder="{{ __('entity_trust.actions.relink_placeholder') }}"
