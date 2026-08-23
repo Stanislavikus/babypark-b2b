@@ -509,6 +509,7 @@ class ManageAdobeProductsExportPreview extends Page
                 );
             },
             $productId,
+            expectedAction: 'review',
         );
     }
 
@@ -540,6 +541,7 @@ class ManageAdobeProductsExportPreview extends Page
                 );
             },
             $productId,
+            expectedAction: 'relink',
         );
     }
 
@@ -612,6 +614,7 @@ class ManageAdobeProductsExportPreview extends Page
     private function dispatchEntityTrustOrchestrator(
         Closure $callback,
         string $productId,
+        string $expectedAction,
     ): void {
         $user = Auth::user();
         abort_unless($user instanceof User, 403);
@@ -671,6 +674,13 @@ class ManageAdobeProductsExportPreview extends Page
 
         if ($projectedRow === null) {
             $this->entityTrustErrorTitle = __('entity_trust.errors.product_not_found');
+            $this->refreshEntityTrustPresentation($user, $workspace);
+
+            return;
+        }
+
+        if (($projectedRow['available_action'] ?? 'none') !== $expectedAction) {
+            $this->resetEntityTrustActiveReviewState();
             $this->refreshEntityTrustPresentation($user, $workspace);
 
             return;
@@ -863,18 +873,17 @@ class ManageAdobeProductsExportPreview extends Page
     {
         $previewAuth = app(AdobeProductsExportPreviewAuthorizationService::class);
         $liveAuth = app(AdobeProductsExportLiveAuthorizationService::class);
-        $canManageSetup = $previewAuth->canManageSetup($user, $workspace)
-            || $liveAuth->canManageSetup($user, $workspace);
 
         if ($previewAuth->canAccess($user, $workspace) || $liveAuth->canAccessLive($user, $workspace)) {
             return true;
         }
 
         if ($accountId === null) {
-            return $canManageSetup;
+            return $previewAuth->canManageSetup($user, $workspace)
+                || $liveAuth->canManageSetup($user, $workspace);
         }
 
-        return $canManageSetup;
+        return $previewAuth->isEligibleSetupTarget($user, $workspace, $accountId);
     }
 
     private function resetEntityTrustPresentation(): void

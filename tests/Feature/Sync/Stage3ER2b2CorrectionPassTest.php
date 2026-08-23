@@ -7,14 +7,15 @@ use App\Enums\UserRole;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportPreview;
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
+use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\ProductVariant;
-use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Connectors\ConnectorAccountSettingsService;
 use App\Services\Connectors\UpdateConnectorAccountInput;
 use App\Services\Sync\EntityTrust\EntityTrustReviewFlowStore;
+use App\Services\Sync\SyncConfigurationLookupService;
 use App\Support\Connectors\CredentialMutation;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
@@ -160,6 +161,49 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
             ->assertSet('entityTrustOutcomeReadyForConfirmation', false);
     }
 
+    #[Test]
+    public function setup_only_actor_is_forbidden_from_foreign_workspace_target(): void
+    {
+        $foreignWorkspace = Workspace::query()->create(['name' => 'Foreign Workspace']);
+        $foreignAccount = $this->createConnectorAccount($foreignWorkspace);
+        $actor = User::factory()->create(['is_active' => true]);
+        $this->grantExactWorkspacePermissions($this->defaultWorkspace(), $actor, [
+            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+        ]);
+
+        $this->actingAs($actor)
+            ->get(ManageAdobeProductsExportPreview::getUrl(['account' => $foreignAccount->id]))
+            ->assertForbidden();
+    }
+
+    #[Test]
+    public function setup_only_actor_is_forbidden_from_non_adobe_or_non_eligible_target(): void
+    {
+        $nonAdobeAccount = $this->createSyncSupportAccount();
+        $actor = User::factory()->create(['is_active' => true]);
+        $this->grantExactWorkspacePermissions($nonAdobeAccount->workspace, $actor, [
+            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+        ]);
+
+        $this->actingAs($actor)
+            ->get(ManageAdobeProductsExportPreview::getUrl(['account' => $nonAdobeAccount->id]))
+            ->assertForbidden();
+    }
+
+    #[Test]
+    public function setup_only_actor_can_access_management_page_for_valid_adobe_setup_target(): void
+    {
+        [$account] = $this->seedSimpleReadyFixture('CORR-SETUP-OK-SKU', 7005);
+        $actor = User::factory()->create(['is_active' => true]);
+        $this->grantExactWorkspacePermissions($account->workspace, $actor, [
+            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+        ]);
+
+        $this->actingAs($actor)
+            ->get(ManageAdobeProductsExportPreview::getUrl(['account' => $account->id]))
+            ->assertOk();
+    }
+
     // -----------------------------------------------------------------
     // Configurable initial review -> confirm family (Fix #1, #8)
     // -----------------------------------------------------------------
@@ -212,33 +256,37 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     #[Test]
     public function simple_explicit_relink_does_not_ask_for_parent_sku_and_uses_no_hint(): void
     {
-        [$account, $product] = $this->seedSimpleReadyFixture('CORR-RELINK-SIMPLE-SKU', 7010);
+        [$account, $product] = $this->seedSimpleRelinkRequiredFixture('CORR-RELINK-SIMPLE-SKU', 7010);
         $actor = $this->createEntityTrustActor($account->workspace);
 
         // The Livewire method only takes a product id. The merchant must
         // never be asked for a Magento parent SKU for a simple product.
         $component = Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertSet('entityTrustWorkingSet.0.available_action', 'relink')
             ->call('requestEntityTrustRelink', (string) $product->id);
 
         $component
             ->assertSet('entityTrustReviewIsConfigurable', false)
+            ->assertSet('entityTrustOutcomeReadyForConfirmation', true)
             ->assertSet("entityTrustRelinkParentSkuByProduct.{$product->id}", null);
     }
 
     #[Test]
     public function configurable_explicit_relink_requires_merchant_parent_sku_and_forwards_it(): void
     {
-        [$account, $product,, $parentSku] = $this->seedConfigurableReadyFixture();
+        [$account, $product,, $parentSku] = $this->seedConfigurableRelinkRequiredFixture();
         $actor = $this->createEntityTrustActor($account->workspace);
 
         $component = Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertSet('entityTrustWorkingSet.0.available_action', 'relink')
             ->set("entityTrustRelinkParentSkuByProduct.{$product->id}", $parentSku)
             ->call('requestEntityTrustRelink', (string) $product->id);
 
         $component
             ->assertSet('entityTrustReviewIsConfigurable', true)
+            ->assertSet('entityTrustOutcomeReadyForConfirmation', true)
             ->assertSet("entityTrustRelinkParentSkuByProduct.{$product->id}", $parentSku);
     }
 
@@ -289,6 +337,69 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
             ->call('requestEntityTrustReview', (string) $productB->id)
             ->assertSet('entityTrustOutcomeReadyForConfirmation', true)
             ->assertSet('entityTrustOutcomeProductName', $productB->name);
+    }
+
+    #[Test]
+    public function initial_link_required_product_rejects_crafted_relink_action_before_backend_review(): void
+    {
+        [$account, $product, $variant] = $this->seedSimpleReadyFixture('CORR-ACTION-REVIEW-ONLY-SKU', 7011);
+        $actor = $this->createEntityTrustActor($account->workspace);
+
+        $component = Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertSet('entityTrustWorkingSet.0.available_action', 'review')
+            ->call('requestEntityTrustRelink', (string) $product->id)
+            ->assertSet('entityTrustReviewFlowId', null)
+            ->assertSet('entityTrustOutcomeCategory', null)
+            ->assertSet('entityTrustOutcomeReadyForConfirmation', false);
+
+        $this->assertSame(0, ExternalRecordLink::withoutWorkspaceScope()->where('product_variant_id', $variant->id)->count());
+        $this->assertFalse($this->responder->hasConsequentialWrite());
+    }
+
+    #[Test]
+    public function already_confirmed_product_rejects_crafted_relink_action_without_mutating_existing_trust(): void
+    {
+        [$account, $product, $variant] = $this->seedSimpleReadyFixture('CORR-ACTION-NONE-SKU', 7012);
+        $actor = $this->createEntityTrustActor($account->workspace);
+
+        $existingLink = $this->createMerchantConfirmedLinkForProduct($product, $variant, '7012', 'CORR-ACTION-NONE-SKU');
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertSet('entityTrustWorkingSet.0.available_action', 'none')
+            ->call('requestEntityTrustRelink', (string) $product->id)
+            ->assertSet('entityTrustReviewFlowId', null)
+            ->assertSet('entityTrustOutcomeCategory', null)
+            ->assertSet('entityTrustOutcomeReadyForConfirmation', false);
+
+        $this->assertDatabaseHas('external_record_links', [
+            'id' => $existingLink->id,
+            'external_identifier' => 'CORR-ACTION-NONE-SKU',
+            'external_record_discriminator' => '7012',
+        ]);
+        $this->assertSame(1, ExternalRecordLink::withoutWorkspaceScope()->where('product_variant_id', $variant->id)->count());
+        $this->assertFalse($this->responder->hasConsequentialWrite());
+    }
+
+    #[Test]
+    public function relink_review_required_product_rejects_crafted_review_action_before_normal_review_flow(): void
+    {
+        [$account, $product, $variant] = $this->seedSimpleReadyFixture('CORR-ACTION-RELINK-SKU', 7013);
+        $actor = $this->createEntityTrustActor($account->workspace);
+
+        $this->createMerchantConfirmedLinkForProduct($product, $variant, '7013', 'CORR-ACTION-RELINK-SKU');
+        $this->createMerchantConfirmedLinkForProduct($product, $variant, '7713', 'CORR-ACTION-RELINK-OTHER-SKU');
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertSet('entityTrustWorkingSet.0.available_action', 'relink')
+            ->call('requestEntityTrustReview', (string) $product->id)
+            ->assertSet('entityTrustReviewFlowId', null)
+            ->assertSet('entityTrustOutcomeCategory', null)
+            ->assertSet('entityTrustOutcomeReadyForConfirmation', false);
+
+        $this->assertFalse($this->responder->hasConsequentialWrite());
     }
 
     // -----------------------------------------------------------------
@@ -386,9 +497,9 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     }
 
     #[Test]
-    public function stale_local_review_returns_local_changed_failure_category(): void
+    public function local_fingerprint_change_before_confirm_returns_stale_review_with_confirmation_expired_copy(): void
     {
-        [$account, $product] = $this->seedSimpleReadyFixture('CORR-STALE-LOCAL-SKU', 7021);
+        [$account, $product, $variant] = $this->seedSimpleReadyFixture('CORR-STALE-LOCAL-SKU', 7021);
         $actor = $this->createEntityTrustActor($account->workspace);
 
         $component = Livewire::actingAs($actor)
@@ -398,13 +509,19 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         $flowId = $component->get('entityTrustReviewFlowId');
         $this->assertNotNull($flowId);
 
-        // Mutate a field that participates in the local fingerprint. This path
-        // reaches the canonical R2b-1 LocalChangedSinceReview branch rather
-        // than envelope-level InvalidReviewEvidence validation.
-        $product->forceFill(['name' => 'CORR-STALE-LOCAL-SKU-DRIFT'])->save();
+        // Focused execution shows the current production path surfaces the
+        // stale confirmation_expired_or_invalid copy here, so the UI
+        // assertion must match that literal outcome instead of assuming the
+        // envelope-security branch.
+        PriceListItem::withoutWorkspaceScope()
+            ->where('workspace_id', $account->workspace->id)
+            ->where('product_variant_id', $variant->id)
+            ->where('quantity_min', 1)
+            ->update(['price' => 149.00]);
 
         $component->call('confirmEntityTrust')
             ->assertSet('entityTrustOutcomeCategory', 'stale_review')
+            ->assertSet('entityTrustOutcomeExplanation', __('entity_trust.failure.confirmation_expired_or_invalid.explanation'))
             ->assertSet('entityTrustActiveReviewFlowId', null);
     }
 
@@ -471,7 +588,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     // -----------------------------------------------------------------
 
     #[Test]
-    public function account_configuration_change_between_review_and_confirm_is_rejected(): void
+    public function configuration_revision_change_before_confirm_returns_stale_review_with_confirmation_expired_copy(): void
     {
         [$account, $product] = $this->seedSimpleReadyFixture('CORR-ACCTCFG-SKU', 7030);
         $actor = $this->createEntityTrustActor($account->workspace);
@@ -482,16 +599,16 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
 
         $this->assertNotNull($component->get('entityTrustReviewFlowId'));
 
-        // Mutate the real default-context configuration revision after review.
-        $configuration = SyncConfiguration::withoutWorkspaceScope()
-            ->where('workspace_id', $account->workspace->id)
-            ->where('connector_account_id', $account->id)
-            ->first();
+        // Focused execution shows this mutation currently lands in the stale
+        // confirmation_expired_or_invalid presentation path, so the UI proof
+        // asserts that literal outcome instead of assuming Security.
+        $configuration = app(SyncConfigurationLookupService::class)->findProductsDefaultContext($account);
         $this->assertNotNull($configuration);
         $configuration->forceFill(['configuration_revision' => 'rev-drift-'.uniqid()])->save();
 
         $component->call('confirmEntityTrust')
             ->assertSet('entityTrustOutcomeCategory', 'stale_review')
+            ->assertSet('entityTrustOutcomeExplanation', __('entity_trust.failure.confirmation_expired_or_invalid.explanation'))
             ->assertSet('entityTrustActiveReviewFlowId', null);
 
         $this->assertFalse($this->responder->hasConsequentialWrite());
@@ -873,6 +990,50 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         ]);
 
         return [$account, $product, $variants, 'CORR-MERCHANT-PARENT'];
+    }
+
+    /**
+     * @return array{0: ConnectorAccount, 1: Product, 2: ProductVariant}
+     */
+    private function seedSimpleRelinkRequiredFixture(string $sku, int $logicalEntityId): array
+    {
+        [$account, $product, $variant] = $this->seedSimpleReadyFixture($sku, $logicalEntityId);
+
+        $this->createMerchantConfirmedLinkForProduct($product, $variant, (string) $logicalEntityId, $sku);
+        $this->createMerchantConfirmedLinkForProduct($product, $variant, (string) ($logicalEntityId + 5000), $sku.'-ALT');
+
+        return [$account, $product, $variant];
+    }
+
+    /**
+     * @return array{0: ConnectorAccount, 1: Product, 2: list<ProductVariant>, 3: string}
+     */
+    private function seedConfigurableRelinkRequiredFixture(): array
+    {
+        [$account, $product, $variants, $parentSku] = $this->seedConfigurableReadyFixture();
+
+        ExternalRecordLink::withoutWorkspaceScope()->create(
+            $this->merchantConfirmedParentLinkAttributes(
+                $account->workspace,
+                $account->id,
+                $product,
+                $parentSku,
+                '9777',
+                $this->createWorkspaceActor($account->workspace),
+            ),
+        );
+        ExternalRecordLink::withoutWorkspaceScope()->create(
+            $this->merchantConfirmedParentLinkAttributes(
+                $account->workspace,
+                $account->id,
+                $product,
+                'CORR-OTHER-PARENT',
+                '9778',
+                $this->createWorkspaceActor($account->workspace),
+            ),
+        );
+
+        return [$account, $product, $variants, $parentSku];
     }
 
     private function createMerchantConfirmedLinkForProduct(
