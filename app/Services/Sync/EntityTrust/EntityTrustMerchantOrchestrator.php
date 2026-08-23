@@ -88,6 +88,17 @@ final class EntityTrustMerchantOrchestrator
                 $isConfigurable,
                 $exception->reason,
             );
+        } catch (\Illuminate\Auth\Access\AuthorizationException $exception) {
+            return $this->outcomeFromFailure(
+                $actor,
+                $workspace,
+                $account,
+                $product,
+                $productName,
+                $primarySku,
+                $isConfigurable,
+                EntityTrustFailureReason::Unauthorized,
+            );
         } catch (Throwable $exception) {
             Log::warning('entity_trust.merchant.review_unexpected_failure', [
                 'workspace_id' => $workspace->id,
@@ -194,6 +205,18 @@ final class EntityTrustMerchantOrchestrator
                 $exception->reason,
                 reviewFlowId: null,
             );
+        } catch (\Illuminate\Auth\Access\AuthorizationException $exception) {
+            return $this->outcomeFromFailure(
+                $actor,
+                $workspace,
+                $account,
+                $product,
+                $productName,
+                $primarySku,
+                $isConfigurable,
+                EntityTrustFailureReason::Unauthorized,
+                reviewFlowId: null,
+            );
         } catch (Throwable $exception) {
             Log::warning('entity_trust.merchant.confirm_unexpected_failure', [
                 'workspace_id' => $workspace->id,
@@ -244,7 +267,7 @@ final class EntityTrustMerchantOrchestrator
                 (string) $product->id,
                 $result->reviewToken,
                 $result->mode,
-                $existingParentSkuHint: $this->extractParentSkuHint($result),
+                existingParentSkuHint: $this->extractParentSkuHint($result),
                 explicitRelink: $explicitRelink,
             );
         }

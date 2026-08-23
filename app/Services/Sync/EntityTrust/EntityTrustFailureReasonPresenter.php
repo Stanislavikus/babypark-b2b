@@ -12,6 +12,11 @@ use App\Enums\EntityTrust\EntityTrustPresentationCategory;
  * test iterates EntityTrustFailureReason::cases() and asserts every case is
  * covered here. Adding a new enum case must produce a mapping update in the
  * same PR.
+ *
+ * Implemented as a match expression (not an array literal) because PHP 8.5
+ * does not support enum cases as array keys — neither as a `const array` nor
+ * as a runtime array literal. A match expression evaluates enum cases as
+ * subjects and is the only correct way to build a frozen exhaustive mapping.
  */
 final class EntityTrustFailureReasonPresenter
 {
@@ -25,51 +30,7 @@ final class EntityTrustFailureReasonPresenter
      */
     public function present(EntityTrustFailureReason $reason): array
     {
-        return self::map()[$reason];
-    }
-
-    public function category(EntityTrustFailureReason $reason): EntityTrustPresentationCategory
-    {
-        return self::map()[$reason]['category'];
-    }
-
-    public function availableAction(EntityTrustFailureReason $reason): string
-    {
-        return self::map()[$reason]['available_action'];
-    }
-
-    public function isConfirmationResult(EntityTrustFailureReason $reason): bool
-    {
-        return $reason === EntityTrustFailureReason::ConfirmationCompleted
-            || $reason === EntityTrustFailureReason::RelinkCompleted
-            || $reason === EntityTrustFailureReason::AlreadyConfirmed;
-    }
-
-    public function isStaleReviewOutcome(EntityTrustFailureReason $reason): bool
-    {
-        return $this->category($reason) === EntityTrustPresentationCategory::StaleReview;
-    }
-
-    /**
-     * Merchant-readable copy + action descriptor per enum case.
-     *
-     * Available actions are intentionally short tags consumed by the UI layer:
-     *   - none                 → nothing to offer
-     *   - review               → start a fresh review
-     *   - relink               → start a fresh explicit relink review
-     *   - resolve_setup        → guide merchant to settings/setup
-     *   - retry_review         → safe re-review / re-verify
-     *   - contact_support      → out of band; merchant-safe
-     *
-     * Implemented as a method (not a class const) so enum-case keys are
-     * supported by PHP at runtime. A `const array` with enum-case keys
-     * coerces keys to integer offsets in PHP 8.5, breaking lookups.
-     *
-     * @return array<EntityTrustFailureReason, array{category: EntityTrustPresentationCategory, label_key: string, explanation_key: string, available_action: string}>
-     */
-    private static function map(): array
-    {
-        return [
+        return match ($reason) {
             EntityTrustFailureReason::Unauthorized => [
                 'category' => EntityTrustPresentationCategory::Security,
                 'label_key' => 'entity_trust.failure.unauthorized.label',
@@ -184,6 +145,28 @@ final class EntityTrustFailureReasonPresenter
                 'explanation_key' => 'entity_trust.failure.review_target_mismatch.explanation',
                 'available_action' => 'resolve_setup',
             ],
-        ];
+        };
+    }
+
+    public function category(EntityTrustFailureReason $reason): EntityTrustPresentationCategory
+    {
+        return $this->present($reason)['category'];
+    }
+
+    public function availableAction(EntityTrustFailureReason $reason): string
+    {
+        return $this->present($reason)['available_action'];
+    }
+
+    public function isConfirmationResult(EntityTrustFailureReason $reason): bool
+    {
+        return $reason === EntityTrustFailureReason::ConfirmationCompleted
+            || $reason === EntityTrustFailureReason::RelinkCompleted
+            || $reason === EntityTrustFailureReason::AlreadyConfirmed;
+    }
+
+    public function isStaleReviewOutcome(EntityTrustFailureReason $reason): bool
+    {
+        return $this->category($reason) === EntityTrustPresentationCategory::StaleReview;
     }
 }

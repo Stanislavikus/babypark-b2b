@@ -557,14 +557,15 @@ class ManageAdobeProductsExportPreview extends Page
 
         $workspace = $this->resolveAdobeProductsExportExecutionWorkspace();
 
+        // Resolve the account if the actor has at least live visibility. If the
+        // actor lacks the dual permission, fall through with a null account so
+        // the orchestrator can produce a safe Unauthorized outcome instead of
+        // aborting the Livewire request.
+        $account = null;
         try {
             $account = $this->resolveEntityTrustAccount($user, $workspace);
         } catch (AuthorizationException) {
-            abort(403);
-        }
-
-        if ($account === null) {
-            abort(403);
+            // fall through
         }
 
         $product = Product::withoutWorkspaceScope()
@@ -576,6 +577,20 @@ class ManageAdobeProductsExportPreview extends Page
         if ($product === null) {
             $this->entityTrustErrorTitle = __('entity_trust.errors.product_not_found');
             $this->refreshEntityTrustPresentation($user, $workspace);
+
+            return;
+        }
+
+        if ($account === null) {
+            // No eligible account (or no dual permission): produce a safe
+            // Unauthorized outcome through the orchestrator so the merchant
+            // gets a copy-keyed Security category, not an HTTP abort.
+            $this->entityTrustProductId = $product->id;
+            $this->entityTrustRelinkParentSku = $entityTrustRelinkParentSku;
+            $this->applyEntityTrustOutcome(
+                $this->makeUnauthorizedOutcomeForNoAccount((string) $product->id),
+                previousFlowId: null,
+            );
 
             return;
         }
@@ -592,6 +607,29 @@ class ManageAdobeProductsExportPreview extends Page
         );
 
         $this->applyEntityTrustOutcome($outcome, previousFlowId: null);
+    }
+
+    private function makeUnauthorizedOutcomeForNoAccount(string $productId): \App\Support\Sync\EntityTrust\EntityTrustMerchantOutcome
+    {
+        $presenter = app(\App\Services\Sync\EntityTrust\EntityTrustFailureReasonPresenter::class);
+
+        $presentation = $presenter->present(\App\Enums\EntityTrust\EntityTrustFailureReason::Unauthorized);
+
+        return new \App\Support\Sync\EntityTrust\EntityTrustMerchantOutcome(
+            product_id: $productId,
+            product_name: '',
+            primary_sku: null,
+            is_configurable_family: false,
+            reason: \App\Enums\EntityTrust\EntityTrustFailureReason::Unauthorized,
+            category: $presentation['category'],
+            label_key: $presentation['label_key'],
+            explanation_key: $presentation['explanation_key'],
+            available_action: $presentation['available_action'],
+            review_flow_id: null,
+            subjects: [],
+            extra_remote_child_skus: [],
+            extra_remote_children_available: false,
+        );
     }
 
     private function applyEntityTrustOutcome(EntityTrustMerchantOutcome $outcome, ?string $previousFlowId): void

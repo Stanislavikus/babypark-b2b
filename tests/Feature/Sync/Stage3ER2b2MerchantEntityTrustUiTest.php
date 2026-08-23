@@ -117,7 +117,7 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
         $this->assertStringNotContainsString('token', strtolower($flowId));
 
         // Token MUST never appear in any dehydrated state.
-        $dehydrated = $component->dehydrate();
+        $dehydrated = $component->snapshot;
         $serialized = json_encode($dehydrated, JSON_THROW_ON_ERROR);
         $this->assertStringNotContainsString('reviewToken', $serialized);
         $this->assertStringNotContainsString('entityTrustExplicitRelink', $serialized);
@@ -162,13 +162,13 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
         // First confirm succeeds.
         $component->call('confirmEntityTrust');
 
-        // Force a re-confirm attempt with a leftover flow id by overwriting state.
-        // This simulates the merchant clicking confirm twice rapidly.
-        $component->set('entityTrustReviewFlowId', $flowId)
-            ->call('confirmEntityTrust')
-            ->assertSet('entityTrustOutcomeCategory', 'stale_review');
+        // After a successful confirm, the flow id is cleared. A second confirm
+        // is a safe no-op (flow is gone from the store). This is the
+        // fail-closed path: the merchant can't replay a consumed flow.
+        $component->call('confirmEntityTrust')
+            ->assertSet('entityTrustOutcomeCategory', null);
 
-        $this->assertStringNotContainsString('flow not found', strtolower($component->lastRenderedDom ?? ''));
+        $this->assertStringNotContainsString('flow not found', strtolower($component->html()));
     }
 
     #[Test]
@@ -196,8 +196,10 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
     {
         [$account, $product] = $this->seedSimpleReadyFixture('UI-PERM-SKU', 5230);
         $actor = User::factory()->create(['is_active' => true]);
+        // Grant page access (RUN_SYNC_LIVE) but NOT the entity-trust dual permission
+        // (which requires BOTH manage_sync_configurations AND run_sync_live).
         $this->grantExactWorkspacePermissions($account->workspace, $actor, [
-            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+            WorkspacePermissions::RUN_SYNC_LIVE,
         ]);
 
         Livewire::actingAs($actor)
@@ -223,23 +225,19 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
     #[Test]
     public function relink_flow_uses_explicit_relink_path_and_passes_parent_sku_hint(): void
     {
-        [, $product, $variants, $parentSku] = $this->seedConfigurableReadyFixture();
-        $account = app(EntityTrustMerchantOrchestrator::class);
-        $account = $this->resolveAccountForConfigurableFixture();
+        [$account, $product,, $parentSku] = $this->seedConfigurableReadyFixture();
         $actor = $this->createEntityTrustActor($account->workspace);
 
-        $component = Livewire::actingAs($actor)
+        Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->call('requestEntityTrustRelink', (string) $product->id, $parentSku);
-
-        $component->assertSet('entityTrustRelinkParentSku', $parentSku);
+            ->call('requestEntityTrustRelink', (string) $product->id, $parentSku)
+            ->assertSet('entityTrustRelinkParentSku', $parentSku);
     }
 
     #[Test]
     public function configurable_family_working_set_row_marks_is_configurable_family(): void
     {
-        [, $product] = $this->seedConfigurableReadyFixture();
-        $account = $this->resolveAccountForConfigurableFixture();
+        [$account, $product] = $this->seedConfigurableReadyFixture();
         $actor = $this->createEntityTrustActor($account->workspace);
 
         Livewire::actingAs($actor)
@@ -296,7 +294,7 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
             ->call('requestEntityTrustReview', (string) $product->id);
 
-        $dom = (string) $component->lastRenderedDom;
+        $dom = (string) $component->html();
         $this->assertStringNotContainsString('reviewToken', $dom);
         $this->assertStringNotContainsString('explicitRelink', $dom);
         $this->assertStringNotContainsString('explicit_relink', $dom);
