@@ -12,10 +12,10 @@ use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Sync\EntityTrust\EntityTrustMerchantFieldComparison;
 use App\Support\Sync\EntityTrust\EntityTrustMerchantOutcome;
 use App\Support\Sync\EntityTrust\EntityTrustMerchantSubjectRow;
-use App\Support\Sync\EntityTrust\EntityTrustReviewFlowPayload;
 use App\Support\Sync\EntityTrust\EntityTrustReviewResult;
 use App\Support\Sync\EntityTrust\EntityTrustSubjectReview;
 use App\Support\Sync\EntityTrust\Exceptions\EntityTrustException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -88,7 +88,7 @@ final class EntityTrustMerchantOrchestrator
                 $isConfigurable,
                 $exception->reason,
             );
-        } catch (\Illuminate\Auth\Access\AuthorizationException $exception) {
+        } catch (AuthorizationException $exception) {
             return $this->outcomeFromFailure(
                 $actor,
                 $workspace,
@@ -205,7 +205,7 @@ final class EntityTrustMerchantOrchestrator
                 $exception->reason,
                 reviewFlowId: null,
             );
-        } catch (\Illuminate\Auth\Access\AuthorizationException $exception) {
+        } catch (AuthorizationException $exception) {
             return $this->outcomeFromFailure(
                 $actor,
                 $workspace,

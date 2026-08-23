@@ -8,7 +8,6 @@ use App\Models\Workspace;
 use App\Support\Sync\EntityTrust\EntityTrustReviewFlowPayload;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Str;
 
 /**
  * Narrow, server-side transient store for the R2b-2 merchant Entity Trust UI.

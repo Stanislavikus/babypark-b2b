@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages\Sync;
 
+use App\Enums\EntityTrust\EntityTrustFailureReason;
 use App\Enums\SyncLiveMerchantLifecycleState;
 use App\Enums\SyncLiveWorklistFilter;
 use App\Enums\SyncPreviewMerchantPageState;
@@ -17,6 +18,7 @@ use App\Services\Sync\AdobeProductsExportLiveAuthorizationService;
 use App\Services\Sync\AdobeProductsExportPreviewAuthorizationService;
 use App\Services\Sync\ConnectorAccountLayerBSetupProjectionQuery;
 use App\Services\Sync\EntityTrust\AdobeProductEntityTrustAuthorizationService;
+use App\Services\Sync\EntityTrust\EntityTrustFailureReasonPresenter;
 use App\Services\Sync\EntityTrust\EntityTrustMerchantOrchestrator;
 use App\Services\Sync\EntityTrust\EntityTrustMerchantReadService;
 use App\Services\Sync\SyncActiveRunReadQuery;
@@ -609,18 +611,18 @@ class ManageAdobeProductsExportPreview extends Page
         $this->applyEntityTrustOutcome($outcome, previousFlowId: null);
     }
 
-    private function makeUnauthorizedOutcomeForNoAccount(string $productId): \App\Support\Sync\EntityTrust\EntityTrustMerchantOutcome
+    private function makeUnauthorizedOutcomeForNoAccount(string $productId): EntityTrustMerchantOutcome
     {
-        $presenter = app(\App\Services\Sync\EntityTrust\EntityTrustFailureReasonPresenter::class);
+        $presenter = app(EntityTrustFailureReasonPresenter::class);
 
-        $presentation = $presenter->present(\App\Enums\EntityTrust\EntityTrustFailureReason::Unauthorized);
+        $presentation = $presenter->present(EntityTrustFailureReason::Unauthorized);
 
-        return new \App\Support\Sync\EntityTrust\EntityTrustMerchantOutcome(
+        return new EntityTrustMerchantOutcome(
             product_id: $productId,
             product_name: '',
             primary_sku: null,
             is_configurable_family: false,
-            reason: \App\Enums\EntityTrust\EntityTrustFailureReason::Unauthorized,
+            reason: EntityTrustFailureReason::Unauthorized,
             category: $presentation['category'],
             label_key: $presentation['label_key'],
             explanation_key: $presentation['explanation_key'],
@@ -671,11 +673,11 @@ class ManageAdobeProductsExportPreview extends Page
         $this->entityTrustErrorTitle = null;
     }
 
-    private function isConfirmationReason(\App\Enums\EntityTrust\EntityTrustFailureReason $reason): bool
+    private function isConfirmationReason(EntityTrustFailureReason $reason): bool
     {
-        return $reason === \App\Enums\EntityTrust\EntityTrustFailureReason::ConfirmationCompleted
-            || $reason === \App\Enums\EntityTrust\EntityTrustFailureReason::RelinkCompleted
-            || $reason === \App\Enums\EntityTrust\EntityTrustFailureReason::AlreadyConfirmed;
+        return $reason === EntityTrustFailureReason::ConfirmationCompleted
+            || $reason === EntityTrustFailureReason::RelinkCompleted
+            || $reason === EntityTrustFailureReason::AlreadyConfirmed;
     }
 
     private function mapModeLabel(EntityTrustMerchantOutcome $outcome): string

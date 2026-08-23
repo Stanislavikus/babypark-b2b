@@ -2,29 +2,24 @@
 
 namespace Tests\Feature\Sync;
 
+use App\Enums\EntityTrust\EntityTrustConfirmationMode;
 use App\Enums\EntityTrust\EntityTrustFailureReason;
 use App\Enums\EntityTrust\EntityTrustReadinessStatus;
-use App\Enums\SyncDataDomain;
-use App\Enums\SyncRunMode;
-use App\Enums\SyncSemanticOperation;
-use App\Enums\UserRole;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportPreview;
+use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\User;
-use App\Services\Sync\EntityTrust\AdobeProductEntityTrustAuthorizationService;
+use App\Models\Workspace;
 use App\Services\Sync\EntityTrust\EntityTrustFailureReasonPresenter;
-use App\Services\Sync\EntityTrust\EntityTrustMerchantOrchestrator;
 use App\Services\Sync\EntityTrust\EntityTrustReviewFlowStore;
-use App\Services\Workspace\WorkspaceAuthorization;
-use App\Support\Sync\EntityTrust\EntityTrustReviewFlowPayload;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Crypt;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
@@ -315,7 +310,7 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
             $account->id,
             (string) $product->id,
             'test-token',
-            \App\Enums\EntityTrust\EntityTrustConfirmationMode::SimpleVariant,
+            EntityTrustConfirmationMode::SimpleVariant,
             null,
             false,
         );
@@ -372,7 +367,7 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
     }
 
     /**
-     * @return array{0: Product, 1: \App\Models\Workspace}
+     * @return array{0: Product, 1: Workspace}
      */
     private function resolveAccountForConfigurableFixture(): array
     {
@@ -380,7 +375,7 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
         // product; we just need the workspace under which it was created. The account
         // is reused from the prior seed via the cached default fixture.
         $workspace = $this->defaultWorkspace();
-        $account = \App\Models\ConnectorAccount::withoutWorkspaceScope()
+        $account = ConnectorAccount::withoutWorkspaceScope()
             ->where('workspace_id', $workspace->id)
             ->where('auth_profile', 'adobe_commerce_paas_oauth1_integration')
             ->first();
@@ -389,7 +384,7 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
     }
 
     /**
-     * @return array{0: \App\Models\ConnectorAccount, 1: Product, 2: list<\App\Models\ProductVariant>, 3: string}
+     * @return array{0: ConnectorAccount, 1: Product, 2: list<ProductVariant>, 3: string}
      */
     private function seedConfigurableReadyFixture(): array
     {
@@ -411,7 +406,7 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
     }
 
     /**
-     * @return array{0: \App\Models\ConnectorAccount, 1: Product, 2: \App\Models\ProductVariant}
+     * @return array{0: ConnectorAccount, 1: Product, 2: ProductVariant}
      */
     private function seedSimpleReadyFixture(string $sku, int $logicalEntityId): array
     {
