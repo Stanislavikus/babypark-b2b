@@ -75,15 +75,15 @@ class ProductWriteRequest extends AbstractSimpleObject implements ProductWriteRe
         return $this->setData(self::PRICE, $price);
     }
 
-    public function getCustomAttributes(): array
+    public function getMappedAttributes(): array
     {
-        $value = $this->_get(self::CUSTOM_ATTRIBUTES);
+        $value = $this->_get(self::MAPPED_ATTRIBUTES);
 
         return is_array($value) ? array_values($value) : [];
     }
 
-    public function setCustomAttributes(array $customAttributes): ProductWriteRequestInterface
+    public function setMappedAttributes(array $mappedAttributes): ProductWriteRequestInterface
     {
-        return $this->setData(self::CUSTOM_ATTRIBUTES, array_values($customAttributes));
+        return $this->setData(self::MAPPED_ATTRIBUTES, array_values($mappedAttributes));
     }
 }

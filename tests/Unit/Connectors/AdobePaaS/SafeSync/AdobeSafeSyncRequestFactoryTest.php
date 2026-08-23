@@ -109,7 +109,7 @@ class AdobeSafeSyncRequestFactoryTest extends TestCase
                 status: 2,
                 visibility: 4,
                 price: 19.99,
-                customAttributes: [
+                mappedAttributes: [
                     new AdobeSafeSyncSimpleProductWriteCustomAttribute('color', 'red'),
                 ],
             ),
@@ -125,13 +125,14 @@ class AdobeSafeSyncRequestFactoryTest extends TestCase
 
         $payload = json_decode((string) $request->getBody(), true, flags: JSON_THROW_ON_ERROR);
 
-        $this->assertSame('SKU-321', $payload['expected_sku'] ?? null);
-        $this->assertSame('Updated Product', $payload['name'] ?? null);
-        $this->assertSame(2, $payload['status'] ?? null);
-        $this->assertSame(4, $payload['visibility'] ?? null);
-        $this->assertSame(19.99, $payload['price'] ?? null);
-        $this->assertSame([['attribute_code' => 'color', 'value' => 'red']], $payload['custom_attributes'] ?? null);
-        $this->assertArrayNotHasKey('id', $payload);
+        $this->assertSame(['request'], array_keys($payload));
+        $this->assertSame('SKU-321', $payload['request']['expected_sku'] ?? null);
+        $this->assertSame('Updated Product', $payload['request']['name'] ?? null);
+        $this->assertSame(2, $payload['request']['status'] ?? null);
+        $this->assertSame(4, $payload['request']['visibility'] ?? null);
+        $this->assertSame(19.99, $payload['request']['price'] ?? null);
+        $this->assertSame([['attribute_code' => 'color', 'value' => 'red']], $payload['request']['mapped_attributes'] ?? null);
+        $this->assertArrayNotHasKey('id', $payload['request']);
         $this->assertStringContainsString('oauth_consumer_key="ck_test"', $request->getHeaderLine('Authorization'));
     }
 
@@ -146,7 +147,7 @@ class AdobeSafeSyncRequestFactoryTest extends TestCase
             321,
             new AdobeSafeSyncSimpleProductWriteRequest(
                 expectedSku: 'SKU-321',
-                customAttributes: [
+                mappedAttributes: [
                     new AdobeSafeSyncSimpleProductWriteCustomAttribute('notes', str_repeat('x', 20_000)),
                 ],
             ),

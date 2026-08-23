@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace B2BPlatform\MagentoSafeSync\Model;
 
+use B2BPlatform\MagentoSafeSync\Api\Data\ProductWriteMappedAttributeInterface;
 use B2BPlatform\MagentoSafeSync\Api\Data\ProductWriteRequestInterface;
 use B2BPlatform\MagentoSafeSync\Api\Data\ProductWriteResponseInterface;
 use B2BPlatform\MagentoSafeSync\Api\ProductWriteManagementInterface;
@@ -83,8 +84,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
         $identifierField = (string) $metadata->getIdentifierField();
         $linkField = method_exists($metadata, 'getLinkField') ? (string) $metadata->getLinkField() : $identifierField;
         $entityTable = method_exists($metadata, 'getEntityTable') ? (string) $metadata->getEntityTable() : 'catalog_product_entity';
-        $connectionName = $this->resolveConnectionName($metadata);
-        $connection = $this->resourceConnection->getConnection($connectionName);
+        $connection = $this->resolveEntityConnection($metadata);
 
         if ($this->transactionLevel($connection) !== 0) {
             return $this->knownNotApplied('safe_sync_bridge_transaction_state_unexpected', $logicalEntityId, $expectedSku, false, 0);
@@ -112,194 +112,45 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
             );
         }
 
-        $consequentialWriteAttempts = 0;
+        $preCommitOutcome = $this->executeRollbackCapablePhase(
+            $connection,
+            $galeraState,
+            $identifierField,
+            $linkField,
+            $entityTable,
+            $logicalEntityId,
+            $expectedSku,
+            $mutation,
+        );
+
+        if ($preCommitOutcome instanceof ProductWriteResponseInterface) {
+            return $preCommitOutcome;
+        }
+
+        $warningCodes = [];
 
         try {
-            $connection->beginTransaction();
-
-            $lockedRows = $this->fetchAll(
-                $connection,
-                sprintf(
-                    'SELECT %s FROM %s WHERE %s = %d FOR UPDATE',
-                    $this->quoteIdentifier($connection, $linkField),
-                    $this->quoteIdentifier($connection, $entityTable),
-                    $this->quoteIdentifier($connection, $identifierField),
-                    $logicalEntityId,
-                ),
-            );
-
-            if ($lockedRows === []) {
-                return $this->rollbackAndReturn(
-                    $connection,
-                    $galeraState,
-                    $this->knownNotApplied('safe_sync_entity_missing', $logicalEntityId, $expectedSku, false, 0),
-                );
-            }
-
-            if (! $this->skuResolvesOnlyToLogicalEntity($connection, $entityTable, $identifierField, $logicalEntityId, $expectedSku)) {
-                return $this->rollbackAndReturn(
-                    $connection,
-                    $galeraState,
-                    $this->knownNotApplied('safe_sync_ambiguous_sku', $logicalEntityId, $expectedSku, false, 0),
-                );
-            }
-
-            try {
-                $product = $this->productRepository->getById($logicalEntityId, false, null, true);
-            } catch (NoSuchEntityException) {
-                return $this->rollbackAndReturn(
-                    $connection,
-                    $galeraState,
-                    $this->knownNotApplied('safe_sync_entity_missing', $logicalEntityId, $expectedSku, false, 0),
-                );
-            }
-
-            if ((int) $product->getData($identifierField) !== $logicalEntityId) {
-                return $this->rollbackAndReturn(
-                    $connection,
-                    $galeraState,
-                    $this->knownNotApplied('safe_sync_identity_mismatch', $logicalEntityId, $expectedSku, false, 0),
-                );
-            }
-
-            if ((string) $product->getSku() !== $expectedSku) {
-                return $this->rollbackAndReturn(
-                    $connection,
-                    $galeraState,
-                    $this->knownNotApplied('safe_sync_sku_mismatch', $logicalEntityId, $expectedSku, false, 0),
-                );
-            }
-
-            if ((string) $product->getTypeId() !== 'simple') {
-                return $this->rollbackAndReturn(
-                    $connection,
-                    $galeraState,
-                    $this->knownNotApplied('safe_sync_non_simple_product_type', $logicalEntityId, $expectedSku, false, 0),
-                );
-            }
-
-            $this->applyMutation($product, $mutation);
-
-            if ($product->getData($identifierField) === null) {
-                return $this->rollbackAndReturn(
-                    $connection,
-                    $galeraState,
-                    $this->knownNotApplied('safe_sync_identifier_missing_before_save', $logicalEntityId, $expectedSku, false, 0),
-                );
-            }
-
-            if ((int) $product->getData($identifierField) !== $logicalEntityId) {
-                return $this->rollbackAndReturn(
-                    $connection,
-                    $galeraState,
-                    $this->knownNotApplied('safe_sync_identity_mismatch_before_save', $logicalEntityId, $expectedSku, false, 0),
-                );
-            }
-
-            if ((string) $product->getSku() !== $expectedSku) {
-                return $this->rollbackAndReturn(
-                    $connection,
-                    $galeraState,
-                    $this->knownNotApplied('safe_sync_sku_mismatch_before_save', $logicalEntityId, $expectedSku, false, 0),
-                );
-            }
-
-            try {
-                $consequentialWriteAttempts = 1;
-                $this->productRepository->save($product);
-            } catch (\Throwable $exception) {
-                $this->logger->warning('Safe Sync product save failed before outer commit.', ['exception' => $exception]);
-
-                return $this->rollbackAndReturn(
-                    $connection,
-                    $galeraState,
-                    $this->knownNotApplied('safe_sync_repository_save_failed', $logicalEntityId, $expectedSku, false, $consequentialWriteAttempts),
-                );
-            }
-
-            try {
-                $postSave = $this->productRepository->getById($logicalEntityId, false, null, true);
-            } catch (NoSuchEntityException) {
-                return $this->rollbackAndReturn(
-                    $connection,
-                    $galeraState,
-                    $this->knownNotApplied('safe_sync_entity_missing_after_save', $logicalEntityId, $expectedSku, false, $consequentialWriteAttempts),
-                );
-            }
-
-            $postconditionReason = $this->verifyPostcondition(
-                $postSave,
-                $identifierField,
-                $entityTable,
-                $connection,
-                $logicalEntityId,
-                $expectedSku,
-                $mutation,
-            );
-
-            if ($postconditionReason !== null) {
-                return $this->rollbackAndReturn(
-                    $connection,
-                    $galeraState,
-                    $this->knownNotApplied($postconditionReason, $logicalEntityId, $expectedSku, false, $consequentialWriteAttempts),
-                );
-            }
-
-            try {
-                $connection->commit();
-            } catch (\Throwable $exception) {
-                $warningCodes = $this->restoreAfterCommitException($connection, $galeraState);
-                $this->logger->warning('Safe Sync outer commit acknowledgement is uncertain.', ['exception' => $exception]);
-
-                return $this->unknownOrAmbiguous(
-                    'safe_sync_commit_uncertain',
-                    $logicalEntityId,
-                    $expectedSku,
-                    true,
-                    $consequentialWriteAttempts,
-                    $warningCodes,
-                );
-            }
-
-            $warningCodes = [];
-
-            try {
-                $this->callbackBridge->processPendingProductCallbacks();
-            } catch (\Throwable $exception) {
-                $warningCodes[] = 'safe_sync_post_commit_callback_failed';
-                $this->logger->error('Safe Sync post-commit product callback failed.', ['exception' => $exception]);
-            }
-
-            try {
-                $this->galeraWriteSession->restore($connection, $galeraState);
-            } catch (\Throwable $exception) {
-                $warningCodes[] = 'safe_sync_post_commit_galera_restore_failed';
-                $this->logger->error('Safe Sync post-commit Galera restore failed.', ['exception' => $exception]);
-            }
-
-            return $this->knownApplied(
-                'safe_sync_simple_product_write_applied',
-                $logicalEntityId,
-                $expectedSku,
-                true,
-                $consequentialWriteAttempts,
-                $warningCodes,
-            );
+            $this->callbackBridge->processPendingProductCallbacks();
         } catch (\Throwable $exception) {
-            $this->logger->error('Safe Sync write failed closed before commit.', ['exception' => $exception]);
-
-            return $this->rollbackAndReturn(
-                $connection,
-                $galeraState,
-                $this->knownNotApplied(
-                    'safe_sync_precommit_failure',
-                    $logicalEntityId,
-                    $expectedSku,
-                    false,
-                    $consequentialWriteAttempts,
-                ),
-            );
+            $warningCodes[] = 'safe_sync_post_commit_callback_failed';
+            $this->logger->error('Safe Sync post-commit product callback failed.', ['exception' => $exception]);
         }
+
+        try {
+            $this->galeraWriteSession->restore($connection, $galeraState);
+        } catch (\Throwable $exception) {
+            $warningCodes[] = 'safe_sync_post_commit_galera_restore_failed';
+            $this->logger->error('Safe Sync post-commit Galera restore failed.', ['exception' => $exception]);
+        }
+
+        return $this->knownApplied(
+            'safe_sync_simple_product_write_applied',
+            $logicalEntityId,
+            $expectedSku,
+            true,
+            $preCommitOutcome['consequential_write_attempts'],
+            $warningCodes,
+        );
     }
 
     /**
@@ -310,34 +161,34 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
      *   status:?int,
      *   visibility:?int,
      *   price:?float,
-     *   custom_attributes:list<array{attribute_code:string,value:string}>
+     *   mapped_attributes:list<array{attribute_code:string,value:string}>
      * }
      */
     private function buildMutation(ProductWriteRequestInterface $request): array
     {
-        $customAttributes = [];
+        $mappedAttributes = [];
 
-        foreach ($request->getCustomAttributes() as $index => $entry) {
-            if (! is_array($entry)) {
-                return $this->invalidMutation('safe_sync_invalid_custom_attribute_payload');
+        foreach ($request->getMappedAttributes() as $entry) {
+            if (! $entry instanceof ProductWriteMappedAttributeInterface) {
+                return $this->invalidMutation('safe_sync_invalid_mapped_attribute_payload');
             }
 
-            $attributeCode = $entry['attribute_code'] ?? null;
-            $value = $entry['value'] ?? null;
+            $attributeCode = $entry->getAttributeCode();
+            $value = $entry->getValue();
 
             if (! is_string($attributeCode) || ! is_string($value) || $attributeCode === '') {
-                return $this->invalidMutation('safe_sync_invalid_custom_attribute_payload');
+                return $this->invalidMutation('safe_sync_invalid_mapped_attribute_payload');
             }
 
             if (preg_match('/^[A-Za-z][A-Za-z0-9_]{0,63}$/', $attributeCode) !== 1) {
-                return $this->invalidMutation('safe_sync_invalid_custom_attribute_code');
+                return $this->invalidMutation('safe_sync_invalid_mapped_attribute_code');
             }
 
             if (in_array(strtolower($attributeCode), self::RESERVED_CUSTOM_ATTRIBUTE_CODES, true)) {
-                return $this->invalidMutation('safe_sync_reserved_custom_attribute_code');
+                return $this->invalidMutation('safe_sync_reserved_mapped_attribute_code');
             }
 
-            $customAttributes[] = [
+            $mappedAttributes[] = [
                 'attribute_code' => $attributeCode,
                 'value' => $value,
             ];
@@ -348,13 +199,13 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
                 || $request->getStatus() !== null
                 || $request->getVisibility() !== null
                 || $request->getPrice() !== null
-                || $customAttributes !== [],
+                || $mappedAttributes !== [],
             'reason_code' => null,
             'name' => $request->getName(),
             'status' => $request->getStatus(),
             'visibility' => $request->getVisibility(),
             'price' => $request->getPrice(),
-            'custom_attributes' => $customAttributes,
+            'mapped_attributes' => $mappedAttributes,
         ];
     }
 
@@ -366,7 +217,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
      *   status:?int,
      *   visibility:?int,
      *   price:?float,
-     *   custom_attributes:list<array{attribute_code:string,value:string}>
+     *   mapped_attributes:list<array{attribute_code:string,value:string}>
      * }
      */
     private function invalidMutation(string $reasonCode): array
@@ -378,7 +229,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
             'status' => null,
             'visibility' => null,
             'price' => null,
-            'custom_attributes' => [],
+            'mapped_attributes' => [],
         ];
     }
 
@@ -388,7 +239,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
      *   status:?int,
      *   visibility:?int,
      *   price:?float,
-     *   custom_attributes:list<array{attribute_code:string,value:string}>
+     *   mapped_attributes:list<array{attribute_code:string,value:string}>
      * }  $mutation
      */
     private function applyMutation(object $product, array $mutation): void
@@ -409,7 +260,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
             $product->setPrice($mutation['price']);
         }
 
-        foreach ($mutation['custom_attributes'] as $attribute) {
+        foreach ($mutation['mapped_attributes'] as $attribute) {
             if (method_exists($product, 'setCustomAttribute')) {
                 $product->setCustomAttribute($attribute['attribute_code'], $attribute['value']);
             } elseif (method_exists($product, 'setData')) {
@@ -424,7 +275,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
      *   status:?int,
      *   visibility:?int,
      *   price:?float,
-     *   custom_attributes:list<array{attribute_code:string,value:string}>
+     *   mapped_attributes:list<array{attribute_code:string,value:string}>
      * }  $mutation
      */
     private function verifyPostcondition(
@@ -468,7 +319,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
             return 'safe_sync_postcondition_controlled_field_mismatch';
         }
 
-        foreach ($mutation['custom_attributes'] as $attribute) {
+        foreach ($mutation['mapped_attributes'] as $attribute) {
             $actualValue = $this->readCustomAttributeValue($postSave, $attribute['attribute_code']);
 
             if ($actualValue !== $attribute['value']) {
@@ -496,13 +347,21 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
         return is_scalar($value) ? (string) $value : null;
     }
 
-    private function resolveConnectionName(object $metadata): ?string
+    private function resolveEntityConnection(object $metadata): object
     {
-        if (method_exists($metadata, 'getEntityConnectionName')) {
-            return $metadata->getEntityConnectionName();
+        if (method_exists($metadata, 'getEntityConnection')) {
+            $connection = $metadata->getEntityConnection();
+
+            if (is_object($connection)) {
+                return $connection;
+            }
         }
 
-        return null;
+        if (method_exists($metadata, 'getEntityConnectionName')) {
+            return $this->resourceConnection->getConnectionByName((string) $metadata->getEntityConnectionName());
+        }
+
+        return $this->resourceConnection->getConnection();
     }
 
     private function transactionLevel(object $connection): int
@@ -574,13 +433,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
     ): bool {
         $rows = $this->fetchAll(
             $connection,
-            sprintf(
-                'SELECT DISTINCT %s FROM %s WHERE %s = %s LIMIT 2',
-                $this->quoteIdentifier($connection, $identifierField),
-                $this->quoteIdentifier($connection, $entityTable),
-                $this->quoteIdentifier($connection, 'sku'),
-                $this->quoteString($connection, $expectedSku),
-            ),
+            $this->buildSkuOwnershipLockingQuery($connection, $entityTable, $identifierField, $expectedSku),
         );
 
         $identifiers = [];
@@ -608,25 +461,76 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
     private function rollbackAndReturn(
         object $connection,
         array $galeraState,
-        ProductWriteResponseInterface $response,
+        string $reasonCode,
+        int $logicalEntityId,
+        string $expectedSku,
+        bool $postconditionVerified,
+        int $consequentialWriteAttempts,
     ): ProductWriteResponseInterface {
-        if ($this->transactionLevel($connection) > 0) {
-            $connection->rollBack();
+        if ($this->transactionLevel($connection) <= 0) {
+            $this->quarantineConnection($connection);
+
+            return $this->unknownOrAmbiguous(
+                'safe_sync_rollback_uncertain',
+                $logicalEntityId,
+                $expectedSku,
+                false,
+                $consequentialWriteAttempts,
+            );
         }
+
+        try {
+            $connection->rollBack();
+        } catch (\Throwable $exception) {
+            $this->logger->error('Safe Sync rollback acknowledgement is uncertain.', ['exception' => $exception]);
+            $this->quarantineConnection($connection);
+
+            return $this->unknownOrAmbiguous(
+                'safe_sync_rollback_uncertain',
+                $logicalEntityId,
+                $expectedSku,
+                false,
+                $consequentialWriteAttempts,
+            );
+        }
+
+        if ($this->transactionLevel($connection) !== 0) {
+            $this->logger->error('Safe Sync rollback left the transaction level open.');
+            $this->quarantineConnection($connection);
+
+            return $this->unknownOrAmbiguous(
+                'safe_sync_rollback_uncertain',
+                $logicalEntityId,
+                $expectedSku,
+                false,
+                $consequentialWriteAttempts,
+            );
+        }
+
+        $warningCodes = [];
 
         try {
             $this->callbackBridge->clearPendingProductCallbacks();
         } catch (\Throwable $exception) {
+            $warningCodes[] = 'safe_sync_rollback_callback_clear_failed';
             $this->logger->warning('Safe Sync rollback callback clear failed.', ['exception' => $exception]);
         }
 
         try {
             $this->galeraWriteSession->restore($connection, $galeraState);
         } catch (\Throwable $exception) {
+            $warningCodes[] = 'safe_sync_rollback_galera_restore_failed';
             $this->logger->warning('Safe Sync rollback Galera restore failed.', ['exception' => $exception]);
         }
 
-        return $response;
+        return $this->knownNotApplied(
+            $reasonCode,
+            $logicalEntityId,
+            $expectedSku,
+            $postconditionVerified,
+            $consequentialWriteAttempts,
+            $warningCodes,
+        );
     }
 
     /**
@@ -647,6 +551,267 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
         }
 
         return $warningCodes;
+    }
+
+    private function buildSkuOwnershipLockingQuery(
+        object $connection,
+        string $entityTable,
+        string $identifierField,
+        string $expectedSku,
+    ): string {
+        return sprintf(
+            'SELECT DISTINCT %s FROM %s WHERE %s = %s LIMIT 2 FOR UPDATE',
+            $this->quoteIdentifier($connection, $identifierField),
+            $this->quoteIdentifier($connection, $entityTable),
+            $this->quoteIdentifier($connection, 'sku'),
+            $this->quoteString($connection, $expectedSku),
+        );
+    }
+
+    private function quarantineConnection(object $connection): void
+    {
+        try {
+            if (method_exists($connection, 'closeConnection')) {
+                $connection->closeConnection();
+            }
+        } catch (\Throwable $exception) {
+            $this->logger->error('Safe Sync connection quarantine failed.', ['exception' => $exception]);
+        }
+    }
+
+    /**
+     * @param  array{previous:?int}  $galeraState
+     * @param  array{
+     *   name:?string,
+     *   status:?int,
+     *   visibility:?int,
+     *   price:?float,
+     *   mapped_attributes:list<array{attribute_code:string,value:string}>
+     * }  $mutation
+     * @return ProductWriteResponseInterface|array{consequential_write_attempts:int}
+     */
+    private function executeRollbackCapablePhase(
+        object $connection,
+        array $galeraState,
+        string $identifierField,
+        string $linkField,
+        string $entityTable,
+        int $logicalEntityId,
+        string $expectedSku,
+        array $mutation,
+    ): ProductWriteResponseInterface|array {
+        $consequentialWriteAttempts = 0;
+        $connection->beginTransaction();
+
+        try {
+            $lockedRows = $this->fetchAll(
+                $connection,
+                sprintf(
+                    'SELECT %s FROM %s WHERE %s = %d FOR UPDATE',
+                    $this->quoteIdentifier($connection, $linkField),
+                    $this->quoteIdentifier($connection, $entityTable),
+                    $this->quoteIdentifier($connection, $identifierField),
+                    $logicalEntityId,
+                ),
+            );
+
+            if ($lockedRows === []) {
+                return $this->rollbackAndReturn(
+                    $connection,
+                    $galeraState,
+                    'safe_sync_entity_missing',
+                    $logicalEntityId,
+                    $expectedSku,
+                    false,
+                    0,
+                );
+            }
+
+            if (! $this->skuResolvesOnlyToLogicalEntity($connection, $entityTable, $identifierField, $logicalEntityId, $expectedSku)) {
+                return $this->rollbackAndReturn(
+                    $connection,
+                    $galeraState,
+                    'safe_sync_ambiguous_sku',
+                    $logicalEntityId,
+                    $expectedSku,
+                    false,
+                    0,
+                );
+            }
+
+            try {
+                $product = $this->productRepository->getById($logicalEntityId, false, null, true);
+            } catch (NoSuchEntityException) {
+                return $this->rollbackAndReturn(
+                    $connection,
+                    $galeraState,
+                    'safe_sync_entity_missing',
+                    $logicalEntityId,
+                    $expectedSku,
+                    false,
+                    0,
+                );
+            }
+
+            if ((int) $product->getData($identifierField) !== $logicalEntityId) {
+                return $this->rollbackAndReturn(
+                    $connection,
+                    $galeraState,
+                    'safe_sync_identity_mismatch',
+                    $logicalEntityId,
+                    $expectedSku,
+                    false,
+                    0,
+                );
+            }
+
+            if ((string) $product->getSku() !== $expectedSku) {
+                return $this->rollbackAndReturn(
+                    $connection,
+                    $galeraState,
+                    'safe_sync_sku_mismatch',
+                    $logicalEntityId,
+                    $expectedSku,
+                    false,
+                    0,
+                );
+            }
+
+            if ((string) $product->getTypeId() !== 'simple') {
+                return $this->rollbackAndReturn(
+                    $connection,
+                    $galeraState,
+                    'safe_sync_non_simple_product_type',
+                    $logicalEntityId,
+                    $expectedSku,
+                    false,
+                    0,
+                );
+            }
+
+            $this->applyMutation($product, $mutation);
+
+            if ($product->getData($identifierField) === null) {
+                return $this->rollbackAndReturn(
+                    $connection,
+                    $galeraState,
+                    'safe_sync_identifier_missing_before_save',
+                    $logicalEntityId,
+                    $expectedSku,
+                    false,
+                    0,
+                );
+            }
+
+            if ((int) $product->getData($identifierField) !== $logicalEntityId) {
+                return $this->rollbackAndReturn(
+                    $connection,
+                    $galeraState,
+                    'safe_sync_identity_mismatch_before_save',
+                    $logicalEntityId,
+                    $expectedSku,
+                    false,
+                    0,
+                );
+            }
+
+            if ((string) $product->getSku() !== $expectedSku) {
+                return $this->rollbackAndReturn(
+                    $connection,
+                    $galeraState,
+                    'safe_sync_sku_mismatch_before_save',
+                    $logicalEntityId,
+                    $expectedSku,
+                    false,
+                    0,
+                );
+            }
+
+            try {
+                $consequentialWriteAttempts = 1;
+                $this->productRepository->save($product);
+            } catch (\Throwable $exception) {
+                $this->logger->warning('Safe Sync product save failed before outer commit.', ['exception' => $exception]);
+
+                return $this->rollbackAndReturn(
+                    $connection,
+                    $galeraState,
+                    'safe_sync_repository_save_failed',
+                    $logicalEntityId,
+                    $expectedSku,
+                    false,
+                    $consequentialWriteAttempts,
+                );
+            }
+
+            try {
+                $postSave = $this->productRepository->getById($logicalEntityId, false, null, true);
+            } catch (NoSuchEntityException) {
+                return $this->rollbackAndReturn(
+                    $connection,
+                    $galeraState,
+                    'safe_sync_entity_missing_after_save',
+                    $logicalEntityId,
+                    $expectedSku,
+                    false,
+                    $consequentialWriteAttempts,
+                );
+            }
+
+            $postconditionReason = $this->verifyPostcondition(
+                $postSave,
+                $identifierField,
+                $entityTable,
+                $connection,
+                $logicalEntityId,
+                $expectedSku,
+                $mutation,
+            );
+
+            if ($postconditionReason !== null) {
+                return $this->rollbackAndReturn(
+                    $connection,
+                    $galeraState,
+                    $postconditionReason,
+                    $logicalEntityId,
+                    $expectedSku,
+                    false,
+                    $consequentialWriteAttempts,
+                );
+            }
+
+            try {
+                $connection->commit();
+            } catch (\Throwable $exception) {
+                $warningCodes = $this->restoreAfterCommitException($connection, $galeraState);
+                $this->logger->warning('Safe Sync outer commit acknowledgement is uncertain.', ['exception' => $exception]);
+
+                return $this->unknownOrAmbiguous(
+                    'safe_sync_commit_uncertain',
+                    $logicalEntityId,
+                    $expectedSku,
+                    true,
+                    $consequentialWriteAttempts,
+                    $warningCodes,
+                );
+            }
+
+            return [
+                'consequential_write_attempts' => $consequentialWriteAttempts,
+            ];
+        } catch (\Throwable $exception) {
+            $this->logger->error('Safe Sync write failed closed before commit.', ['exception' => $exception]);
+
+            return $this->rollbackAndReturn(
+                $connection,
+                $galeraState,
+                'safe_sync_precommit_failure',
+                $logicalEntityId,
+                $expectedSku,
+                false,
+                $consequentialWriteAttempts,
+            );
+        }
     }
 
     private function knownApplied(

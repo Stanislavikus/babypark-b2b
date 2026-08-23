@@ -117,10 +117,13 @@ class MagentoSafeSyncModuleContractTest extends TestCase
         $this->assertStringContainsString('getLinkField()', $content);
         $this->assertStringContainsString('getEntityTable()', $content);
         $this->assertStringContainsString('SELECT %s FROM %s WHERE %s = %d FOR UPDATE', $content);
+        $this->assertStringContainsString('LIMIT 2 FOR UPDATE', $content);
         $this->assertStringContainsString('getById($logicalEntityId, false, null, true)', $content);
-        $this->assertStringContainsString("knownNotApplied('safe_sync_non_simple_product_type'", $content);
-        $this->assertStringContainsString("knownNotApplied('safe_sync_identifier_index_unavailable'", $content);
-        $this->assertStringContainsString("knownNotApplied('safe_sync_sku_index_unavailable'", $content);
+        $this->assertStringContainsString("'safe_sync_non_simple_product_type'", $content);
+        $this->assertStringContainsString("'safe_sync_identifier_index_unavailable'", $content);
+        $this->assertStringContainsString("'safe_sync_sku_index_unavailable'", $content);
+        $this->assertStringContainsString("'safe_sync_rollback_uncertain'", $content);
+        $this->assertStringContainsString('mapped_attributes', $content);
         $this->assertStringNotContainsString('postProduct(', $content);
         $this->assertStringNotContainsString('row_id as identity', $content);
     }

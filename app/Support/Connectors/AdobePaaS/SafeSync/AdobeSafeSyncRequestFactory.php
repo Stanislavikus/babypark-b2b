@@ -124,35 +124,35 @@ final class AdobeSafeSyncRequestFactory
 
     private function encodeWritePayload(AdobeSafeSyncSimpleProductWriteRequest $payload): string
     {
-        $data = [
+        $request = [
             'expected_sku' => $payload->expectedSku,
-            'custom_attributes' => array_map(
+            'mapped_attributes' => array_map(
                 static fn (AdobeSafeSyncSimpleProductWriteCustomAttribute $attribute): array => [
                     'attribute_code' => $attribute->attributeCode,
                     'value' => $attribute->value,
                 ],
-                $payload->customAttributes,
+                $payload->mappedAttributes,
             ),
         ];
 
         if ($payload->name !== null) {
-            $data['name'] = $payload->name;
+            $request['name'] = $payload->name;
         }
 
         if ($payload->status !== null) {
-            $data['status'] = $payload->status;
+            $request['status'] = $payload->status;
         }
 
         if ($payload->visibility !== null) {
-            $data['visibility'] = $payload->visibility;
+            $request['visibility'] = $payload->visibility;
         }
 
         if ($payload->price !== null) {
-            $data['price'] = $payload->price;
+            $request['price'] = $payload->price;
         }
 
         try {
-            $encoded = json_encode($data, JSON_THROW_ON_ERROR);
+            $encoded = json_encode(['request' => $request], JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
             throw new AdobeSafeSyncRequestException('Safe Sync write payload JSON encoding failed.', 0, $exception);
         }

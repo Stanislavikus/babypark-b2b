@@ -5,7 +5,7 @@ namespace App\Support\Connectors\AdobePaaS\SafeSync;
 final readonly class AdobeSafeSyncSimpleProductWriteRequest
 {
     /**
-     * @param  list<AdobeSafeSyncSimpleProductWriteCustomAttribute>  $customAttributes
+     * @param  list<AdobeSafeSyncSimpleProductWriteCustomAttribute>  $mappedAttributes
      */
     public function __construct(
         public string $expectedSku,
@@ -13,6 +13,6 @@ final readonly class AdobeSafeSyncSimpleProductWriteRequest
         public ?int $status = null,
         public ?int $visibility = null,
         public ?float $price = null,
-        public array $customAttributes = [],
+        public array $mappedAttributes = [],
     ) {}
 }

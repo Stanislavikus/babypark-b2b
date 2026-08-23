@@ -4,15 +4,10 @@ declare(strict_types=1);
 
 namespace B2BPlatform\MagentoSafeSync\Model;
 
-use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 
 final class GaleraWriteSession
 {
-    public function __construct(
-        private readonly ResourceConnection $resourceConnection,
-    ) {}
-
     /**
      * @return array{previous:?int}
      */
@@ -49,7 +44,7 @@ final class GaleraWriteSession
         try {
             $this->setWsrepSyncWait($connection, $state['previous']);
         } catch (\Throwable $restoreException) {
-            $this->quarantineConnectionAfterRestoreFailure($restoreException);
+            $this->quarantineConnectionAfterRestoreFailure($connection, $restoreException);
             throw new \RuntimeException('safe_sync_wsrep_restore_failed', 0, $restoreException);
         }
     }
@@ -101,10 +96,16 @@ final class GaleraWriteSession
         return method_exists($connection, 'getTransactionLevel') ? (int) $connection->getTransactionLevel() : 0;
     }
 
-    private function quarantineConnectionAfterRestoreFailure(\Throwable $restoreException): void
-    {
+    private function quarantineConnectionAfterRestoreFailure(
+        AdapterInterface $connection,
+        \Throwable $restoreException,
+    ): void {
         try {
-            $this->resourceConnection->closeConnection();
+            if (! method_exists($connection, 'closeConnection')) {
+                throw new \RuntimeException('closeConnection unavailable');
+            }
+
+            $connection->closeConnection();
         } catch (\Throwable $quarantineException) {
             throw new \RuntimeException(
                 sprintf('safe_sync_wsrep_connection_quarantine_failed:%s', $quarantineException::class),

@@ -16,7 +16,7 @@ interface ProductWriteRequestInterface
 
     public const PRICE = 'price';
 
-    public const CUSTOM_ATTRIBUTES = 'custom_attributes';
+    public const MAPPED_ATTRIBUTES = 'mapped_attributes';
 
     public function getExpectedSku(): string;
 
@@ -39,12 +39,12 @@ interface ProductWriteRequestInterface
     public function setPrice(?float $price): self;
 
     /**
-     * @return list<array{attribute_code:mixed,value:mixed}>
+     * @return ProductWriteMappedAttributeInterface[]
      */
-    public function getCustomAttributes(): array;
+    public function getMappedAttributes(): array;
 
     /**
-     * @param  list<array{attribute_code:mixed,value:mixed}>  $customAttributes
+     * @param  ProductWriteMappedAttributeInterface[]  $mappedAttributes
      */
-    public function setCustomAttributes(array $customAttributes): self;
+    public function setMappedAttributes(array $mappedAttributes): self;
 }

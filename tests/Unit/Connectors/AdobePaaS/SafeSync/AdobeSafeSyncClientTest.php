@@ -382,7 +382,7 @@ class AdobeSafeSyncClientTest extends TestCase
             new AdobeSafeSyncSimpleProductWriteRequest(
                 expectedSku: 'SKU-77',
                 name: 'Updated Product',
-                customAttributes: [
+                mappedAttributes: [
                     new AdobeSafeSyncSimpleProductWriteCustomAttribute('color', 'red'),
                 ],
             ),
@@ -396,10 +396,14 @@ class AdobeSafeSyncClientTest extends TestCase
             (string) $transport->captured->request->getUri(),
         );
         $this->assertSame(AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_MAX_RESPONSE_BYTES, $transport->captured->limits->maxResponseBodyBytes);
+        $payload = json_decode((string) $transport->captured->request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame(['request'], array_keys($payload));
+        $this->assertSame('SKU-77', $payload['request']['expected_sku'] ?? null);
+        $this->assertSame([['attribute_code' => 'color', 'value' => 'red']], $payload['request']['mapped_attributes'] ?? null);
     }
 
     #[Test]
-    public function malformed_simple_product_write_response_fails_closed(): void
+    public function malformed_simple_product_write_response_is_unknown_or_ambiguous_after_put_submission(): void
     {
         $client = $this->clientWithTransport(new class implements ConnectorHttpTransport
         {
@@ -417,14 +421,133 @@ class AdobeSafeSyncClientTest extends TestCase
             }
         });
 
-        $this->expectException(AdobeSafeSyncClientException::class);
-        $this->expectExceptionMessage('Safe Sync response field `consequential_write_attempts` is invalid.');
-
-        $client->writeSimpleProductWithContext(
+        $result = $client->writeSimpleProductWithContext(
             $this->context(),
             77,
             new AdobeSafeSyncSimpleProductWriteRequest(expectedSku: 'SKU-77'),
         );
+
+        $this->assertSame('unknown_or_ambiguous', $result->appliedStateKnowledge->value);
+        $this->assertSame('safe_sync_bridge_response_ambiguous', $result->reasonCode);
+        $this->assertFalse($result->postconditionVerified);
+        $this->assertSame(1, $result->consequentialWriteAttempts);
+        $this->assertSame([], $result->warningCodes);
+    }
+
+    #[Test]
+    public function write_timeout_is_unknown_or_ambiguous_with_single_send_attempt_and_no_secret_leakage(): void
+    {
+        $transport = new class implements ConnectorHttpTransport
+        {
+            public int $sendCount = 0;
+
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                $this->sendCount++;
+
+                throw new ConnectorTransportException(TransportFailureReason::Timeout);
+            }
+        };
+
+        $client = $this->clientWithTransport($transport);
+        $result = $client->writeSimpleProductWithContext(
+            $this->context(),
+            77,
+            new AdobeSafeSyncSimpleProductWriteRequest(expectedSku: 'SKU-77'),
+        );
+
+        $this->assertSame('unknown_or_ambiguous', $result->appliedStateKnowledge->value);
+        $this->assertSame('safe_sync_transport_ambiguous', $result->reasonCode);
+        $this->assertSame(1, $result->consequentialWriteAttempts);
+        $this->assertSame(1, $transport->sendCount);
+    }
+
+    #[Test]
+    public function write_connection_reset_is_unknown_or_ambiguous_with_single_send_attempt(): void
+    {
+        $transport = new class implements ConnectorHttpTransport
+        {
+            public int $sendCount = 0;
+
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                $this->sendCount++;
+
+                throw new ConnectorTransportException(TransportFailureReason::ConnectionFailed);
+            }
+        };
+
+        $client = $this->clientWithTransport($transport);
+        $result = $client->writeSimpleProductWithContext(
+            $this->context(),
+            77,
+            new AdobeSafeSyncSimpleProductWriteRequest(expectedSku: 'SKU-77'),
+        );
+
+        $this->assertSame('unknown_or_ambiguous', $result->appliedStateKnowledge->value);
+        $this->assertSame('safe_sync_transport_ambiguous', $result->reasonCode);
+        $this->assertSame(1, $result->consequentialWriteAttempts);
+        $this->assertSame(1, $transport->sendCount);
+    }
+
+    #[Test]
+    public function non_success_write_http_response_is_unknown_or_ambiguous_after_submission(): void
+    {
+        $transport = new class implements ConnectorHttpTransport
+        {
+            public int $sendCount = 0;
+
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                $this->sendCount++;
+
+                return new ConnectorHttpResult(409, [], json_encode([
+                    'message' => 'safe_sync_ambiguous_sku',
+                ], JSON_THROW_ON_ERROR));
+            }
+        };
+
+        $client = $this->clientWithTransport($transport);
+        $result = $client->writeSimpleProductWithContext(
+            $this->context(),
+            77,
+            new AdobeSafeSyncSimpleProductWriteRequest(expectedSku: 'SKU-77'),
+        );
+
+        $this->assertSame('unknown_or_ambiguous', $result->appliedStateKnowledge->value);
+        $this->assertSame('safe_sync_bridge_response_ambiguous', $result->reasonCode);
+        $this->assertSame(1, $result->consequentialWriteAttempts);
+        $this->assertSame(1, $transport->sendCount);
+    }
+
+    #[Test]
+    public function known_applied_write_response_must_prove_postcondition_and_single_attempt(): void
+    {
+        $client = $this->clientWithTransport(new class implements ConnectorHttpTransport
+        {
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'applied_state' => 'known_applied',
+                    'reason_code' => 'safe_sync_simple_product_write_applied',
+                    'logical_entity_id' => 77,
+                    'sku' => 'SKU-77',
+                    'postcondition_verified' => false,
+                    'consequential_write_attempts' => 0,
+                    'warning_codes' => [],
+                ], JSON_THROW_ON_ERROR));
+            }
+        });
+
+        $result = $client->writeSimpleProductWithContext(
+            $this->context(),
+            77,
+            new AdobeSafeSyncSimpleProductWriteRequest(expectedSku: 'SKU-77'),
+        );
+
+        $this->assertSame('unknown_or_ambiguous', $result->appliedStateKnowledge->value);
+        $this->assertSame('safe_sync_bridge_response_ambiguous', $result->reasonCode);
+        $this->assertSame(1, $result->consequentialWriteAttempts);
     }
 
     #[Test]

@@ -84,17 +84,39 @@ final class AdobeSafeSyncClient
         int $logicalEntityId,
         AdobeSafeSyncSimpleProductWriteRequest $payload,
     ): AdobeSafeSyncSimpleProductWriteResult {
-        $result = $this->send(
-            $this->requestFactory->buildWriteSimpleProduct(
-                $context,
-                $logicalEntityId,
-                $payload,
-                $this->newSigningContext(),
-            ),
-            AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_MAX_RESPONSE_BYTES,
+        $request = $this->requestFactory->buildWriteSimpleProduct(
+            $context,
+            $logicalEntityId,
+            $payload,
+            $this->newSigningContext(),
         );
 
-        return $this->parseSimpleProductWriteResult($result, $logicalEntityId, $payload->expectedSku);
+        try {
+            $result = $this->transport->send(new ConnectorOutboundRequest(
+                $request,
+                new ConnectorTransportLimits(
+                    connectTimeoutSeconds: 10.0,
+                    totalTimeoutSeconds: 30.0,
+                    maxResponseBodyBytes: AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_MAX_RESPONSE_BYTES,
+                ),
+            ));
+        } catch (ConnectorTransportException) {
+            return $this->unknownWriteResult(
+                'safe_sync_transport_ambiguous',
+                $logicalEntityId,
+                $payload->expectedSku,
+            );
+        }
+
+        try {
+            return $this->parseSimpleProductWriteResult($result, $logicalEntityId, $payload->expectedSku);
+        } catch (AdobeSafeSyncClientException) {
+            return $this->unknownWriteResult(
+                'safe_sync_bridge_response_ambiguous',
+                $logicalEntityId,
+                $payload->expectedSku,
+            );
+        }
     }
 
     private function send(RequestInterface $request, int $maxResponseBodyBytes): ConnectorHttpResult
@@ -191,6 +213,13 @@ final class AdobeSafeSyncClient
             throw new AdobeSafeSyncClientException('Safe Sync response field `applied_state` is invalid.', 0, $exception);
         }
 
+        if (
+            $knowledge === AdobeProductAppliedStateKnowledge::KnownApplied
+            && ($consequentialWriteAttempts !== 1 || $postconditionVerified !== true)
+        ) {
+            throw new AdobeSafeSyncClientException('Safe Sync known-applied write response is internally inconsistent.');
+        }
+
         return new AdobeSafeSyncSimpleProductWriteResult(
             $knowledge,
             $reasonCode,
@@ -199,6 +228,22 @@ final class AdobeSafeSyncClient
             $postconditionVerified,
             $consequentialWriteAttempts,
             $warningCodes,
+        );
+    }
+
+    private function unknownWriteResult(
+        string $reasonCode,
+        int $logicalEntityId,
+        string $expectedSku,
+    ): AdobeSafeSyncSimpleProductWriteResult {
+        return new AdobeSafeSyncSimpleProductWriteResult(
+            AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous,
+            $reasonCode,
+            $logicalEntityId,
+            $expectedSku,
+            false,
+            1,
+            [],
         );
     }
 

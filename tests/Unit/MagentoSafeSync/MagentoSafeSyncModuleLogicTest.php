@@ -60,9 +60,20 @@ interface ProductWriteRequestInterface
 
     public function setPrice(?float $price): self;
 
-    public function getCustomAttributes(): array;
+    public function getMappedAttributes(): array;
 
-    public function setCustomAttributes(array $customAttributes): self;
+    public function setMappedAttributes(array $mappedAttributes): self;
+}
+
+interface ProductWriteMappedAttributeInterface
+{
+    public function getAttributeCode(): string;
+
+    public function setAttributeCode(string $attributeCode): self;
+
+    public function getValue(): string;
+
+    public function setValue(string $value): self;
 }
 
 interface ProductWriteResponseInterface
@@ -125,6 +136,7 @@ namespace B2BPlatform\MagentoSafeSync\Model\Data;
 
 use B2BPlatform\MagentoSafeSync\Api\Data\HandshakeResponseInterface;
 use B2BPlatform\MagentoSafeSync\Api\Data\ProductReadResponseInterface;
+use B2BPlatform\MagentoSafeSync\Api\Data\ProductWriteMappedAttributeInterface;
 use B2BPlatform\MagentoSafeSync\Api\Data\ProductWriteRequestInterface;
 use B2BPlatform\MagentoSafeSync\Api\Data\ProductWriteResponseInterface;
 
@@ -261,8 +273,8 @@ final class ProductWriteRequest implements ProductWriteRequestInterface
 
     private ?float $price = null;
 
-    /** @var list<array{attribute_code:mixed,value:mixed}> */
-    private array $customAttributes = [];
+    /** @var list<ProductWriteMappedAttributeInterface> */
+    private array $mappedAttributes = [];
 
     public function getExpectedSku(): string
     {
@@ -324,14 +336,45 @@ final class ProductWriteRequest implements ProductWriteRequestInterface
         return $this;
     }
 
-    public function getCustomAttributes(): array
+    public function getMappedAttributes(): array
     {
-        return $this->customAttributes;
+        return $this->mappedAttributes;
     }
 
-    public function setCustomAttributes(array $customAttributes): ProductWriteRequestInterface
+    public function setMappedAttributes(array $mappedAttributes): ProductWriteRequestInterface
     {
-        $this->customAttributes = array_values($customAttributes);
+        $this->mappedAttributes = array_values($mappedAttributes);
+
+        return $this;
+    }
+}
+
+final class ProductWriteMappedAttribute implements ProductWriteMappedAttributeInterface
+{
+    private string $attributeCode = '';
+
+    private string $value = '';
+
+    public function getAttributeCode(): string
+    {
+        return $this->attributeCode;
+    }
+
+    public function setAttributeCode(string $attributeCode): ProductWriteMappedAttributeInterface
+    {
+        $this->attributeCode = $attributeCode;
+
+        return $this;
+    }
+
+    public function getValue(): string
+    {
+        return $this->value;
+    }
+
+    public function setValue(string $value): ProductWriteMappedAttributeInterface
+    {
+        $this->value = $value;
 
         return $this;
     }
@@ -468,6 +511,8 @@ interface AdapterInterface
     public function fetchRow($sql);
 
     public function query($sql);
+
+    public function closeConnection();
 }
 
 namespace Magento\Framework\App;
@@ -480,19 +525,27 @@ final class ResourceConnection
 
     public int $closeCalls = 0;
 
+    /** @var array<string, AdapterInterface> */
+    private array $connections;
+
     public function __construct(
-        private readonly AdapterInterface $connection,
+        AdapterInterface $connection,
         private readonly ?\Throwable $closeFailure = null,
-    ) {}
+        array $namedConnections = [],
+    ) {
+        $this->connections = $namedConnections + [
+            self::DEFAULT_CONNECTION => $connection,
+        ];
+    }
 
     public function getConnection($resourceName = self::DEFAULT_CONNECTION): AdapterInterface
     {
-        return $this->connection;
+        return $this->connections[$resourceName] ?? $this->connections[self::DEFAULT_CONNECTION];
     }
 
     public function getConnectionByName(?string $connectionName): AdapterInterface
     {
-        return $this->connection;
+        return $this->connections[$connectionName ?? self::DEFAULT_CONNECTION] ?? $this->connections[self::DEFAULT_CONNECTION];
     }
 
     public function closeConnection($resourceName = self::DEFAULT_CONNECTION): void
@@ -1085,6 +1138,20 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
     }
 
     #[Test]
+    public function malformed_mapped_attributes_fail_closed_without_consequential_write_attempt(): void
+    {
+        $request = $this->writeRequest('SKU-77', name: 'Updated');
+        $request->setMappedAttributes([['attribute_code' => 'color', 'value' => 'red']]);
+        $fixture = $this->simpleWriteFixture();
+
+        $result = $fixture['management']->writeSimpleProduct(77, $request);
+
+        $this->assertSame('known_not_applied', $result->getAppliedState());
+        $this->assertSame('safe_sync_invalid_mapped_attribute_payload', $result->getReasonCode());
+        $this->assertSame(0, $result->getConsequentialWriteAttempts());
+    }
+
+    #[Test]
     public function non_simple_type_returns_known_not_applied_without_save_attempt(): void
     {
         $fixture = $this->simpleWriteFixture(product: new FakeProduct(entityId: 77, sku: 'SKU-77', typeId: 'configurable', name: 'Name'));
@@ -1169,6 +1236,22 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
     }
 
     #[Test]
+    public function sku_ownership_checks_use_locking_current_reads_before_mutation_and_before_commit(): void
+    {
+        $fixture = $this->simpleWriteFixture();
+
+        $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', name: 'Updated Name'));
+
+        $lockingQuery = "SELECT DISTINCT `entity_id` FROM `catalog_product_entity` WHERE `sku` = 'SKU-77' LIMIT 2 FOR UPDATE";
+        $lockingReads = array_values(array_filter(
+            $fixture['connection']->fetchHistory,
+            static fn (string $query): bool => $query === $lockingQuery,
+        ));
+
+        $this->assertCount(2, $lockingReads);
+    }
+
+    #[Test]
     public function successful_mutation_commits_outer_transaction_then_processes_callbacks(): void
     {
         $fixture = $this->simpleWriteFixture();
@@ -1186,6 +1269,9 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertSame(0, $fixture['callbackHandler']->clearCalls);
         $this->assertSame('Updated Name', $fixture['product']->getName());
         $this->assertSame(2, $fixture['product']->getStatus());
+        $this->assertSame([], $fixture['defaultConnection']->fetchHistory);
+        $this->assertSame([], $fixture['defaultConnection']->queries);
+        $this->assertSame([], $fixture['defaultConnection']->txEvents);
     }
 
     #[Test]
@@ -1198,6 +1284,7 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
 
         $this->assertSame('known_applied', $result->getAppliedState());
         $this->assertSame(['safe_sync_post_commit_callback_failed'], $result->getWarningCodes());
+        $this->assertSame(['begin', 'begin', 'commit', 'commit'], $fixture['connection']->txEvents);
     }
 
     #[Test]
@@ -1212,6 +1299,25 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertSame('safe_sync_commit_uncertain', $result->getReasonCode());
         $this->assertSame(1, $result->getConsequentialWriteAttempts());
         $this->assertSame(1, $fixture['repository']->saveCalls);
+    }
+
+    #[Test]
+    public function rollback_exception_after_consequential_save_attempt_returns_unknown_or_ambiguous_once_and_quarantines_exact_entity_connection(): void
+    {
+        $fixture = $this->simpleWriteFixture();
+        $fixture['repository']->afterSaveMutation = static function (FakeProduct $product): void {
+            $product->setSku('SKU-CHANGED');
+        };
+        $fixture['connection']->rollbackFailure = new \RuntimeException('rollback failed');
+
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', name: 'Updated Name'));
+
+        $this->assertSame('unknown_or_ambiguous', $result->getAppliedState());
+        $this->assertSame('safe_sync_rollback_uncertain', $result->getReasonCode());
+        $this->assertSame(1, $result->getConsequentialWriteAttempts());
+        $this->assertSame(1, $fixture['connection']->closeCalls);
+        $this->assertSame(0, $fixture['defaultConnection']->closeCalls);
+        $this->assertSame(['begin', 'begin', 'commit'], $fixture['connection']->txEvents);
     }
 
     #[Test]
@@ -1280,8 +1386,10 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
      *   management:ProductWriteManagement,
      *   repository:FakeProductRepository,
      *   connection:FakeAdapter,
+     *   defaultConnection:FakeAdapter,
      *   callbackHandler:CallbackHandler,
-     *   product:FakeProduct
+     *   product:FakeProduct,
+     *   logger:FakeLogger
      * }
      */
     private function simpleWriteFixture(
@@ -1298,7 +1406,7 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
                 ['Column_name' => 'sku', 'Seq_in_index' => 1],
             ],
             'SELECT `row_id` FROM `catalog_product_entity` WHERE `entity_id` = 77 FOR UPDATE' => $lockRows ?? [['row_id' => 7001]],
-            "SELECT DISTINCT `entity_id` FROM `catalog_product_entity` WHERE `sku` = 'SKU-77' LIMIT 2" => $skuRows ?? [['entity_id' => 77]],
+            "SELECT DISTINCT `entity_id` FROM `catalog_product_entity` WHERE `sku` = 'SKU-77' LIMIT 2 FOR UPDATE" => $skuRows ?? [['entity_id' => 77]],
             "SHOW VARIABLES LIKE 'wsrep_provider'" => $galeraEnabled ? ['Value' => '/usr/lib/libgalera_smm.so'] : null,
             "SHOW SESSION VARIABLES LIKE 'wsrep_on'" => ['Value' => 'ON'],
             "SHOW SESSION VARIABLES LIKE 'wsrep_dirty_reads'" => ['Value' => 'OFF'],
@@ -1307,6 +1415,7 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
             "SHOW STATUS LIKE 'wsrep_cluster_status'" => ['Value' => 'Primary'],
             "SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'" => ['Value' => '0'],
         ]);
+        $defaultConnection = new FakeAdapter([]);
         $repository = new FakeProductRepository($product, $connection);
         $metadata = new class($connection)
         {
@@ -1340,23 +1449,26 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
             }
         };
         $callbackHandler = new CallbackHandler;
-        $resourceConnection = new ResourceConnection($connection);
+        $resourceConnection = new ResourceConnection($defaultConnection, null, ['catalog' => $connection]);
+        $logger = new FakeLogger;
         $management = new ProductWriteManagement(
             $repository,
             new MetadataPool($metadata),
             $resourceConnection,
             new ProductWriteResponseFactory,
-            new GaleraWriteSession($resourceConnection),
+            new GaleraWriteSession,
             new ProductEntityManagerCallbackBridge($callbackHandler),
-            new FakeLogger,
+            $logger,
         );
 
         return [
             'management' => $management,
             'repository' => $repository,
             'connection' => $connection,
+            'defaultConnection' => $defaultConnection,
             'callbackHandler' => $callbackHandler,
             'product' => $product,
+            'logger' => $logger,
         ];
     }
 
@@ -1366,7 +1478,7 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         ?int $status = null,
         ?int $visibility = null,
         ?float $price = null,
-        array $customAttributes = [],
+        array $mappedAttributes = [],
     ): ProductWriteRequest {
         return (new ProductWriteRequest)
             ->setExpectedSku($expectedSku)
@@ -1374,7 +1486,14 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
             ->setStatus($status)
             ->setVisibility($visibility)
             ->setPrice($price)
-            ->setCustomAttributes($customAttributes);
+            ->setMappedAttributes($mappedAttributes);
+    }
+
+    private function mappedAttribute(string $attributeCode, string $value): ProductWriteMappedAttribute
+    {
+        return (new ProductWriteMappedAttribute)
+            ->setAttributeCode($attributeCode)
+            ->setValue($value);
     }
 
     private function healthyGaleraScope(FakeAdapter $connection): GaleraSessionScope
@@ -1432,6 +1551,10 @@ final class FakeAdapter implements AdapterInterface
     public int $transactionLevel = 0;
 
     public ?\Throwable $commitFailure = null;
+
+    public ?\Throwable $rollbackFailure = null;
+
+    public int $closeCalls = 0;
 
     /**
      * @param  array<string, mixed>  $rows
@@ -1501,6 +1624,10 @@ final class FakeAdapter implements AdapterInterface
 
     public function rollBack(): void
     {
+        if ($this->rollbackFailure !== null) {
+            throw $this->rollbackFailure;
+        }
+
         $this->transactionLevel = max(0, $this->transactionLevel - 1);
         $this->txEvents[] = 'rollback';
     }
@@ -1518,6 +1645,11 @@ final class FakeAdapter implements AdapterInterface
     public function quoteIdentifier(string $identifier): string
     {
         return '`'.$identifier.'`';
+    }
+
+    public function closeConnection(): void
+    {
+        $this->closeCalls++;
     }
 }
 
