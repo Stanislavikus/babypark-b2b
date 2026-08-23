@@ -874,16 +874,24 @@ class ManageAdobeProductsExportPreview extends Page
         $previewAuth = app(AdobeProductsExportPreviewAuthorizationService::class);
         $liveAuth = app(AdobeProductsExportLiveAuthorizationService::class);
 
-        if ($previewAuth->canAccess($user, $workspace) || $liveAuth->canAccessLive($user, $workspace)) {
-            return true;
-        }
-
+        // A. accountId === null — pre-mount / lifecycle. Allow only if the
+        //    actor has at least one broad page permission. The exact target
+        //    check is deferred to mount() / refreshPresentation() which
+        //    receive the route parameter.
         if ($accountId === null) {
-            return $previewAuth->canManageSetup($user, $workspace)
+            return $previewAuth->canAccess($user, $workspace)
+                || $liveAuth->canAccessLive($user, $workspace)
+                || $previewAuth->canManageSetup($user, $workspace)
                 || $liveAuth->canManageSetup($user, $workspace);
         }
 
-        return $previewAuth->isEligibleSetupTarget($user, $workspace, $accountId);
+        // B. accountId !== null — workspace-level permission is NOT
+        //    sufficient authority for an arbitrary account. Access must
+        //    require at least one exact target-aware predicate, each of
+        //    which already includes the corresponding permission check.
+        return $previewAuth->isEligiblePreviewTarget($user, $workspace, $accountId)
+            || $liveAuth->isEligibleLiveTarget($user, $workspace, $accountId)
+            || $previewAuth->isEligibleSetupTarget($user, $workspace, $accountId);
     }
 
     private function resetEntityTrustPresentation(): void
