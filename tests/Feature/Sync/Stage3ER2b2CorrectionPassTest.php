@@ -3,8 +3,6 @@
 namespace Tests\Feature\Sync;
 
 use App\Enums\EntityTrust\EntityTrustConfirmationMode;
-use App\Enums\EntityTrust\EntityTrustFailureReason;
-use App\Enums\EntityTrust\EntityTrustReadinessStatus;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportPreview;
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
@@ -13,15 +11,13 @@ use App\Models\ProductVariant;
 use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Sync\EntityTrust\AdobeProductEntityTrustConfirmationService;
-use App\Services\Sync\EntityTrust\AdobeProductEntityTrustReviewService;
 use App\Services\Sync\EntityTrust\EntityTrustReviewFlowStore;
-use App\Support\Sync\EntityTrust\Exceptions\EntityTrustException;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
+use Illuminate\Cache\Repository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
@@ -602,9 +598,9 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         config(['cache.default' => 'file']);
         config(['cache.stores.file' => ['driver' => 'file', 'path' => $cacheDir]]);
         $this->app->forgetInstance(\Illuminate\Contracts\Cache\Repository::class);
-        $this->app->forgetInstance(\Illuminate\Cache\Repository::class);
+        $this->app->forgetInstance(Repository::class);
         $this->app->forgetInstance(EntityTrustReviewFlowStore::class);
-        $this->app->singleton(\Illuminate\Contracts\Cache\Repository::class, fn () => \Illuminate\Support\Facades\Cache::store('file'));
+        $this->app->singleton(\Illuminate\Contracts\Cache\Repository::class, fn () => Cache::store('file'));
 
         $store = app(EntityTrustReviewFlowStore::class);
         $workspace = $account->workspace;
@@ -624,7 +620,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         // first consume() from succeeding. The cache lock provider is the
         // same one used by consume() — this is a deterministic proof
         // that the lock is the single point of arbitration.
-        $lock = \Illuminate\Support\Facades\Cache::store('file')
+        $lock = Cache::store('file')
             ->lock('entity_trust_review_flow_lock:entity_trust_review_flow:'.$flowId, 5);
         $this->assertTrue($lock->get(), 'Competitor must acquire the lock to set up the test.');
 
@@ -645,7 +641,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         $this->assertNull($replay, 'A consumed flow id must never be replayed.');
 
         // Cleanup.
-        \Illuminate\Support\Facades\Cache::store('file')->flush();
+        Cache::store('file')->flush();
         @rmdir($cacheDir);
     }
 
