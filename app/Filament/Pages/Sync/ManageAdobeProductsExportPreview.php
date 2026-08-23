@@ -7,6 +7,8 @@ use App\Enums\SyncLiveWorklistFilter;
 use App\Enums\SyncPreviewMerchantPageState;
 use App\Enums\SyncPreviewWorklistFilter;
 use App\Enums\SyncSemanticOperation;
+use App\Models\ConnectorAccount;
+use App\Models\Product;
 use App\Models\SyncConfiguration;
 use App\Models\SyncRun;
 use App\Models\User;
@@ -14,6 +16,9 @@ use App\Models\Workspace;
 use App\Services\Sync\AdobeProductsExportLiveAuthorizationService;
 use App\Services\Sync\AdobeProductsExportPreviewAuthorizationService;
 use App\Services\Sync\ConnectorAccountLayerBSetupProjectionQuery;
+use App\Services\Sync\EntityTrust\AdobeProductEntityTrustAuthorizationService;
+use App\Services\Sync\EntityTrust\EntityTrustMerchantOrchestrator;
+use App\Services\Sync\EntityTrust\EntityTrustMerchantReadService;
 use App\Services\Sync\SyncActiveRunReadQuery;
 use App\Services\Sync\SyncConfigurationLookupService;
 use App\Services\Sync\SyncLiveAdmissionService;
@@ -24,10 +29,12 @@ use App\Services\Sync\SyncPreviewAdmissionService;
 use App\Services\Sync\SyncPreviewMerchantReadService;
 use App\Services\Sync\SyncPreviewWorklistPresenter;
 use App\Services\Sync\SyncPreviewWorklistQuery;
+use App\Support\Sync\EntityTrust\EntityTrustMerchantOutcome;
 use App\Support\Sync\Exceptions\SyncLiveAdmissionException;
 use App\Support\Sync\Exceptions\SyncPreviewAdmissionException;
 use App\Support\Workspace\Rbac\Concerns\RequiresFreshWorkspaceAdobeProductsExportExecutionAccess;
 use App\Support\Workspace\WorkspaceContext;
+use Closure;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -141,6 +148,72 @@ class ManageAdobeProductsExportPreview extends Page
 
     /** @var list<array<string, mixed>> */
     public array $liveWorklistRows = [];
+
+    // ----- Stage 3E-R2b-2: Entity Trust merchant UI state -----
+
+    #[Locked]
+    public ?string $entityTrustProductId = null;
+
+    #[Locked]
+    public ?string $entityTrustReviewFlowId = null;
+
+    #[Locked]
+    public ?string $entityTrustRelinkParentSku = null;
+
+    /** @var list<array<string, mixed>> */
+    public array $entityTrustWorkingSet = [];
+
+    public bool $entityTrustSectionVisible = false;
+
+    public bool $entityTrustCanReviewOrConfirm = false;
+
+    public ?string $entityTrustOutcomeCategory = null;
+
+    public ?string $entityTrustOutcomeLabel = null;
+
+    public ?string $entityTrustOutcomeExplanation = null;
+
+    public ?string $entityTrustOutcomeAction = null;
+
+    public ?string $entityTrustOutcomeProductName = null;
+
+    public ?string $entityTrustOutcomePrimarySku = null;
+
+    public bool $entityTrustOutcomeIsConfigurable = false;
+
+    public ?string $entityTrustOutcomeAvailableAction = null;
+
+    public bool $entityTrustOutcomeIsConfirmation = false;
+
+    public bool $entityTrustOutcomeIsStale = false;
+
+    public bool $entityTrustOutcomeIsSuccess = false;
+
+    public bool $entityTrustOutcomeIsConflict = false;
+
+    public bool $entityTrustOutcomeIsSecurity = false;
+
+    public bool $entityTrustOutcomeIsRemoteFailure = false;
+
+    public bool $entityTrustOutcomeIsRelinkRequired = false;
+
+    public bool $entityTrustOutcomeReadyForConfirmation = false;
+
+    public ?string $entityTrustActiveReviewFlowId = null;
+
+    public ?string $entityTrustActiveReviewProductId = null;
+
+    /** @var list<array<string, mixed>> */
+    public array $entityTrustActiveSubjects = [];
+
+    /** @var list<string> */
+    public array $entityTrustActiveExtraChildSkus = [];
+
+    public bool $entityTrustActiveExtraChildrenAvailable = false;
+
+    public ?string $entityTrustActiveMode = null;
+
+    public ?string $entityTrustErrorTitle = null;
 
     #[Url(as: 'filter')]
     public string $worklistFilter = 'needs_attention';
@@ -372,9 +445,328 @@ class ManageAdobeProductsExportPreview extends Page
             $this->accountName = $projection->accountName;
         }
 
+        // Stage 3E-R2b-2: entity trust section only surfaces inside the Live area.
+        if ($this->liveSectionVisible) {
+            $this->refreshEntityTrustPresentation($user, $workspace);
+        } else {
+            $this->resetEntityTrustPresentation();
+        }
+
         $this->pollActive = $this->pollActive
             || $this->livePollActive
             || $this->isBlockedByAnyActiveRun($workspace, $this->configurationId);
+    }
+
+    // ----- Stage 3E-R2b-2: Entity Trust merchant surface methods -----
+
+    public function requestEntityTrustReview(string $productId): void
+    {
+        $this->dispatchEntityTrustOrchestrator(
+            function (EntityTrustMerchantOrchestrator $orchestrator, User $user, Workspace $workspace, ConnectorAccount $account, Product $product): EntityTrustMerchantOutcome {
+                return $orchestrator->requestReview($user, $workspace, $account, $product);
+            },
+            $productId,
+            entityTrustRelinkParentSku: null,
+        );
+    }
+
+    public function requestEntityTrustRelink(string $productId, string $newMagentoParentSku): void
+    {
+        $this->dispatchEntityTrustOrchestrator(
+            function (EntityTrustMerchantOrchestrator $orchestrator, User $user, Workspace $workspace, ConnectorAccount $account, Product $product) use ($newMagentoParentSku): EntityTrustMerchantOutcome {
+                return $orchestrator->requestRelink($user, $workspace, $account, $product, $newMagentoParentSku);
+            },
+            $productId,
+            entityTrustRelinkParentSku: $newMagentoParentSku,
+        );
+    }
+
+    public function confirmEntityTrust(): void
+    {
+        $productId = $this->entityTrustProductId;
+        $flowId = $this->entityTrustReviewFlowId;
+
+        if ($productId === null || $flowId === null) {
+            $this->resetEntityTrustActiveReviewState();
+            $this->refreshPresentation();
+
+            return;
+        }
+
+        $user = Auth::user();
+        abort_unless($user instanceof User, 403);
+
+        $workspace = $this->resolveAdobeProductsExportExecutionWorkspace();
+
+        try {
+            $account = $this->resolveEntityTrustAccount($user, $workspace);
+        } catch (AuthorizationException) {
+            abort(403);
+        }
+
+        if ($account === null) {
+            abort(403);
+        }
+
+        $product = Product::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
+            ->where('id', $productId)
+            ->with('variants')
+            ->first();
+
+        if ($product === null) {
+            $this->resetEntityTrustActiveReviewState();
+            $this->refreshPresentation();
+
+            return;
+        }
+
+        $outcome = app(EntityTrustMerchantOrchestrator::class)->confirm(
+            $user,
+            $workspace,
+            $account,
+            $product,
+            $flowId,
+        );
+
+        $this->applyEntityTrustOutcome($outcome, previousFlowId: $flowId);
+    }
+
+    public function cancelEntityTrustFlow(): void
+    {
+        $flowId = $this->entityTrustReviewFlowId;
+
+        if ($flowId !== null) {
+            app(EntityTrustMerchantOrchestrator::class)->cancelFlow($flowId);
+        }
+
+        $this->resetEntityTrustActiveReviewState();
+        $this->refreshEntityTrustPresentation(
+            Auth::user() instanceof User ? Auth::user() : null,
+            app(WorkspaceContext::class)->current(),
+        );
+    }
+
+    private function dispatchEntityTrustOrchestrator(
+        Closure $callback,
+        string $productId,
+        ?string $entityTrustRelinkParentSku,
+    ): void {
+        $user = Auth::user();
+        abort_unless($user instanceof User, 403);
+
+        $workspace = $this->resolveAdobeProductsExportExecutionWorkspace();
+
+        try {
+            $account = $this->resolveEntityTrustAccount($user, $workspace);
+        } catch (AuthorizationException) {
+            abort(403);
+        }
+
+        if ($account === null) {
+            abort(403);
+        }
+
+        $product = Product::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
+            ->where('id', $productId)
+            ->with('variants')
+            ->first();
+
+        if ($product === null) {
+            $this->entityTrustErrorTitle = __('entity_trust.errors.product_not_found');
+            $this->refreshEntityTrustPresentation($user, $workspace);
+
+            return;
+        }
+
+        $this->entityTrustProductId = $product->id;
+        $this->entityTrustRelinkParentSku = $entityTrustRelinkParentSku;
+
+        $outcome = $callback(
+            app(EntityTrustMerchantOrchestrator::class),
+            $user,
+            $workspace,
+            $account,
+            $product,
+        );
+
+        $this->applyEntityTrustOutcome($outcome, previousFlowId: null);
+    }
+
+    private function applyEntityTrustOutcome(EntityTrustMerchantOutcome $outcome, ?string $previousFlowId): void
+    {
+        // Always discard any previous flow that is no longer the current one
+        // (e.g. a new review replaces a stale one before confirm).
+        if ($previousFlowId !== null && $previousFlowId !== $outcome->review_flow_id) {
+            app(EntityTrustMerchantOrchestrator::class)->cancelFlow($previousFlowId);
+        }
+
+        $this->entityTrustOutcomeCategory = $outcome->category->value;
+        $this->entityTrustOutcomeLabel = __($outcome->label_key);
+        $this->entityTrustOutcomeExplanation = __($outcome->explanation_key);
+        $this->entityTrustOutcomeAction = $outcome->available_action;
+        $this->entityTrustOutcomeProductName = $outcome->product_name;
+        $this->entityTrustOutcomePrimarySku = $outcome->primary_sku;
+        $this->entityTrustOutcomeIsConfigurable = $outcome->is_configurable_family;
+        $this->entityTrustOutcomeAvailableAction = $outcome->available_action;
+        $this->entityTrustOutcomeIsConfirmation = $this->isConfirmationReason($outcome->reason);
+        $this->entityTrustOutcomeIsStale = $outcome->category->value === 'stale_review';
+        $this->entityTrustOutcomeIsSuccess = $outcome->category->value === 'success';
+        $this->entityTrustOutcomeIsConflict = $outcome->category->value === 'identity_conflict';
+        $this->entityTrustOutcomeIsSecurity = $outcome->category->value === 'security';
+        $this->entityTrustOutcomeIsRemoteFailure = $outcome->category->value === 'remote_verification_failure';
+        $this->entityTrustOutcomeIsRelinkRequired = $outcome->category->value === 'relink_required'
+            || $outcome->available_action === 'relink';
+        $this->entityTrustOutcomeReadyForConfirmation = $outcome->review_flow_id !== null;
+
+        $this->entityTrustActiveReviewFlowId = $outcome->review_flow_id;
+        $this->entityTrustActiveReviewProductId = $outcome->review_flow_id !== null ? $outcome->product_id : null;
+        $this->entityTrustReviewFlowId = $outcome->review_flow_id;
+        $this->entityTrustActiveMode = $outcome->review_flow_id !== null
+            ? $this->mapModeLabel($outcome)
+            : null;
+        $this->entityTrustActiveSubjects = $this->presentActiveSubjects($outcome);
+        $this->entityTrustActiveExtraChildSkus = $outcome->extra_remote_child_skus;
+        $this->entityTrustActiveExtraChildrenAvailable = $outcome->extra_remote_children_available;
+
+        $this->entityTrustErrorTitle = null;
+    }
+
+    private function isConfirmationReason(\App\Enums\EntityTrust\EntityTrustFailureReason $reason): bool
+    {
+        return $reason === \App\Enums\EntityTrust\EntityTrustFailureReason::ConfirmationCompleted
+            || $reason === \App\Enums\EntityTrust\EntityTrustFailureReason::RelinkCompleted
+            || $reason === \App\Enums\EntityTrust\EntityTrustFailureReason::AlreadyConfirmed;
+    }
+
+    private function mapModeLabel(EntityTrustMerchantOutcome $outcome): string
+    {
+        return $outcome->is_configurable_family
+            ? __('entity_trust.mode.configurable_existing_parent')
+            : __('entity_trust.mode.simple_variant');
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function presentActiveSubjects(EntityTrustMerchantOutcome $outcome): array
+    {
+        $rows = [];
+
+        foreach ($outcome->subjects as $subject) {
+            $rows[] = [
+                'role' => $subject->role,
+                'subject_key' => $subject->subject_key,
+                'expected_sku' => $subject->expected_sku,
+                'magento_type_label' => __($subject->magento_type_label),
+                'platform_name' => $subject->platform_name,
+                'declared_image_count' => $subject->declared_image_count,
+                'declared_roles_summary' => $subject->declared_roles_summary,
+                'field_comparisons' => array_map(
+                    static fn ($c): array => [
+                        'field_key' => $c->field_key,
+                        'label' => $c->label,
+                        'platform_value' => $c->platform_value,
+                        'remote_value' => $c->remote_value,
+                    ],
+                    $subject->field_comparisons,
+                ),
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function resolveEntityTrustAccount(User $user, Workspace $workspace): ?ConnectorAccount
+    {
+        $auth = app(AdobeProductsExportLiveAuthorizationService::class);
+
+        if (! $auth->canAccessLive($user, $workspace)) {
+            return null;
+        }
+
+        if (! $auth->isEligibleLiveTarget($user, $workspace, $this->accountId)) {
+            return null;
+        }
+
+        return $auth->resolveConnectorAccount($user, $workspace, $this->accountId);
+    }
+
+    private function refreshEntityTrustPresentation(?User $user, ?Workspace $workspace): void
+    {
+        if (! $user instanceof User) {
+            $this->resetEntityTrustPresentation();
+
+            return;
+        }
+
+        $workspace ??= $this->resolveAdobeProductsExportExecutionWorkspace();
+
+        $auth = app(AdobeProductsExportLiveAuthorizationService::class);
+        $entityTrustAuth = app(AdobeProductEntityTrustAuthorizationService::class);
+
+        $this->entityTrustSectionVisible = $auth->isEligibleLiveTarget($user, $workspace, $this->accountId);
+        $this->entityTrustCanReviewOrConfirm = $this->entityTrustSectionVisible
+            && $entityTrustAuth->canReviewOrConfirm($user, $workspace);
+
+        if (! $this->entityTrustSectionVisible) {
+            $this->entityTrustWorkingSet = [];
+
+            return;
+        }
+
+        $account = $this->resolveEntityTrustAccount($user, $workspace);
+
+        if ($account === null) {
+            $this->entityTrustWorkingSet = [];
+
+            return;
+        }
+
+        $this->entityTrustWorkingSet = app(EntityTrustMerchantReadService::class)
+            ->workingSet($user, $workspace, $account);
+    }
+
+    private function resetEntityTrustPresentation(): void
+    {
+        $this->entityTrustWorkingSet = [];
+        $this->entityTrustSectionVisible = false;
+        $this->entityTrustCanReviewOrConfirm = false;
+        $this->resetEntityTrustActiveReviewState();
+    }
+
+    private function resetEntityTrustActiveReviewState(): void
+    {
+        $this->entityTrustProductId = null;
+        $this->entityTrustReviewFlowId = null;
+        $this->entityTrustRelinkParentSku = null;
+
+        $this->entityTrustOutcomeCategory = null;
+        $this->entityTrustOutcomeLabel = null;
+        $this->entityTrustOutcomeExplanation = null;
+        $this->entityTrustOutcomeAction = null;
+        $this->entityTrustOutcomeProductName = null;
+        $this->entityTrustOutcomePrimarySku = null;
+        $this->entityTrustOutcomeIsConfigurable = false;
+        $this->entityTrustOutcomeAvailableAction = null;
+        $this->entityTrustOutcomeIsConfirmation = false;
+        $this->entityTrustOutcomeIsStale = false;
+        $this->entityTrustOutcomeIsSuccess = false;
+        $this->entityTrustOutcomeIsConflict = false;
+        $this->entityTrustOutcomeIsSecurity = false;
+        $this->entityTrustOutcomeIsRemoteFailure = false;
+        $this->entityTrustOutcomeIsRelinkRequired = false;
+        $this->entityTrustOutcomeReadyForConfirmation = false;
+
+        $this->entityTrustActiveReviewFlowId = null;
+        $this->entityTrustActiveReviewProductId = null;
+        $this->entityTrustActiveSubjects = [];
+        $this->entityTrustActiveExtraChildSkus = [];
+        $this->entityTrustActiveExtraChildrenAvailable = false;
+        $this->entityTrustActiveMode = null;
+
+        $this->entityTrustErrorTitle = null;
     }
 
     private function applyCommonActiveRunGate(Workspace $workspace): void

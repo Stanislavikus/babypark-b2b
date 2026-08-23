@@ -226,5 +226,7 @@
         </div>
       @endif
     @endif
+
+    @include('filament.pages.sync.partials.sync-live-entity-trust')
   </x-filament::section>
 @endif
