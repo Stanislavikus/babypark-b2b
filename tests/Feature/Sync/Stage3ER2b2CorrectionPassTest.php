@@ -3,6 +3,7 @@
 namespace Tests\Feature\Sync;
 
 use App\Enums\EntityTrust\EntityTrustConfirmationMode;
+use App\Enums\EntityTrust\EntityTrustFailureReason;
 use App\Enums\UserRole;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportPreview;
 use App\Models\ConnectorAccount;
@@ -14,9 +15,13 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Connectors\ConnectorAccountSettingsService;
 use App\Services\Connectors\UpdateConnectorAccountInput;
+use App\Services\Sync\EntityTrust\AdobeProductEntityTrustConfirmationService;
+use App\Services\Sync\EntityTrust\AdobeProductEntityTrustReviewService;
 use App\Services\Sync\EntityTrust\EntityTrustReviewFlowStore;
 use App\Services\Sync\SyncConfigurationLookupService;
 use App\Support\Connectors\CredentialMutation;
+use App\Support\Sync\EntityTrust\EntityTrustReviewFlowPayload;
+use App\Support\Sync\EntityTrust\Exceptions\EntityTrustException;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -497,7 +502,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     }
 
     #[Test]
-    public function local_fingerprint_change_before_confirm_returns_stale_review_with_confirmation_expired_copy(): void
+    public function local_fingerprint_change_preserves_flow_until_confirm_and_returns_security(): void
     {
         [$account, $product, $variant] = $this->seedSimpleReadyFixture('CORR-STALE-LOCAL-SKU', 7021);
         $actor = $this->createEntityTrustActor($account->workspace);
@@ -508,20 +513,20 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
 
         $flowId = $component->get('entityTrustReviewFlowId');
         $this->assertNotNull($flowId);
+        $this->assertSame((string) $product->id, $component->get('entityTrustProductId'));
+        $this->assertNotNull($this->getFlowEntry($flowId), 'Flow entry must exist before local-fingerprint mutation.');
 
-        // Focused execution shows the current production path surfaces the
-        // stale confirmation_expired_or_invalid copy here, so the UI
-        // assertion must match that literal outcome instead of assuming the
-        // envelope-security branch.
         PriceListItem::withoutWorkspaceScope()
             ->where('workspace_id', $account->workspace->id)
             ->where('product_variant_id', $variant->id)
             ->where('quantity_min', 1)
             ->update(['price' => 149.00]);
 
+        $this->assertNotNull($this->getFlowEntry($flowId), 'Flow entry must survive local-fingerprint mutation before confirm.');
+
         $component->call('confirmEntityTrust')
-            ->assertSet('entityTrustOutcomeCategory', 'stale_review')
-            ->assertSet('entityTrustOutcomeExplanation', __('entity_trust.failure.confirmation_expired_or_invalid.explanation'))
+            ->assertSet('entityTrustOutcomeCategory', 'security')
+            ->assertSet('entityTrustOutcomeExplanation', __('entity_trust.failure.invalid_review_evidence.explanation'))
             ->assertSet('entityTrustActiveReviewFlowId', null);
     }
 
@@ -588,7 +593,7 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     // -----------------------------------------------------------------
 
     #[Test]
-    public function configuration_revision_change_before_confirm_returns_stale_review_with_confirmation_expired_copy(): void
+    public function configuration_revision_change_preserves_flow_until_confirm_and_returns_security(): void
     {
         [$account, $product] = $this->seedSimpleReadyFixture('CORR-ACCTCFG-SKU', 7030);
         $actor = $this->createEntityTrustActor($account->workspace);
@@ -597,21 +602,87 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
             ->call('requestEntityTrustReview', (string) $product->id);
 
-        $this->assertNotNull($component->get('entityTrustReviewFlowId'));
+        $flowId = $component->get('entityTrustReviewFlowId');
+        $this->assertNotNull($flowId);
+        $this->assertSame((string) $product->id, $component->get('entityTrustProductId'));
+        $this->assertNotNull($this->getFlowEntry($flowId), 'Flow entry must exist before configuration drift.');
 
-        // Focused execution shows this mutation currently lands in the stale
-        // confirmation_expired_or_invalid presentation path, so the UI proof
-        // asserts that literal outcome instead of assuming Security.
         $configuration = app(SyncConfigurationLookupService::class)->findProductsDefaultContext($account);
         $this->assertNotNull($configuration);
         $configuration->forceFill(['configuration_revision' => 'rev-drift-'.uniqid()])->save();
 
+        $this->assertNotNull($this->getFlowEntry($flowId), 'Flow entry must survive configuration drift before confirm.');
+
         $component->call('confirmEntityTrust')
-            ->assertSet('entityTrustOutcomeCategory', 'stale_review')
-            ->assertSet('entityTrustOutcomeExplanation', __('entity_trust.failure.confirmation_expired_or_invalid.explanation'))
+            ->assertSet('entityTrustOutcomeCategory', 'security')
+            ->assertSet('entityTrustOutcomeExplanation', __('entity_trust.failure.invalid_review_evidence.explanation'))
             ->assertSet('entityTrustActiveReviewFlowId', null);
 
         $this->assertFalse($this->responder->hasConsequentialWrite());
+    }
+
+    #[Test]
+    public function direct_backend_local_fingerprint_drift_returns_invalid_review_evidence(): void
+    {
+        [$account, $product, $variant] = $this->seedSimpleReadyFixture('CORR-DIRECT-LOCAL-SKU', 7038);
+        $actor = $this->createEntityTrustActor($account->workspace);
+
+        $review = app(AdobeProductEntityTrustReviewService::class)->review(
+            $actor,
+            $account->workspace,
+            $account->id,
+            (string) $product->id,
+        );
+
+        PriceListItem::withoutWorkspaceScope()
+            ->where('workspace_id', $account->workspace->id)
+            ->where('product_variant_id', $variant->id)
+            ->where('quantity_min', 1)
+            ->update(['price' => 149.00]);
+
+        try {
+            app(AdobeProductEntityTrustConfirmationService::class)->confirm(
+                $actor,
+                $account->workspace,
+                $account->id,
+                (string) $product->id,
+                $review->reviewToken,
+            );
+            $this->fail('Expected InvalidReviewEvidence for direct local-fingerprint drift.');
+        } catch (EntityTrustException $exception) {
+            $this->assertSame(EntityTrustFailureReason::InvalidReviewEvidence, $exception->reason);
+        }
+    }
+
+    #[Test]
+    public function direct_backend_configuration_revision_drift_returns_invalid_review_evidence(): void
+    {
+        [$account, $product] = $this->seedSimpleReadyFixture('CORR-DIRECT-CONFIG-SKU', 7039);
+        $actor = $this->createEntityTrustActor($account->workspace);
+
+        $review = app(AdobeProductEntityTrustReviewService::class)->review(
+            $actor,
+            $account->workspace,
+            $account->id,
+            (string) $product->id,
+        );
+
+        $configuration = app(SyncConfigurationLookupService::class)->findProductsDefaultContext($account);
+        $this->assertNotNull($configuration);
+        $configuration->forceFill(['configuration_revision' => 'rev-direct-'.uniqid()])->save();
+
+        try {
+            app(AdobeProductEntityTrustConfirmationService::class)->confirm(
+                $actor,
+                $account->workspace,
+                $account->id,
+                (string) $product->id,
+                $review->reviewToken,
+            );
+            $this->fail('Expected InvalidReviewEvidence for direct configuration revision drift.');
+        } catch (EntityTrustException $exception) {
+            $this->assertSame(EntityTrustFailureReason::InvalidReviewEvidence, $exception->reason);
+        }
     }
 
     #[Test]
@@ -1051,5 +1122,17 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         );
 
         return ExternalRecordLink::withoutWorkspaceScope()->create($attributes);
+    }
+
+    private function getFlowEntry(string $flowId): ?EntityTrustReviewFlowPayload
+    {
+        $entry = Cache::store()->get($this->reviewFlowCacheKey($flowId));
+
+        return $entry instanceof EntityTrustReviewFlowPayload ? $entry : null;
+    }
+
+    private function reviewFlowCacheKey(string $flowId): string
+    {
+        return 'entity_trust_review_flow:'.$flowId;
     }
 }
