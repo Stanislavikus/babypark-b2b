@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace B2BPlatform\MagentoSafeSync\Model;
 
+use B2BPlatform\MagentoSafeSync\Model\Connection\ConnectionQuarantine;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 
 final class GaleraWriteSession
 {
+    public function __construct(
+        private readonly ConnectionQuarantine $connectionQuarantine,
+    ) {}
+
     /**
      * @return array{previous:?int}
      */
@@ -100,15 +105,14 @@ final class GaleraWriteSession
         AdapterInterface $connection,
         \Throwable $restoreException,
     ): void {
-        try {
-            if (! method_exists($connection, 'closeConnection')) {
-                throw new \RuntimeException('closeConnection unavailable');
-            }
+        $result = $this->connectionQuarantine->quarantine($connection);
 
-            $connection->closeConnection();
-        } catch (\Throwable $quarantineException) {
+        if (! $result['success']) {
             throw new \RuntimeException(
-                sprintf('safe_sync_wsrep_connection_quarantine_failed:%s', $quarantineException::class),
+                sprintf(
+                    'safe_sync_wsrep_connection_quarantine_failed:%s',
+                    $result['callback_clear_failed'] ? 'callback_clear_failed' : 'reset_failed',
+                ),
                 0,
                 $restoreException,
             );

@@ -7,8 +7,8 @@
     ],
     "require": {
         "php": ">=8.4 <8.6",
-        "magento/framework": "^103.0",
-        "magento/module-catalog": ">=103.0 <105.0"
+        "magento/framework": ">=103.0.8-p5 <103.0.10",
+        "magento/module-catalog": ">=104.0.8-p5 <104.0.10"
     },
     "autoload": {
         "files": [
