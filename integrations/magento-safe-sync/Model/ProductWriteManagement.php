@@ -281,19 +281,10 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
             return false;
         }
 
-        $normalized = rtrim(rtrim(sprintf('%.14F', $price), '0'), '.');
-
-        if ($normalized === '' || $normalized === '-0') {
-            return true;
-        }
-
-        $decimalPosition = strpos($normalized, '.');
-
-        if ($decimalPosition === false) {
-            return true;
-        }
-
-        return strlen(substr($normalized, $decimalPosition + 1)) <= self::PRICE_SCALE;
+        return (float) sprintf(
+            '%.'.self::PRICE_SCALE.'F',
+            $price,
+        ) === $price;
     }
 
     /**

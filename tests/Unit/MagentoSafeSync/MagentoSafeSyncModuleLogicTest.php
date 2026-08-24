@@ -681,6 +681,7 @@ use Magento\Framework\EntityManager\MetadataPool;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Framework\Module\ModuleListInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Log\LoggerInterface;
 use Tests\TestCase;
@@ -1188,25 +1189,58 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertSame([], $fixture['connection']->txEvents);
     }
 
+    /**
+     * @return list<array{0:float}>
+     */
+    public static function acceptedPriceProvider(): array
+    {
+        return [
+            [0.1],
+            [12.34],
+            [64.01],
+            [199.0],
+            [199.99],
+            [12345.678],
+            [123.456789],
+        ];
+    }
+
+    /**
+     * @return list<array{0:float}>
+     */
+    public static function rejectedPriceProvider(): array
+    {
+        return [
+            [123.4567891],
+            [0.0000001],
+            [1e-15],
+            [INF],
+        ];
+    }
+
     #[Test]
-    public function six_decimal_price_is_accepted_without_local_rejection(): void
+    #[DataProvider('acceptedPriceProvider')]
+    public function supported_prices_are_accepted_without_local_rejection(float $price): void
     {
         $fixture = $this->simpleWriteFixture();
 
-        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', price: 123.456789));
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', price: $price));
 
         $this->assertSame('known_applied', $result->getAppliedState());
         $this->assertSame('safe_sync_simple_product_write_applied', $result->getReasonCode());
-        $this->assertSame(123.456789, $fixture['product']->getPrice());
+        $this->assertTrue($result->getPostconditionVerified());
+        $this->assertSame(1, $result->getConsequentialWriteAttempts());
+        $this->assertSame($price, $fixture['product']->getPrice());
         $this->assertSame(['begin', 'begin', 'commit', 'commit'], $fixture['connection']->txEvents);
     }
 
     #[Test]
-    public function seven_decimal_price_fails_closed_before_transaction_or_callback_activity(): void
+    #[DataProvider('rejectedPriceProvider')]
+    public function unsupported_prices_are_rejected_before_any_mutation_activity(float $price): void
     {
         $fixture = $this->simpleWriteFixture();
 
-        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', price: 123.4567891));
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', price: $price));
 
         $this->assertSame('known_not_applied', $result->getAppliedState());
         $this->assertSame('safe_sync_invalid_price_precision', $result->getReasonCode());
@@ -1214,35 +1248,9 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertSame(0, $result->getConsequentialWriteAttempts());
         $this->assertSame(0, $fixture['repository']->saveCalls);
         $this->assertSame([], $fixture['connection']->txEvents);
+        $this->assertSame([], $fixture['connection']->queries);
         $this->assertSame(0, $fixture['callbackHandler']->processCalls);
         $this->assertSame(0, $fixture['callbackHandler']->clearCalls);
-    }
-
-    #[Test]
-    public function ordinary_two_decimal_price_is_preserved_without_local_normalization(): void
-    {
-        $fixture = $this->simpleWriteFixture();
-
-        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', price: 12.34));
-
-        $this->assertSame('known_applied', $result->getAppliedState());
-        $this->assertSame('safe_sync_simple_product_write_applied', $result->getReasonCode());
-        $this->assertTrue($result->getPostconditionVerified());
-        $this->assertSame(12.34, $fixture['product']->getPrice());
-    }
-
-    #[Test]
-    public function non_finite_price_fails_closed_before_any_mutation_activity(): void
-    {
-        $fixture = $this->simpleWriteFixture();
-
-        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', price: INF));
-
-        $this->assertSame('known_not_applied', $result->getAppliedState());
-        $this->assertSame('safe_sync_invalid_price_precision', $result->getReasonCode());
-        $this->assertSame(0, $result->getConsequentialWriteAttempts());
-        $this->assertSame([], $fixture['connection']->txEvents);
-        $this->assertSame(0, $fixture['repository']->saveCalls);
     }
 
     #[Test]
