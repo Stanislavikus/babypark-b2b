@@ -3,7 +3,10 @@
 namespace Tests\Unit\Connectors\AdobePaaS\SafeSync;
 
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncRequestException;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncRequestFactory;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncSimpleProductWriteCustomAttribute;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncSimpleProductWriteRequest;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
 use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
 use App\Support\Connectors\OAuth1\OAuth1SigningContext;
@@ -72,6 +75,7 @@ class AdobeSafeSyncRequestFactoryTest extends TestCase
         $methods = [
             [AdobeSafeSyncRequestFactory::class, 'buildHandshake', [0, 1], false],
             [AdobeSafeSyncRequestFactory::class, 'buildReadProduct', [0, 3], false],
+            [AdobeSafeSyncRequestFactory::class, 'buildWriteSimpleProduct', [0, 3], false],
             [AdobeSafeSyncRequestFactory::class, 'buildSignedRequest', [1, 4], true],
             [AdobeSafeSyncRequestFactory::class, 'buildAbsoluteUrl', [0], true],
         ];
@@ -91,5 +95,63 @@ class AdobeSafeSyncRequestFactoryTest extends TestCase
                 );
             }
         }
+    }
+
+    #[Test]
+    public function simple_product_write_request_uses_put_json_body_without_product_id(): void
+    {
+        $request = $this->factory->buildWriteSimpleProduct(
+            $this->context,
+            321,
+            new AdobeSafeSyncSimpleProductWriteRequest(
+                expectedSku: 'SKU-321',
+                name: 'Updated Product',
+                status: 2,
+                visibility: 4,
+                price: 19.99,
+                mappedAttributes: [
+                    new AdobeSafeSyncSimpleProductWriteCustomAttribute('color', 'red'),
+                ],
+            ),
+            $this->signingContext,
+        );
+
+        $this->assertSame('PUT', $request->getMethod());
+        $this->assertSame(
+            'https://shop.example.com/rest/default/V1/safe-sync/products/321',
+            (string) $request->getUri(),
+        );
+        $this->assertSame('application/json', $request->getHeaderLine('Content-Type'));
+
+        $payload = json_decode((string) $request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame(['request'], array_keys($payload));
+        $this->assertSame('SKU-321', $payload['request']['expected_sku'] ?? null);
+        $this->assertSame('Updated Product', $payload['request']['name'] ?? null);
+        $this->assertSame(2, $payload['request']['status'] ?? null);
+        $this->assertSame(4, $payload['request']['visibility'] ?? null);
+        $this->assertSame(19.99, $payload['request']['price'] ?? null);
+        $this->assertSame([['attribute_code' => 'color', 'value' => 'red']], $payload['request']['mapped_attributes'] ?? null);
+        $this->assertArrayNotHasKey('id', $payload['request']);
+        $this->assertStringContainsString('oauth_consumer_key="ck_test"', $request->getHeaderLine('Authorization'));
+    }
+
+    #[Test]
+    public function simple_product_write_payload_size_is_bounded(): void
+    {
+        $this->expectException(AdobeSafeSyncRequestException::class);
+        $this->expectExceptionMessage('Safe Sync write payload exceeds the request size limit.');
+
+        $this->factory->buildWriteSimpleProduct(
+            $this->context,
+            321,
+            new AdobeSafeSyncSimpleProductWriteRequest(
+                expectedSku: 'SKU-321',
+                mappedAttributes: [
+                    new AdobeSafeSyncSimpleProductWriteCustomAttribute('notes', str_repeat('x', 20_000)),
+                ],
+            ),
+            $this->signingContext,
+        );
     }
 }

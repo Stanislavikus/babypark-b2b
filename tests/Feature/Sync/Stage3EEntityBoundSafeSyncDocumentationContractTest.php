@@ -25,11 +25,13 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
     {
         $section = $this->stage3eContractSection();
 
-        $this->assertStringContainsString('**Docs-only in this PR.**', $section);
-        $this->assertStringContainsString('No Magento module runtime', $section);
+        $this->assertStringContainsString('original contract landed as a', $section);
+        $this->assertStringContainsString('docs-only', $section);
+        $this->assertStringContainsString('isolated entity-bound simple Product', $section);
+        $this->assertStringContainsString('not consumed by Live runtime', $section);
         $this->assertStringContainsString('**Implemented in Stage 3E-R2a.**', $section);
         $this->assertStringContainsString('Adobe Products/Export/Live | **FALSE**', $section);
-        $this->assertStringContainsString('Replacement runtime follows in a separate follow-on PR', $section);
+        $this->assertStringContainsString('no real-target validation harness execution or deployment has', $section);
     }
 
     #[Test]
@@ -193,7 +195,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $section = $this->stage3eContractSection();
 
         $this->assertStringContainsString('3E docs contract | **Done (docs contract)**', $section);
-        $this->assertStringContainsString('3E runtime + validation | **Pending**', $section);
+        $this->assertStringContainsString('3E runtime + validation | **Pending** — isolated simple Product WRITE foundation shipped internally', $section);
         $this->assertStringContainsString('Adobe Products/Export/Live | **FALSE**', $section);
         $this->assertStringContainsString('No Stage 3F', $section);
     }
@@ -206,6 +208,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('**Stage 3E — Real Adobe Validation + Truth Flip**', $gaps);
         $this->assertStringContainsString('**Done (docs contract)**', $gaps);
         $this->assertStringContainsString('entity-bound Safe Sync runtime contract frozen', $gaps);
+        $this->assertStringContainsString('**isolated entity-bound simple Product WRITE foundation is implemented internally**', $gaps);
         $this->assertStringContainsString('support remains **false**', $gaps);
     }
 
@@ -215,6 +218,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
         $this->assertStringContainsString('| Stage 3E entity-bound Safe Sync contract (docs) | DOCS CONTRACT DONE — runtime pending |', $atlas);
+        $this->assertStringContainsString('| Stage 3E Magento Safe Sync read + isolated simple write foundation | IMPLEMENTED (internal; support false) |', $atlas);
         $this->assertStringContainsString('Stage3EEntityBoundSafeSyncDocumentationContractTest.php', $atlas);
     }
 

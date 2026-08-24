@@ -13,4 +13,10 @@
             <resource ref="Magento_Catalog::products"/>
         </resources>
     </route>
+    <route url="/V1/safe-sync/products/:logicalEntityId" method="PUT">
+        <service class="B2BPlatform\MagentoSafeSync\Api\ProductWriteManagementInterface" method="writeSimpleProduct"/>
+        <resources>
+            <resource ref="Magento_Catalog::products"/>
+        </resources>
+    </route>
 </routes>

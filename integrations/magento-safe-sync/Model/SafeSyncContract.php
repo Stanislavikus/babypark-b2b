@@ -12,5 +12,7 @@ final class SafeSyncContract
 
     public const PRODUCT_VERIFICATION_READ_FAMILY = 'entity_bound_product_read';
 
+    public const SIMPLE_PRODUCT_WRITE_FAMILY = 'entity_bound_simple_product_write';
+
     private function __construct() {}
 }

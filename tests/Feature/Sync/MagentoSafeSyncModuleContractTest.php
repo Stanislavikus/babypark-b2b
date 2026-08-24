@@ -44,11 +44,14 @@ class MagentoSafeSyncModuleContractTest extends TestCase
         $xml = new \SimpleXMLElement(File::get(base_path($this->moduleBasePath.'/etc/webapi.xml')));
         $routes = $xml->xpath('//route');
 
-        $this->assertCount(2, $routes);
+        $this->assertCount(3, $routes);
         $this->assertSame('/V1/safe-sync/handshake', (string) $routes[0]['url']);
         $this->assertSame('/V1/safe-sync/products/:logicalEntityId', (string) $routes[1]['url']);
+        $this->assertSame('/V1/safe-sync/products/:logicalEntityId', (string) $routes[2]['url']);
         $this->assertSame('Magento_Catalog::products', (string) $routes[0]->resources->resource['ref']);
         $this->assertSame('Magento_Catalog::products', (string) $routes[1]->resources->resource['ref']);
+        $this->assertSame('Magento_Catalog::products', (string) $routes[2]->resources->resource['ref']);
+        $this->assertSame('PUT', (string) $routes[2]['method']);
         $this->assertStringNotContainsString('anonymous', File::get(base_path($this->moduleBasePath.'/etc/webapi.xml')));
     }
 
@@ -91,6 +94,38 @@ class MagentoSafeSyncModuleContractTest extends TestCase
 
         $this->assertStringContainsString('safe_sync_module_version_unavailable', $content);
         $this->assertStringNotContainsString("['setup_version'] ?? '0.0.0'", $content);
+        $this->assertStringContainsString('SafeSyncContract::SIMPLE_PRODUCT_WRITE_FAMILY', $content);
+    }
+
+    #[Test]
+    public function module_version_is_bumped_to_point_two_zero_without_contract_bump(): void
+    {
+        $moduleXml = File::get(base_path($this->moduleBasePath.'/etc/module.xml'));
+        $contract = File::get(base_path($this->moduleBasePath.'/Model/SafeSyncContract.php'));
+
+        $this->assertStringContainsString('setup_version="0.2.0"', $moduleXml);
+        $this->assertStringContainsString("CONTRACT_VERSION = 'stage3e-r1';", $contract);
+        $this->assertStringContainsString("SIMPLE_PRODUCT_WRITE_FAMILY = 'entity_bound_simple_product_write';", $contract);
+    }
+
+    #[Test]
+    public function module_simple_product_write_contract_remains_entity_bound_and_closed_bounded(): void
+    {
+        $content = File::get(base_path($this->moduleBasePath.'/Model/ProductWriteManagement.php'));
+
+        $this->assertStringContainsString('getIdentifierField()', $content);
+        $this->assertStringContainsString('getLinkField()', $content);
+        $this->assertStringContainsString('getEntityTable()', $content);
+        $this->assertStringContainsString('SELECT %s FROM %s WHERE %s = %d FOR UPDATE', $content);
+        $this->assertStringContainsString('LIMIT 2 FOR UPDATE', $content);
+        $this->assertStringContainsString('getById($logicalEntityId, false, null, true)', $content);
+        $this->assertStringContainsString("'safe_sync_non_simple_product_type'", $content);
+        $this->assertStringContainsString("'safe_sync_identifier_index_unavailable'", $content);
+        $this->assertStringContainsString("'safe_sync_sku_index_unavailable'", $content);
+        $this->assertStringContainsString("'safe_sync_rollback_uncertain'", $content);
+        $this->assertStringContainsString('mapped_attributes', $content);
+        $this->assertStringNotContainsString('postProduct(', $content);
+        $this->assertStringNotContainsString('row_id as identity', $content);
     }
 
     #[Test]

@@ -27,6 +27,7 @@ final class HandshakeManagement implements HandshakeManagementInterface
         $response->setModuleVersion($moduleVersion);
         $response->setSupportedOperationFamilies([
             SafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY,
+            SafeSyncContract::SIMPLE_PRODUCT_WRITE_FAMILY,
         ]);
 
         return $response;
