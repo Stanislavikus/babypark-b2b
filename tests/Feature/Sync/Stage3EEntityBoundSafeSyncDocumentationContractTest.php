@@ -218,7 +218,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
         $this->assertStringContainsString('| Stage 3E entity-bound Safe Sync contract (docs) | DOCS CONTRACT DONE — runtime pending |', $atlas);
-        $this->assertStringContainsString('| Stage 3E Magento Safe Sync read + isolated simple write foundation | IMPLEMENTED (internal; support false) |', $atlas);
+        $this->assertStringContainsString('| Stage 3E Magento Safe Sync read + isolated simple write foundation | IMPLEMENTED (internal; support false; not consumed by Live) |', $atlas);
         $this->assertStringContainsString('Stage3EEntityBoundSafeSyncDocumentationContractTest.php', $atlas);
     }
 
@@ -261,6 +261,242 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('Do **not** persist handshake evidence into `SyncRunItem`', $section);
     }
 
+    #[Test]
+    public function post_168_amendment_section_is_present_and_marked_docs_only(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        $this->assertStringContainsString(
+            '##### Stage 3E Post-#168 Real-Target Certification Amendment (docs only)',
+            $content,
+        );
+        $this->assertStringContainsString('[Resolved — Stage 3E post-#168 docs amendment]', $content);
+        $this->assertStringContainsString('No runtime PHP under `app/` or', $content);
+        $this->assertStringContainsString('No `composer.json`', $content);
+        $this->assertStringContainsString('No validation harness was implemented', $content);
+        $this->assertStringContainsString('Live was not enabled', $content);
+        $this->assertStringContainsString('not merged into `develop`', $content);
+        $this->assertStringContainsString('No new broad Stage 3F was created', $content);
+    }
+
+    #[Test]
+    public function decision_1_records_current_state_without_overstating_readiness(): void
+    {
+        $section = $this->post168AmendmentSection();
+
+        $this->assertStringContainsString('#### DECISION 1 — Current state (frozen)', $section);
+        $this->assertStringContainsString('isolated entity-bound simple Product **WRITE** primitive exists', $section);
+        $this->assertStringContainsString('Laravel **Safe Sync write client**', $section);
+        $this->assertStringContainsString('not currently consumed** by the Live executor', $section);
+        $this->assertStringContainsString('`ConnectorSyncOperationSupport(Products, Export, Live)` remains **false**', $section);
+        $this->assertStringContainsString('No** real-target consequential WRITE certification has occurred', $section);
+        $this->assertStringContainsString('isolated primitive is reachable', $section);
+        $this->assertStringContainsString('no consumer', $section);
+        $this->assertStringContainsString('no real-target evidence', $section);
+        $this->assertStringContainsString('support remains false', $section);
+    }
+
+    #[Test]
+    public function decision_2_requires_media_neutral_product_save(): void
+    {
+        $section = $this->post168AmendmentSection();
+
+        $this->assertStringContainsString('#### DECISION 2 — Product save must be media-neutral (frozen)', $section);
+        $this->assertStringContainsString('`media_gallery`', $section);
+        $this->assertStringContainsString('MUST NOT** cause uncontrolled', $section);
+        $this->assertStringContainsString('image-role mutation', $section);
+        $this->assertStringContainsString('structurally exclude media state from the core Product save', $section);
+        $this->assertStringContainsString('prove and enforce media neutrality', $section);
+        $this->assertStringContainsString('**insufficient** as proof if', $section);
+        $this->assertStringContainsString('controlled-field postcondition alone is', $section);
+    }
+
+    #[Test]
+    public function decision_3_requires_connection_reset_quarantine_not_just_close(): void
+    {
+        $section = $this->post168AmendmentSection();
+
+        $this->assertStringContainsString('#### DECISION 3 — Connection quarantine (frozen)', $section);
+        $this->assertStringContainsString('merely closing the Magento DB connection is insufficient', $section);
+        $this->assertStringContainsString('non-zero / poisoned', $section);
+        $this->assertStringContainsString('reset / quarantine the exact', $section);
+        $this->assertStringContainsString('shared entity connection**', $section);
+        $this->assertStringContainsString('module-local', $section);
+        $this->assertStringContainsString('**target-version tested**', $section);
+        $this->assertStringContainsString('Do not claim real-target proof already exists', $section);
+        $this->assertStringContainsString('`GaleraSessionScope::quarantineConnectionAfterRestoreFailure`', $section);
+    }
+
+    #[Test]
+    public function decision_4_marks_price_scale_6_as_contract_not_defect(): void
+    {
+        $section = $this->post168AmendmentSection();
+
+        $this->assertStringContainsString('#### DECISION 4 — Price scale (frozen — not an open defect)', $section);
+        $this->assertStringContainsString('scale 6** for', $section);
+        $this->assertStringContainsString('`catalog_product_entity_decimal.value`', $section);
+        $this->assertStringContainsString('fail-closed six-decimal admission', $section);
+        $this->assertStringContainsString('Do **not** mark `PRICE_SCALE = 6` as an open defect', $section);
+    }
+
+    #[Test]
+    public function decision_5_narrows_e12_to_one_explicit_store_view_code(): void
+    {
+        $section = $this->post168AmendmentSection();
+
+        $this->assertStringContainsString('#### DECISION 5 — Store view context (frozen — amends E12 narrowly)', $section);
+        $this->assertStringContainsString('one explicit Magento Store View code**', $section);
+        $this->assertStringContainsString('`all` is **NOT** a V1 consequential WRITE target', $section);
+        $this->assertStringContainsString('MUST NOT** silently fan out across all Store Views', $section);
+        $this->assertStringContainsString('Default Store View', $section);
+        $this->assertStringContainsString('own explicit execution contexts', $section);
+        $this->assertStringContainsString('Automatic multi-Store-View fan-out within one V1 run is **OUT**', $section);
+        $this->assertStringContainsString('Localized / store-scoped fan-out remains **OUT of first V1**', $section);
+        $this->assertStringContainsString('Magento **Website** or **Store Group** names are never REST store codes', $section);
+    }
+
+    #[Test]
+    public function decision_5_e12_narrow_amendment_is_present_in_e12_section(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        if (! preg_match(
+            '/#### E12\. Multi-store \/ store-view scope\n\n(.*?)(?=\n#### E13\.)/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate E12 section in 03-DOMAIN_MODEL.md');
+        }
+
+        $section = $matches[1];
+
+        $this->assertStringContainsString('**Magento V1 freeze:**', $section);
+        $this->assertStringContainsString('**Safe Sync consequential WRITE scope (Stage 3E post-#168 amendment — frozen):**', $section);
+        $this->assertStringContainsString('narrows E12 for the Safe Sync path', $section);
+        $this->assertStringContainsString('does not create a parallel rule', $section);
+        $this->assertStringContainsString('one explicit Magento Store View code** per', $section);
+        $this->assertStringContainsString('`all` is **NOT** a V1 consequential WRITE target', $section);
+    }
+
+    #[Test]
+    public function decision_6_records_php_adobe_certification_matrix(): void
+    {
+        $section = $this->post168AmendmentSection();
+
+        $this->assertStringContainsString('#### DECISION 6 — PHP / Adobe certification matrix (frozen)', $section);
+        $this->assertStringContainsString('| **PRIMARY** | 2.4.9 | 8.5 |', $section);
+        $this->assertStringContainsString('| **SUPPORTED COMPATIBILITY** | 2.4.9 | 8.4 |', $section);
+        $this->assertStringContainsString('| **PREVIOUS ADOBE LINE** | 2.4.8-p5 | 8.4 |', $section);
+        $this->assertStringContainsString('| **OUT OF V1 CERTIFICATION** | — | 8.3 |', $section);
+        $this->assertStringContainsString('PHP 8.4 **IS supported** on Adobe Commerce 2.4.9', $section);
+        $this->assertStringContainsString('PHP 8.3 is **OUT of V1 certification**', $section);
+        $this->assertStringContainsString('broader than this certification envelope', $section);
+        $this->assertStringContainsString('narrowed before certification', $section);
+        $this->assertStringContainsString('exact `composer.json` constraint is **not chosen in this docs', $section);
+    }
+
+    #[Test]
+    public function decision_7_preserves_known_applied_with_warning_no_new_enum(): void
+    {
+        $section = $this->post168AmendmentSection();
+
+        $this->assertStringContainsString('#### DECISION 7 — Callback failure semantics (frozen)', $section);
+        $this->assertStringContainsString('physical COMMIT precedes bridge-owned callback processing', $section);
+        $this->assertStringContainsString('does NOT** downgrade durable', $section);
+        $this->assertStringContainsString('response remains `KnownApplied` with a **warning**', $section);
+        $this->assertStringContainsString('not a separate `KnownAppliedWithWarning` enum', $section);
+        $this->assertStringContainsString('prove `CallbackPool` drain / failure behaviour', $section);
+        $this->assertStringContainsString('`KnownApplied` / `KnownNotApplied` / `UnknownOrAmbiguous`', $section);
+        $this->assertStringContainsString('is **unchanged** for this docs task', $section);
+        $this->assertStringContainsString('post-COMMIT warnings', $section);
+    }
+
+    #[Test]
+    public function decision_8_preserves_content_staging_rules_and_no_new_staged_version_semantics(): void
+    {
+        $section = $this->post168AmendmentSection();
+
+        $this->assertStringContainsString('#### DECISION 8 — Content staging (frozen — no new semantics)', $section);
+        $this->assertStringContainsString('Preserve the frozen Stage 3E Stop-and-Amend Content Staging rules', $section);
+        $this->assertStringContainsString('**do not** invent a staged-version warning', $section);
+        $this->assertStringContainsString('Logical `entity_id` identity is preserved', $section);
+        $this->assertStringContainsString('All relevant physical rows are locked', $section);
+        $this->assertStringContainsString('No Commerce-only `VersionManager` dependency', $section);
+        $this->assertStringContainsString('pending scheduled update', $section);
+        $this->assertStringContainsString('returns to architectural arbitration', $section);
+    }
+
+    #[Test]
+    public function decision_9_records_12_step_pre_live_sequence_with_support_false(): void
+    {
+        $section = $this->post168AmendmentSection();
+
+        $this->assertStringContainsString('#### DECISION 9 — Order of work (frozen pre-Live sequence)', $section);
+        $this->assertStringContainsString('1. **Docs certification amendment**', $section);
+        $this->assertStringContainsString('2. **Bounded Safe Sync module correction**', $section);
+        $this->assertStringContainsString('3. **Disposable validation harness**', $section);
+        $this->assertStringContainsString('4. **Isolated simple writer certification**', $section);
+        $this->assertStringContainsString('5. **Content Staging proof**', $section);
+        $this->assertStringContainsString('6. **Galera proof**', $section);
+        $this->assertStringContainsString('7. **Entity-bound lifecycle**', $section);
+        $this->assertStringContainsString('8. **Entity-bound configurable**', $section);
+        $this->assertStringContainsString('9. **Entity-bound media**', $section);
+        $this->assertStringContainsString('10. **`ConnectorLiveRuntimeReadiness` integration**', $section);
+        $this->assertStringContainsString('11. **Live consumption**', $section);
+        $this->assertStringContainsString('12. **Final truth-flip gate**', $section);
+        $this->assertStringContainsString('**logical evidence gates**, not a per-item-PR', $section);
+        $this->assertStringContainsString('**Support remains', $section);
+    }
+
+    #[Test]
+    public function dormant_discrepancies_table_records_three_stock_sku_addressed_paths(): void
+    {
+        $section = $this->post168AmendmentSection();
+
+        $this->assertStringContainsString('#### Code-vs-docs dormant discrepancies', $section);
+        $this->assertStringContainsString('documented here, not fixed in this docs task', $section);
+        $this->assertStringContainsString('Stock SKU-addressed **media** consequential path', $section);
+        $this->assertStringContainsString('Stock SKU-addressed **configurable options / child link** path', $section);
+        $this->assertStringContainsString('Stock SKU-addressed **lifecycle status** path', $section);
+        $this->assertStringContainsString('production-unreachable**', $section);
+        $this->assertStringContainsString('replaced before their respective Live path becomes', $section);
+    }
+
+    #[Test]
+    public function post_168_status_table_keeps_support_false_and_lists_decision_9_steps(): void
+    {
+        $section = $this->post168AmendmentSection();
+
+        $this->assertStringContainsString('#### Post-#168 status after this docs amendment', $section);
+        $this->assertStringContainsString('| Stage 3E post-#168 certification amendment | **Done (docs only)** — 9 decisions recorded; no runtime change |', $section);
+        $this->assertStringContainsString('| Adobe Products / Export / Live | **FALSE** |', $section);
+        $this->assertStringContainsString('| Merchant consequential Live | **NOT EXPOSED** |', $section);
+        $this->assertStringContainsString('| Deployment | **NOT PERFORMED** |', $section);
+    }
+
+    #[Test]
+    public function atlas_documents_post_168_amendment_and_dormant_discrepancies(): void
+    {
+        $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
+
+        $this->assertStringContainsString('post-#168 real-target certification amendment (9 decisions) recorded in', $atlas);
+        $this->assertStringContainsString('not consumed by Live', $atlas);
+        $this->assertStringContainsString('| Stage 3E post-#168 dormant code-vs-docs discrepancies | DOCUMENTED (dormant; not fixed) |', $atlas);
+        $this->assertStringContainsString('production-unreachable code paths still use stock SKU-addressed', $atlas);
+        $this->assertStringContainsString('media (`GalleryManagement`), configurable options / child link, lifecycle status / visibility', $atlas);
+    }
+
+    #[Test]
+    public function implementation_gaps_documents_post_168_amendment_summary(): void
+    {
+        $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
+
+        $this->assertStringContainsString('**Stage 3E Post-#168 Real-Target Certification Amendment (docs only) is recorded**', $gaps);
+        $this->assertStringContainsString('9 decisions (current state, media-neutral Product save, connection quarantine,', $gaps);
+        $this->assertStringContainsString('a `Code-vs-docs dormant discrepancies` table', $gaps);
+        $this->assertStringContainsString('no runtime PHP, no `composer.json` change, no validation harness, no Live enable, no merge into `develop` in this docs task', $gaps);
+    }
+
     /**
      * @return non-empty-string
      */
@@ -274,6 +510,24 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
             $matches,
         )) {
             $this->fail('Could not locate Stage 3E contract section in 03-DOMAIN_MODEL.md');
+        }
+
+        return $matches[1];
+    }
+
+    /**
+     * @return non-empty-string
+     */
+    private function post168AmendmentSection(): string
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        if (! preg_match(
+            '/##### Stage 3E Post-#168 Real-Target Certification Amendment \(docs only\)\n\n(.*?)(?=\n#### Merchant Preview Authorization)/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate Stage 3E post-#168 amendment section in 03-DOMAIN_MODEL.md');
         }
 
         return $matches[1];

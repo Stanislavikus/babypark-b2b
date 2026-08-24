@@ -25,7 +25,7 @@ class Stage3ER1ImplementationTruthDocumentationTest extends TestCase
     {
         $content = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
-        $this->assertStringContainsString('| Stage 3E Magento Safe Sync read + isolated simple write foundation | IMPLEMENTED (internal; support false) |', $content);
+        $this->assertStringContainsString('| Stage 3E Magento Safe Sync read + isolated simple write foundation | IMPLEMENTED (internal; support false; not consumed by Live) |', $content);
         $this->assertStringContainsString('integrations/magento-safe-sync/', $content);
         $this->assertStringContainsString('AdobeSafeSyncClient.php', $content);
         $this->assertStringContainsString('| Adobe Products/Export/Live support truth | CONFIRMED ABSENT (public) |', $content);

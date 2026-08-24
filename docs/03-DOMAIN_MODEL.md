@@ -6508,6 +6508,27 @@ store-view-scoped.
   operations inside that one default context (parent + children + options +
   media), which does not change business-record cardinality.
 
+**Safe Sync consequential WRITE scope (Stage 3E post-#168 amendment — frozen):**
+
+The above freeze governs the SyncConfiguration / business-record surface.
+Within that surface, the **Safe Sync consequential WRITE** is further
+constrained as follows (this narrows E12 for the Safe Sync path;
+it does not create a parallel rule):
+
+- the write is scoped to **one explicit Magento Store View code** per
+  execution context;
+- `all` is **NOT** a V1 consequential WRITE target;
+- one operation MUST NOT silently fan out across all Store Views;
+- the first certification target uses the target's Default Store View;
+- additional Store Views may later use their **own explicit execution
+  contexts**, not implicit multi-context fan-out;
+- Magento **Website** or **Store Group** names are never REST store codes —
+  only the explicit REST store code is identity for the write scope.
+
+Future multi-store extensibility is preserved by routing additional
+Store Views through their own explicit execution contexts, not by
+relaxing the above.
+
 PO-2 remains open for later merchant-configurable independent contexts.
 
 #### E13. Deactivation / removal semantics
@@ -7120,6 +7141,267 @@ required Stage 3E evidence exists:
 | 3E docs contract | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen |
 | 3E runtime + validation | **Pending** — isolated simple Product WRITE foundation shipped internally; runtime consumption + real target validation **NOT YET EXECUTED** |
 | Adobe Products/Export/Live | **FALSE** |
+| Merchant consequential Live | **NOT EXPOSED** |
+| Deployment | **NOT PERFORMED** |
+
+No Stage 3D-3. No Stage 3F. No new normative Stage.
+
+##### Stage 3E Post-#168 Real-Target Certification Amendment (docs only)
+
+[Resolved — Stage 3E post-#168 docs amendment] This section records the
+post-PR #168 RED research findings and the exact pre-certification sequence
+that follow the isolated entity-bound simple Product WRITE foundation landing
+internally. **This is documentation only.** No runtime PHP under `app/` or
+under `integrations/magento-safe-sync/` was modified. No `composer.json`
+change was made. No validation harness was implemented. Live was not enabled.
+The PR was not merged into `develop`. No new broad Stage 3F was created. This
+is an additive Stage 3E certification amendment layered on top of the
+[Stage 3E Stop-and-Amend](#stage-3e-stop-and-amend--magento-ownership-and-entity-bound-safe-sync-runtime-contract)
+section above.
+
+#### DECISION 1 — Current state (frozen)
+
+Record explicitly, without overstating readiness:
+
+- An isolated entity-bound simple Product **WRITE** primitive exists in
+  `integrations/magento-safe-sync/` and is reachable through the standalone
+  `magento2-module` first-party component.
+- A bounded Laravel **Safe Sync write client** (`AdobeSafeSyncClient` +
+  `AdobeSafeSyncRequestFactory`) exists; it is a **write-capable** client
+  but is **not currently consumed** by the Live executor.
+- No Live executor consumes the Safe Sync write client; the Live capability
+  surface still routes the historic SKU-addressed `PUT /V1/products/:sku`
+  path that Stage 3E Stop-and-Amend had already marked unsafe for
+  consequential safety decisions.
+- `ConnectorSyncOperationSupport(Products, Export, Live)` remains **false**;
+  Adobe Products / Export / Live public support is unchanged.
+- **No** real-target consequential WRITE certification has occurred.
+  PR #168 only proved that the isolated write primitive is reachable; it
+  did not prove behaviour on a real Adobe Commerce target.
+
+Do not promote the post-#168 foundation to "ready for Live" or "ready for
+real-target". The truthful description is: **isolated primitive is reachable;
+no consumer; no real-target evidence; support remains false.**
+
+#### DECISION 2 — Product save must be media-neutral (frozen)
+
+A verified Magento primary-source fact constrains the post-#168 corrective
+work:
+
+> A Product loaded through the normal repository/resource pipeline carries
+> `media_gallery` state. `ProductRepository::save()` may process
+> `media_gallery` when that loaded state is present even if the requested
+> Safe Sync mutation only changes `name` / `price` / `status` / `visibility`
+> / mapped attributes.
+
+Therefore the normative contract is amended as follows:
+
+- A non-media Safe Sync Product write **MUST NOT** cause uncontrolled
+  `media_gallery` or image-role mutation.
+- Before real-target certification, the first-party component must either
+  **structurally exclude media state from the core Product save** or
+  **otherwise prove and enforce media neutrality**.
+- A controlled-field postcondition alone is **insufficient** as proof if
+  media state could change outside that postcondition.
+
+This is a **documentation amendment** of the contract. The exact PHP
+implementation remains a module-local concern to be implemented and
+real-target validated in the bounded Safe Sync module correction step
+(Decision 9 step 2). Do not prescribe the implementation here.
+
+#### DECISION 3 — Connection quarantine (frozen)
+
+Record the post-PR #168 RED research finding on connection cleanup:
+
+> On uncertain transaction/rollback state, merely closing the Magento DB connection is insufficient
+> if the adapter logical transaction state remains non-zero / poisoned.
+
+Therefore:
+
+- The Safe Sync compatibility seam must **reset / quarantine the exact
+  shared entity connection** so subsequent work cannot inherit stale
+  transaction state.
+- The exact implementation is module-local and must be **target-version
+  tested** (Decision 6) on the certified Magento / PHP combination.
+- Do not claim real-target proof already exists. The current
+  `GaleraSessionScope::quarantineConnectionAfterRestoreFailure` only calls
+  `ResourceConnection::closeConnection()`. Connection reset / quarantine at
+  the adapter level remains part of the bounded Safe Sync module
+  correction (Decision 9 step 2).
+
+#### DECISION 4 — Price scale (frozen — not an open defect)
+
+Record the post-PR #168 RED research finding on price precision:
+
+- The target Magento 2.4.8 / 2.4.9 catalog decimal storage uses
+  **scale 6** for `catalog_product_entity_decimal.value`.
+- The existing **fail-closed six-decimal admission** in the Safe Sync
+  primitive remains the current contract.
+- Do **not** mark `PRICE_SCALE = 6` as an open defect.
+- Real-target certification still confirms the deployed schema against
+  the target's `DESCRIBE catalog_product_entity_decimal` evidence.
+
+#### DECISION 5 — Store view context (frozen — amends E12 narrowly)
+
+The E12 wording "single/default store context only" remains correct at the
+SyncConfiguration level. This amendment makes the **Safe Sync consequential
+WRITE** scope explicit within E12 and does not create a parallel rule.
+
+For Safe Sync consequential WRITEs specifically:
+
+- The write is **scoped to one explicit Magento Store View code** per
+  execution context.
+- `all` is **NOT** a V1 consequential WRITE target.
+- One operation **MUST NOT** silently fan out across all Store Views.
+- The first certification target uses the target's **Default Store View**.
+- Additional Store Views may later use their **own explicit execution
+  contexts**.
+- Automatic multi-Store-View fan-out within one V1 run is **OUT**.
+- Localized / store-scoped fan-out remains **OUT of first V1** (this preserves
+  the existing E12 freeze on localized value fan-out).
+- Magento **Website** or **Store Group** names are never REST store codes —
+  only the explicit REST store code is identity for the write scope.
+
+Future multi-store extensibility is preserved by routing additional
+Store Views through their own explicit execution contexts, not through
+implicit multi-context fan-out.
+
+#### DECISION 6 — PHP / Adobe certification matrix (frozen)
+
+The post-#168 certification envelope is:
+
+| Tier | Adobe Commerce | PHP |
+|---|---|---|
+| **PRIMARY** | 2.4.9 | 8.5 |
+| **SUPPORTED COMPATIBILITY** | 2.4.9 | 8.4 |
+| **PREVIOUS ADOBE LINE** | 2.4.8-p5 | 8.4 |
+| **OUT OF V1 CERTIFICATION** | — | 8.3 |
+
+- PHP 8.4 **IS supported** on Adobe Commerce 2.4.9. Do not record it as
+  unsupported.
+- PHP 8.3 is **OUT of V1 certification** and must not be claimed as a
+  supported V1 target.
+- The current `integrations/magento-safe-sync/composer.json` PHP and
+  `magento/framework` constraints are **broader than this certification envelope**
+  and must be **narrowed before certification**.
+- The exact `composer.json` constraint is **not chosen in this docs
+  task**; it belongs to the bounded Safe Sync module correction
+  (Decision 9 step 2).
+
+#### DECISION 7 — Callback failure semantics (frozen)
+
+Record the post-PR #168 callback failure semantics without introducing a
+new applied-state enum:
+
+- The physical COMMIT precedes bridge-owned callback processing.
+- A post-COMMIT callback exception **does NOT** downgrade durable
+  Product DB state from `KnownApplied`.
+- The response remains `KnownApplied` with a **warning**.
+- A **warning** means post-commit target maintenance / index / cache state
+  may be incomplete and requires explicit evidence / remediation
+  semantics (not a separate `KnownAppliedWithWarning` enum).
+- Real-target certification must prove `CallbackPool` drain / failure behaviour
+  on each certified combination in the Decision 6 matrix.
+- The existing applied-state vocabulary remains:
+  `KnownApplied` / `KnownNotApplied` / `UnknownOrAmbiguous`. `IdentityMismatch`
+  remains a reason beneath `KnownNotApplied` (see the
+  [Stage 3E Stop-and-Amend](#stage-3e-stop-and-amend--magento-ownership-and-entity-bound-safe-sync-runtime-contract)
+  `Failure semantics` sub-section above).
+- The merchant-facing UX contract (see `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md` §17 / §18)
+  is **unchanged** for this docs task because the new warning is only reachable on a
+  real-target consequential WRITE; Live support is still false and
+  merchants do not yet see post-COMMIT warnings.
+
+#### DECISION 8 — Content staging (frozen — no new semantics)
+
+Preserve the frozen Stage 3E Stop-and-Amend Content Staging rules and
+**do not** invent a staged-version warning or new applied-state semantics
+in this docs task:
+
+- Logical `entity_id` identity is preserved.
+- All relevant physical rows are locked.
+- Operational version is resolved through the normal Magento
+  repository / resource pipeline.
+- No Commerce-only `VersionManager` dependency.
+- Real Adobe Commerce evidence with a **pending scheduled update**
+  remains mandatory for the Decision 9 step 5 proof.
+- Any material staging contradiction discovered on a real target returns to architectural arbitration
+  **before** Live is enabled.
+
+#### DECISION 9 — Order of work (frozen pre-Live sequence)
+
+The pre-Live sequence is:
+
+1. **Docs certification amendment** — this PR.
+2. **Bounded Safe Sync module correction**:
+   - media-neutral Product write (Decision 2);
+   - correct connection reset / quarantine (Decision 3);
+   - truthful Magento Composer support envelope (Decision 6).
+3. **Disposable validation harness** — rebuild of the reverted Part 1
+   harness, scoped to the real-target proofs listed in the
+   [Stage 3E Stop-and-Amend `Validation harness contract`](#stage-3e-stop-and-amend--magento-ownership-and-entity-bound-safe-sync-runtime-contract)
+   sub-section above.
+4. **Isolated simple writer certification** on:
+   - Adobe Commerce 2.4.9 / PHP 8.5 (PRIMARY);
+   - 2.4.9 / PHP 8.4 (SUPPORTED COMPATIBILITY);
+   - 2.4.8-p5 / PHP 8.4 (PREVIOUS ADOBE LINE).
+5. **Content Staging proof** — real Commerce Product with a pending
+   scheduled update.
+6. **Galera proof** — causal cross-node entity read.
+7. **Entity-bound lifecycle** — Status / visibility write proof.
+8. **Entity-bound configurable** — options / child link write proof.
+9. **Entity-bound media** — primary / gallery write proof.
+10. **`ConnectorLiveRuntimeReadiness` integration** with the fresh
+    handshake timing rules from the
+    [Stage 3E Stop-and-Amend `Account readiness freeze`](#stage-3e-stop-and-amend--magento-ownership-and-entity-bound-safe-sync-runtime-contract)
+    sub-section above.
+11. **Live consumption** — the Live executor is rewired to the Safe Sync
+    write client; SKU-addressed `PUT /V1/products/:sku` is removed from
+    the consequential WRITE path.
+12. **Final truth-flip gate** — `support = true` is the last step, gated
+    on all of the items above passing.
+
+The numbered list is **logical evidence gates**, not a per-item-PR
+contract. Items may ship in a single PR or in a small set of PRs as long
+as each gate's evidence is real and attributable. **Support remains
+false** through every pre-truth-flip slice.
+
+#### Code-vs-docs dormant discrepancies (recorded, not fixed in this docs task)
+
+The following dormant discrepancies exist between current code and the
+Stage 3E post-trust Safe Sync primitive requirements. They are
+**documented here, not fixed in this docs task** because the relevant
+code paths are still **production-unreachable** (Live support is `false`
+and the Safe Sync writer is not consumed by the Live executor).
+
+| Discrepancy | Safe Sync primitive requirement | Current code state | Production reachability |
+|---|---|---|---|
+| Stock SKU-addressed **media** consequential path | Entity-loaded Product / media extension mechanics — not SKU-addressed `GalleryManagement` operations | Stock SKU-addressed media path still exists in the historic Live capability surface | Unreachable: `support = false` and Safe Sync write client is not consumed by Live |
+| Stock SKU-addressed **configurable options / child link** path | Entity-loaded parent extension attributes / ID-bound Magento mechanics | Stock SKU-addressed configurable path still exists in the historic Live capability surface | Unreachable: same as above |
+| Stock SKU-addressed **lifecycle status** path | Entity-loaded Product + normal repository save | Stock SKU-addressed status / visibility path still exists in the historic Live capability surface | Unreachable: same as above |
+
+These must be **replaced before their respective Live path becomes reachable**
+(i.e. before any of Decision 9 steps 7–11 is enabled for that mutation
+category). Replacement is module-local and **target-version tested**; the
+live-truth-flip gate (Decision 9 step 12) remains the last authorisation
+point for the `support = true` flip.
+
+#### Post-#168 status after this docs amendment
+
+| Item | Status |
+|---|---|
+| Stage 3E docs contract | **Done** — entity-bound Safe Sync runtime contract frozen |
+| Stage 3E post-#168 certification amendment | **Done (docs only)** — 9 decisions recorded; no runtime change |
+| Stage 3E-R1 internal read foundation | **Implemented (internal; support false)** |
+| Isolated entity-bound simple Product WRITE foundation | **Implemented (internal; not consumed by Live; support false)** |
+| Bounded Safe Sync module correction (media-neutral Product write, connection reset / quarantine, narrowed Composer envelope) | **Pending** — Decision 9 step 2 |
+| Disposable validation harness | **Pending** — Decision 9 step 3 |
+| Isolated simple writer real-target certification (2.4.9 / 8.5; 2.4.9 / 8.4; 2.4.8-p5 / 8.4) | **Pending** — Decision 9 step 4 |
+| Content Staging / Galera / entity-bound lifecycle / configurable / media proofs | **Pending** — Decision 9 steps 5–9 |
+| `ConnectorLiveRuntimeReadiness` integration | **Pending** — Decision 9 step 10 |
+| Live consumption (rewire + remove SKU-addressed consequential path) | **Pending** — Decision 9 step 11 |
+| Final truth-flip gate / `support = true` | **Pending** — Decision 9 step 12 |
+| Adobe Products / Export / Live | **FALSE** |
 | Merchant consequential Live | **NOT EXPOSED** |
 | Deployment | **NOT PERFORMED** |
 
