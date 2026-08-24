@@ -492,14 +492,16 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
     {
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
-        $this->assertStringContainsString('post-#168 real-target certification amendment (9 decisions) recorded in', $atlas);
+        $this->assertStringContainsString('Stage 3E Post-#168 Real-Target Certification Amendment (9 decisions + dormant discrepancies table) layered on top', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED (internal; support false; not consumed by Live)', $atlas);
         $this->assertStringContainsString('not consumed by Live', $atlas);
+        $this->assertStringContainsString('stops fail-closed at `entity_bound_mutation_bridge_required`', $atlas);
+        $this->assertStringContainsString('zero consequential Product write', $atlas);
         $this->assertStringContainsString('Stage 3E post-#168 dormant code-vs-docs discrepancies', $atlas);
         $this->assertStringContainsString('DOCUMENTED (dormant; not fixed)', $atlas);
-        $this->assertStringContainsString('production-unreachable code paths still use stock SKU-addressed', $atlas);
-        $this->assertStringContainsString('media (`GalleryManagement`), configurable options / child link, lifecycle status / visibility', $atlas);
-        $this->assertStringContainsString('does **not** currently route a trusted simple Product through the historic SKU-addressed', $atlas);
-        $this->assertStringContainsString('stops fail-closed with `entity_bound_mutation_bridge_required`', $atlas);
+        $this->assertStringContainsString('Production-unreachable code paths that still use stock SKU-addressed', $atlas);
+        $this->assertStringContainsString('media (`GalleryManagement`); configurable options / child link; lifecycle status / visibility', $atlas);
+        $this->assertStringContainsString('replaced before their respective Live path becomes reachable', $atlas);
     }
 
     #[Test]
@@ -510,7 +512,12 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('**Stage 3E Post-#168 Real-Target Certification Amendment (docs only) is recorded**', $gaps);
         $this->assertStringContainsString('9 decisions (current state, media-neutral Product save, connection quarantine,', $gaps);
         $this->assertStringContainsString('a `Code-vs-docs dormant discrepancies` table', $gaps);
-        $this->assertStringContainsString('no runtime PHP, no `composer.json` change, no validation harness, no Live enable, no merge into `develop` in this docs task', $gaps);
+        $this->assertStringContainsString('no runtime PHP change', $gaps);
+        $this->assertStringContainsString('no `integrations/magento-safe-sync` runtime change', $gaps);
+        $this->assertStringContainsString('no `composer.json` change', $gaps);
+        $this->assertStringContainsString('no validation harness', $gaps);
+        $this->assertStringContainsString('no Live enablement', $gaps);
+        $this->assertStringContainsString('no deployment', $gaps);
     }
 
     /**
