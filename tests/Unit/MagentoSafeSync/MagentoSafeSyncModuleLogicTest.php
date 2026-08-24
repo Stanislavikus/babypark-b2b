@@ -1639,6 +1639,32 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
     }
 
     #[Test]
+    public function successful_commit_without_physical_level_zero_is_unknown_or_ambiguous_and_quarantined(): void
+    {
+        $fixture = $this->simpleWriteFixture(galeraEnabled: true);
+        $fixture['repository']->simulateDanglingNestedTransaction = true;
+
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', name: 'Updated Name'));
+
+        $this->assertSame('unknown_or_ambiguous', $result->getAppliedState());
+        $this->assertSame('safe_sync_commit_uncertain', $result->getReasonCode());
+        $this->assertTrue($result->getPostconditionVerified());
+        $this->assertSame(1, $result->getConsequentialWriteAttempts());
+        $this->assertSame([], $result->getWarningCodes());
+        $this->assertSame(0, $fixture['callbackHandler']->processCalls);
+        $this->assertSame(0, $fixture['callbackHandler']->clearCalls);
+        $this->assertSame([spl_object_hash($fixture['connection'])], CallbackPool::$clearedHashes);
+        $this->assertSame([
+            'clear:'.spl_object_hash($fixture['connection']),
+            'reset:'.spl_object_hash($fixture['connection']),
+        ], CallbackPool::$events);
+        $this->assertSame(1, $fixture['connection']->resetCalls);
+        $this->assertSame(0, $fixture['connection']->getTransactionLevel());
+        $this->assertSame(['SET SESSION wsrep_sync_wait = 1'], $fixture['connection']->queries);
+        $this->assertSame(['begin', 'begin', 'begin', 'commit', 'commit'], $fixture['connection']->txEvents);
+    }
+
+    #[Test]
     public function rollback_exception_after_consequential_save_attempt_returns_unknown_or_ambiguous_once_and_quarantines_exact_entity_connection(): void
     {
         $fixture = $this->simpleWriteFixture();
@@ -1741,6 +1767,54 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
             'clear:'.spl_object_hash($connection),
             'reset:'.spl_object_hash($connection),
         ], CallbackPool::$events);
+    }
+
+    #[Test]
+    public function galera_restore_with_open_transaction_quarantines_before_throwing_original_precondition_failure(): void
+    {
+        $callbackBridge = new ProductEntityManagerCallbackBridge(new CallbackHandler);
+        $connection = new ResettableFakeAdapter([]);
+        $connection->transactionLevel = 1;
+        $session = new GaleraWriteSession(new ConnectionQuarantine($callbackBridge));
+
+        try {
+            $session->restore($connection, ['previous' => 0]);
+            $this->fail('Expected restore precondition failure.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('safe_sync_wsrep_restore_before_transaction_level_zero', $exception->getMessage());
+        }
+
+        $this->assertSame([
+            'clear:'.spl_object_hash($connection),
+            'reset:'.spl_object_hash($connection),
+        ], CallbackPool::$events);
+        $this->assertSame(1, $connection->resetCalls);
+        $this->assertSame(0, $connection->getTransactionLevel());
+        $this->assertSame([], $connection->queries);
+    }
+
+    #[Test]
+    public function galera_restore_with_open_transaction_preserves_quarantine_failure_diagnostics(): void
+    {
+        $callbackBridge = new ProductEntityManagerCallbackBridge(new CallbackHandler);
+        $connection = new ResettableFakeAdapter([]);
+        $connection->transactionLevel = 1;
+        $connection->resetFailure = new \RuntimeException('reset failed');
+        $session = new GaleraWriteSession(new ConnectionQuarantine($callbackBridge));
+
+        try {
+            $session->restore($connection, ['previous' => 0]);
+            $this->fail('Expected quarantine failure diagnostics.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('safe_sync_wsrep_connection_quarantine_failed:reset_failed', $exception->getMessage());
+            $this->assertSame('safe_sync_wsrep_restore_before_transaction_level_zero', $exception->getPrevious()?->getMessage());
+        }
+
+        $this->assertSame([
+            'clear:'.spl_object_hash($connection),
+            'reset:'.spl_object_hash($connection),
+        ], CallbackPool::$events);
+        $this->assertSame([], $connection->queries);
     }
 
     #[Test]
@@ -2338,6 +2412,8 @@ final class FakeProductRepository implements ProductRepositoryInterface
 
     public bool $simulateNestedRollbackPoison = false;
 
+    public bool $simulateDanglingNestedTransaction = false;
+
     public function __construct(
         private readonly FakeProduct $product,
         private readonly ?FakeAdapter $connection = null,
@@ -2364,6 +2440,10 @@ final class FakeProductRepository implements ProductRepositoryInterface
 
         if ($this->connection !== null) {
             $this->connection->beginTransaction();
+
+            if ($this->simulateDanglingNestedTransaction) {
+                $this->connection->beginTransaction();
+            }
 
             if ($this->simulateNestedRollbackPoison) {
                 $this->connection->rollBack();

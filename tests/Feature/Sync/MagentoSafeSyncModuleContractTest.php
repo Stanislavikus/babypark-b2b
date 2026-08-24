@@ -136,12 +136,14 @@ class MagentoSafeSyncModuleContractTest extends TestCase
         $this->assertStringContainsString("'safe_sync_media_attribute_not_allowed'", $content);
         $this->assertStringContainsString('runForLogicalEntity(', $content);
         $this->assertStringContainsString("'safe_sync_connection_quarantine_unavailable'", $content);
+        $this->assertStringContainsString("'safe_sync_commit_uncertain'", $content);
         $this->assertStringContainsString('CallbackPool::clear(spl_object_hash($connection))', $bridge);
         $this->assertStringContainsString('$connection->_resetState()', $quarantine);
         $this->assertStringContainsString('implements ResetAfterRequestInterface', $scope);
         $this->assertStringContainsString('mapped_attributes', $content);
         $this->assertStringNotContainsString('postProduct(', $content);
         $this->assertStringNotContainsString('row_id as identity', $content);
+        $this->assertStringNotContainsString("method_exists(\$product, 'unsetData')", $content);
         $this->assertStringNotContainsString('setMediaGalleryEntries(null)', $content);
         $this->assertStringNotContainsString('closeConnection()', $content);
     }

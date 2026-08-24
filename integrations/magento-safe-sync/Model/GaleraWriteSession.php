@@ -43,7 +43,10 @@ final class GaleraWriteSession
         }
 
         if ($this->transactionLevel($connection) !== 0) {
-            throw new \RuntimeException('safe_sync_wsrep_restore_before_transaction_level_zero');
+            $restoreException = new \RuntimeException('safe_sync_wsrep_restore_before_transaction_level_zero');
+            $this->quarantineConnectionAfterRestoreFailure($connection, $restoreException);
+
+            throw $restoreException;
         }
 
         try {

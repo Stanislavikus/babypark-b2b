@@ -828,9 +828,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
                 );
             }
 
-            if (method_exists($product, 'unsetData')) {
-                $product->unsetData('media_gallery');
-            }
+            $product->unsetData('media_gallery');
 
             $this->applyMutation($product, $mutation);
 
@@ -931,6 +929,20 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
             } catch (\Throwable $exception) {
                 $warningCodes = $this->restoreAfterCommitException($connection, $galeraState);
                 $this->logger->warning('Safe Sync outer commit acknowledgement is uncertain.', ['exception' => $exception]);
+
+                return $this->unknownOrAmbiguous(
+                    'safe_sync_commit_uncertain',
+                    $logicalEntityId,
+                    $expectedSku,
+                    true,
+                    $consequentialWriteAttempts,
+                    $warningCodes,
+                );
+            }
+
+            if ($this->transactionLevel($connection) !== 0) {
+                $this->logger->error('Safe Sync commit returned without proving physical transaction completion.');
+                $warningCodes = $this->quarantineConnection($connection);
 
                 return $this->unknownOrAmbiguous(
                     'safe_sync_commit_uncertain',
