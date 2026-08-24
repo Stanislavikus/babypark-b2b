@@ -12,21 +12,48 @@ interface HandshakeResponseInterface
 
     public const SUPPORTED_OPERATION_FAMILIES = 'supported_operation_families';
 
+    /**
+     * Gets the negotiated Safe Sync contract version.
+     *
+     * @return string Safe Sync contract version.
+     */
     public function getContractVersion(): string;
 
+    /**
+     * Sets the negotiated Safe Sync contract version.
+     *
+     * @param  string  $contractVersion  Safe Sync contract version.
+     * @return $this
+     */
     public function setContractVersion(string $contractVersion): self;
 
+    /**
+     * Gets the installed Safe Sync module version.
+     *
+     * @return string Safe Sync module version.
+     */
     public function getModuleVersion(): string;
 
+    /**
+     * Sets the installed Safe Sync module version.
+     *
+     * @param  string  $moduleVersion  Safe Sync module version.
+     * @return $this
+     */
     public function setModuleVersion(string $moduleVersion): self;
 
     /**
-     * @return string[]
+     * Gets the supported Safe Sync operation families.
+     *
+     * @return string[] Supported operation family codes.
      */
     public function getSupportedOperationFamilies(): array;
 
     /**
-     * @param  string[]  $supportedOperationFamilies
+     * Sets the supported Safe Sync operation families.
+     *
+     * @param  string[]  $supportedOperationFamilies  Supported operation family codes.
+     * @return $this
      */
     public function setSupportedOperationFamilies(array $supportedOperationFamilies): self;
 }

@@ -11,6 +11,10 @@ interface ProductWriteManagementInterface
 {
     /**
      * Performs entity-bound simple product mutation using logical entity identity plus exact expected SKU.
+     *
+     * @param  int  $logicalEntityId  Requested logical product identity.
+     * @param  ProductWriteRequestInterface  $request  Closed simple-product mutation payload.
+     * @return ProductWriteResponseInterface Entity-bound write result metadata.
      */
     public function writeSimpleProduct(
         int $logicalEntityId,

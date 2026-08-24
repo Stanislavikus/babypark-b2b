@@ -1189,6 +1189,63 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
     }
 
     #[Test]
+    public function six_decimal_price_is_accepted_without_local_rejection(): void
+    {
+        $fixture = $this->simpleWriteFixture();
+
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', price: 123.456789));
+
+        $this->assertSame('known_applied', $result->getAppliedState());
+        $this->assertSame('safe_sync_simple_product_write_applied', $result->getReasonCode());
+        $this->assertSame(123.456789, $fixture['product']->getPrice());
+        $this->assertSame(['begin', 'begin', 'commit', 'commit'], $fixture['connection']->txEvents);
+    }
+
+    #[Test]
+    public function seven_decimal_price_fails_closed_before_transaction_or_callback_activity(): void
+    {
+        $fixture = $this->simpleWriteFixture();
+
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', price: 123.4567891));
+
+        $this->assertSame('known_not_applied', $result->getAppliedState());
+        $this->assertSame('safe_sync_invalid_price_precision', $result->getReasonCode());
+        $this->assertFalse($result->getPostconditionVerified());
+        $this->assertSame(0, $result->getConsequentialWriteAttempts());
+        $this->assertSame(0, $fixture['repository']->saveCalls);
+        $this->assertSame([], $fixture['connection']->txEvents);
+        $this->assertSame(0, $fixture['callbackHandler']->processCalls);
+        $this->assertSame(0, $fixture['callbackHandler']->clearCalls);
+    }
+
+    #[Test]
+    public function ordinary_two_decimal_price_is_preserved_without_local_normalization(): void
+    {
+        $fixture = $this->simpleWriteFixture();
+
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', price: 12.34));
+
+        $this->assertSame('known_applied', $result->getAppliedState());
+        $this->assertSame('safe_sync_simple_product_write_applied', $result->getReasonCode());
+        $this->assertTrue($result->getPostconditionVerified());
+        $this->assertSame(12.34, $fixture['product']->getPrice());
+    }
+
+    #[Test]
+    public function non_finite_price_fails_closed_before_any_mutation_activity(): void
+    {
+        $fixture = $this->simpleWriteFixture();
+
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', price: INF));
+
+        $this->assertSame('known_not_applied', $result->getAppliedState());
+        $this->assertSame('safe_sync_invalid_price_precision', $result->getReasonCode());
+        $this->assertSame(0, $result->getConsequentialWriteAttempts());
+        $this->assertSame([], $fixture['connection']->txEvents);
+        $this->assertSame(0, $fixture['repository']->saveCalls);
+    }
+
+    #[Test]
     public function identifier_removed_before_save_blocks_create_fallback_and_rolls_back(): void
     {
         $product = new FakeProduct(entityId: 77, sku: 'SKU-77', typeId: 'simple', name: 'Original');
@@ -1217,6 +1274,24 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertSame('safe_sync_simple_product_write_applied', $result->getReasonCode());
         $this->assertSame([77, 77], $fixture['repository']->getByIdCalls);
         $this->assertSame(1, $fixture['repository']->saveCalls);
+    }
+
+    #[Test]
+    public function known_applied_response_uses_the_fresh_post_save_product_sku_observation(): void
+    {
+        $fixture = $this->simpleWriteFixture();
+        $fixture['repository']->postSaveProduct = new FakeProduct(
+            entityId: 77,
+            sku: 'SKU-77',
+            typeId: 'simple',
+            name: 'Updated Name',
+        );
+
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', name: 'Updated Name'));
+
+        $this->assertSame('known_applied', $result->getAppliedState());
+        $this->assertSame('SKU-77', $result->getSku());
+        $this->assertSame(2, $fixture['repository']->postSaveProduct->skuReads);
     }
 
     #[Test]
@@ -1326,6 +1401,24 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertSame(1, $fixture['connection']->closeCalls);
         $this->assertSame(0, $fixture['defaultConnection']->closeCalls);
         $this->assertSame(['begin', 'begin', 'commit'], $fixture['connection']->txEvents);
+    }
+
+    #[Test]
+    public function nested_repository_rollback_poison_requires_a_successful_bridge_owned_outer_rollback(): void
+    {
+        $fixture = $this->simpleWriteFixture();
+        $fixture['repository']->simulateNestedRollbackPoison = true;
+
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', name: 'Updated Name'));
+
+        $this->assertSame('known_not_applied', $result->getAppliedState());
+        $this->assertSame('safe_sync_repository_save_failed', $result->getReasonCode());
+        $this->assertSame(1, $result->getConsequentialWriteAttempts());
+        $this->assertSame(['begin', 'begin', 'rollback', 'rollback'], $fixture['connection']->txEvents);
+        $this->assertSame(0, $fixture['connection']->getTransactionLevel());
+        $this->assertFalse($fixture['connection']->isRolledBack);
+        $this->assertSame(1, $fixture['callbackHandler']->clearCalls);
+        $this->assertSame(0, $fixture['callbackHandler']->processCalls);
     }
 
     #[Test]
@@ -1585,6 +1678,8 @@ final class FakeAdapter implements AdapterInterface
 
     public ?\Throwable $rollbackFailure = null;
 
+    public bool $isRolledBack = false;
+
     public int $closeCalls = 0;
 
     /**
@@ -1649,6 +1744,10 @@ final class FakeAdapter implements AdapterInterface
     {
         $this->txEvents[] = 'commit';
 
+        if ($this->isRolledBack) {
+            throw new \RuntimeException('Rolled back transaction has not been completed correctly.');
+        }
+
         if ($this->transactionLevel === 1 && $this->commitFailure !== null) {
             throw $this->commitFailure;
         }
@@ -1664,8 +1763,19 @@ final class FakeAdapter implements AdapterInterface
             throw $this->rollbackFailure;
         }
 
-        $this->transactionLevel = max(0, $this->transactionLevel - 1);
         $this->txEvents[] = 'rollback';
+
+        if ($this->transactionLevel > 1) {
+            $this->transactionLevel--;
+            $this->isRolledBack = true;
+
+            return;
+        }
+
+        if ($this->transactionLevel === 1) {
+            $this->transactionLevel = 0;
+            $this->isRolledBack = false;
+        }
     }
 
     public function getTransactionLevel(): int
@@ -1692,6 +1802,8 @@ final class FakeAdapter implements AdapterInterface
 final class FakeProduct implements ProductInterface
 {
     public bool $dropIdentifierOnWrite = false;
+
+    public int $skuReads = 0;
 
     public function __construct(
         private ?int $entityId,
@@ -1730,6 +1842,8 @@ final class FakeProduct implements ProductInterface
 
     public function getSku(): string
     {
+        $this->skuReads++;
+
         return $this->sku;
     }
 
@@ -1833,8 +1947,12 @@ final class FakeProductRepository implements ProductRepositoryInterface
 
     public ?FakeProduct $saveReturnProduct = null;
 
+    public ?FakeProduct $postSaveProduct = null;
+
     /** @var null|\Closure(FakeProduct): void */
     public ?\Closure $afterSaveMutation = null;
+
+    public bool $simulateNestedRollbackPoison = false;
 
     public function __construct(
         private readonly FakeProduct $product,
@@ -1844,6 +1962,10 @@ final class FakeProductRepository implements ProductRepositoryInterface
     public function getById($productId, $editMode = false, $storeId = null, $forceReload = false)
     {
         $this->getByIdCalls[] = (int) $productId;
+
+        if ($forceReload && count($this->getByIdCalls) > 1 && $this->postSaveProduct !== null) {
+            return $this->postSaveProduct;
+        }
 
         if ($this->product->getData('entity_id') === null) {
             throw new NoSuchEntityException('missing');
@@ -1858,6 +1980,13 @@ final class FakeProductRepository implements ProductRepositoryInterface
 
         if ($this->connection !== null) {
             $this->connection->beginTransaction();
+
+            if ($this->simulateNestedRollbackPoison) {
+                $this->connection->rollBack();
+
+                throw new \RuntimeException('nested rollback poison');
+            }
+
             $this->connection->commit();
         }
 

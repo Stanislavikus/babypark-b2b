@@ -24,6 +24,8 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
 
     private const APPLIED_UNKNOWN_OR_AMBIGUOUS = 'unknown_or_ambiguous';
 
+    private const PRICE_SCALE = 6;
+
     /** @var list<string> */
     private const RESERVED_CUSTOM_ATTRIBUTE_CODES = [
         'attribute_set_id',
@@ -78,6 +80,10 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
 
         if ($mutation['has_changes'] === false) {
             return $this->knownNotApplied('safe_sync_no_controlled_fields_requested', $logicalEntityId, $expectedSku, false, 0);
+        }
+
+        if ($mutation['price'] !== null && ! $this->hasSupportedPricePrecision($mutation['price'])) {
+            return $this->knownNotApplied('safe_sync_invalid_price_precision', $logicalEntityId, $expectedSku, false, 0);
         }
 
         $metadata = $this->metadataPool->getMetadata(ProductInterface::class);
@@ -146,7 +152,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
         return $this->knownApplied(
             'safe_sync_simple_product_write_applied',
             $logicalEntityId,
-            $expectedSku,
+            $preCommitOutcome['observed_sku'],
             true,
             $preCommitOutcome['consequential_write_attempts'],
             $warningCodes,
@@ -267,6 +273,27 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
                 $product->setData($attribute['attribute_code'], $attribute['value']);
             }
         }
+    }
+
+    private function hasSupportedPricePrecision(float $price): bool
+    {
+        if (! is_finite($price)) {
+            return false;
+        }
+
+        $normalized = rtrim(rtrim(sprintf('%.14F', $price), '0'), '.');
+
+        if ($normalized === '' || $normalized === '-0') {
+            return true;
+        }
+
+        $decimalPosition = strpos($normalized, '.');
+
+        if ($decimalPosition === false) {
+            return true;
+        }
+
+        return strlen(substr($normalized, $decimalPosition + 1)) <= self::PRICE_SCALE;
     }
 
     /**
@@ -592,7 +619,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
      *   price:?float,
      *   mapped_attributes:list<array{attribute_code:string,value:string}>
      * }  $mutation
-     * @return ProductWriteResponseInterface|array{consequential_write_attempts:int}
+     * @return ProductWriteResponseInterface|array{consequential_write_attempts:int,observed_sku:string}
      */
     private function executeRollbackCapablePhase(
         object $connection,
@@ -816,6 +843,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
 
             return [
                 'consequential_write_attempts' => $consequentialWriteAttempts,
+                'observed_sku' => (string) $postSave->getSku(),
             ];
         } catch (\Throwable $exception) {
             $this->logger->error('Safe Sync write failed closed before commit.', ['exception' => $exception]);

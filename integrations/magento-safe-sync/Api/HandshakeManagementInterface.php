@@ -10,6 +10,8 @@ interface HandshakeManagementInterface
 {
     /**
      * Returns machine-safe compatibility metadata for the Safe Sync module.
+     *
+     * @return HandshakeResponseInterface Safe Sync compatibility metadata.
      */
     public function handshake(): HandshakeResponseInterface;
 }
