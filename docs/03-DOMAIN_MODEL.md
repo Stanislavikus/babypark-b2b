@@ -7154,8 +7154,8 @@ that follow the isolated entity-bound simple Product WRITE foundation landing
 internally. **This is documentation only.** No runtime PHP under `app/` or
 under `integrations/magento-safe-sync/` was modified. No `composer.json`
 change was made. No validation harness was implemented. Live was not enabled.
-The PR was not merged into `develop`. No new broad Stage 3F was created. This
-is an additive Stage 3E certification amendment layered on top of the
+No new broad Stage 3F was created. This is an additive Stage 3E certification
+amendment layered on top of the
 [Stage 3E Stop-and-Amend](#stage-3e-stop-and-amend--magento-ownership-and-entity-bound-safe-sync-runtime-contract)
 section above.
 
@@ -7169,10 +7169,17 @@ Record explicitly, without overstating readiness:
 - A bounded Laravel **Safe Sync write client** (`AdobeSafeSyncClient` +
   `AdobeSafeSyncRequestFactory`) exists; it is a **write-capable** client
   but is **not currently consumed** by the Live executor.
-- No Live executor consumes the Safe Sync write client; the Live capability
-  surface still routes the historic SKU-addressed `PUT /V1/products/:sku`
-  path that Stage 3E Stop-and-Amend had already marked unsafe for
-  consequential safety decisions.
+- `AdobeProductSimpleCommandExecutor` does **not** currently route a trusted
+  simple Product through the historic SKU-addressed `PUT /V1/products/:sku`
+  path. For a trusted variant link it currently stops fail-closed with
+  `entity_bound_mutation_bridge_required` and performs **zero consequential
+  Product write**. The Live capability surface therefore has no
+  consequential simple Product writer wired today.
+- Historic SKU-addressed consequential writers remain separately in
+  dormant production-unreachable code paths for: media
+  (`GalleryManagement`), configurable options / child link, and lifecycle
+  status / visibility. Those downstream seams must be replaced before their
+  respective Live paths become reachable.
 - `ConnectorSyncOperationSupport(Products, Export, Live)` remains **false**;
   Adobe Products / Export / Live public support is unchanged.
 - **No** real-target consequential WRITE certification has occurred.
@@ -7181,7 +7188,8 @@ Record explicitly, without overstating readiness:
 
 Do not promote the post-#168 foundation to "ready for Live" or "ready for
 real-target". The truthful description is: **isolated primitive is reachable;
-no consumer; no real-target evidence; support remains false.**
+no consumer; simple core Live path is fail-closed at
+`entity_bound_mutation_bridge_required`; no real-target evidence; support remains false.**
 
 #### DECISION 2 — Product save must be media-neutral (frozen)
 
@@ -7221,13 +7229,20 @@ Therefore:
 - The Safe Sync compatibility seam must **reset / quarantine the exact
   shared entity connection** so subsequent work cannot inherit stale
   transaction state.
+- Current code facts (write-side seams implicated by the RED finding):
+  - `ProductWriteManagement::quarantineConnection()` currently closes the
+    exact entity adapter after uncertain transaction / rollback
+    situations.
+  - `GaleraWriteSession::quarantineConnectionAfterRestoreFailure()` currently
+    closes the write-side adapter after a `wsrep` restore failure.
+  - `GaleraSessionScope::quarantineConnectionAfterRestoreFailure()` has an
+    analogous READ-side quarantine seam, but it is **not** the sole or primary
+    source of the write transaction-state finding.
 - The exact implementation is module-local and must be **target-version
   tested** (Decision 6) on the certified Magento / PHP combination.
-- Do not claim real-target proof already exists. The current
-  `GaleraSessionScope::quarantineConnectionAfterRestoreFailure` only calls
-  `ResourceConnection::closeConnection()`. Connection reset / quarantine at
-  the adapter level remains part of the bounded Safe Sync module
-  correction (Decision 9 step 2).
+- Do not claim real-target proof already exists. Connection reset /
+  quarantine at the adapter level remains part of the bounded Safe Sync
+  module correction (Decision 9 step 2).
 
 #### DECISION 4 — Price scale (frozen — not an open defect)
 

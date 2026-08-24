@@ -217,8 +217,10 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
     {
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
-        $this->assertStringContainsString('| Stage 3E entity-bound Safe Sync contract (docs) | DOCS CONTRACT DONE — runtime pending |', $atlas);
-        $this->assertStringContainsString('| Stage 3E Magento Safe Sync read + isolated simple write foundation | IMPLEMENTED (internal; support false; not consumed by Live) |', $atlas);
+        $this->assertStringContainsString('Stage 3E entity-bound Safe Sync contract (docs)', $atlas);
+        $this->assertStringContainsString('DOCS CONTRACT DONE — runtime pending', $atlas);
+        $this->assertStringContainsString('Stage 3E Magento Safe Sync read + isolated simple write foundation', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED (internal; support false; not consumed by Live)', $atlas);
         $this->assertStringContainsString('Stage3EEntityBoundSafeSyncDocumentationContractTest.php', $atlas);
     }
 
@@ -275,7 +277,6 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('No `composer.json`', $content);
         $this->assertStringContainsString('No validation harness was implemented', $content);
         $this->assertStringContainsString('Live was not enabled', $content);
-        $this->assertStringContainsString('not merged into `develop`', $content);
         $this->assertStringContainsString('No new broad Stage 3F was created', $content);
     }
 
@@ -288,10 +289,16 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('isolated entity-bound simple Product **WRITE** primitive exists', $section);
         $this->assertStringContainsString('Laravel **Safe Sync write client**', $section);
         $this->assertStringContainsString('not currently consumed** by the Live executor', $section);
+        $this->assertStringContainsString('`AdobeProductSimpleCommandExecutor` does **not** currently route a trusted', $section);
+        $this->assertStringContainsString('stops fail-closed with', $section);
+        $this->assertStringContainsString('`entity_bound_mutation_bridge_required`', $section);
+        $this->assertStringContainsString('zero consequential', $section);
+        $this->assertStringContainsString('Historic SKU-addressed consequential writers remain separately in', $section);
         $this->assertStringContainsString('`ConnectorSyncOperationSupport(Products, Export, Live)` remains **false**', $section);
         $this->assertStringContainsString('No** real-target consequential WRITE certification has occurred', $section);
         $this->assertStringContainsString('isolated primitive is reachable', $section);
         $this->assertStringContainsString('no consumer', $section);
+        $this->assertStringContainsString('simple core Live path is fail-closed at', $section);
         $this->assertStringContainsString('no real-target evidence', $section);
         $this->assertStringContainsString('support remains false', $section);
     }
@@ -321,10 +328,16 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('non-zero / poisoned', $section);
         $this->assertStringContainsString('reset / quarantine the exact', $section);
         $this->assertStringContainsString('shared entity connection**', $section);
+        $this->assertStringContainsString('Current code facts (write-side seams implicated by the RED finding)', $section);
+        $this->assertStringContainsString('`ProductWriteManagement::quarantineConnection()`', $section);
+        $this->assertStringContainsString('`GaleraWriteSession::quarantineConnectionAfterRestoreFailure()`', $section);
+        $this->assertStringContainsString('`GaleraSessionScope::quarantineConnectionAfterRestoreFailure()`', $section);
+        $this->assertStringContainsString('analogous READ-side quarantine seam', $section);
+        $this->assertStringContainsString('is **not** the sole or primary', $section);
+        $this->assertStringContainsString('source of the write transaction-state finding', $section);
         $this->assertStringContainsString('module-local', $section);
         $this->assertStringContainsString('**target-version tested**', $section);
         $this->assertStringContainsString('Do not claim real-target proof already exists', $section);
-        $this->assertStringContainsString('`GaleraSessionScope::quarantineConnectionAfterRestoreFailure`', $section);
     }
 
     #[Test]
@@ -481,9 +494,12 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('post-#168 real-target certification amendment (9 decisions) recorded in', $atlas);
         $this->assertStringContainsString('not consumed by Live', $atlas);
-        $this->assertStringContainsString('| Stage 3E post-#168 dormant code-vs-docs discrepancies | DOCUMENTED (dormant; not fixed) |', $atlas);
+        $this->assertStringContainsString('Stage 3E post-#168 dormant code-vs-docs discrepancies', $atlas);
+        $this->assertStringContainsString('DOCUMENTED (dormant; not fixed)', $atlas);
         $this->assertStringContainsString('production-unreachable code paths still use stock SKU-addressed', $atlas);
         $this->assertStringContainsString('media (`GalleryManagement`), configurable options / child link, lifecycle status / visibility', $atlas);
+        $this->assertStringContainsString('does **not** currently route a trusted simple Product through the historic SKU-addressed', $atlas);
+        $this->assertStringContainsString('stops fail-closed with `entity_bound_mutation_bridge_required`', $atlas);
     }
 
     #[Test]
