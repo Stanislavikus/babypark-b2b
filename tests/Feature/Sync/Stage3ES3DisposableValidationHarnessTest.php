@@ -18,6 +18,7 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
@@ -65,6 +66,7 @@ class Stage3ES3DisposableValidationHarnessTest extends TestCase
         $this->seed(WorkspaceSeeder::class);
         $this->seed(ConnectorFoundationSeeder::class);
         config()->set('adobe_stage3e_validation.allow_host', 'shop.example.com');
+        Storage::disk('local')->deleteDirectory((string) config('adobe_stage3e_validation.artifact_directory', 'stage3e-validation'));
     }
 
     #[Test]
@@ -376,6 +378,64 @@ class Stage3ES3DisposableValidationHarnessTest extends TestCase
     }
 
     #[Test]
+    public function module_version_below_s2_minimum_fails_before_put(): void
+    {
+        $transport = $this->bindTransport(function (ConnectorOutboundRequest $request): ConnectorHttpResult {
+            $uri = (string) $request->request->getUri();
+
+            if (str_contains($uri, '/safe-sync/handshake')) {
+                return $this->handshakeResult(moduleVersion: '0.2.0');
+            }
+
+            return $this->productReadResult(116, 'B2BVAL-MOD-1', 'Original Name');
+        });
+        $account = $this->createConnectorAccount();
+        [$_, $variant] = $this->createValidationVariant($account->workspace, 'B2BVAL-MOD-1');
+        $this->createTrustedVariantLink($account, $variant, 116);
+
+        $exitCode = $this->runCommand($account, $variant, 'B2BVAL-MOD-1');
+
+        $this->assertSame(1, $exitCode);
+        $this->assertSame(1, $transport->sendCount);
+        $puts = array_values(array_filter(
+            $transport->recordedRequests,
+            static fn (ConnectorOutboundRequest $request): bool => $request->request->getMethod() === 'PUT',
+        ));
+        $this->assertCount(0, $puts);
+        $this->assertStringContainsString('safe_sync_module_version_below_s2_minimum', Artisan::output());
+    }
+
+    #[Test]
+    public function missing_simple_write_family_fails_before_put(): void
+    {
+        $transport = $this->bindTransport(function (ConnectorOutboundRequest $request): ConnectorHttpResult {
+            $uri = (string) $request->request->getUri();
+
+            if (str_contains($uri, '/safe-sync/handshake')) {
+                return $this->handshakeResult(
+                    supportedOperationFamilies: ['entity_bound_product_read'],
+                );
+            }
+
+            return $this->productReadResult(117, 'B2BVAL-FAM-1', 'Original Name');
+        });
+        $account = $this->createConnectorAccount();
+        [$_, $variant] = $this->createValidationVariant($account->workspace, 'B2BVAL-FAM-1');
+        $this->createTrustedVariantLink($account, $variant, 117);
+
+        $exitCode = $this->runCommand($account, $variant, 'B2BVAL-FAM-1');
+
+        $this->assertSame(1, $exitCode);
+        $this->assertSame(1, $transport->sendCount);
+        $puts = array_values(array_filter(
+            $transport->recordedRequests,
+            static fn (ConnectorOutboundRequest $request): bool => $request->request->getMethod() === 'PUT',
+        ));
+        $this->assertCount(0, $puts);
+        $this->assertStringContainsString('safe_sync_simple_write_family_not_advertised', Artisan::output());
+    }
+
+    #[Test]
     public function decorator_is_local_and_does_not_replace_global_transport_binding(): void
     {
         $transport = $this->bindTransport(fn (ConnectorOutboundRequest $request): ConnectorHttpResult => $this->baselineResponder($request));
@@ -589,6 +649,64 @@ class Stage3ES3DisposableValidationHarnessTest extends TestCase
         $this->assertGreaterThan(0, $transport->sendCount);
     }
 
+    #[Test]
+    public function rejected_handshake_admission_still_emits_sanitized_evidence(): void
+    {
+        $transport = $this->bindTransport(function (ConnectorOutboundRequest $request): ConnectorHttpResult {
+            $uri = (string) $request->request->getUri();
+
+            if (str_contains($uri, '/safe-sync/handshake')) {
+                return $this->handshakeResult(moduleVersion: '0.2.0');
+            }
+
+            return $this->productReadResult(118, 'B2BVAL-EVID-1', 'Original Name');
+        });
+        $account = $this->createConnectorAccount();
+        [$_, $variant] = $this->createValidationVariant($account->workspace, 'B2BVAL-EVID-1');
+        $this->createTrustedVariantLink($account, $variant, 118);
+
+        $exitCode = $this->runCommand($account, $variant, 'B2BVAL-EVID-1');
+
+        $this->assertSame(1, $exitCode);
+        $this->assertSame(1, $transport->sendCount);
+        $artifact = $this->readArtifactFromOutput(Artisan::output());
+        $this->assertSame('FAIL', $artifact['result']);
+        $this->assertContains('safe_sync_module_version_below_s2_minimum', $artifact['failure_codes']);
+        $this->assertSame('stage3e-r1', $artifact['contract_version']);
+        $this->assertSame('0.2.0', $artifact['module_version']);
+        $this->assertSame([
+            'entity_bound_product_read',
+            'entity_bound_simple_product_write',
+        ], $artifact['supported_operation_families']);
+
+        $contents = file_get_contents($this->artifactPathFromOutput(Artisan::output()));
+        $this->assertIsString($contents);
+        $this->assertStringNotContainsString('Authorization', $contents);
+        $this->assertStringNotContainsString('ck_live', $contents);
+        $this->assertStringNotContainsString('"request"', $contents);
+        $this->assertStringNotContainsString('"body"', $contents);
+    }
+
+    #[Test]
+    public function accepted_handshake_artifact_records_contract_module_and_supported_operation_families(): void
+    {
+        $transport = $this->bindTransport(fn (ConnectorOutboundRequest $request): ConnectorHttpResult => $this->baselineResponder($request));
+        $account = $this->createConnectorAccount();
+        [$_, $variant] = $this->createValidationVariant($account->workspace, 'B2BVAL-HSHAKE-1');
+        $this->createTrustedVariantLink($account, $variant, 119);
+
+        $exitCode = $this->runCommand($account, $variant, 'B2BVAL-HSHAKE-1');
+
+        $this->assertSame(0, $exitCode);
+        $artifact = $this->readArtifactFromOutput(Artisan::output());
+        $this->assertSame('stage3e-r1', $artifact['contract_version']);
+        $this->assertSame('0.2.1', $artifact['module_version']);
+        $this->assertSame([
+            'entity_bound_product_read',
+            'entity_bound_simple_product_write',
+        ], $artifact['supported_operation_families']);
+    }
+
     private function runCommand($account, ProductVariant $variant, string $ackSku): int
     {
         return Artisan::call('adobe:stage3e-validate', [
@@ -646,12 +764,17 @@ class Stage3ES3DisposableValidationHarnessTest extends TestCase
         );
     }
 
-    private function handshakeResult(): ConnectorHttpResult
-    {
+    /**
+     * @param  list<string>|null  $supportedOperationFamilies
+     */
+    private function handshakeResult(
+        string $moduleVersion = '0.2.1',
+        ?array $supportedOperationFamilies = null,
+    ): ConnectorHttpResult {
         return new ConnectorHttpResult(200, [], json_encode([
             'contract_version' => 'stage3e-r1',
-            'module_version' => '0.2.1',
-            'supported_operation_families' => [
+            'module_version' => $moduleVersion,
+            'supported_operation_families' => $supportedOperationFamilies ?? [
                 'entity_bound_product_read',
                 'entity_bound_simple_product_write',
             ],
@@ -725,8 +848,17 @@ class Stage3ES3DisposableValidationHarnessTest extends TestCase
     {
         preg_match('/^Evidence:\s+(.+)$/m', $output, $matches);
 
-        $this->assertNotEmpty($matches[1] ?? null, 'Artifact path was not present in command output.');
+        if (! empty($matches[1] ?? null)) {
+            return trim($matches[1]);
+        }
 
-        return trim($matches[1]);
+        $artifactDirectory = trim((string) config('adobe_stage3e_validation.artifact_directory', 'stage3e-validation'), '/');
+        $artifacts = Storage::disk('local')->files($artifactDirectory);
+
+        $this->assertNotEmpty($artifacts, 'Artifact path was not present in command output and no validation artifact was written.');
+
+        sort($artifacts);
+
+        return Storage::disk('local')->path((string) last($artifacts));
     }
 }

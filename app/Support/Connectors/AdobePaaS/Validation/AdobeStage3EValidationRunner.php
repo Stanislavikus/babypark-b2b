@@ -5,6 +5,7 @@ namespace App\Support\Connectors\AdobePaaS\Validation;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductAppliedStateKnowledge;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClient;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncContract;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncHandshake;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncRequestFactory;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncSimpleProductWriteRequest;
@@ -75,6 +76,20 @@ final class AdobeStage3EValidationRunner
                 subject: $subject,
                 failureCodes: ['safe_sync_handshake_failed'],
                 messages: [$exception->getMessage()],
+            );
+        }
+
+        $handshakeAdmissionFailureCodes = $this->handshakeAdmissionFailureCodes($handshake);
+        if ($handshakeAdmissionFailureCodes !== []) {
+            return $this->finalize(
+                runId: $runId,
+                startedAt: $startedAt,
+                scenarioCode: $input->scenarioCode(),
+                outcome: AdobeStage3EValidationOutcome::Fail,
+                subject: $subject,
+                handshake: $handshake,
+                failureCodes: $handshakeAdmissionFailureCodes,
+                messages: ['Stage 3E validation handshake admission failed before pre-read/write scenario execution.'],
             );
         }
 
@@ -514,6 +529,7 @@ final class AdobeStage3EValidationRunner
             'sku' => $subject?->sku,
             'contract_version' => $handshake?->contractVersion,
             'module_version' => $handshake?->moduleVersion,
+            'supported_operation_families' => $handshake?->supportedOperationFamilies,
             'failure_codes' => array_values(array_unique($failureCodes)),
             'messages' => $messages,
             'support_remains_false' => true,
@@ -527,5 +543,34 @@ final class AdobeStage3EValidationRunner
             messages: $messages,
             failureCodes: array_values(array_unique($failureCodes)),
         );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function handshakeAdmissionFailureCodes(AdobeSafeSyncHandshake $handshake): array
+    {
+        $failureCodes = [];
+
+        if (! in_array(AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_FAMILY, $handshake->supportedOperationFamilies, true)) {
+            $failureCodes[] = 'safe_sync_simple_write_family_not_advertised';
+        }
+
+        if (! $this->isComparableSemanticVersion($handshake->moduleVersion)) {
+            $failureCodes[] = 'safe_sync_module_version_not_comparable';
+
+            return $failureCodes;
+        }
+
+        if (version_compare($handshake->moduleVersion, '0.2.1', '<')) {
+            $failureCodes[] = 'safe_sync_module_version_below_s2_minimum';
+        }
+
+        return $failureCodes;
+    }
+
+    private function isComparableSemanticVersion(string $version): bool
+    {
+        return preg_match('/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/', $version) === 1;
     }
 }
