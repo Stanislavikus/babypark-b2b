@@ -18,15 +18,17 @@ final class LocalizationContractViolationException extends FieldValueWriterExcep
         );
     }
 
-    public static function invalidLocale(string $locale): self
-    {
-        return new self("Locale '{$locale}' is not a syntactically valid BCP-47 / app-supported tag.");
-    }
-
     public static function corruptLocalizedStorage(string $fieldDefinitionId): self
     {
         return new self(
             "Existing localized value row for field definition {$fieldDefinitionId} is corrupt (not a JSON object). Refusing to silently overwrite."
+        );
+    }
+
+    public static function localizableSelectNotSupported(string $fieldDefinitionId): self
+    {
+        return new self(
+            "Field definition {$fieldDefinitionId} is configured as localizable Select, which is not supported by the GAP-028A writer."
         );
     }
 }

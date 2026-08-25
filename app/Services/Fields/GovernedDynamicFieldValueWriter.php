@@ -26,6 +26,8 @@ use App\Services\Fields\Exceptions\MultiValueNotSupportedException;
 use App\Services\Fields\Exceptions\TargetNotFoundException;
 use App\Services\Fields\Exceptions\TargetWorkspaceMismatchException;
 use App\Services\Fields\Exceptions\UnsupportedFieldDataTypeException;
+use App\Services\Fields\Exceptions\UnsupportedFieldObjectTypeException;
+use App\Services\Fields\Exceptions\UnsupportedFieldValidationRulesException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
@@ -64,12 +66,18 @@ use Illuminate\Support\Facades\DB;
  */
 final class GovernedDynamicFieldValueWriter
 {
+    private const DEADLOCK_RETRY_ATTEMPTS = 5;
+
     /**
      * Max concurrent-retry attempts for absent-slot create + unique-violation.
      * Bounded; on exhaustion the unique violation is re-thrown so the caller
      * is not silently masked into a wrong-state.
      */
     private const ABSENT_SLOT_CREATE_RETRY_LIMIT = 5;
+
+    private const PRODUCT_SLOT_UNIQUE_INDEX = 'product_field_values_ws_product_binding_unique';
+
+    private const VARIANT_SLOT_UNIQUE_INDEX = 'variant_field_values_ws_variant_binding_unique';
 
     public function __construct(
         private readonly FieldDefinitionSelectOptionValidator $selectOptionValidator,
@@ -249,7 +257,9 @@ final class GovernedDynamicFieldValueWriter
         }
 
         $this->assertDataTypeSupported($definition);
+        $this->assertValidationRulesSupported($definition);
         $this->assertLocalizationContract($definition, $locale);
+        $this->assertTargetTypeSupported($targetType);
 
         $target = $this->resolveTarget($targetType, $targetId, $workspaceId);
 
@@ -303,8 +313,7 @@ final class GovernedDynamicFieldValueWriter
             return $variant;
         }
 
-        // Customer is intentionally not supported in GAP-028A (Product/Variant only).
-        throw new \LogicException("Unsupported target type {$targetType->value} for GAP-028A writer.");
+        throw UnsupportedFieldObjectTypeException::forType($targetType);
     }
 
     private function assertDataTypeSupported(FieldDefinition $definition): void
@@ -324,6 +333,76 @@ final class GovernedDynamicFieldValueWriter
         if ($definition->is_multi_value) {
             throw MultiValueNotSupportedException::forDefinition($definition->id);
         }
+
+        if ($type === AttributeDataType::Select && $definition->is_localizable) {
+            throw LocalizationContractViolationException::localizableSelectNotSupported($definition->id);
+        }
+    }
+
+    private function assertValidationRulesSupported(FieldDefinition $definition): void
+    {
+        $rules = $definition->validation_rules;
+
+        if ($rules === null) {
+            return;
+        }
+
+        if (! is_array($rules)) {
+            throw UnsupportedFieldValidationRulesException::forDefinition(
+                $definition->data_type,
+                $definition->id,
+            );
+        }
+
+        if (in_array($definition->data_type, [AttributeDataType::Text, AttributeDataType::LongText], true)) {
+            if ($rules !== []) {
+                throw UnsupportedFieldValidationRulesException::forDefinition(
+                    $definition->data_type,
+                    $definition->id,
+                );
+            }
+
+            return;
+        }
+
+        if ($definition->data_type !== AttributeDataType::Select) {
+            return;
+        }
+
+        foreach ($rules as $ruleName => $ruleValue) {
+            if ($ruleName === 'options') {
+                continue;
+            }
+
+            if ($this->isMeaningfullyNonEmptyRuleValue($ruleValue)) {
+                throw UnsupportedFieldValidationRulesException::forDefinition(
+                    $definition->data_type,
+                    $definition->id,
+                );
+            }
+        }
+    }
+
+    private function isMeaningfullyNonEmptyRuleValue(mixed $ruleValue): bool
+    {
+        if ($ruleValue === null || $ruleValue === '' || $ruleValue === false) {
+            return false;
+        }
+
+        if (is_array($ruleValue)) {
+            return $ruleValue !== [];
+        }
+
+        return true;
+    }
+
+    private function assertTargetTypeSupported(FieldObjectType $targetType): void
+    {
+        if (in_array($targetType, [FieldObjectType::Product, FieldObjectType::ProductVariant], true)) {
+            return;
+        }
+
+        throw UnsupportedFieldObjectTypeException::forType($targetType);
     }
 
     private function assertLocalizationContract(FieldDefinition $definition, ?string $locale): void
@@ -332,24 +411,11 @@ final class GovernedDynamicFieldValueWriter
             if ($locale === null || $locale === '') {
                 throw LocalizationContractViolationException::localeRequiredForLocalizable($definition->id);
             }
-
-            if (! $this->isValidLocale($locale)) {
-                throw LocalizationContractViolationException::invalidLocale($locale);
-            }
         } else {
             if ($locale !== null && $locale !== '') {
                 throw LocalizationContractViolationException::localeForbiddenForNonLocalizable($definition->id);
             }
         }
-    }
-
-    private function isValidLocale(string $locale): bool
-    {
-        // Pragmatic BCP-47 shape check; do not pull Intl to keep writer zero-dep.
-        // We accept the conventional pattern used in Laravel app locale + region,
-        // e.g. "uk", "en", "en-US", "uk-UA", "pt-BR". We do NOT require that the
-        // tag be installed — the writer is storage-only and language-policy-agnostic.
-        return (bool) preg_match('/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/', $locale);
     }
 
     // ------------------------------------------------------------------
@@ -377,6 +443,7 @@ final class GovernedDynamicFieldValueWriter
         $workspaceId = $context['workspace_id'];
         $binding = $context['binding'];
         $definition = $context['definition'];
+        $lastExpectedUniqueViolation = null;
 
         for ($attempt = 1; $attempt <= self::ABSENT_SLOT_CREATE_RETRY_LIMIT; $attempt++) {
             try {
@@ -392,6 +459,7 @@ final class GovernedDynamicFieldValueWriter
                     $locale,
                 ): FieldValueWriteResult {
                     $slot = $modelClass::withoutWorkspaceScope()
+                        ->where('workspace_id', $workspaceId)
                         ->where($entityColumn, $entityId)
                         ->where('field_binding_id', $binding->id)
                         ->lockForUpdate()
@@ -421,14 +489,16 @@ final class GovernedDynamicFieldValueWriter
                         slot: $slot,
                         locale: $locale,
                     );
-                });
-            } catch (UniqueConstraintViolationException) {
-                // Lost the absent-slot create race. The transaction has already
-                // rolled back (DB::transaction() handles that for any escaped
-                // exception). Retry the entire operation: a fresh transaction
-                // will lockForUpdate the now-existing row.
+                }, self::DEADLOCK_RETRY_ATTEMPTS);
+            } catch (UniqueConstraintViolationException $exception) {
+                if (! $this->isExpectedSlotUniqueViolation($exception, $context['target_type'])) {
+                    throw $exception;
+                }
+
+                $lastExpectedUniqueViolation = $exception;
+
                 if ($attempt >= self::ABSENT_SLOT_CREATE_RETRY_LIMIT) {
-                    throw $this->exhaustedRetryMarker($entityColumn, $entityId, (string) $binding->id);
+                    throw $lastExpectedUniqueViolation;
                 }
 
                 continue;
@@ -439,12 +509,21 @@ final class GovernedDynamicFieldValueWriter
         throw new \LogicException('mutateWithRetry exited without returning or throwing.');
     }
 
-    private function exhaustedRetryMarker(string $entityColumn, int $entityId, string $fieldBindingId): \RuntimeException
-    {
-        return new \RuntimeException(
-            'GovernedDynamicFieldValueWriter exhausted absent-slot create retries for '
-            ."{$entityColumn}={$entityId} binding={$fieldBindingId}."
-        );
+    private function isExpectedSlotUniqueViolation(
+        UniqueConstraintViolationException $exception,
+        FieldObjectType $targetType,
+    ): bool {
+        $expectedIndex = match ($targetType) {
+            FieldObjectType::Product => self::PRODUCT_SLOT_UNIQUE_INDEX,
+            FieldObjectType::ProductVariant => self::VARIANT_SLOT_UNIQUE_INDEX,
+            default => null,
+        };
+
+        if ($expectedIndex === null) {
+            return false;
+        }
+
+        return str_contains((string) $exception->getMessage(), $expectedIndex);
     }
 
     // ------------------------------------------------------------------
@@ -501,8 +580,10 @@ final class GovernedDynamicFieldValueWriter
         // Non-localizable → value_text only.
         $normalized = $this->normalizePayloadForType($type, $value, $definition);
 
-        // NoOp: same text already present on the row.
-        if ($slot !== null && (string) $slot->value_text === (string) $normalized) {
+        if ($slot !== null
+            && (string) $slot->value_text === (string) $normalized
+            && $slot->value_num === null
+            && $slot->value_jsonb === null) {
             return new FieldValueWriteResult(FieldValueWriteResult::NoOp, (string) $binding->id);
         }
 
@@ -614,10 +695,14 @@ final class GovernedDynamicFieldValueWriter
             return [];
         }
 
+        if ($slot->value_text !== null || $slot->value_num !== null) {
+            throw LocalizationContractViolationException::corruptLocalizedStorage($fieldDefinitionId);
+        }
+
         $raw = $slot->value_jsonb;
 
         if ($raw === null || $raw === '') {
-            return [];
+            throw LocalizationContractViolationException::corruptLocalizedStorage($fieldDefinitionId);
         }
 
         if (is_string($raw)) {
@@ -632,10 +717,14 @@ final class GovernedDynamicFieldValueWriter
             throw LocalizationContractViolationException::corruptLocalizedStorage($fieldDefinitionId);
         }
 
+        if ($decoded === []) {
+            throw LocalizationContractViolationException::corruptLocalizedStorage($fieldDefinitionId);
+        }
+
         $map = [];
 
         foreach ($decoded as $key => $value) {
-            if (! is_string($key) || ! is_string($value)) {
+            if (! is_string($key) || $key === '' || ! is_string($value)) {
                 throw LocalizationContractViolationException::corruptLocalizedStorage($fieldDefinitionId);
             }
 
@@ -678,7 +767,7 @@ final class GovernedDynamicFieldValueWriter
         return match ($targetType) {
             FieldObjectType::Product => ProductFieldValue::class,
             FieldObjectType::ProductVariant => VariantFieldValue::class,
-            default => throw new \LogicException("Unsupported target type {$targetType->value}."),
+            default => throw UnsupportedFieldObjectTypeException::forType($targetType),
         };
     }
 
@@ -687,7 +776,7 @@ final class GovernedDynamicFieldValueWriter
         return match ($targetType) {
             FieldObjectType::Product => 'product_id',
             FieldObjectType::ProductVariant => 'variant_id',
-            default => throw new \LogicException("Unsupported target type {$targetType->value}."),
+            default => throw UnsupportedFieldObjectTypeException::forType($targetType),
         };
     }
 }

@@ -31,13 +31,36 @@ if (! is_dir($ipcDir) && ! mkdir($ipcDir, 0777, true) && ! is_dir($ipcDir)) {
 $writer = app(GovernedDynamicFieldValueWriter::class);
 
 $objectType = FieldObjectType::from($targetType);
+$pid = (string) getmypid();
+$readyFile = $ipcDir.'/'.$pid.'.ready';
+$goFile = $ipcDir.'/go';
+$resultFile = $ipcDir.'/'.$pid.'.result';
+
+file_put_contents($readyFile, '1');
+
+$deadline = microtime(true) + 30.0;
+while (! is_file($goFile) && microtime(true) < $deadline) {
+    usleep(50_000);
+}
+
+if (! is_file($goFile)) {
+    file_put_contents(
+        $resultFile,
+        json_encode([
+            'ok' => false,
+            'class' => 'BarrierTimeout',
+            'message' => 'Worker timed out waiting for GO marker.',
+        ], JSON_THROW_ON_ERROR),
+    );
+    exit(1);
+}
 
 try {
     if ($mode === 'set') {
         $result = $writer->set($workspaceId, $objectType, (int) $targetId, $fieldBindingId, $payload, $locale);
         file_put_contents(
-            $ipcDir.'/'.getmypid().'.result',
-            json_encode(['ok' => true, 'status' => $result->status->value], JSON_THROW_ON_ERROR),
+            $resultFile,
+            json_encode(['ok' => true, 'status' => $result->status], JSON_THROW_ON_ERROR),
         );
         exit(0);
     }
@@ -45,8 +68,8 @@ try {
     if ($mode === 'clear') {
         $result = $writer->clear($workspaceId, $objectType, (int) $targetId, $fieldBindingId, $locale);
         file_put_contents(
-            $ipcDir.'/'.getmypid().'.result',
-            json_encode(['ok' => true, 'status' => $result->status->value], JSON_THROW_ON_ERROR),
+            $resultFile,
+            json_encode(['ok' => true, 'status' => $result->status], JSON_THROW_ON_ERROR),
         );
         exit(0);
     }
@@ -55,7 +78,7 @@ try {
     exit(2);
 } catch (Throwable $e) {
     file_put_contents(
-        $ipcDir.'/'.getmypid().'.result',
+        $resultFile,
         json_encode([
             'ok' => false,
             'class' => $e::class,

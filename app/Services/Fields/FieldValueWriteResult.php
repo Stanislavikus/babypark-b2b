@@ -5,10 +5,10 @@ namespace App\Services\Fields;
 /**
  * Result of a GovernedDynamicFieldValueWriter set/clear operation.
  *
- * The status enum is small and exhaustive; callers (Magento Receive,
+ * The status contract is small and exhaustive; callers (Magento Receive,
  * CSV/Smart Import, Google Sheets, ERP/1C, product-card editing) MUST
- * use the explicit constants instead of a raw boolean. The field binding
- * id is returned so callers can correlate without re-resolving.
+ * use the explicit string constants instead of a raw boolean. The field
+ * binding id is returned so callers can correlate without re-resolving.
  */
 final class FieldValueWriteResult
 {

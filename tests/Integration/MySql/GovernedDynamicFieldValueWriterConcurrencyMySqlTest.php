@@ -14,6 +14,7 @@ use App\Models\ProductFieldValue;
 use App\Models\Workspace;
 use App\Services\Fields\GovernedDynamicFieldValueWriter;
 use Database\Seeders\WorkspaceSeeder;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
@@ -52,7 +53,7 @@ class GovernedDynamicFieldValueWriterConcurrencyMySqlTest extends TestCase
     {
         $workspace = Workspace::query()->where('is_default', true)->firstOrFail();
         $product = $this->makeProduct($workspace->id);
-        [$definition, $binding] = $this->makeTextDefinitionAndBinding(
+        [, $binding] = $this->makeTextDefinitionAndBinding(
             $workspace->id,
             FieldObjectType::Product,
             isLocalizable: false,
@@ -75,24 +76,22 @@ class GovernedDynamicFieldValueWriterConcurrencyMySqlTest extends TestCase
             );
         }
 
-        foreach ($processes as $p) {
-            $p->wait();
-        }
+        $results = $this->runWorkersAndCollectResults($processes, $ipcDir, 4);
 
         $rows = ProductFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
             ->where('product_id', $product->id)
             ->where('field_binding_id', $binding->id)
             ->get();
 
-        $this->assertCount(
-            1,
-            $rows,
-            'Expected exactly one logical row, got '.$rows->count().': '
-                .$rows->pluck('value_text')->implode(', '),
-        );
-        $this->assertContains($rows->first()->value_text, ['value-0', 'value-1', 'value-2', 'value-3']);
+        $this->assertCount(1, $rows, 'Expected exactly one logical row after concurrent absent-slot Sets.');
 
-        $this->assertNoLeakedUniqueFailures($ipcDir, expectedOk: 4);
+        $row = $rows->sole();
+        $this->assertContains($row->value_text, ['value-0', 'value-1', 'value-2', 'value-3']);
+        $this->assertNull($row->value_num);
+        $this->assertNull($row->value_jsonb);
+
+        $this->assertSame([true, true, true, true], array_column($results, 'ok'));
     }
 
     #[Test]
@@ -100,7 +99,7 @@ class GovernedDynamicFieldValueWriterConcurrencyMySqlTest extends TestCase
     {
         $workspace = Workspace::query()->where('is_default', true)->firstOrFail();
         $product = $this->makeProduct($workspace->id);
-        [$definition, $binding] = $this->makeTextDefinitionAndBinding(
+        [, $binding] = $this->makeTextDefinitionAndBinding(
             $workspace->id,
             FieldObjectType::Product,
             isLocalizable: true,
@@ -132,29 +131,21 @@ class GovernedDynamicFieldValueWriterConcurrencyMySqlTest extends TestCase
             ),
         ];
 
-        foreach ($processes as $p) {
-            $p->wait();
-        }
+        $results = $this->runWorkersAndCollectResults($processes, $ipcDir, 2);
 
         $rows = ProductFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
             ->where('product_id', $product->id)
             ->where('field_binding_id', $binding->id)
             ->get();
 
         $this->assertCount(1, $rows, 'Expected exactly one logical row after concurrent localized sets.');
 
-        $row = $rows->first();
+        $row = $rows->sole();
         $this->assertNull($row->value_text);
         $this->assertNull($row->value_num);
-
-        $decoded = json_decode((string) $row->value_jsonb, true);
-        $this->assertIsArray($decoded);
-        $this->assertArrayHasKey('uk', $decoded);
-        $this->assertArrayHasKey('en', $decoded);
-        $this->assertSame('Укр', $decoded['uk']);
-        $this->assertSame('En', $decoded['en']);
-
-        $this->assertNoLeakedUniqueFailures($ipcDir, expectedOk: 2);
+        $this->assertSame(['uk' => 'Укр', 'en' => 'En'], $row->value_jsonb);
+        $this->assertSame([true, true], array_column($results, 'ok'));
     }
 
     #[Test]
@@ -162,7 +153,7 @@ class GovernedDynamicFieldValueWriterConcurrencyMySqlTest extends TestCase
     {
         $workspace = Workspace::query()->where('is_default', true)->firstOrFail();
         $product = $this->makeProduct($workspace->id);
-        [$definition, $binding] = $this->makeTextDefinitionAndBinding(
+        [, $binding] = $this->makeTextDefinitionAndBinding(
             $workspace->id,
             FieldObjectType::Product,
             isLocalizable: true,
@@ -198,39 +189,21 @@ class GovernedDynamicFieldValueWriterConcurrencyMySqlTest extends TestCase
             ),
         ];
 
-        foreach ($processes as $p) {
-            $p->wait();
-        }
+        $results = $this->runWorkersAndCollectResults($processes, $ipcDir, 2);
 
         $rows = ProductFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
             ->where('product_id', $product->id)
             ->where('field_binding_id', $binding->id)
             ->get();
 
-        $this->assertLessThanOrEqual(
-            1,
-            $rows->count(),
-            'Expected at most one row after concurrent clear+set; got '.$rows->count(),
-        );
+        $this->assertCount(1, $rows, 'Expected exactly one logical row after concurrent clear-last-locale + set.');
 
-        if ($rows->count() === 1) {
-            $row = $rows->first();
-            $decoded = json_decode((string) $row->value_jsonb, true) ?? [];
-            // After race, only valid states are: (a) en present (uk cleared) or (b) only uk present
-            // if the Set(en) lost to the clear-uk (NoOp). Either is deterministic & non-corrupt.
-            $this->assertSame(
-                [],
-                array_diff(array_keys($decoded), ['uk', 'en']),
-                'No other locale keys may be present.',
-            );
-            $this->assertNotSame(
-                [],
-                array_keys($decoded),
-                'Row may not be empty (no all-null EAV row).',
-            );
-        }
-
-        $this->assertNoLeakedUniqueFailures($ipcDir, expectedOk: 2);
+        $row = $rows->sole();
+        $this->assertNull($row->value_text);
+        $this->assertNull($row->value_num);
+        $this->assertSame(['en' => 'En'], $row->value_jsonb);
+        $this->assertSame([true, true], array_column($results, 'ok'));
     }
 
     // -----------------------------------------------------------------
@@ -331,10 +304,26 @@ class GovernedDynamicFieldValueWriterConcurrencyMySqlTest extends TestCase
         return $process;
     }
 
-    private function assertNoLeakedUniqueFailures(string $ipcDir, int $expectedOk): void
+    /**
+     * @param  list<Process>  $processes
+     * @return list<array{ok: bool, status?: string, class?: string, message?: string}>
+     */
+    private function runWorkersAndCollectResults(array $processes, string $ipcDir, int $expectedCount): array
     {
+        $this->waitForFiles($ipcDir, '*.ready', $expectedCount, 'Workers did not reach the READY barrier.');
+        file_put_contents($ipcDir.'/go', '1');
+
+        foreach ($processes as $process) {
+            $process->wait();
+            $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput().$process->getOutput());
+        }
+
+        $this->waitForFiles($ipcDir, '*.result', $expectedCount, 'Workers did not write all result files.');
+
         $files = glob($ipcDir.'/*.result') ?: [];
-        $this->assertCount($expectedOk, $files, 'Expected '.$expectedOk.' result file(s).');
+        $this->assertCount($expectedCount, $files, 'Expected '.$expectedCount.' result file(s).');
+
+        $results = [];
 
         foreach ($files as $file) {
             $payload = json_decode((string) file_get_contents($file), true);
@@ -343,6 +332,28 @@ class GovernedDynamicFieldValueWriterConcurrencyMySqlTest extends TestCase
                 $payload['ok'] ?? false,
                 'Worker reported failure: '.($payload['class'] ?? '?').': '.($payload['message'] ?? '?'),
             );
+
+            $results[] = $payload;
         }
+
+        return $results;
+    }
+
+    private function waitForFiles(string $ipcDir, string $pattern, int $expectedCount, string $failureMessage): void
+    {
+        $deadline = microtime(true) + 30.0;
+
+        while (microtime(true) < $deadline) {
+            $matches = glob($ipcDir.'/'.$pattern) ?: [];
+
+            if (count($matches) === $expectedCount) {
+                return;
+            }
+
+            usleep(50_000);
+        }
+
+        $matches = glob($ipcDir.'/'.$pattern) ?: [];
+        $this->fail($failureMessage.' Expected '.$expectedCount.', got '.count($matches).'.');
     }
 }
