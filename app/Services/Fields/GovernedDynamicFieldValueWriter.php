@@ -191,6 +191,7 @@ final class GovernedDynamicFieldValueWriter
      *   workspace_id: string,
      *   target: Product|ProductVariant,
      *   target_type: FieldObjectType,
+     *   field_binding_id: string,
      *   binding: FieldBinding,
      *   definition: FieldDefinition
      * }
@@ -267,6 +268,7 @@ final class GovernedDynamicFieldValueWriter
             'workspace_id' => $workspaceId,
             'target' => $target,
             'target_type' => $targetType,
+            'field_binding_id' => $fieldBindingId,
             'binding' => $binding,
             'definition' => $definition,
         ];
@@ -427,6 +429,7 @@ final class GovernedDynamicFieldValueWriter
      *   workspace_id: string,
      *   target: Product|ProductVariant,
      *   target_type: FieldObjectType,
+     *   field_binding_id: string,
      *   binding: FieldBinding,
      *   definition: FieldDefinition
      * }  $context
@@ -441,8 +444,7 @@ final class GovernedDynamicFieldValueWriter
         $entityColumn = $this->entityColumnFor($context['target_type']);
         $entityId = (int) $context['target']->getKey();
         $workspaceId = $context['workspace_id'];
-        $binding = $context['binding'];
-        $definition = $context['definition'];
+        $fieldBindingId = $context['field_binding_id'];
         $lastExpectedUniqueViolation = null;
 
         for ($attempt = 1; $attempt <= self::ABSENT_SLOT_CREATE_RETRY_LIMIT; $attempt++) {
@@ -452,12 +454,22 @@ final class GovernedDynamicFieldValueWriter
                     $entityColumn,
                     $entityId,
                     $workspaceId,
-                    $binding,
-                    $definition,
+                    $fieldBindingId,
                     $operation,
                     $value,
                     $locale,
+                    $context,
                 ): FieldValueWriteResult {
+                    $binding = $this->lockBindingForMutation(
+                        fieldBindingId: $fieldBindingId,
+                        workspaceId: $workspaceId,
+                        targetType: $context['target_type'],
+                    );
+                    $definition = $this->lockDefinitionForMutation(
+                        binding: $binding,
+                        locale: $locale,
+                    );
+
                     $slot = $modelClass::withoutWorkspaceScope()
                         ->where('workspace_id', $workspaceId)
                         ->where($entityColumn, $entityId)
@@ -524,6 +536,88 @@ final class GovernedDynamicFieldValueWriter
         }
 
         return str_contains((string) $exception->getMessage(), $expectedIndex);
+    }
+
+    private function lockBindingForMutation(
+        string $fieldBindingId,
+        string $workspaceId,
+        FieldObjectType $targetType,
+    ): FieldBinding {
+        $this->assertTargetTypeSupported($targetType);
+
+        $binding = FieldBinding::withoutWorkspaceScope()
+            ->whereKey($fieldBindingId)
+            ->sharedLock()
+            ->first();
+
+        if ($binding === null) {
+            throw FieldBindingNotFoundException::forId($fieldBindingId);
+        }
+
+        if ($binding->workspace_id !== null && $binding->workspace_id !== $workspaceId) {
+            throw FieldBindingWorkspaceMismatchException::forId(
+                $fieldBindingId,
+                $workspaceId,
+                $binding->workspace_id,
+            );
+        }
+
+        if ($binding->status !== AttributeStatus::Active) {
+            throw FieldBindingArchivedException::forId($fieldBindingId, $binding->status);
+        }
+
+        if ($binding->object_type !== $targetType) {
+            throw FieldBindingObjectTypeMismatchException::forId(
+                $fieldBindingId,
+                $targetType,
+                $binding->object_type,
+            );
+        }
+
+        if ($binding->storage_type !== AttributeStorageType::Dynamic) {
+            throw FieldBindingStorageTypeMismatchException::forId(
+                $fieldBindingId,
+                $binding->storage_type,
+            );
+        }
+
+        return $binding;
+    }
+
+    private function lockDefinitionForMutation(
+        FieldBinding $binding,
+        ?string $locale,
+    ): FieldDefinition {
+        $definition = FieldDefinition::withoutWorkspaceScope()
+            ->whereKey($binding->field_definition_id)
+            ->sharedLock()
+            ->first();
+
+        if ($definition === null) {
+            throw FieldDefinitionNotFoundException::forId((string) $binding->field_definition_id);
+        }
+
+        if ((string) $definition->id !== (string) $binding->field_definition_id) {
+            throw FieldDefinitionNotFoundException::forId((string) $binding->field_definition_id);
+        }
+
+        if (($definition->workspace_id ?? null) !== ($binding->workspace_id ?? null)) {
+            throw FieldDefinitionWorkspaceMismatchException::forId(
+                $definition->id,
+                (string) ($binding->workspace_id ?? '<global>'),
+                $definition->workspace_id,
+            );
+        }
+
+        if ($definition->status !== AttributeStatus::Active) {
+            throw FieldDefinitionArchivedException::forId($definition->id, $definition->status);
+        }
+
+        $this->assertDataTypeSupported($definition);
+        $this->assertValidationRulesSupported($definition);
+        $this->assertLocalizationContract($definition, $locale);
+
+        return $definition;
     }
 
     // ------------------------------------------------------------------

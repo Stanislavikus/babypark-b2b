@@ -12,6 +12,7 @@ use App\Models\FieldDefinition;
 use App\Models\Product;
 use App\Models\ProductFieldValue;
 use App\Models\Workspace;
+use App\Services\Fields\Exceptions\FieldDefinitionArchivedException;
 use App\Services\Fields\GovernedDynamicFieldValueWriter;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Support\Facades\Artisan;
@@ -35,6 +36,8 @@ use Tests\TestCase;
 class GovernedDynamicFieldValueWriterConcurrencyMySqlTest extends TestCase
 {
     private const WORKER_SCRIPT = 'tests/Support/GovernedDynamicFieldValueWriterConcurrencyWorker.php';
+
+    private const METADATA_WORKER_SCRIPT = 'tests/Support/GovernedDynamicFieldMetadataToctouWorker.php';
 
     protected function setUp(): void
     {
@@ -206,6 +209,86 @@ class GovernedDynamicFieldValueWriterConcurrencyMySqlTest extends TestCase
         $this->assertSame([true, true], array_column($results, 'ok'));
     }
 
+    #[Test]
+    public function writer_revalidates_definition_under_shared_lock_before_mutation(): void
+    {
+        $workspace = Workspace::query()->where('is_default', true)->firstOrFail();
+        $product = $this->makeProduct($workspace->id);
+        [$definition, $binding] = $this->makeTextDefinitionAndBinding(
+            $workspace->id,
+            FieldObjectType::Product,
+            isLocalizable: false,
+            code: 'gap028a_metadata_toctou_definition',
+        );
+
+        $ipcDir = $this->makeIpcDir('metadata-toctou');
+        $metadataProcess = new Process([
+            PHP_BINARY,
+            base_path(self::METADATA_WORKER_SCRIPT),
+            'archive-definition-hold',
+            $definition->id,
+            $ipcDir,
+        ], base_path());
+        $metadataProcess->setTimeout(60);
+        $metadataProcess->start();
+
+        $this->waitForSpecificFile(
+            $ipcDir.'/metadata_changed_uncommitted',
+            'Metadata locker did not archive the definition before writer start.',
+        );
+
+        $writerProcess = $this->startWorker(
+            'set',
+            $workspace->id,
+            FieldObjectType::Product->value,
+            $product->id,
+            $binding->id,
+            'blocked-write',
+            null,
+            $ipcDir,
+        );
+
+        $this->waitForFiles($ipcDir, '*.ready', 1, 'Writer did not reach the READY barrier.');
+        file_put_contents($ipcDir.'/go', '1');
+
+        $resultFile = $ipcDir.'/'.$writerProcess->getPid().'.result';
+        $blockedDeadline = microtime(true) + 1.5;
+
+        while (microtime(true) < $blockedDeadline) {
+            if (is_file($resultFile)) {
+                $this->fail('Writer completed before archived metadata transaction committed.');
+            }
+
+            usleep(50_000);
+        }
+
+        $this->assertTrue($writerProcess->isRunning(), 'Writer should still be blocked on metadata shared lock.');
+
+        file_put_contents($ipcDir.'/release_lock', '1');
+
+        $metadataProcess->wait();
+        $this->assertSame(0, $metadataProcess->getExitCode(), $metadataProcess->getErrorOutput().$metadataProcess->getOutput());
+        $this->waitForSpecificFile(
+            $ipcDir.'/metadata_committed',
+            'Metadata locker did not commit archived definition state.',
+        );
+
+        $writerProcess->wait();
+        $this->assertSame(1, $writerProcess->getExitCode(), 'Writer should fail after metadata commit archives the definition.');
+        $this->waitForSpecificFile($resultFile, 'Writer did not emit a result payload.');
+
+        $payload = json_decode((string) file_get_contents($resultFile), true);
+        $this->assertIsArray($payload);
+        $this->assertFalse($payload['ok'] ?? true);
+        $this->assertSame(FieldDefinitionArchivedException::class, $payload['class'] ?? null);
+
+        $this->assertDatabaseMissing('product_field_values', [
+            'workspace_id' => $workspace->id,
+            'product_id' => $product->id,
+            'field_binding_id' => $binding->id,
+        ]);
+    }
+
     // -----------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------
@@ -355,5 +438,20 @@ class GovernedDynamicFieldValueWriterConcurrencyMySqlTest extends TestCase
 
         $matches = glob($ipcDir.'/'.$pattern) ?: [];
         $this->fail($failureMessage.' Expected '.$expectedCount.', got '.count($matches).'.');
+    }
+
+    private function waitForSpecificFile(string $filePath, string $failureMessage): void
+    {
+        $deadline = microtime(true) + 30.0;
+
+        while (microtime(true) < $deadline) {
+            if (is_file($filePath)) {
+                return;
+            }
+
+            usleep(50_000);
+        }
+
+        $this->fail($failureMessage);
     }
 }
