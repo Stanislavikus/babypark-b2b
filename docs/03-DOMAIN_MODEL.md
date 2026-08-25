@@ -7079,7 +7079,7 @@ explanation that subsequent synchronization may update those fields.
 Do **not** expose: `ExternalRecordLink`, `entity_id`, discriminator, ownership
 policy, reconciliation, HTTP evidence.
 
-#### Validation harness contract (frozen — runtime pending)
+#### Validation harness contract (frozen — harness implemented; real-target proofs pending)
 
 The Part 1 validation harness runtime is **reverted**. Retain existing disposable
 harness rules and add real-target proofs for:
@@ -7102,6 +7102,68 @@ Harness environment rules (unchanged):
 - safe evidence only; no raw request/response bodies or secrets
 - `B2BVAL-*` validation variant SKU namespace where appropriate
 - production configurable parent generator only where the production path requires it
+
+##### Certification abort disambiguation (frozen — Step-4 arbitration)
+
+The earlier shorthand "certification / brute-force abort" was undefined and
+ambiguous. The contract below freezes the exact meaning of the
+"certification abort" class of evidence in Step-4, separating three distinct
+scenarios. Do **not** reintroduce "brute-force abort" as a normative term.
+
+The literal phrase **transport loss around COMMIT** is preserved because an
+existing documentation contract test requires it.
+
+The three scenarios are:
+
+**A. Worker termination around COMMIT**
+
+The PHP-FPM / request worker executing Safe Sync is terminated after the
+target may have physically committed but before the caller receives a
+reliable HTTP result.
+
+Required evidence:
+
+- caller classifies the result as `UnknownOrAmbiguous`;
+- **no** automatic consequential retry occurs;
+- durable target state is independently reconciled afterward.
+
+Do **not** require a later request to reuse "the same connection": the
+original worker / process is gone.
+
+**B. DB session loss around COMMIT**
+
+The server-side DB session is deliberately lost in the COMMIT /
+commit-acknowledgement window.
+
+Required contract:
+
+- if physical application cannot be proven, the result must not be falsely
+  classified as `KnownApplied`; ambiguous state remains `UnknownOrAmbiguous`;
+- if the Magento adapter returns with uncertain / non-zero logical
+  transaction state, the exact adapter must be quarantined / reset before
+  reuse (see Decision 3);
+- a subsequent safe operation must **not** inherit poisoned transaction
+  state;
+- target-side evidence must establish whether the mutation physically
+  applied.
+
+Do **not** promise that every possible DB-session-kill timing necessarily
+enters one exact module branch.
+
+**C. Transport loss around COMMIT**
+
+Keep this separate from A and B. The current S3 post-delegate transport-loss
+scenario proves:
+
+- target response completed at the delegate boundary;
+- caller receives `UnknownOrAmbiguous`;
+- exactly one consequential PUT;
+- no automatic retry;
+- read-only reconciliation only.
+
+It does **not** by itself prove the instant of physical DB COMMIT. Step-4
+real-target certification must additionally satisfy A and B as separate,
+independently proven scenarios.
 
 #### Live truth-flip gate (expanded)
 
@@ -7220,6 +7282,45 @@ implementation remains a module-local concern to be implemented and
 real-target validated in the bounded Safe Sync module correction step
 (Decision 9 step 2). Do not prescribe the implementation here.
 
+**Image-role scope requirement (frozen — Step-4 arbitration):**
+
+Record that `Magento\ProductRepository::save()` has store-scope
+normalization logic involving:
+
+- `image`
+- `small_image`
+- `thumbnail`
+
+for a Product save executed in a Store View context.
+
+Therefore Step-4 non-media certification must compare before / after
+evidence for:
+
+**A. gallery state:**
+
+- gallery identity / value
+- position
+- label / store-scope state where applicable
+
+**B. image-role EAV state:**
+
+- `image`
+- `small_image`
+- `thumbnail`
+
+at **both**:
+
+- default / admin scope representation relevant to Magento storage;
+- exact certification Store View scope.
+
+Evidence must preserve whether a store-scoped override existed before the
+write and whether exactly that state remains afterward.
+
+Gallery-only comparison is **INSUFFICIENT**.
+
+Do **not** claim this is media WRITE certification. Full media WRITE
+remains Decision 9 step 9.
+
 #### DECISION 3 — Connection quarantine (frozen)
 
 Record the post-PR #168 RED research finding on connection cleanup:
@@ -7329,6 +7430,44 @@ new applied-state enum:
   is **unchanged** for this docs task because the new warning is only reachable on a
   real-target consequential WRITE; Live support is still false and
   merchants do not yet see post-COMMIT warnings.
+
+**Stock reachability (frozen — Step-4 arbitration):**
+
+Record these verified Magento primary-source facts:
+
+- Magento 2.4.9 and 2.4.8-p5 register
+  `Magento\Framework\Model\ExecuteCommitCallbacks`
+  on `Magento\Framework\DB\Adapter\AdapterInterface`.
+- `afterCommit()`, when transaction level reaches zero: `CallbackPool::get`
+  `(connection-hash)` drains the pool, callbacks execute, callback exceptions
+  are logged / swallowed by Magento and are **not** rethrown.
+- `afterRollBack()` clears `CallbackPool` for the same adapter hash.
+
+Therefore:
+
+1. Ordinary stock Magento Product callback exceptions do **NOT** normally
+   propagate to `ProductWriteManagement`'s later bridge process call.
+2. The production bridge's `KnownApplied` +
+   `safe_sync_post_commit_callback_failed` handling remains a defensive
+   seam for non-stock / future / explicitly injected bridge-processing
+   failure.
+3. Real-target Step-4 certification must separately prove:
+
+   a. successful COMMIT: pending callback executes exactly once / no
+      duplicate drain;
+   b. bridge-owned rollback: pending callback does not execute and cannot
+      leak into subsequent work;
+   c. bridge post-COMMIT exception handling: a VALIDATION-ONLY fault
+      fixture may force the bridge processing seam to throw after durable
+      COMMIT; Product durable state stays `KnownApplied` and a warning is
+      emitted.
+
+For item (c), state explicitly: this proves the Safe Sync bridge's
+defensive exception handling; it is **NOT** a claim that stock Magento
+Product callback exceptions naturally propagate to that bridge.
+
+Do **not** change the applied-state enum. Do **not** change production
+module code.
 
 #### DECISION 8 — Content staging (frozen — no new semantics)
 
@@ -7891,8 +8030,11 @@ identity collision, divergence before/after mutation, relevant status codes,
 timeout classification); entity-bound Safe Sync component proof for every advertised
 V1 consequential operation category including Content Staging scheduled version,
 Galera causal-current read, CallbackPool cleanup, silent SKU suffix rollback,
-repository create-fallback guard, and certification/BF abort + transport loss around
-COMMIT.
+repository create-fallback guard, and the abort scenarios explicitly defined in
+the
+[`Certification abort disambiguation`](#certification-abort-disambiguation--frozen--step-4-arbitration)
+subsection above (worker termination around COMMIT, DB session loss around
+COMMIT, and transport loss around COMMIT).
 
 Use disposable `B2BVAL-*` test identities. Require explicit human authorization.
 No production catalogue writes. No destructive Product DELETE for cleanup —

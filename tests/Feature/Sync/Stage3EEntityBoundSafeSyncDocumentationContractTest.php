@@ -191,6 +191,127 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
     }
 
     #[Test]
+    public function validation_harness_status_heading_marks_harness_implemented_real_target_pending(): void
+    {
+        $section = $this->stage3eContractSection();
+
+        $this->assertStringContainsString(
+            '#### Validation harness contract (frozen — harness implemented; real-target proofs pending)',
+            $section,
+        );
+        $this->assertStringContainsString('harness implemented; real-target proofs pending', $section);
+    }
+
+    #[Test]
+    public function certification_abort_disambiguation_freezes_three_distinct_scenarios(): void
+    {
+        $section = $this->stage3eContractSection();
+
+        $this->assertStringContainsString(
+            '##### Certification abort disambiguation (frozen — Step-4 arbitration)',
+            $section,
+        );
+        $this->assertStringContainsString('Certification abort disambiguation', $section);
+        $this->assertStringContainsString('Do **not** reintroduce "brute-force abort" as a normative term', $section);
+        $this->assertStringContainsString('transport loss around COMMIT', $section);
+
+        $this->assertStringContainsString('**A. Worker termination around COMMIT**', $section);
+        $this->assertStringContainsString('Worker termination around COMMIT', $section);
+        $this->assertStringContainsString('caller classifies the result as `UnknownOrAmbiguous`', $section);
+        $this->assertStringContainsString('**no** automatic consequential retry occurs', $section);
+        $this->assertStringContainsString('durable target state is independently reconciled afterward', $section);
+        $this->assertStringContainsString('Do **not** require a later request to reuse "the same connection"', $section);
+
+        $this->assertStringContainsString('**B. DB session loss around COMMIT**', $section);
+        $this->assertStringContainsString('DB session loss around COMMIT', $section);
+        $this->assertStringContainsString('ambiguous state remains `UnknownOrAmbiguous`', $section);
+        $this->assertStringContainsString('quarantined / reset before', $section);
+        $this->assertStringContainsString('must **not** inherit poisoned transaction', $section);
+
+        $this->assertStringContainsString('**C. Transport loss around COMMIT**', $section);
+        $this->assertStringContainsString('Keep this separate from A and B', $section);
+        $this->assertStringContainsString('target response completed at the delegate boundary', $section);
+        $this->assertStringContainsString('read-only reconciliation only', $section);
+        $this->assertStringContainsString('does **not** by itself prove the instant of physical DB COMMIT', $section);
+    }
+
+    #[Test]
+    public function decision_7_stock_reachability_documents_callback_pool_facts_and_step4_proofs(): void
+    {
+        $section = $this->post168AmendmentSection();
+
+        $this->assertStringContainsString('**Stock reachability (frozen — Step-4 arbitration):**', $section);
+        $this->assertStringContainsString('Stock reachability', $section);
+        $this->assertStringContainsString('Magento 2.4.9 and 2.4.8-p5', $section);
+        $this->assertStringContainsString('Magento\Framework\Model\ExecuteCommitCallbacks', $section);
+        $this->assertStringContainsString('ExecuteCommitCallbacks', $section);
+        $this->assertStringContainsString('Magento\Framework\DB\Adapter\AdapterInterface', $section);
+        $this->assertStringContainsString('`CallbackPool::get`', $section);
+        $this->assertStringContainsString('CallbackPool::get', $section);
+        $this->assertStringContainsString('`afterRollBack()` clears `CallbackPool` for the same adapter hash', $section);
+
+        $this->assertStringContainsString('Ordinary stock Magento Product callback exceptions do **NOT** normally', $section);
+        $this->assertStringContainsString('`safe_sync_post_commit_callback_failed`', $section);
+        $this->assertStringContainsString('VALIDATION-ONLY fault', $section);
+        $this->assertStringContainsString('Product durable state stays `KnownApplied` and a warning is', $section);
+        $this->assertStringContainsString("this proves the Safe Sync bridge's", $section);
+        $this->assertStringContainsString(
+            'it is **NOT** a claim that stock Magento',
+            $section,
+        );
+        $this->assertStringContainsString('Product callback exceptions naturally', $section);
+        $this->assertStringContainsString('Do **not** change the applied-state enum', $section);
+    }
+
+    #[Test]
+    public function decision_2_image_role_scope_requires_gallery_and_eav_evidence(): void
+    {
+        $section = $this->post168AmendmentSection();
+
+        $this->assertStringContainsString('**Image-role scope requirement (frozen — Step-4 arbitration):**', $section);
+        $this->assertStringContainsString('`Magento\ProductRepository::save()`', $section);
+        $this->assertStringContainsString('store-scope', $section);
+        $this->assertStringContainsString('normalization logic', $section);
+
+        $this->assertStringContainsString('`image`', $section);
+        $this->assertStringContainsString('`small_image`', $section);
+        $this->assertStringContainsString('`thumbnail`', $section);
+
+        $this->assertStringContainsString('**A. gallery state:**', $section);
+        $this->assertStringContainsString('gallery identity / value', $section);
+        $this->assertStringContainsString('**B. image-role EAV state:**', $section);
+        $this->assertStringContainsString('default / admin scope representation', $section);
+        $this->assertStringContainsString('exact certification Store View scope', $section);
+        $this->assertStringContainsString('Gallery-only comparison is **INSUFFICIENT**', $section);
+        $this->assertStringContainsString('Gallery-only', $section);
+        $this->assertStringContainsString('INSUFFICIENT', $section);
+        $this->assertStringContainsString('Do **not** claim this is media WRITE certification', $section);
+        $this->assertStringContainsString('Full media WRITE', $section);
+        $this->assertStringContainsString('Decision 9 step 9', $section);
+    }
+
+    #[Test]
+    public function real_adobe_validation_gate_references_certification_abort_disambiguation_subsection(): void
+    {
+        $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+
+        if (! preg_match(
+            '/##### Real Adobe validation gate\n\n(.*?)(?=\n##### Transport contract)/s',
+            $content,
+            $matches,
+        )) {
+            $this->fail('Could not locate Real Adobe validation gate section in 03-DOMAIN_MODEL.md');
+        }
+
+        $section = $matches[1];
+
+        $this->assertStringContainsString('Certification abort disambiguation', $section);
+        $this->assertStringContainsString('worker termination around COMMIT', $section);
+        $this->assertStringContainsString('DB session loss around', $section);
+        $this->assertStringContainsString('transport loss around COMMIT', $section);
+    }
+
+    #[Test]
     public function stage_status_documents_docs_contract_done_and_runtime_pending(): void
     {
         $section = $this->stage3eContractSection();
