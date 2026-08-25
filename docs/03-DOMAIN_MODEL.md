@@ -4445,7 +4445,15 @@ service, and relation cross-workspace rejection.
 This contract defines the structural boundaries for receiving data from an external system.
 
 ### 1. Existing Sync Architecture Remains Intact
-`SyncConfiguration` (representing `ConnectorAccount` + `data_domain` + `external_context`) and its enabled operations remain the identity boundary. `FieldMapping`, `FieldOptionMapping`, `ExternalRecordLink`, and the zero-mutation `SyncRun` preview semantics are unchanged. A single `SyncConfiguration` may enable multiple semantic operations; do not create separate hidden Import and Export configurations merely because both operations are enabled.
+`SyncConfiguration` identity is exactly:
+
+```text
+ConnectorAccount
++ data_domain
++ external_context
+```
+
+Enabled semantic operations (`import`, `export`, or both) are **configuration state**, NOT part of identity. One `SyncConfiguration` may therefore enable `import` only, `export` only, or both. Do **not** create separate hidden Import and Export configurations merely because both operations are enabled. `FieldMapping`, `FieldOptionMapping`, `ExternalRecordLink`, and the zero-mutation `SyncRun` preview semantics are unchanged.
 
 ### 2. FieldMapping is Direction-Neutral
 `FieldMapping` represents **semantic correspondence** between an internal target and an external logical identity. It is not an execution plan, field ownership record, data authority, Import-only mapping, Export-only mapping, or a reversible transformation. It possesses no `direction`, `authority`, `import_enabled`, `export_enabled`, `master_system`, or `last_writer` attributes. Import and Export use the same semantic correspondence but follow different execution pipelines.
@@ -4466,7 +4474,11 @@ For the first manual Receive/Send experience, the user's explicit confirmed acti
 - Ownership and the default-authority mechanism for automated bidirectional behavior remain the **existing open Product/domain decision** — see [Field/data-domain write ownership (future — UX contract 2026-08-10)](#fielddata-domain-write-ownership-future--ux-contract-2026-08-10) above. This contract does **not** choose now between domain-level ownership, later per-field rules, or any other approved mechanism, and it does **not** reopen that open decision.
 
 ### 7. Receive Mutation Routing by Domain Owner
-The generic governed Product/Variant field-value writer is **absent today** (see `docs/IMPLEMENTATION_GAPS.md` → GAP-028). When implemented, this writer MUST be the governed boundary for ordinary Product/Variant dynamic `FieldBinding` values, and it MUST validate/enforce at minimum:
+Receive applies two **distinct** mutation routes. The storage path alone does not grant write capability.
+
+**7.1 Dynamic route — `storage_type = dynamic`**
+Target: ordinary Product/Variant dynamic `FieldBinding` values (text, number, boolean, datetime, select option resolution, etc.).
+Boundary: the governed Product/Variant field-value writer (currently **absent today** — see `docs/IMPLEMENTATION_GAPS.md` → GAP-028). When implemented, this writer MUST be the governed boundary and MUST validate/enforce at minimum:
 - explicit `Workspace` scope;
 - active `FieldDefinition`;
 - active `FieldBinding`;
@@ -4476,7 +4488,19 @@ The generic governed Product/Variant field-value writer is **absent today** (see
 - option validity/resolution where applicable;
 - localization / storage invariants, including prohibition of illegal flat overwrites of `is_localizable = true` structured values.
 
-It may handle only ordinary values whose invariants belong entirely to Field Dictionary. The following MUST remain outside this writer and routed to their domain-owning services:
+It may handle only ordinary values whose invariants belong entirely to Field Dictionary.
+
+**7.2 Column-backed route — `storage_type = column`**
+Target: Product/Variant column-backed core fields (e.g. typed `products` / `product_variants` columns).
+Boundary: the appropriate Product/Variant domain mutation boundary, with an explicit Receive allowlist. Invariants:
+- Column-backed values **MUST NOT** go through the generic dynamic field-value writer in §7.1.
+- Storage path alone does not grant write capability.
+- Every column-backed field must be **explicitly admitted** based on its domain semantics (its routing is not implied by its column location).
+- Connector code MUST NOT use broad `fill()`, mass assignment, or arbitrary `Model::update()` with remotely supplied values.
+- `sku` is **NOT** Receive-writable in the first slice. SKU remains an identity/addressing precondition, not an incoming mutable field.
+
+**7.3 Out of both routes (always routed to domain owners)**
+
 - **Pricing** — `PriceList` / `PriceListItem` / pricing domain. `PriceResolver` is not a writer.
 - **Availability / Inventory** — inventory / availability domain. No direct mapped stock assignment.
 - **Media** — media owner / runtime. Not generic field mutation.

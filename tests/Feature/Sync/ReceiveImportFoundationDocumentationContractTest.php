@@ -333,6 +333,122 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
         );
     }
 
+    public function test_sync_configuration_identity_excludes_enabled_operations(): void
+    {
+        $this->assertStringContainsString(
+            '`SyncConfiguration` identity is exactly:',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '+ data_domain',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '+ external_context',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Enabled semantic operations (`import`, `export`, or both) are **configuration state**, NOT part of identity',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_no_separate_hidden_configurations_by_direction(): void
+    {
+        $this->assertStringContainsString(
+            'Do **not** create separate hidden Import and Export configurations',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_dynamic_and_column_backed_routes_are_distinct(): void
+    {
+        $this->assertStringContainsString(
+            'two **distinct** mutation routes',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`storage_type = dynamic`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`storage_type = column`',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_column_backed_must_not_use_dynamic_writer(): void
+    {
+        $this->assertStringContainsString(
+            'Column-backed values **MUST NOT** go through the generic dynamic field-value writer',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_storage_path_alone_does_not_grant_write(): void
+    {
+        $this->assertStringContainsString(
+            'Storage path alone does not grant write capability',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_column_backed_requires_explicit_allowlist_and_product_variant_domain_mutation(): void
+    {
+        $this->assertStringContainsString(
+            'explicit Receive allowlist',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'appropriate Product/Variant domain mutation boundary',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Every column-backed field must be **explicitly admitted**',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_connector_code_must_not_use_broad_mass_assignment(): void
+    {
+        $this->assertStringContainsString(
+            'broad `fill()`, mass assignment, or arbitrary `Model::update()` with remotely supplied values',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_sku_is_not_receive_writable_in_first_slice(): void
+    {
+        $this->assertStringContainsString(
+            '`sku` is **NOT** Receive-writable in the first slice',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'SKU remains an identity/addressing precondition, not an incoming mutable field',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_pricing_availability_media_relations_still_excluded(): void
+    {
+        $this->assertStringContainsString(
+            '**Pricing**',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '**Availability / Inventory**',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '**Media**',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '**Relations / categories**',
+            $this->domainModelContent,
+        );
+    }
+
     private function extractGap028Section(string $content): string
     {
         if (preg_match('/## GAP-028 —[^\n]*\n(.*?)(?=\n## |\z)/s', $content, $m) === 1) {
