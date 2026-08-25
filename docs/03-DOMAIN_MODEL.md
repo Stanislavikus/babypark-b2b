@@ -4438,6 +4438,58 @@ Every table above includes `workspace_id` from the first migration, uses
 rows are workspace-scoped, policies on read/write, and tests for direct model,
 service, and relation cross-workspace rejection.
 
+## Receive / Import Foundation Contract (Resolved)
+
+**Status:** Approved normative Receive / Import architecture.
+
+This contract defines the structural boundaries for receiving data from an external system.
+
+### 1. Existing Sync Architecture Remains Intact
+`SyncConfiguration` (representing `ConnectorAccount` + `data_domain` + `external_context`) and its enabled operations remain the identity boundary. `FieldMapping`, `FieldOptionMapping`, `ExternalRecordLink`, and the zero-mutation `SyncRun` preview semantics are unchanged. A single `SyncConfiguration` may enable multiple semantic operations; do not create separate hidden Import and Export configurations merely because both operations are enabled.
+
+### 2. FieldMapping is Direction-Neutral
+`FieldMapping` represents **semantic correspondence** between an internal target and an external logical identity. It is not an execution plan, field ownership record, data authority, Import-only mapping, Export-only mapping, or a reversible transformation. It possesses no `direction`, `authority`, `import_enabled`, `export_enabled`, `master_system`, or `last_writer` attributes. Import and Export use the same semantic correspondence but follow different execution pipelines.
+
+### 3. Receive is Not Export Reversed
+Export translates `FieldMapping` into platform execution input, then into a connector semantic planner, desired external state, and finally the Safe Sync external mutation boundary.
+Receive flows from trusted remote identity → remote read → external normalization → `FieldMapping` resolution → Receive planner (candidate values) → domain-owner routing → zero-mutation proposal/diff → explicit Apply → platform domain writers. No universal reversible transformer exists.
+
+### 4. Entity Trust is Direction-Neutral
+The same merchant-confirmed `ExternalRecordLink` (ENTITY TRUST) serves both Receive and Send. Receive must not introduce a weaker second trust model. SKU alone, name matching, fuzzy matching, discovery snapshot existence, Receive proposal, or cached schema metadata are forbidden as identity authority. SKU may remain a mandatory equality/addressing precondition where already required, but it is not remote logical identity authority. The first Receive slice operates only against an existing internal Product/Variant with an established trusted `ExternalRecordLink`. Remote Product to new internal Product creation is out of the first Receive slice (though not permanently impossible).
+
+### 5. Manual Receive Uses Operation-Time Authority
+For the first manual Receive/Send experience, the user's explicit confirmed action is the authority for that one operation. There is no persistent field-level ownership or silent last-write-wins mechanism. Without a persisted synchronization baseline, the system cannot determine "only Magento changed" or "both changed". The contract recognizes: equal, differs, remote absent, local absent, unsupported/blocked, or explicit clear. Equal may silently no-op, but destructive replacement or clear requires explicit action.
+
+### 6. Persistent Ownership is Deferred
+Persistent field-level ownership and baselines are mandatory before unattended bidirectional automation can ship, but they are deferred and not solved in this foundation.
+
+### 7. Receive Mutation Routing by Domain Owner
+A generic governed Product/Variant field-value writer handles ordinary dynamic `FieldBinding` values (text, number, boolean, datetime, option resolution, etc.) and enforces workspace scope, active definitions/bindings, and type/null invariants. However, this generic writer must not become a Product God Writer. Explicitly routed outside it are:
+- **Pricing:** PriceList / PriceListItem / pricing domain.
+- **Availability:** Inventory / Availability domain (no direct mapped stock assignment).
+- **Relations:** category / relation-owning domain services.
+- **Media:** media owner / runtime.
+- **Connector-owned metadata:** Magento `entity_id`, `attribute_set_id`, etc.
+
+### 8. Receive Proposal/Diff is Not SyncRun Preview
+A per-item or per-operation Receive proposal is short-lived, server-authoritative, and transient. It is not execution history, authorization, identity, or ENTITY TRUST, and is not persisted in `sync_runs` / `sync_run_items`. It reuses the existing opaque server-side flow pattern rather than a new persisted entity.
+
+### 9. Apply-Time Revalidation is Mandatory
+Before applying a Receive proposal, the runtime must freshly verify: actor authorization, target Workspace/ConnectorAccount, existing trusted `ExternalRecordLink`, remote logical identity, SKU equality precondition, `SyncConfiguration.configuration_revision`, mapping/option-mapping state, and that participating local and remote values have not changed. If state has changed, the proposal is invalidated and requires a rebuild (zero mutation).
+
+### 10. Option Mappings and Reverse Resolution
+`FieldOptionMapping` remains direction-neutral. For Receive, if external option → internal option resolution is ambiguous (not unique) under the current legitimate persistence model, that field is blocked. No uniqueness constraint is added merely to simplify Receive.
+
+### 11. Discovered ≠ Executable
+A field may be Discovered → Normalizable → Semantically mappable → Supported for this operation → Has a domain writer → Executable. Unsupported discovered fields must not be silently hidden, nor made executable merely because discovery found them.
+
+### 12. Safe Sync Read / Entity-Bound Transport
+For Receive, the entity-bound transport is a validation gate. If stock REST (e.g., `GET /V1/products?searchCriteria[...] entity_id ...`) can satisfy the frozen identity contract, it may be used; otherwise, the existing first-party Safe Sync entity-bound read is the fallback. Transport choice must not weaken ENTITY TRUST.
+
+### 13. Stage 3E Send Remains Unchanged
+Receive-first sequencing does not reopen or weaken Stage 3E Send. ENTITY TRUST, no-link mutation prohibitions, entity-bound consequential writes, ambiguous applied-state handling, no blind retry, real-target certification gates, and current support=false truth remain strictly enforced.
+
+
 ## Sync Domain Rebaseline (Resolved — normative)
 
 **Status:** Approved normative Sync UX / Domain model. Supersedes earlier

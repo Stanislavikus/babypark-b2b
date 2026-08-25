@@ -1714,6 +1714,25 @@ unblocked as the next sequenced task.
 
 ---
 
+## GAP-028 — Missing governed Product/Variant field-value writer
+
+**Approved docs:**
+- `03-DOMAIN_MODEL.md`, Receive / Import Foundation Contract (Resolved): A generic governed Product/Variant field-value writer is required to handle ordinary dynamic `FieldBinding` values (text, number, boolean, datetime, select option resolution, etc.) during Receive operations.
+
+**Current code:**
+- There is no governed reusable runtime write boundary for ordinary Product/Variant dynamic `FieldBinding` values suitable for connector/import ingestion.
+
+**Impact:**
+- The first manual Receive/Import execution slice cannot safely update dynamic field values because it lacks an enforcement boundary for workspace scope, active definitions/bindings, type/null semantics, option validity, and localization/storage invariants.
+- This missing platform-core seam is a prerequisite for Magento Receive, spreadsheet/CSV imports, Google Sheets, 1C/ERP, and future source connectors.
+
+**Decision:**
+- Do not implement a "Product God Writer" that bypasses domain routing. Explicitly route Pricing, Availability, Media, and Relations outside of this generic writer.
+
+**Next task:** Implement the generic governed field-value writer for ordinary `FieldBinding` values.
+
+**Status:** Open.
+
 ## Pending Minor Documentation Fixes
 
 Small, low-effort textual corrections identified during review but not
