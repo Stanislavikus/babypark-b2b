@@ -347,7 +347,8 @@ yet), but should be scheduled before any payment gateway integration work starts
   **Done (internal)**; normative **Stage 3D** (merchant first-Live UX) **Done (internal)**;
   **Stage 3E** (entity-bound Safe Sync runtime contract **Done (docs contract)**;
   Safe Sync read + isolated simple WRITE foundation implemented internally;
-  runtime consumption + real Adobe validation + truth flip **pending** — stock
+  bounded Safe Sync module correction is implemented internally but not
+  real-target certified; runtime consumption + real Adobe validation + truth flip **pending** — stock
   no-link auto-create invalidated; first-party Magento entity-bound component +
   merchant link-first runtime required before flip).
   Scheduling,

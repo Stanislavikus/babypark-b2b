@@ -7409,7 +7409,7 @@ point for the `support = true` flip.
 | Stage 3E post-#168 certification amendment | **Done (docs only)** — 9 decisions recorded; no runtime change |
 | Stage 3E-R1 internal read foundation | **Implemented (internal; support false)** |
 | Isolated entity-bound simple Product WRITE foundation | **Implemented (internal; not consumed by Live; support false)** |
-| Bounded Safe Sync module correction (media-neutral Product write, connection reset / quarantine, narrowed Composer envelope) | **Pending** — Decision 9 step 2 |
+| Bounded Safe Sync module correction (media-neutral Product write, connection reset / quarantine, narrowed Composer envelope) | **Implemented (internal; not real-target certified)** — Decision 9 step 2 runtime landed; real-target certification remains pending |
 | Disposable validation harness | **Pending** — Decision 9 step 3 |
 | Isolated simple writer real-target certification (2.4.9 / 8.5; 2.4.9 / 8.4; 2.4.8-p5 / 8.4) | **Pending** — Decision 9 step 4 |
 | Content Staging / Galera / entity-bound lifecycle / configurable / media proofs | **Pending** — Decision 9 steps 5–9 |

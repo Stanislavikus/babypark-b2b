@@ -220,7 +220,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('Stage 3E entity-bound Safe Sync contract (docs)', $atlas);
         $this->assertStringContainsString('DOCS CONTRACT DONE — runtime pending', $atlas);
         $this->assertStringContainsString('Stage 3E Magento Safe Sync read + isolated simple write foundation', $atlas);
-        $this->assertStringContainsString('IMPLEMENTED (internal; support false; not consumed by Live)', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED (internal; support false; not consumed by Live; not real-target certified)', $atlas);
         $this->assertStringContainsString('Stage3EEntityBoundSafeSyncDocumentationContractTest.php', $atlas);
     }
 
@@ -493,7 +493,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
         $this->assertStringContainsString('Stage 3E Post-#168 Real-Target Certification Amendment (9 decisions + dormant discrepancies table) layered on top', $atlas);
-        $this->assertStringContainsString('IMPLEMENTED (internal; support false; not consumed by Live)', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED (internal; support false; not consumed by Live; not real-target certified)', $atlas);
         $this->assertStringContainsString('not consumed by Live', $atlas);
         $this->assertStringContainsString('stops fail-closed at `entity_bound_mutation_bridge_required`', $atlas);
         $this->assertStringContainsString('zero consequential Product write', $atlas);

@@ -8,9 +8,12 @@ use B2BPlatform\MagentoSafeSync\Api\Data\ProductWriteMappedAttributeInterface;
 use B2BPlatform\MagentoSafeSync\Api\Data\ProductWriteRequestInterface;
 use B2BPlatform\MagentoSafeSync\Api\Data\ProductWriteResponseInterface;
 use B2BPlatform\MagentoSafeSync\Api\ProductWriteManagementInterface;
+use B2BPlatform\MagentoSafeSync\Model\Connection\ConnectionQuarantine;
 use B2BPlatform\MagentoSafeSync\Model\Data\ProductWriteResponseFactory;
+use B2BPlatform\MagentoSafeSync\Model\Media\NonMediaProductWriteScope;
 use Magento\Catalog\Api\Data\ProductInterface;
 use Magento\Catalog\Api\ProductRepositoryInterface;
+use Magento\Catalog\Model\Product\Media\Config as ProductMediaConfig;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\EntityManager\MetadataPool;
 use Magento\Framework\Exception\NoSuchEntityException;
@@ -53,7 +56,10 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
         private readonly MetadataPool $metadataPool,
         private readonly ResourceConnection $resourceConnection,
         private readonly ProductWriteResponseFactory $responseFactory,
+        private readonly ProductMediaConfig $productMediaConfig,
         private readonly GaleraWriteSession $galeraWriteSession,
+        private readonly ConnectionQuarantine $connectionQuarantine,
+        private readonly NonMediaProductWriteScope $nonMediaProductWriteScope,
         private readonly ProductEntityManagerCallbackBridge $callbackBridge,
         private readonly LoggerInterface $logger,
     ) {}
@@ -94,6 +100,16 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
 
         if ($this->transactionLevel($connection) !== 0) {
             return $this->knownNotApplied('safe_sync_bridge_transaction_state_unexpected', $logicalEntityId, $expectedSku, false, 0);
+        }
+
+        if (! $this->connectionQuarantine->isSupported($connection)) {
+            return $this->knownNotApplied(
+                'safe_sync_connection_quarantine_unavailable',
+                $logicalEntityId,
+                $expectedSku,
+                false,
+                0,
+            );
         }
 
         if (! $this->hasLeadingIndexedColumn($connection, $entityTable, $identifierField)) {
@@ -146,6 +162,10 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
             $this->galeraWriteSession->restore($connection, $galeraState);
         } catch (\Throwable $exception) {
             $warningCodes[] = 'safe_sync_post_commit_galera_restore_failed';
+            $warningCodes = array_values(array_unique(array_merge(
+                $warningCodes,
+                $this->warningCodesFromRestoreFailure($exception),
+            )));
             $this->logger->error('Safe Sync post-commit Galera restore failed.', ['exception' => $exception]);
         }
 
@@ -173,6 +193,11 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
     private function buildMutation(ProductWriteRequestInterface $request): array
     {
         $mappedAttributes = [];
+        $forbiddenMediaAttributeCodes = $this->forbiddenMediaAttributeCodes();
+
+        if ($forbiddenMediaAttributeCodes === null) {
+            return $this->invalidMutation('safe_sync_media_attribute_capability_unavailable');
+        }
 
         foreach ($request->getMappedAttributes() as $entry) {
             if (! $entry instanceof ProductWriteMappedAttributeInterface) {
@@ -192,6 +217,10 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
 
             if (in_array(strtolower($attributeCode), self::RESERVED_CUSTOM_ATTRIBUTE_CODES, true)) {
                 return $this->invalidMutation('safe_sync_reserved_mapped_attribute_code');
+            }
+
+            if (isset($forbiddenMediaAttributeCodes[strtolower($attributeCode)])) {
+                return $this->invalidMutation('safe_sync_media_attribute_not_allowed');
             }
 
             $mappedAttributes[] = [
@@ -237,6 +266,36 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
             'price' => null,
             'mapped_attributes' => [],
         ];
+    }
+
+    /**
+     * @return array<string, true>|null
+     */
+    private function forbiddenMediaAttributeCodes(): ?array
+    {
+        try {
+            $mediaAttributeCodes = $this->productMediaConfig->getMediaAttributeCodes();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if (! is_array($mediaAttributeCodes)) {
+            return null;
+        }
+
+        $forbiddenCodes = [];
+
+        foreach ($mediaAttributeCodes as $mediaAttributeCode) {
+            if (! is_string($mediaAttributeCode) || $mediaAttributeCode === '') {
+                return null;
+            }
+
+            $normalizedCode = strtolower($mediaAttributeCode);
+            $forbiddenCodes[$normalizedCode] = true;
+            $forbiddenCodes[$normalizedCode.'_label'] = true;
+        }
+
+        return $forbiddenCodes;
     }
 
     /**
@@ -486,7 +545,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
         int $consequentialWriteAttempts,
     ): ProductWriteResponseInterface {
         if ($this->transactionLevel($connection) <= 0) {
-            $this->quarantineConnection($connection);
+            $warningCodes = $this->quarantineConnection($connection);
 
             return $this->unknownOrAmbiguous(
                 'safe_sync_rollback_uncertain',
@@ -494,6 +553,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
                 $expectedSku,
                 false,
                 $consequentialWriteAttempts,
+                $warningCodes,
             );
         }
 
@@ -501,7 +561,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
             $connection->rollBack();
         } catch (\Throwable $exception) {
             $this->logger->error('Safe Sync rollback acknowledgement is uncertain.', ['exception' => $exception]);
-            $this->quarantineConnection($connection);
+            $warningCodes = $this->quarantineConnection($connection);
 
             return $this->unknownOrAmbiguous(
                 'safe_sync_rollback_uncertain',
@@ -509,12 +569,13 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
                 $expectedSku,
                 false,
                 $consequentialWriteAttempts,
+                $warningCodes,
             );
         }
 
         if ($this->transactionLevel($connection) !== 0) {
             $this->logger->error('Safe Sync rollback left the transaction level open.');
-            $this->quarantineConnection($connection);
+            $warningCodes = $this->quarantineConnection($connection);
 
             return $this->unknownOrAmbiguous(
                 'safe_sync_rollback_uncertain',
@@ -522,6 +583,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
                 $expectedSku,
                 false,
                 $consequentialWriteAttempts,
+                $warningCodes,
             );
         }
 
@@ -538,6 +600,10 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
             $this->galeraWriteSession->restore($connection, $galeraState);
         } catch (\Throwable $exception) {
             $warningCodes[] = 'safe_sync_rollback_galera_restore_failed';
+            $warningCodes = array_values(array_unique(array_merge(
+                $warningCodes,
+                $this->warningCodesFromRestoreFailure($exception),
+            )));
             $this->logger->warning('Safe Sync rollback Galera restore failed.', ['exception' => $exception]);
         }
 
@@ -561,18 +627,27 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
 
         if ($this->transactionLevel($connection) === 0) {
             try {
+                $this->callbackBridge->clearPendingProductCallbacks();
+            } catch (\Throwable $exception) {
+                $warningCodes[] = 'safe_sync_callback_pool_clear_failed';
+                $this->logger->warning('Safe Sync uncertain-commit callback clear failed.', ['exception' => $exception]);
+            }
+
+            try {
                 $this->galeraWriteSession->restore($connection, $galeraState);
             } catch (\Throwable $exception) {
                 $warningCodes[] = 'safe_sync_post_commit_galera_restore_failed';
+                $warningCodes = array_values(array_unique(array_merge(
+                    $warningCodes,
+                    $this->warningCodesFromRestoreFailure($exception),
+                )));
                 $this->logger->error('Safe Sync uncertain-commit Galera restore failed.', ['exception' => $exception]);
             }
 
             return $warningCodes;
         }
 
-        $this->quarantineConnection($connection);
-
-        return $warningCodes;
+        return $this->quarantineConnection($connection);
     }
 
     private function buildSkuOwnershipLockingQuery(
@@ -590,15 +665,42 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
         );
     }
 
-    private function quarantineConnection(object $connection): void
+    /**
+     * @return list<string>
+     */
+    private function quarantineConnection(object $connection): array
     {
-        try {
-            if (method_exists($connection, 'closeConnection')) {
-                $connection->closeConnection();
-            }
-        } catch (\Throwable $exception) {
-            $this->logger->error('Safe Sync connection quarantine failed.', ['exception' => $exception]);
+        $result = $this->connectionQuarantine->quarantine($connection);
+        $warningCodes = [];
+
+        if ($result['callback_clear_failed']) {
+            $warningCodes[] = 'safe_sync_callback_pool_clear_failed';
         }
+
+        if (! $result['success']) {
+            $warningCodes[] = 'safe_sync_connection_quarantine_failed';
+            $this->logger->error('Safe Sync connection quarantine failed.');
+        }
+
+        return array_values(array_unique($warningCodes));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function warningCodesFromRestoreFailure(\Throwable $exception): array
+    {
+        $warningCodes = [];
+
+        if (str_starts_with($exception->getMessage(), 'safe_sync_wsrep_connection_quarantine_failed:')) {
+            $warningCodes[] = 'safe_sync_connection_quarantine_failed';
+
+            if (str_contains($exception->getMessage(), 'callback_clear_failed')) {
+                $warningCodes[] = 'safe_sync_callback_pool_clear_failed';
+            }
+        }
+
+        return $warningCodes;
     }
 
     /**
@@ -628,7 +730,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
             $connection->beginTransaction();
         } catch (\Throwable $exception) {
             $this->logger->warning('Safe Sync outer transaction begin failed.', ['exception' => $exception]);
-            $this->quarantineConnection($connection);
+            $warningCodes = $this->quarantineConnection($connection);
 
             return $this->knownNotApplied(
                 'safe_sync_begin_failed',
@@ -636,6 +738,7 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
                 $expectedSku,
                 false,
                 0,
+                $warningCodes,
             );
         }
 
@@ -725,6 +828,8 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
                 );
             }
 
+            $product->unsetData('media_gallery');
+
             $this->applyMutation($product, $mutation);
 
             if ($product->getData($identifierField) === null) {
@@ -765,7 +870,10 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
 
             try {
                 $consequentialWriteAttempts = 1;
-                $this->productRepository->save($product);
+                $this->nonMediaProductWriteScope->runForLogicalEntity(
+                    $logicalEntityId,
+                    fn (): mixed => $this->productRepository->save($product),
+                );
             } catch (\Throwable $exception) {
                 $this->logger->warning('Safe Sync product save failed before outer commit.', ['exception' => $exception]);
 
@@ -821,6 +929,20 @@ final class ProductWriteManagement implements ProductWriteManagementInterface
             } catch (\Throwable $exception) {
                 $warningCodes = $this->restoreAfterCommitException($connection, $galeraState);
                 $this->logger->warning('Safe Sync outer commit acknowledgement is uncertain.', ['exception' => $exception]);
+
+                return $this->unknownOrAmbiguous(
+                    'safe_sync_commit_uncertain',
+                    $logicalEntityId,
+                    $expectedSku,
+                    true,
+                    $consequentialWriteAttempts,
+                    $warningCodes,
+                );
+            }
+
+            if ($this->transactionLevel($connection) !== 0) {
+                $this->logger->error('Safe Sync commit returned without proving physical transaction completion.');
+                $warningCodes = $this->quarantineConnection($connection);
 
                 return $this->unknownOrAmbiguous(
                     'safe_sync_commit_uncertain',

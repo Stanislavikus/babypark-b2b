@@ -515,6 +515,44 @@ interface AdapterInterface
     public function closeConnection();
 }
 
+namespace Magento\Framework\ObjectManager;
+
+interface ResetAfterRequestInterface
+{
+    public function _resetState(): void;
+}
+
+namespace Magento\Framework\Model;
+
+final class CallbackPool
+{
+    /** @var list<string> */
+    public static array $clearedHashes = [];
+
+    /** @var list<string> */
+    public static array $events = [];
+
+    /** @var array<string, \Throwable> */
+    public static array $failures = [];
+
+    public static function clear(string $connectionHash): void
+    {
+        self::$events[] = 'clear:'.$connectionHash;
+        self::$clearedHashes[] = $connectionHash;
+
+        if (isset(self::$failures[$connectionHash])) {
+            throw self::$failures[$connectionHash];
+        }
+    }
+
+    public static function reset(): void
+    {
+        self::$clearedHashes = [];
+        self::$events = [];
+        self::$failures = [];
+    }
+}
+
 namespace Magento\Framework\App;
 
 use Magento\Framework\DB\Adapter\AdapterInterface;
@@ -658,21 +696,61 @@ final class CollectionFactory
     }
 }
 
+namespace Magento\Catalog\Model\Product\Media;
+
+final class Config
+{
+    /**
+     * @param  list<string>|\Throwable  $mediaAttributeCodes
+     */
+    public function __construct(
+        private readonly array|\Throwable $mediaAttributeCodes = ['image', 'small_image', 'thumbnail'],
+    ) {}
+
+    /**
+     * @return list<string>
+     */
+    public function getMediaAttributeCodes(): array
+    {
+        if ($this->mediaAttributeCodes instanceof \Throwable) {
+            throw $this->mediaAttributeCodes;
+        }
+
+        return $this->mediaAttributeCodes;
+    }
+}
+
+namespace Magento\Catalog\Model\Product\Gallery;
+
+class UpdateHandler
+{
+    public function execute(object $product, array $arguments = []): object
+    {
+        return $product;
+    }
+}
+
 namespace Tests\Unit\MagentoSafeSync;
 
+use B2BPlatform\MagentoSafeSync\Model\Connection\ConnectionQuarantine;
 use B2BPlatform\MagentoSafeSync\Model\Data\HandshakeResponseFactory;
 use B2BPlatform\MagentoSafeSync\Model\Data\ProductReadResponseFactory;
+use B2BPlatform\MagentoSafeSync\Model\Data\ProductWriteMappedAttribute;
 use B2BPlatform\MagentoSafeSync\Model\Data\ProductWriteRequest;
 use B2BPlatform\MagentoSafeSync\Model\Data\ProductWriteResponseFactory;
 use B2BPlatform\MagentoSafeSync\Model\GaleraSessionScope;
 use B2BPlatform\MagentoSafeSync\Model\GaleraWriteSession;
 use B2BPlatform\MagentoSafeSync\Model\HandshakeManagement;
+use B2BPlatform\MagentoSafeSync\Model\Media\NonMediaProductWriteScope;
 use B2BPlatform\MagentoSafeSync\Model\ProductEntityManagerCallbackBridge;
 use B2BPlatform\MagentoSafeSync\Model\ProductReadManagement;
 use B2BPlatform\MagentoSafeSync\Model\ProductWriteManagement;
 use B2BPlatform\MagentoSafeSync\Model\SafeSyncReadException;
+use B2BPlatform\MagentoSafeSync\Plugin\Gallery\UpdateHandlerNonMediaBypassPlugin;
 use Magento\Catalog\Api\Data\ProductInterface;
 use Magento\Catalog\Api\ProductRepositoryInterface;
+use Magento\Catalog\Model\Product\Gallery\UpdateHandler;
+use Magento\Catalog\Model\Product\Media\Config as ProductMediaConfig;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\DB\Adapter\AdapterInterface;
@@ -680,7 +758,9 @@ use Magento\Framework\EntityManager\CallbackHandler;
 use Magento\Framework\EntityManager\MetadataPool;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\NoSuchEntityException;
+use Magento\Framework\Model\CallbackPool;
 use Magento\Framework\Module\ModuleListInterface;
+use Magento\Framework\ObjectManager\ResetAfterRequestInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Log\LoggerInterface;
@@ -692,11 +772,21 @@ require_once dirname(__DIR__, 3).'/integrations/magento-safe-sync/Model/GaleraSe
 require_once dirname(__DIR__, 3).'/integrations/magento-safe-sync/Model/GaleraWriteSession.php';
 require_once dirname(__DIR__, 3).'/integrations/magento-safe-sync/Model/ProductReadManagement.php';
 require_once dirname(__DIR__, 3).'/integrations/magento-safe-sync/Model/ProductEntityManagerCallbackBridge.php';
+require_once dirname(__DIR__, 3).'/integrations/magento-safe-sync/Model/Connection/ConnectionQuarantine.php';
+require_once dirname(__DIR__, 3).'/integrations/magento-safe-sync/Model/Media/NonMediaProductWriteScope.php';
 require_once dirname(__DIR__, 3).'/integrations/magento-safe-sync/Model/ProductWriteManagement.php';
 require_once dirname(__DIR__, 3).'/integrations/magento-safe-sync/Model/HandshakeManagement.php';
+require_once dirname(__DIR__, 3).'/integrations/magento-safe-sync/Plugin/Gallery/UpdateHandlerNonMediaBypassPlugin.php';
 
 final class MagentoSafeSyncModuleLogicTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        CallbackPool::reset();
+    }
+
     #[Test]
     public function exact_sku_precondition_rejects_leading_whitespace_without_normalization(): void
     {
@@ -1085,7 +1175,7 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
             {
                 public function getOne($name)
                 {
-                    return ['setup_version' => '0.2.0'];
+                    return ['setup_version' => '0.2.1'];
                 }
             },
         );
@@ -1093,11 +1183,86 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $handshake = $management->handshake();
 
         $this->assertSame('stage3e-r1', $handshake->getContractVersion());
-        $this->assertSame('0.2.0', $handshake->getModuleVersion());
+        $this->assertSame('0.2.1', $handshake->getModuleVersion());
         $this->assertSame([
             'entity_bound_product_read',
             'entity_bound_simple_product_write',
         ], $handshake->getSupportedOperationFamilies());
+    }
+
+    #[Test]
+    public function non_media_scope_closes_in_finally_and_cannot_leak_after_exception(): void
+    {
+        $scope = new NonMediaProductWriteScope;
+
+        try {
+            $scope->runForLogicalEntity(77, function () use ($scope): void {
+                $this->assertTrue($scope->isActiveForLogicalEntity(77));
+                throw new \RuntimeException('boom');
+            });
+            $this->fail('Expected the callback exception to escape.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('boom', $exception->getMessage());
+        }
+
+        $this->assertFalse($scope->isActiveForLogicalEntity(77));
+    }
+
+    #[Test]
+    public function non_media_scope_reentry_fails_closed(): void
+    {
+        $scope = new NonMediaProductWriteScope;
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('safe_sync_non_media_scope_reentry_forbidden');
+
+        $scope->runForLogicalEntity(77, fn (): mixed => $scope->runForLogicalEntity(77, static fn (): null => null));
+    }
+
+    #[Test]
+    public function gallery_update_handler_plugin_suppresses_only_the_exact_logical_entity_in_scope(): void
+    {
+        $scope = new NonMediaProductWriteScope;
+        $metadata = new class
+        {
+            public function getIdentifierField(): string
+            {
+                return 'entity_id';
+            }
+        };
+        $plugin = new UpdateHandlerNonMediaBypassPlugin($scope, new MetadataPool($metadata));
+        $subject = new UpdateHandler;
+        $target = new FakeProduct(entityId: 77, sku: 'SKU-77', typeId: 'simple', name: 'Target');
+        $other = new FakeProduct(entityId: 88, sku: 'SKU-88', typeId: 'simple', name: 'Other');
+        $proceedCalls = 0;
+
+        $inactive = $plugin->aroundExecute($subject, function (object $product, array $arguments) use (&$proceedCalls): object {
+            $proceedCalls++;
+
+            return $product;
+        }, $target, []);
+
+        $this->assertSame($target, $inactive);
+        $this->assertSame(1, $proceedCalls);
+
+        $scope->runForLogicalEntity(77, function () use ($plugin, $subject, $target, $other, &$proceedCalls): void {
+            $suppressed = $plugin->aroundExecute($subject, function (object $product, array $arguments) use (&$proceedCalls): object {
+                $proceedCalls++;
+
+                return $product;
+            }, $target, []);
+
+            $passedThrough = $plugin->aroundExecute($subject, function (object $product, array $arguments) use (&$proceedCalls): object {
+                $proceedCalls++;
+
+                return $product;
+            }, $other, []);
+
+            $this->assertSame($target, $suppressed);
+            $this->assertSame($other, $passedThrough);
+        });
+
+        $this->assertSame(2, $proceedCalls);
     }
 
     #[Test]
@@ -1150,6 +1315,58 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertSame('known_not_applied', $result->getAppliedState());
         $this->assertSame('safe_sync_invalid_mapped_attribute_payload', $result->getReasonCode());
         $this->assertSame(0, $result->getConsequentialWriteAttempts());
+    }
+
+    #[Test]
+    public function mapped_media_attribute_codes_fail_closed_before_write_attempt(): void
+    {
+        $fixture = $this->simpleWriteFixture(mediaAttributeCodes: ['image', 'custom_media']);
+
+        $result = $fixture['management']->writeSimpleProduct(
+            77,
+            $this->writeRequest('SKU-77', mappedAttributes: [
+                $this->mappedAttribute('custom_media', 'file.jpg'),
+            ]),
+        );
+
+        $this->assertSame('known_not_applied', $result->getAppliedState());
+        $this->assertSame('safe_sync_media_attribute_not_allowed', $result->getReasonCode());
+        $this->assertSame(0, $result->getConsequentialWriteAttempts());
+        $this->assertSame(0, $fixture['repository']->saveCalls);
+    }
+
+    #[Test]
+    public function mapped_media_label_attribute_codes_also_fail_closed_before_write_attempt(): void
+    {
+        $fixture = $this->simpleWriteFixture(mediaAttributeCodes: ['image', 'custom_media']);
+
+        $result = $fixture['management']->writeSimpleProduct(
+            77,
+            $this->writeRequest('SKU-77', mappedAttributes: [
+                $this->mappedAttribute('custom_media_label', 'Front'),
+            ]),
+        );
+
+        $this->assertSame('safe_sync_media_attribute_not_allowed', $result->getReasonCode());
+        $this->assertSame(0, $result->getConsequentialWriteAttempts());
+        $this->assertSame(0, $fixture['repository']->saveCalls);
+    }
+
+    #[Test]
+    public function unavailable_media_attribute_capability_fails_closed_before_write_attempt(): void
+    {
+        $fixture = $this->simpleWriteFixture(mediaConfigFailure: new \RuntimeException('unsupported'));
+
+        $result = $fixture['management']->writeSimpleProduct(
+            77,
+            $this->writeRequest('SKU-77', mappedAttributes: [
+                $this->mappedAttribute('color', 'red'),
+            ]),
+        );
+
+        $this->assertSame('safe_sync_media_attribute_capability_unavailable', $result->getReasonCode());
+        $this->assertSame(0, $result->getConsequentialWriteAttempts());
+        $this->assertSame(0, $fixture['repository']->saveCalls);
     }
 
     #[Test]
@@ -1265,6 +1482,19 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertSame('safe_sync_identifier_missing_before_save', $result->getReasonCode());
         $this->assertSame(['begin', 'rollback'], $fixture['connection']->txEvents);
         $this->assertSame(1, $fixture['callbackHandler']->clearCalls);
+    }
+
+    #[Test]
+    public function product_write_unsets_media_gallery_before_repository_save_without_other_media_mutation(): void
+    {
+        $fixture = $this->simpleWriteFixture();
+
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', name: 'Updated Name'));
+
+        $this->assertSame('known_applied', $result->getAppliedState());
+        $this->assertSame(['media_gallery'], $fixture['product']->unsetDataCalls);
+        $this->assertSame(0, $fixture['product']->mediaGalleryEntriesSetCalls);
+        $this->assertSame(0, $fixture['product']->origDataWriteCalls);
     }
 
     #[Test]
@@ -1384,12 +1614,54 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertSame(1, $result->getConsequentialWriteAttempts());
         $this->assertSame(1, $fixture['repository']->saveCalls);
         $this->assertSame(['begin', 'begin', 'commit', 'commit'], $fixture['connection']->txEvents);
-        $this->assertSame(1, $fixture['connection']->getTransactionLevel());
+        $this->assertSame(0, $fixture['connection']->getTransactionLevel());
         $this->assertSame(0, $fixture['callbackHandler']->processCalls);
         $this->assertSame(0, $fixture['callbackHandler']->clearCalls);
-        $this->assertSame(1, $fixture['connection']->closeCalls);
-        $this->assertSame(0, $fixture['defaultConnection']->closeCalls);
+        $this->assertSame(1, $fixture['connection']->resetCalls);
+        $this->assertSame([spl_object_hash($fixture['connection'])], CallbackPool::$clearedHashes);
         $this->assertSame(['SET SESSION wsrep_sync_wait = 1'], $fixture['connection']->queries);
+    }
+
+    #[Test]
+    public function commit_uncertainty_with_zero_transaction_level_clears_pending_callbacks_without_quarantine(): void
+    {
+        $fixture = $this->simpleWriteFixture(galeraEnabled: true);
+        $fixture['connection']->commitFailure = new \RuntimeException('commit uncertain');
+        $fixture['connection']->dropToLevelZeroOnCommitFailure = true;
+
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', name: 'Updated Name'));
+
+        $this->assertSame('unknown_or_ambiguous', $result->getAppliedState());
+        $this->assertSame('safe_sync_commit_uncertain', $result->getReasonCode());
+        $this->assertSame(1, $fixture['callbackHandler']->clearCalls);
+        $this->assertSame(0, $fixture['connection']->resetCalls);
+        $this->assertSame([], CallbackPool::$clearedHashes);
+    }
+
+    #[Test]
+    public function successful_commit_without_physical_level_zero_is_unknown_or_ambiguous_and_quarantined(): void
+    {
+        $fixture = $this->simpleWriteFixture(galeraEnabled: true);
+        $fixture['repository']->simulateDanglingNestedTransaction = true;
+
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', name: 'Updated Name'));
+
+        $this->assertSame('unknown_or_ambiguous', $result->getAppliedState());
+        $this->assertSame('safe_sync_commit_uncertain', $result->getReasonCode());
+        $this->assertTrue($result->getPostconditionVerified());
+        $this->assertSame(1, $result->getConsequentialWriteAttempts());
+        $this->assertSame([], $result->getWarningCodes());
+        $this->assertSame(0, $fixture['callbackHandler']->processCalls);
+        $this->assertSame(0, $fixture['callbackHandler']->clearCalls);
+        $this->assertSame([spl_object_hash($fixture['connection'])], CallbackPool::$clearedHashes);
+        $this->assertSame([
+            'clear:'.spl_object_hash($fixture['connection']),
+            'reset:'.spl_object_hash($fixture['connection']),
+        ], CallbackPool::$events);
+        $this->assertSame(1, $fixture['connection']->resetCalls);
+        $this->assertSame(0, $fixture['connection']->getTransactionLevel());
+        $this->assertSame(['SET SESSION wsrep_sync_wait = 1'], $fixture['connection']->queries);
+        $this->assertSame(['begin', 'begin', 'begin', 'commit', 'commit'], $fixture['connection']->txEvents);
     }
 
     #[Test]
@@ -1406,8 +1678,8 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertSame('unknown_or_ambiguous', $result->getAppliedState());
         $this->assertSame('safe_sync_rollback_uncertain', $result->getReasonCode());
         $this->assertSame(1, $result->getConsequentialWriteAttempts());
-        $this->assertSame(1, $fixture['connection']->closeCalls);
-        $this->assertSame(0, $fixture['defaultConnection']->closeCalls);
+        $this->assertSame(1, $fixture['connection']->resetCalls);
+        $this->assertSame([spl_object_hash($fixture['connection'])], CallbackPool::$clearedHashes);
         $this->assertSame(['begin', 'begin', 'commit'], $fixture['connection']->txEvents);
     }
 
@@ -1443,11 +1715,106 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         $this->assertSame(0, $fixture['repository']->saveCalls);
         $this->assertSame(['begin'], $fixture['connection']->txEvents);
         $this->assertSame(0, $fixture['connection']->getTransactionLevel());
-        $this->assertSame(1, $fixture['connection']->closeCalls);
-        $this->assertSame(0, $fixture['defaultConnection']->closeCalls);
+        $this->assertSame(1, $fixture['connection']->resetCalls);
+        $this->assertSame([spl_object_hash($fixture['connection'])], CallbackPool::$clearedHashes);
         $this->assertSame(0, $fixture['callbackHandler']->processCalls);
         $this->assertSame(0, $fixture['callbackHandler']->clearCalls);
         $this->assertSame(['SET SESSION wsrep_sync_wait = 1'], $fixture['connection']->queries);
+    }
+
+    #[Test]
+    public function unsupported_connection_quarantine_seam_fails_closed_before_any_write_attempt(): void
+    {
+        $fixture = $this->simpleWriteFixture(supportsReset: false);
+
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', name: 'Updated Name'));
+
+        $this->assertSame('known_not_applied', $result->getAppliedState());
+        $this->assertSame('safe_sync_connection_quarantine_unavailable', $result->getReasonCode());
+        $this->assertSame(0, $result->getConsequentialWriteAttempts());
+        $this->assertSame(0, $fixture['repository']->saveCalls);
+    }
+
+    #[Test]
+    public function quarantine_warning_codes_surface_callback_clear_failure(): void
+    {
+        $fixture = $this->simpleWriteFixture(galeraEnabled: true, callbackPoolClearFailure: new \RuntimeException('clear failed'));
+        $fixture['connection']->beginFailure = new \RuntimeException('begin failed');
+
+        $result = $fixture['management']->writeSimpleProduct(77, $this->writeRequest('SKU-77', name: 'Updated Name'));
+
+        $this->assertSame('known_not_applied', $result->getAppliedState());
+        $this->assertSame('safe_sync_begin_failed', $result->getReasonCode());
+        $this->assertSame([
+            'safe_sync_callback_pool_clear_failed',
+            'safe_sync_connection_quarantine_failed',
+        ], $result->getWarningCodes());
+        $this->assertSame(1, $fixture['connection']->resetCalls);
+    }
+
+    #[Test]
+    public function connection_quarantine_clears_exact_callback_pool_before_reset(): void
+    {
+        $callbackBridge = new ProductEntityManagerCallbackBridge(new CallbackHandler);
+        $quarantine = new ConnectionQuarantine($callbackBridge);
+        $connection = new ResettableFakeAdapter([]);
+
+        $result = $quarantine->quarantine($connection);
+
+        $this->assertTrue($result['success']);
+        $this->assertFalse($result['callback_clear_failed']);
+        $this->assertSame([
+            'clear:'.spl_object_hash($connection),
+            'reset:'.spl_object_hash($connection),
+        ], CallbackPool::$events);
+    }
+
+    #[Test]
+    public function galera_restore_with_open_transaction_quarantines_before_throwing_original_precondition_failure(): void
+    {
+        $callbackBridge = new ProductEntityManagerCallbackBridge(new CallbackHandler);
+        $connection = new ResettableFakeAdapter([]);
+        $connection->transactionLevel = 1;
+        $session = new GaleraWriteSession(new ConnectionQuarantine($callbackBridge));
+
+        try {
+            $session->restore($connection, ['previous' => 0]);
+            $this->fail('Expected restore precondition failure.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('safe_sync_wsrep_restore_before_transaction_level_zero', $exception->getMessage());
+        }
+
+        $this->assertSame([
+            'clear:'.spl_object_hash($connection),
+            'reset:'.spl_object_hash($connection),
+        ], CallbackPool::$events);
+        $this->assertSame(1, $connection->resetCalls);
+        $this->assertSame(0, $connection->getTransactionLevel());
+        $this->assertSame([], $connection->queries);
+    }
+
+    #[Test]
+    public function galera_restore_with_open_transaction_preserves_quarantine_failure_diagnostics(): void
+    {
+        $callbackBridge = new ProductEntityManagerCallbackBridge(new CallbackHandler);
+        $connection = new ResettableFakeAdapter([]);
+        $connection->transactionLevel = 1;
+        $connection->resetFailure = new \RuntimeException('reset failed');
+        $session = new GaleraWriteSession(new ConnectionQuarantine($callbackBridge));
+
+        try {
+            $session->restore($connection, ['previous' => 0]);
+            $this->fail('Expected quarantine failure diagnostics.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame('safe_sync_wsrep_connection_quarantine_failed:reset_failed', $exception->getMessage());
+            $this->assertSame('safe_sync_wsrep_restore_before_transaction_level_zero', $exception->getPrevious()?->getMessage());
+        }
+
+        $this->assertSame([
+            'clear:'.spl_object_hash($connection),
+            'reset:'.spl_object_hash($connection),
+        ], CallbackPool::$events);
+        $this->assertSame([], $connection->queries);
     }
 
     #[Test]
@@ -1528,23 +1895,43 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
         ?array $lockRows = null,
         ?array $skuRows = null,
         bool $galeraEnabled = false,
+        ?array $mediaAttributeCodes = null,
+        ?\Throwable $mediaConfigFailure = null,
+        bool $supportsReset = true,
+        ?\Throwable $callbackPoolClearFailure = null,
     ): array {
         $product ??= new FakeProduct(entityId: 77, sku: 'SKU-77', typeId: 'simple', name: 'Original');
-        $connection = new FakeAdapter([
-            'SHOW INDEX FROM `catalog_product_entity`' => $indexRows ?? [
-                ['Column_name' => 'entity_id', 'Seq_in_index' => 1],
-                ['Column_name' => 'sku', 'Seq_in_index' => 1],
-            ],
-            'SELECT `row_id` FROM `catalog_product_entity` WHERE `entity_id` = 77 FOR UPDATE' => $lockRows ?? [['row_id' => 7001]],
-            "SELECT DISTINCT `entity_id` FROM `catalog_product_entity` WHERE `sku` = 'SKU-77' LIMIT 2 FOR UPDATE" => $skuRows ?? [['entity_id' => 77]],
-            "SHOW VARIABLES LIKE 'wsrep_provider'" => $galeraEnabled ? ['Value' => '/usr/lib/libgalera_smm.so'] : null,
-            "SHOW SESSION VARIABLES LIKE 'wsrep_on'" => ['Value' => 'ON'],
-            "SHOW SESSION VARIABLES LIKE 'wsrep_dirty_reads'" => ['Value' => 'OFF'],
-            "SHOW STATUS LIKE 'wsrep_connected'" => ['Value' => 'ON'],
-            "SHOW STATUS LIKE 'wsrep_ready'" => ['Value' => 'ON'],
-            "SHOW STATUS LIKE 'wsrep_cluster_status'" => ['Value' => 'Primary'],
-            "SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'" => ['Value' => '0'],
-        ]);
+        $connection = $supportsReset
+            ? new ResettableFakeAdapter([
+                'SHOW INDEX FROM `catalog_product_entity`' => $indexRows ?? [
+                    ['Column_name' => 'entity_id', 'Seq_in_index' => 1],
+                    ['Column_name' => 'sku', 'Seq_in_index' => 1],
+                ],
+                'SELECT `row_id` FROM `catalog_product_entity` WHERE `entity_id` = 77 FOR UPDATE' => $lockRows ?? [['row_id' => 7001]],
+                "SELECT DISTINCT `entity_id` FROM `catalog_product_entity` WHERE `sku` = 'SKU-77' LIMIT 2 FOR UPDATE" => $skuRows ?? [['entity_id' => 77]],
+                "SHOW VARIABLES LIKE 'wsrep_provider'" => $galeraEnabled ? ['Value' => '/usr/lib/libgalera_smm.so'] : null,
+                "SHOW SESSION VARIABLES LIKE 'wsrep_on'" => ['Value' => 'ON'],
+                "SHOW SESSION VARIABLES LIKE 'wsrep_dirty_reads'" => ['Value' => 'OFF'],
+                "SHOW STATUS LIKE 'wsrep_connected'" => ['Value' => 'ON'],
+                "SHOW STATUS LIKE 'wsrep_ready'" => ['Value' => 'ON'],
+                "SHOW STATUS LIKE 'wsrep_cluster_status'" => ['Value' => 'Primary'],
+                "SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'" => ['Value' => '0'],
+            ])
+            : new FakeAdapter([
+                'SHOW INDEX FROM `catalog_product_entity`' => $indexRows ?? [
+                    ['Column_name' => 'entity_id', 'Seq_in_index' => 1],
+                    ['Column_name' => 'sku', 'Seq_in_index' => 1],
+                ],
+                'SELECT `row_id` FROM `catalog_product_entity` WHERE `entity_id` = 77 FOR UPDATE' => $lockRows ?? [['row_id' => 7001]],
+                "SELECT DISTINCT `entity_id` FROM `catalog_product_entity` WHERE `sku` = 'SKU-77' LIMIT 2 FOR UPDATE" => $skuRows ?? [['entity_id' => 77]],
+                "SHOW VARIABLES LIKE 'wsrep_provider'" => $galeraEnabled ? ['Value' => '/usr/lib/libgalera_smm.so'] : null,
+                "SHOW SESSION VARIABLES LIKE 'wsrep_on'" => ['Value' => 'ON'],
+                "SHOW SESSION VARIABLES LIKE 'wsrep_dirty_reads'" => ['Value' => 'OFF'],
+                "SHOW STATUS LIKE 'wsrep_connected'" => ['Value' => 'ON'],
+                "SHOW STATUS LIKE 'wsrep_ready'" => ['Value' => 'ON'],
+                "SHOW STATUS LIKE 'wsrep_cluster_status'" => ['Value' => 'Primary'],
+                "SHOW SESSION VARIABLES LIKE 'wsrep_sync_wait'" => ['Value' => '0'],
+            ]);
         $defaultConnection = new FakeAdapter([]);
         $repository = new FakeProductRepository($product, $connection);
         $metadata = new class($connection)
@@ -1579,15 +1966,23 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
             }
         };
         $callbackHandler = new CallbackHandler;
+        if ($callbackPoolClearFailure !== null) {
+            CallbackPool::$failures[spl_object_hash($connection)] = $callbackPoolClearFailure;
+        }
         $resourceConnection = new ResourceConnection($defaultConnection, null, ['catalog' => $connection]);
         $logger = new FakeLogger;
+        $callbackBridge = new ProductEntityManagerCallbackBridge($callbackHandler);
+        $connectionQuarantine = new ConnectionQuarantine($callbackBridge);
         $management = new ProductWriteManagement(
             $repository,
             new MetadataPool($metadata),
             $resourceConnection,
             new ProductWriteResponseFactory,
-            new GaleraWriteSession,
-            new ProductEntityManagerCallbackBridge($callbackHandler),
+            $mediaConfigFailure !== null ? new ProductMediaConfig($mediaConfigFailure) : new ProductMediaConfig($mediaAttributeCodes ?? ['image', 'small_image', 'thumbnail']),
+            new GaleraWriteSession($connectionQuarantine),
+            $connectionQuarantine,
+            new NonMediaProductWriteScope,
+            $callbackBridge,
             $logger,
         );
 
@@ -1658,7 +2053,7 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
     }
 }
 
-final class FakeAdapter implements AdapterInterface
+class FakeAdapter implements AdapterInterface
 {
     /** @var array<string, mixed> */
     private array $rows;
@@ -1685,6 +2080,8 @@ final class FakeAdapter implements AdapterInterface
     public ?\Throwable $commitFailure = null;
 
     public ?\Throwable $rollbackFailure = null;
+
+    public bool $dropToLevelZeroOnCommitFailure = false;
 
     public bool $isRolledBack = false;
 
@@ -1757,6 +2154,10 @@ final class FakeAdapter implements AdapterInterface
         }
 
         if ($this->transactionLevel === 1 && $this->commitFailure !== null) {
+            if ($this->dropToLevelZeroOnCommitFailure) {
+                $this->transactionLevel = 0;
+            }
+
             throw $this->commitFailure;
         }
 
@@ -1807,11 +2208,38 @@ final class FakeAdapter implements AdapterInterface
     }
 }
 
+final class ResettableFakeAdapter extends FakeAdapter implements ResetAfterRequestInterface
+{
+    public int $resetCalls = 0;
+
+    public ?\Throwable $resetFailure = null;
+
+    public function _resetState(): void
+    {
+        CallbackPool::$events[] = 'reset:'.spl_object_hash($this);
+        $this->resetCalls++;
+
+        if ($this->resetFailure !== null) {
+            throw $this->resetFailure;
+        }
+
+        $this->transactionLevel = 0;
+        $this->isRolledBack = false;
+    }
+}
+
 final class FakeProduct implements ProductInterface
 {
     public bool $dropIdentifierOnWrite = false;
 
     public int $skuReads = 0;
+
+    /** @var list<string> */
+    public array $unsetDataCalls = [];
+
+    public int $mediaGalleryEntriesSetCalls = 0;
+
+    public int $origDataWriteCalls = 0;
 
     public function __construct(
         private ?int $entityId,
@@ -1844,6 +2272,14 @@ final class FakeProduct implements ProductInterface
         if (is_scalar($value)) {
             $this->customAttributes[$key] = (string) $value;
         }
+
+        return $this;
+    }
+
+    public function unsetData(string $key): self
+    {
+        $this->unsetDataCalls[] = $key;
+        unset($this->customAttributes[$key]);
 
         return $this;
     }
@@ -1944,6 +2380,20 @@ final class FakeProduct implements ProductInterface
             }
         };
     }
+
+    public function setMediaGalleryEntries(?array $entries): self
+    {
+        $this->mediaGalleryEntriesSetCalls++;
+
+        return $this;
+    }
+
+    public function setOrigData(string $key, mixed $value): self
+    {
+        $this->origDataWriteCalls++;
+
+        return $this;
+    }
 }
 
 final class FakeProductRepository implements ProductRepositoryInterface
@@ -1961,6 +2411,8 @@ final class FakeProductRepository implements ProductRepositoryInterface
     public ?\Closure $afterSaveMutation = null;
 
     public bool $simulateNestedRollbackPoison = false;
+
+    public bool $simulateDanglingNestedTransaction = false;
 
     public function __construct(
         private readonly FakeProduct $product,
@@ -1988,6 +2440,10 @@ final class FakeProductRepository implements ProductRepositoryInterface
 
         if ($this->connection !== null) {
             $this->connection->beginTransaction();
+
+            if ($this->simulateDanglingNestedTransaction) {
+                $this->connection->beginTransaction();
+            }
 
             if ($this->simulateNestedRollbackPoison) {
                 $this->connection->rollBack();

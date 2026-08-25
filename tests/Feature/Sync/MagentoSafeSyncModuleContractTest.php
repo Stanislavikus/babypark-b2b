@@ -36,6 +36,11 @@ class MagentoSafeSyncModuleContractTest extends TestCase
         );
 
         $this->assertSame('>=8.4 <8.6', $composer['require']['php'] ?? null);
+        $this->assertSame('>=103.0.8-p5 <103.0.10', $composer['require']['magento/framework'] ?? null);
+        $this->assertSame('>=104.0.8-p5 <104.0.10', $composer['require']['magento/module-catalog'] ?? null);
+        $this->assertStringNotContainsString('>=8.3', json_encode($composer, JSON_THROW_ON_ERROR));
+        $this->assertStringNotContainsString('103.0.0', json_encode($composer, JSON_THROW_ON_ERROR));
+        $this->assertStringNotContainsString('104.0.0', json_encode($composer, JSON_THROW_ON_ERROR));
     }
 
     #[Test]
@@ -98,12 +103,12 @@ class MagentoSafeSyncModuleContractTest extends TestCase
     }
 
     #[Test]
-    public function module_version_is_bumped_to_point_two_zero_without_contract_bump(): void
+    public function module_version_is_bumped_to_point_two_one_without_contract_bump(): void
     {
         $moduleXml = File::get(base_path($this->moduleBasePath.'/etc/module.xml'));
         $contract = File::get(base_path($this->moduleBasePath.'/Model/SafeSyncContract.php'));
 
-        $this->assertStringContainsString('setup_version="0.2.0"', $moduleXml);
+        $this->assertStringContainsString('setup_version="0.2.1"', $moduleXml);
         $this->assertStringContainsString("CONTRACT_VERSION = 'stage3e-r1';", $contract);
         $this->assertStringContainsString("SIMPLE_PRODUCT_WRITE_FAMILY = 'entity_bound_simple_product_write';", $contract);
     }
@@ -112,6 +117,9 @@ class MagentoSafeSyncModuleContractTest extends TestCase
     public function module_simple_product_write_contract_remains_entity_bound_and_closed_bounded(): void
     {
         $content = File::get(base_path($this->moduleBasePath.'/Model/ProductWriteManagement.php'));
+        $quarantine = File::get(base_path($this->moduleBasePath.'/Model/Connection/ConnectionQuarantine.php'));
+        $scope = File::get(base_path($this->moduleBasePath.'/Model/Media/NonMediaProductWriteScope.php'));
+        $bridge = File::get(base_path($this->moduleBasePath.'/Model/ProductEntityManagerCallbackBridge.php'));
 
         $this->assertStringContainsString('getIdentifierField()', $content);
         $this->assertStringContainsString('getLinkField()', $content);
@@ -123,9 +131,34 @@ class MagentoSafeSyncModuleContractTest extends TestCase
         $this->assertStringContainsString("'safe_sync_identifier_index_unavailable'", $content);
         $this->assertStringContainsString("'safe_sync_sku_index_unavailable'", $content);
         $this->assertStringContainsString("'safe_sync_rollback_uncertain'", $content);
+        $this->assertStringContainsString("\$product->unsetData('media_gallery')", $content);
+        $this->assertStringContainsString('getMediaAttributeCodes()', $content);
+        $this->assertStringContainsString("'safe_sync_media_attribute_not_allowed'", $content);
+        $this->assertStringContainsString('runForLogicalEntity(', $content);
+        $this->assertStringContainsString("'safe_sync_connection_quarantine_unavailable'", $content);
+        $this->assertStringContainsString("'safe_sync_commit_uncertain'", $content);
+        $this->assertStringContainsString('CallbackPool::clear(spl_object_hash($connection))', $bridge);
+        $this->assertStringContainsString('$connection->_resetState()', $quarantine);
+        $this->assertStringContainsString('implements ResetAfterRequestInterface', $scope);
         $this->assertStringContainsString('mapped_attributes', $content);
         $this->assertStringNotContainsString('postProduct(', $content);
         $this->assertStringNotContainsString('row_id as identity', $content);
+        $this->assertStringNotContainsString("method_exists(\$product, 'unsetData')", $content);
+        $this->assertStringNotContainsString('setMediaGalleryEntries(null)', $content);
+        $this->assertStringNotContainsString('closeConnection()', $content);
+    }
+
+    #[Test]
+    public function module_registers_only_the_narrow_gallery_update_handler_plugin_for_non_media_write_scope(): void
+    {
+        $di = File::get(base_path($this->moduleBasePath.'/etc/di.xml'));
+
+        $this->assertStringContainsString('Magento\Catalog\Model\Product\Gallery\UpdateHandler', $di);
+        $this->assertStringContainsString('UpdateHandlerNonMediaBypassPlugin', $di);
+        $this->assertStringNotContainsString('Magento\Catalog\Model\ProductRepository', $di);
+        $this->assertStringNotContainsString('Magento\Catalog\Api\ProductRepositoryInterface', $di);
+        $this->assertStringNotContainsString('Magento\Catalog\Model\Product"', $di);
+        $this->assertStringNotContainsString('Magento\Framework\EntityManager', $di);
     }
 
     #[Test]
