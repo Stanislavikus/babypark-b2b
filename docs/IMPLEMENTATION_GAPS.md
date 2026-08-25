@@ -1717,21 +1717,23 @@ unblocked as the next sequenced task.
 ## GAP-028 — Missing governed Product/Variant field-value writer
 
 **Approved docs:**
-- `03-DOMAIN_MODEL.md`, Receive / Import Foundation Contract (Resolved): A generic governed Product/Variant field-value writer is required to handle ordinary dynamic `FieldBinding` values (text, number, boolean, date, select option resolution, etc.) during Receive operations.
+- `03-DOMAIN_MODEL.md`, Receive / Import Foundation Contract (Resolved): A generic governed Product/Variant field-value writer is required to handle ordinary dynamic `FieldBinding` values whose invariants belong entirely to Field Dictionary during Receive operations. Current GAP-028A scope: `Text`, `LongText`, and single-value `Select`.
 
 **Current code:**
 - GAP-028A is implemented as the platform-core governed writer foundation for ordinary Product/Variant dynamic `Text`, `LongText`, and single-value `Select` fields. See `app/Services/Fields/GovernedDynamicFieldValueWriter.php` and the bounded typed exception set under `app/Services/Fields/Exceptions/`. Coverage includes explicit Set/Clear commands, workspace + object-type eligibility, internal-option validation, localized text merge semantics, and narrow same-slot concurrency via `DB::transaction` + `lockForUpdate` with bounded retry on duplicate-slot races.
-- The remaining declared dynamic datatypes (`Number`, `Decimal`, `Money`, `Boolean`, `Date`, `MultiSelect`, `Image`, `Url`, `Computed`, and any `is_multi_value = true` definition) are still **not** implemented. They require a follow-up typed-storage extension before GAP-028 can be marked Closed.
+- The remaining generic GAP-028 typed extension is still **not** implemented for `Number`, `Decimal`, `Boolean`, `Date`, `MultiSelect`, and `Url`. They require a follow-up typed-storage extension before GAP-028 can be marked Closed.
+- `Money`, `Image`, and `Computed` are **not** part of the generic GAP-028 follow-up typed extension: `Money` belongs to the Pricing domain, `Image` belongs to the Media domain, and `Computed` remains derived / non-writable.
 
 **Impact:**
 - The platform-core seam GAP-028A delivers is reusable by Magento Receive, spreadsheet/CSV imports, Google Sheets, 1C/ERP, and future source connectors for Text/LongText/Select writes only.
-- The first manual Receive/Import execution slice still cannot safely update dynamic field values for the deferred datatypes because the governed runtime path for them remains absent.
+- The first manual Receive/Import execution slice still cannot safely update dynamic field values for the remaining generic GAP-028 datatypes because the governed runtime path for them remains absent.
 
 **Decision:**
 - Do not implement a "Product God Writer" that bypasses domain routing. Explicitly route Pricing, Availability, Media, and Relations outside of this generic writer.
-- GAP-028A explicitly fails closed for the deferred dynamic datatypes — they are intentionally not silently coerced into one of the supported physical representations.
+- GAP-028A explicitly fails closed for the remaining generic GAP-028 datatypes — they are intentionally not silently coerced into one of the supported physical representations.
+- `Money`, `Image`, and `Computed` remain outside the generic GAP-028 writer and must continue to route to their owning domain boundaries.
 
-**Next task:** Extend the governed Product/Variant field-value writer to the remaining declared dynamic datatypes (Number, Decimal, Money, Boolean, Date, MultiSelect, Image, Url, Computed) on top of the GAP-028A foundation. Implement the column-backed mutation boundary (GAP-029) as a separate, allowlisted Product/Variant domain boundary.
+**Next task:** Extend the governed Product/Variant field-value writer to the remaining generic GAP-028 datatypes (`Number`, `Decimal`, `Boolean`, `Date`, `MultiSelect`, `Url`) on top of the GAP-028A foundation. Implement the column-backed mutation boundary (GAP-029) as a separate, allowlisted Product/Variant domain boundary.
 
 **Status:** Partially implemented.
 
@@ -1740,8 +1742,9 @@ Text, LongText and single-value Select, including workspace/object-type
 validation, explicit clear, localized text merge semantics and safe same-slot
 concurrency.
 
-The remaining declared dynamic datatypes require a follow-up typed-storage
-extension before GAP-028 can be marked Closed.
+The remaining generic GAP-028 datatypes (`Number`, `Decimal`, `Boolean`,
+`Date`, `MultiSelect`, `Url`) require a follow-up typed-storage extension
+before GAP-028 can be marked Closed.
 
 ## GAP-029 — Missing governed Product/Variant column-backed mutation boundary
 
