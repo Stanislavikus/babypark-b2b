@@ -4478,7 +4478,7 @@ For the first manual Receive/Send experience, the user's explicit confirmed acti
 Receive applies two **distinct** mutation routes. The storage path alone does not grant write capability.
 
 **7.1 Dynamic route — `storage_type = dynamic`**
-Target: ordinary Product/Variant dynamic `FieldBinding` values (text, number, boolean, datetime, select option resolution, etc.).
+Target: ordinary Product/Variant dynamic `FieldBinding` values (text, number, boolean, date, select option resolution, etc.).
 Boundary: the governed Product/Variant field-value writer (currently **absent today** — see `docs/IMPLEMENTATION_GAPS.md` → GAP-028). When implemented, this writer MUST be the governed boundary and MUST validate/enforce at minimum:
 - explicit `Workspace` scope;
 - active `FieldDefinition`;

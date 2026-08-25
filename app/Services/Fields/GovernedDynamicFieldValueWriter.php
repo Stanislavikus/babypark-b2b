@@ -1,0 +1,693 @@
+<?php
+
+namespace App\Services\Fields;
+
+use App\Enums\AttributeDataType;
+use App\Enums\AttributeStatus;
+use App\Enums\AttributeStorageType;
+use App\Enums\FieldObjectType;
+use App\Models\FieldBinding;
+use App\Models\FieldDefinition;
+use App\Models\Product;
+use App\Models\ProductFieldValue;
+use App\Models\ProductVariant;
+use App\Models\VariantFieldValue;
+use App\Services\Fields\Exceptions\FieldBindingArchivedException;
+use App\Services\Fields\Exceptions\FieldBindingNotFoundException;
+use App\Services\Fields\Exceptions\FieldBindingObjectTypeMismatchException;
+use App\Services\Fields\Exceptions\FieldBindingStorageTypeMismatchException;
+use App\Services\Fields\Exceptions\FieldBindingWorkspaceMismatchException;
+use App\Services\Fields\Exceptions\FieldDefinitionArchivedException;
+use App\Services\Fields\Exceptions\FieldDefinitionNotFoundException;
+use App\Services\Fields\Exceptions\FieldDefinitionWorkspaceMismatchException;
+use App\Services\Fields\Exceptions\InvalidFieldValuePayloadException;
+use App\Services\Fields\Exceptions\LocalizationContractViolationException;
+use App\Services\Fields\Exceptions\MultiValueNotSupportedException;
+use App\Services\Fields\Exceptions\TargetNotFoundException;
+use App\Services\Fields\Exceptions\TargetWorkspaceMismatchException;
+use App\Services\Fields\Exceptions\UnsupportedFieldDataTypeException;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Governed Product / ProductVariant dynamic field-value writer (GAP-028A).
+ *
+ * Scope: the minimum-safe platform-core runtime slice that establishes
+ * the reusable persistence, workspace, localization, clear, option-validation
+ * and concurrency boundary for ordinary dynamic FieldBinding values.
+ *
+ * Supported target / datatype matrix:
+ *   - Product        + Text        (non-localizable / localizable)
+ *   - Product        + LongText    (non-localizable / localizable)
+ *   - Product        + Select      (single-value, non-localizable)
+ *   - ProductVariant + Text        (non-localizable / localizable)
+ *   - ProductVariant + LongText    (non-localizable / localizable)
+ *   - ProductVariant + Select      (single-value, non-localizable)
+ *
+ * Fail-closed for: Number, Decimal, Money, Boolean, Date, MultiSelect,
+ *                  Image, Url, Computed, is_multi_value=true.
+ *
+ * No schema changes; no dependencies on ConnectorAccount /
+ * SyncConfiguration / ExternalRecordLink / Adobe / FieldMapping.
+ *
+ * Public API: set() and clear(). Each is a single-locale mutation;
+ * whole-map localization overwrites are explicitly NOT exposed in
+ * GAP-028A — callers (Magento Receive, CSV/Smart Import, Google Sheets,
+ * ERP/1C, product-card editing) MUST drive per-locale Set/Clear.
+ *
+ * Concurrency: DB::transaction + lockForUpdate on the existing slot
+ * row (when present). On absent-slot create, bounded retry on the
+ * unique-constraint violation: re-read under lockForUpdate and
+ * reapply the operation. This guarantees that the final row state
+ * is deterministic, never duplicated, and never contains a
+ * payload corruption from a flat-merge race.
+ */
+final class GovernedDynamicFieldValueWriter
+{
+    /**
+     * Max concurrent-retry attempts for absent-slot create + unique-violation.
+     * Bounded; on exhaustion the unique violation is re-thrown so the caller
+     * is not silently masked into a wrong-state.
+     */
+    private const ABSENT_SLOT_CREATE_RETRY_LIMIT = 5;
+
+    public function __construct(
+        private readonly FieldDefinitionSelectOptionValidator $selectOptionValidator,
+    ) {}
+
+    // ------------------------------------------------------------------
+    // Public API
+    // ------------------------------------------------------------------
+
+    /**
+     * Persist a single value for a dynamic FieldBinding slot.
+     *
+     * Canonical storage:
+     *   - non-localizable text/long_text/select  → value_text only;
+     *                                              value_num/value_jsonb nulled.
+     *   - localizable text/long_text             → value_jsonb[locale] only;
+     *                                              value_text/value_num nulled.
+     *
+     * Semantics:
+     *   - set(null) is REJECTED — use clear().
+     *   - set('') for text/long_text is a legitimate explicit value
+     *     (it is not silently coerced to clear()).
+     *   - same-value set is NoOp (no DB mutation).
+     *
+     * @throws TargetNotFoundException
+     * @throws TargetWorkspaceMismatchException
+     * @throws FieldBindingNotFoundException
+     * @throws FieldBindingWorkspaceMismatchException
+     * @throws FieldBindingArchivedException
+     * @throws FieldBindingObjectTypeMismatchException
+     * @throws FieldBindingStorageTypeMismatchException
+     * @throws FieldDefinitionNotFoundException
+     * @throws FieldDefinitionWorkspaceMismatchException
+     * @throws FieldDefinitionArchivedException
+     * @throws UnsupportedFieldDataTypeException
+     * @throws MultiValueNotSupportedException
+     * @throws LocalizationContractViolationException
+     * @throws InvalidSelectOptionException
+     * @throws InvalidFieldValuePayloadException
+     */
+    public function set(
+        string $workspaceId,
+        FieldObjectType $targetType,
+        int|string $targetId,
+        string $fieldBindingId,
+        mixed $value,
+        ?string $locale = null,
+    ): FieldValueWriteResult {
+        if ($value === null) {
+            throw InvalidFieldValuePayloadException::nullPayload();
+        }
+
+        $context = $this->resolveContext(
+            workspaceId: $workspaceId,
+            targetType: $targetType,
+            targetId: $targetId,
+            fieldBindingId: $fieldBindingId,
+            locale: $locale,
+        );
+
+        return $this->mutateWithRetry(
+            context: $context,
+            operation: 'set',
+            value: $value,
+            locale: $locale,
+        );
+    }
+
+    /**
+     * Explicitly remove a value from a dynamic FieldBinding slot.
+     *
+     * Semantics:
+     *   - non-localizable binding + non-empty existing value → delete the row.
+     *   - non-localizable binding + absent/already-empty       → NoOp.
+     *   - localizable binding + locale present                 → remove only
+     *     that locale from value_jsonb; preserve all other locales.
+     *   - localizable binding + locale removed last locale     → delete the row.
+     *   - localizable binding + locale already absent          → NoOp.
+     *   - localizable Clear MUST receive a locale (per the public
+     *     single-locale API contract).
+     */
+    public function clear(
+        string $workspaceId,
+        FieldObjectType $targetType,
+        int|string $targetId,
+        string $fieldBindingId,
+        ?string $locale = null,
+    ): FieldValueWriteResult {
+        $context = $this->resolveContext(
+            workspaceId: $workspaceId,
+            targetType: $targetType,
+            targetId: $targetId,
+            fieldBindingId: $fieldBindingId,
+            locale: $locale,
+        );
+
+        return $this->mutateWithRetry(
+            context: $context,
+            operation: 'clear',
+            value: null,
+            locale: $locale,
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // Context resolution (workspace, target, binding, definition)
+    // ------------------------------------------------------------------
+
+    /**
+     * @return array{
+     *   workspace_id: string,
+     *   target: Product|ProductVariant,
+     *   target_type: FieldObjectType,
+     *   binding: FieldBinding,
+     *   definition: FieldDefinition
+     * }
+     */
+    private function resolveContext(
+        string $workspaceId,
+        FieldObjectType $targetType,
+        int|string $targetId,
+        string $fieldBindingId,
+        ?string $locale,
+    ): array {
+        $binding = FieldBinding::withoutWorkspaceScope()->find($fieldBindingId);
+
+        if ($binding === null) {
+            throw FieldBindingNotFoundException::forId($fieldBindingId);
+        }
+
+        // Binding ownership rule (strict per GAP-028A override A):
+        //   binding.workspace_id is global (NULL) OR binding.workspace_id === explicit workspace
+        //   target.workspace_id === explicit workspace
+        if ($binding->workspace_id !== null && $binding->workspace_id !== $workspaceId) {
+            throw FieldBindingWorkspaceMismatchException::forId(
+                $fieldBindingId,
+                $workspaceId,
+                $binding->workspace_id,
+            );
+        }
+
+        if ($binding->status !== AttributeStatus::Active) {
+            throw FieldBindingArchivedException::forId($fieldBindingId, $binding->status);
+        }
+
+        if ($binding->object_type !== $targetType) {
+            throw FieldBindingObjectTypeMismatchException::forId(
+                $fieldBindingId,
+                $targetType,
+                $binding->object_type,
+            );
+        }
+
+        if ($binding->storage_type !== AttributeStorageType::Dynamic) {
+            throw FieldBindingStorageTypeMismatchException::forId(
+                $fieldBindingId,
+                $binding->storage_type,
+            );
+        }
+
+        $definition = FieldDefinition::withoutWorkspaceScope()->find($binding->field_definition_id);
+
+        if ($definition === null) {
+            throw FieldDefinitionNotFoundException::forId((string) $binding->field_definition_id);
+        }
+
+        if (($definition->workspace_id ?? null) !== ($binding->workspace_id ?? null)) {
+            throw FieldDefinitionWorkspaceMismatchException::forId(
+                $definition->id,
+                (string) ($binding->workspace_id ?? '<global>'),
+                $definition->workspace_id,
+            );
+        }
+
+        if ($definition->status !== AttributeStatus::Active) {
+            throw FieldDefinitionArchivedException::forId($definition->id, $definition->status);
+        }
+
+        $this->assertDataTypeSupported($definition);
+        $this->assertLocalizationContract($definition, $locale);
+
+        $target = $this->resolveTarget($targetType, $targetId, $workspaceId);
+
+        return [
+            'workspace_id' => $workspaceId,
+            'target' => $target,
+            'target_type' => $targetType,
+            'binding' => $binding,
+            'definition' => $definition,
+        ];
+    }
+
+    private function resolveTarget(
+        FieldObjectType $targetType,
+        int|string $targetId,
+        string $workspaceId,
+    ): Product|ProductVariant {
+        if ($targetType === FieldObjectType::Product) {
+            $product = Product::withoutWorkspaceScope()->find($targetId);
+
+            if ($product === null) {
+                throw TargetNotFoundException::product($targetId);
+            }
+
+            if ($product->workspace_id !== $workspaceId) {
+                throw TargetWorkspaceMismatchException::product(
+                    (int) $targetId,
+                    $workspaceId,
+                    (string) $product->workspace_id,
+                );
+            }
+
+            return $product;
+        }
+
+        if ($targetType === FieldObjectType::ProductVariant) {
+            $variant = ProductVariant::withoutWorkspaceScope()->find($targetId);
+
+            if ($variant === null) {
+                throw TargetNotFoundException::variant($targetId);
+            }
+
+            if ($variant->workspace_id !== $workspaceId) {
+                throw TargetWorkspaceMismatchException::variant(
+                    (int) $targetId,
+                    $workspaceId,
+                    (string) $variant->workspace_id,
+                );
+            }
+
+            return $variant;
+        }
+
+        // Customer is intentionally not supported in GAP-028A (Product/Variant only).
+        throw new \LogicException("Unsupported target type {$targetType->value} for GAP-028A writer.");
+    }
+
+    private function assertDataTypeSupported(FieldDefinition $definition): void
+    {
+        $type = $definition->data_type;
+
+        $supported = in_array($type, [
+            AttributeDataType::Text,
+            AttributeDataType::LongText,
+            AttributeDataType::Select,
+        ], true);
+
+        if (! $supported) {
+            throw UnsupportedFieldDataTypeException::forType($type, $definition->id);
+        }
+
+        if ($definition->is_multi_value) {
+            throw MultiValueNotSupportedException::forDefinition($definition->id);
+        }
+    }
+
+    private function assertLocalizationContract(FieldDefinition $definition, ?string $locale): void
+    {
+        if ($definition->is_localizable) {
+            if ($locale === null || $locale === '') {
+                throw LocalizationContractViolationException::localeRequiredForLocalizable($definition->id);
+            }
+
+            if (! $this->isValidLocale($locale)) {
+                throw LocalizationContractViolationException::invalidLocale($locale);
+            }
+        } else {
+            if ($locale !== null && $locale !== '') {
+                throw LocalizationContractViolationException::localeForbiddenForNonLocalizable($definition->id);
+            }
+        }
+    }
+
+    private function isValidLocale(string $locale): bool
+    {
+        // Pragmatic BCP-47 shape check; do not pull Intl to keep writer zero-dep.
+        // We accept the conventional pattern used in Laravel app locale + region,
+        // e.g. "uk", "en", "en-US", "uk-UA", "pt-BR". We do NOT require that the
+        // tag be installed — the writer is storage-only and language-policy-agnostic.
+        return (bool) preg_match('/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/', $locale);
+    }
+
+    // ------------------------------------------------------------------
+    // Mutation with bounded retry (absent-slot create race)
+    // ------------------------------------------------------------------
+
+    /**
+     * @param  array{
+     *   workspace_id: string,
+     *   target: Product|ProductVariant,
+     *   target_type: FieldObjectType,
+     *   binding: FieldBinding,
+     *   definition: FieldDefinition
+     * }  $context
+     */
+    private function mutateWithRetry(
+        array $context,
+        string $operation,
+        mixed $value,
+        ?string $locale,
+    ): FieldValueWriteResult {
+        $modelClass = $this->valueModelFor($context['target_type']);
+        $entityColumn = $this->entityColumnFor($context['target_type']);
+        $entityId = (int) $context['target']->getKey();
+        $workspaceId = $context['workspace_id'];
+        $binding = $context['binding'];
+        $definition = $context['definition'];
+
+        for ($attempt = 1; $attempt <= self::ABSENT_SLOT_CREATE_RETRY_LIMIT; $attempt++) {
+            try {
+                return DB::transaction(function () use (
+                    $modelClass,
+                    $entityColumn,
+                    $entityId,
+                    $workspaceId,
+                    $binding,
+                    $definition,
+                    $operation,
+                    $value,
+                    $locale,
+                ): FieldValueWriteResult {
+                    $slot = $modelClass::withoutWorkspaceScope()
+                        ->where($entityColumn, $entityId)
+                        ->where('field_binding_id', $binding->id)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($operation === 'set') {
+                        return $this->applySet(
+                            modelClass: $modelClass,
+                            entityColumn: $entityColumn,
+                            entityId: $entityId,
+                            workspaceId: $workspaceId,
+                            binding: $binding,
+                            definition: $definition,
+                            slot: $slot,
+                            value: $value,
+                            locale: $locale,
+                        );
+                    }
+
+                    return $this->applyClear(
+                        modelClass: $modelClass,
+                        entityColumn: $entityColumn,
+                        entityId: $entityId,
+                        workspaceId: $workspaceId,
+                        binding: $binding,
+                        definition: $definition,
+                        slot: $slot,
+                        locale: $locale,
+                    );
+                });
+            } catch (UniqueConstraintViolationException) {
+                // Lost the absent-slot create race. The transaction has already
+                // rolled back (DB::transaction() handles that for any escaped
+                // exception). Retry the entire operation: a fresh transaction
+                // will lockForUpdate the now-existing row.
+                if ($attempt >= self::ABSENT_SLOT_CREATE_RETRY_LIMIT) {
+                    throw $this->exhaustedRetryMarker($entityColumn, $entityId, (string) $binding->id);
+                }
+
+                continue;
+            }
+        }
+
+        // Unreachable; the loop either returns or throws.
+        throw new \LogicException('mutateWithRetry exited without returning or throwing.');
+    }
+
+    private function exhaustedRetryMarker(string $entityColumn, int $entityId, string $fieldBindingId): \RuntimeException
+    {
+        return new \RuntimeException(
+            'GovernedDynamicFieldValueWriter exhausted absent-slot create retries for '
+            ."{$entityColumn}={$entityId} binding={$fieldBindingId}."
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // Per-operation application (Set / Clear)
+    // ------------------------------------------------------------------
+
+    private function applySet(
+        string $modelClass,
+        string $entityColumn,
+        int $entityId,
+        string $workspaceId,
+        FieldBinding $binding,
+        FieldDefinition $definition,
+        mixed $slot,
+        mixed $value,
+        ?string $locale,
+    ): FieldValueWriteResult {
+        $isLocalizable = (bool) $definition->is_localizable;
+        $type = $definition->data_type;
+
+        if ($isLocalizable) {
+            // Localizable → value_jsonb[locale] only; preserve all other locales.
+            $existingMap = $this->readLocalizedMap($slot, $definition->id);
+
+            $newMap = $existingMap;
+            $newMap[$locale] = $this->normalizePayloadForType($type, $value, $definition);
+
+            // NoOp: same locale payload already present and equal.
+            if (array_key_exists($locale, $existingMap)
+                && $existingMap[$locale] === $newMap[$locale]
+                && count($existingMap) === count($newMap)) {
+                return new FieldValueWriteResult(FieldValueWriteResult::NoOp, (string) $binding->id);
+            }
+
+            $payload = [
+                $entityColumn => $entityId,
+                'field_binding_id' => $binding->id,
+                'workspace_id' => $workspaceId,
+                'value_jsonb' => $newMap,
+                'value_text' => null,
+                'value_num' => null,
+            ];
+
+            return $this->upsertCanonical(
+                modelClass: $modelClass,
+                entityColumn: $entityColumn,
+                entityId: $entityId,
+                binding: $binding,
+                payload: $payload,
+                slot: $slot,
+            );
+        }
+
+        // Non-localizable → value_text only.
+        $normalized = $this->normalizePayloadForType($type, $value, $definition);
+
+        // NoOp: same text already present on the row.
+        if ($slot !== null && (string) $slot->value_text === (string) $normalized) {
+            return new FieldValueWriteResult(FieldValueWriteResult::NoOp, (string) $binding->id);
+        }
+
+        $payload = [
+            $entityColumn => $entityId,
+            'field_binding_id' => $binding->id,
+            'workspace_id' => $workspaceId,
+            'value_text' => (string) $normalized,
+            'value_num' => null,
+            'value_jsonb' => null,
+        ];
+
+        return $this->upsertCanonical(
+            modelClass: $modelClass,
+            entityColumn: $entityColumn,
+            entityId: $entityId,
+            binding: $binding,
+            payload: $payload,
+            slot: $slot,
+        );
+    }
+
+    private function applyClear(
+        string $modelClass,
+        string $entityColumn,
+        int $entityId,
+        string $workspaceId,
+        FieldBinding $binding,
+        FieldDefinition $definition,
+        mixed $slot,
+        ?string $locale,
+    ): FieldValueWriteResult {
+        $isLocalizable = (bool) $definition->is_localizable;
+
+        if (! $isLocalizable) {
+            if ($slot === null) {
+                return new FieldValueWriteResult(FieldValueWriteResult::NoOp, (string) $binding->id);
+            }
+
+            // Non-localizable Clear → delete row.
+            $slot->delete();
+
+            return new FieldValueWriteResult(FieldValueWriteResult::Deleted, (string) $binding->id);
+        }
+
+        // Localizable Clear removes only that locale; final-locale clear deletes the row.
+        if ($slot === null) {
+            return new FieldValueWriteResult(FieldValueWriteResult::NoOp, (string) $binding->id);
+        }
+
+        $existingMap = $this->readLocalizedMap($slot, $definition->id);
+
+        if (! array_key_exists($locale, $existingMap)) {
+            return new FieldValueWriteResult(FieldValueWriteResult::NoOp, (string) $binding->id);
+        }
+
+        unset($existingMap[$locale]);
+
+        if ($existingMap === []) {
+            $slot->delete();
+
+            return new FieldValueWriteResult(FieldValueWriteResult::Deleted, (string) $binding->id);
+        }
+
+        $slot->value_jsonb = $existingMap;
+        $slot->value_text = null;
+        $slot->value_num = null;
+        $slot->save();
+
+        return new FieldValueWriteResult(FieldValueWriteResult::Updated, (string) $binding->id);
+    }
+
+    /**
+     * Canonicalize a fresh or updated slot row, choosing Created vs Updated.
+     * Slot may be null (absent). Lets UniqueConstraintViolationException
+     * escape so the bounded retry in mutateWithRetry() can drive a fresh
+     * transaction that locks the now-existing row.
+     */
+    private function upsertCanonical(
+        string $modelClass,
+        string $entityColumn,
+        int $entityId,
+        FieldBinding $binding,
+        array $payload,
+        mixed $slot,
+    ): FieldValueWriteResult {
+        if ($slot === null) {
+            $modelClass::withoutWorkspaceScope()->create($payload);
+
+            return new FieldValueWriteResult(FieldValueWriteResult::Created, (string) $binding->id);
+        }
+
+        $slot->fill($payload);
+        $slot->save();
+
+        return new FieldValueWriteResult(FieldValueWriteResult::Updated, (string) $binding->id);
+    }
+
+    // ------------------------------------------------------------------
+    // Localized-map canonical read
+    // ------------------------------------------------------------------
+
+    /**
+     * @return array<string, string>
+     */
+    private function readLocalizedMap(mixed $slot, string $fieldDefinitionId): array
+    {
+        if ($slot === null) {
+            return [];
+        }
+
+        $raw = $slot->value_jsonb;
+
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+        } elseif (is_array($raw)) {
+            $decoded = $raw;
+        } else {
+            throw LocalizationContractViolationException::corruptLocalizedStorage($fieldDefinitionId);
+        }
+
+        if (! is_array($decoded)) {
+            throw LocalizationContractViolationException::corruptLocalizedStorage($fieldDefinitionId);
+        }
+
+        $map = [];
+
+        foreach ($decoded as $key => $value) {
+            if (! is_string($key) || ! is_string($value)) {
+                throw LocalizationContractViolationException::corruptLocalizedStorage($fieldDefinitionId);
+            }
+
+            $map[$key] = $value;
+        }
+
+        return $map;
+    }
+
+    // ------------------------------------------------------------------
+    // Payload normalization
+    // ------------------------------------------------------------------
+
+    private function normalizePayloadForType(
+        AttributeDataType $type,
+        mixed $value,
+        FieldDefinition $definition,
+    ): string {
+        if (! is_string($value)) {
+            if ($type === AttributeDataType::Select) {
+                throw InvalidFieldValuePayloadException::nonStringSelectPayload();
+            }
+
+            throw InvalidFieldValuePayloadException::nonStringTextPayload();
+        }
+
+        if ($type === AttributeDataType::Select) {
+            $this->selectOptionValidator->assertOptionAllowed($definition, $value);
+        }
+
+        return $value;
+    }
+
+    // ------------------------------------------------------------------
+    // Target → model/column mapping
+    // ------------------------------------------------------------------
+
+    private function valueModelFor(FieldObjectType $targetType): string
+    {
+        return match ($targetType) {
+            FieldObjectType::Product => ProductFieldValue::class,
+            FieldObjectType::ProductVariant => VariantFieldValue::class,
+            default => throw new \LogicException("Unsupported target type {$targetType->value}."),
+        };
+    }
+
+    private function entityColumnFor(FieldObjectType $targetType): string
+    {
+        return match ($targetType) {
+            FieldObjectType::Product => 'product_id',
+            FieldObjectType::ProductVariant => 'variant_id',
+            default => throw new \LogicException("Unsupported target type {$targetType->value}."),
+        };
+    }
+}
