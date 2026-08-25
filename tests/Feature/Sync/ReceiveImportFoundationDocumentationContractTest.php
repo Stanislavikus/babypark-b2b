@@ -28,6 +28,46 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             '`direction`, `authority`, `import_enabled`, `export_enabled`, `master_system`, or `last_writer`',
             $this->domainModelContent,
         );
+        $this->assertStringContainsString(
+            'does **not** imply that the mapped field must execute in every enabled semantic operation',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Execution eligibility may differ by semantic operation, connector/runtime capability, domain ownership policy, operation-specific planner/transformation, and future verified per-operation configuration',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Independent per-operation mapping/configuration remains deferred until a verified product requirement exists',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_receive_contract_scope_is_connector_backed_sync_domain_only(): void
+    {
+        $this->assertStringContainsString(
+            'This contract governs connector-backed Receive through the Sync Domain (`ConnectorAccount` + `SyncConfiguration`) path',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_smart_import_and_csv_are_not_forced_through_connector_receive_semantics(): void
+    {
+        $this->assertStringContainsString(
+            'It does **not** redefine the separate Smart Import / spreadsheet / CSV onboarding flow',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'File/snapshot imports may reuse shared Product/Variant domain writers and Field Foundation invariants',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'do **not** automatically inherit `ExternalRecordLink`, ENTITY TRUST, live remote reread, or Magento entity-bound transport requirements',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'their own source identity, provenance, and staleness semantics remain governed by their own import architecture',
+            $this->domainModelContent,
+        );
     }
 
     public function test_no_mandatory_per_field_authority_introduced(): void
@@ -305,6 +345,10 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             'Receive / Import runtime | CONFIRMED ABSENT',
             $atlasContent,
         );
+        $this->assertStringContainsString(
+            'connector-backed Sync Domain Receive',
+            $atlasContent,
+        );
     }
 
     public function test_gap_028_is_field_value_writer_not_ownership(): void
@@ -330,6 +374,30 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             'ownership',
             $gap028,
             'GAP-028 must not be described as about ownership; it is about the missing governed field-value writer.',
+        );
+    }
+
+    public function test_gap_029_records_missing_column_backed_mutation_boundary(): void
+    {
+        $this->assertStringContainsString(
+            'GAP-029',
+            $this->gapsContent,
+        );
+        $this->assertStringContainsString(
+            'Missing governed Product/Variant column-backed mutation boundary',
+            $this->gapsContent,
+        );
+        $this->assertStringContainsString(
+            'Do **not** migrate column-backed fields into dynamic storage merely to reuse GAP-028',
+            $this->gapsContent,
+        );
+        $this->assertStringContainsString(
+            'explicit allowlist plus Product/Variant domain invariants',
+            $this->gapsContent,
+        );
+        $this->assertStringContainsString(
+            '`sku` remains excluded from first Receive',
+            $this->gapsContent,
         );
     }
 
@@ -404,6 +472,10 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             $this->domainModelContent,
         );
         $this->assertStringContainsString(
+            'currently **absent today**',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
             'Every column-backed field must be **explicitly admitted**',
             $this->domainModelContent,
         );
@@ -446,6 +518,28 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
         $this->assertStringContainsString(
             '**Relations / categories**',
             $this->domainModelContent,
+        );
+    }
+
+    public function test_field_mapping_has_no_import_export_persistence_requirement(): void
+    {
+        $migration = File::get(base_path('database/migrations/2026_08_12_110000_field_mappings.php'));
+
+        $this->assertStringNotContainsString('import_enabled', $migration);
+        $this->assertStringNotContainsString('export_enabled', $migration);
+    }
+
+    public function test_atlas_records_missing_column_backed_mutation_boundary(): void
+    {
+        $atlasContent = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
+
+        $this->assertStringContainsString(
+            'Governed Product/Variant column-backed mutation boundary | CONFIRMED ABSENT',
+            $atlasContent,
+        );
+        $this->assertStringContainsString(
+            'GAP-029',
+            $atlasContent,
         );
     }
 

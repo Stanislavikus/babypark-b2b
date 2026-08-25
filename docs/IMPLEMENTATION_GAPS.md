@@ -1733,6 +1733,31 @@ unblocked as the next sequenced task.
 
 **Status:** Open.
 
+## GAP-029 — Missing governed Product/Variant column-backed mutation boundary
+
+**Approved docs:**
+- `03-DOMAIN_MODEL.md`, Receive / Import Foundation Contract (Resolved): column-backed Product/Variant core fields are intentionally outside the GAP-028 dynamic writer and require the appropriate Product/Variant domain mutation boundary with an explicit Receive allowlist.
+
+**Current code:**
+- There is no reusable governed Product/Variant mutation boundary suitable for connector/import writes to column-backed core fields such as `products.name` or `products.description`.
+- Current Product editing relies on Filament resource form binding / default persistence, not a reusable governed ingestion boundary.
+- Broad connector/import mass assignment into Product/Variant models remains forbidden by the approved docs contract.
+
+**Impact:**
+- The first manual connector-backed Receive execution slice cannot safely apply admitted column-backed Product/Variant fields because no reusable allowlisted Product/Variant domain mutation boundary exists yet.
+- The missing boundary is reusable for connector Receive and other ingestion paths where appropriate, but those other ingestion paths retain their own source identity/provenance/staleness semantics.
+
+**Decision:**
+- Do **not** migrate column-backed fields into dynamic storage merely to reuse GAP-028.
+- Future implementation must use an explicit allowlist plus Product/Variant domain invariants.
+- Do **not** implement broad connector mass assignment.
+- `sku` remains excluded from first Receive.
+- Pricing, Availability, Media, and Relations remain outside this boundary.
+
+**Next task:** Implement the governed Product/Variant column-backed mutation boundary for admitted core fields.
+
+**Status:** Open.
+
 ## Pending Minor Documentation Fixes
 
 Small, low-effort textual corrections identified during review but not

@@ -4442,7 +4442,7 @@ service, and relation cross-workspace rejection.
 
 **Status:** Approved normative Receive / Import architecture.
 
-This contract defines the structural boundaries for receiving data from an external system.
+This contract governs connector-backed Receive through the Sync Domain (`ConnectorAccount` + `SyncConfiguration`) path. It does **not** redefine the separate Smart Import / spreadsheet / CSV onboarding flow. File/snapshot imports may reuse shared Product/Variant domain writers and Field Foundation invariants, but they do **not** automatically inherit `ExternalRecordLink`, ENTITY TRUST, live remote reread, or Magento entity-bound transport requirements; their own source identity, provenance, and staleness semantics remain governed by their own import architecture.
 
 ### 1. Existing Sync Architecture Remains Intact
 `SyncConfiguration` identity is exactly:
@@ -4457,6 +4457,7 @@ Enabled semantic operations (`import`, `export`, or both) are **configuration st
 
 ### 2. FieldMapping is Direction-Neutral
 `FieldMapping` represents **semantic correspondence** between an internal target and an external logical identity. It is not an execution plan, field ownership record, data authority, Import-only mapping, Export-only mapping, or a reversible transformation. It possesses no `direction`, `authority`, `import_enabled`, `export_enabled`, `master_system`, or `last_writer` attributes. Import and Export use the same semantic correspondence but follow different execution pipelines.
+The existence of a direction-neutral `FieldMapping` does **not** imply that the mapped field must execute in every enabled semantic operation. Execution eligibility may differ by semantic operation, connector/runtime capability, domain ownership policy, operation-specific planner/transformation, and future verified per-operation configuration. Independent per-operation mapping/configuration remains deferred until a verified product requirement exists (see Sync Domain Rebaseline historical/deferred notes).
 
 ### 3. Receive is Not Export Reversed
 Export translates `FieldMapping` into platform execution input, then into a connector semantic planner, desired external state, and finally the Safe Sync external mutation boundary.
@@ -4492,7 +4493,7 @@ It may handle only ordinary values whose invariants belong entirely to Field Dic
 
 **7.2 Column-backed route — `storage_type = column`**
 Target: Product/Variant column-backed core fields (e.g. typed `products` / `product_variants` columns).
-Boundary: the appropriate Product/Variant domain mutation boundary, with an explicit Receive allowlist. Invariants:
+Boundary: the appropriate Product/Variant domain mutation boundary, with an explicit Receive allowlist (currently **absent today** — see `docs/IMPLEMENTATION_GAPS.md` → GAP-029). This contract does **not** propose migrating column-backed core fields into dynamic storage merely to reuse §7.1. Invariants:
 - Column-backed values **MUST NOT** go through the generic dynamic field-value writer in §7.1.
 - Storage path alone does not grant write capability.
 - Every column-backed field must be **explicitly admitted** based on its domain semantics (its routing is not implied by its column location).
@@ -4507,7 +4508,7 @@ Boundary: the appropriate Product/Variant domain mutation boundary, with an expl
 - **Relations / categories** — relation-owning domain services.
 - **Connector-owned metadata** — Magento `entity_id`, `attribute_set_id`, structural execution metadata, etc.
 
-This routing contract is connector-independent. See `docs/IMPLEMENTATION_GAPS.md` → GAP-028.
+This routing contract is connector-independent. See `docs/IMPLEMENTATION_GAPS.md` → GAP-028 and GAP-029.
 
 ### 8. Receive Proposal/Diff is Not SyncRun Preview
 A per-item or per-operation Receive proposal is short-lived, server-authoritative, and transient. It is not execution history, authorization, identity, or ENTITY TRUST, and is not persisted in `sync_runs` / `sync_run_items`. It reuses the existing opaque server-side flow pattern rather than a new persisted entity.
