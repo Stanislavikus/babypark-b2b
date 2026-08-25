@@ -6725,9 +6725,10 @@ without separate explicit approval.
 Safe Sync runtime contract after Magento primary-source research and
 Security/Concurrency arbitration. The original contract landed as a
 **docs-only** slice. Current repository status now includes the standalone
-Magento Safe Sync read foundation and an isolated entity-bound simple Product
-WRITE primitive that is not consumed by Live runtime. Live support remains
-**false**; no real-target validation harness execution or deployment has
+Magento Safe Sync read foundation, an isolated entity-bound simple Product
+WRITE primitive that is not consumed by Live runtime, and an internal
+validation-only disposable validation harness. Live support remains **false**;
+no real-target validation harness execution/certification or deployment has
 occurred.
 
 #### First-party Magento Safe Sync component (frozen)
@@ -7139,7 +7140,7 @@ required Stage 3E evidence exists:
 | 3C | **Done (internal)** — existing-parent link identity clarified |
 | 3D | **Done (internal)** |
 | 3E docs contract | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen |
-| 3E runtime + validation | **Pending** — isolated simple Product WRITE foundation shipped internally; runtime consumption + real target validation **NOT YET EXECUTED** |
+| 3E runtime + validation | **Partially implemented (internal; validation-only)** — isolated simple Product WRITE foundation and disposable validation harness shipped internally; real-target certification **NOT YET EXECUTED**; Live consumption remains pending |
 | Adobe Products/Export/Live | **FALSE** |
 | Merchant consequential Live | **NOT EXPOSED** |
 | Deployment | **NOT PERFORMED** |
@@ -7153,8 +7154,10 @@ post-PR #168 RED research findings and the exact pre-certification sequence
 that follow the isolated entity-bound simple Product WRITE foundation landing
 internally. **This is documentation only.** No runtime PHP under `app/` or
 under `integrations/magento-safe-sync/` was modified. No `composer.json`
-change was made. No validation harness was implemented. Live was not enabled.
-No new broad Stage 3F was created. This is an additive Stage 3E certification
+change was made. The disposable validation harness is now implemented
+separately as a validation-only Laravel control plane, but no real-target
+validation execution/certification occurred and Live was not enabled. No new
+broad Stage 3F was created. This is an additive Stage 3E certification
 amendment layered on top of the
 [Stage 3E Stop-and-Amend](#stage-3e-stop-and-amend--magento-ownership-and-entity-bound-safe-sync-runtime-contract)
 section above.
@@ -7410,7 +7413,7 @@ point for the `support = true` flip.
 | Stage 3E-R1 internal read foundation | **Implemented (internal; support false)** |
 | Isolated entity-bound simple Product WRITE foundation | **Implemented (internal; not consumed by Live; support false)** |
 | Bounded Safe Sync module correction (media-neutral Product write, connection reset / quarantine, narrowed Composer envelope) | **Implemented (internal; not real-target certified)** — Decision 9 step 2 runtime landed; real-target certification remains pending |
-| Disposable validation harness | **Pending** — Decision 9 step 3 |
+| Disposable validation harness | **Implemented (internal; validation-only)** — Decision 9 step 3 landed; no real-target certification executed in this PR |
 | Isolated simple writer real-target certification (2.4.9 / 8.5; 2.4.9 / 8.4; 2.4.8-p5 / 8.4) | **Pending** — Decision 9 step 4 |
 | Content Staging / Galera / entity-bound lifecycle / configurable / media proofs | **Pending** — Decision 9 steps 5–9 |
 | `ConnectorLiveRuntimeReadiness` integration | **Pending** — Decision 9 step 10 |

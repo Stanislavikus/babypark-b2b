@@ -29,9 +29,10 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('docs-only', $section);
         $this->assertStringContainsString('isolated entity-bound simple Product', $section);
         $this->assertStringContainsString('not consumed by Live runtime', $section);
+        $this->assertStringContainsString('validation-only disposable validation harness', $section);
         $this->assertStringContainsString('**Implemented in Stage 3E-R2a.**', $section);
         $this->assertStringContainsString('Adobe Products/Export/Live | **FALSE**', $section);
-        $this->assertStringContainsString('no real-target validation harness execution or deployment has', $section);
+        $this->assertStringContainsString('no real-target validation harness execution/certification or deployment has', $section);
     }
 
     #[Test]
@@ -195,7 +196,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $section = $this->stage3eContractSection();
 
         $this->assertStringContainsString('3E docs contract | **Done (docs contract)**', $section);
-        $this->assertStringContainsString('3E runtime + validation | **Pending** — isolated simple Product WRITE foundation shipped internally', $section);
+        $this->assertStringContainsString('3E runtime + validation | **Partially implemented (internal; validation-only)**', $section);
         $this->assertStringContainsString('Adobe Products/Export/Live | **FALSE**', $section);
         $this->assertStringContainsString('No Stage 3F', $section);
     }
@@ -275,9 +276,9 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('[Resolved — Stage 3E post-#168 docs amendment]', $content);
         $this->assertStringContainsString('No runtime PHP under `app/` or', $content);
         $this->assertStringContainsString('No `composer.json`', $content);
-        $this->assertStringContainsString('No validation harness was implemented', $content);
+        $this->assertStringContainsString('validation-only Laravel control plane', $content);
         $this->assertStringContainsString('Live was not enabled', $content);
-        $this->assertStringContainsString('No new broad Stage 3F was created', $content);
+        $this->assertStringContainsString('broad Stage 3F was created', $content);
     }
 
     #[Test]
@@ -482,6 +483,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('#### Post-#168 status after this docs amendment', $section);
         $this->assertStringContainsString('| Stage 3E post-#168 certification amendment | **Done (docs only)** — 9 decisions recorded; no runtime change |', $section);
+        $this->assertStringContainsString('| Disposable validation harness | **Implemented (internal; validation-only)** — Decision 9 step 3 landed; no real-target certification executed in this PR |', $section);
         $this->assertStringContainsString('| Adobe Products / Export / Live | **FALSE** |', $section);
         $this->assertStringContainsString('| Merchant consequential Live | **NOT EXPOSED** |', $section);
         $this->assertStringContainsString('| Deployment | **NOT PERFORMED** |', $section);
@@ -494,6 +496,8 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('Stage 3E Post-#168 Real-Target Certification Amendment (9 decisions + dormant discrepancies table) layered on top', $atlas);
         $this->assertStringContainsString('IMPLEMENTED (internal; support false; not consumed by Live; not real-target certified)', $atlas);
+        $this->assertStringContainsString('Stage 3E disposable validation harness', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED (internal; validation-only; support false; no real-target certification executed)', $atlas);
         $this->assertStringContainsString('not consumed by Live', $atlas);
         $this->assertStringContainsString('stops fail-closed at `entity_bound_mutation_bridge_required`', $atlas);
         $this->assertStringContainsString('zero consequential Product write', $atlas);
@@ -512,10 +516,10 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('**Stage 3E Post-#168 Real-Target Certification Amendment (docs only) is recorded**', $gaps);
         $this->assertStringContainsString('9 decisions (current state, media-neutral Product save, connection quarantine,', $gaps);
         $this->assertStringContainsString('a `Code-vs-docs dormant discrepancies` table', $gaps);
-        $this->assertStringContainsString('no runtime PHP change', $gaps);
         $this->assertStringContainsString('no `integrations/magento-safe-sync` runtime change', $gaps);
         $this->assertStringContainsString('no `composer.json` change', $gaps);
-        $this->assertStringContainsString('no validation harness', $gaps);
+        $this->assertStringContainsString('validation-only Laravel control plane', $gaps);
+        $this->assertStringContainsString('no real-target validation harness execution/certification in this PR', $gaps);
         $this->assertStringContainsString('no Live enablement', $gaps);
         $this->assertStringContainsString('no deployment', $gaps);
     }
