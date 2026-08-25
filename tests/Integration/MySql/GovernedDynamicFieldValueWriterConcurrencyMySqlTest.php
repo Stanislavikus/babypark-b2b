@@ -147,7 +147,13 @@ class GovernedDynamicFieldValueWriterConcurrencyMySqlTest extends TestCase
         $row = $rows->sole();
         $this->assertNull($row->value_text);
         $this->assertNull($row->value_num);
-        $this->assertSame(['uk' => 'Укр', 'en' => 'En'], $row->value_jsonb);
+        $this->assertIsArray($row->value_jsonb);
+        $this->assertCount(2, $row->value_jsonb);
+        $this->assertSame('Укр', $row->value_jsonb['uk'] ?? null);
+        $this->assertSame('En', $row->value_jsonb['en'] ?? null);
+        $locales = array_keys($row->value_jsonb);
+        sort($locales);
+        $this->assertSame(['en', 'uk'], $locales);
         $this->assertSame([true, true], array_column($results, 'ok'));
     }
 
