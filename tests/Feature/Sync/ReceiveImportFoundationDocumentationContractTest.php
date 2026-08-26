@@ -106,10 +106,10 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
         );
     }
 
-    public function test_gap_028a_writer_is_partially_implemented_today(): void
+    public function test_gap_028_writer_is_closed_for_supported_generic_dynamic_types(): void
     {
         $this->assertStringContainsString(
-            'GAP-028A is **partially implemented** today as the current governed boundary for ordinary dynamic `Text`, `LongText`, and single-value `Select` fields',
+            'GAP-028 is implemented today as the current governed boundary for ordinary dynamic `Text`, `LongText`, `Number`, `Decimal`, `Boolean`, `Date`, single-value `Select`, `MultiSelect`, and `Url` fields',
             $this->domainModelContent,
         );
         $this->assertStringContainsString(
@@ -117,19 +117,15 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             $this->domainModelContent,
         );
         $this->assertStringContainsString(
-            'Current generic GAP-028A scope: `Text`, `LongText`, single-value `Select`.',
+            'Current generic GAP-028 scope: `Text`, `LongText`, `Number`, `Decimal`, `Boolean`, `Date`, single-value `Select`, `MultiSelect`, `Url`.',
             $this->domainModelContent,
         );
         $this->assertStringContainsString(
-            'Remaining generic GAP-028 typed extension: `Number`, `Decimal`, `Boolean`, `Date`, `MultiSelect`, `Url`.',
+            'GAP-028 is **Closed**.',
             $this->domainModelContent,
         );
         $this->assertStringContainsString(
-            'GAP-028 is **not Closed**.',
-            $this->domainModelContent,
-        );
-        $this->assertStringContainsString(
-            '**Status:** Partially implemented.',
+            '**Status:** Closed.',
             $this->gapsContent,
         );
         $this->assertStringContainsString(
@@ -139,6 +135,10 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
         $this->assertStringContainsString(
             '`Money`, `Image`, and `Computed` are **not** part of the generic GAP-028 follow-up typed extension',
             $this->gapsContent,
+        );
+        $this->assertStringContainsString(
+            'GAP-029 remains the separate open column-backed mutation gap.',
+            File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md')),
         );
     }
 

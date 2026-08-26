@@ -2,6 +2,8 @@
 
 namespace App\Services\Fields\Exceptions;
 
+use App\Enums\AttributeDataType;
+
 final class LocalizationContractViolationException extends FieldValueWriterException
 {
     public static function localeRequiredForLocalizable(string $fieldDefinitionId): self
@@ -29,6 +31,13 @@ final class LocalizationContractViolationException extends FieldValueWriterExcep
     {
         return new self(
             "Field definition {$fieldDefinitionId} is configured as localizable Select, which is not supported by the GAP-028A writer."
+        );
+    }
+
+    public static function nonTextLocalizableNotSupported(string $fieldDefinitionId, AttributeDataType $type): self
+    {
+        return new self(
+            "Field definition {$fieldDefinitionId} declares data type {$type->value}, which must not be localizable in the governed dynamic writer."
         );
     }
 }

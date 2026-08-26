@@ -9,7 +9,7 @@ final class UnsupportedFieldValidationRulesException extends FieldValueWriterExc
     public static function forDefinition(AttributeDataType $type, string $fieldDefinitionId): self
     {
         return new self(
-            "Field definition {$fieldDefinitionId} declares validation_rules that are not supported by the GAP-028A writer for data type {$type->value}."
+            "Field definition {$fieldDefinitionId} declares validation_rules that are not supported by the governed dynamic field-value writer for data type {$type->value}."
         );
     }
 }
