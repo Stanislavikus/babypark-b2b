@@ -4496,12 +4496,21 @@ Current generic GAP-028 scope: `Text`, `LongText`, `Number`, `Decimal`, `Boolean
 
 **7.2 Column-backed route — `storage_type = column`**
 Target: Product/Variant column-backed core fields (e.g. typed `products` / `product_variants` columns).
-Boundary: the appropriate Product/Variant domain mutation boundary, with an explicit Receive allowlist (currently **absent today** — see `docs/IMPLEMENTATION_GAPS.md` → GAP-029). This contract does **not** propose migrating column-backed core fields into dynamic storage merely to reuse §7.1. Invariants:
+Boundary: `app/Services/Catalog/GovernedProductVariantColumnMutationService.php`, the appropriate Product/Variant domain mutation boundary with an explicit Receive allowlist, closed under GAP-029. This contract does **not** propose migrating column-backed core fields into dynamic storage merely to reuse §7.1. Invariants:
 - Column-backed values **MUST NOT** go through the generic dynamic field-value writer in §7.1.
+- `storage_type = column` is never sufficient authority.
 - Storage path alone does not grant write capability.
+- Mutation authority requires the full canonical metadata tuple: `FieldDefinition` code, scope, workspace ownership, declared data type, active status, `is_localizable`, `is_multi_value`, supported validation-rules shape, plus `FieldBinding` workspace ownership, object type, storage type, storage path, and active status.
 - Every column-backed field must be **explicitly admitted** based on its domain semantics (its routing is not implied by its column location).
 - Connector code MUST NOT use broad `fill()`, mass assignment, or arbitrary `Model::update()` with remotely supplied values.
+- First explicit allowlist: Product `name` and Product `description` only.
+- Product `name` is admitted only for the canonical global/global System `FieldDefinition` / `FieldBinding` tuple bound to `products.name`; Set requires a PHP string, rejects `null`, empty string, and whitespace-only string, preserves the exact string, rejects physically oversized payloads, and `clear()` is forbidden.
+- Product `description` is admitted only for the canonical global/global System `FieldDefinition` / `FieldBinding` tuple bound to `products.description`; Set requires a PHP string, rejects `null`, preserves the exact string including `''`, rejects physically oversized payloads, and `clear()` sets `NULL`.
+- All other current and future column-backed fields remain fail-closed until separately admitted, including `sku`, `gtin`, status / lifecycle, `brand`, `url`, `merchant_type`, `net_weight`, `gross_weight`, `volume_m3`, `internal_product_id`, pricing, availability, media, relations, and connector metadata.
 - `sku` is **NOT** Receive-writable in the first slice. SKU remains an identity/addressing precondition, not an incoming mutable field.
+- Product lifecycle status remains excluded from this first boundary; the interim two-state `products.is_active` representation must not be frozen as generic Receive lifecycle semantics.
+
+GAP-029 is **Closed**.
 
 **7.3 Out of both routes (always routed to domain owners)**
 
