@@ -725,6 +725,74 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
     }
 
     #[Test]
+    public function supported_mapping_mutation_after_http_and_before_issuance_invalidates_build(): void
+    {
+        $account = $this->createConnectorAccount($this->workspace);
+        $configuration = $this->createReceiveConfiguration($account);
+        [$product] = $this->createProductWithVariant($this->workspace, 'Local', 'SKU-FINAL-REV');
+        $this->createCanonicalNameMapping($account, $configuration);
+        $actor = $this->createWorkspaceActor($this->workspace);
+
+        ExternalRecordLink::withoutWorkspaceScope()->create(
+            $this->merchantConfirmedParentLinkAttributes(
+                $this->workspace,
+                $account->id,
+                $product,
+                'SKU-FINAL-REV',
+                '811',
+                $actor,
+            ),
+        );
+
+        $this->bindSafeSyncTransport(
+            fn (): ConnectorHttpResult => $this->verifiedProductResponse(811, 'SKU-FINAL-REV', 'Remote'),
+        );
+
+        $retrievalCount = 0;
+        $triggered = false;
+        $dispatcher = Product::getEventDispatcher();
+
+        Product::retrieved(function (Product $retrieved) use (&$retrievalCount, &$triggered, $product, $account, $configuration): void {
+            if ((string) $retrieved->id !== (string) $product->id) {
+                return;
+            }
+
+            $retrievalCount++;
+
+            if ($retrievalCount !== 2 || $triggered) {
+                return;
+            }
+
+            $triggered = true;
+            $this->publishAuthoritativeSnapshot($account, ['name', 'description']);
+
+            app(FieldMappingMutationService::class)->confirm(
+                $account,
+                $configuration->id,
+                $this->productBinding('description')->id,
+                'description',
+            );
+        });
+
+        try {
+            app(AdobeProductReceiveProposalService::class)->build(
+                actorUserId: $actor->user_id,
+                workspaceId: $this->workspace->id,
+                connectorAccountId: $account->id,
+                targetType: FieldObjectType::Product,
+                targetId: $product->id,
+            );
+            $this->fail('Expected configuration changed failure.');
+        } catch (AdobeProductReceiveProposalException $exception) {
+            $this->assertTrue($triggered);
+            $this->assertSame('receive_configuration_changed', $exception->reasonCode);
+        } finally {
+            Product::flushEventListeners();
+            Product::setEventDispatcher($dispatcher);
+        }
+    }
+
+    #[Test]
     public function target_workspace_and_relation_validation_fail_before_or_after_http_as_required(): void
     {
         $foreignWorkspace = Workspace::query()->create([

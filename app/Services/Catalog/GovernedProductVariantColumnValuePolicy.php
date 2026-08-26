@@ -2,6 +2,7 @@
 
 namespace App\Services\Catalog;
 
+use App\Exceptions\Catalog\ColumnFieldNotAllowlistedException;
 use App\Exceptions\Catalog\InvalidColumnFieldValueException;
 
 final class GovernedProductVariantColumnValuePolicy
@@ -23,7 +24,7 @@ final class GovernedProductVariantColumnValuePolicy
         return match ($fieldCode) {
             'name' => $this->normalizeName($value),
             'description' => $this->normalizeDescription($value),
-            default => $value,
+            default => throw ColumnFieldNotAllowlistedException::forBinding('<unknown>', $fieldCode, null),
         };
     }
 

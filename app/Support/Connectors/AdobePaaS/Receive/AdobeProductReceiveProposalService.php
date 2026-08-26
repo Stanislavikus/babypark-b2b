@@ -138,10 +138,16 @@ final class AdobeProductReceiveProposalService
             ),
         ]);
 
+        $finalConfiguration = $this->revalidateConfiguration(
+            account: $account,
+            expectedConfigurationId: $configuration->id,
+            expectedRevision: $configurationRevision,
+        );
+
         $proposal = new ReceiveProposal(
             workspaceId: $workspaceId,
             connectorAccountId: $connectorAccountId,
-            syncConfigurationId: $revalidatedConfiguration->id,
+            syncConfigurationId: $finalConfiguration->id,
             configurationRevision: $configurationRevision,
             targetType: $targetType,
             targetId: $targetId,
@@ -154,7 +160,7 @@ final class AdobeProductReceiveProposalService
             actorUserId: $actorUserId,
             workspaceId: $workspaceId,
             connectorAccountId: $connectorAccountId,
-            syncConfigurationId: $revalidatedConfiguration->id,
+            syncConfigurationId: $finalConfiguration->id,
             targetType: $targetType,
             targetId: $targetId,
         );
