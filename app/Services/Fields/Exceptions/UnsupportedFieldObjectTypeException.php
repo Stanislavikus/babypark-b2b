@@ -9,7 +9,7 @@ final class UnsupportedFieldObjectTypeException extends FieldValueWriterExceptio
     public static function forType(FieldObjectType $type): self
     {
         return new self(
-            "Field object type {$type->value} is not supported by the GAP-028A writer. Supported target types in this slice: product, product_variant."
+            "Field object type {$type->value} is not supported by the governed dynamic field-value writer. Supported target types in this slice: product, product_variant."
         );
     }
 }

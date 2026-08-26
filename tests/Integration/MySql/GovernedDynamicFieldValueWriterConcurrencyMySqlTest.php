@@ -98,6 +98,54 @@ class GovernedDynamicFieldValueWriterConcurrencyMySqlTest extends TestCase
     }
 
     #[Test]
+    public function concurrent_absent_slot_number_sets_produce_exactly_one_logical_row_in_value_num(): void
+    {
+        $workspace = Workspace::query()->where('is_default', true)->firstOrFail();
+        $product = $this->makeProduct($workspace->id);
+        [, $binding] = $this->makeDynamicDefinitionAndBinding(
+            workspaceId: $workspace->id,
+            objectType: FieldObjectType::Product,
+            dataType: AttributeDataType::Number,
+            code: 'gap028b_number_concurrency',
+            isLocalizable: false,
+            validationRules: [],
+            isMultiValue: false,
+        );
+
+        $ipcDir = $this->makeIpcDir('absent-slot-number');
+
+        $processes = [];
+        foreach (['1', '2.5', '3.0000000', '4.125000'] as $payload) {
+            $processes[] = $this->startWorker(
+                'set',
+                $workspace->id,
+                FieldObjectType::Product->value,
+                $product->id,
+                $binding->id,
+                $payload,
+                null,
+                $ipcDir,
+            );
+        }
+
+        $results = $this->runWorkersAndCollectResults($processes, $ipcDir, 4);
+
+        $rows = ProductFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
+            ->where('product_id', $product->id)
+            ->where('field_binding_id', $binding->id)
+            ->get();
+
+        $this->assertCount(1, $rows, 'Expected exactly one logical row after concurrent absent-slot number Sets.');
+
+        $row = $rows->sole();
+        $this->assertNull($row->value_text);
+        $this->assertContains($row->value_num, ['1.000000', '2.500000', '3.000000', '4.125000']);
+        $this->assertNull($row->value_jsonb);
+        $this->assertSame([true, true, true, true], array_column($results, 'ok'));
+    }
+
+    #[Test]
     public function concurrent_localized_uk_and_en_sets_preserve_both_locales(): void
     {
         $workspace = Workspace::query()->where('is_default', true)->firstOrFail();
@@ -320,17 +368,40 @@ class GovernedDynamicFieldValueWriterConcurrencyMySqlTest extends TestCase
         bool $isLocalizable,
         string $code,
     ): array {
+        return $this->makeDynamicDefinitionAndBinding(
+            workspaceId: $workspaceId,
+            objectType: $objectType,
+            dataType: AttributeDataType::Text,
+            code: $code,
+            isLocalizable: $isLocalizable,
+            validationRules: [],
+            isMultiValue: false,
+        );
+    }
+
+    /**
+     * @return array{0: FieldDefinition, 1: FieldBinding}
+     */
+    private function makeDynamicDefinitionAndBinding(
+        string $workspaceId,
+        FieldObjectType $objectType,
+        AttributeDataType $dataType,
+        string $code,
+        bool $isLocalizable,
+        ?array $validationRules,
+        bool $isMultiValue,
+    ): array {
         $definition = FieldDefinition::withoutWorkspaceScope()->create([
             'id' => (string) Str::uuid(),
             'workspace_id' => null,
             'code' => $code,
-            'data_type' => AttributeDataType::Text,
+            'data_type' => $dataType,
             'scope' => AttributeScope::PlatformLibrary,
             'localized_labels' => ['uk' => $code],
             'description' => null,
-            'validation_rules' => [],
+            'validation_rules' => $validationRules,
             'is_localizable' => $isLocalizable,
-            'is_multi_value' => false,
+            'is_multi_value' => $isMultiValue,
             'status' => AttributeStatus::Active,
         ]);
 

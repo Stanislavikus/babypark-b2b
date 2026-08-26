@@ -696,6 +696,828 @@ class GovernedDynamicFieldValueWriterTest extends TestCase
     }
 
     // ---------------------------------------------------------------
+    // Number / Decimal
+    // ---------------------------------------------------------------
+
+    #[DataProvider('numericAcceptedPayloadProvider')]
+    public function test_set_numeric_types_accept_supported_payloads(
+        AttributeDataType $dataType,
+        int|string $payload,
+        string $expectedValueNum,
+    ): void {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'numeric_accept_'.$dataType->value.'_'.Str::lower(Str::random(6)),
+            dataType: $dataType,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $result = $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            $payload,
+        );
+
+        $this->assertSame(FieldValueWriteResult::Created, $result->status);
+
+        $row = VariantFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('variant_id', $this->variant->id)
+            ->where('field_binding_id', $binding->id)
+            ->sole();
+
+        $this->assertNull($row->value_text);
+        $this->assertSame($expectedValueNum, $row->value_num);
+        $this->assertNull($row->value_jsonb);
+    }
+
+    #[DataProvider('numericCanonicalNoOpProvider')]
+    public function test_set_numeric_types_treat_canonical_same_value_as_noop(
+        AttributeDataType $dataType,
+        string $initialPayload,
+        int|string $secondPayload,
+        string $expectedValueNum,
+    ): void {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'numeric_noop_'.$dataType->value.'_'.Str::lower(Str::random(6)),
+            dataType: $dataType,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            $initialPayload,
+        );
+
+        $rowBefore = VariantFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('variant_id', $this->variant->id)
+            ->where('field_binding_id', $binding->id)
+            ->sole();
+        $updatedAtBefore = $rowBefore->updated_at;
+
+        $result = $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            $secondPayload,
+        );
+
+        $this->assertSame(FieldValueWriteResult::NoOp, $result->status);
+
+        $rowAfter = VariantFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('variant_id', $this->variant->id)
+            ->where('field_binding_id', $binding->id)
+            ->sole();
+
+        $this->assertSame($expectedValueNum, $rowAfter->value_num);
+        $this->assertSame($updatedAtBefore->toAtomString(), $rowAfter->updated_at->toAtomString());
+        $this->assertNull($rowAfter->value_text);
+        $this->assertNull($rowAfter->value_jsonb);
+    }
+
+    #[DataProvider('numericTypeProvider')]
+    public function test_set_numeric_types_canonicalize_stale_other_payload_columns(AttributeDataType $dataType): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'numeric_stale_'.$dataType->value.'_'.Str::lower(Str::random(6)),
+            dataType: $dataType,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        VariantFieldValue::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'variant_id' => $this->variant->id,
+            'field_binding_id' => $binding->id,
+            'value_text' => 'stale',
+            'value_num' => '12.500000',
+            'value_jsonb' => ['legacy'],
+        ]);
+
+        $result = $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            '12.5',
+        );
+
+        $this->assertSame(FieldValueWriteResult::Updated, $result->status);
+
+        $row = VariantFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('variant_id', $this->variant->id)
+            ->where('field_binding_id', $binding->id)
+            ->sole();
+
+        $this->assertNull($row->value_text);
+        $this->assertSame('12.500000', $row->value_num);
+        $this->assertNull($row->value_jsonb);
+    }
+
+    #[DataProvider('numericTypeProvider')]
+    public function test_set_numeric_types_reject_float_payloads(AttributeDataType $dataType): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'numeric_float_'.$dataType->value.'_'.Str::lower(Str::random(6)),
+            dataType: $dataType,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $this->expectException(InvalidFieldValuePayloadException::class);
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            12.5,
+        );
+    }
+
+    #[DataProvider('numericTypeProvider')]
+    public function test_set_numeric_types_reject_exponent_notation(AttributeDataType $dataType): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'numeric_exp_'.$dataType->value.'_'.Str::lower(Str::random(6)),
+            dataType: $dataType,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $this->expectException(InvalidFieldValuePayloadException::class);
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            '1e3',
+        );
+    }
+
+    #[DataProvider('invalidNumericPayloadProvider')]
+    public function test_set_numeric_types_reject_invalid_numeric_strings(string $payload): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'numeric_invalid_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::Number,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $this->expectException(InvalidFieldValuePayloadException::class);
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            $payload,
+        );
+    }
+
+    #[DataProvider('numericTypeProvider')]
+    public function test_set_numeric_types_reject_excess_meaningful_scale_without_rounding(AttributeDataType $dataType): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'numeric_scale_'.$dataType->value.'_'.Str::lower(Str::random(6)),
+            dataType: $dataType,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $this->expectException(InvalidFieldValuePayloadException::class);
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            '1.1234567',
+        );
+    }
+
+    #[DataProvider('numericTypeProvider')]
+    public function test_set_numeric_types_reject_localizable_definitions(AttributeDataType $dataType): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'numeric_localizable_'.$dataType->value.'_'.Str::lower(Str::random(6)),
+            dataType: $dataType,
+            objectType: FieldObjectType::ProductVariant,
+            isLocalizable: true,
+        );
+
+        $this->expectException(LocalizationContractViolationException::class);
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            '12',
+            'uk',
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // Boolean
+    // ---------------------------------------------------------------
+
+    public function test_set_boolean_true_uses_value_num_only(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'boolean_true_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::Boolean,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $result = $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            true,
+        );
+
+        $this->assertSame(FieldValueWriteResult::Created, $result->status);
+
+        $row = VariantFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('variant_id', $this->variant->id)
+            ->where('field_binding_id', $binding->id)
+            ->sole();
+
+        $this->assertNull($row->value_text);
+        $this->assertSame('1.000000', $row->value_num);
+        $this->assertNull($row->value_jsonb);
+    }
+
+    public function test_set_boolean_false_uses_value_num_only(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'boolean_false_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::Boolean,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            false,
+        );
+
+        $row = VariantFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('variant_id', $this->variant->id)
+            ->where('field_binding_id', $binding->id)
+            ->sole();
+
+        $this->assertNull($row->value_text);
+        $this->assertSame('0.000000', $row->value_num);
+        $this->assertNull($row->value_jsonb);
+    }
+
+    #[DataProvider('invalidBooleanPayloadProvider')]
+    public function test_set_boolean_rejects_pseudo_boolean_payloads(mixed $payload): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'boolean_invalid_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::Boolean,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $this->expectException(InvalidFieldValuePayloadException::class);
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            $payload,
+        );
+    }
+
+    public function test_set_boolean_same_value_is_noop(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'boolean_noop_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::Boolean,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            true,
+        );
+
+        $result = $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            true,
+        );
+
+        $this->assertSame(FieldValueWriteResult::NoOp, $result->status);
+    }
+
+    public function test_set_boolean_canonicalizes_stale_payload_columns(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'boolean_stale_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::Boolean,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        VariantFieldValue::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'variant_id' => $this->variant->id,
+            'field_binding_id' => $binding->id,
+            'value_text' => 'true',
+            'value_num' => '1.000000',
+            'value_jsonb' => ['legacy' => true],
+        ]);
+
+        $result = $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            true,
+        );
+
+        $this->assertSame(FieldValueWriteResult::Updated, $result->status);
+
+        $row = VariantFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('variant_id', $this->variant->id)
+            ->where('field_binding_id', $binding->id)
+            ->sole();
+
+        $this->assertNull($row->value_text);
+        $this->assertSame('1.000000', $row->value_num);
+        $this->assertNull($row->value_jsonb);
+    }
+
+    // ---------------------------------------------------------------
+    // Date
+    // ---------------------------------------------------------------
+
+    public function test_set_date_stores_valid_date_in_value_text_only(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'date_valid_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::Date,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            '2026-08-26',
+        );
+
+        $row = VariantFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('variant_id', $this->variant->id)
+            ->where('field_binding_id', $binding->id)
+            ->sole();
+
+        $this->assertSame('2026-08-26', $row->value_text);
+        $this->assertNull($row->value_num);
+        $this->assertNull($row->value_jsonb);
+    }
+
+    public function test_set_date_allows_real_leap_day_and_rejects_invalid_leap_day(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'date_leap_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::Date,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            '2024-02-29',
+        );
+
+        $this->expectException(InvalidFieldValuePayloadException::class);
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            '2026-02-29',
+        );
+    }
+
+    #[DataProvider('invalidDatePayloadProvider')]
+    public function test_set_date_rejects_invalid_formats(string $payload): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'date_invalid_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::Date,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $this->expectException(InvalidFieldValuePayloadException::class);
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            $payload,
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // Url
+    // ---------------------------------------------------------------
+
+    #[DataProvider('validUrlProvider')]
+    public function test_set_url_accepts_valid_absolute_http_and_https_urls(string $payload): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'url_valid_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::Url,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            $payload,
+        );
+
+        $row = VariantFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('variant_id', $this->variant->id)
+            ->where('field_binding_id', $binding->id)
+            ->sole();
+
+        $this->assertSame($payload, $row->value_text);
+        $this->assertNull($row->value_num);
+        $this->assertNull($row->value_jsonb);
+    }
+
+    #[DataProvider('invalidUrlPayloadProvider')]
+    public function test_set_url_rejects_invalid_urls(mixed $payload): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'url_invalid_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::Url,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $this->expectException(InvalidFieldValuePayloadException::class);
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            $payload,
+        );
+    }
+
+    // ---------------------------------------------------------------
+    // MultiSelect
+    // ---------------------------------------------------------------
+
+    public function test_set_multiselect_stores_sorted_internal_option_codes_in_value_jsonb_only(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'multi_select_valid_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::MultiSelect,
+            objectType: FieldObjectType::ProductVariant,
+            isMultiValue: true,
+            validationRules: [
+                'options' => [
+                    ['code' => 'blue', 'labels' => ['uk' => 'Синій']],
+                    ['code' => 'pink', 'labels' => ['uk' => 'Рожевий']],
+                ],
+            ],
+        );
+
+        $result = $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            ['pink', 'blue'],
+        );
+
+        $this->assertSame(FieldValueWriteResult::Created, $result->status);
+
+        $row = VariantFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('variant_id', $this->variant->id)
+            ->where('field_binding_id', $binding->id)
+            ->sole();
+
+        $this->assertNull($row->value_text);
+        $this->assertNull($row->value_num);
+        $this->assertSame(['blue', 'pink'], $row->value_jsonb);
+    }
+
+    public function test_set_multiselect_different_input_order_is_noop_when_stored_value_is_already_canonical(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'multi_select_noop_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::MultiSelect,
+            objectType: FieldObjectType::ProductVariant,
+            isMultiValue: true,
+            validationRules: [
+                'options' => [
+                    ['code' => 'blue', 'labels' => ['uk' => 'Синій']],
+                    ['code' => 'pink', 'labels' => ['uk' => 'Рожевий']],
+                ],
+            ],
+        );
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            ['pink', 'blue'],
+        );
+
+        $result = $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            ['blue', 'pink'],
+        );
+
+        $this->assertSame(FieldValueWriteResult::NoOp, $result->status);
+    }
+
+    public function test_set_multiselect_canonicalizes_stale_scalar_payload_columns(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'multi_select_stale_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::MultiSelect,
+            objectType: FieldObjectType::ProductVariant,
+            isMultiValue: true,
+            validationRules: [
+                'options' => [
+                    ['code' => 'blue', 'labels' => ['uk' => 'Синій']],
+                    ['code' => 'pink', 'labels' => ['uk' => 'Рожевий']],
+                ],
+            ],
+        );
+
+        VariantFieldValue::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'variant_id' => $this->variant->id,
+            'field_binding_id' => $binding->id,
+            'value_text' => 'legacy',
+            'value_num' => '2.000000',
+            'value_jsonb' => ['pink', 'blue'],
+        ]);
+
+        $result = $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            ['blue', 'pink'],
+        );
+
+        $this->assertSame(FieldValueWriteResult::Updated, $result->status);
+
+        $row = VariantFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('variant_id', $this->variant->id)
+            ->where('field_binding_id', $binding->id)
+            ->sole();
+
+        $this->assertNull($row->value_text);
+        $this->assertNull($row->value_num);
+        $this->assertSame(['blue', 'pink'], $row->value_jsonb);
+    }
+
+    public function test_clear_multiselect_deletes_row(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'multi_select_clear_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::MultiSelect,
+            objectType: FieldObjectType::ProductVariant,
+            isMultiValue: true,
+            validationRules: [
+                'options' => [
+                    ['code' => 'blue', 'labels' => ['uk' => 'Синій']],
+                    ['code' => 'pink', 'labels' => ['uk' => 'Рожевий']],
+                ],
+            ],
+        );
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            ['blue', 'pink'],
+        );
+
+        $result = $this->writer->clear(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+        );
+
+        $this->assertSame(FieldValueWriteResult::Deleted, $result->status);
+        $this->assertDatabaseMissing('variant_field_values', [
+            'workspace_id' => $this->workspace->id,
+            'variant_id' => $this->variant->id,
+            'field_binding_id' => $binding->id,
+        ]);
+    }
+
+    public function test_set_multiselect_rejects_display_labels(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'multi_select_labels_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::MultiSelect,
+            objectType: FieldObjectType::ProductVariant,
+            isMultiValue: true,
+            validationRules: [
+                'options' => [
+                    ['code' => 'blue', 'labels' => ['uk' => 'Синій']],
+                ],
+            ],
+        );
+
+        $this->expectException(InvalidSelectOptionException::class);
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            ['Синій'],
+        );
+    }
+
+    public function test_set_multiselect_rejects_unknown_option_codes(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'multi_select_unknown_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::MultiSelect,
+            objectType: FieldObjectType::ProductVariant,
+            isMultiValue: true,
+            validationRules: [
+                'options' => [
+                    ['code' => 'blue', 'labels' => ['uk' => 'Синій']],
+                ],
+            ],
+        );
+
+        $this->expectException(InvalidSelectOptionException::class);
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            ['blue', 'pink'],
+        );
+    }
+
+    public function test_set_multiselect_rejects_duplicate_codes(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'multi_select_dup_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::MultiSelect,
+            objectType: FieldObjectType::ProductVariant,
+            isMultiValue: true,
+            validationRules: [
+                'options' => [
+                    ['code' => 'blue', 'labels' => ['uk' => 'Синій']],
+                ],
+            ],
+        );
+
+        $this->expectException(InvalidFieldValuePayloadException::class);
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            ['blue', 'blue'],
+        );
+    }
+
+    public function test_set_multiselect_rejects_empty_list_associative_array_and_non_string_members(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'multi_select_invalid_payload_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::MultiSelect,
+            objectType: FieldObjectType::ProductVariant,
+            isMultiValue: true,
+            validationRules: [
+                'options' => [
+                    ['code' => 'blue', 'labels' => ['uk' => 'Синій']],
+                    ['code' => 'pink', 'labels' => ['uk' => 'Рожевий']],
+                ],
+            ],
+        );
+
+        foreach ([[], ['first' => 'blue'], ['blue', 1]] as $payload) {
+            try {
+                $this->writer->set(
+                    $this->workspace->id,
+                    FieldObjectType::ProductVariant,
+                    $this->variant->id,
+                    $binding->id,
+                    $payload,
+                );
+                $this->fail('Expected InvalidFieldValuePayloadException was not thrown.');
+            } catch (InvalidFieldValuePayloadException) {
+                $this->assertDatabaseMissing('variant_field_values', [
+                    'workspace_id' => $this->workspace->id,
+                    'variant_id' => $this->variant->id,
+                    'field_binding_id' => $binding->id,
+                ]);
+            }
+        }
+    }
+
+    public function test_set_multiselect_rejects_is_multi_value_false_metadata(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'multi_select_wrong_cardinality_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::MultiSelect,
+            objectType: FieldObjectType::ProductVariant,
+            isMultiValue: false,
+            validationRules: [
+                'options' => [
+                    ['code' => 'blue', 'labels' => ['uk' => 'Синій']],
+                ],
+            ],
+        );
+
+        $this->expectException(MultiValueNotSupportedException::class);
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            ['blue'],
+        );
+    }
+
+    public function test_set_multiselect_rejects_localizable_metadata(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'multi_select_localizable_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::MultiSelect,
+            objectType: FieldObjectType::ProductVariant,
+            isLocalizable: true,
+            isMultiValue: true,
+            validationRules: [
+                'options' => [
+                    ['code' => 'blue', 'labels' => ['uk' => 'Синій']],
+                ],
+            ],
+        );
+
+        $this->expectException(LocalizationContractViolationException::class);
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            ['blue'],
+            'uk',
+        );
+    }
+
+    // ---------------------------------------------------------------
     // Authorization / target / binding / definition
     // ---------------------------------------------------------------
 
@@ -947,7 +1769,7 @@ class GovernedDynamicFieldValueWriterTest extends TestCase
     // ---------------------------------------------------------------
 
     #[DataProvider('unsupportedDataTypeProvider')]
-    public function test_set_rejects_deferred_unsupported_data_types(AttributeDataType $dataType): void
+    public function test_set_rejects_non_generic_domain_owned_data_types(AttributeDataType $dataType): void
     {
         $variant = $this->variant;
 
@@ -1102,15 +1924,118 @@ class GovernedDynamicFieldValueWriterTest extends TestCase
     public static function unsupportedDataTypeProvider(): array
     {
         return [
-            'number' => [AttributeDataType::Number],
-            'decimal' => [AttributeDataType::Decimal],
-            'boolean' => [AttributeDataType::Boolean],
-            'date' => [AttributeDataType::Date],
-            'multi_select' => [AttributeDataType::MultiSelect],
-            'url' => [AttributeDataType::Url],
             'money' => [AttributeDataType::Money],
             'image' => [AttributeDataType::Image],
             'computed' => [AttributeDataType::Computed],
+        ];
+    }
+
+    /**
+     * @return array<string, array{0: AttributeDataType}>
+     */
+    public static function numericTypeProvider(): array
+    {
+        return [
+            'number' => [AttributeDataType::Number],
+            'decimal' => [AttributeDataType::Decimal],
+        ];
+    }
+
+    /**
+     * @return array<string, array{0: AttributeDataType, 1: int|string, 2: string}>
+     */
+    public static function numericAcceptedPayloadProvider(): array
+    {
+        return [
+            'number_int' => [AttributeDataType::Number, 12, '12.000000'],
+            'number_fractional' => [AttributeDataType::Number, '12.500000', '12.500000'],
+            'number_negative' => [AttributeDataType::Number, '-12.5', '-12.500000'],
+            'number_precision_boundary' => [AttributeDataType::Number, '99999999999999.999999', '99999999999999.999999'],
+            'number_scale_boundary' => [AttributeDataType::Number, '1.123456000', '1.123456'],
+            'decimal_int' => [AttributeDataType::Decimal, 7, '7.000000'],
+            'decimal_fractional' => [AttributeDataType::Decimal, '98.765432', '98.765432'],
+            'decimal_negative' => [AttributeDataType::Decimal, '-0.500000', '-0.500000'],
+            'decimal_precision_boundary' => [AttributeDataType::Decimal, '99999999999999.999999', '99999999999999.999999'],
+            'decimal_scale_boundary' => [AttributeDataType::Decimal, '2.654321000', '2.654321'],
+        ];
+    }
+
+    /**
+     * @return array<string, array{0: AttributeDataType, 1: string, 2: int|string, 3: string}>
+     */
+    public static function numericCanonicalNoOpProvider(): array
+    {
+        return [
+            'number_same_value' => [AttributeDataType::Number, '0012.340000', '12.34', '12.340000'],
+            'decimal_same_value' => [AttributeDataType::Decimal, '0007.500000', '7.5', '7.500000'],
+        ];
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function invalidNumericPayloadProvider(): array
+    {
+        return [
+            'nan' => ['NaN'],
+            'infinity' => ['Infinity'],
+            'garbage' => ['12abc'],
+            'locale_comma' => ['1,23'],
+            'empty' => [''],
+            'precision_overflow' => ['100000000000000.000000'],
+        ];
+    }
+
+    /**
+     * @return array<string, array{0: mixed}>
+     */
+    public static function invalidBooleanPayloadProvider(): array
+    {
+        return [
+            'int_zero' => [0],
+            'int_one' => [1],
+            'string_zero' => ['0'],
+            'string_one' => ['1'],
+            'string_true' => ['true'],
+            'string_false' => ['false'],
+            'string_yes' => ['yes'],
+            'string_no' => ['no'],
+        ];
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function invalidDatePayloadProvider(): array
+    {
+        return [
+            'datetime' => ['2026-08-26T00:00:00Z'],
+            'dotted' => ['26.08.2026'],
+            'non_canonical' => ['2026-8-26'],
+        ];
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function validUrlProvider(): array
+    {
+        return [
+            'https' => ['https://example.com/product'],
+            'http' => ['http://example.com/catalog?sku=ABC'],
+        ];
+    }
+
+    /**
+     * @return array<string, array{0: mixed}>
+     */
+    public static function invalidUrlPayloadProvider(): array
+    {
+        return [
+            'relative' => ['/relative/path'],
+            'missing_host' => ['https:///missing-host'],
+            'unsupported_scheme' => ['ftp://example.com/file'],
+            'non_string' => [['https://example.com']],
         ];
     }
 }
