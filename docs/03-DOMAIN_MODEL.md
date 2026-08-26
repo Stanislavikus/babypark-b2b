@@ -4469,6 +4469,41 @@ The same merchant-confirmed `ExternalRecordLink` (ENTITY TRUST) serves both Rece
 ### 5. Manual Receive Uses Operation-Time Authority
 For the first manual Receive/Send experience, the user's explicit confirmed action is the authority for that one operation. There is no persistent field-level ownership or silent last-write-wins mechanism. Without a persisted synchronization baseline, the system cannot determine "only Magento changed" or "both changed". The contract recognizes: equal, differs, remote absent, local absent, unsupported/blocked, or explicit clear. Equal may silently no-op, but destructive replacement or clear requires explicit action.
 
+Consequential Live execution authority for manual Receive Apply remains the existing
+`run_sync_live` permission for both semantic operations:
+
+- Import;
+- Export.
+
+Do **not** introduce `run_sync_receive`.
+
+The current Stage 3-0 merchant consequential Live admission gate list is the
+first Products/Export gate list. It is **not** a proof that every future Live
+semantic operation inherits the same non-authority prerequisites unchanged.
+
+For first manual Receive Apply:
+
+- fresh `run_sync_live` is required;
+- Export Preview evidence is **not** a Receive prerequisite;
+- the matching operation-support gate is
+  `ConnectorSyncOperationSupport(Products, Import, Live) === true`;
+- the transient server-authoritative Receive proposal plus mandatory Apply-time
+  revalidation is the manual Receive trust/readiness prerequisite.
+
+Apply authorization commit points are frozen:
+
+- the first fresh `run_sync_live` check occurs **before** proposal consumption,
+  so an unauthorized actor does not burn the proposal;
+- a second fresh `run_sync_live` check occurs **inside** the short Live Import
+  admission transaction, immediately before `SyncRun` creation, against the
+  locked/current Workspace authority state.
+
+Revocation before successful admission means no `SyncRun` and no mutation.
+Revocation after successful admission does **not** cancel that already-admitted
+execution; this matches existing Live authority semantics.
+
+This clarification does **not** enable Adobe Products/Import support.
+
 ### 6. Ownership, Baselines, and Automated Bidirectional Sync (Cross-Reference)
 - Manual Receive requires **no** persistent field-level ownership.
 - A persisted synchronization baseline — or equivalent evidence sufficient to distinguish change provenance and conflicts — is required **before** the platform may make unattended conflict claims (such as "only Magento changed", "only platform changed", or "both changed"). Without such baseline, the honest contract is only the manual diff vocabulary in §5.
@@ -4506,6 +4541,24 @@ Boundary: `app/Services/Catalog/GovernedProductVariantColumnMutationService.php`
 - First explicit allowlist: Product `name` and Product `description` only.
 - Product `name` is admitted only for the canonical global/global System `FieldDefinition` / `FieldBinding` tuple bound to `products.name`; Set requires a PHP string, rejects `null`, empty string, and whitespace-only string, preserves the exact string, rejects physically oversized payloads, and `clear()` is forbidden.
 - Product `description` is admitted only for the canonical global/global System `FieldDefinition` / `FieldBinding` tuple bound to `products.description`; Set requires a PHP string, rejects `null`, preserves the exact string including `''`, rejects physically oversized payloads, and `clear()` sets `NULL`.
+- The first consequential column-backed Receive Apply MUST NOT call GAP-029
+  `set()` blindly.
+- Future Apply runtime requires an additive expected-current-value mutation path
+  conceptually equivalent to `setIfCurrentValue(...)`.
+- This expected-current-value precondition must be checked only **after**
+  locking the target Product row inside the authoritative GAP-029 mutation
+  transaction.
+- Existing GAP-029 `set()` / `clear()` semantics remain unchanged. This
+  contract does **not** claim that `setIfCurrentValue(...)` is already
+  implemented.
+- Immediately before local consequential mutation, the same locked section must
+  also verify the Receive `SyncRun` is still executable: the run exists, its
+  `status = Running`, `writer_deadline_at` is present, and current time is
+  before that deadline.
+- A recovered, failed, or expired run must **not** mutate `Product`, even if
+  the earlier Receive proposal was valid when issued.
+- No remote HTTP may occur inside this authoritative locked mutation
+  transaction.
 - All other current and future column-backed fields remain fail-closed until separately admitted, including `sku`, `gtin`, status / lifecycle, `brand`, `url`, `merchant_type`, `net_weight`, `gross_weight`, `volume_m3`, `internal_product_id`, pricing, availability, media, relations, and connector metadata.
 - `sku` is **NOT** Receive-writable in the first slice. SKU remains an identity/addressing precondition, not an incoming mutable field.
 - Product lifecycle status remains excluded from this first boundary; the interim two-state `products.is_active` representation must not be frozen as generic Receive lifecycle semantics.
@@ -4525,8 +4578,128 @@ This routing contract is connector-independent. See `docs/IMPLEMENTATION_GAPS.md
 ### 8. Receive Proposal/Diff is Not SyncRun Preview
 A per-item or per-operation Receive proposal is short-lived, server-authoritative, and transient. It is not execution history, authorization, identity, or ENTITY TRUST, and is not persisted in `sync_runs` / `sync_run_items`. It reuses the existing opaque server-side flow pattern rather than a new persisted entity.
 
+Consequential Receive Apply uses the existing Sync execution history shape:
+
+- `SyncRun.mode = Live`;
+- `SyncRun.semantic_operation = Import`;
+- `SyncRun.configuration_revision =` the proposal/current verified revision at
+  Apply time;
+- `SyncRunItem =` Product business-record outcome.
+
+First manual Receive Apply is synchronous/internal, not queue-dispatched.
+Admission creates the `SyncRun` directly in:
+
+- `mode = Live`;
+- `semantic_operation = Import`;
+- `status = Running`;
+- `started_at =` admission time;
+- `writer_deadline_at =` populated from the existing Live execution timing
+  model;
+- `recoverable_after =` populated from the existing Live recovery window.
+
+Do **not** invent a `Queued` state or connector job for this first foreground
+Apply. If the process dies, existing active-run recovery must eventually move
+the stale `Running` run to `Failed`.
+
+The Receive proposal itself remains transient and is **not** `SyncRun` history.
+
+For the first name-only slice:
+
+- exactly one affected business `Product`;
+- a trusted `ProductVariant` may remain the remote correlation target, but its
+  owning `Product` is the business record and local mutation owner;
+- `SyncRunItem.product_id` is that owning `Product` id;
+- no Variant column mutation;
+- no SKU mutation.
+
+Do **not** generalize `SyncRunItem` identity beyond `Product` from this slice.
+Future genuine Variant-level Receive requires a separate Stop-and-Amend.
+
+Expected/classified no-write outcomes such as stale local/remote state or a
+classified pre-write remote-read failure use the existing Live
+`not_applied` business outcome. Unexpected execution/lifecycle failure may fail
+the `SyncRun`.
+
+Do **not** add a new `SyncRunStatus` or `SyncLiveOutcome` value for Receive
+Apply.
+
+The configuration-owned selection contract remains unchanged and remains part of
+`configuration_revision`. Do **not** change `SyncConfigurationRevisionHasher`.
+
+A manual per-item Receive Apply has narrower run scope than the
+configuration-owned selection. Freeze an additive run-owned `execution_target`
+block in `SyncRun.configuration_snapshot` for targeted Receive execution.
+
+The exact first Receive snapshot representation is frozen as
+`platform.sync-run-input.v2` with additive run-owned:
+
+```json
+"execution_target": {
+    "mode": "explicit_product",
+    "product_id": "<owning Product id>"
+}
+```
+
+For the first slice:
+
+- configuration selection remains the truthful configuration state;
+- `execution_target` identifies the one effective business `Product` executed;
+- if the trusted Receive correlation target is `ProductVariant`, execution still
+  resolves to its owning `Product` for this Product-name slice;
+- `execution_target` is runtime evidence only, not configurable selection;
+- `execution_target` must **not** become a general subset/selection feature.
+- existing Export snapshots remain `v1` and unchanged;
+- do **not** add generic `object_type` / `internal_record` polymorphism.
+
 ### 9. Apply-Time Revalidation is Mandatory
 Before applying a Receive proposal, the runtime must freshly verify: actor authorization, target Workspace/ConnectorAccount, existing trusted `ExternalRecordLink`, remote logical identity, SKU equality precondition, `SyncConfiguration.configuration_revision`, mapping/option-mapping state, and that participating local and remote values have not changed. If state has changed, the proposal is invalidated and requires a rebuild (zero mutation).
+
+First manual Apply ordering is frozen:
+
+1. fresh authorization;
+2. consume the opaque Receive proposal once;
+3. Live Import run admission;
+4. fresh remote reread **outside** the DB transaction;
+5. short final locked validation/mutation transaction.
+
+Live Import admission reuses the existing one-active-run-per-`SyncConfiguration`
+boundary. Inside admission:
+
+- recover stale active runs using the existing recovery semantics;
+- reject if any `Queued` / `Running` `SyncRun` still exists for the
+  configuration, regardless of Preview/Live or Import/Export.
+
+Do **not** introduce a Receive-specific lock or concurrency table. Receive
+Apply intentionally serializes with existing Preview and Export Live activity on
+the same `SyncConfiguration`.
+
+After successful proposal consumption, any failure requires a fresh proposal. No
+automatic replay.
+
+Apply must revalidate at minimum:
+
+- `SyncConfiguration.configuration_revision`;
+- trusted `ExternalRecordLink`, remote logical identity, and SKU precondition;
+- current `FieldMapping` / `FieldOptionMapping` state where applicable;
+- participating remote value unchanged;
+- participating local value unchanged.
+
+For this R3 name-only slice, Apply is executable only when the consumed
+proposal contains exactly **one** entry satisfying all of:
+
+- `objectType = Product`;
+- `domainRoute = ProductVariantColumn`;
+- `diffState = Differs`;
+- `localValuePresent = true`;
+- `remoteValuePresent = true`;
+- `explicitClear = false`;
+- `blockedReasonCode = null`;
+- `fieldBinding` resolves to the canonical admitted Product `name`.
+
+`Equal` is not a consequential Apply action.
+`UnsupportedOrBlocked` is not executable.
+Any other proposal shape fails closed **before** `SyncRun` admission and before
+remote HTTP.
 
 ### 10. Option Mappings and Reverse Resolution
 `FieldOptionMapping` remains direction-neutral. For Receive, if external option → internal option resolution is ambiguous (not unique) under the current legitimate persistence model, that field is blocked. No uniqueness constraint is added merely to simplify Receive.
@@ -4546,6 +4719,36 @@ A field may be Discovered → Normalizable → Semantically mappable → Support
 
 ### 13. Stage 3E Send Remains Unchanged
 Receive-first sequencing does not reopen or weaken Stage 3E Send. ENTITY TRUST, no-link mutation prohibitions, entity-bound consequential writes, ambiguous applied-state handling, no blind retry, real-target certification gates, and current support=false truth remain strictly enforced.
+
+### 14. First-Slice Boundaries (R3 Contract)
+The first manual Receive Apply contract remains:
+
+**IN**
+
+- existing trusted `Product` / `ProductVariant`;
+- existing name proposal;
+- canonical Product `name` only;
+- manual explicit Apply;
+- existing GAP-029 column owner;
+- existing `SyncRun` / `SyncRunItem`;
+- existing `run_sync_live`.
+
+**OUT**
+
+- new `Product` creation;
+- Variant field Apply;
+- SKU Receive;
+- `description` or broader fields;
+- pricing / availability / media;
+- ownership / baseline;
+- unattended sync;
+- new permission;
+- new persistence table / column;
+- Import support flip;
+- merchant UI.
+
+Adobe Products/Import support remains **false** until separate truthful runtime
+and real-target validation work is completed.
 
 
 ## Sync Domain Rebaseline (Resolved — normative)
@@ -8064,6 +8267,10 @@ Merchant consequential Live admission/exposure requires **all** relevant gates:
 - current configuration readiness;
 - fresh `ConnectorLiveRuntimeReadiness` (account-specific remote prerequisite);
 - `ConnectorSyncOperationSupport(Products, Export, Live) === true`.
+
+This gate list is the first Products/Export Live gate list. Manual Receive
+Import admission is governed by the Receive / Import Foundation Contract
+clarification and does **not** require Export Preview evidence.
 
 `ConnectorSyncOperationSupport` is static software capability.
 `ConnectorLiveRuntimeReadiness` is fresh account-specific remote prerequisite.

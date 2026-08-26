@@ -238,6 +238,58 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
         );
     }
 
+    public function test_manual_receive_apply_reuses_existing_live_authority_without_new_permission(): void
+    {
+        $this->assertStringContainsString(
+            'Consequential Live execution authority for manual Receive Apply remains the existing',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`run_sync_live` permission for both semantic operations',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Import;',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Export.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Do **not** introduce `run_sync_receive`.',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_manual_receive_apply_clarifies_stage_3_0_export_gates_and_import_specific_prerequisites(): void
+    {
+        $this->assertStringContainsString(
+            'the first Products/Export gate list',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Export Preview evidence is **not** a Receive prerequisite',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`ConnectorSyncOperationSupport(Products, Import, Live) === true`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'transient server-authoritative Receive proposal plus mandatory Apply-time',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'This clarification does **not** enable Adobe Products/Import support.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Manual Receive' . PHP_EOL . 'Import admission is governed by the Receive / Import Foundation Contract',
+            $this->domainModelContent,
+        );
+    }
+
     public function test_apply_requires_configuration_revision(): void
     {
         $this->assertStringContainsString(
@@ -278,6 +330,334 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
     {
         $this->assertStringContainsString(
             'If state has changed, the proposal is invalidated and requires a rebuild (zero mutation)',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_consequential_receive_apply_uses_existing_sync_run_history_shape(): void
+    {
+        $this->assertStringContainsString(
+            'Consequential Receive Apply uses the existing Sync execution history shape',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`SyncRun.mode = Live`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`SyncRun.semantic_operation = Import`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`SyncRunItem =` Product business-record outcome',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'The Receive proposal itself remains transient and is **not** `SyncRun` history.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Do **not** add a new `SyncRunStatus` or `SyncLiveOutcome` value for Receive',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_first_name_only_slice_keeps_sync_run_item_identity_on_owning_product(): void
+    {
+        $this->assertStringContainsString(
+            'For the first name-only slice:',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'exactly one affected business `Product`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'its owning `Product` is the business record and local mutation owner',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`SyncRunItem.product_id` is that owning `Product` id',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Do **not** generalize `SyncRunItem` identity beyond `Product` from this slice.',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_receive_apply_freezes_run_owned_execution_target_without_changing_selection_contract(): void
+    {
+        $this->assertStringContainsString(
+            'Do **not** change `SyncConfigurationRevisionHasher`.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Freeze an additive run-owned `execution_target`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'in `SyncRun.configuration_snapshot` for targeted Receive execution',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`platform.sync-run-input.v2`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '"mode": "explicit_product"',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '"product_id": "<owning Product id>"',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`execution_target` is runtime evidence only, not configurable selection',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'must **not** become a general subset/selection feature',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'existing Export snapshots remain `v1` and unchanged;',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'do **not** add generic `object_type` / `internal_record` polymorphism.',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_apply_flow_freezes_single_use_proposal_consumption_and_remote_reread_outside_transaction(): void
+    {
+        $this->assertStringContainsString(
+            'First manual Apply ordering is frozen:',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'consume the opaque Receive proposal once',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Live Import run admission',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'fresh remote reread **outside** the DB transaction',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'After successful proposal consumption, any failure requires a fresh proposal. No',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'the first fresh `run_sync_live` check occurs **before** proposal consumption',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'a second fresh `run_sync_live` check occurs **inside** the short Live Import',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Revocation before successful admission means no `SyncRun` and no mutation.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Revocation after successful admission does **not** cancel that already-admitted',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_receive_apply_reuses_existing_active_run_serialization_boundary(): void
+    {
+        $this->assertStringContainsString(
+            'reuses the existing one-active-run-per-`SyncConfiguration`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'recover stale active runs using the existing recovery semantics',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'reject if any `Queued` / `Running` `SyncRun` still exists for the',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Do **not** introduce a Receive-specific lock or concurrency table.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'serializes with existing Preview and Export Live activity',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_column_backed_receive_apply_requires_expected_current_value_and_running_run_lease(): void
+    {
+        $this->assertStringContainsString(
+            'First explicit allowlist: Product `name` and Product `description` only.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Product `description` is admitted only for the canonical global/global System `FieldDefinition` / `FieldBinding` tuple bound to `products.description`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            "preserves the exact string including `''`",
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`clear()` sets `NULL`.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'MUST NOT call GAP-029',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`setIfCurrentValue(...)`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Existing GAP-029 `set()` / `clear()` semantics remain unchanged.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'does **not** claim that `setIfCurrentValue(...)` is already',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`status = Running`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`writer_deadline_at` is present',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'No remote HTTP may occur inside this authoritative locked mutation',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'status = Running',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Do **not** invent a `Queued` state or connector job for this first foreground',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'stale `Running` run to `Failed`',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_receive_apply_requires_exactly_one_executable_product_name_differs_entry(): void
+    {
+        $this->assertStringContainsString(
+            'proposal contains exactly **one** entry satisfying all of:',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`objectType = Product`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`domainRoute = ProductVariantColumn`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`diffState = Differs`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`localValuePresent = true`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`remoteValuePresent = true`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`explicitClear = false`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`blockedReasonCode = null`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'canonical admitted Product `name`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`Equal` is not a consequential Apply action.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Any other proposal shape fails closed **before** `SyncRun` admission and before',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_r3_first_slice_boundaries_remain_frozen(): void
+    {
+        $this->assertStringContainsString(
+            '### 14. First-Slice Boundaries (R3 Contract)',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'canonical Product `name` only',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'existing `SyncRun` / `SyncRunItem`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'new `Product` creation',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'new permission',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'new persistence table / column',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Import support flip',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'merchant UI.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Adobe Products/Import support remains **false**',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '- `description` or broader fields;',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_general_gap_029_allowlist_remains_broader_while_r3_apply_stays_name_only(): void
+    {
+        $this->assertStringContainsString(
+            'First explicit allowlist: Product `name` and Product `description` only.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'canonical Product `name` only',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '- `description` or broader fields;',
             $this->domainModelContent,
         );
     }
