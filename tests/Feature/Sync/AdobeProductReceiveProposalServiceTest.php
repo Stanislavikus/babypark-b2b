@@ -212,6 +212,56 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
     }
 
     #[Test]
+    public function non_default_workspace_variant_target_builds_successfully_without_ambient_workspace_context(): void
+    {
+        $workspaceB = Workspace::query()->create([
+            'name' => 'Workspace B',
+            'is_default' => false,
+        ]);
+
+        $this->assertNotSame($this->workspace->id, $workspaceB->id);
+
+        $account = $this->createConnectorAccount($workspaceB);
+        $configuration = $this->createReceiveConfiguration($account);
+        [$product, $variant] = $this->createProductWithVariant($workspaceB, 'Workspace B Product', 'SKU-B');
+        $this->createCanonicalNameMapping($account, $configuration);
+        $actor = $this->createWorkspaceActor($workspaceB);
+
+        ExternalRecordLink::withoutWorkspaceScope()->create(
+            $this->merchantConfirmedVariantLinkAttributes(
+                $workspaceB,
+                $account->id,
+                $variant,
+                'SKU-B',
+                '191',
+                $actor,
+            ),
+        );
+
+        $this->bindSafeSyncTransport(
+            fn (): ConnectorHttpResult => $this->verifiedProductResponse(191, 'SKU-B', 'Workspace B Remote'),
+        );
+
+        $result = app(AdobeProductReceiveProposalService::class)->build(
+            actorUserId: $actor->user_id,
+            workspaceId: $workspaceB->id,
+            connectorAccountId: $account->id,
+            targetType: FieldObjectType::ProductVariant,
+            targetId: $variant->id,
+        );
+
+        $entry = $result->proposal->entries[0];
+
+        $this->assertSame(FieldObjectType::ProductVariant, $result->proposal->targetType);
+        $this->assertSame((string) $variant->id, $result->proposal->targetId);
+        $this->assertSame(FieldObjectType::Product, $entry->objectType);
+        $this->assertSame(ReceiveDomainRoute::ProductVariantColumn, $entry->domainRoute);
+        $this->assertSame('Workspace B Product', $entry->localCanonicalValue);
+        $this->assertSame('Workspace B Remote', $entry->remoteCanonicalValue);
+        $this->assertSame($workspaceB->id, $product->workspace_id);
+    }
+
+    #[Test]
     public function no_trusted_erl_fails_before_http_and_issues_no_flow(): void
     {
         $account = $this->createConnectorAccount($this->workspace);
@@ -340,6 +390,48 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
             $this->fail('Expected trusted link absence for foreign workspace/account.');
         } catch (AdobeProductReceiveProposalException $exception) {
             $this->assertSame('trusted_external_link_missing', $exception->reasonCode);
+        }
+
+        $this->assertSame(0, $transport->sendCount);
+    }
+
+    #[Test]
+    #[DataProvider('invalidSafeSyncContextProvider')]
+    public function invalid_safe_sync_context_is_normalized_into_bounded_receive_failure(
+        array $accountOverrides,
+    ): void {
+        $account = $this->createConnectorAccount($this->workspace, $accountOverrides);
+        $configuration = $this->createReceiveConfiguration($account);
+        [$product] = $this->createProductWithVariant($this->workspace, 'Local', 'SKU-CONTEXT');
+        $this->createCanonicalNameMapping($account, $configuration);
+        $actor = $this->createWorkspaceActor($this->workspace);
+
+        ExternalRecordLink::withoutWorkspaceScope()->create(
+            $this->merchantConfirmedParentLinkAttributes(
+                $this->workspace,
+                $account->id,
+                $product,
+                'SKU-CONTEXT',
+                '171',
+                $actor,
+            ),
+        );
+
+        $transport = $this->bindSafeSyncTransport(
+            fn (): ConnectorHttpResult => $this->verifiedProductResponse(171, 'SKU-CONTEXT', 'Never'),
+        );
+
+        try {
+            app(AdobeProductReceiveProposalService::class)->build(
+                actorUserId: $actor->user_id,
+                workspaceId: $this->workspace->id,
+                connectorAccountId: $account->id,
+                targetType: FieldObjectType::Product,
+                targetId: $product->id,
+            );
+            $this->fail('Expected invalid Safe Sync context failure.');
+        } catch (AdobeProductReceiveProposalException $exception) {
+            $this->assertSame('safe_sync_context_invalid', $exception->reasonCode);
         }
 
         $this->assertSame(0, $transport->sendCount);
@@ -771,6 +863,88 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
     }
 
     #[Test]
+    #[DataProvider('invalidRemoteNameProvider')]
+    public function invalid_gap029_remote_name_value_yields_unsupported_candidate_without_mutation(string $remoteName): void
+    {
+        $account = $this->createConnectorAccount($this->workspace);
+        $configuration = $this->createReceiveConfiguration($account);
+        [$product] = $this->createProductWithVariant($this->workspace, 'Local Name', 'SKU-NAME-BLOCKED');
+        $this->createCanonicalNameMapping($account, $configuration);
+        $actor = $this->createWorkspaceActor($this->workspace);
+
+        ExternalRecordLink::withoutWorkspaceScope()->create(
+            $this->merchantConfirmedParentLinkAttributes(
+                $this->workspace,
+                $account->id,
+                $product,
+                'SKU-NAME-BLOCKED',
+                '1051',
+                $actor,
+            ),
+        );
+
+        $this->bindSafeSyncTransport(
+            fn (): ConnectorHttpResult => $this->verifiedProductResponse(1051, 'SKU-NAME-BLOCKED', $remoteName),
+        );
+
+        $result = app(AdobeProductReceiveProposalService::class)->build(
+            actorUserId: $actor->user_id,
+            workspaceId: $this->workspace->id,
+            connectorAccountId: $account->id,
+            targetType: FieldObjectType::Product,
+            targetId: $product->id,
+        );
+
+        $entry = $result->proposal->entries[0];
+
+        $this->assertSame(ReceiveDiffState::UnsupportedOrBlocked, $entry->diffState);
+        $this->assertSame(ReceiveDomainRoute::Unsupported, $entry->domainRoute);
+        $this->assertSame('name_value_not_executable', $entry->blockedReasonCode);
+        $this->assertSame($remoteName, $entry->remoteCanonicalValue);
+        $this->assertSame('Local Name', Product::withoutWorkspaceScope()->findOrFail($product->id)->name);
+    }
+
+    #[Test]
+    #[DataProvider('validRemoteNameProvider')]
+    public function valid_gap029_remote_name_boundary_values_remain_executable_and_preserved(string $remoteName): void
+    {
+        $account = $this->createConnectorAccount($this->workspace);
+        $configuration = $this->createReceiveConfiguration($account);
+        [$product] = $this->createProductWithVariant($this->workspace, 'Local Name', 'SKU-NAME-VALID');
+        $this->createCanonicalNameMapping($account, $configuration);
+        $actor = $this->createWorkspaceActor($this->workspace);
+
+        ExternalRecordLink::withoutWorkspaceScope()->create(
+            $this->merchantConfirmedParentLinkAttributes(
+                $this->workspace,
+                $account->id,
+                $product,
+                'SKU-NAME-VALID',
+                '1061',
+                $actor,
+            ),
+        );
+
+        $this->bindSafeSyncTransport(
+            fn (): ConnectorHttpResult => $this->verifiedProductResponse(1061, 'SKU-NAME-VALID', $remoteName),
+        );
+
+        $result = app(AdobeProductReceiveProposalService::class)->build(
+            actorUserId: $actor->user_id,
+            workspaceId: $this->workspace->id,
+            connectorAccountId: $account->id,
+            targetType: FieldObjectType::Product,
+            targetId: $product->id,
+        );
+
+        $entry = $result->proposal->entries[0];
+
+        $this->assertSame(ReceiveDomainRoute::ProductVariantColumn, $entry->domainRoute);
+        $this->assertSame(ReceiveDiffState::Differs, $entry->diffState);
+        $this->assertSame($remoteName, $entry->remoteCanonicalValue);
+    }
+
+    #[Test]
     #[DataProvider('blockedNameMappingProvider')]
     public function mapped_but_noncanonical_or_inactive_name_metadata_yields_unsupported_candidate(
         callable $forgeMapping,
@@ -967,6 +1141,37 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
                 ),
                 'name_mapping_not_canonical',
             ],
+        ];
+    }
+
+    public static function invalidSafeSyncContextProvider(): array
+    {
+        return [
+            'disabled connector account' => [
+                ['is_enabled' => false],
+            ],
+            'incomplete adobe settings' => [
+                ['base_url' => null],
+            ],
+            'unsupported auth profile' => [
+                ['auth_profile' => 'test_sync_support'],
+            ],
+        ];
+    }
+
+    public static function invalidRemoteNameProvider(): array
+    {
+        return [
+            'whitespace-only remote name' => ['   '],
+            '256 character remote name' => [str_repeat('N', 256)],
+        ];
+    }
+
+    public static function validRemoteNameProvider(): array
+    {
+        return [
+            '255 character remote name' => [str_repeat('N', 255)],
+            'preserved padded remote name' => ['  Valid Name  '],
         ];
     }
 

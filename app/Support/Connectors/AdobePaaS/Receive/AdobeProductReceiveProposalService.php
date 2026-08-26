@@ -7,6 +7,7 @@ use App\Enums\FieldObjectType;
 use App\Enums\ReceiveDomainRoute;
 use App\Enums\SyncConfigurationOperationalState;
 use App\Enums\SyncSemanticOperation;
+use App\Exceptions\Catalog\InvalidColumnFieldValueException;
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
 use App\Models\FieldBinding;
@@ -16,6 +17,7 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\SyncConfiguration;
 use App\Services\Catalog\GovernedProductVariantColumnEligibility;
+use App\Services\Catalog\GovernedProductVariantColumnValuePolicy;
 use App\Services\Sync\FieldMappingBindingValidator;
 use App\Services\Sync\Receive\ReceiveProposalFlowStore;
 use App\Services\Sync\Receive\ReceiveProposalPlanner;
@@ -23,8 +25,10 @@ use App\Services\Sync\SyncConfigurationLookupService;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkGuard;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductTrustedParentLinkLookup;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductTrustedVariantLinkLookup;
+use App\Support\Connectors\AdobePaaS\Exceptions\IncompleteAdobePaaSCredentialsException;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClient;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClientException;
+use App\Support\Connectors\Exceptions\ConnectorAccountNotFoundException;
 use App\Support\Sync\Exceptions\FieldMappingValidationException;
 use App\Support\Sync\Receive\ReceiveFieldCandidate;
 use App\Support\Sync\Receive\ReceiveProposal;
@@ -39,6 +43,7 @@ final class AdobeProductReceiveProposalService
         private readonly SyncConfigurationLookupService $configurationLookup,
         private readonly FieldMappingBindingValidator $fieldMappingBindingValidator,
         private readonly GovernedProductVariantColumnEligibility $columnEligibility,
+        private readonly GovernedProductVariantColumnValuePolicy $columnValuePolicy,
         private readonly ReceiveProposalPlanner $proposalPlanner,
         private readonly ReceiveProposalFlowStore $proposalFlowStore,
     ) {}
@@ -87,6 +92,8 @@ final class AdobeProductReceiveProposalService
                 $logicalEntityId,
                 $expectedSku,
             );
+        } catch (ConnectorAccountNotFoundException|IncompleteAdobePaaSCredentialsException $exception) {
+            throw AdobeProductReceiveProposalException::safeSyncContextInvalid($exception);
         } catch (AdobeSafeSyncClientException $exception) {
             throw AdobeProductReceiveProposalException::safeSyncReadFailed(
                 $this->classifySafeSyncReadFailure($exception),
@@ -115,6 +122,10 @@ final class AdobeProductReceiveProposalService
             workspaceId: $workspaceId,
             targetType: $targetType,
             targetId: $targetId,
+        );
+        $mappingState = $this->applyNameValueExecutability(
+            $mappingState,
+            $verifiedProduct->name,
         );
 
         $entries = $this->proposalPlanner->plan([
@@ -235,22 +246,8 @@ final class AdobeProductReceiveProposalService
         }
 
         if ($targetType === FieldObjectType::ProductVariant) {
-            $variant = ProductVariant::withoutWorkspaceScope()
-                ->with('product')
-                ->whereKey($targetId)
-                ->first();
-
-            if ($variant === null) {
-                throw AdobeProductReceiveProposalException::targetNotFound($targetType->value, $targetId);
-            }
-
-            if ($variant->workspace_id !== $workspaceId) {
-                throw AdobeProductReceiveProposalException::targetWorkspaceMismatch($targetType->value, $targetId);
-            }
-
-            if ($variant->product === null || $variant->product->workspace_id !== $workspaceId) {
-                throw AdobeProductReceiveProposalException::invalidVariantOwnership($targetId);
-            }
+            $variant = $this->loadVariantForWorkspace($workspaceId, $targetId);
+            $this->loadOwningProductForVariant($workspaceId, $variant);
 
             return;
         }
@@ -485,24 +482,62 @@ final class AdobeProductReceiveProposalService
             return $product;
         }
 
+        $variant = $this->loadVariantForWorkspace($workspaceId, $targetId);
+
+        return $this->loadOwningProductForVariant($workspaceId, $variant);
+    }
+
+    /**
+     * @param  array{field_binding_id: string, is_supported: bool, blocked_reason_code: ?string}  $mappingState
+     * @return array{field_binding_id: string, is_supported: bool, blocked_reason_code: ?string}
+     */
+    private function applyNameValueExecutability(array $mappingState, string $remoteName): array
+    {
+        if (! $mappingState['is_supported']) {
+            return $mappingState;
+        }
+
+        try {
+            $this->columnValuePolicy->normalizeSetValue('name', $remoteName);
+        } catch (InvalidColumnFieldValueException) {
+            return [
+                'field_binding_id' => $mappingState['field_binding_id'],
+                'is_supported' => false,
+                'blocked_reason_code' => 'name_value_not_executable',
+            ];
+        }
+
+        return $mappingState;
+    }
+
+    private function loadVariantForWorkspace(string $workspaceId, string $targetId): ProductVariant
+    {
         $variant = ProductVariant::withoutWorkspaceScope()
-            ->with('product')
             ->whereKey($targetId)
             ->first();
 
         if ($variant === null) {
-            throw AdobeProductReceiveProposalException::targetNotFound($targetType->value, $targetId);
+            throw AdobeProductReceiveProposalException::targetNotFound(FieldObjectType::ProductVariant->value, $targetId);
         }
 
         if ($variant->workspace_id !== $workspaceId) {
-            throw AdobeProductReceiveProposalException::targetWorkspaceMismatch($targetType->value, $targetId);
+            throw AdobeProductReceiveProposalException::targetWorkspaceMismatch(FieldObjectType::ProductVariant->value, $targetId);
         }
 
-        if ($variant->product === null || $variant->product->workspace_id !== $workspaceId) {
-            throw AdobeProductReceiveProposalException::invalidVariantOwnership($targetId);
+        return $variant;
+    }
+
+    private function loadOwningProductForVariant(string $workspaceId, ProductVariant $variant): Product
+    {
+        $product = Product::withoutWorkspaceScope()
+            ->whereKey($variant->product_id)
+            ->first();
+
+        if ($product === null || $product->workspace_id !== $workspaceId) {
+            throw AdobeProductReceiveProposalException::invalidVariantOwnership((string) $variant->id);
         }
 
-        return $variant->product;
+        return $product;
     }
 
     private function buildNameCandidate(

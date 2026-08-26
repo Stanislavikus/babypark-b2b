@@ -119,6 +119,15 @@ final class AdobeProductReceiveProposalException extends RuntimeException
         );
     }
 
+    public static function safeSyncContextInvalid(?\Throwable $previous = null): self
+    {
+        return new self(
+            'safe_sync_context_invalid',
+            'Safe Sync request context is invalid for Receive proposal build.',
+            $previous,
+        );
+    }
+
     public static function configurationChanged(): self
     {
         return new self(
