@@ -4479,7 +4479,7 @@ Receive applies two **distinct** mutation routes. The storage path alone does no
 
 **7.1 Dynamic route — `storage_type = dynamic`**
 Target: ordinary Product/Variant dynamic `FieldBinding` values (text, number, boolean, date, select option resolution, etc.).
-Boundary: the governed Product/Variant field-value writer (see `docs/IMPLEMENTATION_GAPS.md` → GAP-028). GAP-028A is **partially implemented** today as the current governed boundary for ordinary dynamic `Text`, `LongText`, and single-value `Select` fields. This writer MUST validate/enforce at minimum:
+Boundary: the governed Product/Variant field-value writer (see `docs/IMPLEMENTATION_GAPS.md` → GAP-028). GAP-028 is implemented today as the current governed boundary for ordinary dynamic `Text`, `LongText`, `Number`, `Decimal`, `Boolean`, `Date`, single-value `Select`, `MultiSelect`, and `Url` fields. This writer MUST validate/enforce at minimum:
 - explicit `Workspace` scope;
 - active `FieldDefinition`;
 - active `FieldBinding`;
@@ -4491,9 +4491,8 @@ Boundary: the governed Product/Variant field-value writer (see `docs/IMPLEMENTAT
 
 It may handle only ordinary values whose invariants belong entirely to Field Dictionary.
 
-Current generic GAP-028A scope: `Text`, `LongText`, single-value `Select`.
-Remaining generic GAP-028 typed extension: `Number`, `Decimal`, `Boolean`, `Date`, `MultiSelect`, `Url`.
-`Money` remains owned by the Pricing domain, `Image` remains owned by the Media domain, and `Computed` remains derived / non-writable; they are outside the generic GAP-028 writer. GAP-028 is **not Closed**.
+Current generic GAP-028 scope: `Text`, `LongText`, `Number`, `Decimal`, `Boolean`, `Date`, single-value `Select`, `MultiSelect`, `Url`.
+`Money` remains owned by the Pricing domain, `Image` remains owned by the Media domain, and `Computed` remains derived / non-writable; they are outside the generic GAP-028 writer. GAP-028 is **Closed**.
 
 **7.2 Column-backed route — `storage_type = column`**
 Target: Product/Variant column-backed core fields (e.g. typed `products` / `product_variants` columns).

@@ -21,6 +21,7 @@ use App\Services\Fields\Exceptions\FieldDefinitionArchivedException;
 use App\Services\Fields\Exceptions\FieldDefinitionNotFoundException;
 use App\Services\Fields\Exceptions\FieldDefinitionWorkspaceMismatchException;
 use App\Services\Fields\Exceptions\InvalidFieldValuePayloadException;
+use App\Services\Fields\Exceptions\InvalidSelectOptionException;
 use App\Services\Fields\Exceptions\LocalizationContractViolationException;
 use App\Services\Fields\Exceptions\MultiValueNotSupportedException;
 use App\Services\Fields\Exceptions\TargetNotFoundException;
@@ -32,29 +33,35 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Governed Product / ProductVariant dynamic field-value writer (GAP-028A).
+ * Governed Product / ProductVariant dynamic field-value writer.
  *
  * Scope: the minimum-safe platform-core runtime slice that establishes
  * the reusable persistence, workspace, localization, clear, option-validation
  * and concurrency boundary for ordinary dynamic FieldBinding values.
  *
  * Supported target / datatype matrix:
- *   - Product        + Text        (non-localizable / localizable)
- *   - Product        + LongText    (non-localizable / localizable)
- *   - Product        + Select      (single-value, non-localizable)
- *   - ProductVariant + Text        (non-localizable / localizable)
- *   - ProductVariant + LongText    (non-localizable / localizable)
- *   - ProductVariant + Select      (single-value, non-localizable)
+ *   - Product        + Text / LongText   (non-localizable / localizable)
+ *   - Product        + Number / Decimal  (single-value, non-localizable)
+ *   - Product        + Boolean / Date    (single-value, non-localizable)
+ *   - Product        + Select            (single-value, non-localizable)
+ *   - Product        + MultiSelect       (multi-value, non-localizable)
+ *   - Product        + Url               (single-value, non-localizable)
+ *   - ProductVariant + Text / LongText   (non-localizable / localizable)
+ *   - ProductVariant + Number / Decimal  (single-value, non-localizable)
+ *   - ProductVariant + Boolean / Date    (single-value, non-localizable)
+ *   - ProductVariant + Select            (single-value, non-localizable)
+ *   - ProductVariant + MultiSelect       (multi-value, non-localizable)
+ *   - ProductVariant + Url               (single-value, non-localizable)
  *
- * Fail-closed for: Number, Decimal, Money, Boolean, Date, MultiSelect,
- *                  Image, Url, Computed, is_multi_value=true.
+ * Fail-closed for: Money, Image, Computed, unsupported validation rules,
+ *                  and inconsistent localization/cardinality metadata.
  *
  * No schema changes; no dependencies on ConnectorAccount /
  * SyncConfiguration / ExternalRecordLink / Adobe / FieldMapping.
  *
  * Public API: set() and clear(). Each is a single-locale mutation;
  * whole-map localization overwrites are explicitly NOT exposed in
- * GAP-028A — callers (Magento Receive, CSV/Smart Import, Google Sheets,
+ * GAP-028 callers (Magento Receive, CSV/Smart Import, Google Sheets,
  * ERP/1C, product-card editing) MUST drive per-locale Set/Clear.
  *
  * Concurrency: DB::transaction + lockForUpdate on the existing slot
@@ -91,8 +98,12 @@ final class GovernedDynamicFieldValueWriter
      * Persist a single value for a dynamic FieldBinding slot.
      *
      * Canonical storage:
-     *   - non-localizable text/long_text/select  → value_text only;
-     *                                              value_num/value_jsonb nulled.
+     *   - non-localizable text/long_text/select/date/url  → value_text only;
+     *                                                        value_num/value_jsonb nulled.
+     *   - non-localizable number/decimal/boolean          → value_num only;
+     *                                                        value_text/value_jsonb nulled.
+     *   - non-localizable multi_select                    → value_jsonb only;
+     *                                                        value_text/value_num nulled.
      *   - localizable text/long_text             → value_jsonb[locale] only;
      *                                              value_text/value_num nulled.
      *
@@ -322,22 +333,65 @@ final class GovernedDynamicFieldValueWriter
     {
         $type = $definition->data_type;
 
-        $supported = in_array($type, [
+        match ($type) {
             AttributeDataType::Text,
-            AttributeDataType::LongText,
-            AttributeDataType::Select,
-        ], true);
+            AttributeDataType::LongText => $this->assertTextualMetadataContract($definition),
+            AttributeDataType::Number,
+            AttributeDataType::Decimal,
+            AttributeDataType::Boolean,
+            AttributeDataType::Date,
+            AttributeDataType::Url,
+            AttributeDataType::Select => $this->assertSingleValueNonLocalizableContract($definition),
+            AttributeDataType::MultiSelect => $this->assertMultiSelectMetadataContract($definition),
+            default => throw UnsupportedFieldDataTypeException::forType($type, $definition->id),
+        };
+    }
 
-        if (! $supported) {
-            throw UnsupportedFieldDataTypeException::forType($type, $definition->id);
-        }
-
+    private function assertTextualMetadataContract(FieldDefinition $definition): void
+    {
         if ($definition->is_multi_value) {
-            throw MultiValueNotSupportedException::forDefinition($definition->id);
+            throw MultiValueNotSupportedException::singleValueRequired(
+                $definition->id,
+                $definition->data_type->value,
+            );
+        }
+    }
+
+    private function assertSingleValueNonLocalizableContract(FieldDefinition $definition): void
+    {
+        if ($definition->is_multi_value) {
+            throw MultiValueNotSupportedException::singleValueRequired(
+                $definition->id,
+                $definition->data_type->value,
+            );
         }
 
-        if ($type === AttributeDataType::Select && $definition->is_localizable) {
-            throw LocalizationContractViolationException::localizableSelectNotSupported($definition->id);
+        if ($definition->is_localizable) {
+            if ($definition->data_type === AttributeDataType::Select) {
+                throw LocalizationContractViolationException::localizableSelectNotSupported($definition->id);
+            }
+
+            throw LocalizationContractViolationException::nonTextLocalizableNotSupported(
+                $definition->id,
+                $definition->data_type,
+            );
+        }
+    }
+
+    private function assertMultiSelectMetadataContract(FieldDefinition $definition): void
+    {
+        if (! $definition->is_multi_value) {
+            throw MultiValueNotSupportedException::multiValueRequired(
+                $definition->id,
+                $definition->data_type->value,
+            );
+        }
+
+        if ($definition->is_localizable) {
+            throw LocalizationContractViolationException::nonTextLocalizableNotSupported(
+                $definition->id,
+                $definition->data_type,
+            );
         }
     }
 
@@ -356,7 +410,15 @@ final class GovernedDynamicFieldValueWriter
             );
         }
 
-        if (in_array($definition->data_type, [AttributeDataType::Text, AttributeDataType::LongText], true)) {
+        if (in_array($definition->data_type, [
+            AttributeDataType::Text,
+            AttributeDataType::LongText,
+            AttributeDataType::Number,
+            AttributeDataType::Decimal,
+            AttributeDataType::Boolean,
+            AttributeDataType::Date,
+            AttributeDataType::Url,
+        ], true)) {
             if ($rules !== []) {
                 throw UnsupportedFieldValidationRulesException::forDefinition(
                     $definition->data_type,
@@ -367,7 +429,7 @@ final class GovernedDynamicFieldValueWriter
             return;
         }
 
-        if ($definition->data_type !== AttributeDataType::Select) {
+        if (! in_array($definition->data_type, [AttributeDataType::Select, AttributeDataType::MultiSelect], true)) {
             return;
         }
 
@@ -643,7 +705,7 @@ final class GovernedDynamicFieldValueWriter
             $existingMap = $this->readLocalizedMap($slot, $definition->id);
 
             $newMap = $existingMap;
-            $newMap[$locale] = $this->normalizePayloadForType($type, $value, $definition);
+            $newMap[$locale] = $this->normalizeStringPayloadForType($type, $value, $definition);
 
             // NoOp: same locale payload already present and equal.
             if (array_key_exists($locale, $existingMap)
@@ -671,13 +733,9 @@ final class GovernedDynamicFieldValueWriter
             );
         }
 
-        // Non-localizable → value_text only.
-        $normalized = $this->normalizePayloadForType($type, $value, $definition);
+        $canonicalPayload = $this->canonicalPayloadForNonLocalizableType($type, $value, $definition);
 
-        if ($slot !== null
-            && (string) $slot->value_text === (string) $normalized
-            && $slot->value_num === null
-            && $slot->value_jsonb === null) {
+        if ($this->slotMatchesCanonicalPayload($slot, $canonicalPayload)) {
             return new FieldValueWriteResult(FieldValueWriteResult::NoOp, (string) $binding->id);
         }
 
@@ -685,9 +743,9 @@ final class GovernedDynamicFieldValueWriter
             $entityColumn => $entityId,
             'field_binding_id' => $binding->id,
             'workspace_id' => $workspaceId,
-            'value_text' => (string) $normalized,
-            'value_num' => null,
-            'value_jsonb' => null,
+            'value_text' => $canonicalPayload['value_text'],
+            'value_num' => $canonicalPayload['value_num'],
+            'value_jsonb' => $canonicalPayload['value_jsonb'],
         ];
 
         return $this->upsertCanonical(
@@ -832,7 +890,49 @@ final class GovernedDynamicFieldValueWriter
     // Payload normalization
     // ------------------------------------------------------------------
 
-    private function normalizePayloadForType(
+    /**
+     * @return array{value_text: ?string, value_num: ?string, value_jsonb: ?array}
+     */
+    private function canonicalPayloadForNonLocalizableType(
+        AttributeDataType $type,
+        mixed $value,
+        FieldDefinition $definition,
+    ): array {
+        return match ($type) {
+            AttributeDataType::Text,
+            AttributeDataType::LongText,
+            AttributeDataType::Select,
+            AttributeDataType::Date,
+            AttributeDataType::Url => [
+                'value_text' => $this->normalizeStringPayloadForType($type, $value, $definition),
+                'value_num' => null,
+                'value_jsonb' => null,
+            ],
+            AttributeDataType::Number => [
+                'value_text' => null,
+                'value_num' => $this->normalizeIntegerPayload($value),
+                'value_jsonb' => null,
+            ],
+            AttributeDataType::Decimal => [
+                'value_text' => null,
+                'value_num' => $this->normalizeDecimalPayload($value),
+                'value_jsonb' => null,
+            ],
+            AttributeDataType::Boolean => [
+                'value_text' => null,
+                'value_num' => $this->normalizeBooleanPayload($value),
+                'value_jsonb' => null,
+            ],
+            AttributeDataType::MultiSelect => [
+                'value_text' => null,
+                'value_num' => null,
+                'value_jsonb' => $this->normalizeMultiSelectPayload($definition, $value),
+            ],
+            default => throw UnsupportedFieldDataTypeException::forType($type, $definition->id),
+        };
+    }
+
+    private function normalizeStringPayloadForType(
         AttributeDataType $type,
         mixed $value,
         FieldDefinition $definition,
@@ -842,6 +942,14 @@ final class GovernedDynamicFieldValueWriter
                 throw InvalidFieldValuePayloadException::nonStringSelectPayload();
             }
 
+            if ($type === AttributeDataType::Date) {
+                throw InvalidFieldValuePayloadException::invalidDatePayload();
+            }
+
+            if ($type === AttributeDataType::Url) {
+                throw InvalidFieldValuePayloadException::invalidUrlPayload();
+            }
+
             throw InvalidFieldValuePayloadException::nonStringTextPayload();
         }
 
@@ -849,7 +957,196 @@ final class GovernedDynamicFieldValueWriter
             $this->selectOptionValidator->assertOptionAllowed($definition, $value);
         }
 
+        if ($type === AttributeDataType::Date) {
+            $this->assertValidDateString($value);
+        }
+
+        if ($type === AttributeDataType::Url) {
+            $this->assertValidAbsoluteUrl($value);
+        }
+
         return $value;
+    }
+
+    private function normalizeIntegerPayload(mixed $value): string
+    {
+        if (is_float($value)) {
+            throw InvalidFieldValuePayloadException::floatPayloadNotAllowed('Number');
+        }
+
+        if (is_int($value)) {
+            $raw = (string) $value;
+        } elseif (is_string($value)) {
+            $raw = $value;
+        } else {
+            throw InvalidFieldValuePayloadException::invalidIntegerPayload();
+        }
+
+        if (! preg_match('/^(?:0|-?[1-9]\d*)$/', $raw)) {
+            throw InvalidFieldValuePayloadException::invalidIntegerPayload();
+        }
+
+        $negative = str_starts_with($raw, '-');
+        $digits = ltrim($negative ? substr($raw, 1) : $raw, '0');
+        $digits = $digits === '' ? '0' : $digits;
+
+        if (strlen($digits) > 14) {
+            throw InvalidFieldValuePayloadException::invalidIntegerPayload();
+        }
+
+        if ($digits === '0') {
+            return '0.000000';
+        }
+
+        return ($negative ? '-' : '').$digits.'.000000';
+    }
+
+    private function normalizeDecimalPayload(mixed $value): string
+    {
+        if (is_float($value)) {
+            throw InvalidFieldValuePayloadException::floatPayloadNotAllowed('Decimal');
+        }
+
+        if (is_int($value)) {
+            $raw = (string) $value;
+        } elseif (is_string($value)) {
+            $raw = $value;
+        } else {
+            throw InvalidFieldValuePayloadException::invalidDecimalPayload();
+        }
+
+        if (! preg_match('/^-?\d+(?:\.\d+)?$/', $raw)) {
+            throw InvalidFieldValuePayloadException::invalidDecimalPayload();
+        }
+
+        $negative = str_starts_with($raw, '-');
+        $unsigned = $negative ? substr($raw, 1) : $raw;
+        [$integerPart, $fractionPart] = array_pad(explode('.', $unsigned, 2), 2, '');
+
+        $integerPart = ltrim($integerPart, '0');
+        $integerPart = $integerPart === '' ? '0' : $integerPart;
+
+        if (strlen($integerPart) > 14) {
+            throw InvalidFieldValuePayloadException::invalidDecimalPayload();
+        }
+
+        if (strlen($fractionPart) > 6) {
+            $extraScale = substr($fractionPart, 6);
+
+            if (trim($extraScale, '0') !== '') {
+                throw InvalidFieldValuePayloadException::invalidDecimalPayload();
+            }
+
+            $fractionPart = substr($fractionPart, 0, 6);
+        }
+
+        $fractionPart = str_pad($fractionPart, 6, '0');
+        $normalized = $integerPart.'.'.$fractionPart;
+
+        if ($normalized === '0.000000') {
+            return $normalized;
+        }
+
+        return ($negative ? '-' : '').$normalized;
+    }
+
+    private function normalizeBooleanPayload(mixed $value): string
+    {
+        if (! is_bool($value)) {
+            throw InvalidFieldValuePayloadException::invalidBooleanPayload();
+        }
+
+        return $value ? '1.000000' : '0.000000';
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function normalizeMultiSelectPayload(FieldDefinition $definition, mixed $value): array
+    {
+        if (! is_array($value) || ! array_is_list($value) || $value === []) {
+            throw InvalidFieldValuePayloadException::invalidMultiSelectPayload();
+        }
+
+        $allowed = $this->selectOptionValidator->allowedOptionKeys($definition);
+
+        if ($allowed === []) {
+            throw InvalidSelectOptionException::optionsUndeclared($definition->id);
+        }
+
+        $seen = [];
+        $codes = [];
+
+        foreach ($value as $item) {
+            if (! is_string($item) || $item === '') {
+                throw InvalidFieldValuePayloadException::invalidMultiSelectPayload();
+            }
+
+            if (isset($seen[$item])) {
+                throw InvalidFieldValuePayloadException::duplicateMultiSelectCode($item);
+            }
+
+            if (! in_array($item, $allowed, true)) {
+                throw InvalidSelectOptionException::forValue($item, $definition->id);
+            }
+
+            $seen[$item] = true;
+            $codes[] = $item;
+        }
+
+        sort($codes, SORT_STRING);
+
+        return $codes;
+    }
+
+    private function assertValidDateString(string $value): void
+    {
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            throw InvalidFieldValuePayloadException::invalidDatePayload();
+        }
+
+        [$year, $month, $day] = array_map('intval', explode('-', $value));
+
+        if (! checkdate($month, $day, $year)) {
+            throw InvalidFieldValuePayloadException::invalidDatePayload();
+        }
+    }
+
+    private function assertValidAbsoluteUrl(string $value): void
+    {
+        if ($value === '' || filter_var($value, FILTER_VALIDATE_URL) === false) {
+            throw InvalidFieldValuePayloadException::invalidUrlPayload();
+        }
+
+        $parts = parse_url($value);
+
+        if (! is_array($parts)) {
+            throw InvalidFieldValuePayloadException::invalidUrlPayload();
+        }
+
+        $scheme = $parts['scheme'] ?? null;
+        $host = $parts['host'] ?? null;
+
+        $normalizedScheme = is_string($scheme) ? strtolower($scheme) : null;
+
+        if (! is_string($normalizedScheme) || ! in_array($normalizedScheme, ['http', 'https'], true) || ! is_string($host) || $host === '') {
+            throw InvalidFieldValuePayloadException::invalidUrlPayload();
+        }
+    }
+
+    /**
+     * @param  array{value_text: ?string, value_num: ?string, value_jsonb: ?array}  $canonicalPayload
+     */
+    private function slotMatchesCanonicalPayload(mixed $slot, array $canonicalPayload): bool
+    {
+        if ($slot === null) {
+            return false;
+        }
+
+        return $slot->value_text === $canonicalPayload['value_text']
+            && (($slot->value_num === null && $canonicalPayload['value_num'] === null)
+                || ((string) $slot->value_num === (string) $canonicalPayload['value_num']))
+            && $slot->value_jsonb === $canonicalPayload['value_jsonb'];
     }
 
     // ------------------------------------------------------------------

@@ -6,7 +6,7 @@ use RuntimeException;
 
 /**
  * Base class for the bounded, Product/Field Dictionary exception taxonomy
- * thrown by the GovernedDynamicFieldValueWriter (GAP-028A).
+ * thrown by the GovernedDynamicFieldValueWriter.
  *
  * Every concrete exception in this directory MUST extend this class.
  * Do not introduce exceptions that bypass this hierarchy; the
