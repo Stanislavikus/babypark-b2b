@@ -370,7 +370,19 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             $atlasContent,
         );
         $this->assertStringContainsString(
-            'Receive connector read/orchestration | CONFIRMED ABSENT',
+            'Adobe Products Receive name proposal orchestration | IMPLEMENTED (internal; zero-mutation; no merchant entrypoint; no Apply)',
+            $atlasContent,
+        );
+        $this->assertStringContainsString(
+            'Receive connector read/orchestration | PARTIAL',
+            $atlasContent,
+        );
+        $this->assertStringContainsString(
+            'Normal `ConnectorSyncOperationSupport` / `SyncConfigurationService` admission still does **not** advertise or admit Adobe Products/Import from this internal primitive.',
+            $atlasContent,
+        );
+        $this->assertStringContainsString(
+            'Import support must **not** be inferred from the existence of this internal Adobe service because normal Adobe Products/Import admission remains disabled.',
             $atlasContent,
         );
         $this->assertStringContainsString(
