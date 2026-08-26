@@ -362,15 +362,27 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
         );
     }
 
-    public function test_import_runtime_remains_absent_in_atlas(): void
+    public function test_receive_runtime_truth_is_granular_in_atlas(): void
     {
         $atlasContent = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
         $this->assertStringContainsString(
-            'Receive / Import runtime | CONFIRMED ABSENT',
+            'Receive proposal/planner foundation | IMPLEMENTED',
+            $atlasContent,
+        );
+        $this->assertStringContainsString(
+            'Receive connector read/orchestration | CONFIRMED ABSENT',
+            $atlasContent,
+        );
+        $this->assertStringContainsString(
+            'Receive Apply runtime | CONFIRMED ABSENT',
             $atlasContent,
         );
         $this->assertStringContainsString(
             'connector-backed Sync Domain Receive',
+            $atlasContent,
+        );
+        $this->assertStringNotContainsString(
+            'Receive / Import runtime | CONFIRMED ABSENT',
             $atlasContent,
         );
     }
