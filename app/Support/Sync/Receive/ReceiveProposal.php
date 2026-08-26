@@ -22,6 +22,10 @@ final readonly class ReceiveProposal
         public array $entries,
         public DateTimeImmutable $issuedAt,
     ) {
+        if (! in_array($this->targetType, [FieldObjectType::Product, FieldObjectType::ProductVariant], true)) {
+            throw new InvalidArgumentException('ReceiveProposal targetType must be Product or ProductVariant.');
+        }
+
         if (
             $this->workspaceId === ''
             || $this->connectorAccountId === ''

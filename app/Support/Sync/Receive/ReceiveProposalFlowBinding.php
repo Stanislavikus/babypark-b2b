@@ -3,6 +3,7 @@
 namespace App\Support\Sync\Receive;
 
 use App\Enums\FieldObjectType;
+use InvalidArgumentException;
 
 final readonly class ReceiveProposalFlowBinding
 {
@@ -18,6 +19,10 @@ final readonly class ReceiveProposalFlowBinding
         public FieldObjectType $targetType,
         int|string $targetId,
     ) {
+        if (! in_array($this->targetType, [FieldObjectType::Product, FieldObjectType::ProductVariant], true)) {
+            throw new InvalidArgumentException('ReceiveProposalFlowBinding targetType must be Product or ProductVariant.');
+        }
+
         $this->actorUserId = (string) $actorUserId;
         $this->targetId = (string) $targetId;
     }

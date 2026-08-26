@@ -75,4 +75,23 @@ class ReceiveProposalTest extends TestCase
         $this->assertSame($beforeRunCount, SyncRun::withoutWorkspaceScope()->count());
         $this->assertSame($beforeItemCount, SyncRunItem::withoutWorkspaceScope()->count());
     }
+
+    #[Test]
+    public function proposal_rejects_customer_target_type_for_receive_r1(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('ReceiveProposal targetType must be Product or ProductVariant.');
+
+        new ReceiveProposal(
+            workspaceId: 'workspace-1',
+            connectorAccountId: 'account-1',
+            syncConfigurationId: 'config-1',
+            configurationRevision: str_repeat('d', 64),
+            targetType: FieldObjectType::Customer,
+            targetId: 'customer-1',
+            trustedExternalLinkEvidenceId: 'erl-evidence-3',
+            entries: [],
+            issuedAt: new DateTimeImmutable,
+        );
+    }
 }

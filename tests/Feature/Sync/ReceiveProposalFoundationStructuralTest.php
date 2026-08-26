@@ -42,6 +42,7 @@ class ReceiveProposalFoundationStructuralTest extends TestCase
             'app/Support/Sync/Receive/ReceiveProposal.php',
             'app/Support/Sync/Receive/ReceiveProposalEntry.php',
             'app/Support/Sync/Receive/ReceiveProposalFlowBinding.php',
+            'app/Support/Sync/Receive/ReceiveStoredProposalFlow.php',
         ];
 
         return collect($paths)

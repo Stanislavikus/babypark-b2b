@@ -5,6 +5,7 @@ namespace App\Services\Sync\Receive;
 use App\Support\Sync\Receive\ReceiveProposal;
 use App\Support\Sync\Receive\ReceiveProposalFlowBinding;
 use App\Support\Sync\Receive\ReceiveStoredProposalFlow;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 
@@ -13,6 +14,10 @@ final class ReceiveProposalFlowStore
     private const DEFAULT_TTL_SECONDS = 600;
 
     private const LOCK_TTL_SECONDS = 5;
+
+    public function __construct(
+        private readonly CacheRepository $cache,
+    ) {}
 
     /**
      * The flow id is only an opaque server-side lookup handle.
@@ -39,7 +44,7 @@ final class ReceiveProposalFlowStore
 
         $flowId = bin2hex(random_bytes(32));
 
-        Cache::put(
+        $this->cache->put(
             $this->cacheKey($flowId),
             new ReceiveStoredProposalFlow($binding, $proposal),
             now()->addSeconds($ttlSeconds),
@@ -54,46 +59,64 @@ final class ReceiveProposalFlowStore
      */
     public function consume(string $flowId, ReceiveProposalFlowBinding $binding): ?ReceiveProposal
     {
-        return Cache::lock($this->lockKey($flowId), self::LOCK_TTL_SECONDS)->block(
-            self::LOCK_TTL_SECONDS,
-            function () use ($flowId, $binding): ?ReceiveProposal {
-                $stored = Cache::get($this->cacheKey($flowId));
+        $cacheKey = $this->cacheKey($flowId);
+        $lock = $this->cache->lock($this->lockKey($flowId), self::LOCK_TTL_SECONDS);
 
-                if (! $stored instanceof ReceiveStoredProposalFlow) {
-                    return null;
-                }
+        if (! $lock->get()) {
+            return null;
+        }
 
-                if (! $stored->binding->matches($binding)) {
-                    return null;
-                }
+        try {
+            $stored = $this->cache->get($cacheKey);
 
-                Cache::forget($this->cacheKey($flowId));
+            if (! $stored instanceof ReceiveStoredProposalFlow) {
+                return null;
+            }
 
-                return $stored->proposal;
-            },
-        );
+            // Single-use: invalidate immediately regardless of binding outcome.
+            $this->cache->forget($cacheKey);
+
+            if (! $stored->binding->matches($binding)) {
+                return null;
+            }
+
+            return $stored->proposal;
+        } finally {
+            optional($lock)->release();
+        }
     }
 
     public function discard(string $flowId, ReceiveProposalFlowBinding $binding): bool
     {
-        return Cache::lock($this->lockKey($flowId), self::LOCK_TTL_SECONDS)->block(
-            self::LOCK_TTL_SECONDS,
-            function () use ($flowId, $binding): bool {
-                $stored = Cache::get($this->cacheKey($flowId));
+        $cacheKey = $this->cacheKey($flowId);
+        $lock = $this->cache->lock($this->lockKey($flowId), self::LOCK_TTL_SECONDS);
 
-                if (! $stored instanceof ReceiveStoredProposalFlow) {
-                    return false;
-                }
+        if (! $lock->get()) {
+            return false;
+        }
 
-                if (! $stored->binding->matches($binding)) {
-                    return false;
-                }
+        try {
+            $stored = $this->cache->get($cacheKey);
 
-                Cache::forget($this->cacheKey($flowId));
+            if (! $stored instanceof ReceiveStoredProposalFlow) {
+                return false;
+            }
 
-                return true;
-            },
-        );
+            if (! $stored->binding->matches($binding)) {
+                return false;
+            }
+
+            $this->cache->forget($cacheKey);
+
+            return true;
+        } finally {
+            optional($lock)->release();
+        }
+    }
+
+    public static function makeDefault(): self
+    {
+        return new self(Cache::store());
     }
 
     private function cacheKey(string $flowId): string

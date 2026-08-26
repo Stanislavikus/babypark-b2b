@@ -24,6 +24,14 @@ final readonly class ReceiveFieldCandidate
             throw new InvalidArgumentException('fieldBindingId must not be empty.');
         }
 
+        if (! in_array($this->objectType, [FieldObjectType::Product, FieldObjectType::ProductVariant], true)) {
+            throw new InvalidArgumentException('ReceiveFieldCandidate objectType must be Product or ProductVariant.');
+        }
+
+        if ($this->domainRoute === ReceiveDomainRoute::Unsupported && $this->isSupported) {
+            throw new InvalidArgumentException('ReceiveFieldCandidate with Unsupported route must be unsupported or blocked.');
+        }
+
         if ($this->localValuePresent === false && $this->localCanonicalValue !== null) {
             throw new InvalidArgumentException('localCanonicalValue must be null when localValuePresent is false.');
         }

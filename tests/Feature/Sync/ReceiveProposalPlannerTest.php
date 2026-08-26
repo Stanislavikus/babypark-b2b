@@ -83,6 +83,41 @@ class ReceiveProposalPlannerTest extends TestCase
     }
 
     #[Test]
+    public function candidate_rejects_customer_object_type_for_receive_r1(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('ReceiveFieldCandidate objectType must be Product or ProductVariant.');
+
+        new ReceiveFieldCandidate(
+            fieldBindingId: 'binding-customer',
+            objectType: FieldObjectType::Customer,
+            domainRoute: ReceiveDomainRoute::DynamicField,
+            localValuePresent: false,
+            localCanonicalValue: null,
+            remoteValuePresent: false,
+            remoteCanonicalValue: null,
+        );
+    }
+
+    #[Test]
+    public function unsupported_route_requires_candidate_to_be_marked_unsupported(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('ReceiveFieldCandidate with Unsupported route must be unsupported or blocked.');
+
+        new ReceiveFieldCandidate(
+            fieldBindingId: 'binding-unsupported',
+            objectType: FieldObjectType::Product,
+            domainRoute: ReceiveDomainRoute::Unsupported,
+            localValuePresent: false,
+            localCanonicalValue: null,
+            remoteValuePresent: false,
+            remoteCanonicalValue: null,
+            isSupported: true,
+        );
+    }
+
+    #[Test]
     public function explicit_clear_takes_precedence_over_ordinary_remote_absence(): void
     {
         $entry = $this->planner->plan([

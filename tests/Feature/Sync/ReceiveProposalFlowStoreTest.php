@@ -58,8 +58,6 @@ class ReceiveProposalFlowStoreTest extends TestCase
     #[Test]
     public function mismatched_binding_fails_closed_for_actor_workspace_account_configuration_and_target(): void
     {
-        $flowId = $this->store->issue($this->binding(), $this->proposal());
-
         $mismatches = [
             $this->binding(actorUserId: '999'),
             $this->binding(workspaceId: 'workspace-2'),
@@ -70,10 +68,11 @@ class ReceiveProposalFlowStoreTest extends TestCase
         ];
 
         foreach ($mismatches as $binding) {
-            $this->assertNull($this->store->consume($flowId, $binding));
-        }
+            $flowId = $this->store->issue($this->binding(), $this->proposal());
 
-        $this->assertInstanceOf(ReceiveProposal::class, $this->store->consume($flowId, $this->binding()));
+            $this->assertNull($this->store->consume($flowId, $binding));
+            $this->assertNull($this->store->consume($flowId, $this->binding()));
+        }
     }
 
     #[Test]
@@ -94,6 +93,15 @@ class ReceiveProposalFlowStoreTest extends TestCase
 
         $this->assertTrue($this->store->discard($flowId, $this->binding()));
         $this->assertNull($this->store->consume($flowId, $this->binding()));
+    }
+
+    #[Test]
+    public function flow_binding_rejects_customer_target_type_for_receive_r1(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('ReceiveProposalFlowBinding targetType must be Product or ProductVariant.');
+
+        $this->binding(targetType: FieldObjectType::Customer);
     }
 
     #[Test]
