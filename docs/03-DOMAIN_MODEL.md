@@ -4538,8 +4538,9 @@ Boundary: `app/Services/Catalog/GovernedProductVariantColumnMutationService.php`
 - Mutation authority requires the full canonical metadata tuple: `FieldDefinition` code, scope, workspace ownership, declared data type, active status, `is_localizable`, `is_multi_value`, supported validation-rules shape, plus `FieldBinding` workspace ownership, object type, storage type, storage path, and active status.
 - Every column-backed field must be **explicitly admitted** based on its domain semantics (its routing is not implied by its column location).
 - Connector code MUST NOT use broad `fill()`, mass assignment, or arbitrary `Model::update()` with remotely supplied values.
-- First explicit allowlist: Product `name` only.
+- First explicit allowlist: Product `name` and Product `description` only.
 - Product `name` is admitted only for the canonical global/global System `FieldDefinition` / `FieldBinding` tuple bound to `products.name`; Set requires a PHP string, rejects `null`, empty string, and whitespace-only string, preserves the exact string, rejects physically oversized payloads, and `clear()` is forbidden.
+- Product `description` is admitted only for the canonical global/global System `FieldDefinition` / `FieldBinding` tuple bound to `products.description`; Set requires a PHP string, rejects `null`, preserves the exact string including `''`, rejects physically oversized payloads, and `clear()` sets `NULL`.
 - The first consequential column-backed Receive Apply MUST NOT call GAP-029
   `set()` blindly.
 - Future Apply runtime requires an additive expected-current-value mutation path

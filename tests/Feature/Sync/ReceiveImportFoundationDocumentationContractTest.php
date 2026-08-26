@@ -497,6 +497,22 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
     public function test_column_backed_receive_apply_requires_expected_current_value_and_running_run_lease(): void
     {
         $this->assertStringContainsString(
+            'First explicit allowlist: Product `name` and Product `description` only.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Product `description` is admitted only for the canonical global/global System `FieldDefinition` / `FieldBinding` tuple bound to `products.description`',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            "preserves the exact string including `''`",
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`clear()` sets `NULL`.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
             'MUST NOT call GAP-029',
             $this->domainModelContent,
         );
@@ -622,6 +638,22 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
         );
         $this->assertStringContainsString(
             'Adobe Products/Import support remains **false**',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '- `description` or broader fields;',
+            $this->domainModelContent,
+        );
+    }
+
+    public function test_general_gap_029_allowlist_remains_broader_while_r3_apply_stays_name_only(): void
+    {
+        $this->assertStringContainsString(
+            'First explicit allowlist: Product `name` and Product `description` only.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'canonical Product `name` only',
             $this->domainModelContent,
         );
         $this->assertStringContainsString(
