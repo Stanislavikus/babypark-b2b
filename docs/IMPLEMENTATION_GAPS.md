@@ -1725,14 +1725,14 @@ unblocked as the next sequenced task.
 
 **Impact:**
 - The platform-core seam GAP-028 delivers a reusable governed dynamic writer for the supported generic Product/Variant Field Dictionary datatypes across Magento Receive, spreadsheet/CSV imports, Google Sheets, 1C/ERP, and future source connectors.
-- The first manual Receive/Import execution slice still cannot safely update column-backed Product/Variant fields because that governed runtime path remains absent under GAP-029.
+- GAP-029 now supplies the separate governed column-backed mutation boundary for the admitted first allowlist; GAP-028 remains the dynamic route only.
 
 **Decision:**
 - Do not implement a "Product God Writer" that bypasses domain routing. Explicitly route Pricing, Availability, Media, and Relations outside of this generic writer.
 - GAP-028 remains restricted to generic dynamic Product/Variant fields whose invariants belong entirely to Field Dictionary; it does not reopen column-backed mutation, pricing, media, or computed semantics.
 - `Money`, `Image`, and `Computed` remain outside the generic GAP-028 writer and must continue to route to their owning domain boundaries.
 
-**Next task:** Implement the column-backed mutation boundary (GAP-029) as a separate, allowlisted Product/Variant domain boundary.
+**Next task:** None within GAP-028. Future column-backed allowlist expansion belongs to the already-closed GAP-029 boundary and must remain separately admitted.
 
 **Status:** Closed.
 
@@ -1748,24 +1748,31 @@ canonical storage, and safe same-slot concurrency.
 - `03-DOMAIN_MODEL.md`, Receive / Import Foundation Contract (Resolved): column-backed Product/Variant core fields are intentionally outside the GAP-028 dynamic writer and require the appropriate Product/Variant domain mutation boundary with an explicit Receive allowlist.
 
 **Current code:**
-- There is no reusable governed Product/Variant mutation boundary suitable for connector/import writes to column-backed core fields such as `products.name` or `products.description`.
-- Current Product editing relies on Filament resource form binding / default persistence, not a reusable governed ingestion boundary.
-- Broad connector/import mass assignment into Product/Variant models remains forbidden by the approved docs contract.
+- GAP-029 is implemented as `app/Services/Catalog/GovernedProductVariantColumnMutationService.php` with a narrow `set()` / `clear()` API keyed by explicit `workspaceId`, `FieldObjectType`, target id, and `fieldBindingId`.
+- The boundary re-reads `FieldBinding` and `FieldDefinition` under shared lock inside the authoritative mutation transaction, revalidates the complete canonical allowlist tuple, then locks the target `Product` / `ProductVariant` row with `lockForUpdate()` before reading current state and mutating exactly one internally resolved allowlisted column.
+- The first frozen allowlist admits only Product `name` and Product `description`, both as canonical global/global System metadata. `storage_type = Column` or `storage_path` alone never authorizes a mutation.
+- Product `name` allows Set only; Product `description` allows Set and Clear-to-`NULL`; both reject physically unrepresentable payloads rather than relying on silent database truncation.
+- Narrow typed exceptions plus `App\Services\Catalog\ColumnMutationResult` keep the result contract bounded to `Updated` / `NoOp`.
+- Focused feature tests cover payload invariants, governance fail-closed behavior, stale preflight metadata rejection, and no mass-assignment path. MySQL integration tests cover same-row serialization, concurrent name+description preservation, and consequence-time metadata / target-workspace revalidation under lock.
 
 **Impact:**
-- The first manual connector-backed Receive execution slice cannot safely apply admitted column-backed Product/Variant fields because no reusable allowlisted Product/Variant domain mutation boundary exists yet.
-- The missing boundary is reusable for connector Receive and other ingestion paths where appropriate, but those other ingestion paths retain their own source identity/provenance/staleness semantics.
+- The architectural absence is closed: admitted column-backed Product/Variant mutations now have a reusable governed boundary independent of any connector runtime.
+- The first manual connector-backed Receive slice now has the required platform-core seam for the admitted first allowlist while preserving fail-closed behavior for all other column-backed fields.
+- Other ingestion paths may reuse this boundary where appropriate, but they retain their own source identity, provenance, authorization, and staleness contracts.
 
 **Decision:**
 - Do **not** migrate column-backed fields into dynamic storage merely to reuse GAP-028.
-- Future implementation must use an explicit allowlist plus Product/Variant domain invariants.
+- Mutation authority requires an explicit allowlist plus Product/Variant domain invariants; a matching `(object_type, storage_path)` pair is insufficient authority.
 - Do **not** implement broad connector mass assignment.
+- First explicit allowlist = Product `name` + Product `description` only.
 - `sku` remains excluded from first Receive.
+- Product lifecycle status remains excluded from the first boundary.
 - Pricing, Availability, Media, and Relations remain outside this boundary.
+- Future additive allowlist expansion does **not** reopen GAP-029 or downgrade it to Partial; GAP-029 is the existence of the governed boundary itself.
 
-**Next task:** Implement the governed Product/Variant column-backed mutation boundary for admitted core fields.
+**Next task:** None. Future work, if any, is additive allowlist admission within the closed boundary.
 
-**Status:** Open.
+**Status:** Closed.
 
 ## Pending Minor Documentation Fixes
 

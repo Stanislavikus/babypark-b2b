@@ -137,7 +137,7 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             $this->gapsContent,
         );
         $this->assertStringContainsString(
-            'GAP-029 remains the separate open column-backed mutation gap.',
+            'GAP-029 now covers the separate column-backed route.',
             File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md')),
         );
     }
@@ -401,7 +401,7 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
         );
     }
 
-    public function test_gap_029_records_missing_column_backed_mutation_boundary(): void
+    public function test_gap_029_records_implemented_column_backed_mutation_boundary(): void
     {
         $this->assertStringContainsString(
             'GAP-029',
@@ -421,6 +421,14 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
         );
         $this->assertStringContainsString(
             '`sku` remains excluded from first Receive',
+            $this->gapsContent,
+        );
+        $this->assertStringContainsString(
+            'First explicit allowlist = Product `name` + Product `description` only.',
+            $this->gapsContent,
+        );
+        $this->assertStringContainsString(
+            '**Status:** Closed.',
             $this->gapsContent,
         );
     }
@@ -496,11 +504,19 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             $this->domainModelContent,
         );
         $this->assertStringContainsString(
-            'currently **absent today**',
+            'GovernedProductVariantColumnMutationService.php',
             $this->domainModelContent,
         );
         $this->assertStringContainsString(
             'Every column-backed field must be **explicitly admitted**',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'First explicit allowlist: Product `name` and Product `description` only.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'GAP-029 is **Closed**.',
             $this->domainModelContent,
         );
     }
@@ -553,16 +569,20 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
         $this->assertStringNotContainsString('export_enabled', $migration);
     }
 
-    public function test_atlas_records_missing_column_backed_mutation_boundary(): void
+    public function test_atlas_records_implemented_column_backed_mutation_boundary(): void
     {
         $atlasContent = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
         $this->assertStringContainsString(
-            'Governed Product/Variant column-backed mutation boundary | CONFIRMED ABSENT',
+            'Governed Product/Variant column-backed mutation boundary | IMPLEMENTED (GAP-029 closed)',
             $atlasContent,
         );
         $this->assertStringContainsString(
             'GAP-029',
+            $atlasContent,
+        );
+        $this->assertStringContainsString(
+            'storage_type = Column` or `storage_path` alone is insufficient authority',
             $atlasContent,
         );
     }
