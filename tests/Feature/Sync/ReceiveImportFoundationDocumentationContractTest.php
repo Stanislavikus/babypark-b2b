@@ -370,7 +370,11 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             $atlasContent,
         );
         $this->assertStringContainsString(
-            'Receive connector read/orchestration | CONFIRMED ABSENT',
+            'Adobe Products Receive name proposal orchestration | IMPLEMENTED (internal; zero-mutation; no merchant entrypoint; no Apply)',
+            $atlasContent,
+        );
+        $this->assertStringContainsString(
+            'Receive connector read/orchestration | PARTIAL',
             $atlasContent,
         );
         $this->assertStringContainsString(

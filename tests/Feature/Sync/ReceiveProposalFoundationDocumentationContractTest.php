@@ -25,7 +25,8 @@ class ReceiveProposalFoundationDocumentationContractTest extends TestCase
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
         $this->assertStringContainsString('| Receive proposal/planner foundation | IMPLEMENTED |', $atlas);
-        $this->assertStringContainsString('| Receive connector read/orchestration | CONFIRMED ABSENT |', $atlas);
+        $this->assertStringContainsString('| Adobe Products Receive name proposal orchestration | IMPLEMENTED (internal; zero-mutation; no merchant entrypoint; no Apply) |', $atlas);
+        $this->assertStringContainsString('| Receive connector read/orchestration | PARTIAL |', $atlas);
         $this->assertStringContainsString('| Receive Apply runtime | CONFIRMED ABSENT |', $atlas);
         $this->assertStringNotContainsString('| Receive / Import runtime | CONFIRMED ABSENT |', $atlas);
     }
