@@ -4490,6 +4490,18 @@ For first manual Receive Apply:
 - the transient server-authoritative Receive proposal plus mandatory Apply-time
   revalidation is the manual Receive trust/readiness prerequisite.
 
+Apply authorization commit points are frozen:
+
+- the first fresh `run_sync_live` check occurs **before** proposal consumption,
+  so an unauthorized actor does not burn the proposal;
+- a second fresh `run_sync_live` check occurs **inside** the short Live Import
+  admission transaction, immediately before `SyncRun` creation, against the
+  locked/current Workspace authority state.
+
+Revocation before successful admission means no `SyncRun` and no mutation.
+Revocation after successful admission does **not** cancel that already-admitted
+execution; this matches existing Live authority semantics.
+
 This clarification does **not** enable Adobe Products/Import support.
 
 ### 6. Ownership, Baselines, and Automated Bidirectional Sync (Cross-Reference)
@@ -4526,9 +4538,8 @@ Boundary: `app/Services/Catalog/GovernedProductVariantColumnMutationService.php`
 - Mutation authority requires the full canonical metadata tuple: `FieldDefinition` code, scope, workspace ownership, declared data type, active status, `is_localizable`, `is_multi_value`, supported validation-rules shape, plus `FieldBinding` workspace ownership, object type, storage type, storage path, and active status.
 - Every column-backed field must be **explicitly admitted** based on its domain semantics (its routing is not implied by its column location).
 - Connector code MUST NOT use broad `fill()`, mass assignment, or arbitrary `Model::update()` with remotely supplied values.
-- First explicit allowlist: Product `name` and Product `description` only.
+- First explicit allowlist: Product `name` only.
 - Product `name` is admitted only for the canonical global/global System `FieldDefinition` / `FieldBinding` tuple bound to `products.name`; Set requires a PHP string, rejects `null`, empty string, and whitespace-only string, preserves the exact string, rejects physically oversized payloads, and `clear()` is forbidden.
-- Product `description` is admitted only for the canonical global/global System `FieldDefinition` / `FieldBinding` tuple bound to `products.description`; Set requires a PHP string, rejects `null`, preserves the exact string including `''`, rejects physically oversized payloads, and `clear()` sets `NULL`.
 - The first consequential column-backed Receive Apply MUST NOT call GAP-029
   `set()` blindly.
 - Future Apply runtime requires an additive expected-current-value mutation path
@@ -4574,6 +4585,21 @@ Consequential Receive Apply uses the existing Sync execution history shape:
   Apply time;
 - `SyncRunItem =` Product business-record outcome.
 
+First manual Receive Apply is synchronous/internal, not queue-dispatched.
+Admission creates the `SyncRun` directly in:
+
+- `mode = Live`;
+- `semantic_operation = Import`;
+- `status = Running`;
+- `started_at =` admission time;
+- `writer_deadline_at =` populated from the existing Live execution timing
+  model;
+- `recoverable_after =` populated from the existing Live recovery window.
+
+Do **not** invent a `Queued` state or connector job for this first foreground
+Apply. If the process dies, existing active-run recovery must eventually move
+the stale `Running` run to `Failed`.
+
 The Receive proposal itself remains transient and is **not** `SyncRun` history.
 
 For the first name-only slice:
@@ -4603,6 +4629,16 @@ A manual per-item Receive Apply has narrower run scope than the
 configuration-owned selection. Freeze an additive run-owned `execution_target`
 block in `SyncRun.configuration_snapshot` for targeted Receive execution.
 
+The exact first Receive snapshot representation is frozen as
+`platform.sync-run-input.v2` with additive run-owned:
+
+```json
+"execution_target": {
+    "mode": "explicit_product",
+    "product_id": "<owning Product id>"
+}
+```
+
 For the first slice:
 
 - configuration selection remains the truthful configuration state;
@@ -4611,10 +4647,8 @@ For the first slice:
   resolves to its owning `Product` for this Product-name slice;
 - `execution_target` is runtime evidence only, not configurable selection;
 - `execution_target` must **not** become a general subset/selection feature.
-
-If required, use a new snapshot envelope version only for snapshots that contain
-this additive `execution_target` block. Existing Export snapshot semantics and
-readers remain unchanged.
+- existing Export snapshots remain `v1` and unchanged;
+- do **not** add generic `object_type` / `internal_record` polymorphism.
 
 ### 9. Apply-Time Revalidation is Mandatory
 Before applying a Receive proposal, the runtime must freshly verify: actor authorization, target Workspace/ConnectorAccount, existing trusted `ExternalRecordLink`, remote logical identity, SKU equality precondition, `SyncConfiguration.configuration_revision`, mapping/option-mapping state, and that participating local and remote values have not changed. If state has changed, the proposal is invalidated and requires a rebuild (zero mutation).
@@ -4627,6 +4661,17 @@ First manual Apply ordering is frozen:
 4. fresh remote reread **outside** the DB transaction;
 5. short final locked validation/mutation transaction.
 
+Live Import admission reuses the existing one-active-run-per-`SyncConfiguration`
+boundary. Inside admission:
+
+- recover stale active runs using the existing recovery semantics;
+- reject if any `Queued` / `Running` `SyncRun` still exists for the
+  configuration, regardless of Preview/Live or Import/Export.
+
+Do **not** introduce a Receive-specific lock or concurrency table. Receive
+Apply intentionally serializes with existing Preview and Export Live activity on
+the same `SyncConfiguration`.
+
 After successful proposal consumption, any failure requires a fresh proposal. No
 automatic replay.
 
@@ -4637,6 +4682,23 @@ Apply must revalidate at minimum:
 - current `FieldMapping` / `FieldOptionMapping` state where applicable;
 - participating remote value unchanged;
 - participating local value unchanged.
+
+For this R3 name-only slice, Apply is executable only when the consumed
+proposal contains exactly **one** entry satisfying all of:
+
+- `objectType = Product`;
+- `domainRoute = ProductVariantColumn`;
+- `diffState = Differs`;
+- `localValuePresent = true`;
+- `remoteValuePresent = true`;
+- `explicitClear = false`;
+- `blockedReasonCode = null`;
+- `fieldBinding` resolves to the canonical admitted Product `name`.
+
+`Equal` is not a consequential Apply action.
+`UnsupportedOrBlocked` is not executable.
+Any other proposal shape fails closed **before** `SyncRun` admission and before
+remote HTTP.
 
 ### 10. Option Mappings and Reverse Resolution
 `FieldOptionMapping` remains direction-neutral. For Receive, if external option → internal option resolution is ambiguous (not unique) under the current legitimate persistence model, that field is blocked. No uniqueness constraint is added merely to simplify Receive.
@@ -8204,6 +8266,10 @@ Merchant consequential Live admission/exposure requires **all** relevant gates:
 - current configuration readiness;
 - fresh `ConnectorLiveRuntimeReadiness` (account-specific remote prerequisite);
 - `ConnectorSyncOperationSupport(Products, Export, Live) === true`.
+
+This gate list is the first Products/Export Live gate list. Manual Receive
+Import admission is governed by the Receive / Import Foundation Contract
+clarification and does **not** require Export Preview evidence.
 
 `ConnectorSyncOperationSupport` is static software capability.
 `ConnectorLiveRuntimeReadiness` is fresh account-specific remote prerequisite.
