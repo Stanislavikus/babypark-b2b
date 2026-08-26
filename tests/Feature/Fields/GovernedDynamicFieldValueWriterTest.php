@@ -1201,6 +1201,35 @@ class GovernedDynamicFieldValueWriterTest extends TestCase
         $this->assertSame(FieldValueWriteResult::Updated, $result->status);
     }
 
+    public function test_set_url_preserves_original_supplied_casing_in_stored_value_text(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'url_case_'.Str::lower(Str::random(6)),
+            dataType: AttributeDataType::Url,
+            objectType: FieldObjectType::ProductVariant,
+        );
+
+        $payload = 'HTTPS://Example.COM/Path';
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            $payload,
+        );
+
+        $row = VariantFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('variant_id', $this->variant->id)
+            ->where('field_binding_id', $binding->id)
+            ->sole();
+
+        $this->assertSame($payload, $row->value_text);
+        $this->assertNull($row->value_num);
+        $this->assertNull($row->value_jsonb);
+    }
+
     public function test_set_multiselect_accepts_valid_codes_and_stores_lexical_canonical_order(): void
     {
         [, $binding] = $this->createDefinitionAndBinding(
@@ -2009,6 +2038,8 @@ class GovernedDynamicFieldValueWriterTest extends TestCase
         return [
             'http' => ['http://example.com/catalog'],
             'https' => ['https://example.com/product?sku=ABC'],
+            'http_uppercase_scheme' => ['HTTP://example.com/Product'],
+            'https_mixed_case_scheme_and_host' => ['HTTPS://Example.COM/Path'],
         ];
     }
 

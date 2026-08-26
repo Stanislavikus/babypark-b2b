@@ -1127,7 +1127,9 @@ final class GovernedDynamicFieldValueWriter
         $scheme = $parts['scheme'] ?? null;
         $host = $parts['host'] ?? null;
 
-        if (! is_string($scheme) || ! in_array($scheme, ['http', 'https'], true) || ! is_string($host) || $host === '') {
+        $normalizedScheme = is_string($scheme) ? strtolower($scheme) : null;
+
+        if (! is_string($normalizedScheme) || ! in_array($normalizedScheme, ['http', 'https'], true) || ! is_string($host) || $host === '') {
             throw InvalidFieldValuePayloadException::invalidUrlPayload();
         }
     }
