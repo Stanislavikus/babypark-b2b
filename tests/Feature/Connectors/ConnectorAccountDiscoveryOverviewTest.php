@@ -181,13 +181,22 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
         ]);
         $successfulRun->update(['snapshot_id' => $successfulSnapshot->id]);
 
-        $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Failed, [
+        $failedRun = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Failed, [
             'created_at' => now(),
             'finished_at' => now(),
             'user_message_key' => 'connectors.errors.discovery_failed',
             'technical_summary' => self::SENSITIVE_CANARY,
             'error_code' => 'discovery_vendor_timeout',
         ]);
+
+        $this->assertTrue(
+            $successfulRun->fresh()->created_at->lt($failedRun->fresh()->created_at),
+            'Fixture precondition failed: successful discovery run must be older than the failed run.',
+        );
+        $this->assertTrue(
+            $failedRun->fresh()->created_at->gt($successfulRun->fresh()->created_at),
+            'Fixture precondition failed: failed discovery run must be newer than the successful run.',
+        );
 
         $component = Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
@@ -664,7 +673,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
             ->where('code', 'live_account_attributes')
             ->firstOrFail();
 
-        return ConnectorDiscoveryRun::withoutWorkspaceScope()->create(array_merge([
+        $attributes = array_merge([
             'id' => (string) Str::uuid(),
             'workspace_id' => $account->workspace_id,
             'connector_account_id' => $account->id,
@@ -687,8 +696,18 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
             'error_code' => null,
             'snapshot_id' => null,
             'previous_snapshot_id' => null,
-            'created_at' => now(),
-        ], $overrides));
+        ], $overrides);
+
+        $explicitCreatedAt = $attributes['created_at'] ?? null;
+        unset($attributes['created_at']);
+
+        $run = ConnectorDiscoveryRun::withoutWorkspaceScope()->create($attributes);
+
+        if ($explicitCreatedAt !== null) {
+            $run->forceFill(['created_at' => $explicitCreatedAt])->saveQuietly();
+        }
+
+        return $run->fresh();
     }
 
     /**

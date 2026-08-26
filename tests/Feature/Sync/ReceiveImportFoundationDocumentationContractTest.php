@@ -106,15 +106,39 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
         );
     }
 
-    public function test_writer_is_absent_today(): void
+    public function test_gap_028a_writer_is_partially_implemented_today(): void
     {
         $this->assertStringContainsString(
-            'absent today',
+            'GAP-028A is **partially implemented** today as the current governed boundary for ordinary dynamic `Text`, `LongText`, and single-value `Select` fields',
             $this->domainModelContent,
         );
         $this->assertStringContainsString(
-            'When implemented, this writer MUST be the governed boundary',
+            'This writer MUST validate/enforce at minimum',
             $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Current generic GAP-028A scope: `Text`, `LongText`, single-value `Select`.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'Remaining generic GAP-028 typed extension: `Number`, `Decimal`, `Boolean`, `Date`, `MultiSelect`, `Url`.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'GAP-028 is **not Closed**.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '**Status:** Partially implemented.',
+            $this->gapsContent,
+        );
+        $this->assertStringContainsString(
+            '`Money` remains owned by the Pricing domain, `Image` remains owned by the Media domain, and `Computed` remains derived / non-writable; they are outside the generic GAP-028 writer.',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            '`Money`, `Image`, and `Computed` are **not** part of the generic GAP-028 follow-up typed extension',
+            $this->gapsContent,
         );
     }
 
