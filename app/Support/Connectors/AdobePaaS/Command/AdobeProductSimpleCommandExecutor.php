@@ -11,7 +11,7 @@ final class AdobeProductSimpleCommandExecutor
     public function __construct(
         private readonly AdobeProductDesiredStateCompiler $compiler,
         private readonly AdobeProductExternalRecordLinkGuard $linkGuard,
-        private readonly AdobeSafeSyncClient $safeSyncClient,
+        private readonly ?AdobeSafeSyncClient $safeSyncClient = null,
     ) {}
 
     public function execute(AdobeProductSimpleCommandInput $input): AdobeProductSimpleCommandResult
@@ -115,6 +115,13 @@ final class AdobeProductSimpleCommandExecutor
         ) {
             return $this->knownNotApplied(
                 'consequential_write_gate_closed',
+                subjectSku: $desiredState->sku,
+            );
+        }
+
+        if ($this->safeSyncClient === null) {
+            return $this->knownNotApplied(
+                'entity_bound_mutation_bridge_unavailable',
                 subjectSku: $desiredState->sku,
             );
         }
