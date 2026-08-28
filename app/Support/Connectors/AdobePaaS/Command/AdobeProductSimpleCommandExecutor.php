@@ -2,11 +2,16 @@
 
 namespace App\Support\Connectors\AdobePaaS\Command;
 
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClient;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncSimpleProductWriteCustomAttribute;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncSimpleProductWriteRequest;
+
 final class AdobeProductSimpleCommandExecutor
 {
     public function __construct(
         private readonly AdobeProductDesiredStateCompiler $compiler,
         private readonly AdobeProductExternalRecordLinkGuard $linkGuard,
+        private readonly AdobeSafeSyncClient $safeSyncClient,
     ) {}
 
     public function execute(AdobeProductSimpleCommandInput $input): AdobeProductSimpleCommandResult
@@ -77,14 +82,135 @@ final class AdobeProductSimpleCommandExecutor
             return $this->unknownOrAmbiguous('ambiguous_variant_identity_links');
         }
 
-        if ($trustedLookup->isTrusted()) {
+        if (! $trustedLookup->isTrusted()) {
+            return $this->knownNotApplied('link_required', subjectSku: $desiredState->sku);
+        }
+
+        $trustedLink = $trustedLookup->link;
+
+        if ($trustedLink === null) {
+            return $this->unknownOrAmbiguous('trusted_variant_identity_link_missing');
+        }
+
+        if ($trustedLink->external_identifier !== $desiredState->sku) {
             return $this->knownNotApplied(
-                'entity_bound_mutation_bridge_required',
-                subjectSku: $trustedLookup->link?->external_identifier ?? $desiredState->sku,
+                'trusted_link_sku_mismatch',
+                subjectSku: $desiredState->sku,
             );
         }
 
-        return $this->knownNotApplied('link_required', subjectSku: $desiredState->sku);
+        $logicalEntityId = $this->logicalEntityId($trustedLink->external_record_discriminator);
+
+        if ($logicalEntityId === null) {
+            return $this->knownNotApplied(
+                'trusted_link_discriminator_invalid',
+                subjectSku: $desiredState->sku,
+            );
+        }
+
+        if (
+            $input->consequentialWriteGate === null
+            || ! $input->consequentialWriteGate->permitsProductExecution()
+            || ! $input->consequentialWriteGate->permitsConsequentialWrite()
+        ) {
+            return $this->knownNotApplied(
+                'consequential_write_gate_closed',
+                subjectSku: $desiredState->sku,
+            );
+        }
+
+        $mappedAttributes = $this->safeSyncMappedAttributes($desiredState->customAttributes);
+
+        if ($mappedAttributes === null) {
+            return $this->knownNotApplied(
+                'safe_sync_mapped_attribute_value_unsupported',
+                subjectSku: $desiredState->sku,
+            );
+        }
+
+        $writeResult = $this->safeSyncClient->writeSimpleProduct(
+            $input->workspaceId,
+            $input->connectorAccountId,
+            $logicalEntityId,
+            new AdobeSafeSyncSimpleProductWriteRequest(
+                expectedSku: $desiredState->sku,
+                name: $desiredState->name,
+                status: $desiredState->status,
+                visibility: $desiredState->visibility,
+                price: $desiredState->price,
+                mappedAttributes: $mappedAttributes,
+            ),
+        );
+
+        return new AdobeProductSimpleCommandResult(
+            $writeResult->appliedStateKnowledge,
+            new AdobeProductCommandSafeEvidence(
+                reasonCode: $writeResult->reasonCode,
+                subjectSku: $writeResult->sku,
+                remoteGetClassification: null,
+                consequentialWriteAttempts: $writeResult->consequentialWriteAttempts,
+                reconciliationGetAttempts: 0,
+                externalRecordLinkPersisted: false,
+                ownershipTrustSatisfied: true,
+                warningCodes: $writeResult->warningCodes,
+            ),
+        );
+    }
+
+    private function logicalEntityId(mixed $discriminator): ?int
+    {
+        if (! is_string($discriminator) || $discriminator === '' || ! ctype_digit($discriminator)) {
+            return null;
+        }
+
+        $logicalEntityId = (int) $discriminator;
+
+        return $logicalEntityId > 0 ? $logicalEntityId : null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $customAttributes
+     * @return list<AdobeSafeSyncSimpleProductWriteCustomAttribute>|null
+     */
+    private function safeSyncMappedAttributes(array $customAttributes): ?array
+    {
+        $mappedAttributes = [];
+
+        foreach ($customAttributes as $attributeCode => $value) {
+            if (! is_string($attributeCode) || $attributeCode === '') {
+                return null;
+            }
+
+            $normalizedValue = $this->safeSyncScalarValue($value);
+
+            if ($normalizedValue === null) {
+                return null;
+            }
+
+            $mappedAttributes[] = new AdobeSafeSyncSimpleProductWriteCustomAttribute(
+                $attributeCode,
+                $normalizedValue,
+            );
+        }
+
+        return $mappedAttributes;
+    }
+
+    private function safeSyncScalarValue(mixed $value): ?string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
+        return null;
     }
 
     private function knownNotApplied(
