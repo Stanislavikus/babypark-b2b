@@ -706,3 +706,14 @@ before the relevant domain area is implemented.
 | Wholesale pricing meaning | 01 | Must be resolved before PricingRule is implemented |
 | Connector scope for MVP | 03 | **Resolved** — Adobe Commerce PaaS/on-prem first (`03-DOMAIN_MODEL.md`, Connector scope (Resolved)) |
 | Billing scope for MVP | 03 | Deferred; simple workspace plan flags until resolved |
+
+---
+
+## Magento / Adobe Commerce V1 Product Field Contract
+
+`docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md` is the
+human-readable Magento Product V1 contract/runtime audit. Its adjacent
+`magento_v1_product_field_matrix.json` is authoritative for individual matrix
+rows and the prioritized implementation backlog. The contract separates core
+Product fields, installation-dependent EAV metadata, and extension/type-specific
+structures; it does not enable Adobe Products/Export/Live support.
