@@ -587,6 +587,32 @@ semantic freshness.
 
 ---
 
+## 09-CONNECTOR_DELIVERY_PROTOCOL.md
+
+Mandatory delivery and certification protocol for Magento / Adobe Commerce and every
+future external connector.
+
+This document exists to prevent connector work from degrading into an arbitrary
+field-by-field or GAP-by-GAP sequence.
+
+It defines the connector campaign as:
+
+`authoritative external inventory → classify all fields into clusters → map every field to a platform owner/representation → implement only proven missing seams → real representative READ/WRITE probe per cluster → capture actual errors → fix root causes → rerun → field-by-field certification`
+
+For mutable fields, the default goal is working change propagation in both directions:
+external system → platform and platform → external system, wherever the external
+platform actually permits those operations.
+
+Every connector task must be selected from a concrete missing capability, failed probe,
+or uncertified field/cluster that blocks the final field-complete result. Individual
+fields, stages, GAPs, endpoints and architecture foundations are checkpoints, not the
+connector goal.
+
+This file is mandatory reading for any connector implementation, connector planning,
+connector certification, import/export transport expansion, or real-target validation task.
+
+---
+
 ## Reading Order
 
 **For product decisions:**
@@ -605,6 +631,7 @@ semantic freshness.
 - CANONICAL_PRODUCT_FIELD_REGISTRY.md and the related `docs/data/*.csv`
 - IMPLEMENTATION_GAPS.md — open gaps affecting the field or mapping in question
 - 08-CONNECTOR_SYNC_RUNTIME_ATLAS.md — current-state locator only; verify owners in code
+- 09-CONNECTOR_DELIVERY_PROTOCOL.md — mandatory for connector/import/export delivery sequencing and certification
 - `docs/prototypes/task-4b0-connector-account/` — Task 4B-0 visual contract
   (when implementing connector operational UI)
 
@@ -627,6 +654,8 @@ semantic freshness.
 - 05-AI_WORKING_AGREEMENT.md
 - 08-CONNECTOR_SYNC_RUNTIME_ATLAS.md when the task touches Connector/Sync seams
   (locator only; verify current owner in code before modification)
+- 09-CONNECTOR_DELIVERY_PROTOCOL.md when the task touches connector implementation,
+  import/export transport, real-target validation, or connector certification
 
 **For AI-assisted implementation (UI and frontend tasks):**
 
@@ -656,7 +685,9 @@ The current core documentation set is intentionally complete but not over-docume
 - how AI assistants must work with the project;
 - how the user interface must look and behave;
 - which tech stack and patterns to use for implementation;
-- where current Connector/Sync implementation actually lives (Atlas locator).
+- where current Connector/Sync implementation actually lives (Atlas locator);
+- how connectors are driven from complete field inventory through real error-driven
+  validation to field-by-field certification.
 
 Implementation details may later live in code, migrations, issues or feature specs.
 

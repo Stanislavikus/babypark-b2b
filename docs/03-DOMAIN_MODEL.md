@@ -4477,8 +4477,8 @@ Consequential Live execution authority for manual Receive Apply remains the exis
 
 Do **not** introduce `run_sync_receive`.
 
-The current Stage 3-0 merchant consequential Live admission gate list is the
-first Products/Export gate list. It is **not** a proof that every future Live
+The current Stage 3-0 merchant consequential Live admission gate list is
+the first Products/Export gate list. It is **not** a proof that every future Live
 semantic operation inherits the same non-authority prerequisites unchanged.
 
 For first manual Receive Apply:
@@ -4606,8 +4606,8 @@ The Receive proposal itself remains transient and is **not** `SyncRun` history.
 For the first name-only slice:
 
 - exactly one affected business `Product`;
-- a trusted `ProductVariant` may remain the remote correlation target, but its
-  owning `Product` is the business record and local mutation owner;
+- a trusted `ProductVariant` may remain the remote correlation target, but
+  its owning `Product` is the business record and local mutation owner;
 - `SyncRunItem.product_id` is that owning `Product` id;
 - no Variant column mutation;
 - no SKU mutation.
