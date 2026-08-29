@@ -180,7 +180,7 @@ This document describes:
 ### Attribute Dictionary Context
 
 - AttributeDefinition (schema, validation, behavior profiles);
-- Hybrid storage: column-backed core fields + EAV dynamic tables;
+- Hybrid storage: column-backed core fields + dynamic EAV tables;
 - product_attribute_values (product-level dynamic values);
 - variant_attribute_values (variant-level dynamic values);
 - These two tables must never be merged into a single polymorphic table;
@@ -341,7 +341,7 @@ mandates and a 22-item Architecture Review Checklist.
    AttributeDefinition aliases and FieldMapping.
 
 9. **Configuration Over Custom Code** — no hardcoded workspace-specific or
-   client-specific logic; WorkspaceOrderStatusMatrix governs order lifecycle rules.
+   client-specific logic; WorkspaceOrderStatusMatrix governs all workspace-specific behavior.
 
 10. **Reduction of PCI Scope and Payment Liability** — no raw card data;
     hosted payment flows only; webhook signature validation required.
