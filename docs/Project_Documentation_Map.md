@@ -341,7 +341,7 @@ mandates and a 22-item Architecture Review Checklist.
    AttributeDefinition aliases and FieldMapping.
 
 9. **Configuration Over Custom Code** — no hardcoded workspace-specific or
-   client-specific logic; WorkspaceOrderStatusMatrix governs all workspace-specific behavior.
+   client-specific logic; WorkspaceOrderStatusMatrix governs order lifecycle rules.
 
 10. **Reduction of PCI Scope and Payment Liability** — no raw card data;
     hosted payment flows only; webhook signature validation required.
