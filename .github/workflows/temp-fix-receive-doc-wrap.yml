@@ -62,7 +62,7 @@ jobs:
           git add docs/03-DOMAIN_MODEL.md .github/workflows/temp-fix-receive-doc-wrap.yml
           git diff --cached --check
 
-          test "$(git diff --cached --numstat -- docs/03-DOMAIN_MODEL.md | awk '{print $1 ":" $2}')" = "2:2"
+          test "$(git diff --cached --numstat -- docs/03-DOMAIN_MODEL.md | awk '{print $1 ":" $2}')" = "4:4"
 
           git commit -m "docs(sync): align Receive contract line wrapping"
           git push origin HEAD:chatgpt/connector-delivery-protocol
