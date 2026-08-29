@@ -285,7 +285,7 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             $this->domainModelContent,
         );
         $this->assertStringContainsString(
-            'Manual Receive' . PHP_EOL . 'Import admission is governed by the Receive / Import Foundation Contract',
+            'Manual Receive'.PHP_EOL.'Import admission is governed by the Receive / Import Foundation Contract',
             $this->domainModelContent,
         );
     }
