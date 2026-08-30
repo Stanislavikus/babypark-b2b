@@ -1,15 +1,7 @@
 @php
-    use Livewire\Livewire;
-
-    /** @var \App\Models\ConnectorAccount $record */
-    $livewire = Livewire::current();
-
-    if (! $livewire instanceof \App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount || ! $livewire->shouldShowStoreSetupBlock()) {
-        return;
-    }
-
-    $actionState = $livewire->storeSetupActionState();
-    $state = $livewire->storeSetupState;
+    /** @var \App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount $this */
+    $actionState = $this->storeSetupActionState();
+    $state = $this->storeSetupState;
 
     $containerClasses = match ($state) {
         'READY' => 'border-success-200 bg-success-50/70 dark:border-success-500/30 dark:bg-success-500/10',
@@ -32,10 +24,6 @@
         'UPDATE_REQUIRED' => 'connectors.ui.readiness.update_required.body',
         default => null,
     };
-
-    $buttonLabel = $state === 'NOT_CHECKED'
-        ? __('connectors.ui.readiness.check')
-        : __('connectors.ui.readiness.check_again');
 @endphp
 
 <div class="space-y-2">
@@ -67,16 +55,7 @@
             @endif
 
             <div class="flex flex-wrap items-center gap-3">
-                <x-filament::button
-                    color="gray"
-                    size="sm"
-                    wire:click="checkStoreSetup"
-                    wire:loading.attr="disabled"
-                    wire:target="checkStoreSetup"
-                    @disabled(! $actionState['enabled'])
-                >
-                    {{ $buttonLabel }}
-                </x-filament::button>
+                {{ $this->checkStoreSetupAction }}
 
                 @if (filled($actionState['disabled_reason']))
                     <span class="text-sm text-gray-600 dark:text-gray-400">

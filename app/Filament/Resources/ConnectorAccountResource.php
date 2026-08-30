@@ -26,6 +26,7 @@ use Filament\Tables\Table;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Gate;
 
 class ConnectorAccountResource extends Resource
 {
@@ -210,6 +211,7 @@ class ConnectorAccountResource extends Resource
                         ViewEntry::make('store_setup')
                             ->label(__('connectors.ui.readiness.store_setup'))
                             ->view('filament.connector-accounts.store-setup')
+                            ->visible(fn (ConnectorAccount $record): bool => static::shouldShowStoreSetupEntry($record))
                             ->columnSpanFull(),
                         TextEntry::make('last_checked_at')
                             ->label(__('connectors.ui.columns.last_check'))
@@ -409,5 +411,27 @@ class ConnectorAccountResource extends Resource
         }
 
         return static::capabilityPresentation()->canManage($user, app(WorkspaceContext::class)->current());
+    }
+
+    public static function shouldShowStoreSetupEntry(ConnectorAccount $record): bool
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        $workspace = $record->workspace ?? Workspace::query()->findOrFail($record->workspace_id);
+        $presentation = static::capabilityPresentation();
+
+        if (! $presentation->showActiveConnectionCheck($user, $workspace)) {
+            return false;
+        }
+
+        if ($record->auth_profile !== 'adobe_commerce_paas_oauth1_integration') {
+            return false;
+        }
+
+        return Gate::forUser($user)->allows('runConnectionCheck', $record);
     }
 }

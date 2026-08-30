@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\ConnectorAccountResource\Pages;
 
-use App\Enums\ConnectorComponentReadiness;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
@@ -144,24 +143,8 @@ class ViewConnectorAccount extends ViewRecord
 
     public function shouldShowStoreSetupBlock(): bool
     {
-        $user = auth()->user();
-
-        if (! $user instanceof User || ! $this->record instanceof ConnectorAccount) {
-            return false;
-        }
-
-        $workspace = $this->presentationWorkspace();
-        $presentation = app(ConnectorAccountCapabilityPresentation::class);
-
-        if (! $presentation->showActiveConnectionCheck($user, $workspace)) {
-            return false;
-        }
-
-        if ($this->record->auth_profile !== 'adobe_commerce_paas_oauth1_integration') {
-            return false;
-        }
-
-        return Gate::forUser($user)->allows('runConnectionCheck', $this->record);
+        return $this->record instanceof ConnectorAccount
+            && ConnectorAccountResource::shouldShowStoreSetupEntry($this->record);
     }
 
     /**
@@ -172,8 +155,27 @@ class ViewConnectorAccount extends ViewRecord
         return app(ConnectorAccountUiState::class)->manualCheckActionState($this->record);
     }
 
+    public function checkStoreSetupAction(): Action
+    {
+        return Action::make('checkStoreSetup')
+            ->label(fn (): string => $this->storeSetupState === 'NOT_CHECKED'
+                ? __('connectors.ui.readiness.check')
+                : __('connectors.ui.readiness.check_again'))
+            ->color('gray')
+            ->size('sm')
+            ->authorize(fn (): bool => $this->shouldShowStoreSetupBlock())
+            ->disabled(fn (): bool => ! $this->storeSetupActionState()['enabled'])
+            ->tooltip(fn (): ?string => $this->storeSetupActionState()['disabled_reason'])
+            ->action(function (): void {
+                $this->checkStoreSetup();
+            });
+    }
+
     public function checkStoreSetup(): void
     {
+        $this->storeSetupState = 'NOT_CHECKED';
+        $this->storeSetupBaselineMessage = null;
+
         try {
             $actor = auth()->user();
             abort_unless($actor instanceof User, 403);

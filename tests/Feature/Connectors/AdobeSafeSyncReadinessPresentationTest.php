@@ -75,12 +75,22 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
     public function connector_account_action_uses_transient_resolver_without_readiness_persistence(): void
     {
         $page = file_get_contents(app_path('Filament/Resources/ConnectorAccountResource/Pages/ViewConnectorAccount.php'));
+        $resource = file_get_contents(app_path('Filament/Resources/ConnectorAccountResource.php'));
         $resolver = file_get_contents(app_path('Services/Connectors/AdobeSafeSyncComponentReadinessResolver.php'));
+        $view = file_get_contents(resource_path('views/filament/connector-accounts/store-setup.blade.php'));
 
         $this->assertStringContainsString('AdobeSafeSyncComponentReadinessResolver', $page);
         $this->assertStringContainsString('AdobeSafeSyncRequiredOperation::SimpleProductWrite', $page);
-        $this->assertStringContainsString('checkStoreSetup', $page);
+        $this->assertStringContainsString('public function checkStoreSetupAction(): Action', $page);
+        $this->assertStringContainsString("Action::make('checkStoreSetup')", $page);
+        $this->assertStringContainsString("->authorize(fn (): bool => \$this->shouldShowStoreSetupBlock())", $page);
+        $this->assertStringContainsString("->disabled(fn (): bool => ! \$this->storeSetupActionState()['enabled'])", $page);
+        $this->assertStringContainsString("\$this->storeSetupState = 'NOT_CHECKED';", $page);
         $this->assertStringNotContainsString('checkComponentReadiness', $page);
+        $this->assertStringContainsString('shouldShowStoreSetupEntry', $resource);
+        $this->assertStringContainsString("->visible(fn (ConnectorAccount \$record): bool => static::shouldShowStoreSetupEntry(\$record))", $resource);
+        $this->assertStringContainsString('{{ $this->checkStoreSetupAction }}', $view);
+        $this->assertStringNotContainsString('wire:click="checkStoreSetup"', $view);
         $this->assertStringNotContainsString('ConnectorAccount::update', $resolver);
         $this->assertStringNotContainsString('save()', $resolver);
         $this->assertSame([], glob(database_path('migrations/*readiness*')) ?: []);
