@@ -207,6 +207,10 @@ class ConnectorAccountResource extends Resource
                                 'uiState' => $uiState,
                                 'showActiveConnectionCheck' => static::actorCanManageConnectorAccounts(),
                             ]),
+                        ViewEntry::make('store_setup')
+                            ->label(__('connectors.ui.readiness.store_setup'))
+                            ->view('filament.connector-accounts.store-setup')
+                            ->columnSpanFull(),
                         TextEntry::make('last_checked_at')
                             ->label(__('connectors.ui.columns.last_check'))
                             ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))

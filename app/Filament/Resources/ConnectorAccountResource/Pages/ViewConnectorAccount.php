@@ -37,6 +37,10 @@ class ViewConnectorAccount extends ViewRecord
 {
     protected static string $resource = ConnectorAccountResource::class;
 
+    public string $storeSetupState = 'NOT_CHECKED';
+
+    public ?string $storeSetupBaselineMessage = null;
+
     public function getSubheading(): string|Htmlable|null
     {
         $user = auth()->user();
@@ -101,10 +105,6 @@ class ViewConnectorAccount extends ViewRecord
 
         if ($presentation->showActiveConnectionCheck($user, $workspace)) {
             $actions[] = $this->makeRunConnectionCheckAction();
-
-            if ($this->record->auth_profile === 'adobe_commerce_paas_oauth1_integration') {
-                $actions[] = $this->makeCheckComponentReadinessAction();
-            }
         }
 
         if ($presentation->showDiscoveryExecution($user, $workspace) && config('connectors.discovery.manual_trigger_enabled')) {
@@ -140,6 +140,84 @@ class ViewConnectorAccount extends ViewRecord
         }
 
         return ConnectorAccountResource::loadAccountPresentationRelations($record, $user);
+    }
+
+    public function shouldShowStoreSetupBlock(): bool
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User || ! $this->record instanceof ConnectorAccount) {
+            return false;
+        }
+
+        $workspace = $this->presentationWorkspace();
+        $presentation = app(ConnectorAccountCapabilityPresentation::class);
+
+        if (! $presentation->showActiveConnectionCheck($user, $workspace)) {
+            return false;
+        }
+
+        if ($this->record->auth_profile !== 'adobe_commerce_paas_oauth1_integration') {
+            return false;
+        }
+
+        return Gate::forUser($user)->allows('runConnectionCheck', $this->record);
+    }
+
+    /**
+     * @return array{enabled: bool, label: string, disabled_reason: ?string}
+     */
+    public function storeSetupActionState(): array
+    {
+        return app(ConnectorAccountUiState::class)->manualCheckActionState($this->record);
+    }
+
+    public function checkStoreSetup(): void
+    {
+        try {
+            $actor = auth()->user();
+            abort_unless($actor instanceof User, 403);
+
+            $workspaceId = app(WorkspaceContext::class)->id();
+            $account = ConnectorAccount::withoutWorkspaceScope()
+                ->where('workspace_id', $workspaceId)
+                ->whereKey($this->record->getKey())
+                ->firstOrFail();
+
+            Gate::forUser($actor)->authorize('runConnectionCheck', $account);
+
+            if (! app(ConnectorAccountUiState::class)->manualCheckActionState($account)['enabled']) {
+                throw new AuthorizationException;
+            }
+
+            $result = app(AdobeSafeSyncComponentReadinessResolver::class)->resolve(
+                $workspaceId,
+                (string) $account->getKey(),
+                AdobeSafeSyncRequiredOperation::SimpleProductWrite,
+            );
+
+            $readiness = $result->componentReadiness;
+
+            if ($readiness !== null) {
+                $this->storeSetupState = strtoupper($readiness->value);
+                $this->storeSetupBaselineMessage = null;
+
+                return;
+            }
+
+            $this->storeSetupState = 'BASELINE_FAILURE';
+            $this->storeSetupBaselineMessage = app(ConnectorSafeMessagePresenter::class)->present(
+                $result->connectionResult->messageKey(),
+                $result->connectionResult->safeMessageParameters(),
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->danger()
+                ->title(__('connectors.ui.notifications.action_failed'))
+                ->send();
+        }
     }
 
     private function presentationWorkspace(): Workspace
@@ -215,76 +293,6 @@ class ViewConnectorAccount extends ViewRecord
 
                     Notification::make()
                         ->danger()
-                        ->title(__('connectors.ui.notifications.action_failed'))
-                        ->send();
-                }
-            });
-    }
-
-    private function makeCheckComponentReadinessAction(): Action
-    {
-        return Action::make('checkComponentReadiness')
-            ->label(__('connectors.ui.readiness.check_again'))
-            ->icon('heroicon-o-arrow-path')
-            ->authorize('runConnectionCheck')
-            ->tooltip(fn (): ?string => app(ConnectorAccountUiState::class)
-                ->manualCheckActionState($this->record)['disabled_reason'])
-            ->disabled(fn (): bool => ! app(ConnectorAccountUiState::class)
-                ->manualCheckActionState($this->record)['enabled'])
-            ->action(function (): void {
-                try {
-                    $actor = auth()->user();
-                    abort_unless($actor instanceof User, 403);
-
-                    $workspaceId = app(WorkspaceContext::class)->id();
-                    $account = ConnectorAccount::withoutWorkspaceScope()
-                        ->where('workspace_id', $workspaceId)
-                        ->whereKey($this->record->getKey())
-                        ->firstOrFail();
-
-                    Gate::forUser($actor)->authorize('runConnectionCheck', $account);
-
-                    if (! app(ConnectorAccountUiState::class)->manualCheckActionState($account)['enabled']) {
-                        throw new AuthorizationException;
-                    }
-
-                    $result = app(AdobeSafeSyncComponentReadinessResolver::class)->resolve(
-                        $workspaceId,
-                        (string) $account->getKey(),
-                        AdobeSafeSyncRequiredOperation::SimpleProductWrite,
-                    );
-
-                    $readiness = $result->componentReadiness;
-
-                    if ($readiness !== null) {
-                        $notification = Notification::make()
-                            ->title(__('connectors.ui.readiness.'.$readiness->value.'.title'));
-
-                        if ($readiness === ConnectorComponentReadiness::Ready) {
-                            $notification->success()->send();
-
-                            return;
-                        }
-
-                        $notification->warning()
-                            ->body(__('connectors.ui.readiness.'.$readiness->value.'.body'))
-                            ->persistent()
-                            ->send();
-
-                        return;
-                    }
-
-                    Notification::make()->danger()
-                        ->title(__('connectors.ui.notifications.check_failed'))
-                        ->body(app(ConnectorSafeMessagePresenter::class)->present(
-                            $result->connectionResult->messageKey(),
-                            $result->connectionResult->safeMessageParameters(),
-                        ))
-                        ->send();
-                } catch (Throwable $exception) {
-                    report($exception);
-
-                    Notification::make()->danger()
                         ->title(__('connectors.ui.notifications.action_failed'))
                         ->send();
                 }

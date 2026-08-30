@@ -3,6 +3,8 @@
 namespace Tests\Feature\Connectors;
 
 use App\Enums\ConnectorAccountConnectionStatus;
+use App\Enums\ConnectorComponentReadiness;
+use App\Enums\ConnectorConnectionCheckErrorCode;
 use App\Enums\ConnectorConnectionCheckLifecycleErrorCode;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Enums\ConnectorConnectionCheckTrigger;
@@ -17,9 +19,13 @@ use App\Models\ConnectorAccount;
 use App\Models\ConnectorConnectionCheck;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Connectors\AdobeSafeSyncComponentReadinessResolver;
 use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncReadinessResult;
 use App\Support\Connectors\AdobePaaS\AdobePaaSCredentialMapper;
+use App\Support\Connectors\ConnectorConnectionCheckResult;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
+use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -71,6 +77,11 @@ class ConnectorAccountResourceTest extends TestCase
     {
         $this->dispatchStub = $stub;
         $this->app->instance(ConnectorConnectionCheckDispatchService::class, $stub);
+    }
+
+    private function bindReadinessResolverStub(AdobeSafeSyncComponentReadinessResolverStub $stub): void
+    {
+        $this->app->instance(AdobeSafeSyncComponentReadinessResolver::class, $stub);
     }
 
     #[Test]
@@ -423,20 +434,23 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
-    public function readiness_action_reuses_manual_check_availability(): void
+    public function store_setup_block_reuses_manual_check_availability(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
 
         $disabledAccount = $this->createConnectorAccount(overrides: ['is_enabled' => false]);
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $disabledAccount->getKey()])
-            ->assertActionDisabled('checkComponentReadiness');
+            ->assertActionDoesNotExist('checkComponentReadiness')
+            ->assertSee(__('connectors.ui.readiness.store_setup'))
+            ->assertSee(__('connectors.ui.disabled_reasons.account_disabled'));
 
         $activeAccount = $this->createConnectorAccount();
         $this->createActiveCheck($activeAccount, ConnectorConnectionCheckStatus::Running);
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $activeAccount->getKey()])
-            ->assertActionDisabled('checkComponentReadiness');
+            ->assertSee(__('connectors.ui.readiness.store_setup'))
+            ->assertSee(__('connectors.ui.disabled_reasons.check_already_active'));
     }
 
     #[Test]
@@ -448,7 +462,9 @@ class ConnectorAccountResourceTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertActionDisabled('checkComponentReadiness');
+            ->assertActionDoesNotExist('checkComponentReadiness')
+            ->assertSee(__('connectors.ui.readiness.store_setup'))
+            ->assertSee(__('connectors.ui.disabled_reasons.profile_disabled'));
     }
 
     #[Test]
@@ -460,7 +476,92 @@ class ConnectorAccountResourceTest extends TestCase
 
         Livewire::actingAs($viewer)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertActionDoesNotExist('checkComponentReadiness');
+            ->assertActionDoesNotExist('checkComponentReadiness')
+            ->assertDontSee(__('connectors.ui.readiness.store_setup'));
+    }
+
+    #[Test]
+    public function inline_store_setup_check_sets_ready_state_without_notification(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+        $stub = new AdobeSafeSyncComponentReadinessResolverStub;
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            ConnectorConnectionCheckResult::success(),
+            ConnectorComponentReadiness::Ready,
+        );
+        $this->bindReadinessResolverStub($stub);
+
+        $component = Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSee(__('connectors.ui.readiness.store_setup'))
+            ->call('checkStoreSetup')
+            ->assertSet('storeSetupState', 'READY')
+            ->assertSee(__('connectors.ui.readiness.ready.title'))
+            ->assertSee(__('connectors.ui.readiness.ready.body'));
+
+        $this->assertSame(1, $stub->callCount);
+        $effects = json_encode($component->effects, JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString(__('connectors.ui.notifications.action_failed'), $effects);
+        $this->assertStringNotContainsString(__('connectors.ui.notifications.check_failed'), $effects);
+    }
+
+    #[Test]
+    public function inline_store_setup_baseline_failure_stays_inline_without_generic_notification(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+        $stub = new AdobeSafeSyncComponentReadinessResolverStub;
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            ConnectorConnectionCheckResult::httpFailure(
+                ConnectorConnectionCheckErrorCode::AdobeInvalidCredentials,
+                401,
+            ),
+            null,
+        );
+        $this->bindReadinessResolverStub($stub);
+
+        $component = Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->call('checkStoreSetup')
+            ->assertSet('storeSetupState', 'BASELINE_FAILURE')
+            ->assertSee(__('connectors.ui.readiness.baseline_failure.title'))
+            ->assertSee(__('connectors.errors.invalid_credentials'))
+            ->assertSee(__('connectors.ui.readiness.baseline_failure.guidance'));
+
+        $effects = json_encode($component->effects, JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString(__('connectors.ui.notifications.action_failed'), $effects);
+        $this->assertStringNotContainsString(__('connectors.ui.notifications.check_failed'), $effects);
+    }
+
+    #[Test]
+    public function store_setup_check_reauthorizes_and_reloads_account_before_resolving(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $actor = $this->createStaffUser(UserRole::Manager);
+        $membership = $this->grantExactWorkspacePermissions($workspace, $actor, [
+            WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+            WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS,
+        ]);
+        $account = $this->createConnectorAccount($workspace);
+        $stub = new AdobeSafeSyncComponentReadinessResolverStub;
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            ConnectorConnectionCheckResult::success(),
+            ConnectorComponentReadiness::Ready,
+        );
+        $this->bindReadinessResolverStub($stub);
+
+        $component = Livewire::actingAs($actor)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSee(__('connectors.ui.readiness.store_setup'));
+
+        $this->revokeAllWorkspaceRoles($membership);
+        $actor->refresh();
+
+        $component->call('checkStoreSetup');
+
+        $this->assertSame(0, $stub->callCount);
+        $component->assertNotified(__('connectors.ui.notifications.action_failed'));
     }
 
     #[Test]
@@ -773,5 +874,26 @@ final class ConnectorConnectionCheckDispatchServiceStub
         }
 
         return $this->executeManualResult;
+    }
+}
+
+final class AdobeSafeSyncComponentReadinessResolverStub
+{
+    public int $callCount = 0;
+
+    public ?AdobeSafeSyncReadinessResult $result = null;
+
+    public function resolve(
+        string $workspaceId,
+        string $connectorAccountId,
+        \App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncRequiredOperation $operation,
+    ): AdobeSafeSyncReadinessResult {
+        $this->callCount++;
+
+        if ($this->result === null) {
+            throw new \RuntimeException('Unexpected resolve call in test stub.');
+        }
+
+        return $this->result;
     }
 }
