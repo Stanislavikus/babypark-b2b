@@ -7266,6 +7266,19 @@ are **forbidden** for safety decisions.
 
 #### Account readiness freeze (ConnectorSyncOperationSupport vs ConnectorLiveRuntimeReadiness)
 
+**Safe Sync component readiness (Resolved — 2026-08-30):** after the ordinary
+Magento connection check succeeds, one bounded handshake classifies the
+requested operation as `READY`, `SETUP_REQUIRED`, or `UPDATE_REQUIRED`.
+`SETUP_REQUIRED` requires the conjunction of a successful baseline and the
+structured existing `AdobeInvalidOrUnsupportedEndpoint` result with exact HTTP
+404; it means the endpoint is unavailable or installation/setup/deployment is
+incomplete, not that physical module absence was proven. An unaccepted
+compatibility epoch or missing required operation family is `UPDATE_REQUIRED`.
+Other failures preserve existing connection/error semantics with component
+readiness absent. Evaluation is stateless and presentation-only: no readiness
+table or account projection is introduced. The result does not replace the
+fresh `ConnectorLiveRuntimeReadiness` consequential-write timing rules.
+
 | Concept | Meaning |
 |---|---|
 | `ConnectorSyncOperationSupport` | Static software capability — what the connector profile advertises |
@@ -7705,20 +7718,24 @@ The post-#168 certification envelope is:
 | Tier | Adobe Commerce | PHP |
 |---|---|---|
 | **PRIMARY** | 2.4.9 | 8.5 |
-| **SUPPORTED COMPATIBILITY** | 2.4.9 | 8.4 |
-| **PREVIOUS ADOBE LINE** | 2.4.8-p5 | 8.4 |
+| **UPGRADE-COMPATIBILITY ONLY — not a production support claim** | 2.4.9 | 8.4 |
+| **PREVIOUS CERTIFIED TARGET** | 2.4.8-p5 | 8.4 |
 | **OUT OF V1 CERTIFICATION** | — | 8.3 |
 
-- PHP 8.4 **IS supported** on Adobe Commerce 2.4.9. Do not record it as
-  unsupported.
+- **2026-08-30 Stop & Amend:** newer Adobe primary-source system requirements
+  supersede the former statement that PHP 8.4 was a production-supported Adobe
+  Commerce 2.4.9 target. Adobe now lists PHP 8.5 for 2.4.9 production use and
+  describes PHP 8.4 as upgrade compatibility only. This label correction does
+  not broaden or otherwise change the Safe Sync Composer constraints. Primary
+  source: [Adobe Commerce system requirements](https://experienceleague.adobe.com/en/docs/commerce-operations/installation-guide/system-requirements)
+  (current requirements reviewed for this amendment).
 - PHP 8.3 is **OUT of V1 certification** and must not be claimed as a
   supported V1 target.
-- The current `integrations/magento-safe-sync/composer.json` PHP and
-  `magento/framework` constraints are **broader than this certification envelope**
-  and must be **narrowed before certification**.
-- The exact `composer.json` constraint is **not chosen in this docs
-  task**; it belongs to the bounded Safe Sync module correction
-  (Decision 9 step 2).
+- The current `integrations/magento-safe-sync/composer.json` constraints remain
+  the intentional install envelope delivered by the bounded Safe Sync module
+  correction. They are unchanged by this certification-label amendment; an
+  installable upgrade-compatibility combination is not a production support
+  claim.
 
 #### DECISION 7 — Callback failure semantics (frozen)
 
@@ -7813,8 +7830,8 @@ The pre-Live sequence is:
    sub-section above.
 4. **Isolated simple writer certification** on:
    - Adobe Commerce 2.4.9 / PHP 8.5 (PRIMARY);
-   - 2.4.9 / PHP 8.4 (SUPPORTED COMPATIBILITY);
-   - 2.4.8-p5 / PHP 8.4 (PREVIOUS ADOBE LINE).
+   - 2.4.9 / PHP 8.4 (UPGRADE-COMPATIBILITY ONLY; not a production support claim);
+   - 2.4.8-p5 / PHP 8.4 (PREVIOUS CERTIFIED TARGET).
 5. **Content Staging proof** — real Commerce Product with a pending
    scheduled update.
 6. **Galera proof** — causal cross-node entity read.

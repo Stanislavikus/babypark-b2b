@@ -20,7 +20,12 @@ final class AdobeSafeSyncClient
         private readonly AdobePaaSRequestContextFactory $contextFactory,
         private readonly AdobeSafeSyncRequestFactory $requestFactory,
         private readonly ConnectorHttpTransport $transport,
-    ) {}
+        ?AdobeSafeSyncHandshakeParser $handshakeParser = null,
+    ) {
+        $this->handshakeParser = $handshakeParser ?? new AdobeSafeSyncHandshakeParser;
+    }
+
+    private readonly AdobeSafeSyncHandshakeParser $handshakeParser;
 
     public function handshake(string $workspaceId, string $connectorAccountId): AdobeSafeSyncHandshake
     {
@@ -137,24 +142,22 @@ final class AdobeSafeSyncClient
 
     private function parseHandshake(ConnectorHttpResult $result): AdobeSafeSyncHandshake
     {
-        $payload = $this->decodeJsonObject($result, expectedStatusCode: 200);
+        if ($result->statusCode !== 200) {
+            throw new AdobeSafeSyncClientException(sprintf('Safe Sync returned unexpected HTTP status %d.', $result->statusCode));
+        }
 
-        $contractVersion = $this->requireString($payload, 'contract_version');
-        $moduleVersion = $this->requireString($payload, 'module_version');
-        $supportedOperationFamilies = $this->requireStringList($payload, 'supported_operation_families');
+        $handshake = $this->handshakeParser->parse($result->body);
 
-        if ($contractVersion !== AdobeSafeSyncContract::CONTRACT_VERSION) {
+        if ($handshake->contractVersion !== AdobeSafeSyncContract::CONTRACT_VERSION) {
             throw new AdobeSafeSyncClientException('Safe Sync contract version is not supported.');
         }
 
-        $this->assertValidModuleVersion($moduleVersion);
-        $this->assertSupportedOperationFamilies($supportedOperationFamilies);
-
-        return new AdobeSafeSyncHandshake(
-            $contractVersion,
-            $moduleVersion,
-            $supportedOperationFamilies,
+        $this->assertRequiredOperationFamilies(
+            $handshake->supportedOperationFamilies,
+            AdobeSafeSyncRequiredOperation::ProductRead,
         );
+
+        return $handshake;
     }
 
     private function parseVerifiedProduct(
@@ -333,32 +336,10 @@ final class AdobeSafeSyncClient
     /**
      * @param  list<string>  $supportedOperationFamilies
      */
-    private function assertSupportedOperationFamilies(array $supportedOperationFamilies): void
+    private function assertRequiredOperationFamilies(array $supportedOperationFamilies, AdobeSafeSyncRequiredOperation $operation): void
     {
-        $allowed = [
-            AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY,
-            AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_FAMILY,
-        ];
-
-        foreach ($supportedOperationFamilies as $family) {
-            if (! in_array($family, $allowed, true)) {
-                throw new AdobeSafeSyncClientException('Safe Sync advertised an unknown operation family.');
-            }
-        }
-
-        if (! in_array(AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY, $supportedOperationFamilies, true)) {
-            throw new AdobeSafeSyncClientException('Safe Sync product verification family is not supported.');
-        }
-    }
-
-    private function assertValidModuleVersion(string $moduleVersion): void
-    {
-        if (
-            $moduleVersion === '0.0.0'
-            || trim($moduleVersion) !== $moduleVersion
-            || preg_match('/^[A-Za-z0-9][A-Za-z0-9.+_-]*$/', $moduleVersion) !== 1
-        ) {
-            throw new AdobeSafeSyncClientException('Safe Sync module version is invalid.');
+        if (array_diff($operation->requiredFamilies(), $supportedOperationFamilies) !== []) {
+            throw new AdobeSafeSyncClientException('Safe Sync required operation family is not supported.');
         }
     }
 

@@ -4,6 +4,7 @@ namespace App\Support\Connectors\AdobePaaS\SafeSync;
 
 final class AdobeSafeSyncContract
 {
+    /** Compatibility epoch. Additive component releases retain this value. */
     public const string CONTRACT_VERSION = 'stage3e-r1';
 
     public const string PRODUCT_VERIFICATION_READ_FAMILY = 'entity_bound_product_read';

@@ -15,6 +15,8 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersi
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersister;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductOwnershipTrustPolicy;
 use App\Support\Connectors\AdobePaaS\Command\ConservativeAdobeProductOwnershipTrustPolicy;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncHandshakeProbe;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncHandshakeProbeCapability;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspaceMembership;
@@ -30,6 +32,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(AdobeSafeSyncHandshakeProbeCapability::class, AdobeSafeSyncHandshakeProbe::class);
         $this->app->singleton(WorkspaceContext::class);
         $this->app->singleton(ConnectorProfileRegistry::class);
         $this->app->singleton(WorkspaceMembership::class);

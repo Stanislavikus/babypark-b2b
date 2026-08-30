@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ConnectorAccountResource\Pages;
 
+use App\Enums\ConnectorComponentReadiness;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
@@ -11,9 +12,11 @@ use App\Models\ConnectorConnectionCheck;
 use App\Models\ConnectorDiscoveryRun;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Connectors\AdobeSafeSyncComponentReadinessResolver;
 use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
 use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
 use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncRequiredOperation;
 use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorAuthorization;
@@ -98,6 +101,10 @@ class ViewConnectorAccount extends ViewRecord
 
         if ($presentation->showActiveConnectionCheck($user, $workspace)) {
             $actions[] = $this->makeRunConnectionCheckAction();
+
+            if ($this->record->auth_profile === 'adobe_commerce_paas_oauth1_integration') {
+                $actions[] = $this->makeCheckComponentReadinessAction();
+            }
         }
 
         if ($presentation->showDiscoveryExecution($user, $workspace) && config('connectors.discovery.manual_trigger_enabled')) {
@@ -208,6 +215,57 @@ class ViewConnectorAccount extends ViewRecord
 
                     Notification::make()
                         ->danger()
+                        ->title(__('connectors.ui.notifications.action_failed'))
+                        ->send();
+                }
+            });
+    }
+
+    private function makeCheckComponentReadinessAction(): Action
+    {
+        return Action::make('checkComponentReadiness')
+            ->label(__('connectors.ui.readiness.check_again'))
+            ->icon('heroicon-o-arrow-path')
+            ->authorize('runConnectionCheck')
+            ->action(function (): void {
+                try {
+                    $result = app(AdobeSafeSyncComponentReadinessResolver::class)->resolve(
+                        app(WorkspaceContext::class)->id(),
+                        (string) $this->record->getKey(),
+                        AdobeSafeSyncRequiredOperation::SimpleProductWrite,
+                    );
+
+                    $readiness = $result->componentReadiness;
+
+                    if ($readiness !== null) {
+                        $notification = Notification::make()
+                            ->title(__('connectors.ui.readiness.'.$readiness->value.'.title'));
+
+                        if ($readiness === ConnectorComponentReadiness::Ready) {
+                            $notification->success()->send();
+
+                            return;
+                        }
+
+                        $notification->warning()
+                            ->body(__('connectors.ui.readiness.'.$readiness->value.'.body'))
+                            ->persistent()
+                            ->send();
+
+                        return;
+                    }
+
+                    Notification::make()->danger()
+                        ->title(__('connectors.ui.notifications.check_failed'))
+                        ->body(app(ConnectorSafeMessagePresenter::class)->present(
+                            $result->connectionResult->messageKey(),
+                            $result->connectionResult->safeMessageParameters(),
+                        ))
+                        ->send();
+                } catch (Throwable $exception) {
+                    report($exception);
+
+                    Notification::make()->danger()
                         ->title(__('connectors.ui.notifications.action_failed'))
                         ->send();
                 }
