@@ -57,18 +57,23 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
     public function english_readiness_copy_uses_merchant_safe_phrasing(): void
     {
         $this->assertSame('Store setup', __('connectors.ui.readiness.store_setup', locale: 'en'));
-        $this->assertSame('Check store setup', __('connectors.ui.readiness.check', locale: 'en'));
+        $this->assertSame('Check setup', __('connectors.ui.readiness.check', locale: 'en'));
         $this->assertSame('Check again', __('connectors.ui.readiness.check_again', locale: 'en'));
-        $this->assertSame('Checking store setup…', __('connectors.ui.readiness.checking', locale: 'en'));
+        $this->assertSame('Checking setup…', __('connectors.ui.readiness.checking', locale: 'en'));
         $this->assertSame('Store setup is ready', __('connectors.ui.readiness.ready.title', locale: 'en'));
         $this->assertSame('Store setup needs to be completed', __('connectors.ui.readiness.setup_required.title', locale: 'en'));
         $this->assertSame('Store setup needs to be updated', __('connectors.ui.readiness.update_required.title', locale: 'en'));
 
-        $this->assertStringContainsString('safe product synchronization', __('connectors.ui.readiness.not_checked.body', locale: 'en'));
+        $this->assertSame('Check whether the store setup is ready.', __('connectors.ui.readiness.not_checked.body', locale: 'en'));
+        $this->assertSame('The store setup is ready.', __('connectors.ui.readiness.ready.body', locale: 'en'));
         $this->assertStringContainsString('Magento connection works', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
         $this->assertStringContainsString('store administrator', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
         $this->assertStringContainsString('Magento connection works', __('connectors.ui.readiness.update_required.body', locale: 'en'));
         $this->assertStringContainsString('Magento connection', __('connectors.ui.readiness.baseline_failure.guidance', locale: 'en'));
+        $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.not_checked.body', locale: 'en'));
+        $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.ready.body', locale: 'en'));
+        $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
+        $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.update_required.body', locale: 'en'));
     }
 
     #[Test]
@@ -82,14 +87,18 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
         $this->assertStringContainsString('AdobeSafeSyncComponentReadinessResolver', $page);
         $this->assertStringContainsString('AdobeSafeSyncRequiredOperation::SimpleProductWrite', $page);
         $this->assertStringContainsString('public function checkStoreSetupAction(): Action', $page);
+        $this->assertStringContainsString('private function executeStoreSetupCheck(): void', $page);
         $this->assertStringContainsString("Action::make('checkStoreSetup')", $page);
-        $this->assertStringContainsString("->authorize(fn (): bool => \$this->shouldShowStoreSetupBlock())", $page);
+        $this->assertStringContainsString("->authorize('runConnectionCheck')", $page);
         $this->assertStringContainsString("->disabled(fn (): bool => ! \$this->storeSetupActionState()['enabled'])", $page);
         $this->assertStringContainsString("\$this->storeSetupState = 'NOT_CHECKED';", $page);
-        $this->assertStringNotContainsString('checkComponentReadiness', $page);
+        $this->assertStringNotContainsString('public function checkStoreSetup(): void', $page);
         $this->assertStringContainsString('shouldShowStoreSetupEntry', $resource);
         $this->assertStringContainsString("->visible(fn (ConnectorAccount \$record): bool => static::shouldShowStoreSetupEntry(\$record))", $resource);
+        $this->assertStringNotContainsString("Gate::forUser(\$user)->allows('runConnectionCheck', \$record);", $resource);
         $this->assertStringContainsString('{{ $this->checkStoreSetupAction }}', $view);
+        $this->assertStringContainsString("\$baselineMessage = \$this->storeSetupBaselineMessage;", $view);
+        $this->assertStringNotContainsString('$livewire->storeSetupBaselineMessage', $view);
         $this->assertStringNotContainsString('wire:click="checkStoreSetup"', $view);
         $this->assertStringNotContainsString('ConnectorAccount::update', $resolver);
         $this->assertStringNotContainsString('save()', $resolver);

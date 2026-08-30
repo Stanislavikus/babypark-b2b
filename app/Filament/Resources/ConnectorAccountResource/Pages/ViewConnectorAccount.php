@@ -163,15 +163,15 @@ class ViewConnectorAccount extends ViewRecord
                 : __('connectors.ui.readiness.check_again'))
             ->color('gray')
             ->size('sm')
-            ->authorize(fn (): bool => $this->shouldShowStoreSetupBlock())
+            ->authorize('runConnectionCheck')
             ->disabled(fn (): bool => ! $this->storeSetupActionState()['enabled'])
             ->tooltip(fn (): ?string => $this->storeSetupActionState()['disabled_reason'])
             ->action(function (): void {
-                $this->checkStoreSetup();
+                $this->executeStoreSetupCheck();
             });
     }
 
-    public function checkStoreSetup(): void
+    private function executeStoreSetupCheck(): void
     {
         $this->storeSetupState = 'NOT_CHECKED';
         $this->storeSetupBaselineMessage = null;

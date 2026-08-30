@@ -441,7 +441,7 @@ class ConnectorAccountResourceTest extends TestCase
         $disabledAccount = $this->createConnectorAccount(overrides: ['is_enabled' => false]);
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $disabledAccount->getKey()])
-            ->assertActionDoesNotExist('checkComponentReadiness')
+            ->assertActionDisabled('checkStoreSetup')
             ->assertSee(__('connectors.ui.readiness.store_setup'))
             ->assertSee(__('connectors.ui.disabled_reasons.account_disabled'));
 
@@ -462,7 +462,7 @@ class ConnectorAccountResourceTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertActionDoesNotExist('checkComponentReadiness')
+            ->assertActionDisabled('checkStoreSetup')
             ->assertSee(__('connectors.ui.readiness.store_setup'))
             ->assertSee(__('connectors.ui.disabled_reasons.profile_disabled'));
     }
@@ -476,7 +476,7 @@ class ConnectorAccountResourceTest extends TestCase
 
         Livewire::actingAs($viewer)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertActionDoesNotExist('checkComponentReadiness')
+            ->assertActionDoesNotExist('checkStoreSetup')
             ->assertDontSee(__('connectors.ui.readiness.store_setup'));
     }
 
@@ -495,7 +495,7 @@ class ConnectorAccountResourceTest extends TestCase
         $component = Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->assertSee(__('connectors.ui.readiness.store_setup'))
-            ->call('checkStoreSetup')
+            ->callAction('checkStoreSetup')
             ->assertSet('storeSetupState', 'READY')
             ->assertSee(__('connectors.ui.readiness.ready.title'))
             ->assertSee(__('connectors.ui.readiness.ready.body'));
@@ -523,7 +523,7 @@ class ConnectorAccountResourceTest extends TestCase
 
         $component = Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->call('checkStoreSetup')
+            ->callAction('checkStoreSetup')
             ->assertSet('storeSetupState', 'BASELINE_FAILURE')
             ->assertSee(__('connectors.ui.readiness.baseline_failure.title'))
             ->assertSee(__('connectors.errors.invalid_credentials'))
@@ -558,7 +558,7 @@ class ConnectorAccountResourceTest extends TestCase
         $this->revokeAllWorkspaceRoles($membership);
         $actor->refresh();
 
-        $component->call('checkStoreSetup');
+        $component->callAction('checkStoreSetup');
 
         $this->assertSame(0, $stub->callCount);
         $component->assertNotified(__('connectors.ui.notifications.action_failed'));

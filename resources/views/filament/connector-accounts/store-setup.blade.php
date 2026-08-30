@@ -1,6 +1,7 @@
 @php
     /** @var \App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount $this */
     $actionState = $this->storeSetupActionState();
+    $baselineMessage = $this->storeSetupBaselineMessage;
     $state = $this->storeSetupState;
 
     $containerClasses = match ($state) {
@@ -30,9 +31,8 @@
     <div
         class="rounded-xl border p-4 {{ $containerClasses }}"
         wire:loading.class="opacity-70"
-        wire:target="checkStoreSetup"
     >
-        <div wire:loading.remove wire:target="checkStoreSetup" class="space-y-3">
+        <div wire:loading.remove class="space-y-3">
             @if ($titleKey !== null)
                 <p class="text-sm font-medium text-gray-950 dark:text-white">
                     {{ __($titleKey) }}
@@ -44,28 +44,54 @@
                     {{ __($bodyKey) }}
                 </p>
             @elseif ($state === 'BASELINE_FAILURE')
-                <div class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                    <p>{{ $livewire->storeSetupBaselineMessage }}</p>
-                    <p>{{ __('connectors.ui.readiness.baseline_failure.guidance') }}</p>
+                <div class="space-y-3">
+                    <div class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                        <p>{{ $baselineMessage }}</p>
+                        <p>{{ __('connectors.ui.readiness.baseline_failure.guidance') }}</p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        {{ $this->checkStoreSetupAction }}
+
+                        @if (filled($actionState['disabled_reason']))
+                            <span class="text-sm text-gray-600 dark:text-gray-400">
+                                {{ $actionState['disabled_reason'] }}
+                            </span>
+                        @endif
+                    </div>
                 </div>
             @else
-                <p class="text-sm text-gray-700 dark:text-gray-300">
-                    {{ __('connectors.ui.readiness.not_checked.body') }}
-                </p>
+                <div class="space-y-3">
+                    <p class="text-sm text-gray-700 dark:text-gray-300">
+                        {{ __('connectors.ui.readiness.not_checked.body') }}
+                    </p>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        {{ $this->checkStoreSetupAction }}
+
+                        @if (filled($actionState['disabled_reason']))
+                            <span class="text-sm text-gray-600 dark:text-gray-400">
+                                {{ $actionState['disabled_reason'] }}
+                            </span>
+                        @endif
+                    </div>
+                </div>
             @endif
 
-            <div class="flex flex-wrap items-center gap-3">
-                {{ $this->checkStoreSetupAction }}
+            @if ($bodyKey !== null)
+                <div class="flex flex-wrap items-center gap-3">
+                    {{ $this->checkStoreSetupAction }}
 
-                @if (filled($actionState['disabled_reason']))
-                    <span class="text-sm text-gray-600 dark:text-gray-400">
-                        {{ $actionState['disabled_reason'] }}
-                    </span>
-                @endif
-            </div>
+                    @if (filled($actionState['disabled_reason']))
+                        <span class="text-sm text-gray-600 dark:text-gray-400">
+                            {{ $actionState['disabled_reason'] }}
+                        </span>
+                    @endif
+                </div>
+            @endif
         </div>
 
-        <div wire:loading.flex wire:target="checkStoreSetup" class="hidden items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
+        <div wire:loading.flex class="hidden items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
             <x-filament::loading-indicator class="h-5 w-5" />
             <span>{{ __('connectors.ui.readiness.checking') }}</span>
         </div>

@@ -26,7 +26,6 @@ use Filament\Tables\Table;
 use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Gate;
 
 class ConnectorAccountResource extends Resource
 {
@@ -423,6 +422,11 @@ class ConnectorAccountResource extends Resource
 
         $workspace = $record->workspace ?? Workspace::query()->findOrFail($record->workspace_id);
         $presentation = static::capabilityPresentation();
+        $currentWorkspace = app(WorkspaceContext::class)->current();
+
+        if ($workspace->isNot($currentWorkspace)) {
+            return false;
+        }
 
         if (! $presentation->showActiveConnectionCheck($user, $workspace)) {
             return false;
@@ -432,6 +436,6 @@ class ConnectorAccountResource extends Resource
             return false;
         }
 
-        return Gate::forUser($user)->allows('runConnectionCheck', $record);
+        return true;
     }
 }
