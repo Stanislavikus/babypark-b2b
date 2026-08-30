@@ -11,9 +11,9 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
     public static function readinessLocaleProvider(): array
     {
         return [
-            'english' => 'en',
-            'russian' => 'ru',
-            'ukrainian' => 'uk',
+            'english' => ['en'],
+            'russian' => ['ru'],
+            'ukrainian' => ['uk'],
         ];
     }
 

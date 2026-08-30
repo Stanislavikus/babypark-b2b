@@ -520,14 +520,17 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('#### DECISION 6 — PHP / Adobe certification matrix (frozen)', $section);
         $this->assertStringContainsString('| **PRIMARY** | 2.4.9 | 8.5 |', $section);
-        $this->assertStringContainsString('| **SUPPORTED COMPATIBILITY** | 2.4.9 | 8.4 |', $section);
-        $this->assertStringContainsString('| **PREVIOUS ADOBE LINE** | 2.4.8-p5 | 8.4 |', $section);
+        $this->assertStringContainsString('| **UPGRADE-COMPATIBILITY ONLY — not a production support claim** | 2.4.9 | 8.4 |', $section);
+        $this->assertStringContainsString('| **PREVIOUS CERTIFIED TARGET** | 2.4.8-p5 | 8.4 |', $section);
         $this->assertStringContainsString('| **OUT OF V1 CERTIFICATION** | — | 8.3 |', $section);
-        $this->assertStringContainsString('PHP 8.4 **IS supported** on Adobe Commerce 2.4.9', $section);
+
+        $this->assertStringContainsString('PHP 8.5 is the 2.4.9 production target', $section);
+        $this->assertStringContainsString('PHP 8.4 on 2.4.9 is upgrade compatibility only', $section);
+        $this->assertStringContainsString('This label correction does not broaden or otherwise change the Safe Sync Composer constraints', $section);
         $this->assertStringContainsString('PHP 8.3 is **OUT of V1 certification**', $section);
-        $this->assertStringContainsString('broader than this certification envelope', $section);
-        $this->assertStringContainsString('narrowed before certification', $section);
-        $this->assertStringContainsString('exact `composer.json` constraint is **not chosen in this docs', $section);
+
+        $this->assertStringNotContainsString('| **SUPPORTED COMPATIBILITY** | 2.4.9 | 8.4 |', $section);
+        $this->assertStringNotContainsString('PHP 8.4 **IS supported** on Adobe Commerce 2.4.9', $section);
     }
 
     #[Test]
