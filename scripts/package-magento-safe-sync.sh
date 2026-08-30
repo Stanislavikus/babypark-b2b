@@ -19,28 +19,11 @@ git -C "$repo_root" archive --format=zip --output="$artifact" "HEAD:$module_path
 sha256="$(sha256sum "$artifact" | cut -d' ' -f1)"
 sha1="$(sha1sum "$artifact" | cut -d' ' -f1)"
 
-cat > "$output_dir/packages.json" <<JSON
-{
-    "packages": {
-        "b2b-platform/magento-safe-sync": {
-            "$version": {
-                "name": "b2b-platform/magento-safe-sync",
-                "version": "$version",
-                "type": "magento2-module",
-                "require": {
-                    "php": ">=8.4 <8.6",
-                    "magento/framework": ">=103.0.8-p5 <103.0.10",
-                    "magento/module-catalog": ">=104.0.8-p5 <104.0.10"
-                },
-                "dist": {
-                    "url": "$dist_url",
-                    "type": "zip",
-                    "shasum": "$sha1"
-                }
-            }
-        }
-    }
-}
-JSON
+php "$repo_root/scripts/build-magento-safe-sync-repository.php" \
+    "$repo_root/$module_path/composer.json" \
+    "$version" \
+    "$dist_url" \
+    "$sha1" \
+    "$output_dir/packages.json"
 
 printf 'Artifact: %s\nRepository metadata: %s\nSHA-256: %s\n' "$artifact" "$output_dir/packages.json" "$sha256"

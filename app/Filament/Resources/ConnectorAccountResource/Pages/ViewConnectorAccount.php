@@ -227,11 +227,30 @@ class ViewConnectorAccount extends ViewRecord
             ->label(__('connectors.ui.readiness.check_again'))
             ->icon('heroicon-o-arrow-path')
             ->authorize('runConnectionCheck')
+            ->tooltip(fn (): ?string => app(ConnectorAccountUiState::class)
+                ->manualCheckActionState($this->record)['disabled_reason'])
+            ->disabled(fn (): bool => ! app(ConnectorAccountUiState::class)
+                ->manualCheckActionState($this->record)['enabled'])
             ->action(function (): void {
                 try {
+                    $actor = auth()->user();
+                    abort_unless($actor instanceof User, 403);
+
+                    $workspaceId = app(WorkspaceContext::class)->id();
+                    $account = ConnectorAccount::withoutWorkspaceScope()
+                        ->where('workspace_id', $workspaceId)
+                        ->whereKey($this->record->getKey())
+                        ->firstOrFail();
+
+                    Gate::forUser($actor)->authorize('runConnectionCheck', $account);
+
+                    if (! app(ConnectorAccountUiState::class)->manualCheckActionState($account)['enabled']) {
+                        throw new AuthorizationException;
+                    }
+
                     $result = app(AdobeSafeSyncComponentReadinessResolver::class)->resolve(
-                        app(WorkspaceContext::class)->id(),
-                        (string) $this->record->getKey(),
+                        $workspaceId,
+                        (string) $account->getKey(),
                         AdobeSafeSyncRequiredOperation::SimpleProductWrite,
                     );
 

@@ -423,6 +423,47 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
+    public function readiness_action_reuses_manual_check_availability(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+
+        $disabledAccount = $this->createConnectorAccount(overrides: ['is_enabled' => false]);
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $disabledAccount->getKey()])
+            ->assertActionDisabled('checkComponentReadiness');
+
+        $activeAccount = $this->createConnectorAccount();
+        $this->createActiveCheck($activeAccount, ConnectorConnectionCheckStatus::Running);
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $activeAccount->getKey()])
+            ->assertActionDisabled('checkComponentReadiness');
+    }
+
+    #[Test]
+    public function unavailable_connection_check_profile_disables_readiness(): void
+    {
+        config(['connectors.profiles.adobe_commerce_paas_oauth1_integration.enabled' => false]);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertActionDisabled('checkComponentReadiness');
+    }
+
+    #[Test]
+    public function actor_without_connector_management_cannot_execute_readiness(): void
+    {
+        $viewer = $this->createStaffUser(UserRole::Manager);
+        $this->grantConnectorView($this->defaultWorkspace(), $viewer);
+        $account = $this->createConnectorAccount();
+
+        Livewire::actingAs($viewer)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertActionDoesNotExist('checkComponentReadiness');
+    }
+
+    #[Test]
     public function manual_action_disabled_when_profile_missing(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);

@@ -140,7 +140,7 @@
     "connectors.ui.readiness.check_again": "Проверить ещё раз",
     "connectors.ui.readiness.ready.title": "Готово к синхронизации",
     "connectors.ui.readiness.setup_required.title": "Нужно настроить компонент",
-    "connectors.ui.readiness.setup_required.body": "Подключение к Magento работает, но компонент синхронизации ещё нужно установить, включить или завершить его развёртывание. Передайте инструкцию администратору магазина, затем проверьте ещё раз.",
+    "connectors.ui.readiness.setup_required.body": "Обратитесь к администратору магазина, чтобы установить или завершить настройку компонента синхронизации. Затем проверьте ещё раз.",
     "connectors.ui.readiness.update_required.title": "Нужно обновить компонент",
     "connectors.ui.readiness.update_required.body": "Установленный компонент нужно заменить совместимым выпуском, рекомендованным платформой. После обновления проверьте ещё раз.",
     "connectors.ui.notifications.check_completed": "Проверка завершена. Данные подключения обновлены.",

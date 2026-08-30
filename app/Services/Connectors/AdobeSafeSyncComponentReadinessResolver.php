@@ -43,12 +43,23 @@ final class AdobeSafeSyncComponentReadinessResolver
         $handshake = $probe->handshake;
         $compatible = $handshake !== null
             && $handshake->contractVersion === AdobeSafeSyncContract::CONTRACT_VERSION
-            && array_diff($operation->requiredFamilies(), $handshake->supportedOperationFamilies) === [];
+            && array_diff($operation->requiredFamilies(), $handshake->supportedOperationFamilies) === []
+            && $this->moduleVersionSupports($operation, $handshake->moduleVersion);
 
         return new AdobeSafeSyncReadinessResult(
             $probe->connectionResult,
             $compatible ? ConnectorComponentReadiness::Ready : ConnectorComponentReadiness::UpdateRequired,
             $handshake?->moduleVersion,
         );
+    }
+
+    private function moduleVersionSupports(AdobeSafeSyncRequiredOperation $operation, string $moduleVersion): bool
+    {
+        if ($operation === AdobeSafeSyncRequiredOperation::ProductRead) {
+            return true;
+        }
+
+        return preg_match('/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/', $moduleVersion) === 1
+            && version_compare($moduleVersion, AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_MINIMUM_MODULE_VERSION, '>=');
     }
 }

@@ -113,6 +113,53 @@ class AdobeSafeSyncComponentReadinessResolverTest extends TestCase
         )->componentReadiness);
     }
 
+    #[Test]
+    public function simple_write_readiness_uses_the_validation_minimum_without_imposing_it_on_read(): void
+    {
+        foreach ([
+            '0.2.0' => ConnectorComponentReadiness::UpdateRequired,
+            '0.2.1' => ConnectorComponentReadiness::Ready,
+            '0.2.2' => ConnectorComponentReadiness::Ready,
+            'dev-main' => ConnectorComponentReadiness::UpdateRequired,
+        ] as $moduleVersion => $expected) {
+            $probe = AdobeSafeSyncHandshakeProbeResult::succeeded(new AdobeSafeSyncHandshake(
+                AdobeSafeSyncContract::CONTRACT_VERSION,
+                $moduleVersion,
+                [AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY, AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_FAMILY],
+            ));
+
+            $this->assertSame($expected, $this->resolve(
+                ConnectorConnectionCheckResult::success(),
+                $probe,
+                AdobeSafeSyncRequiredOperation::SimpleProductWrite,
+            )->componentReadiness, $moduleVersion);
+        }
+
+        $legacyRead = AdobeSafeSyncHandshakeProbeResult::succeeded(new AdobeSafeSyncHandshake(
+            AdobeSafeSyncContract::CONTRACT_VERSION,
+            '0.1.0',
+            [AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY],
+        ));
+
+        $this->assertSame(ConnectorComponentReadiness::Ready, $this->resolve(
+            ConnectorConnectionCheckResult::success(),
+            $legacyRead,
+            AdobeSafeSyncRequiredOperation::ProductRead,
+        )->componentReadiness);
+    }
+
+    #[Test]
+    public function validation_runner_and_readiness_share_the_simple_write_minimum_constant(): void
+    {
+        $runner = file_get_contents(app_path('Support/Connectors/AdobePaaS/Validation/AdobeStage3EValidationRunner.php'));
+        $resolver = file_get_contents(app_path('Services/Connectors/AdobeSafeSyncComponentReadinessResolver.php'));
+
+        $this->assertSame('0.2.1', AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_MINIMUM_MODULE_VERSION);
+        $this->assertStringContainsString('AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_MINIMUM_MODULE_VERSION', $runner);
+        $this->assertStringContainsString('AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_MINIMUM_MODULE_VERSION', $resolver);
+        $this->assertStringNotContainsString("version_compare(\$handshake->moduleVersion, '0.2.1'", $runner);
+    }
+
     private function resolve(
         ConnectorConnectionCheckResult $baseline,
         ?AdobeSafeSyncHandshakeProbeResult $probe,

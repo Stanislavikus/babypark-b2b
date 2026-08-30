@@ -7274,6 +7274,9 @@ structured existing `AdobeInvalidOrUnsupportedEndpoint` result with exact HTTP
 404; it means the endpoint is unavailable or installation/setup/deployment is
 incomplete, not that physical module absence was proven. An unaccepted
 compatibility epoch or missing required operation family is `UPDATE_REQUIRED`.
+Simple Product WRITE readiness also requires a comparable semantic module
+version at or above the validation runtime's proven minimum; Product READ does
+not inherit that operation-specific floor.
 Other failures preserve existing connection/error semantics with component
 readiness absent. Evaluation is stateless and presentation-only: no readiness
 table or account projection is introduced. The result does not replace the

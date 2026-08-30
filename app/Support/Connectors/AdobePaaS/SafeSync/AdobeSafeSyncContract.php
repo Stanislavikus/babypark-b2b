@@ -11,6 +11,8 @@ final class AdobeSafeSyncContract
 
     public const string SIMPLE_PRODUCT_WRITE_FAMILY = 'entity_bound_simple_product_write';
 
+    public const string SIMPLE_PRODUCT_WRITE_MINIMUM_MODULE_VERSION = '0.2.1';
+
     public const int HANDSHAKE_MAX_RESPONSE_BYTES = 16 * 1024;
 
     public const int PRODUCT_READ_MAX_RESPONSE_BYTES = 64 * 1024;

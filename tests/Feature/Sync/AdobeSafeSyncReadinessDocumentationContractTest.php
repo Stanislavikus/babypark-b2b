@@ -18,6 +18,7 @@ class AdobeSafeSyncReadinessDocumentationContractTest extends TestCase
         $this->assertStringContainsString('Safe Sync component readiness (Resolved — 2026-08-30)', $domain);
         $this->assertStringContainsString('no readiness', $domain);
         $this->assertStringContainsString('table or account projection is introduced', $domain);
+        $this->assertStringContainsString("Simple Product WRITE readiness also requires a comparable semantic module\nversion at or above", $domain);
         $this->assertStringContainsString('Safe Sync component readiness + certification package', $atlas);
     }
 }

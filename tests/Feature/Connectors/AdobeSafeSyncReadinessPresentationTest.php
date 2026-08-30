@@ -21,6 +21,8 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
 
         $this->assertStringContainsString('Готово до синхронізації', $copy);
         $this->assertStringContainsString('Перевірити ще раз', $copy);
+        $this->assertStringContainsString('Зверніться до адміністратора магазину', $copy);
+        $this->assertStringNotContainsString('Передайте інструкцію', $copy);
 
         foreach (['PHP', '2.4.', 'Composer', 'B2BPlatform_MagentoSafeSync', 'HTTP', 'stage3e-r1', 'operation', 'entity_bound', 'AdobeInvalid'] as $forbidden) {
             $this->assertStringNotContainsString($forbidden, $copy);

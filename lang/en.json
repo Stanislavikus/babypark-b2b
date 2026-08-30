@@ -140,7 +140,7 @@
     "connectors.ui.readiness.check_again": "Check again",
     "connectors.ui.readiness.ready.title": "Ready to synchronize",
     "connectors.ui.readiness.setup_required.title": "Component setup required",
-    "connectors.ui.readiness.setup_required.body": "The Magento connection works, but the synchronization component must still be installed, enabled, or fully deployed. Send the installation instructions to the store administrator, then check again.",
+    "connectors.ui.readiness.setup_required.body": "Contact the store administrator to install or finish setting up the synchronization component. Then check again.",
     "connectors.ui.readiness.update_required.title": "Component update required",
     "connectors.ui.readiness.update_required.body": "The installed component must be replaced with the compatible release recommended by the platform. Check again after the update.",
     "connectors.ui.notifications.check_completed": "Check completed. Connection data has been updated.",
