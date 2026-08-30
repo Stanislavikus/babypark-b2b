@@ -524,9 +524,14 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('| **PREVIOUS CERTIFIED TARGET** | 2.4.8-p5 | 8.4 |', $section);
         $this->assertStringContainsString('| **OUT OF V1 CERTIFICATION** | — | 8.3 |', $section);
 
-        $this->assertStringContainsString('PHP 8.5 is the 2.4.9 production target', $section);
-        $this->assertStringContainsString('PHP 8.4 on 2.4.9 is upgrade compatibility only', $section);
-        $this->assertStringContainsString('This label correction does not broaden or otherwise change the Safe Sync Composer constraints', $section);
+        $this->assertStringContainsString('2026-08-30 Stop & Amend', $section);
+        $this->assertStringContainsString('Adobe now lists PHP 8.5 for 2.4.9 production use', $section);
+        $this->assertStringContainsString('describes PHP 8.4 as upgrade compatibility only', $section);
+        $this->assertStringContainsString('This label correction does', $section);
+        $this->assertStringContainsString(
+            'not broaden or otherwise change the Safe Sync Composer constraints',
+            $section,
+        );
         $this->assertStringContainsString('PHP 8.3 is **OUT of V1 certification**', $section);
 
         $this->assertStringNotContainsString('| **SUPPORTED COMPATIBILITY** | 2.4.9 | 8.4 |', $section);
