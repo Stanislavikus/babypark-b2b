@@ -2,31 +2,59 @@
 
 namespace Tests\Feature\Connectors;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AdobeSafeSyncReadinessPresentationTest extends TestCase
 {
+    public static function readinessLocaleProvider(): array
+    {
+        return [
+            'english' => 'en',
+            'russian' => 'ru',
+            'ukrainian' => 'uk',
+        ];
+    }
+
     #[Test]
-    public function ukrainian_readiness_copy_exposes_three_business_states_without_technical_vocabulary(): void
+    #[DataProvider('readinessLocaleProvider')]
+    public function readiness_copy_exposes_three_business_states_without_technical_vocabulary(string $locale): void
     {
         $copy = implode(' ', [
-            __('connectors.ui.readiness.ready.title', locale: 'uk'),
-            __('connectors.ui.readiness.setup_required.title', locale: 'uk'),
-            __('connectors.ui.readiness.setup_required.body', locale: 'uk'),
-            __('connectors.ui.readiness.update_required.title', locale: 'uk'),
-            __('connectors.ui.readiness.update_required.body', locale: 'uk'),
-            __('connectors.ui.readiness.check_again', locale: 'uk'),
+            __('connectors.ui.readiness.check_again', locale: $locale),
+            __('connectors.ui.readiness.ready.title', locale: $locale),
+            __('connectors.ui.readiness.setup_required.title', locale: $locale),
+            __('connectors.ui.readiness.setup_required.body', locale: $locale),
+            __('connectors.ui.readiness.update_required.title', locale: $locale),
+            __('connectors.ui.readiness.update_required.body', locale: $locale),
         ]);
 
-        $this->assertStringContainsString('Готово до синхронізації', $copy);
-        $this->assertStringContainsString('Перевірити ще раз', $copy);
-        $this->assertStringContainsString('Зверніться до адміністратора магазину', $copy);
-        $this->assertStringNotContainsString('Передайте інструкцію', $copy);
+        $this->assertNotSame(trim($copy), '');
+        $this->assertStringNotContainsString('Connector', $copy);
+        $this->assertStringNotContainsString('component', $copy);
+        $this->assertStringNotContainsString('компонент', $copy);
 
-        foreach (['PHP', '2.4.', 'Composer', 'B2BPlatform_MagentoSafeSync', 'HTTP', 'stage3e-r1', 'operation', 'entity_bound', 'AdobeInvalid'] as $forbidden) {
+        foreach ([
+            'PHP', '2.4.', 'Composer', 'B2BPlatform_MagentoSafeSync', 'HTTP',
+            'stage3e-r1', 'operation', 'entity_bound', 'AdobeInvalid', 'safe-sync',
+            'handshake', 'омпозер', 'андак',
+        ] as $forbidden) {
             $this->assertStringNotContainsString($forbidden, $copy);
         }
+    }
+
+    #[Test]
+    public function english_readiness_copy_uses_merchant_safe_phrasing(): void
+    {
+        $this->assertSame('Check synchronization readiness', __('connectors.ui.readiness.check_again', locale: 'en'));
+        $this->assertSame('Synchronization module is ready', __('connectors.ui.readiness.ready.title', locale: 'en'));
+        $this->assertSame('Synchronization setup needs to be completed', __('connectors.ui.readiness.setup_required.title', locale: 'en'));
+        $this->assertSame('Synchronization module needs to be updated', __('connectors.ui.readiness.update_required.title', locale: 'en'));
+
+        $this->assertStringContainsString('Magento connection works', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
+        $this->assertStringContainsString('store administrator', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
+        $this->assertStringContainsString('Magento connection works', __('connectors.ui.readiness.update_required.body', locale: 'en'));
     }
 
     #[Test]
