@@ -194,7 +194,7 @@
       "real_validation_state": "repository_contract_only",
       "field_certification_status": "uncertified_current_base",
       "installation_condition": "",
-      "result_or_blocker": "Current trusted simple executor still stops fail-closed before invoking Safe Sync."
+      "result_or_blocker": "Trusted simple Safe Sync write now covers status for simple Products; configurable and real-target proof remain pending."
     },
     {
       "id": "product-visibility",

@@ -9,8 +9,8 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteGetClassifier;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateClient;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateNormalizer;
 use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocument;
-use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReadException;
 use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReader;
+use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReadException;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
 use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
@@ -187,7 +187,7 @@ final class AdobeProductDocumentReaderTest extends TestCase
 
     private function contextFactory(): AdobePaaSRequestContextFactory
     {
-        return new AdobePaaSRequestContextFactory();
+        return new AdobePaaSRequestContextFactory;
     }
 
     private function repoPath(string $path): string

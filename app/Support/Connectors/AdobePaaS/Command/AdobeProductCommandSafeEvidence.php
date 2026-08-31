@@ -4,6 +4,9 @@ namespace App\Support\Connectors\AdobePaaS\Command;
 
 final readonly class AdobeProductCommandSafeEvidence
 {
+    /**
+     * @param  list<string>  $warningCodes
+     */
     public function __construct(
         public string $reasonCode,
         public ?string $subjectSku = null,
@@ -12,5 +15,6 @@ final readonly class AdobeProductCommandSafeEvidence
         public int $reconciliationGetAttempts = 0,
         public bool $externalRecordLinkPersisted = false,
         public bool $ownershipTrustSatisfied = false,
+        public array $warningCodes = [],
     ) {}
 }

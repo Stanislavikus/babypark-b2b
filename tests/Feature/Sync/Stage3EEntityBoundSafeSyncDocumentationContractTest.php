@@ -27,8 +27,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('original contract landed as a', $section);
         $this->assertStringContainsString('docs-only', $section);
-        $this->assertStringContainsString('isolated entity-bound simple Product', $section);
-        $this->assertStringContainsString('not consumed by Live runtime', $section);
+        $this->assertStringContainsString('trusted simple entity-bound Product WRITE', $section);
         $this->assertStringContainsString('validation-only disposable validation harness', $section);
         $this->assertStringContainsString('**Implemented in Stage 3E-R2a.**', $section);
         $this->assertStringContainsString('Adobe Products/Export/Live | **FALSE**', $section);
@@ -330,7 +329,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('**Stage 3E — Real Adobe Validation + Truth Flip**', $gaps);
         $this->assertStringContainsString('**Done (docs contract)**', $gaps);
         $this->assertStringContainsString('entity-bound Safe Sync runtime contract frozen', $gaps);
-        $this->assertStringContainsString('**isolated entity-bound simple Product WRITE foundation is implemented internally**', $gaps);
+        $this->assertStringContainsString('**simple trusted entity-bound Product WRITE consumption is implemented internally**', $gaps);
         $this->assertStringContainsString('support remains **false**', $gaps);
     }
 
@@ -341,8 +340,8 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('Stage 3E entity-bound Safe Sync contract (docs)', $atlas);
         $this->assertStringContainsString('DOCS CONTRACT DONE — runtime pending', $atlas);
-        $this->assertStringContainsString('Stage 3E Magento Safe Sync read + isolated simple write foundation', $atlas);
-        $this->assertStringContainsString('IMPLEMENTED (internal; support false; not consumed by Live; not real-target certified)', $atlas);
+        $this->assertStringContainsString('Stage 3E Magento Safe Sync read + simple trusted write consumption', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED (internal; support false; simple path consumed; not real-target certified)', $atlas);
         $this->assertStringContainsString('Stage3EEntityBoundSafeSyncDocumentationContractTest.php', $atlas);
     }
 
@@ -408,19 +407,17 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $section = $this->post168AmendmentSection();
 
         $this->assertStringContainsString('#### DECISION 1 — Current state (frozen)', $section);
-        $this->assertStringContainsString('isolated entity-bound simple Product **WRITE** primitive exists', $section);
+        $this->assertStringContainsString('trusted simple entity-bound Product WRITE', $section);
         $this->assertStringContainsString('Laravel **Safe Sync write client**', $section);
-        $this->assertStringContainsString('not currently consumed** by the Live executor', $section);
-        $this->assertStringContainsString('`AdobeProductSimpleCommandExecutor` does **not** currently route a trusted', $section);
-        $this->assertStringContainsString('stops fail-closed with', $section);
-        $this->assertStringContainsString('`entity_bound_mutation_bridge_required`', $section);
-        $this->assertStringContainsString('zero consequential', $section);
+        $this->assertStringContainsString('is consumed by the trusted simple', $section);
+        $this->assertStringContainsString('does **not** route a trusted simple', $section);
+        $this->assertStringContainsString('at most one', $section);
+        $this->assertStringContainsString('consequential WRITE', $section);
         $this->assertStringContainsString('Historic SKU-addressed consequential writers remain separately in', $section);
         $this->assertStringContainsString('`ConnectorSyncOperationSupport(Products, Export, Live)` remains **false**', $section);
         $this->assertStringContainsString('No** real-target consequential WRITE certification has occurred', $section);
-        $this->assertStringContainsString('isolated primitive is reachable', $section);
-        $this->assertStringContainsString('no consumer', $section);
-        $this->assertStringContainsString('simple core Live path is fail-closed at', $section);
+        $this->assertStringContainsString('trusted simple consumption is', $section);
+        $this->assertStringContainsString('configured/media completion and real-target evidence remain', $section);
         $this->assertStringContainsString('no real-target evidence', $section);
         $this->assertStringContainsString('support remains false', $section);
     }
@@ -623,13 +620,11 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
     {
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
-        $this->assertStringContainsString('Stage 3E Post-#168 Real-Target Certification Amendment (9 decisions + dormant discrepancies table) layered on top', $atlas);
-        $this->assertStringContainsString('IMPLEMENTED (internal; support false; not consumed by Live; not real-target certified)', $atlas);
+        $this->assertStringContainsString('Stage 3E Magento Safe Sync read + simple trusted write consumption', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED (internal; support false; simple path consumed; not real-target certified)', $atlas);
         $this->assertStringContainsString('Stage 3E disposable validation harness', $atlas);
         $this->assertStringContainsString('IMPLEMENTED (internal; validation-only; support false; no real-target certification executed)', $atlas);
-        $this->assertStringContainsString('not consumed by Live', $atlas);
-        $this->assertStringContainsString('stops fail-closed at `entity_bound_mutation_bridge_required`', $atlas);
-        $this->assertStringContainsString('zero consequential Product write', $atlas);
+        $this->assertStringContainsString('trusted simple Product execution now consumes', $atlas);
         $this->assertStringContainsString('Stage 3E post-#168 dormant code-vs-docs discrepancies', $atlas);
         $this->assertStringContainsString('DOCUMENTED (dormant; not fixed)', $atlas);
         $this->assertStringContainsString('Production-unreachable code paths that still use stock SKU-addressed', $atlas);
