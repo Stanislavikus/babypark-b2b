@@ -27,7 +27,9 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('original contract landed as a', $section);
         $this->assertStringContainsString('docs-only', $section);
-        $this->assertStringContainsString('trusted simple entity-bound Product WRITE consumption', $section);
+        $this->assertStringContainsString('trusted simple entity-bound Product WRITE', $section);
+        $this->assertStringContainsString('consumption', $section);
+        $this->assertStringContainsString('standalone Magento Safe Sync read foundation', $section);
         $this->assertStringContainsString('validation-only disposable validation harness', $section);
         $this->assertStringContainsString('**Implemented in Stage 3E-R2a.**', $section);
         $this->assertStringContainsString('Adobe Products/Export/Live | **FALSE**', $section);
@@ -418,7 +420,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('No** real-target consequential WRITE certification has occurred', $section);
         $this->assertStringContainsString('trusted simple consumption is', $section);
         $this->assertStringContainsString('configurable/media completion and real-target evidence remain', $section);
-        $this->assertStringContainsString('no real-target evidence', $section);
+        $this->assertStringContainsString('it did not prove behaviour on a real Adobe Commerce target', $section);
         $this->assertStringContainsString('support remains false', $section);
     }
 
@@ -645,7 +647,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('no `composer.json` change', $gaps);
         $this->assertStringContainsString('validation-only Laravel control plane', $gaps);
         $this->assertStringContainsString('no real-target validation harness execution/certification in this PR', $gaps);
-        $this->assertStringContainsString('no Live enablement', $gaps);
+        $this->assertStringContainsString('no Live support enablement', $gaps);
         $this->assertStringContainsString('no deployment', $gaps);
     }
 
