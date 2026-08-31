@@ -27,7 +27,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('original contract landed as a', $section);
         $this->assertStringContainsString('docs-only', $section);
-        $this->assertStringContainsString('trusted simple entity-bound Product WRITE', $section);
+        $this->assertStringContainsString('trusted simple entity-bound Product WRITE consumption', $section);
         $this->assertStringContainsString('validation-only disposable validation harness', $section);
         $this->assertStringContainsString('**Implemented in Stage 3E-R2a.**', $section);
         $this->assertStringContainsString('Adobe Products/Export/Live | **FALSE**', $section);
@@ -407,7 +407,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $section = $this->post168AmendmentSection();
 
         $this->assertStringContainsString('#### DECISION 1 — Current state (frozen)', $section);
-        $this->assertStringContainsString('trusted simple entity-bound Product WRITE', $section);
+        $this->assertStringContainsString('An isolated entity-bound simple Product **WRITE** primitive exists', $section);
         $this->assertStringContainsString('Laravel **Safe Sync write client**', $section);
         $this->assertStringContainsString('is consumed by the trusted simple', $section);
         $this->assertStringContainsString('does **not** route a trusted simple', $section);
@@ -640,7 +640,8 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('**Stage 3E Post-#168 Real-Target Certification Amendment (docs only) is recorded**', $gaps);
         $this->assertStringContainsString('9 decisions (current state, media-neutral Product save, connection quarantine,', $gaps);
         $this->assertStringContainsString('a `Code-vs-docs dormant discrepancies` table', $gaps);
-        $this->assertStringContainsString('no `integrations/magento-safe-sync` runtime change', $gaps);
+        $this->assertStringContainsString('no change to the first-party `integrations/magento-safe-sync` module in this campaign', $gaps);
+        $this->assertStringContainsString('Laravel trusted simple execution now consumes the previously existing Safe Sync write primitive', $gaps);
         $this->assertStringContainsString('no `composer.json` change', $gaps);
         $this->assertStringContainsString('validation-only Laravel control plane', $gaps);
         $this->assertStringContainsString('no real-target validation harness execution/certification in this PR', $gaps);
