@@ -22,8 +22,9 @@ use App\Models\Workspace;
 use App\Services\Connectors\AdobeSafeSyncComponentReadinessResolver;
 use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
 use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
-use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncReadinessResult;
 use App\Support\Connectors\AdobePaaS\AdobePaaSCredentialMapper;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncReadinessResult;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncRequiredOperation;
 use App\Support\Connectors\ConnectorConnectionCheckResult;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
 use App\Support\Workspace\WorkspacePermissions;
@@ -979,7 +980,7 @@ final class AdobeSafeSyncComponentReadinessResolverStub
     public function resolve(
         string $workspaceId,
         string $connectorAccountId,
-        \App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncRequiredOperation $operation,
+        AdobeSafeSyncRequiredOperation $operation,
     ): AdobeSafeSyncReadinessResult {
         $this->callCount++;
 

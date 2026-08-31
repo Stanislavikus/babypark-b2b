@@ -94,13 +94,13 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
         $this->assertStringContainsString("\$this->storeSetupState = 'NOT_CHECKED';", $page);
         $this->assertStringNotContainsString('public function checkStoreSetup(): void', $page);
         $this->assertStringContainsString('shouldShowStoreSetupEntry', $resource);
-        $this->assertStringContainsString("->visible(fn (ConnectorAccount \$record): bool => static::shouldShowStoreSetupEntry(\$record))", $resource);
+        $this->assertStringContainsString('->visible(fn (ConnectorAccount $record): bool => static::shouldShowStoreSetupEntry($record))', $resource);
         $this->assertStringNotContainsString("Gate::forUser(\$user)->allows('runConnectionCheck', \$record);", $resource);
         $this->assertStringContainsString('{{ $this->checkStoreSetupAction }}', $view);
         $this->assertStringContainsString("__('connectors.ui.readiness.not_checked.body')", $view);
         $this->assertStringContainsString("'connectors.ui.readiness.ready.title'", $view);
         $this->assertStringContainsString("'connectors.ui.readiness.ready.body'", $view);
-        $this->assertStringContainsString("\$baselineMessage = \$this->storeSetupBaselineMessage;", $view);
+        $this->assertStringContainsString('$baselineMessage = $this->storeSetupBaselineMessage;', $view);
         $this->assertStringNotContainsString('$livewire->storeSetupBaselineMessage', $view);
         $this->assertStringNotContainsString('wire:click="checkStoreSetup"', $view);
         $this->assertStringNotContainsString('ConnectorAccount::update', $resolver);
