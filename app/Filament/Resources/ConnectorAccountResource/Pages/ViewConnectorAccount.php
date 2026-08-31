@@ -40,6 +40,12 @@ class ViewConnectorAccount extends ViewRecord
 
     public ?string $storeSetupBaselineMessage = null;
 
+    public ?string $storeSetupModuleVersion = null;
+
+    public ?string $storeSetupApplicationVersion = null;
+
+    public ?string $storeSetupPhpVersion = null;
+
     public function getSubheading(): string|Htmlable|null
     {
         $user = auth()->user();
@@ -175,6 +181,9 @@ class ViewConnectorAccount extends ViewRecord
     {
         $this->storeSetupState = 'NOT_CHECKED';
         $this->storeSetupBaselineMessage = null;
+        $this->storeSetupModuleVersion = null;
+        $this->storeSetupApplicationVersion = null;
+        $this->storeSetupPhpVersion = null;
 
         try {
             $actor = auth()->user();
@@ -203,6 +212,9 @@ class ViewConnectorAccount extends ViewRecord
             if ($readiness !== null) {
                 $this->storeSetupState = strtoupper($readiness->value);
                 $this->storeSetupBaselineMessage = null;
+                $this->storeSetupModuleVersion = $result->moduleVersion;
+                $this->storeSetupApplicationVersion = $result->applicationVersion;
+                $this->storeSetupPhpVersion = $result->phpVersion;
 
                 return;
             }

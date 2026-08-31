@@ -3,6 +3,17 @@
     $actionState = $this->storeSetupActionState();
     $baselineMessage = $this->storeSetupBaselineMessage;
     $state = $this->storeSetupState;
+    $moduleVersion = $this->storeSetupModuleVersion;
+    $applicationVersion = $this->storeSetupApplicationVersion;
+    $phpVersion = $this->storeSetupPhpVersion;
+
+    $detailsParts = array_values(array_filter([
+        filled($applicationVersion) ? __('connectors.ui.readiness.details.magento', ['version' => $applicationVersion]) : null,
+        filled($phpVersion) ? __('connectors.ui.readiness.details.php', ['version' => $phpVersion]) : null,
+        filled($moduleVersion) ? __('connectors.ui.readiness.details.extension', ['version' => $moduleVersion]) : null,
+    ], fn (?string $value): bool => filled($value)));
+
+    $detailsLine = $detailsParts !== [] ? implode(' · ', $detailsParts) : null;
 
     $containerClasses = match ($state) {
         'READY' => 'border-success-200 bg-success-50/70 dark:border-success-500/30 dark:bg-success-500/10',
@@ -43,6 +54,12 @@
                 <p class="text-sm text-gray-700 dark:text-gray-300">
                     {{ __($bodyKey) }}
                 </p>
+
+                @if ($detailsLine !== null)
+                    <p class="text-xs text-gray-600 dark:text-gray-400">
+                        {{ $detailsLine }}
+                    </p>
+                @endif
             @elseif ($state === 'BASELINE_FAILURE')
                 <div class="space-y-3">
                     <div class="space-y-2 text-sm text-gray-700 dark:text-gray-300">

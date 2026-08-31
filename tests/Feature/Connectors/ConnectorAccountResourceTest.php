@@ -593,6 +593,29 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
+    public function inline_store_setup_ready_state_renders_optional_environment_details_when_available(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+        $stub = new AdobeSafeSyncComponentReadinessResolverStub;
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            connectionResult: ConnectorConnectionCheckResult::success(),
+            componentReadiness: ConnectorComponentReadiness::Ready,
+            moduleVersion: '0.2.1',
+            applicationVersion: '2.4.7-p1',
+            phpVersion: '8.3.10',
+        );
+        $this->bindReadinessResolverStub($stub);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSee('Magento 2.4.7-p1')
+            ->assertSee('PHP 8.3.10')
+            ->assertSee('Розширення 0.2.1');
+    }
+
+    #[Test]
     public function inline_store_setup_baseline_failure_stays_inline_without_generic_notification(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);

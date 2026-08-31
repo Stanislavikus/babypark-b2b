@@ -102,6 +102,23 @@ class AdobeSafeSyncComponentReadinessResolverTest extends TestCase
     }
 
     #[Test]
+    public function handshake_environment_versions_are_optional_and_propagate_when_present(): void
+    {
+        $probe = AdobeSafeSyncHandshakeProbeResult::succeeded(new AdobeSafeSyncHandshake(
+            AdobeSafeSyncContract::CONTRACT_VERSION,
+            '0.2.1',
+            [AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY, AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_FAMILY],
+            '2.4.7-p1',
+            '8.3.10',
+        ));
+
+        $result = $this->resolve(ConnectorConnectionCheckResult::success(), $probe);
+
+        $this->assertSame('2.4.7-p1', $result->applicationVersion);
+        $this->assertSame('8.3.10', $result->phpVersion);
+    }
+
+    #[Test]
     public function unsupported_epoch_requires_compatible_component_replacement(): void
     {
         $probe = AdobeSafeSyncHandshakeProbeResult::succeeded(new AdobeSafeSyncHandshake(

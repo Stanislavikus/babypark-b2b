@@ -11,5 +11,7 @@ final readonly class AdobeSafeSyncHandshake
         public string $contractVersion,
         public string $moduleVersion,
         public array $supportedOperationFamilies,
+        public ?string $applicationVersion = null,
+        public ?string $phpVersion = null,
     ) {}
 }
