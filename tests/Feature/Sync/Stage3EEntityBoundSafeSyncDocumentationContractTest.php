@@ -417,7 +417,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('`ConnectorSyncOperationSupport(Products, Export, Live)` remains **false**', $section);
         $this->assertStringContainsString('No** real-target consequential WRITE certification has occurred', $section);
         $this->assertStringContainsString('trusted simple consumption is', $section);
-        $this->assertStringContainsString('configured/media completion and real-target evidence remain', $section);
+        $this->assertStringContainsString('configurable/media completion and real-target evidence remain', $section);
         $this->assertStringContainsString('no real-target evidence', $section);
         $this->assertStringContainsString('support remains false', $section);
     }

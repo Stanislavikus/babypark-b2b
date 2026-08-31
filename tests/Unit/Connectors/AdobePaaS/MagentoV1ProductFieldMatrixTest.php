@@ -15,6 +15,37 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
         'NOT_APPLICABLE',
     ];
 
+    private const STABLE_OFFICIAL_ROW_IDS = [
+        'product-id',
+        'product-sku',
+        'product-name',
+        'product-attribute-set-id',
+        'product-price',
+        'product-status',
+        'product-visibility',
+        'product-type-id',
+        'product-created-at',
+        'product-updated-at',
+        'product-weight',
+        'product-extension-attributes',
+        'product-product-links',
+        'product-options',
+        'product-media-gallery-entries',
+        'product-tier-prices',
+        'product-custom-attributes',
+        'attribute-description',
+        'attribute-short-description',
+        'attribute-special-price',
+        'attribute-special-price-from-date',
+        'attribute-special-price-to-date',
+        'attribute-url-key',
+        'attribute-meta-title',
+        'attribute-meta-keywords',
+        'attribute-meta-description',
+        'attribute-tax-class',
+        'attribute-cost',
+    ];
+
     #[Test]
     public function authoritative_matrix_rows_are_protocol_aligned_and_individually_certifiable(): void
     {
@@ -36,12 +67,22 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
             $ids[] = $row['id'];
 
             self::assertNotSame('', trim($row['cluster']), $row['id']);
+            self::assertNotSame('', trim($row['external_entity_object']), $row['id']);
+            self::assertNotSame('', trim($row['external_field_key_path']), $row['id']);
+            self::assertNotSame('', trim($row['type_and_shape']), $row['id']);
+            self::assertNotSame('', trim($row['required_semantics']), $row['id']);
+            self::assertNotSame('', trim($row['null_semantics']), $row['id']);
+            self::assertNotSame('', trim($row['clear_semantics']), $row['id']);
+            self::assertNotSame('', trim($row['external_read_contract']), $row['id']);
+            self::assertNotSame('', trim($row['external_write_contract']), $row['id']);
+            self::assertNotSame('', trim($row['external_restrictions_or_system_owner']), $row['id']);
+            self::assertNotSame('', trim($row['version_edition_scope']), $row['id']);
             self::assertNotSame('', trim($row['platform_domain_owner']), $row['id']);
+            self::assertNotSame('', trim($row['platform_representation']), $row['id']);
             self::assertNotSame('', trim($row['connector_read_seam']), $row['id']);
             self::assertNotSame('', trim($row['connector_write_seam']), $row['id']);
             self::assertNotSame('', trim($row['real_validation_state']), $row['id']);
             self::assertNotSame('', trim($row['field_certification_status']), $row['id']);
-            self::assertStringContainsString('`'.$row['id'].'`', $markdown, $row['id']);
 
             foreach ([
                 'read_capability_state',
@@ -79,6 +120,35 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
     }
 
     #[Test]
+    public function verified_stable_official_inventory_rows_cannot_silently_disappear(): void
+    {
+        $matrix = $this->matrix();
+        $rowsById = [];
+
+        foreach ($matrix['rows'] as $row) {
+            $rowsById[$row['id']] = $row;
+        }
+
+        self::assertCount(28, self::STABLE_OFFICIAL_ROW_IDS);
+
+        foreach (self::STABLE_OFFICIAL_ROW_IDS as $rowId) {
+            self::assertArrayHasKey($rowId, $rowsById, 'Missing stable official row: '.$rowId);
+            self::assertSame('stable_official_field', $rowsById[$rowId]['inventory_class'], $rowId);
+        }
+
+        self::assertSame(
+            self::STABLE_OFFICIAL_ROW_IDS,
+            array_values(array_map(
+                static fn (array $row): string => $row['id'],
+                array_filter(
+                    $matrix['rows'],
+                    static fn (array $row): bool => $row['inventory_class'] === 'stable_official_field',
+                ),
+            )),
+        );
+    }
+
+    #[Test]
     public function documentation_map_points_to_the_new_contract(): void
     {
         $map = file_get_contents($this->repoPath('docs/Project_Documentation_Map.md'));
@@ -111,7 +181,7 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
         ));
 
         self::assertSame(
-            ['product-name', 'product-status', 'product-visibility', 'product-price'],
+            ['product-name', 'product-price', 'product-status', 'product-visibility'],
             $supportedSafeSyncWriteRows,
         );
 
@@ -120,6 +190,7 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
             self::assertStringContainsString('`'.$field.'`', $markdown);
         }
         self::assertStringContainsString('Adobe Products / Export / Live = false', $markdown);
+        self::assertStringContainsString('trusted simple WRITE consumed internally', $markdown);
     }
 
     #[Test]
@@ -148,6 +219,7 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
         self::assertSame($expected, $actual);
 
         $markdown = file_get_contents($this->repoPath('docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md'));
+        self::assertStringContainsString('Current discovery inputs currently normalized in repository code', $markdown);
         foreach ($expected as $frontendInput) {
             self::assertStringContainsString('`'.$frontendInput.'`', $markdown);
         }

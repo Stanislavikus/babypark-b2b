@@ -1,77 +1,167 @@
 # Magento / Adobe Commerce V1 Product Field Matrix
 
-**Contract version:** `2.0.0`  
-**Repository base:** `133a31ab056ea0292faee5512d77cef0f3986c59`  
-**Refresh date:** `2026-08-31`  
+**Contract version:** `2.1.0`
+**Repository base:** `133a31ab056ea0292faee5512d77cef0f3986c59`
+**Refresh date:** `2026-08-31`
 **Completion state:** `partial_pending_real_target`
 
 This is the current-base Magento V1 Product field and capability inventory for the
 canonical campaign branch.
 
-It exists to satisfy the delivery sequence from `09-CONNECTOR_DELIVERY_PROTOCOL.md`:
-
-`inventory -> classify -> map -> missing seam -> representative READ/WRITE probe -> actual error -> smallest correction -> rerun -> field-by-field certification`
-
 The adjacent JSON contract is authoritative. This markdown is the human-readable audit.
 
 ## Non-negotiable interpretation rules
 
-- Every row below is an individual field or capability outcome. A cluster is only a
-  classification aid.
-- Cluster summaries are **not** field-complete certification.
-- Installation-dependent EAV rows do **not** claim a universal Magento schema.
-- Real-target certification remains pending until the target inventory and probes are
-  executed against an actual connected store.
+- Every row below is an individual field or capability outcome.
+- Cluster summaries are classification only; they are **not** field-complete certification.
+- Installation-dependent rows do **not** claim a universal Magento custom-attribute list.
+- A real connected target must still expand the installation-dependent family into one
+  row per discovered field before field-by-field certification.
 - Public support truth remains unchanged: `Adobe Products / Export / Live = false`.
-- Trusted Receive identity remains unchanged: trusted `ExternalRecordLink` plus
-  logical `entity_id` discriminator plus exact SKU precondition.
-- The existing entity-bound Safe Sync seams remain the only approved trusted product
-  READ/WRITE primitive family:
-  - `AdobeSafeSyncClient::readProduct()`
-  - `AdobeSafeSyncClient::writeSimpleProduct()`
+- Trusted Receive identity remains unchanged: trusted `ExternalRecordLink` plus logical
+  `entity_id` plus exact trusted SKU precondition.
+- The accepted runtime seams remain unchanged:
+  - `AdobeProductDocumentReader` reuses
+    `AdobeProductRemoteStateClient::sendReadOnlyGetWithContext()`
+  - trusted simple Product execution consumes
+    `AdobeSafeSyncClient::writeSimpleProduct()`
+  - no duplicate Product GET transport/client/signing stack exists
+  - no trusted SKU-addressed consequential Product writer exists
 
 ## Current primary-source refresh
 
-The current refresh preserved the useful research direction from donor PR `#180`,
-but replaced stale retrieval claims and stale repository-state conclusions.
-
-Primary-source refresh used current Adobe or Magento-owned sources:
-
 | ID | Source | Current refresh outcome |
 |---|---|---|
-| `S1` | Adobe Commerce REST reference | Refreshed successfully on 2026-08-31; `V1/products`, configurable product, media, and inventory surfaces remain present. |
-| `S2` | Adobe Commerce 2.4.9 release notes | Refreshed successfully on 2026-08-31; current 2.4.9 notes record REST media-gallery store-view inheritance behavior. |
+| `S1` | Adobe Commerce catalog product REST reference | Refreshed successfully on `2026-08-31`. |
+| `S2` | Adobe Commerce `2.4.9` release notes | Refreshed successfully on `2026-08-31`; media-gallery store-view inheritance behavior is current. |
 | `S3` | Magento `Catalog\Api\Data\ProductInterface` | Current `2.4-develop` contract reviewed. |
 | `S4` | Magento `Catalog\Api\ProductRepositoryInterface` | Current `2.4-develop` contract reviewed. |
 | `S5` | Magento `Catalog\Api\Data\ProductAttributeInterface` | Current `2.4-develop` contract reviewed. |
-| `S6` | Magento `ConfigurableProduct` API contracts | Current `2.4-develop` contract reviewed. |
-| `S7` | Magento media gallery API contracts | Current `2.4-develop` contract reviewed. |
-| `S8` | Magento MSI inventory APIs | Adobe REST inventory surface refreshed; exact raw source-path retrieval for one MSI interface remained not re-verified in current tooling, so MSI row conclusions stay explicitly bounded. |
+| `S6` | Adobe Commerce product data attributes reference | Current official export/import attribute surface reviewed. |
+| `S7` | Adobe Commerce simple product docs | Current official admin/product semantics reviewed. |
+| `S8` | Adobe Commerce special prices docs | Current special-price and date-range semantics reviewed. |
+| `S9` | Magento `ConfigurableProduct\Api\LinkManagementInterface` | Current `2.4-develop` configurable child-relation contract reviewed. |
+| `S10` | Magento `ConfigurableProduct\Api\OptionRepositoryInterface` | Current `2.4-develop` configurable option contract reviewed. |
+| `S11` | Magento `Catalog\Api\ProductAttributeMediaGalleryManagementInterface` | Current `2.4-develop` media-gallery management contract reviewed. |
+| `S12` | Adobe Commerce inventory source-items guide | Current MSI source-item REST surface reviewed; exact raw source-path proof remains explicitly bounded. |
 
-## Current repository truths frozen by this matrix
+## Protocol-required inventory dimensions now enforced mechanically
 
-- Current stock Magento GET transport seam already exists and must be reused:
-  - `AdobeProductCommandRequestFactory::buildGet()`
-  - `AdobeProductRemoteStateClient::sendReadOnlyGetWithContext()`
-- Current Receive remains trusted-link and entity-bound Safe Sync read:
-  - trusted `ExternalRecordLink`
-  - strict logical entity discriminator
-  - exact trusted expected SKU
-  - current proposal output remains `Product.name` only
-- Current trusted simple export runtime now consumes entity-bound Safe Sync for
-  simple Products after trusted-link, discriminator, SKU, and consequential-write
-  gate checks.
-- Current Safe Sync write request allowlist remains:
-  - `expected_sku`
-  - `name`
-  - `status`
-  - `visibility`
-  - `price`
-  - `mapped_attributes`
-- Safe Sync `expected_sku` is an identity precondition, not a trusted writable SKU
-  mutation path.
+The JSON contract and `MagentoV1ProductFieldMatrixTest` now require every row to carry:
 
-## Discovery inputs currently normalized in repository code
+- external entity/object
+- external field/key/path
+- type and shape
+- required semantics
+- null semantics
+- clear semantics
+- external READ contract
+- external WRITE contract
+- external restrictions / system ownership
+- version / edition / API scope
+- cluster
+- platform domain owner
+- platform representation / binding
+- connector READ seam
+- connector WRITE seam
+- explicit current connector READ / WRITE state
+- explicit current Safe Sync READ / WRITE state
+- real-validation state
+- result / blocker
+
+The same test also guards the verified stable official inventory count so a known
+stable field cannot silently disappear from the matrix.
+
+## Stable official Product surface
+
+Stable official Product-field rows currently inventoried: **28**
+
+### Stable Product document fields
+
+| ID | External key/path | Type / shape | Current connector truth | Current result / blocker |
+|---|---|---|---|---|
+| `product-id` | `product.id` | positive integer | READ supported via `AdobeProductDocumentReader`; trusted Safe Sync read also returns logical id | trusted identity authority remains ERL + entity-bound Safe Sync |
+| `product-sku` | `product.sku` | string | READ supported; trusted WRITE does **not** mutate SKU | Safe Sync keeps `expected_sku` as precondition only |
+| `product-name` | `product.name` | string | READ supported; trusted simple WRITE consumed internally | real-target certification and public support still pending |
+| `product-attribute-set-id` | `product.attribute_set_id` | integer id | READ supported | current trusted entity-bound update path does not mutate attribute set |
+| `product-price` | `product.price` | decimal | READ supported; trusted simple base-price WRITE consumed internally | advanced pricing remains separate and uncertified |
+| `product-status` | `product.status` | enum/int | READ supported; trusted simple WRITE consumed internally | configurable completion, real-target proof, and public support still pending |
+| `product-visibility` | `product.visibility` | enum/int | READ supported; trusted simple WRITE consumed internally | current runtime no longer truthfully reads as “universally blocked before every write” |
+| `product-type-id` | `product.type_id` | enum/string | READ supported via `AdobeProductDocumentReader`; trusted Safe Sync read also returns `type_id` | reusable full Product document READ now exists |
+| `product-created-at` | `product.created_at` | datetime string | READ supported | read-only system metadata |
+| `product-updated-at` | `product.updated_at` | datetime string | READ supported | read-only system metadata |
+| `product-weight` | `product.weight` | decimal | READ supported | current trusted simple write allowlist does not carry `weight` |
+| `product-extension-attributes` | `product.extension_attributes` | nested object | READ supported as evidence only | every nested structure still needs owner-specific classification |
+| `product-product-links` | `product.product_links` | relation array | READ supported | no current relation write runtime for related/up-sell/cross-sell transport |
+| `product-options` | `product.options` | custom-option array | READ supported | no current governed Product Option owner/runtime for Adobe Product V1 |
+| `product-media-gallery-entries` | `product.media_gallery_entries` | media-entry array | READ supported; internal media WRITE runtime exists | entity-bound Safe Sync media completion and real-target certification remain pending |
+| `product-tier-prices` | `product.tier_prices` | tier-price array | READ supported | current trusted simple write only covers one base price value |
+| `product-custom-attributes` | `product.custom_attributes` | attribute array | READ supported; scalar-string mapped write path exists only partially | contained fields still require row-by-row certification |
+
+### Stable official attribute rows
+
+| ID | External key/path | Current connector truth | Current result / blocker |
+|---|---|---|---|
+| `attribute-description` | `product.custom_attributes.description` | READ supported; WRITE only candidate via scalar `mapped_attributes` | row-level certification and store-scope proof remain pending |
+| `attribute-short-description` | `product.custom_attributes.short_description` | READ supported; WRITE only candidate via scalar `mapped_attributes` | row-level certification remains pending |
+| `attribute-special-price` | `product.custom_attributes.special_price` | READ supported | current trusted simple WRITE does not implement advanced pricing |
+| `attribute-special-price-from-date` | `product.custom_attributes.special_price_from_date` | READ supported | no advanced-pricing schedule writer exists |
+| `attribute-special-price-to-date` | `product.custom_attributes.special_price_to_date` | READ supported | no advanced-pricing schedule writer exists |
+| `attribute-url-key` | `product.custom_attributes.url_key` | READ supported; WRITE only candidate via scalar `mapped_attributes` | rewrite-history semantics remain uncertified |
+| `attribute-meta-title` | `product.custom_attributes.meta_title` | READ supported; WRITE only candidate via scalar `mapped_attributes` | row-level certification remains pending |
+| `attribute-meta-keywords` | `product.custom_attributes.meta_keywords` | READ supported; WRITE only candidate via scalar `mapped_attributes` | singular/plural surface-key variance is now explicit and cannot disappear silently |
+| `attribute-meta-description` | `product.custom_attributes.meta_description` | READ supported; WRITE only candidate via scalar `mapped_attributes` | row-level certification remains pending |
+| `attribute-tax-class` | `product.custom_attributes.tax_class` | READ supported at semantics level | target class binding remains target-dependent and uncertified |
+| `attribute-cost` | `product.custom_attributes.cost` | READ supported as stable attribute code | current connector does not export internal cost data |
+
+## Stable capability families
+
+| ID | Surface | Current connector truth | Current result / blocker |
+|---|---|---|---|
+| `product-attribute-metadata-discovery` | `GET /V1/products/attributes` | implemented | real target still must expand target-dependent rows one field at a time |
+| `product-configurable-options` | `V1/configurable-products/{sku}/options` | internal runtime present | trusted entity-bound Safe Sync configurable completion still pending |
+| `product-configurable-children` | `V1/configurable-products/{sku}/children` | internal runtime present | `executeSimpleChild()` remains fail-closed for trusted Safe Sync consumption |
+| `product-media-gallery-management` | `V1/products/{sku}/media` | internal runtime present | trusted entity-bound Safe Sync media completion still pending |
+| `product-category-links` | category assignment surfaces | no current Adobe Product V1 runtime | category owner/runtime remains absent |
+| `product-inventory-source-items` | `V1/inventory/source-items` | no current Adobe Product V1 runtime | availability remains outside current Product V1 scope/runtime |
+
+## Installation-dependent family that remains target-dependent
+
+| ID | Why it remains target-dependent | Current certification state |
+|---|---|---|
+| `product-installation-dependent-discovered-attributes` | Magento has no universal target-independent custom-attribute list. A real connected target must expand discovered attributes into one row per actual field before field-by-field certification. Repository fixtures remain evidence only, not universal schema. | `pending_real_target_expansion` |
+
+## Current Slice 2 / Slice 3 truth now reflected
+
+- `product-name` no longer claims WRITE is “future” or “pending executor rewiring”.
+- `product-type-id` no longer claims the reusable full Product document reader is missing.
+- `product-visibility` no longer claims the runtime universally blocks before every consequential write.
+- The matrix keeps the accepted boundary:
+  - trusted Receive remains entity-bound Safe Sync READ
+  - trusted simple WRITE remains one entity-bound Safe Sync write after all gates
+  - configurable/media/public Live completion remain pending
+  - `Adobe Products / Export / Live` remains `false`
+
+## Current trusted simple Safe Sync request-field allowlist
+
+The current trusted simple Product Safe Sync request contract remains exactly:
+
+- `expected_sku`
+- `name`
+- `status`
+- `visibility`
+- `price`
+- `mapped_attributes`
+
+Current row-level matrix truth remains aligned with that request contract:
+
+- `expected_sku` is a trusted precondition only and does not create a writable field row.
+- `name`, `status`, `visibility`, and `price` are the only rows whose current
+  `safe_sync_write_state` is `SUPPORTED`.
+- `mapped_attributes` remains an envelope for bounded scalar custom-attribute writes; it
+  does not justify claiming every discovered attribute is already certified for WRITE.
+
+## Current discovery inputs currently normalized in repository code
 
 Current `AdobePaaSAttributeNormalizer` still accepts exactly:
 
@@ -80,58 +170,10 @@ Current `AdobePaaSAttributeNormalizer` still accepts exactly:
 
 Any other `frontend_input` remains fail-closed until explicitly verified and mapped.
 
-## Master matrix
+## What this correction deliberately keeps unchanged
 
-| ID | External field/capability | Cluster | External READ | External WRITE | Platform owner | Connector READ seam | Connector WRITE seam | Real validation | Result / blocker |
-|---|---|---|---|---|---|---|---|---|---|
-| `product-entity-id-discriminator` | Magento logical `id` / trusted discriminator | identity_trust | Stock `GET /V1/products/:sku` can expose `id`; Safe Sync trusted read returns verified logical id | Not a mutable Product save field | Entity Trust + `ExternalRecordLink` | Safe Sync `readProduct()` for trusted identity; stock GET remains read-only candidate evidence | None; trusted writes stay entity-bound and use logical id outside stock PUT/POST identity | `repository_contract_only` | Trusted identity authority remains ERL + entity-bound Safe Sync; stock GET must not replace post-trust identity authority. |
-| `product-sku` | `sku` | core_identity | Stock product GET | Stock POST/PUT at Magento surface | ProductVariant sellable identity + ERL external identity | Stock GET and Safe Sync trusted read precondition | No trusted SKU mutation path; Safe Sync uses `expected_sku` only as precondition | `repository_contract_only` | Trusted consequential write cannot become SKU-addressed stock Product PUT/POST; public Live remains false. |
-| `product-name` | `name` | core_identity | Stock product GET and Safe Sync trusted read | Stock POST/PUT; Safe Sync simple write allowlist | Product | Receive proposal service already maps trusted name read to `Product.name` proposal | Trusted simple executor now consumes `AdobeSafeSyncClient::writeSimpleProduct()` for simple Products | `repository_contract_only` | Current branch now has trusted READ, name proposal, and trusted simple WRITE consumption; public Live support remains false pending real-target certification. |
-| `product-type-id` | `type_id` | core_type | Stock product GET | Product type is effectively fixed by creation path, not current trusted mutation slice | Product family / connector execution planning | Stock GET only on current base | None in current trusted simple write slice | `real_target_pending` | Useful for full product document read and capability classification, but no reusable full-document reader exists on current base yet. |
-| `product-status` | `status` | lifecycle_projection | Stock product GET | Stock POST/PUT; Safe Sync allowlist | Product lifecycle semantics | Stock GET only on current base | Trusted simple executor consumes Safe Sync simple write for simple Products | `repository_contract_only` | Trusted simple Safe Sync write now covers `status` for simple Products; configurable/media expansion and real-target proof remain pending. |
-| `product-visibility` | `visibility` | lifecycle_projection | Stock product GET | Stock POST/PUT; Safe Sync allowlist | Connector-owned external display projection | Stock GET only on current base | Trusted simple executor consumes Safe Sync simple write for simple Products | `repository_contract_only` | Trusted simple Safe Sync write now covers `visibility` for simple Products; public Live support remains false. |
-| `product-price` | `price` | pricing | Stock product GET | Stock product save; Safe Sync allowlist | Pricing domain | Stock GET only on current base | Safe Sync simple write allowlist contains `price` | `repository_contract_only` | Safe Sync trusted READ does not currently expose price; Receive pricing flow is not implemented. |
-| `product-custom-attribute-scalar` | Installation-specific scalar `custom_attributes[]` | eav_scalar | Stock product GET plus attribute metadata discovery | Stock product save via `custom_attributes`; Safe Sync `mapped_attributes` is scalar-string only | Attribute Dictionary | Attribute metadata discovery + stock GET candidate read | Safe Sync simple write `mapped_attributes` for scalar strings only | `real_target_pending` | Installation-dependent; no universal custom-attribute list exists; real target inventory must expand one row per discovered field later. |
-| `product-custom-attribute-select` | Installation-specific select `custom_attributes[]` | eav_select | Stock product GET plus attribute metadata/options discovery | Stock product save via target option ids; Safe Sync `mapped_attributes` can carry one mapped scalar value | Attribute Dictionary + FieldOptionMapping | Attribute discovery plus stock GET candidate read | Safe Sync simple write `mapped_attributes` for single mapped scalar option ids | `real_target_pending` | Option labels and ids are target-dependent; current repository evidence is sufficient for partial mapping only. |
-| `product-custom-attribute-multiselect` | Installation-specific multiselect `custom_attributes[]` | eav_select | Stock product GET plus attribute metadata/options discovery | Magento supports multiselect writes, but current connector trusted write seam does not | Attribute Dictionary + FieldOptionMapping | Attribute discovery plus stock GET candidate read | None in current trusted write seam; current `mapped_attributes` contract is scalar only | `real_target_pending` | Current connector lacks governed multi-option serialization and Safe Sync request support. |
-| `product-media-gallery-entries` | `media_gallery_entries[]` | media | Stock product/media REST surfaces | Magento media create/update/delete surfaces | Media domain | Stock GET candidate read; dedicated media APIs exist externally | None in current trusted Safe Sync product save; media remains intentionally excluded | `real_target_pending` | 2.4.9 media store-view inheritance behavior was refreshed; current connector still has no entity-bound Safe Sync media contract. |
-| `product-configurable-options` | Configurable option structure | configurable_structure | Configurable option APIs and stock payload structures | Configurable option APIs | Product/ProductVariant relation plus mapped dimension fields | Existing stock configurable GET seam family already exists in request factory / remote state client | None in current Safe Sync simple write primitive | `real_target_pending` | Current branch has internal configurable seams, but no trusted entity-bound Safe Sync configurable mutation contract. |
-| `product-configurable-children` | Configurable child relations | configurable_structure | Configurable child APIs | Configurable child relation APIs | Product to ProductVariant relation | Existing stock configurable child GET seam family already exists | None in current Safe Sync simple write primitive | `real_target_pending` | Relation ownership is clear; trusted simple Safe Sync write does not cover configurable relation mutation. |
-| `product-category-links` | `extension_attributes.category_links[]` | category_relation | Stock product/category APIs | Category relation APIs | Category domain | Stock GET candidate read only | None in current trusted product seam | `real_target_pending` | No current connector relation mapping/runtime exists for category receive or trusted write. |
-| `product-tier-and-special-pricing` | Tier pricing / special pricing capability | pricing | Product/tier-price APIs | Tier-price / advanced pricing APIs | Pricing domain | External APIs exist; current connector does not consume them | None in current trusted product seam | `real_target_pending` | Current connector only carries one base price value in Safe Sync simple write. |
-| `product-inventory-source-items` | MSI inventory / source items capability | availability | Magento inventory APIs | Magento inventory APIs | Availability domain | No current Product V1 connector read seam | None in current Product V1 trusted write seam | `not_reverified_exact_source_path` | Must stay outside Product column semantics; Adobe REST inventory surface exists but exact raw MSI interface retrieval was not re-verified in current tooling. |
-| `product-extension-attributes-generic` | Generic `extension_attributes.*` | extension_structure | Product GET may expose module-defined nested structures | Module-defined service contracts vary | Existing owning domain only after classification | None as a generic connector seam | None as a generic connector seam | `real_target_pending` | No generic passthrough is allowed; every nested structure must first be classified to an owner. |
-| `product-attribute-metadata-discovery` | Product attribute metadata inventory capability | discovery_metadata | `GET /V1/products/attributes` | Not part of Product mutation | Connector discovery | Existing Adobe discovery capability | Not applicable | `repository_contract_only` | Current discovery seam exists, but completion remains partial because target-dependent inventory still needs real target expansion. |
-| `product-service-only-null-frontend-input` | Service-only/system metadata skip rule | discovery_metadata | Attribute metadata discovery | Not applicable | Connector discovery eligibility | Existing discovery normalization and skip rule | Not applicable | `repository_contract_only` | Current skip rule is intentionally narrow and evidence-based; do not broaden to a universal null-frontend-input skip. |
-
-## Cluster notes that are useful but not certifying
-
-- `identity_trust`: frozen around trusted ERL, logical `entity_id`, and exact SKU
-  precondition.
-- `core_identity` / `core_type` / `lifecycle_projection` / `pricing`: the stable
-  ProductInterface surface that can be inventory-tested field by field.
-- `eav_*`: target-dependent and must expand from real discovery, not from a universal
-  repository fiction.
-- `media`, `configurable_structure`, `category_relation`, `availability`:
-  legitimate Magento product capabilities, but still blocked by missing or intentionally
-  unimplemented connector seams.
-- `discovery_metadata`: repository evidence exists today, but real target certification
-  still requires a concrete connected Magento inventory run.
-
-## What was preserved from donor `#180`
-
-- official-source inventory mindset;
-- cluster taxonomy as a classification layer;
-- explicit platform-owner analysis;
-- machine-readable adjacent JSON contract;
-- mechanical contract testing.
-
-## What was deliberately rejected or superseded from donor `#180`
-
-- the old `17-row` presentation as if it were field-complete certification;
-- aggregate rows such as combined `status, visibility`;
-- stale repository-base truth;
-- stale retrieval-failure text claiming current Adobe/Magento sources were inaccessible;
-- any claim that installation-dependent EAV rows are a universal Magento field list;
-- any stale status copied forward without recomputing current Receive, Safe Sync,
-  readiness, Entity Trust, and support-gating state.
+- no duplicate Product GET transport or OAuth stack
+- no change to Entity Trust identity authority
+- no change to Safe Sync handshake/readiness boundary from PR `#184`
+- no real Magento WRITE execution in this correction pass
+- no deploy
