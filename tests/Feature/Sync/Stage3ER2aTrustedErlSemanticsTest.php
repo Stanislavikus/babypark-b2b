@@ -7,6 +7,7 @@ use App\Models\ExternalRecordLink;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Workspace;
+use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
 use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableCommandInput;
 use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableDesiredStateCompiler;
 use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableParentCommandExecutor;
@@ -18,6 +19,9 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersi
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersister;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandExecutor;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandInput;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClient;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncRequestFactory;
+use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Database\QueryException;
@@ -379,7 +383,7 @@ class Stage3ER2aTrustedErlSemanticsTest extends TestCase
     }
 
     #[Test]
-    public function complete_trusted_erl_returns_entity_bound_bridge_required_with_zero_writes(): void
+    public function complete_trusted_erl_without_consequential_gate_returns_gate_closed_with_zero_writes(): void
     {
         [$executor, $transport] = $this->executor();
         $workspace = $this->defaultWorkspace();
@@ -406,9 +410,10 @@ class Stage3ER2aTrustedErlSemanticsTest extends TestCase
         ));
 
         $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
-        $this->assertSame('entity_bound_mutation_bridge_required', $result->evidence->reasonCode);
+        $this->assertSame('consequential_write_gate_closed', $result->evidence->reasonCode);
         $this->assertSame(0, $transport->sendCount);
         $this->assertSame(0, $result->evidence->consequentialWriteAttempts);
+        $this->assertTrue($result->evidence->ownershipTrustSatisfied);
     }
 
     #[Test]
@@ -511,6 +516,11 @@ class Stage3ER2aTrustedErlSemanticsTest extends TestCase
         $executor = new AdobeProductSimpleCommandExecutor(
             new AdobeProductDesiredStateCompiler,
             new AdobeProductExternalRecordLinkGuard,
+            new AdobeSafeSyncClient(
+                app(AdobePaaSRequestContextFactory::class),
+                new AdobeSafeSyncRequestFactory(new OAuth1RequestSigner),
+                $transport,
+            ),
         );
 
         return [$executor, $transport];

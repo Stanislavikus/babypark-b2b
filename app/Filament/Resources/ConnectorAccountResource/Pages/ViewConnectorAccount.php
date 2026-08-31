@@ -11,9 +11,11 @@ use App\Models\ConnectorConnectionCheck;
 use App\Models\ConnectorDiscoveryRun;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Connectors\AdobeSafeSyncComponentReadinessResolver;
 use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
 use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
 use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncRequiredOperation;
 use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorAuthorization;
@@ -33,6 +35,10 @@ use Throwable;
 class ViewConnectorAccount extends ViewRecord
 {
     protected static string $resource = ConnectorAccountResource::class;
+
+    public string $storeSetupState = 'NOT_CHECKED';
+
+    public ?string $storeSetupBaselineMessage = null;
 
     public function getSubheading(): string|Htmlable|null
     {
@@ -133,6 +139,87 @@ class ViewConnectorAccount extends ViewRecord
         }
 
         return ConnectorAccountResource::loadAccountPresentationRelations($record, $user);
+    }
+
+    public function shouldShowStoreSetupBlock(): bool
+    {
+        return $this->record instanceof ConnectorAccount
+            && ConnectorAccountResource::shouldShowStoreSetupEntry($this->record);
+    }
+
+    /**
+     * @return array{enabled: bool, label: string, disabled_reason: ?string}
+     */
+    public function storeSetupActionState(): array
+    {
+        return app(ConnectorAccountUiState::class)->manualCheckActionState($this->record);
+    }
+
+    public function checkStoreSetupAction(): Action
+    {
+        return Action::make('checkStoreSetup')
+            ->label(fn (): string => $this->storeSetupState === 'NOT_CHECKED'
+                ? __('connectors.ui.readiness.check')
+                : __('connectors.ui.readiness.check_again'))
+            ->color('gray')
+            ->size('sm')
+            ->authorize('runConnectionCheck')
+            ->disabled(fn (): bool => ! $this->storeSetupActionState()['enabled'])
+            ->tooltip(fn (): ?string => $this->storeSetupActionState()['disabled_reason'])
+            ->action(function (): void {
+                $this->executeStoreSetupCheck();
+            });
+    }
+
+    private function executeStoreSetupCheck(): void
+    {
+        $this->storeSetupState = 'NOT_CHECKED';
+        $this->storeSetupBaselineMessage = null;
+
+        try {
+            $actor = auth()->user();
+            abort_unless($actor instanceof User, 403);
+
+            $workspaceId = app(WorkspaceContext::class)->id();
+            $account = ConnectorAccount::withoutWorkspaceScope()
+                ->where('workspace_id', $workspaceId)
+                ->whereKey($this->record->getKey())
+                ->firstOrFail();
+
+            Gate::forUser($actor)->authorize('runConnectionCheck', $account);
+
+            if (! app(ConnectorAccountUiState::class)->manualCheckActionState($account)['enabled']) {
+                throw new AuthorizationException;
+            }
+
+            $result = app(AdobeSafeSyncComponentReadinessResolver::class)->resolve(
+                $workspaceId,
+                (string) $account->getKey(),
+                AdobeSafeSyncRequiredOperation::SimpleProductWrite,
+            );
+
+            $readiness = $result->componentReadiness;
+
+            if ($readiness !== null) {
+                $this->storeSetupState = strtoupper($readiness->value);
+                $this->storeSetupBaselineMessage = null;
+
+                return;
+            }
+
+            $this->storeSetupState = 'BASELINE_FAILURE';
+            $this->storeSetupBaselineMessage = app(ConnectorSafeMessagePresenter::class)->present(
+                $result->connectionResult->messageKey(),
+                $result->connectionResult->safeMessageParameters(),
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->danger()
+                ->title(__('connectors.ui.notifications.action_failed'))
+                ->send();
+        }
     }
 
     private function presentationWorkspace(): Workspace

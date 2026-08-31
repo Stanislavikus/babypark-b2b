@@ -632,6 +632,9 @@ connector certification, import/export transport expansion, or real-target valid
 - IMPLEMENTATION_GAPS.md — open gaps affecting the field or mapping in question
 - 08-CONNECTOR_SYNC_RUNTIME_ATLAS.md — current-state locator only; verify owners in code
 - 09-CONNECTOR_DELIVERY_PROTOCOL.md — mandatory for connector/import/export delivery sequencing and certification
+- `docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md` — authoritative
+  current-base Magento V1 Product field/capability inventory; cluster summaries are
+  classification only, not field certification
 - `docs/prototypes/task-4b0-connector-account/` — Task 4B-0 visual contract
   (when implementing connector operational UI)
 
@@ -656,6 +659,9 @@ connector certification, import/export transport expansion, or real-target valid
   (locator only; verify current owner in code before modification)
 - 09-CONNECTOR_DELIVERY_PROTOCOL.md when the task touches connector implementation,
   import/export transport, real-target validation, or connector certification
+- `docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md` when the task
+  touches Magento Product inventory, certification, stock Product reads, or entity-bound
+  Safe Sync Product writes
 
 **For AI-assisted implementation (UI and frontend tasks):**
 

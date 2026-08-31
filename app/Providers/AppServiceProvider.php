@@ -11,10 +11,16 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapabilityImpl;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapabilityImpl;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductDesiredStateCompiler;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkGuard;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersistence;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersister;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductOwnershipTrustPolicy;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandExecutor;
 use App\Support\Connectors\AdobePaaS\Command\ConservativeAdobeProductOwnershipTrustPolicy;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClient;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncHandshakeProbe;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncHandshakeProbeCapability;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspaceMembership;
@@ -30,6 +36,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(AdobeSafeSyncHandshakeProbeCapability::class, AdobeSafeSyncHandshakeProbe::class);
         $this->app->singleton(WorkspaceContext::class);
         $this->app->singleton(ConnectorProfileRegistry::class);
         $this->app->singleton(WorkspaceMembership::class);
@@ -53,6 +60,15 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             AdobeProductOwnershipTrustPolicy::class,
             ConservativeAdobeProductOwnershipTrustPolicy::class,
+        );
+
+        $this->app->bind(
+            AdobeProductSimpleCommandExecutor::class,
+            fn ($app): AdobeProductSimpleCommandExecutor => new AdobeProductSimpleCommandExecutor(
+                $app->make(AdobeProductDesiredStateCompiler::class),
+                $app->make(AdobeProductExternalRecordLinkGuard::class),
+                $app->make(AdobeSafeSyncClient::class),
+            ),
         );
 
         $this->app->bind(ConnectorAccountPersistencePort::class, ConnectorAccountSettingsService::class);

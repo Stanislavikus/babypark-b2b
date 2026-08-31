@@ -6654,9 +6654,9 @@ allowing `Product A → external X` and `Product A → external Y`. Do **not** m
 
 Legacy rows with NULL provenance are **not** grandfathered trusted. A link is trusted for Adobe `merchant_confirmed` only when the complete provenance tuple is valid. There is **no** generic DB `UNIQUE(workspace_id, connector_account_id, external_record_discriminator)` constraint; Adobe discriminator collision remains connector-aware in application guards. Existing exact-association unique constraints are unchanged.
 
-Adobe Product Live mutation is **fail-closed** until the entity-bound WRITE bridge exists (`KnownNotApplied` / `entity_bound_mutation_bridge_required` or `link_required`; zero consequential writes). Automatic ERL trust establishment from execution is impossible. **Adobe Products / Export / Live remains FALSE.**
+Adobe Product Live support remains **FALSE** until real-target certification and the final truth-flip gate complete. Trusted simple Product execution now consumes the entity-bound Safe Sync WRITE bridge after trusted-link, discriminator, exact-SKU, and consequential-write gate checks; automatic ERL trust establishment from execution remains impossible. Configurable/media expansion and public support remain pending.
 
-**Stage 3E-R2b-1 (implemented — backend only):** merchant-confirmed ENTITY TRUST review/confirm backend exists for Adobe Products. Current/prospective link readiness projection, tamper-resistant review envelope, Safe Sync entity-bound verification, and dedicated `AdobeProductMerchantConfirmedLinkPersister` are implemented. Existing configurable parent uses confirmed merchant Magento SKU (not `cfg-*` substitution). Merchant Filament/Livewire UI remains **R2b-2** follow-on. Safe Sync consequential WRITE remains pending.
+**Stage 3E-R2b-1 (implemented — backend only):** merchant-confirmed ENTITY TRUST review/confirm backend exists for Adobe Products. Current/prospective link readiness projection, tamper-resistant review envelope, Safe Sync entity-bound verification, and dedicated `AdobeProductMerchantConfirmedLinkPersister` are implemented. Existing configurable parent uses confirmed merchant Magento SKU (not `cfg-*` substitution). Merchant Filament/Livewire UI remains **R2b-2** follow-on. The R2b-1 trust backend itself performs **no** consequential writes; trusted simple Product WRITE consumption now exists internally, while configurable/media completion and public Live support remain pending.
 
 **V1 Adobe configured Review target (frozen — R2b-1 correction):** merchant-confirmed ENTITY TRUST is bound to Magento logical `entity_id` (identity authority). The authenticated Review envelope also binds the configured Adobe target snapshot `base_url + store_code` derived from the same normalized `ConnectorAccount` state used for outbound requests. Credentials are access material only — not target identity — and may rotate without invalidating trust. `tenant_context` currently has no Adobe outbound-runtime target semantics and does not participate in target identity. After any genuinely merchant-confirmed trusted ERL exists for a `ConnectorAccount`, changing `base_url` or `store_code` on that account is prohibited; V1 migration to another Magento installation/store scope requires a new `ConnectorAccount` and reconfirmation. Target fingerprint/version lifecycle is explicitly deferred. Same configured hostname is not proof of immutable Magento installation identity; future consequential WRITE still relies on fresh entity-bound verification at consumption time.
 
@@ -7026,7 +7026,7 @@ After Stage 3-0 merges, implement in order:
 | **3B — Adobe Simple Live** | Shared Adobe semantic planning boundary; child/simple external identity; GET/POST/PUT Product transport; `ExternalRecordLink` read/write; create/update/reconciliation; simple Product Live execution; applied-state classification | remains **false** | **Done (internal)** — **historical no-link create assumption invalidated by Stage 3E Stop-and-Amend**; replacement link-first runtime pending |
 | **3C — Adobe Configurable Live** | Connector-owned deterministic parent SKU; child/parent/options/link command compilation; partial/ambiguous outcomes; inactive linked-variant lifecycle; configurable recovery/reconciliation | remains **false** | **Done (internal)** — existing-parent link identity clarified by Stage 3E Stop-and-Amend; cfg-* generator applies only to future proven atomic create |
 | **3D — Adobe Media + Merchant First Live** | Required E14 primary/gallery image export; merchant Live admission **UI/read model** on `ManageAdobeProductsExportPreview` (non-actionable for consequential execution while Live support is **false**; must not bypass `ConnectorSyncOperationSupport`); queued/running/result presentation; final safe merchant copy | remains **false** | **Done (internal)** — 3D-1 E14 media runtime + 3D-2 merchant first-Live UI/read model |
-| **3E — Real Adobe Validation + Truth Flip** | Merchant link-first runtime; ERL provenance/discriminator persistence; informed merchant confirmation; atomic configurable-family confirmation; first-party Magento entity-bound Safe Sync component; disposable validation harness; target-version proof; only then flip `Adobe Products / Export / Live = true` | flip only after successful evidence | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen; **Stage 3E-R1** internal read foundation is implemented; **isolated entity-bound simple Product WRITE foundation is implemented internally** and not consumed by Live runtime; **Stage 3E-R2a** ERL provenance foundation is implemented; **Stage 3E-R2b-1** merchant-confirmed ENTITY TRUST backend is implemented; **Stage 3E-R2b-2** merchant per-item informed review/confirm UI is implemented with an opaque server-side review-flow store keeping `reviewToken` out of browser state; browser state remains presentation/input only and never identity authority; configurable/media/write-consumption, real target validation, and support flip remain **pending**; support remains **false** |
+| **3E — Real Adobe Validation + Truth Flip** | Merchant link-first runtime; ERL provenance/discriminator persistence; informed merchant confirmation; atomic configurable-family confirmation; first-party Magento entity-bound Safe Sync component; disposable validation harness; target-version proof; only then flip `Adobe Products / Export / Live = true` | flip only after successful evidence | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen; **Stage 3E-R1** internal read foundation is implemented; **trusted simple entity-bound Product WRITE consumption is implemented internally**; **Stage 3E-R2a** ERL provenance foundation is implemented; **Stage 3E-R2b-1** merchant-confirmed ENTITY TRUST backend is implemented; **Stage 3E-R2b-2** merchant per-item informed review/confirm UI is implemented with an opaque server-side review-flow store keeping `reviewToken` out of browser state; browser state remains presentation/input only and never identity authority; configurable/media completion, real target validation, and support flip remain **pending**; support remains **false** |
 
 Production Live remains **NOT IMPLEMENTED** until Stage 3E runtime lands and
 completes real-target validation with explicit human authorization. No deployment
@@ -7038,8 +7038,8 @@ without separate explicit approval.
 Safe Sync runtime contract after Magento primary-source research and
 Security/Concurrency arbitration. The original contract landed as a
 **docs-only** slice. Current repository status now includes the standalone
-Magento Safe Sync read foundation, an isolated entity-bound simple Product
-WRITE primitive that is not consumed by Live runtime, and an internal
+Magento Safe Sync read foundation, trusted simple entity-bound Product WRITE
+consumption, and an internal
 validation-only disposable validation harness. Live support remains **false**;
 no real-target validation harness execution/certification or deployment has
 occurred.
@@ -7265,6 +7265,22 @@ are **forbidden** for safety decisions.
   response size
 
 #### Account readiness freeze (ConnectorSyncOperationSupport vs ConnectorLiveRuntimeReadiness)
+
+**Safe Sync component readiness (Resolved — 2026-08-30):** after the ordinary
+Magento connection check succeeds, one bounded handshake classifies the
+requested operation as `READY`, `SETUP_REQUIRED`, or `UPDATE_REQUIRED`.
+`SETUP_REQUIRED` requires the conjunction of a successful baseline and the
+structured existing `AdobeInvalidOrUnsupportedEndpoint` result with exact HTTP
+404; it means the endpoint is unavailable or installation/setup/deployment is
+incomplete, not that physical module absence was proven. An unaccepted
+compatibility epoch or missing required operation family is `UPDATE_REQUIRED`.
+Simple Product WRITE readiness also requires a comparable semantic module
+version at or above the validation runtime's proven minimum; Product READ does
+not inherit that operation-specific floor.
+Other failures preserve existing connection/error semantics with component
+readiness absent. Evaluation is stateless and presentation-only: no readiness
+table or account projection is introduced. The result does not replace the
+fresh `ConnectorLiveRuntimeReadiness` consequential-write timing rules.
 
 | Concept | Meaning |
 |---|---|
@@ -7515,7 +7531,7 @@ required Stage 3E evidence exists:
 | 3C | **Done (internal)** — existing-parent link identity clarified |
 | 3D | **Done (internal)** |
 | 3E docs contract | **Done (docs contract)** — entity-bound Safe Sync runtime contract frozen |
-| 3E runtime + validation | **Partially implemented (internal; validation-only)** — isolated simple Product WRITE foundation and disposable validation harness shipped internally; real-target certification **NOT YET EXECUTED**; Live consumption remains pending |
+| 3E runtime + validation | **Partially implemented (internal; validation-only)** — trusted simple Product WRITE consumption and disposable validation harness shipped internally; real-target certification **NOT YET EXECUTED**; configurable/media completion and support flip remain pending |
 | Adobe Products/Export/Live | **FALSE** |
 | Merchant consequential Live | **NOT EXPOSED** |
 | Deployment | **NOT PERFORMED** |
@@ -7545,14 +7561,13 @@ Record explicitly, without overstating readiness:
   `integrations/magento-safe-sync/` and is reachable through the standalone
   `magento2-module` first-party component.
 - A bounded Laravel **Safe Sync write client** (`AdobeSafeSyncClient` +
-  `AdobeSafeSyncRequestFactory`) exists; it is a **write-capable** client
-  but is **not currently consumed** by the Live executor.
-- `AdobeProductSimpleCommandExecutor` does **not** currently route a trusted
-  simple Product through the historic SKU-addressed `PUT /V1/products/:sku`
-  path. For a trusted variant link it currently stops fail-closed with
-  `entity_bound_mutation_bridge_required` and performs **zero consequential
-  Product write**. The Live capability surface therefore has no
-  consequential simple Product writer wired today.
+  `AdobeSafeSyncRequestFactory`) exists and is consumed by the trusted simple
+  Live executor path.
+- `AdobeProductSimpleCommandExecutor` does **not** route a trusted simple
+  Product through the historic SKU-addressed `PUT /V1/products/:sku` path.
+  For a trusted simple variant link it now performs at most one
+  entity-bound Safe Sync consequential WRITE after strict trusted-link,
+  discriminator, exact-SKU, and consequential-write gate checks.
 - Historic SKU-addressed consequential writers remain separately in
   dormant production-unreachable code paths for: media
   (`GalleryManagement`), configurable options / child link, and lifecycle
@@ -7565,9 +7580,9 @@ Record explicitly, without overstating readiness:
   did not prove behaviour on a real Adobe Commerce target.
 
 Do not promote the post-#168 foundation to "ready for Live" or "ready for
-real-target". The truthful description is: **isolated primitive is reachable;
-no consumer; simple core Live path is fail-closed at
-`entity_bound_mutation_bridge_required`; no real-target evidence; support remains false.**
+real-target". The truthful description is: **trusted simple consumption is
+implemented; configurable/media completion and real-target evidence remain
+pending; support remains false.**
 
 #### DECISION 2 — Product save must be media-neutral (frozen)
 
@@ -7705,20 +7720,24 @@ The post-#168 certification envelope is:
 | Tier | Adobe Commerce | PHP |
 |---|---|---|
 | **PRIMARY** | 2.4.9 | 8.5 |
-| **SUPPORTED COMPATIBILITY** | 2.4.9 | 8.4 |
-| **PREVIOUS ADOBE LINE** | 2.4.8-p5 | 8.4 |
+| **UPGRADE-COMPATIBILITY ONLY — not a production support claim** | 2.4.9 | 8.4 |
+| **PREVIOUS CERTIFIED TARGET** | 2.4.8-p5 | 8.4 |
 | **OUT OF V1 CERTIFICATION** | — | 8.3 |
 
-- PHP 8.4 **IS supported** on Adobe Commerce 2.4.9. Do not record it as
-  unsupported.
+- **2026-08-30 Stop & Amend:** newer Adobe primary-source system requirements
+  supersede the former statement that PHP 8.4 was a production-supported Adobe
+  Commerce 2.4.9 target. Adobe now lists PHP 8.5 for 2.4.9 production use and
+  describes PHP 8.4 as upgrade compatibility only. This label correction does
+  not broaden or otherwise change the Safe Sync Composer constraints. Primary
+  source: [Adobe Commerce system requirements](https://experienceleague.adobe.com/en/docs/commerce-operations/installation-guide/system-requirements)
+  (current requirements reviewed for this amendment).
 - PHP 8.3 is **OUT of V1 certification** and must not be claimed as a
   supported V1 target.
-- The current `integrations/magento-safe-sync/composer.json` PHP and
-  `magento/framework` constraints are **broader than this certification envelope**
-  and must be **narrowed before certification**.
-- The exact `composer.json` constraint is **not chosen in this docs
-  task**; it belongs to the bounded Safe Sync module correction
-  (Decision 9 step 2).
+- The current `integrations/magento-safe-sync/composer.json` constraints remain
+  the intentional install envelope delivered by the bounded Safe Sync module
+  correction. They are unchanged by this certification-label amendment; an
+  installable upgrade-compatibility combination is not a production support
+  claim.
 
 #### DECISION 7 — Callback failure semantics (frozen)
 
@@ -7813,8 +7832,8 @@ The pre-Live sequence is:
    sub-section above.
 4. **Isolated simple writer certification** on:
    - Adobe Commerce 2.4.9 / PHP 8.5 (PRIMARY);
-   - 2.4.9 / PHP 8.4 (SUPPORTED COMPATIBILITY);
-   - 2.4.8-p5 / PHP 8.4 (PREVIOUS ADOBE LINE).
+   - 2.4.9 / PHP 8.4 (UPGRADE-COMPATIBILITY ONLY; not a production support claim);
+   - 2.4.8-p5 / PHP 8.4 (PREVIOUS CERTIFIED TARGET).
 5. **Content Staging proof** — real Commerce Product with a pending
    scheduled update.
 6. **Galera proof** — causal cross-node entity read.
@@ -7863,13 +7882,13 @@ point for the `support = true` flip.
 | Stage 3E docs contract | **Done** — entity-bound Safe Sync runtime contract frozen |
 | Stage 3E post-#168 certification amendment | **Done (docs only)** — 9 decisions recorded; no runtime change |
 | Stage 3E-R1 internal read foundation | **Implemented (internal; support false)** |
-| Isolated entity-bound simple Product WRITE foundation | **Implemented (internal; not consumed by Live; support false)** |
+| Trusted simple entity-bound Product WRITE consumption | **Implemented (internal; support false)** |
 | Bounded Safe Sync module correction (media-neutral Product write, connection reset / quarantine, narrowed Composer envelope) | **Implemented (internal; not real-target certified)** — Decision 9 step 2 runtime landed; real-target certification remains pending |
 | Disposable validation harness | **Implemented (internal; validation-only)** — Decision 9 step 3 landed; no real-target certification executed in this PR |
 | Isolated simple writer real-target certification (2.4.9 / 8.5; 2.4.9 / 8.4; 2.4.8-p5 / 8.4) | **Pending** — Decision 9 step 4 |
 | Content Staging / Galera / entity-bound lifecycle / configurable / media proofs | **Pending** — Decision 9 steps 5–9 |
 | `ConnectorLiveRuntimeReadiness` integration | **Pending** — Decision 9 step 10 |
-| Live consumption (rewire + remove SKU-addressed consequential path) | **Pending** — Decision 9 step 11 |
+| Live consumption completion (configurable/media + remove remaining stock SKU-addressed consequential paths) | **Pending** — Decision 9 step 11 |
 | Final truth-flip gate / `support = true` | **Pending** — Decision 9 step 12 |
 | Adobe Products / Export / Live | **FALSE** |
 | Merchant consequential Live | **NOT EXPOSED** |
