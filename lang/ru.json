@@ -235,7 +235,7 @@
     "connectors.ui.integrations.empty": "Нет доступных платформ для подключения.",
     "connectors.ui.integrations.status.not_connected": "Ещё не подключено",
     "connectors.ui.integrations.status.untested": "Не проверено",
-    "connectors.ui.integrations.status.connected": "Работает",
+    "connectors.ui.integrations.status.connected": "Подключение проверено",
     "connectors.ui.integrations.status.attention_required": "Требует внимания",
     "connectors.ui.integrations.status.temporarily_unavailable": "Временная проблема",
     "connectors.ui.integrations.status.disabled": "Отключено",

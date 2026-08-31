@@ -235,7 +235,7 @@
     "connectors.ui.integrations.empty": "No platforms are available to connect.",
     "connectors.ui.integrations.status.not_connected": "Not connected yet",
     "connectors.ui.integrations.status.untested": "Not checked",
-    "connectors.ui.integrations.status.connected": "Working",
+    "connectors.ui.integrations.status.connected": "Connection verified",
     "connectors.ui.integrations.status.attention_required": "Needs attention",
     "connectors.ui.integrations.status.temporarily_unavailable": "Temporary issue",
     "connectors.ui.integrations.status.disabled": "Disabled",
