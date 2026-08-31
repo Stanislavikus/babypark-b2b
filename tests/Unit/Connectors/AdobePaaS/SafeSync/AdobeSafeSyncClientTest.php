@@ -84,7 +84,7 @@ class AdobeSafeSyncClientTest extends TestCase
     }
 
     #[Test]
-    public function unknown_operation_family_still_fails_closed(): void
+    public function unknown_additive_operation_family_is_accepted(): void
     {
         $client = $this->clientWithTransport(new class implements ConnectorHttpTransport
         {
@@ -101,10 +101,9 @@ class AdobeSafeSyncClientTest extends TestCase
             }
         });
 
-        $this->expectException(AdobeSafeSyncClientException::class);
-        $this->expectExceptionMessage('Safe Sync advertised an unknown operation family.');
+        $handshake = $client->handshakeWithContext($this->context());
 
-        $client->handshakeWithContext($this->context());
+        $this->assertContains('unexpected_family', $handshake->supportedOperationFamilies);
     }
 
     #[Test]

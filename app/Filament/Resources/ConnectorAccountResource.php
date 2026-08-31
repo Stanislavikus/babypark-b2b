@@ -207,6 +207,11 @@ class ConnectorAccountResource extends Resource
                                 'uiState' => $uiState,
                                 'showActiveConnectionCheck' => static::actorCanManageConnectorAccounts(),
                             ]),
+                        ViewEntry::make('store_setup')
+                            ->label(__('connectors.ui.readiness.store_setup'))
+                            ->view('filament.connector-accounts.store-setup')
+                            ->visible(fn (ConnectorAccount $record): bool => static::shouldShowStoreSetupEntry($record))
+                            ->columnSpanFull(),
                         TextEntry::make('last_checked_at')
                             ->label(__('connectors.ui.columns.last_check'))
                             ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
@@ -405,5 +410,32 @@ class ConnectorAccountResource extends Resource
         }
 
         return static::capabilityPresentation()->canManage($user, app(WorkspaceContext::class)->current());
+    }
+
+    public static function shouldShowStoreSetupEntry(ConnectorAccount $record): bool
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return false;
+        }
+
+        $workspace = $record->workspace ?? Workspace::query()->findOrFail($record->workspace_id);
+        $presentation = static::capabilityPresentation();
+        $currentWorkspace = app(WorkspaceContext::class)->current();
+
+        if ($workspace->isNot($currentWorkspace)) {
+            return false;
+        }
+
+        if (! $presentation->showActiveConnectionCheck($user, $workspace)) {
+            return false;
+        }
+
+        if ($record->auth_profile !== 'adobe_commerce_paas_oauth1_integration') {
+            return false;
+        }
+
+        return true;
     }
 }

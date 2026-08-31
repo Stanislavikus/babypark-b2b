@@ -562,7 +562,7 @@ final class AdobeStage3EValidationRunner
             return $failureCodes;
         }
 
-        if (version_compare($handshake->moduleVersion, '0.2.1', '<')) {
+        if (version_compare($handshake->moduleVersion, AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_MINIMUM_MODULE_VERSION, '<')) {
             $failureCodes[] = 'safe_sync_module_version_below_s2_minimum';
         }
 
