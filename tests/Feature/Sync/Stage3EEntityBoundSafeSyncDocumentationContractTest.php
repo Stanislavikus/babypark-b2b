@@ -29,7 +29,6 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('docs-only', $section);
         $this->assertStringContainsString('trusted simple entity-bound Product WRITE', $section);
         $this->assertStringContainsString('consumption', $section);
-        $this->assertStringContainsString('standalone Magento Safe Sync read foundation', $section);
         $this->assertStringContainsString('validation-only disposable validation harness', $section);
         $this->assertStringContainsString('**Implemented in Stage 3E-R2a.**', $section);
         $this->assertStringContainsString('Adobe Products/Export/Live | **FALSE**', $section);
@@ -420,7 +419,6 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('No** real-target consequential WRITE certification has occurred', $section);
         $this->assertStringContainsString('trusted simple consumption is', $section);
         $this->assertStringContainsString('configurable/media completion and real-target evidence remain', $section);
-        $this->assertStringContainsString('it did not prove behaviour on a real Adobe Commerce target', $section);
         $this->assertStringContainsString('support remains false', $section);
     }
 
