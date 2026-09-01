@@ -80,12 +80,7 @@ class ViewConnectorAccount extends ViewRecord
             return $actions;
         }
 
-        $presentation = app(ConnectorAccountCapabilityPresentation::class);
         $workspace = $this->presentationWorkspace();
-
-        if (config('connectors.discovery.manual_trigger_enabled') && $this->record instanceof ConnectorAccount) {
-            $actions[] = $this->makeRunDiscoveryAction();
-        }
 
         if ($this->shouldShowAdobeExportSetupLink($user, $workspace)) {
             $actions[] = $this->makeAdobeExportSetupAction();

@@ -81,7 +81,8 @@
     </x-filament.data-list-toolbar>
 
     @if ($showDiscoveryRefreshAction)
-      <x-filament::section @if($availableFieldsHasActiveRefresh) wire:poll.5s="refreshDiscoveryState" @endif>
+      <div @if ($availableFieldsHasActiveRefresh) wire:poll.5s="refreshDiscoveryState" @endif>
+        <x-filament::section>
         <x-filament::section.heading>
           {{ __('connectors.ui.sections.available_fields') }}
         </x-filament::section.heading>
@@ -125,7 +126,8 @@
             @endif
           </div>
         </div>
-      </x-filament::section>
+        </x-filament::section>
+      </div>
     @endif
 
     <div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
