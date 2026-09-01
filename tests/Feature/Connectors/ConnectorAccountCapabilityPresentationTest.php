@@ -13,9 +13,13 @@ use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorConnectionCheck;
 use App\Models\User;
+use App\Services\Connectors\AdobeProductExportSetupAuthorizationService;
 use App\Support\Connectors\AdobePaaS\AdobePaaSCredentialMapper;
 use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
+use App\Support\Connectors\Transport\ConnectorTransportDeadline;
+use App\Support\Connectors\Transport\Dns\DnsResolutionResult;
+use App\Support\Connectors\Transport\Dns\DnsResolver;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -50,6 +54,29 @@ class ConnectorAccountCapabilityPresentationTest extends TestCase
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         Http::preventStrayRequests();
+
+        if (PHP_OS_FAMILY !== 'Linux') {
+            $this->app->instance(DnsResolver::class, new class implements DnsResolver
+            {
+                public function resolve(string $absoluteHostname, ConnectorTransportDeadline $deadline): DnsResolutionResult
+                {
+                    return DnsResolutionResult::ok(
+                        requestedHostname: $absoluteHostname,
+                        cnameChain: [],
+                        terminalOwner: $absoluteHostname,
+                        addresses: ['93.184.216.34'],
+                    );
+                }
+            });
+
+            $this->app->instance(AdobeProductExportSetupAuthorizationService::class, new class
+            {
+                public function isEligibleAdobeProductsExportSetupTarget(...$arguments): bool
+                {
+                    return false;
+                }
+            });
+        }
     }
 
     private function discoveryActor(): User
@@ -83,13 +110,11 @@ class ConnectorAccountCapabilityPresentationTest extends TestCase
 
         $detailComponent = Livewire::actingAs($manager)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertSuccessful();
+            ->assertSuccessful()
+            ->assertActionDisabled('runConnectionCheck');
 
-        $expectedReason = __('connectors.ui.disabled_reasons.check_already_active');
-        $discoveryReason = __('connectors.ui.disabled_reasons.discovery_already_active');
-
-        $this->assertSame($expectedReason, $detailComponent->instance()->getSubheading());
-        $this->assertNotSame($discoveryReason, $detailComponent->instance()->getSubheading());
+        $this->assertNull($detailComponent->instance()->getSubheading());
+        $detailComponent->assertSee(__('connectors.ui.disabled_reasons.check_already_active'), escape: false);
     }
 
     #[Test]
@@ -107,10 +132,9 @@ class ConnectorAccountCapabilityPresentationTest extends TestCase
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->assertSuccessful();
 
-        $this->assertSame(
-            __('connectors.ui.disabled_reasons.account_disabled'),
-            $detailComponent->instance()->getSubheading(),
-        );
+        $this->assertNull($detailComponent->instance()->getSubheading());
+        $detailComponent->assertActionDoesNotExist('runDiscovery');
+        $detailComponent->assertActionDoesNotExist('runConnectionCheck');
     }
 
     #[Test]
