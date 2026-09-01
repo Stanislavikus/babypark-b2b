@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ConnectorAccountResource\Pages;
 
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Enums\ConnectorDiscoveryRunStatus;
+use App\Enums\ConnectorErrorActionability;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
 use App\Filament\Resources\ConnectorAccountResource;
 use App\Models\ConnectorAccount;
@@ -48,32 +49,6 @@ class ViewConnectorAccount extends ViewRecord
 
     public function getSubheading(): string|Htmlable|null
     {
-        $user = auth()->user();
-        if (! $user instanceof User) {
-            return null;
-        }
-
-        $workspace = $this->presentationWorkspace();
-        $presentation = app(ConnectorAccountCapabilityPresentation::class);
-
-        if ($presentation->showActiveConnectionCheck($user, $workspace)) {
-            $disabledReason = app(ConnectorAccountUiState::class)
-                ->manualCheckActionState($this->record)['disabled_reason'];
-
-            return filled($disabledReason) ? $disabledReason : null;
-        }
-
-        if ($presentation->showDiscoveryExecution($user, $workspace)) {
-            if (! config('connectors.discovery.manual_trigger_enabled')) {
-                return null;
-            }
-
-            $disabledReason = app(ConnectorAccountUiState::class)
-                ->manualDiscoveryActionState($this->record)['disabled_reason'];
-
-            return filled($disabledReason) ? $disabledReason : null;
-        }
-
         return null;
     }
 
@@ -108,11 +83,7 @@ class ViewConnectorAccount extends ViewRecord
         $presentation = app(ConnectorAccountCapabilityPresentation::class);
         $workspace = $this->presentationWorkspace();
 
-        if ($presentation->showActiveConnectionCheck($user, $workspace)) {
-            $actions[] = $this->makeRunConnectionCheckAction();
-        }
-
-        if ($presentation->showDiscoveryExecution($user, $workspace) && config('connectors.discovery.manual_trigger_enabled')) {
+        if (config('connectors.discovery.manual_trigger_enabled') && $this->record instanceof ConnectorAccount) {
             $actions[] = $this->makeRunDiscoveryAction();
         }
 
@@ -219,11 +190,24 @@ class ViewConnectorAccount extends ViewRecord
                 return;
             }
 
-            $this->storeSetupState = 'BASELINE_FAILURE';
             $this->storeSetupBaselineMessage = app(ConnectorSafeMessagePresenter::class)->present(
                 $result->connectionResult->messageKey(),
                 $result->connectionResult->safeMessageParameters(),
             );
+
+            if (! $result->baselineSucceeded) {
+                $this->storeSetupState = 'BASELINE_CONNECTION_FAILED';
+
+                return;
+            }
+
+            if ($result->connectionResult->actionability() === ConnectorErrorActionability::AutomaticRetry) {
+                $this->storeSetupState = 'READINESS_TEMPORARY_PROBLEM';
+
+                return;
+            }
+
+            $this->storeSetupState = 'BASELINE_OK_READINESS_UNDETERMINED';
         } catch (Throwable $exception) {
             report($exception);
 

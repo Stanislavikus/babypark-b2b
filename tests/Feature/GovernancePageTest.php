@@ -236,7 +236,8 @@ class GovernancePageTest extends TestCase
             ->assertSet('expandedCardId', 'DEC-001')
             ->assertSet('expandedDecision.id', 'DEC-001')
             ->assertSet('expandedDecision.body', $expected['body'])
-            ->assertSee(__('governance.evidence_sources'));
+            ->assertSee(__('governance.evidence_sources'))
+            ->assertSee(__('governance.copy_expanded'));
     }
 
     #[Test]

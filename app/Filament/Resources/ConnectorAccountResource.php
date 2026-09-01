@@ -212,10 +212,6 @@ class ConnectorAccountResource extends Resource
                             ->view('filament.connector-accounts.store-setup')
                             ->visible(fn (ConnectorAccount $record): bool => static::shouldShowStoreSetupEntry($record))
                             ->columnSpanFull(),
-                        TextEntry::make('last_checked_at')
-                            ->label(__('connectors.ui.columns.last_check'))
-                            ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
-                            ->placeholder(__('connectors.ui.common.dash')),
                         TextEntry::make('last_successful_check_at')
                             ->label(__('connectors.ui.columns.last_successful_check'))
                             ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
@@ -227,22 +223,6 @@ class ConnectorAccountResource extends Resource
                             ->visible(fn (ConnectorAccount $record): bool => $uiState->attentionMessage($record) !== null),
                     ])
                     ->columns(2),
-                Section::make(__('connectors.ui.sections.available_fields'))
-                    ->schema([
-                        ViewEntry::make('discovery_state')
-                            ->label('')
-                            ->view('filament.connector-accounts.discovery-state')
-                            ->viewData(fn (ConnectorAccount $record): array => [
-                                'record' => $record,
-                                'uiState' => $uiState,
-                                'latestRun' => $record->relationLoaded('latestPresentationDiscoveryRun')
-                                    ? $record->getRelation('latestPresentationDiscoveryRun')
-                                    : null,
-                                'latestSuccessfulRun' => $record->relationLoaded('latestSuccessfulPresentationDiscoveryRun')
-                                    ? $record->getRelation('latestSuccessfulPresentationDiscoveryRun')
-                                    : null,
-                            ]),
-                    ]),
             ]);
     }
 

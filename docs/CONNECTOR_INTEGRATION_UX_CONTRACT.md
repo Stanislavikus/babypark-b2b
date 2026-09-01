@@ -118,6 +118,16 @@ Magento          🟢 Підключення перевірено
 
 **Rule:** If synchronization is currently failing in a way that could misrepresent price or stock, that fact is on this screen, not behind a click — progressive disclosure never hides an active, consequential problem (see §1's Layer boundary; this is the one place Layer A content is non-negotiable regardless of visual density preferences).
 
+### Connector Account Overview (before sync surfaces are present)
+
+Some connectors may expose an account Overview before a full Sync Overview (runs, issues, scheduling) is present or relevant. In that case the default Overview is still Layer A and must remain merchant-safe and zero-training:
+
+- answers only: **which external account/store**, **last-known connection truth**, **readiness of one concrete business operation when relevant**, and **one causal next action when attention is required**.
+- **Connection truth and operation readiness MUST remain distinct.** A downstream readiness probe failure MUST NOT rewrite a successful baseline connection as connection failure.
+- The default Overview MUST NOT show raw external schema/field counts as health/readiness KPIs and MUST NOT show "Refresh available fields" as a primary account action.
+- Vague internal terminology (e.g. "store setup", "environment setup", connector component names) MUST NOT be the default merchant vocabulary. The default presentation speaks in concrete business operations (e.g. "Передача змін товарів у Magento").
+- Available Fields and manual refresh belong to Mapping as a supporting Layer-B reference (see §7).
+
 ---
 
 ## 6. Synchronization setup — Layer B

@@ -445,19 +445,6 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
-    public function manual_action_disabled_when_account_disabled(): void
-    {
-        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
-        $account = $this->createConnectorAccount(overrides: ['is_enabled' => false]);
-
-        $this->expectNoDispatch();
-
-        Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertActionDisabled('runConnectionCheck');
-    }
-
-    #[Test]
     public function store_setup_block_reuses_manual_check_availability(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
@@ -505,6 +492,7 @@ class ConnectorAccountResourceTest extends TestCase
         $stub->result = new AdobeSafeSyncReadinessResult(
             ConnectorConnectionCheckResult::success(),
             ConnectorComponentReadiness::Ready,
+            true,
         );
         $this->bindReadinessResolverStub($stub);
 
@@ -536,6 +524,7 @@ class ConnectorAccountResourceTest extends TestCase
         $managerStub->result = new AdobeSafeSyncReadinessResult(
             ConnectorConnectionCheckResult::success(),
             ConnectorComponentReadiness::Ready,
+            true,
         );
         $this->bindReadinessResolverStub($managerStub);
 
@@ -553,6 +542,7 @@ class ConnectorAccountResourceTest extends TestCase
         $viewerStub->result = new AdobeSafeSyncReadinessResult(
             ConnectorConnectionCheckResult::success(),
             ConnectorComponentReadiness::Ready,
+            true,
         );
         $this->bindReadinessResolverStub($viewerStub);
 
@@ -574,6 +564,7 @@ class ConnectorAccountResourceTest extends TestCase
         $stub->result = new AdobeSafeSyncReadinessResult(
             ConnectorConnectionCheckResult::success(),
             ConnectorComponentReadiness::Ready,
+            true,
         );
         $this->bindReadinessResolverStub($stub);
 
@@ -601,6 +592,7 @@ class ConnectorAccountResourceTest extends TestCase
         $stub->result = new AdobeSafeSyncReadinessResult(
             connectionResult: ConnectorConnectionCheckResult::success(),
             componentReadiness: ConnectorComponentReadiness::Ready,
+            baselineSucceeded: true,
             moduleVersion: '0.2.1',
             applicationVersion: '2.4.7-p1',
             phpVersion: '8.3.10',
@@ -683,6 +675,7 @@ class ConnectorAccountResourceTest extends TestCase
         $stub->result = new AdobeSafeSyncReadinessResult(
             connectionResult: ConnectorConnectionCheckResult::success(),
             componentReadiness: ConnectorComponentReadiness::SetupRequired,
+            baselineSucceeded: true,
         );
 
         Livewire::actingAs($admin)
@@ -694,6 +687,7 @@ class ConnectorAccountResourceTest extends TestCase
         $stub->result = new AdobeSafeSyncReadinessResult(
             connectionResult: ConnectorConnectionCheckResult::success(),
             componentReadiness: ConnectorComponentReadiness::UpdateRequired,
+            baselineSucceeded: true,
         );
 
         Livewire::actingAs($admin)
@@ -705,6 +699,7 @@ class ConnectorAccountResourceTest extends TestCase
         $stub->result = new AdobeSafeSyncReadinessResult(
             connectionResult: ConnectorConnectionCheckResult::success(),
             componentReadiness: ConnectorComponentReadiness::Ready,
+            baselineSucceeded: true,
         );
 
         Livewire::actingAs($admin)
@@ -723,6 +718,7 @@ class ConnectorAccountResourceTest extends TestCase
         $stub->result = new AdobeSafeSyncReadinessResult(
             connectionResult: ConnectorConnectionCheckResult::success(),
             componentReadiness: ConnectorComponentReadiness::Ready,
+            baselineSucceeded: true,
             moduleVersion: null,
             applicationVersion: null,
             phpVersion: null,
@@ -748,6 +744,7 @@ class ConnectorAccountResourceTest extends TestCase
                 401,
             ),
             null,
+            false,
         );
         $this->bindReadinessResolverStub($stub);
 
@@ -756,7 +753,7 @@ class ConnectorAccountResourceTest extends TestCase
             ->assertSee(__('connectors.ui.readiness.not_checked.body'))
             ->assertSee(__('connectors.ui.readiness.check'))
             ->callAction('checkStoreSetup')
-            ->assertSet('storeSetupState', 'BASELINE_FAILURE')
+            ->assertSet('storeSetupState', 'BASELINE_CONNECTION_FAILED')
             ->assertSee(__('connectors.ui.readiness.baseline_failure.title'))
             ->assertSee(__('connectors.errors.invalid_credentials'))
             ->assertSee(__('connectors.ui.readiness.baseline_failure.guidance'));
@@ -764,6 +761,75 @@ class ConnectorAccountResourceTest extends TestCase
         $effects = json_encode($component->effects, JSON_THROW_ON_ERROR);
         $this->assertStringNotContainsString(__('connectors.ui.notifications.action_failed'), $effects);
         $this->assertStringNotContainsString(__('connectors.ui.notifications.check_failed'), $effects);
+    }
+
+    #[Test]
+    public function baseline_success_with_probe_failure_preserves_connection_truth_and_maps_to_readiness_undetermined(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount(overrides: [
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+            'last_successful_check_at' => now(),
+        ]);
+
+        $stub = new AdobeSafeSyncComponentReadinessResolverStub;
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            ConnectorConnectionCheckResult::httpFailure(
+                ConnectorConnectionCheckErrorCode::AdobeUnexpectedResponse,
+                200,
+            ),
+            null,
+            true,
+        );
+        $this->bindReadinessResolverStub($stub);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSet('storeSetupState', 'BASELINE_OK_READINESS_UNDETERMINED')
+            ->assertSee(__('connectors.ui.readiness.readiness_undetermined.title'))
+            ->assertSee(__('connectors.ui.readiness.readiness_undetermined.body'))
+            ->assertDontSee(__('connectors.ui.readiness.baseline_failure.guidance'));
+    }
+
+    #[Test]
+    public function baseline_success_with_temporary_probe_failure_maps_to_temporary_problem_state(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount(overrides: [
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+            'last_successful_check_at' => now(),
+        ]);
+
+        $stub = new AdobeSafeSyncComponentReadinessResolverStub;
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            ConnectorConnectionCheckResult::transportFailure(
+                ConnectorConnectionCheckErrorCode::TransportConnectionFailed,
+            ),
+            null,
+            true,
+        );
+        $this->bindReadinessResolverStub($stub);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSet('storeSetupState', 'READINESS_TEMPORARY_PROBLEM')
+            ->assertSee(__('connectors.ui.readiness.temporary_problem.title'))
+            ->assertSee(__('connectors.ui.readiness.temporary_problem.body'))
+            ->assertDontSee(__('connectors.ui.readiness.baseline_failure.guidance'));
+    }
+
+    #[Test]
+    public function connector_account_overview_does_not_render_available_fields_summary_or_refresh_action(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertDontSee(__('connectors.ui.sections.available_fields'))
+            ->assertDontSee(__('connectors.ui.actions.refresh_available_fields'));
     }
 
     #[Test]
@@ -780,6 +846,7 @@ class ConnectorAccountResourceTest extends TestCase
         $stub->result = new AdobeSafeSyncReadinessResult(
             ConnectorConnectionCheckResult::success(),
             ConnectorComponentReadiness::Ready,
+            true,
         );
         $this->bindReadinessResolverStub($stub);
 
@@ -800,123 +867,6 @@ class ConnectorAccountResourceTest extends TestCase
         $this->assertSame(0, $stub->callCount);
         $this->assertSame('NOT_CHECKED', $component->instance()->storeSetupState);
         $this->assertNull($component->instance()->storeSetupBaselineMessage);
-    }
-
-    #[Test]
-    public function manual_action_disabled_when_profile_missing(): void
-    {
-        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
-        $account = $this->createConnectorAccount(overrides: ['auth_profile' => 'missing_profile']);
-
-        $this->expectNoDispatch();
-
-        Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertActionDisabled('runConnectionCheck');
-    }
-
-    #[Test]
-    public function manual_action_disabled_when_active_check_exists(): void
-    {
-        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
-        $account = $this->createConnectorAccount();
-        $this->createActiveCheck($account, ConnectorConnectionCheckStatus::Running);
-
-        $this->expectNoDispatch();
-
-        Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertActionDisabled('runConnectionCheck')
-            ->assertSee(__('connectors.ui.actions.check_already_active'));
-    }
-
-    #[Test]
-    public function manual_action_queues_active_check_notification(): void
-    {
-        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
-        $account = $this->createConnectorAccount();
-
-        $stub = new ConnectorConnectionCheckDispatchServiceStub;
-        $stub->executeManualCallback = function () use ($account, $stub): void {
-            $check = $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Queued);
-            $stub->executeManualResult = $check->id;
-        };
-        $this->bindDispatchStub($stub);
-
-        Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->callAction('runConnectionCheck')
-            ->assertNotified();
-
-        $this->assertSame(1, $stub->callCount);
-
-        Http::assertNothingSent();
-    }
-
-    #[Test]
-    public function manual_action_succeeded_race_shows_completed_notification(): void
-    {
-        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
-        $account = $this->createConnectorAccount(overrides: [
-            'connection_status' => ConnectorAccountConnectionStatus::Untested,
-        ]);
-        $stub = new ConnectorConnectionCheckDispatchServiceStub;
-        $stub->executeManualCallback = function () use ($account, $stub): void {
-            $check = $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Succeeded);
-            $stub->executeManualResult = $check->id;
-        };
-        $this->bindDispatchStub($stub);
-
-        Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->callAction('runConnectionCheck')
-            ->assertNotified();
-    }
-
-    #[Test]
-    public function manual_action_failed_with_known_key_shows_cause_specific_message(): void
-    {
-        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
-        $account = $this->createConnectorAccount();
-        $stub = new ConnectorConnectionCheckDispatchServiceStub;
-        $stub->executeManualCallback = function () use ($account, $stub): void {
-            $check = $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Failed, [
-                'user_message_key' => 'connectors.errors.invalid_credentials',
-                'cause_category' => ConnectorErrorCause::Authentication,
-                'actionability' => ConnectorErrorActionability::UserActionRequired,
-            ]);
-            $stub->executeManualResult = $check->id;
-        };
-        $this->bindDispatchStub($stub);
-
-        Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->callAction('runConnectionCheck')
-            ->assertNotified();
-    }
-
-    #[Test]
-    public function manual_action_failed_with_malformed_key_shows_generic_fallback(): void
-    {
-        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
-        $account = $this->createConnectorAccount();
-        $stub = new ConnectorConnectionCheckDispatchServiceStub;
-        $stub->executeManualCallback = function () use ($account, $stub): void {
-            $check = $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Failed, [
-                'user_message_key' => 'connectors.errors.malformed_unknown',
-                'technical_summary' => 'RAW_TECHNICAL_SUMMARY',
-            ]);
-            $stub->executeManualResult = $check->id;
-        };
-        $this->bindDispatchStub($stub);
-
-        $component = Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->callAction('runConnectionCheck');
-
-        $component->assertNotified();
-        $this->assertStringNotContainsString('RAW_TECHNICAL_SUMMARY', $component->html());
-        $this->assertStringNotContainsString('connectors.errors.malformed_unknown', $component->html());
     }
 
     #[Test]
@@ -1022,24 +972,6 @@ class ConnectorAccountResourceTest extends TestCase
                 $this->assertNotSame($key, __($key, locale: $locale));
             }
         }
-    }
-
-    #[Test]
-    public function unexpected_exception_is_reported_without_exposing_message(): void
-    {
-        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
-        $account = $this->createConnectorAccount();
-
-        $stub = new ConnectorConnectionCheckDispatchServiceStub;
-        $stub->executeManualThrowable = new \RuntimeException('SENTINEL_EXCEPTION_MESSAGE');
-        $this->bindDispatchStub($stub);
-
-        $component = Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->callAction('runConnectionCheck');
-
-        $component->assertNotified();
-        $this->assertStringNotContainsString('SENTINEL_EXCEPTION_MESSAGE', $component->html());
     }
 
     private function createActiveCheck(

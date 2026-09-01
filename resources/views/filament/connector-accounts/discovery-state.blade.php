@@ -14,7 +14,7 @@
 
 <div
     @if ($activeRun !== null)
-        wire:poll.5s="refreshDiscoveryState"
+        wire:poll.5s="{{ $pollMethod ?? 'refreshDiscoveryState' }}"
     @endif
     class="space-y-3"
 >

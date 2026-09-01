@@ -46,6 +46,7 @@ class AdobeSafeSyncComponentReadinessResolverTest extends TestCase
 
         $this->assertSame(ConnectorComponentReadiness::SetupRequired, $result->componentReadiness);
         $this->assertSame(404, $result->connectionResult->httpStatus);
+        $this->assertTrue($result->baselineSucceeded);
     }
 
     #[Test]
@@ -60,6 +61,7 @@ class AdobeSafeSyncComponentReadinessResolverTest extends TestCase
         );
 
         $this->assertNull($result->componentReadiness);
+        $this->assertTrue($result->baselineSucceeded);
     }
 
     #[Test]
@@ -72,6 +74,7 @@ class AdobeSafeSyncComponentReadinessResolverTest extends TestCase
             $result = $this->resolve($baseline, null);
             $this->assertNull($result->componentReadiness);
             $this->assertSame($baseline->errorCode, $result->connectionResult->errorCode);
+            $this->assertFalse($result->baselineSucceeded);
         }
     }
 

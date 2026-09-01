@@ -12,9 +12,12 @@ use App\Support\Connectors\Transport\Dns\DnsChildProcessFactory;
 use App\Support\Connectors\Transport\Dns\DnsResolver;
 use App\Support\Connectors\Transport\Dns\DnsResponseParser;
 use App\Support\Connectors\Transport\Dns\ProcessIsolatedDnsResolver;
+use App\Support\Connectors\Transport\Dns\SystemDnsResolver;
 use App\Support\Connectors\Transport\Internal\ConnectorDestinationResolverImpl;
 use App\Support\Connectors\Transport\Internal\ConnectorRequestSenderImpl;
 use App\Support\Connectors\Transport\SsrfSafeConnectorHttpTransport;
+use App\Support\Connectors\Transport\TransportConfigurationException;
+use App\Support\Connectors\Transport\TransportConfigurationFailureReason;
 use Illuminate\Support\ServiceProvider;
 
 class ConnectorTransportServiceProvider extends ServiceProvider
@@ -23,10 +26,18 @@ class ConnectorTransportServiceProvider extends ServiceProvider
     {
         $this->app->singleton(DnsChildProcessFactory::class, DefaultDnsChildProcessFactory::class);
         $this->app->singleton(DnsResolver::class, function ($app) {
-            return new ProcessIsolatedDnsResolver(
-                $app->make(DnsChildProcessFactory::class),
-                new DnsResponseParser,
-            );
+            try {
+                return new ProcessIsolatedDnsResolver(
+                    $app->make(DnsChildProcessFactory::class),
+                    new DnsResponseParser,
+                );
+            } catch (TransportConfigurationException $exception) {
+                if ($exception->reason !== TransportConfigurationFailureReason::UnsupportedPlatform) {
+                    throw $exception;
+                }
+
+                return new SystemDnsResolver;
+            }
         });
         $this->app->singleton(ConnectorDestinationResolver::class, ConnectorDestinationResolverImpl::class);
         $this->app->singleton(CurlClientFactory::class, DefaultCurlClientFactory::class);

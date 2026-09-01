@@ -2271,6 +2271,15 @@ Help must be:
 - dismissible;
 - not required to complete routine tasks.
 
+### Progressive technical detail (shared pattern)
+
+When a feature has technical detail that may be useful for a developer or support person, the UI follows one shared progressive-disclosure pattern:
+
+- **Human-facing surface first:** headline → plain explanation → next action.
+- **Technical details collapsed by default:** expandable/collapsible disclosure; never required to understand the human-facing state.
+- **Copyable handoff packet when intended to be shared:** when the technical block is explicitly meant to be sent to a developer/support person, provide a single Copy action for a canonical shareable packet. The UI may later add a secondary Send action when an approved delivery channel exists.
+- The copy action copies **only the caller-prepared safe text**. The UI primitive does not query domains or assemble sensitive data.
+
 ## Forbidden UI Patterns
 
 The following patterns are forbidden unless explicitly approved by future design/architecture review:

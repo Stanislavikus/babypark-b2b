@@ -25,7 +25,7 @@ final class AdobeSafeSyncComponentReadinessResolver
         $baseline = $this->connectionCheck->checkConnection($context);
 
         if (! $baseline->succeeded) {
-            return new AdobeSafeSyncReadinessResult($baseline, null);
+            return new AdobeSafeSyncReadinessResult($baseline, null, false);
         }
 
         $probe = $this->handshakeProbe->probe($context);
@@ -37,6 +37,7 @@ final class AdobeSafeSyncComponentReadinessResolver
             return new AdobeSafeSyncReadinessResult(
                 $probe->connectionResult,
                 $setupRequired ? ConnectorComponentReadiness::SetupRequired : null,
+                true,
             );
         }
 
@@ -49,6 +50,7 @@ final class AdobeSafeSyncComponentReadinessResolver
         return new AdobeSafeSyncReadinessResult(
             $probe->connectionResult,
             $compatible ? ConnectorComponentReadiness::Ready : ConnectorComponentReadiness::UpdateRequired,
+            true,
             $handshake?->moduleVersion,
             $handshake?->applicationVersion,
             $handshake?->phpVersion,
