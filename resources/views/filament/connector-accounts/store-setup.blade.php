@@ -7,6 +7,19 @@
     $applicationVersion = $this->storeSetupApplicationVersion;
     $phpVersion = $this->storeSetupPhpVersion;
 
+    $requirements = app(\App\Support\Connectors\AdobePaaS\SafeSync\MagentoSafeSyncManifestReader::class)->requirements();
+    $requirementsLines = array_values(array_filter([
+        filled($requirements->phpConstraint)
+            ? __('connectors.ui.readiness.developer.requirements.php', ['constraint' => $requirements->phpConstraint])
+            : null,
+        filled($requirements->magentoFrameworkConstraint)
+            ? __('connectors.ui.readiness.developer.requirements.magento_framework', ['constraint' => $requirements->magentoFrameworkConstraint])
+            : null,
+        filled($requirements->magentoCatalogConstraint)
+            ? __('connectors.ui.readiness.developer.requirements.magento_catalog', ['constraint' => $requirements->magentoCatalogConstraint])
+            : null,
+    ], fn (?string $value): bool => filled($value)));
+
     $detailsParts = array_values(array_filter([
         filled($applicationVersion) ? __('connectors.ui.readiness.details.magento', ['version' => $applicationVersion]) : null,
         filled($phpVersion) ? __('connectors.ui.readiness.details.php', ['version' => $phpVersion]) : null,
@@ -106,6 +119,29 @@
                     @endif
                 </div>
             @endif
+
+            <details class="pt-1">
+                <summary class="cursor-pointer select-none text-sm text-gray-700 dark:text-gray-300">
+                    {{ __('connectors.ui.readiness.developer.summary') }}
+                </summary>
+
+                <div class="mt-3 space-y-3 rounded-lg border border-gray-200 bg-white/60 p-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
+                    <p>{{ __('connectors.ui.readiness.developer.body') }}</p>
+
+                    @if ($requirementsLines !== [])
+                        <div class="space-y-1">
+                            <p class="text-sm font-medium text-gray-900 dark:text-white">
+                                {{ __('connectors.ui.readiness.developer.requirements.title') }}
+                            </p>
+                            <ul class="list-disc space-y-1 pl-5">
+                                @foreach ($requirementsLines as $line)
+                                    <li>{{ $line }}</li>
+                                @endforeach
+                            </ul>
+                        </div>
+                    @endif
+                </div>
+            </details>
         </div>
 
         <div wire:loading.flex class="hidden items-center gap-3 text-sm text-gray-700 dark:text-gray-300">

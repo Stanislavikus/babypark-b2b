@@ -616,6 +616,37 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
+    public function store_setup_developer_handoff_renders_canonical_requirements_from_manifest(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+
+        $manifestPath = dirname(__DIR__, 3).'/integrations/magento-safe-sync/composer.json';
+        $raw = file_get_contents($manifestPath);
+        $this->assertNotFalse($raw);
+
+        $manifest = json_decode($raw, true);
+        $this->assertIsArray($manifest);
+        $require = $manifest['require'] ?? [];
+        $this->assertIsArray($require);
+
+        $expected = array_values(array_filter([
+            $require['php'] ?? null,
+            $require['magento/framework'] ?? null,
+            $require['magento/module-catalog'] ?? null,
+        ], fn ($value): bool => is_string($value) && $value !== ''));
+
+        $component = Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSee(__('connectors.ui.readiness.developer.summary'))
+            ->assertSee(__('connectors.ui.readiness.developer.requirements.title'));
+
+        foreach ($expected as $constraint) {
+            $component->assertSee($constraint);
+        }
+    }
+
+    #[Test]
     public function inline_store_setup_baseline_failure_stays_inline_without_generic_notification(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
