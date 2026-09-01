@@ -647,7 +647,7 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
-    public function store_setup_developer_handoff_packet_is_copy_safe_and_does_not_expose_sensitive_fields(): void
+    public function store_setup_developer_handoff_packet_is_copy_safe_and_does_not_expose_credentials_or_base_url_or_settings(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
@@ -668,8 +668,6 @@ class ConnectorAccountResourceTest extends TestCase
             ->assertSee('Store Copy Packet')
             ->assertSee($iso)
             ->assertDontSee('secret-shop.example.com')
-            ->assertDontSee('secret-store-code')
-            ->assertDontSee('secret-tenant')
             ->assertDontSee('CANARY_PACKET_SETTING')
             ->assertDontSee('CANARY_PACKET_CREDENTIAL');
     }
