@@ -47,7 +47,7 @@
     "Whoops!": "Упс!",
     "You are receiving this email because we received a password reset request for your account.": "Вы получили это письмо, потому что мы получили запрос на сброс пароля для Вашей учётной записи.",
     "connectors.enums.account_connection_status.untested": "Не проверено",
-    "connectors.enums.account_connection_status.connected": "Подключено",
+    "connectors.enums.account_connection_status.connected": "Подключение проверено",
     "connectors.enums.account_connection_status.attention_required": "Требуется внимание",
     "connectors.enums.account_connection_status.temporarily_unavailable": "Временно недоступно",
     "connectors.enums.account_connection_status.disabled": "Отключено",

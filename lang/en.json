@@ -47,7 +47,7 @@
     "Whoops!": "Whoops!",
     "You are receiving this email because we received a password reset request for your account.": "You are receiving this email because we received a password reset request for your account.",
     "connectors.enums.account_connection_status.untested": "Not tested",
-    "connectors.enums.account_connection_status.connected": "Connected",
+    "connectors.enums.account_connection_status.connected": "Connection verified",
     "connectors.enums.account_connection_status.attention_required": "Attention required",
     "connectors.enums.account_connection_status.temporarily_unavailable": "Temporarily unavailable",
     "connectors.enums.account_connection_status.disabled": "Disabled",

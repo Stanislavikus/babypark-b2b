@@ -7282,6 +7282,11 @@ readiness absent. Evaluation is stateless and presentation-only: no readiness
 table or account projection is introduced. The result does not replace the
 fresh `ConnectorLiveRuntimeReadiness` consequential-write timing rules.
 
+Handshake payloads may include additive optional diagnostic fields
+`application_version` and `php_version` (for merchant-safe support/troubleshooting
+only). These fields MUST remain non-authoritative: they must not participate in
+readiness classification, gating, or compatibility decisions.
+
 | Concept | Meaning |
 |---|---|
 | `ConnectorSyncOperationSupport` | Static software capability — what the connector profile advertises |

@@ -69,7 +69,7 @@ For the single-connection case, the composition follows the account-connection p
 
 ```
 Magento                          Google Sheets
-🟢 Підключено                    ➕ Не підключено
+🟢 Підключення перевірено        ➕ Не підключено
 Синхронізовано сьогодні 14:32
 ⚠ 12 товарів потребують уваги
 
@@ -108,7 +108,7 @@ Connection onboarding remains human-friendly and ends in plain confirmation, not
 The default landing tab for an opened integration. Answers exactly one question truthfully: *is everything okay right now?*
 
 ```
-Magento          🟢 Підключено
+Magento          🟢 Підключення перевірено
 Остання синхронізація: сьогодні, 14:32 · Наступна: 15:00
 [Синхронізувати зараз]
 
