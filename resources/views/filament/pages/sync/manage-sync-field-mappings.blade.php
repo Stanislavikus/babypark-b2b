@@ -34,6 +34,19 @@
           </span>
         @endif
 
+        @if ($showDiscoveryRefreshAction)
+          <x-filament::button
+            color="gray"
+            icon="heroicon-m-arrow-path"
+            wire:click="runDiscovery"
+            :disabled="! $discoveryActionState['enabled']"
+            :title="$discoveryActionState['disabled_reason']"
+            data-testid="sync-mappings-refresh-available-fields"
+          >
+            {{ $discoveryActionState['label'] }}
+          </x-filament::button>
+        @endif
+
         @if ($availableFieldsUrl)
           <x-filament::button
             tag="a"
@@ -66,6 +79,56 @@
         </div>
       </x-slot>
     </x-filament.data-list-toolbar>
+
+    @if ($showDiscoveryRefreshAction)
+      <div @if ($availableFieldsHasActiveRefresh) wire:poll.5s="refreshDiscoveryState" @endif>
+        <x-filament::section>
+        <x-filament::section.heading>
+          {{ __('connectors.ui.sections.available_fields') }}
+        </x-filament::section.heading>
+
+        <x-filament::section.description>
+          {{ __('sync_mappings.available_fields_supporting_notice', ['platform' => $platformName]) }}
+        </x-filament::section.description>
+
+        <div class="mt-4">
+          <div class="space-y-3">
+            @if ($availableFieldsNeverChecked)
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                {{ __('connectors.ui.available_fields.never_checked') }}
+              </p>
+            @elseif ($availableFieldsRefreshingLabel !== null)
+              <div class="flex flex-wrap items-center gap-2">
+                <x-filament::badge :color="$availableFieldsRefreshingColor">
+                  {{ $availableFieldsRefreshingLabel }}
+                </x-filament::badge>
+              </div>
+            @else
+              @if ($availableFieldsFailureMessage !== null)
+                <p class="text-sm text-danger-600 dark:text-danger-400">
+                  {{ $availableFieldsFailureMessage }}
+                </p>
+              @endif
+
+              @if ($availableFieldsCheckedAt !== null)
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                  <span class="font-medium text-gray-950 dark:text-white">{{ __('connectors.ui.available_fields.checked_at') }}:</span>
+                  {{ $availableFieldsCheckedAt }}
+                </p>
+              @endif
+
+              @if ($availableFieldsFieldCount !== null)
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                  <span class="font-medium text-gray-950 dark:text-white">{{ __('connectors.ui.available_fields.field_count') }}:</span>
+                  {{ $availableFieldsFieldCount }}
+                </p>
+              @endif
+            @endif
+          </div>
+        </div>
+        </x-filament::section>
+      </div>
+    @endif
 
     <div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
       <table class="min-w-full divide-y divide-gray-200 dark:divide-white/10">

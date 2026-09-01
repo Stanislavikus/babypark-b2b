@@ -2,18 +2,25 @@
 
 namespace App\Filament\Pages\Sync;
 
+use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Filament\Resources\ConnectorAccountResource;
 use App\Models\ConnectorAccount;
+use App\Models\ConnectorDiscoveryRun;
 use App\Models\FieldMapping;
 use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Connectors\AuthoritativeConnectorSchemaSnapshotResolver;
+use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
 use App\Services\Sync\FieldMappingAuthorizationService;
 use App\Services\Sync\FieldOptionMappingEligibilityResolver;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
+use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorAuthorization;
+use App\Support\Connectors\ConnectorSafeMessagePresenter;
+use App\Support\Connectors\Exceptions\ConnectorAccountDisabledException;
+use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceResolutionException;
 use App\Support\Sync\Exceptions\FieldMappingConflictException;
 use App\Support\Sync\Exceptions\FieldMappingValidationException;
 use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
@@ -37,8 +44,10 @@ use Filament\Schemas\Contracts\HasSchemas;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
+use Throwable;
 
 class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
 {
@@ -67,6 +76,25 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
     public bool $canMutate = false;
 
     public ?string $availableFieldsUrl = null;
+
+    public bool $showDiscoveryRefreshAction = false;
+
+    /** @var array{enabled: bool, label: string, disabled_reason: ?string} */
+    public array $discoveryActionState = ['enabled' => false, 'label' => '', 'disabled_reason' => null];
+
+    public bool $availableFieldsHasActiveRefresh = false;
+
+    public bool $availableFieldsNeverChecked = false;
+
+    public ?string $availableFieldsRefreshingLabel = null;
+
+    public ?string $availableFieldsRefreshingColor = null;
+
+    public ?string $availableFieldsFailureMessage = null;
+
+    public ?string $availableFieldsCheckedAt = null;
+
+    public ?int $availableFieldsFieldCount = null;
 
     #[Url(as: 'search')]
     public ?string $search = '';
@@ -124,6 +152,108 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
     public function updatedStatusFilter(): void
     {
         $this->refreshDisplayRows();
+    }
+
+    public function refreshDiscoveryState(): void
+    {
+        if (! $this->showDiscoveryRefreshAction) {
+            return;
+        }
+
+        $workspace = $this->resolveMappingWorkspace();
+        $account = ConnectorAccount::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
+            ->whereKey($this->accountId)
+            ->with(['connectorDefinition'])
+            ->first();
+
+        if ($account === null) {
+            return;
+        }
+
+        $user = Auth::user();
+        abort_unless($user instanceof User, 403);
+
+        $account = app(ConnectorAccountCapabilityPresentation::class)->sanitizeRecord($account, $user, $workspace);
+        $this->hydrateDiscoveryPresentation($workspace, $account);
+    }
+
+    public function runDiscovery(): void
+    {
+        if (! $this->showDiscoveryRefreshAction) {
+            abort(403);
+        }
+
+        if (! $this->discoveryActionState['enabled']) {
+            abort(403);
+        }
+
+        $actor = Auth::user();
+        abort_unless($actor instanceof User, 403);
+
+        $workspace = $this->resolveMappingWorkspace();
+        $account = ConnectorAccount::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
+            ->whereKey($this->accountId)
+            ->firstOrFail();
+
+        Gate::forUser($actor)->authorize('runDiscovery', $account);
+
+        try {
+            $decision = app(ConnectorDiscoveryDispatchPort::class)->executeManual(
+                $actor,
+                $workspace->id,
+                $account->getKey(),
+            );
+
+            $run = ConnectorDiscoveryRun::query()->findOrFail($decision->discoveryRunId);
+
+            $this->refreshDiscoveryState();
+
+            $presenter = app(ConnectorSafeMessagePresenter::class);
+
+            if (! $decision->shouldDispatch) {
+                Notification::make()
+                    ->success()
+                    ->title(__('connectors.ui.notifications.available_fields_refresh_reused'))
+                    ->send();
+            } elseif (in_array($run->status, [
+                ConnectorDiscoveryRunStatus::Queued,
+                ConnectorDiscoveryRunStatus::Running,
+            ], true)) {
+                Notification::make()
+                    ->success()
+                    ->title(__('connectors.ui.notifications.available_fields_refresh_started'))
+                    ->send();
+            } elseif ($run->status === ConnectorDiscoveryRunStatus::Failed) {
+                Notification::make()
+                    ->danger()
+                    ->title(__('connectors.ui.notifications.available_fields_refresh_failed'))
+                    ->body($presenter->present($run->user_message_key))
+                    ->send();
+            }
+        } catch (AuthorizationException) {
+            abort(403);
+        } catch (ConnectorDiscoverySourceResolutionException) {
+            Notification::make()
+                ->danger()
+                ->title(__('connectors.ui.notifications.available_fields_refresh_failed'))
+                ->body(__('connectors.errors.discovery_source_unavailable'))
+                ->send();
+        } catch (ConnectorAccountDisabledException) {
+            Notification::make()
+                ->danger()
+                ->title(__('connectors.ui.notifications.available_fields_refresh_failed'))
+                ->body(__('connectors.errors.account_disabled'))
+                ->send();
+        } catch (Throwable $exception) {
+            report($exception);
+
+            Notification::make()
+                ->danger()
+                ->title(__('connectors.ui.notifications.action_failed'))
+                ->send();
+        }
     }
 
     public function confirmMapping(string $fieldBindingId, string $externalFieldKey): void
@@ -258,6 +388,22 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
 
         $this->canMutate = $this->workspaceAllowsMutation($user, $workspace);
 
+        $this->showDiscoveryRefreshAction = app(ConnectorAuthorization::class)->canDiscoveryControl($user, $workspace)
+            && config('connectors.discovery.manual_trigger_enabled');
+
+        $account = ConnectorAccount::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
+            ->whereKey($this->accountId)
+            ->with(['connectorDefinition'])
+            ->first();
+
+        if ($account !== null) {
+            $uiState = app(ConnectorAccountUiState::class);
+            $this->discoveryActionState = $uiState->manualDiscoveryActionState($account);
+            $account = app(ConnectorAccountCapabilityPresentation::class)->sanitizeRecord($account, $user, $workspace);
+            $this->hydrateDiscoveryPresentation($workspace, $account);
+        }
+
         try {
             $readModel = app(FieldMappingAuthorizationService::class)->projectReadModel(
                 $user,
@@ -274,6 +420,41 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
         $this->availableFieldsUrl = $this->buildAvailableFieldsUrl($workspace);
 
         $this->refreshDisplayRows($readModel);
+    }
+
+    private function hydrateDiscoveryPresentation(Workspace $workspace, ConnectorAccount $account): void
+    {
+        if (! $this->showDiscoveryRefreshAction) {
+            $this->availableFieldsHasActiveRefresh = false;
+            $this->availableFieldsNeverChecked = false;
+            $this->availableFieldsRefreshingLabel = null;
+            $this->availableFieldsRefreshingColor = null;
+            $this->availableFieldsFailureMessage = null;
+            $this->availableFieldsCheckedAt = null;
+            $this->availableFieldsFieldCount = null;
+
+            return;
+        }
+
+        $uiState = app(ConnectorAccountUiState::class);
+        $activeRun = $uiState->activeDiscoveryRun($account);
+
+        $this->availableFieldsHasActiveRefresh = $activeRun !== null;
+        $this->availableFieldsRefreshingLabel = $uiState->availableFieldsRefreshingLabel($activeRun);
+        $this->availableFieldsRefreshingColor = $uiState->discoveryRuntimeStatusColor($activeRun);
+        $this->availableFieldsNeverChecked = $account->last_discovery_at === null && $activeRun === null;
+
+        $presentationAccount = ConnectorAccountResource::loadAccountPresentationRelations($account);
+        $latestRun = $presentationAccount->relationLoaded('latestPresentationDiscoveryRun')
+            ? $presentationAccount->getRelation('latestPresentationDiscoveryRun')
+            : null;
+        $latestSuccessfulRun = $presentationAccount->relationLoaded('latestSuccessfulPresentationDiscoveryRun')
+            ? $presentationAccount->getRelation('latestSuccessfulPresentationDiscoveryRun')
+            : null;
+
+        $this->availableFieldsCheckedAt = $uiState->availableFieldsCheckedAt($account, $latestRun);
+        $this->availableFieldsFieldCount = $uiState->availableFieldsFieldCount($account, $latestRun, $latestSuccessfulRun);
+        $this->availableFieldsFailureMessage = $uiState->availableFieldsFailureMessage($latestRun);
     }
 
     protected function refreshDisplayRows(?FieldMappingReadModel $readModel = null): void

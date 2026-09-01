@@ -12,10 +12,7 @@ use App\Models\ConnectorAccount;
 use App\Models\ConnectorDiscoveryRun;
 use App\Models\ConnectorSchemaSnapshot;
 use App\Models\ConnectorSchemaSource;
-use App\Models\User;
-use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
 use App\Support\Connectors\ConnectorAuthorization;
-use App\Support\Connectors\ConnectorDiscoveryDispatchDecision;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
@@ -39,8 +36,6 @@ class ConnectorAccountGap025aPermissionMatrixTest extends TestCase
     use EnablesConnectorSchemaDiscoveryCapability;
     use RefreshDatabase;
 
-    private ?Gap025aPermissionMatrixDispatchStub $dispatchStub = null;
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -55,9 +50,6 @@ class ConnectorAccountGap025aPermissionMatrixTest extends TestCase
         App::setLocale('uk');
         $this->enableSchemaDiscoveryCapability();
         Config::set('connectors.discovery.manual_trigger_enabled', true);
-
-        $this->dispatchStub = new Gap025aPermissionMatrixDispatchStub;
-        $this->app->instance(ConnectorDiscoveryDispatchPort::class, $this->dispatchStub);
     }
 
     #[Test]
@@ -80,7 +72,7 @@ class ConnectorAccountGap025aPermissionMatrixTest extends TestCase
         Livewire::actingAs($actor)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->assertSuccessful()
-            ->assertActionEnabled('runDiscovery');
+            ->assertActionDoesNotExist('runDiscovery');
 
         $this->actingAs($actor)
             ->get(ConnectorAccountResource::getUrl('view-snapshot', [
@@ -139,7 +131,7 @@ class ConnectorAccountGap025aPermissionMatrixTest extends TestCase
         Livewire::actingAs($actor)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->assertSuccessful()
-            ->assertActionEnabled('runDiscovery')
+            ->assertActionDoesNotExist('runDiscovery')
             ->assertActionEnabled('runConnectionCheck');
     }
 
@@ -232,46 +224,6 @@ class ConnectorAccountGap025aPermissionMatrixTest extends TestCase
             ->assertDontSee(__('connectors.ui.columns.source'));
     }
 
-    #[Test]
-    public function refresh_available_fields_revokes_discovery_permission_after_render_without_dispatching(): void
-    {
-        $workspace = $this->defaultWorkspace();
-        $actor = $this->createStaffUser(UserRole::Merchandiser);
-        $membership = $this->grantExactWorkspacePermissions($workspace, $actor, [
-            WorkspacePermissions::RUN_CONNECTOR_DISCOVERY,
-        ]);
-        $account = $this->createConnectorAccount($workspace);
-
-        $runsBefore = ConnectorDiscoveryRun::withoutWorkspaceScope()->count();
-
-        $component = Livewire::actingAs($actor)
-            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertActionEnabled('runDiscovery');
-
-        $this->revokeAllWorkspaceRoles($membership);
-        $actor->refresh();
-
-        $this->assertFalse($actor->can('viewRunDiscovery', $account));
-        $this->assertFalse($actor->can('runDiscovery', $account));
-
-        $this->dispatchStub->executeManualThrowable = new \RuntimeException('SHOULD_NOT_DISPATCH');
-
-        $component->call('mountAction', 'runDiscovery');
-
-        $this->assertSame(0, $this->dispatchStub->callCount);
-        $this->assertSame($runsBefore, ConnectorDiscoveryRun::withoutWorkspaceScope()->count());
-
-        $html = $component->html();
-        $this->assertStringNotContainsString(
-            __('connectors.ui.notifications.available_fields_refresh_started', locale: 'uk'),
-            $html,
-        );
-        $this->assertStringNotContainsString(
-            __('connectors.ui.notifications.action_failed', locale: 'uk'),
-            $html,
-        );
-    }
-
     private function createSucceededSnapshot(ConnectorAccount $account): ConnectorSchemaSnapshot
     {
         $source = ConnectorSchemaSource::query()
@@ -313,23 +265,5 @@ class ConnectorAccountGap025aPermissionMatrixTest extends TestCase
             'canonical_hash' => hash('sha256', Str::uuid()->toString()),
             'captured_at' => now(),
         ]);
-    }
-}
-
-final class Gap025aPermissionMatrixDispatchStub
-{
-    public int $callCount = 0;
-
-    public ?\Throwable $executeManualThrowable = null;
-
-    public function executeManual(User $actor, string $workspaceId, string $connectorAccountId): ConnectorDiscoveryDispatchDecision
-    {
-        $this->callCount++;
-
-        if ($this->executeManualThrowable !== null) {
-            throw $this->executeManualThrowable;
-        }
-
-        throw new \RuntimeException('Unexpected executeManual call in permission matrix dispatch stub.');
     }
 }

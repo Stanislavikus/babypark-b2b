@@ -10,6 +10,7 @@ final readonly class AdobeSafeSyncReadinessResult
     public function __construct(
         public ConnectorConnectionCheckResult $connectionResult,
         public ?ConnectorComponentReadiness $componentReadiness,
+        public bool $baselineSucceeded,
         public ?string $moduleVersion = null,
         public ?string $applicationVersion = null,
         public ?string $phpVersion = null,

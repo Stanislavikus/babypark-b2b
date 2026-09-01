@@ -3,25 +3,21 @@
 namespace App\Filament\Resources\ConnectorAccountResource\Pages;
 
 use App\Enums\ConnectorConnectionCheckStatus;
-use App\Enums\ConnectorDiscoveryRunStatus;
+use App\Enums\ConnectorErrorActionability;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
 use App\Filament\Resources\ConnectorAccountResource;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorConnectionCheck;
-use App\Models\ConnectorDiscoveryRun;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Connectors\AdobeSafeSyncComponentReadinessResolver;
 use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
-use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
 use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncRequiredOperation;
 use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorAuthorization;
 use App\Support\Connectors\ConnectorSafeMessagePresenter;
-use App\Support\Connectors\Exceptions\ConnectorAccountDisabledException;
-use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceResolutionException;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -48,32 +44,6 @@ class ViewConnectorAccount extends ViewRecord
 
     public function getSubheading(): string|Htmlable|null
     {
-        $user = auth()->user();
-        if (! $user instanceof User) {
-            return null;
-        }
-
-        $workspace = $this->presentationWorkspace();
-        $presentation = app(ConnectorAccountCapabilityPresentation::class);
-
-        if ($presentation->showActiveConnectionCheck($user, $workspace)) {
-            $disabledReason = app(ConnectorAccountUiState::class)
-                ->manualCheckActionState($this->record)['disabled_reason'];
-
-            return filled($disabledReason) ? $disabledReason : null;
-        }
-
-        if ($presentation->showDiscoveryExecution($user, $workspace)) {
-            if (! config('connectors.discovery.manual_trigger_enabled')) {
-                return null;
-            }
-
-            $disabledReason = app(ConnectorAccountUiState::class)
-                ->manualDiscoveryActionState($this->record)['disabled_reason'];
-
-            return filled($disabledReason) ? $disabledReason : null;
-        }
-
         return null;
     }
 
@@ -84,11 +54,6 @@ class ViewConnectorAccount extends ViewRecord
             $this->record,
             auth()->user(),
         );
-    }
-
-    public function refreshDiscoveryState(): void
-    {
-        $this->refreshConnectionState();
     }
 
     protected function getAllRelationManagers(): array
@@ -105,15 +70,12 @@ class ViewConnectorAccount extends ViewRecord
             return $actions;
         }
 
-        $presentation = app(ConnectorAccountCapabilityPresentation::class);
         $workspace = $this->presentationWorkspace();
+        $presentation = app(ConnectorAccountCapabilityPresentation::class);
 
-        if ($presentation->showActiveConnectionCheck($user, $workspace)) {
-            $actions[] = $this->makeRunConnectionCheckAction();
-        }
-
-        if ($presentation->showDiscoveryExecution($user, $workspace) && config('connectors.discovery.manual_trigger_enabled')) {
-            $actions[] = $this->makeRunDiscoveryAction();
+        if ($presentation->canManage($user, $workspace)) {
+            $actions[] = $this->makeRunConnectionCheckAction()
+                ->visible(fn (): bool => ! ($this->shouldShowStoreSetupBlock() && $this->storeSetupState === 'BASELINE_CONNECTION_FAILED'));
         }
 
         if ($this->shouldShowAdobeExportSetupLink($user, $workspace)) {
@@ -219,11 +181,24 @@ class ViewConnectorAccount extends ViewRecord
                 return;
             }
 
-            $this->storeSetupState = 'BASELINE_FAILURE';
             $this->storeSetupBaselineMessage = app(ConnectorSafeMessagePresenter::class)->present(
                 $result->connectionResult->messageKey(),
                 $result->connectionResult->safeMessageParameters(),
             );
+
+            if (! $result->baselineSucceeded) {
+                $this->storeSetupState = 'BASELINE_CONNECTION_FAILED';
+
+                return;
+            }
+
+            if ($result->connectionResult->actionability() === ConnectorErrorActionability::AutomaticRetry) {
+                $this->storeSetupState = 'READINESS_TEMPORARY_PROBLEM';
+
+                return;
+            }
+
+            $this->storeSetupState = 'BASELINE_OK_READINESS_UNDETERMINED';
         } catch (Throwable $exception) {
             report($exception);
 
@@ -256,6 +231,8 @@ class ViewConnectorAccount extends ViewRecord
                     ->manualCheckActionState($this->record)['disabled_reason']]
                 : [])
             ->icon('heroicon-o-arrow-path')
+            ->color('gray')
+            ->size('sm')
             ->authorize('runConnectionCheck')
             ->disabled(fn (): bool => ! app(ConnectorAccountUiState::class)
                 ->manualCheckActionState($this->record)['enabled'])
@@ -302,102 +279,6 @@ class ViewConnectorAccount extends ViewRecord
                     }
 
                     $this->dispatch('refreshRelationManagers');
-                } catch (Throwable $exception) {
-                    report($exception);
-
-                    Notification::make()
-                        ->danger()
-                        ->title(__('connectors.ui.notifications.action_failed'))
-                        ->send();
-                }
-            });
-    }
-
-    private function makeRunDiscoveryAction(): Action
-    {
-        return Action::make('runDiscovery')
-            ->label(fn (): string => app(ConnectorAccountUiState::class)
-                ->manualDiscoveryActionState($this->record)['label'])
-            ->tooltip(fn (): ?string => app(ConnectorAccountUiState::class)
-                ->manualDiscoveryActionState($this->record)['disabled_reason'])
-            ->extraAttributes(fn (): array => filled(app(ConnectorAccountUiState::class)
-                ->manualDiscoveryActionState($this->record)['disabled_reason'])
-                ? ['title' => app(ConnectorAccountUiState::class)
-                    ->manualDiscoveryActionState($this->record)['disabled_reason']]
-                : [])
-            ->icon('heroicon-o-arrow-path')
-            ->authorize('viewRunDiscovery')
-            ->disabled(fn (): bool => ! app(ConnectorAccountUiState::class)
-                ->manualDiscoveryActionState($this->record)['enabled'])
-            ->action(function (): void {
-                $actor = auth()->user();
-                $workspaceId = app(WorkspaceContext::class)->id();
-                $accountId = $this->record->getKey();
-
-                try {
-                    $this->record = $this->resolveRecord($accountId);
-
-                    Gate::forUser($actor)->authorize('runDiscovery', $this->record);
-
-                    $decision = app(ConnectorDiscoveryDispatchPort::class)->executeManual(
-                        $actor,
-                        $workspaceId,
-                        $accountId,
-                    );
-
-                    $run = ConnectorDiscoveryRun::query()->findOrFail($decision->discoveryRunId);
-
-                    $this->refreshDiscoveryState();
-
-                    $presenter = app(ConnectorSafeMessagePresenter::class);
-
-                    if (! $decision->shouldDispatch) {
-                        Notification::make()
-                            ->success()
-                            ->title(__('connectors.ui.notifications.available_fields_refresh_reused'))
-                            ->send();
-                    } elseif (in_array($run->status, [
-                        ConnectorDiscoveryRunStatus::Queued,
-                        ConnectorDiscoveryRunStatus::Running,
-                    ], true)) {
-                        Notification::make()
-                            ->success()
-                            ->title(__('connectors.ui.notifications.available_fields_refresh_started'))
-                            ->send();
-                    } elseif ($run->status === ConnectorDiscoveryRunStatus::Failed) {
-                        Notification::make()
-                            ->danger()
-                            ->title(__('connectors.ui.notifications.available_fields_refresh_failed'))
-                            ->body($presenter->present($run->user_message_key))
-                            ->send();
-                    }
-
-                    $this->dispatch('refreshRelationManagers');
-                } catch (ConnectorDiscoverySourceResolutionException) {
-                    Notification::make()
-                        ->danger()
-                        ->title(__('connectors.ui.notifications.available_fields_refresh_failed'))
-                        ->body(__('connectors.errors.discovery_source_unavailable'))
-                        ->send();
-                } catch (ConnectorAccountDisabledException) {
-                    Notification::make()
-                        ->danger()
-                        ->title(__('connectors.ui.notifications.available_fields_refresh_failed'))
-                        ->body(__('connectors.errors.account_disabled'))
-                        ->send();
-                } catch (AuthorizationException) {
-                    if (! $this->record->is_enabled) {
-                        Notification::make()
-                            ->danger()
-                            ->title(__('connectors.ui.notifications.available_fields_refresh_failed'))
-                            ->body(__('connectors.errors.account_disabled'))
-                            ->send();
-                    } else {
-                        Notification::make()
-                            ->danger()
-                            ->title(__('connectors.ui.notifications.action_failed'))
-                            ->send();
-                    }
                 } catch (Throwable $exception) {
                     report($exception);
 

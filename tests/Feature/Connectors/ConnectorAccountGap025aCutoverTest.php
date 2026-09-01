@@ -14,11 +14,8 @@ use App\Models\ConnectorAccount;
 use App\Models\ConnectorDiscoveryRun;
 use App\Models\ConnectorSchemaSnapshot;
 use App\Models\ConnectorSchemaSource;
-use App\Models\User;
-use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorAuthorization;
-use App\Support\Connectors\ConnectorDiscoveryDispatchDecision;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -41,8 +38,6 @@ class ConnectorAccountGap025aCutoverTest extends TestCase
     use EnablesConnectorSchemaDiscoveryCapability;
     use RefreshDatabase;
 
-    private ?Gap025aDiscoveryDispatchPortStub $dispatchStub = null;
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -56,9 +51,6 @@ class ConnectorAccountGap025aCutoverTest extends TestCase
         Http::preventStrayRequests();
         App::setLocale('uk');
         $this->enableSchemaDiscoveryCapability();
-
-        $this->dispatchStub = new Gap025aDiscoveryDispatchPortStub;
-        $this->app->instance(ConnectorDiscoveryDispatchPort::class, $this->dispatchStub);
     }
 
     #[Test]
@@ -106,7 +98,7 @@ class ConnectorAccountGap025aCutoverTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertSee(__('connectors.ui.sections.available_fields'))
+            ->assertDontSee(__('connectors.ui.sections.available_fields'))
             ->assertDontSee(__('connectors.ui.sections.discovery'));
     }
 
@@ -152,15 +144,9 @@ class ConnectorAccountGap025aCutoverTest extends TestCase
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount();
 
-        $this->dispatchStub->executeManualCallback = function () use ($account): void {
-            $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Queued);
-        };
-
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertActionHasLabel('runDiscovery', __('connectors.ui.actions.refresh_available_fields'))
-            ->callAction('runDiscovery')
-            ->assertNotified(__('connectors.ui.notifications.available_fields_refresh_started'));
+            ->assertActionDoesNotExist('runDiscovery');
     }
 
     #[Test]
@@ -327,38 +313,5 @@ class ConnectorAccountGap025aCutoverTest extends TestCase
             'canonical_hash' => hash('sha256', Str::uuid()->toString()),
             'captured_at' => now(),
         ], $overrides));
-    }
-}
-
-final class Gap025aDiscoveryDispatchPortStub
-{
-    public int $callCount = 0;
-
-    public ?\Closure $executeManualCallback = null;
-
-    public ?\Throwable $executeManualThrowable = null;
-
-    public function executeManual(User $actor, string $workspaceId, string $connectorAccountId): ConnectorDiscoveryDispatchDecision
-    {
-        $this->callCount++;
-
-        if ($this->executeManualThrowable !== null) {
-            throw $this->executeManualThrowable;
-        }
-
-        if ($this->executeManualCallback !== null) {
-            ($this->executeManualCallback)($actor, $workspaceId, $connectorAccountId);
-        }
-
-        $run = ConnectorDiscoveryRun::withoutWorkspaceScope()
-            ->where('connector_account_id', $connectorAccountId)
-            ->latest('created_at')
-            ->first();
-
-        if ($run === null) {
-            throw new \RuntimeException('Unexpected executeManual call in GAP-025A dispatch stub.');
-        }
-
-        return ConnectorDiscoveryDispatchDecision::dispatch($run->id, now()->addHour()->getTimestamp());
     }
 }

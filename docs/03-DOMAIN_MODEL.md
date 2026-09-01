@@ -7282,6 +7282,8 @@ readiness absent. Evaluation is stateless and presentation-only: no readiness
 table or account projection is introduced. The result does not replace the
 fresh `ConnectorLiveRuntimeReadiness` consequential-write timing rules.
 
+**Invariant (merchant-safe causality):** when baseline connection succeeds but a subsequent operation-readiness probe fails, the runtime result must preserve baseline success as distinct evidence from the failed probe. Merchant presentation must not translate this case into "connection failed".
+
 Handshake payloads may include additive optional diagnostic fields
 `application_version` and `php_version` (for merchant-safe support/troubleshooting
 only). These fields MUST remain non-authoritative: they must not participate in

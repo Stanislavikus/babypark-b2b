@@ -83,13 +83,11 @@ class ConnectorAccountCapabilityPresentationTest extends TestCase
 
         $detailComponent = Livewire::actingAs($manager)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertSuccessful();
+            ->assertSuccessful()
+            ->assertActionDisabled('runConnectionCheck');
 
-        $expectedReason = __('connectors.ui.disabled_reasons.check_already_active');
-        $discoveryReason = __('connectors.ui.disabled_reasons.discovery_already_active');
-
-        $this->assertSame($expectedReason, $detailComponent->instance()->getSubheading());
-        $this->assertNotSame($discoveryReason, $detailComponent->instance()->getSubheading());
+        $this->assertNull($detailComponent->instance()->getSubheading());
+        $detailComponent->assertSee(__('connectors.ui.disabled_reasons.check_already_active'), escape: false);
     }
 
     #[Test]
@@ -107,10 +105,9 @@ class ConnectorAccountCapabilityPresentationTest extends TestCase
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->assertSuccessful();
 
-        $this->assertSame(
-            __('connectors.ui.disabled_reasons.account_disabled'),
-            $detailComponent->instance()->getSubheading(),
-        );
+        $this->assertNull($detailComponent->instance()->getSubheading());
+        $detailComponent->assertActionDoesNotExist('runDiscovery');
+        $detailComponent->assertActionDoesNotExist('runConnectionCheck');
     }
 
     #[Test]

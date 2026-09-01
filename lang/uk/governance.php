@@ -16,4 +16,6 @@ return [
     'no_results' => 'Немає записів для відображення',
     'evidence_sources' => 'Джерела доказів',
     'no_evidence_sources' => 'Немає джерел для цього рішення',
+    'copy_expanded' => 'Скопіювати',
+    'copied' => 'Скопійовано',
 ];

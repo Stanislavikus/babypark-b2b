@@ -2,12 +2,16 @@
 
 namespace Tests\Feature\Sync;
 
+use App\Enums\ConnectorDiscoveryRunStatus;
+use App\Enums\ConnectorDiscoveryRunTrigger;
 use App\Enums\SyncDataDomain;
 use App\Enums\SyncSemanticOperation;
 use App\Filament\Pages\Sync\ManageSyncFieldMappings;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorSchemaSnapshot;
 use App\Models\ConnectorAccount;
+use App\Models\ConnectorDiscoveryRun;
+use App\Models\ConnectorSchemaSource;
 use App\Models\FieldBinding;
 use App\Models\FieldMapping;
 use App\Models\SyncConfiguration;
@@ -15,17 +19,23 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceUser;
 use App\Services\Connectors\AuthoritativeConnectorSchemaSnapshotResolver;
+use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
 use App\Services\Sync\CanonicalFieldMappingSuggestionProvider;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\FieldMappingReadModelProjector;
 use App\Support\CanonicalRegistry\CanonicalRegistryReader;
+use App\Support\Connectors\ConnectorDiscoveryDispatchDecision;
+use App\Support\Connectors\ConnectorProfileRegistry;
+use App\Support\Connectors\Exceptions\ConnectorAccountDisabledException;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Js;
@@ -36,6 +46,11 @@ use Tests\Concerns\ConfiguresSyncSupportProfiles;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\Concerns\InteractsWithFieldMappingFixtures;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
+use Tests\Support\Connectors\TestSyncSupportConnectorAccountSchema;
+use Tests\Support\Connectors\TestSyncSupportConnectorAdapter;
+use Tests\Support\Sync\TestFieldOptionMappingOptionValidator;
+use Tests\Support\Sync\TestSyncLiveCapability;
+use Tests\Support\Sync\TestSyncPreviewCapability;
 use Tests\TestCase;
 
 class ManageSyncFieldMappingsPageTest extends TestCase
@@ -59,6 +74,7 @@ class ManageSyncFieldMappingsPageTest extends TestCase
         ]);
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Config::set('connectors.discovery.manual_trigger_enabled', true);
     }
 
     #[Test]
@@ -79,6 +95,252 @@ class ManageSyncFieldMappingsPageTest extends TestCase
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->assertDontSee(__('sync_mappings.title'))
             ->assertDontSee(__('sync_mappings.actions.confirm'));
+    }
+
+    #[Test]
+    public function run_discovery_dispatches_through_port_and_notifies_started(): void
+    {
+        $this->enableSchemaDiscoveryOnTestSyncSupportProfile();
+        [$workspace, $account, $configuration] = $this->fixture();
+        $actor = $this->actorWithPermissions([
+            WorkspacePermissions::VIEW_SYNC_MAPPINGS,
+            WorkspacePermissions::RUN_CONNECTOR_DISCOVERY,
+        ]);
+
+        $dispatchStub = new ManageSyncFieldMappingsDiscoveryDispatchStub(function (User $actor, string $workspaceId, string $connectorAccountId) use ($account): void {
+            $this->createQueuedDiscoveryRun($account);
+        });
+
+        $this->app->instance(ConnectorDiscoveryDispatchPort::class, $dispatchStub);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $configuration->id,
+            ])
+            ->call('runDiscovery')
+            ->assertNotified(__('connectors.ui.notifications.available_fields_refresh_started'));
+
+        $this->assertSame(1, $dispatchStub->callCount);
+    }
+
+    #[Test]
+    public function manual_trigger_disabled_hides_discovery_refresh_action(): void
+    {
+        Config::set('connectors.discovery.manual_trigger_enabled', false);
+
+        [$workspace, $account, $configuration] = $this->fixture();
+        $actor = $this->actorWithPermissions([
+            WorkspacePermissions::VIEW_SYNC_MAPPINGS,
+            WorkspacePermissions::RUN_CONNECTOR_DISCOVERY,
+        ]);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $configuration->id,
+            ])
+            ->assertOk()
+            ->assertDontSeeHtml('data-testid="sync-mappings-refresh-available-fields"')
+            ->assertDontSee(__('connectors.ui.sections.available_fields'));
+    }
+
+    #[Test]
+    public function run_discovery_is_forbidden_when_profile_does_not_support_schema_discovery(): void
+    {
+        [$workspace, $account, $configuration] = $this->fixture();
+        $actor = $this->actorWithPermissions([
+            WorkspacePermissions::VIEW_SYNC_MAPPINGS,
+            WorkspacePermissions::RUN_CONNECTOR_DISCOVERY,
+        ]);
+
+        $dispatchStub = new ManageSyncFieldMappingsDiscoveryDispatchStub;
+        $this->app->instance(ConnectorDiscoveryDispatchPort::class, $dispatchStub);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $configuration->id,
+            ])
+            ->assertOk()
+            ->assertSee(__('connectors.ui.disabled_reasons.discovery_capability_unsupported'))
+            ->call('runDiscovery')
+            ->assertForbidden();
+
+        $this->assertSame(0, $dispatchStub->callCount);
+    }
+
+    #[Test]
+    public function run_discovery_is_forbidden_when_account_is_disabled(): void
+    {
+        $this->enableSchemaDiscoveryOnTestSyncSupportProfile();
+        [$workspace, $account, $configuration] = $this->fixture();
+        $account->update(['is_enabled' => false]);
+
+        $actor = $this->actorWithPermissions([
+            WorkspacePermissions::VIEW_SYNC_MAPPINGS,
+            WorkspacePermissions::RUN_CONNECTOR_DISCOVERY,
+        ]);
+
+        $dispatchStub = new ManageSyncFieldMappingsDiscoveryDispatchStub;
+        $this->app->instance(ConnectorDiscoveryDispatchPort::class, $dispatchStub);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $configuration->id,
+            ])
+            ->assertOk()
+            ->assertSee(__('connectors.ui.disabled_reasons.account_disabled'))
+            ->call('runDiscovery')
+            ->assertForbidden();
+
+        $this->assertSame(0, $dispatchStub->callCount);
+    }
+
+    #[Test]
+    public function run_discovery_is_forbidden_when_active_refresh_is_running(): void
+    {
+        $this->enableSchemaDiscoveryOnTestSyncSupportProfile();
+        [$workspace, $account, $configuration] = $this->fixture();
+        $this->createQueuedDiscoveryRun($account);
+
+        $actor = $this->actorWithPermissions([
+            WorkspacePermissions::VIEW_SYNC_MAPPINGS,
+            WorkspacePermissions::RUN_CONNECTOR_DISCOVERY,
+        ]);
+
+        $dispatchStub = new ManageSyncFieldMappingsDiscoveryDispatchStub;
+        $this->app->instance(ConnectorDiscoveryDispatchPort::class, $dispatchStub);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $configuration->id,
+            ])
+            ->assertOk()
+            ->assertSee(__('connectors.ui.actions.available_fields_refresh_active'))
+            ->assertSee(__('connectors.ui.disabled_reasons.available_fields_refresh_active'))
+            ->call('runDiscovery')
+            ->assertForbidden();
+
+        $this->assertSame(0, $dispatchStub->callCount);
+    }
+
+    #[Test]
+    public function run_discovery_is_forbidden_when_discovery_source_is_unavailable(): void
+    {
+        $this->enableSchemaDiscoveryOnTestSyncSupportProfile();
+        [$workspace, $account, $configuration] = $this->fixture();
+
+        ConnectorSchemaSource::query()
+            ->where('connector_definition_id', $account->connector_definition_id)
+            ->update(['is_primary' => false]);
+
+        $actor = $this->actorWithPermissions([
+            WorkspacePermissions::VIEW_SYNC_MAPPINGS,
+            WorkspacePermissions::RUN_CONNECTOR_DISCOVERY,
+        ]);
+
+        $dispatchStub = new ManageSyncFieldMappingsDiscoveryDispatchStub;
+        $this->app->instance(ConnectorDiscoveryDispatchPort::class, $dispatchStub);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $configuration->id,
+            ])
+            ->assertOk()
+            ->assertSee(__('connectors.ui.disabled_reasons.discovery_source_unavailable'))
+            ->call('runDiscovery')
+            ->assertForbidden();
+
+        $this->assertSame(0, $dispatchStub->callCount);
+    }
+
+    #[Test]
+    public function run_discovery_existing_decision_notifies_reused(): void
+    {
+        $this->enableSchemaDiscoveryOnTestSyncSupportProfile();
+        [$workspace, $account, $configuration] = $this->fixture();
+
+        $actor = $this->actorWithPermissions([
+            WorkspacePermissions::VIEW_SYNC_MAPPINGS,
+            WorkspacePermissions::RUN_CONNECTOR_DISCOVERY,
+        ]);
+
+        $dispatchStub = new ManageSyncFieldMappingsDiscoveryDispatchStub;
+        $dispatchStub->shouldDispatch = false;
+        $this->app->instance(ConnectorDiscoveryDispatchPort::class, $dispatchStub);
+
+        $component = Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $configuration->id,
+            ])
+            ->assertOk();
+
+        $this->createQueuedDiscoveryRun($account);
+
+        $component->call('runDiscovery')
+            ->assertNotified(__('connectors.ui.notifications.available_fields_refresh_reused'));
+
+        $this->assertSame(1, $dispatchStub->callCount);
+    }
+
+    #[Test]
+    public function run_discovery_fails_closed_after_permission_revocation_before_execution(): void
+    {
+        $this->enableSchemaDiscoveryOnTestSyncSupportProfile();
+        [$workspace, $account, $configuration] = $this->fixture();
+        $actor = $this->actorWithPermissions([
+            WorkspacePermissions::VIEW_SYNC_MAPPINGS,
+            WorkspacePermissions::RUN_CONNECTOR_DISCOVERY,
+        ]);
+        $membership = WorkspaceUser::query()
+            ->where('workspace_id', $workspace->id)
+            ->where('user_id', $actor->id)
+            ->firstOrFail();
+
+        $component = Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $configuration->id,
+            ])
+            ->assertOk();
+
+        $this->revokeAllWorkspaceRoles($membership);
+
+        $component->call('runDiscovery')->assertForbidden();
+    }
+
+    #[Test]
+    public function run_discovery_backend_account_disabled_exception_is_reported_safely(): void
+    {
+        $this->enableSchemaDiscoveryOnTestSyncSupportProfile();
+        [$workspace, $account, $configuration] = $this->fixture();
+        $actor = $this->actorWithPermissions([
+            WorkspacePermissions::VIEW_SYNC_MAPPINGS,
+            WorkspacePermissions::RUN_CONNECTOR_DISCOVERY,
+        ]);
+
+        $dispatchStub = new class implements ConnectorDiscoveryDispatchPort
+        {
+            public function executeManual(User $actor, string $workspaceId, string $connectorAccountId): ConnectorDiscoveryDispatchDecision
+            {
+                throw new ConnectorAccountDisabledException('Connector account is disabled.');
+            }
+        };
+
+        $this->app->instance(ConnectorDiscoveryDispatchPort::class, $dispatchStub);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldMappings::class, [
+                'account' => $account->id,
+                'configuration' => $configuration->id,
+            ])
+            ->call('runDiscovery')
+            ->assertNotified(__('connectors.ui.notifications.available_fields_refresh_failed'));
     }
 
     #[Test]
@@ -576,6 +838,27 @@ class ManageSyncFieldMappingsPageTest extends TestCase
         return $actor;
     }
 
+    private function enableSchemaDiscoveryOnTestSyncSupportProfile(): void
+    {
+        $container = app(Container::class);
+        $profiles = config('connectors.profiles', []);
+        $profiles['test_sync_support'] = [
+            'enabled' => true,
+            'connector_definition_code' => 'adobe_commerce',
+            'adapter' => TestSyncSupportConnectorAdapter::class,
+            'account_schema' => TestSyncSupportConnectorAccountSchema::class,
+            'capabilities' => ['schema_discovery'],
+            'preview_capability' => TestSyncPreviewCapability::class,
+            'live_capability' => TestSyncLiveCapability::class,
+            'field_option_mapping_validator' => TestFieldOptionMappingOptionValidator::class,
+        ];
+
+        $container->instance(ConnectorProfileRegistry::class, new ConnectorProfileRegistry(
+            $container,
+            $profiles,
+        ));
+    }
+
     /**
      * @return array{0: Workspace, 1: ConnectorAccount, 2: SyncConfiguration}
      */
@@ -587,6 +870,36 @@ class ManageSyncFieldMappingsPageTest extends TestCase
         $this->publishAuthoritativeSnapshot($account, ['name', 'sku', 'description']);
 
         return [$workspace, $account, $configuration];
+    }
+
+    private function createQueuedDiscoveryRun(ConnectorAccount $account): ConnectorDiscoveryRun
+    {
+        $source = ConnectorSchemaSource::query()
+            ->where('connector_definition_id', $account->connector_definition_id)
+            ->where('code', 'live_account_attributes')
+            ->firstOrFail();
+
+        return ConnectorDiscoveryRun::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'connector_schema_source_id' => $source->id,
+            'trigger' => ConnectorDiscoveryRunTrigger::Manual,
+            'initiated_by_user_id' => null,
+            'status' => ConnectorDiscoveryRunStatus::Queued,
+            'execution_attempts' => 1,
+            'retry_until_at' => now()->addHour(),
+            'next_attempt_at' => null,
+            'started_at' => null,
+            'finished_at' => null,
+            'duration_ms' => null,
+            'user_message_key' => null,
+            'technical_summary' => null,
+            'error_code' => null,
+            'snapshot_id' => null,
+            'previous_snapshot_id' => null,
+            'created_at' => now(),
+        ]);
     }
 
     private function bindHostileKeyCanonicalRegistry(string $externalKey): string
@@ -704,5 +1017,43 @@ class ManageSyncFieldMappingsPageTest extends TestCase
         }
 
         fclose($handle);
+    }
+}
+
+final class ManageSyncFieldMappingsDiscoveryDispatchStub implements ConnectorDiscoveryDispatchPort
+{
+    public int $callCount = 0;
+
+    public bool $shouldDispatch = true;
+
+    public ?\Closure $executeManualCallback = null;
+
+    public function __construct(?\Closure $executeManualCallback = null)
+    {
+        $this->executeManualCallback = $executeManualCallback;
+    }
+
+    public function executeManual(User $actor, string $workspaceId, string $connectorAccountId): ConnectorDiscoveryDispatchDecision
+    {
+        $this->callCount++;
+
+        if ($this->executeManualCallback !== null) {
+            ($this->executeManualCallback)($actor, $workspaceId, $connectorAccountId);
+        }
+
+        $run = ConnectorDiscoveryRun::withoutWorkspaceScope()
+            ->where('connector_account_id', $connectorAccountId)
+            ->latest('created_at')
+            ->first();
+
+        if ($run === null) {
+            throw new \RuntimeException('Discovery dispatch stub expects a ConnectorDiscoveryRun to exist.');
+        }
+
+        if (! $this->shouldDispatch) {
+            return ConnectorDiscoveryDispatchDecision::existing($run->id);
+        }
+
+        return ConnectorDiscoveryDispatchDecision::dispatch($run->id, now()->addHour()->getTimestamp());
     }
 }

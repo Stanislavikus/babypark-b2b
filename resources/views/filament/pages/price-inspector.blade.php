@@ -175,16 +175,12 @@
                     </div>
 
                     @if ($presentedOutput !== null)
-                        <div x-data="{ copied: false }">
-                            <x-filament::button
-                                type="button"
-                                x-on:click="navigator.clipboard.writeText(@js($presentedOutput)); copied = true; setTimeout(() => copied = false, 2000)"
-                                color="gray"
-                                size="sm"
-                            >
-                                <span x-show="!copied">{{ __('price_inspector.section.copy_diagnostics') }}</span>
-                                <span x-show="copied" x-cloak>{{ __('price_inspector.section.copied') }}</span>
-                            </x-filament::button>
+                        <div>
+                            <x-filament.clipboard-copy-button
+                                :text="$presentedOutput"
+                                :label="__('price_inspector.section.copy_diagnostics')"
+                                :copied-label="__('ui.clipboard.copied')"
+                            />
                             <pre class="mt-2 overflow-x-auto rounded bg-gray-50 p-4 text-xs dark:bg-gray-900"
                                  id="price-inspector-diagnostics">{{ $presentedOutput }}</pre>
                         </div>

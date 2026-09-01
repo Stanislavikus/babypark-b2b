@@ -16,4 +16,6 @@ return [
     'no_results' => 'No records to display',
     'evidence_sources' => 'Evidence sources',
     'no_evidence_sources' => 'No sources for this decision',
+    'copy_expanded' => 'Copy',
+    'copied' => 'Copied',
 ];

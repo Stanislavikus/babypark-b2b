@@ -41,8 +41,6 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
         $this->assertStringNotContainsString('Connector', $copy);
         $this->assertStringNotContainsString('component', $copy);
         $this->assertStringNotContainsString('компонент', $copy);
-        $this->assertStringNotContainsString('module', strtolower($copy));
-        $this->assertStringNotContainsString('модул', mb_strtolower($copy));
 
         foreach ([
             'PHP', '2.4.', 'Composer', 'B2BPlatform_MagentoSafeSync', 'HTTP',
@@ -56,25 +54,25 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
     #[Test]
     public function english_readiness_copy_uses_merchant_safe_phrasing(): void
     {
-        $this->assertSame('Store setup', __('connectors.ui.readiness.store_setup', locale: 'en'));
-        $this->assertSame('Check setup', __('connectors.ui.readiness.check', locale: 'en'));
+        $this->assertSame('Send product changes to Magento', __('connectors.ui.readiness.store_setup', locale: 'en'));
+        $this->assertSame('Check readiness', __('connectors.ui.readiness.check', locale: 'en'));
         $this->assertSame('Check again', __('connectors.ui.readiness.check_again', locale: 'en'));
-        $this->assertSame('Checking setup…', __('connectors.ui.readiness.checking', locale: 'en'));
+        $this->assertSame('Checking readiness…', __('connectors.ui.readiness.checking', locale: 'en'));
         $this->assertSame(
-            'Store setup is ready to send product changes',
+            'Ready to send product changes to Magento',
             __('connectors.ui.readiness.ready.title', locale: 'en'),
         );
-        $this->assertSame('Store setup needs to be completed', __('connectors.ui.readiness.setup_required.title', locale: 'en'));
-        $this->assertSame('Store setup needs to be updated', __('connectors.ui.readiness.update_required.title', locale: 'en'));
+        $this->assertSame('Magento setup is required', __('connectors.ui.readiness.setup_required.title', locale: 'en'));
+        $this->assertSame('Integration module update is required', __('connectors.ui.readiness.update_required.title', locale: 'en'));
 
-        $this->assertSame('Check whether the store setup is ready.', __('connectors.ui.readiness.not_checked.body', locale: 'en'));
+        $this->assertSame('Check whether this store is ready to receive product changes.', __('connectors.ui.readiness.not_checked.body', locale: 'en'));
         $this->assertSame(
-            'This store is ready for sending Simple Product changes from the platform to Magento.',
+            'We confirmed that this store can receive simple product changes from the platform.',
             __('connectors.ui.readiness.ready.body', locale: 'en'),
         );
-        $this->assertStringContainsString('Magento connection works', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
-        $this->assertStringContainsString('store administrator', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
-        $this->assertStringContainsString('Magento connection works', __('connectors.ui.readiness.update_required.body', locale: 'en'));
+        $this->assertStringContainsString('Connection to Magento works', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
+        $this->assertStringContainsString('developer instructions', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
+        $this->assertStringContainsString('Connection to Magento works', __('connectors.ui.readiness.update_required.body', locale: 'en'));
         $this->assertStringContainsString('Magento connection', __('connectors.ui.readiness.baseline_failure.guidance', locale: 'en'));
         $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.not_checked.body', locale: 'en'));
         $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.ready.body', locale: 'en'));

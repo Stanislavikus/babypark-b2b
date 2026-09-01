@@ -155,6 +155,35 @@
                   <p class="text-sm text-gray-500">{{ __('governance.no_evidence_sources') }}</p>
                 @endforelse
               </div>
+
+              @php
+                $copyParts = array_values(array_filter([
+                  $expandedDecision['id'].' — '.$expandedDecision['title'],
+                  '',
+                  $expandedDecision['body'],
+                  '',
+                  __('governance.evidence_sources').':',
+                  ...array_map(function (array $source): string {
+                    $lines = array_values(array_filter([
+                      '- '.$source['source_title'],
+                      '  '.$source['source_organization'].' · '.$source['verified_at'],
+                      $source['source_url_or_state'] !== 'not_applicable' ? '  '.$source['source_url_or_state'] : null,
+                      '  '.$source['evidence_note'],
+                    ], fn (?string $value): bool => $value !== null && $value !== ''));
+                    return implode("\n", $lines);
+                  }, $expandedSources),
+                ], fn (?string $value): bool => $value !== null && $value !== ''));
+                $copyText = implode("\n", $copyParts);
+              @endphp
+
+              <div class="mt-6 flex justify-end">
+                <x-filament.clipboard-copy-button
+                  :text="$copyText"
+                  :label="__('governance.copy_expanded')"
+                  :copied-label="__('governance.copied')"
+                  icon="heroicon-o-clipboard-document"
+                />
+              </div>
             </div>
           @endif
         </div>

@@ -29,8 +29,6 @@
     $connectionEvidenceAt = null;
     if (is_object($record) && isset($record->last_successful_check_at) && $record->last_successful_check_at) {
         $connectionEvidenceAt = $record->last_successful_check_at;
-    } elseif (is_object($record) && isset($record->last_checked_at) && $record->last_checked_at) {
-        $connectionEvidenceAt = $record->last_checked_at;
     }
 
     $evidenceIso = $connectionEvidenceAt ? $connectionEvidenceAt->toIso8601String() : null;
@@ -39,7 +37,9 @@
         'READY' => __('connectors.ui.readiness.developer.packet.state.ready'),
         'SETUP_REQUIRED' => __('connectors.ui.readiness.developer.packet.state.setup_required'),
         'UPDATE_REQUIRED' => __('connectors.ui.readiness.developer.packet.state.update_required'),
-        'BASELINE_FAILURE' => __('connectors.ui.readiness.developer.packet.state.baseline_failure'),
+        'BASELINE_CONNECTION_FAILED' => __('connectors.ui.readiness.developer.packet.state.baseline_failure'),
+        'READINESS_TEMPORARY_PROBLEM' => __('connectors.ui.readiness.developer.packet.state.temporary_problem'),
+        'BASELINE_OK_READINESS_UNDETERMINED' => __('connectors.ui.readiness.developer.packet.state.readiness_undetermined'),
         default => __('connectors.ui.readiness.developer.packet.state.not_checked'),
     };
 
@@ -47,7 +47,9 @@
         'READY' => __('connectors.ui.readiness.developer.packet.next_action.ready'),
         'SETUP_REQUIRED' => __('connectors.ui.readiness.developer.packet.next_action.setup_required'),
         'UPDATE_REQUIRED' => __('connectors.ui.readiness.developer.packet.next_action.update_required'),
-        'BASELINE_FAILURE' => __('connectors.ui.readiness.developer.packet.next_action.baseline_failure'),
+        'BASELINE_CONNECTION_FAILED' => __('connectors.ui.readiness.developer.packet.next_action.baseline_failure'),
+        'READINESS_TEMPORARY_PROBLEM' => __('connectors.ui.readiness.developer.packet.next_action.temporary_problem'),
+        'BASELINE_OK_READINESS_UNDETERMINED' => __('connectors.ui.readiness.developer.packet.next_action.readiness_undetermined'),
         default => __('connectors.ui.readiness.developer.packet.next_action.not_checked', [
             'action' => $this->storeSetupState === 'NOT_CHECKED'
                 ? __('connectors.ui.readiness.check')
@@ -69,7 +71,7 @@
         __('connectors.ui.readiness.developer.packet.diagnostics.extension', [
             'value' => filled($moduleVersion) ? $moduleVersion : $unknown,
         ]),
-        $state === 'BASELINE_FAILURE' && filled($baselineMessage)
+        in_array($state, ['BASELINE_CONNECTION_FAILED', 'READINESS_TEMPORARY_PROBLEM', 'BASELINE_OK_READINESS_UNDETERMINED'], true) && filled($baselineMessage)
             ? __('connectors.ui.readiness.developer.packet.diagnostics.failure', ['message' => $baselineMessage])
             : null,
     ], fn (?string $value): bool => filled($value)));
@@ -114,7 +116,9 @@
     $containerClasses = match ($state) {
         'READY' => 'border-success-200 bg-success-50/70 dark:border-success-500/30 dark:bg-success-500/10',
         'SETUP_REQUIRED', 'UPDATE_REQUIRED' => 'border-warning-200 bg-warning-50/70 dark:border-warning-500/30 dark:bg-warning-500/10',
-        'BASELINE_FAILURE' => 'border-danger-200 bg-danger-50/70 dark:border-danger-500/30 dark:bg-danger-500/10',
+        'BASELINE_CONNECTION_FAILED' => 'border-danger-200 bg-danger-50/70 dark:border-danger-500/30 dark:bg-danger-500/10',
+        'READINESS_TEMPORARY_PROBLEM' => 'border-gray-200 bg-gray-50/80 dark:border-white/10 dark:bg-white/5',
+        'BASELINE_OK_READINESS_UNDETERMINED' => 'border-gray-200 bg-gray-50/80 dark:border-white/10 dark:bg-white/5',
         default => 'border-gray-200 bg-gray-50/80 dark:border-white/10 dark:bg-white/5',
     };
 
@@ -122,7 +126,9 @@
         'READY' => 'connectors.ui.readiness.ready.title',
         'SETUP_REQUIRED' => 'connectors.ui.readiness.setup_required.title',
         'UPDATE_REQUIRED' => 'connectors.ui.readiness.update_required.title',
-        'BASELINE_FAILURE' => 'connectors.ui.readiness.baseline_failure.title',
+        'BASELINE_CONNECTION_FAILED' => 'connectors.ui.readiness.baseline_failure.title',
+        'READINESS_TEMPORARY_PROBLEM' => 'connectors.ui.readiness.temporary_problem.title',
+        'BASELINE_OK_READINESS_UNDETERMINED' => 'connectors.ui.readiness.readiness_undetermined.title',
         default => null,
     };
 
@@ -130,6 +136,8 @@
         'READY' => 'connectors.ui.readiness.ready.body',
         'SETUP_REQUIRED' => 'connectors.ui.readiness.setup_required.body',
         'UPDATE_REQUIRED' => 'connectors.ui.readiness.update_required.body',
+        'READINESS_TEMPORARY_PROBLEM' => 'connectors.ui.readiness.temporary_problem.body',
+        'BASELINE_OK_READINESS_UNDETERMINED' => 'connectors.ui.readiness.readiness_undetermined.body',
         default => null,
     };
 @endphp
@@ -156,21 +164,11 @@
                         {{ $detailsLine }}
                     </p>
                 @endif
-            @elseif ($state === 'BASELINE_FAILURE')
+            @elseif ($state === 'BASELINE_CONNECTION_FAILED')
                 <div class="space-y-3">
                     <div class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
                         <p>{{ $baselineMessage }}</p>
                         <p>{{ __('connectors.ui.readiness.baseline_failure.guidance') }}</p>
-                    </div>
-
-                    <div class="flex flex-wrap items-center gap-3">
-                        {{ $this->checkStoreSetupAction }}
-
-                        @if (filled($actionState['disabled_reason']))
-                            <span class="text-sm text-gray-600 dark:text-gray-400">
-                                {{ $actionState['disabled_reason'] }}
-                            </span>
-                        @endif
                     </div>
                 </div>
             @else
@@ -178,24 +176,37 @@
                     <p class="text-sm text-gray-700 dark:text-gray-300">
                         {{ __('connectors.ui.readiness.not_checked.body') }}
                     </p>
-
-                    <div class="flex flex-wrap items-center gap-3">
-                        {{ $this->checkStoreSetupAction }}
-
-                        @if (filled($actionState['disabled_reason']))
-                            <span class="text-sm text-gray-600 dark:text-gray-400">
-                                {{ $actionState['disabled_reason'] }}
-                            </span>
-                        @endif
-                    </div>
                 </div>
             @endif
 
-            @if ($bodyKey !== null)
+            @if ($state !== 'READY')
                 <div class="flex flex-wrap items-center gap-3">
-                    {{ $this->checkStoreSetupAction }}
+                    @if ($state === 'BASELINE_CONNECTION_FAILED')
+                        <x-filament::button
+                            type="button"
+                            color="gray"
+                            size="sm"
+                            icon="heroicon-o-arrow-path"
+                            :disabled="! $actionState['enabled']"
+                            wire:click="mountAction('runConnectionCheck')"
+                        >
+                            {{ $actionState['label'] }}
+                        </x-filament::button>
+                    @elseif (in_array($state, ['SETUP_REQUIRED', 'UPDATE_REQUIRED'], true))
+                        <x-filament.clipboard-copy-button
+                            :text="$packetText"
+                            :label="__('connectors.ui.readiness.developer.packet.copy')"
+                            :copied-label="__('ui.clipboard.copied')"
+                            color="primary"
+                            icon="heroicon-o-clipboard-document"
+                        />
 
-                    @if (filled($actionState['disabled_reason']))
+                        {{ $this->checkStoreSetupAction }}
+                    @else
+                        {{ $this->checkStoreSetupAction }}
+                    @endif
+
+                    @if (filled($actionState['disabled_reason']) && ! $actionState['enabled'])
                         <span class="text-sm text-gray-600 dark:text-gray-400">
                             {{ $actionState['disabled_reason'] }}
                         </span>
@@ -216,15 +227,12 @@
                             {{ __('connectors.ui.readiness.developer.packet.title') }}
                         </p>
 
-                        <x-filament::button
-                            color="gray"
-                            size="sm"
+                        <x-filament.clipboard-copy-button
+                            :text="$packetText"
+                            :label="__('connectors.ui.readiness.developer.packet.copy')"
+                            :copied-label="__('ui.clipboard.copied')"
                             icon="heroicon-o-clipboard-document"
-                            x-data="{}"
-                            x-on:click="navigator.clipboard?.writeText(@js($packetText))"
-                        >
-                            {{ __('connectors.ui.readiness.developer.packet.copy') }}
-                        </x-filament::button>
+                        />
                     </div>
 
                     <pre class="whitespace-pre-wrap rounded-md border border-gray-200 bg-white p-3 text-xs leading-5 text-gray-900 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">{{ $packetText }}</pre>
