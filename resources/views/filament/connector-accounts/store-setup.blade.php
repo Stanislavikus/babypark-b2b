@@ -29,8 +29,6 @@
     $connectionEvidenceAt = null;
     if (is_object($record) && isset($record->last_successful_check_at) && $record->last_successful_check_at) {
         $connectionEvidenceAt = $record->last_successful_check_at;
-    } elseif (is_object($record) && isset($record->last_checked_at) && $record->last_checked_at) {
-        $connectionEvidenceAt = $record->last_checked_at;
     }
 
     $evidenceIso = $connectionEvidenceAt ? $connectionEvidenceAt->toIso8601String() : null;
