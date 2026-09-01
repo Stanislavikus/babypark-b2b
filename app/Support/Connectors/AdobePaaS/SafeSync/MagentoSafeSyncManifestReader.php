@@ -30,7 +30,7 @@ final class MagentoSafeSyncManifestReader
      */
     private function readManifest(): array
     {
-        $path = base_path(self::MANIFEST_PATH);
+        $path = $this->resolveManifestPath();
         $raw = @file_get_contents($path);
 
         if ($raw === false) {
@@ -48,6 +48,15 @@ final class MagentoSafeSyncManifestReader
         }
 
         return $decoded;
+    }
+
+    private function resolveManifestPath(): string
+    {
+        if (function_exists('app') && method_exists(app(), 'basePath')) {
+            return base_path(self::MANIFEST_PATH);
+        }
+
+        return dirname(__DIR__, 5).DIRECTORY_SEPARATOR.str_replace('/', DIRECTORY_SEPARATOR, self::MANIFEST_PATH);
     }
 
     private function optionalString(mixed $value): ?string
