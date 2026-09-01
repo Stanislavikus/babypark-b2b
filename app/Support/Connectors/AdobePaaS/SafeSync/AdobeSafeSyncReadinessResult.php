@@ -11,5 +11,7 @@ final readonly class AdobeSafeSyncReadinessResult
         public ConnectorConnectionCheckResult $connectionResult,
         public ?ConnectorComponentReadiness $componentReadiness,
         public ?string $moduleVersion = null,
+        public ?string $applicationVersion = null,
+        public ?string $phpVersion = null,
     ) {}
 }

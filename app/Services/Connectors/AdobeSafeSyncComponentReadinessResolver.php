@@ -50,6 +50,8 @@ final class AdobeSafeSyncComponentReadinessResolver
             $probe->connectionResult,
             $compatible ? ConnectorComponentReadiness::Ready : ConnectorComponentReadiness::UpdateRequired,
             $handshake?->moduleVersion,
+            $handshake?->applicationVersion,
+            $handshake?->phpVersion,
         );
     }
 

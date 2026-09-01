@@ -7,6 +7,7 @@ namespace B2BPlatform\MagentoSafeSync\Model;
 use B2BPlatform\MagentoSafeSync\Api\Data\HandshakeResponseInterface;
 use B2BPlatform\MagentoSafeSync\Api\HandshakeManagementInterface;
 use B2BPlatform\MagentoSafeSync\Model\Data\HandshakeResponseFactory;
+use Magento\Framework\App\ProductMetadataInterface;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Module\ModuleListInterface;
 
@@ -15,6 +16,7 @@ final class HandshakeManagement implements HandshakeManagementInterface
     public function __construct(
         private readonly HandshakeResponseFactory $responseFactory,
         private readonly ModuleListInterface $moduleList,
+        private readonly ProductMetadataInterface $productMetadata,
     ) {}
 
     public function handshake(): HandshakeResponseInterface
@@ -29,8 +31,27 @@ final class HandshakeManagement implements HandshakeManagementInterface
             SafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY,
             SafeSyncContract::SIMPLE_PRODUCT_WRITE_FAMILY,
         ]);
+        $response->setApplicationVersion($this->resolveApplicationVersion());
+        $response->setPhpVersion($this->resolvePhpVersion());
 
         return $response;
+    }
+
+    private function resolveApplicationVersion(): ?string
+    {
+        $version = $this->productMetadata->getVersion();
+
+        $version = is_string($version) ? trim($version) : '';
+
+        return $version !== '' ? $version : null;
+    }
+
+    private function resolvePhpVersion(): ?string
+    {
+        $version = phpversion();
+        $version = is_string($version) ? trim($version) : '';
+
+        return $version !== '' ? $version : null;
     }
 
     /**

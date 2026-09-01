@@ -21,6 +21,8 @@ final class AdobeSafeSyncHandshakeParser
         $contractVersion = $this->requireString($payload, 'contract_version');
         $moduleVersion = $this->requireString($payload, 'module_version');
         $families = $this->requireStringList($payload, 'supported_operation_families');
+        $applicationVersion = $this->optionalString($payload, 'application_version');
+        $phpVersion = $this->optionalString($payload, 'php_version');
 
         if (
             $moduleVersion === '0.0.0'
@@ -30,7 +32,13 @@ final class AdobeSafeSyncHandshakeParser
             throw new AdobeSafeSyncClientException('Safe Sync module version is invalid.');
         }
 
-        return new AdobeSafeSyncHandshake($contractVersion, $moduleVersion, $families);
+        return new AdobeSafeSyncHandshake(
+            contractVersion: $contractVersion,
+            moduleVersion: $moduleVersion,
+            supportedOperationFamilies: $families,
+            applicationVersion: $applicationVersion,
+            phpVersion: $phpVersion,
+        );
     }
 
     /** @param array<string, mixed> $payload */
@@ -41,6 +49,22 @@ final class AdobeSafeSyncHandshakeParser
         }
 
         return $payload[$key];
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function optionalString(array $payload, string $key): ?string
+    {
+        if (! array_key_exists($key, $payload)) {
+            return null;
+        }
+
+        if (! is_string($payload[$key])) {
+            throw new AdobeSafeSyncClientException(sprintf('Safe Sync response field `%s` is invalid.', $key));
+        }
+
+        $value = trim($payload[$key]);
+
+        return $value !== '' ? $value : null;
     }
 
     /** @param array<string, mixed> $payload @return list<string> */

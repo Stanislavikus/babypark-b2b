@@ -40,4 +40,34 @@ class HandshakeResponse extends AbstractSimpleObject implements HandshakeRespons
     {
         return $this->setData(self::SUPPORTED_OPERATION_FAMILIES, array_values($supportedOperationFamilies));
     }
+
+    public function getApplicationVersion(): ?string
+    {
+        $version = $this->_get(self::APPLICATION_VERSION);
+
+        return is_string($version) && $version !== '' ? $version : null;
+    }
+
+    public function setApplicationVersion(?string $applicationVersion): HandshakeResponseInterface
+    {
+        return $this->setData(
+            self::APPLICATION_VERSION,
+            is_string($applicationVersion) && trim($applicationVersion) !== '' ? trim($applicationVersion) : null,
+        );
+    }
+
+    public function getPhpVersion(): ?string
+    {
+        $version = $this->_get(self::PHP_VERSION);
+
+        return is_string($version) && $version !== '' ? $version : null;
+    }
+
+    public function setPhpVersion(?string $phpVersion): HandshakeResponseInterface
+    {
+        return $this->setData(
+            self::PHP_VERSION,
+            is_string($phpVersion) && trim($phpVersion) !== '' ? trim($phpVersion) : null,
+        );
+    }
 }

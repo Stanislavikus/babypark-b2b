@@ -20,7 +20,7 @@ use App\Support\Connectors\Transport\ConnectorTransportException;
 use App\Support\Connectors\Transport\TimeoutPhase;
 use App\Support\Connectors\Transport\TransportFailureReason;
 use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
+use PHPUnit\Framework\TestCase;
 
 class AdobeSafeSyncHandshakeProbeTest extends TestCase
 {
@@ -73,6 +73,8 @@ class AdobeSafeSyncHandshakeProbeTest extends TestCase
                     'contract_version' => AdobeSafeSyncContract::CONTRACT_VERSION,
                     'module_version' => '0.2.1',
                     'supported_operation_families' => [AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY],
+                    'application_version' => '2.4.7-p1',
+                    'php_version' => '8.3.10',
                     'future_field' => ['ignored' => true],
                 ], JSON_THROW_ON_ERROR));
             }
@@ -80,7 +82,30 @@ class AdobeSafeSyncHandshakeProbeTest extends TestCase
 
         $result = $this->probe($transport)->probe($this->context());
         $this->assertNotNull($result->handshake);
+        $this->assertSame('2.4.7-p1', $result->handshake?->applicationVersion);
+        $this->assertSame('8.3.10', $result->handshake?->phpVersion);
         $this->assertSame(AdobeSafeSyncContract::HANDSHAKE_MAX_RESPONSE_BYTES, $captured->request->limits->maxResponseBodyBytes);
+    }
+
+    #[Test]
+    public function older_payload_without_optional_fields_remains_accepted(): void
+    {
+        $transport = new class implements ConnectorHttpTransport
+        {
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'contract_version' => AdobeSafeSyncContract::CONTRACT_VERSION,
+                    'module_version' => '0.2.1',
+                    'supported_operation_families' => [AdobeSafeSyncContract::PRODUCT_VERIFICATION_READ_FAMILY],
+                ], JSON_THROW_ON_ERROR));
+            }
+        };
+
+        $result = $this->probe($transport)->probe($this->context());
+        $this->assertNotNull($result->handshake);
+        $this->assertNull($result->handshake?->applicationVersion);
+        $this->assertNull($result->handshake?->phpVersion);
     }
 
     private function probeReturning(ConnectorHttpResult $response): AdobeSafeSyncHandshakeProbeResult

@@ -13,6 +13,20 @@ interface HandshakeResponseInterface
     public const SUPPORTED_OPERATION_FAMILIES = 'supported_operation_families';
 
     /**
+     * Optional Magento application version (e.g. 2.4.7).
+     *
+     * Exposed for diagnostics and support; must not be required by clients.
+     */
+    public const APPLICATION_VERSION = 'application_version';
+
+    /**
+     * Optional PHP runtime version (e.g. 8.2.0).
+     *
+     * Exposed for diagnostics and support; must not be required by clients.
+     */
+    public const PHP_VERSION = 'php_version';
+
+    /**
      * Gets the negotiated Safe Sync contract version.
      *
      * @return string Safe Sync contract version.
@@ -56,4 +70,34 @@ interface HandshakeResponseInterface
      * @return $this
      */
     public function setSupportedOperationFamilies(array $supportedOperationFamilies): self;
+
+    /**
+     * Gets the Magento application version (optional).
+     *
+     * @return string|null Magento version.
+     */
+    public function getApplicationVersion(): ?string;
+
+    /**
+     * Sets the Magento application version (optional).
+     *
+     * @param  string|null  $applicationVersion  Magento version.
+     * @return $this
+     */
+    public function setApplicationVersion(?string $applicationVersion): self;
+
+    /**
+     * Gets the PHP runtime version (optional).
+     *
+     * @return string|null PHP version.
+     */
+    public function getPhpVersion(): ?string;
+
+    /**
+     * Sets the PHP runtime version (optional).
+     *
+     * @param  string|null  $phpVersion  PHP version.
+     * @return $this
+     */
+    public function setPhpVersion(?string $phpVersion): self;
 }

@@ -36,6 +36,14 @@ interface HandshakeResponseInterface
     public function getSupportedOperationFamilies(): array;
 
     public function setSupportedOperationFamilies(array $supportedOperationFamilies): self;
+
+    public function getApplicationVersion(): ?string;
+
+    public function setApplicationVersion(?string $applicationVersion): self;
+
+    public function getPhpVersion(): ?string;
+
+    public function setPhpVersion(?string $phpVersion): self;
 }
 
 interface ProductWriteRequestInterface
@@ -216,6 +224,10 @@ final class HandshakeResponse implements HandshakeResponseInterface
     /** @var list<string> */
     private array $supportedOperationFamilies = [];
 
+    private ?string $applicationVersion = null;
+
+    private ?string $phpVersion = null;
+
     public function getContractVersion(): string
     {
         return $this->contractVersion;
@@ -248,6 +260,30 @@ final class HandshakeResponse implements HandshakeResponseInterface
     public function setSupportedOperationFamilies(array $supportedOperationFamilies): HandshakeResponseInterface
     {
         $this->supportedOperationFamilies = $supportedOperationFamilies;
+
+        return $this;
+    }
+
+    public function getApplicationVersion(): ?string
+    {
+        return $this->applicationVersion;
+    }
+
+    public function setApplicationVersion(?string $applicationVersion): HandshakeResponseInterface
+    {
+        $this->applicationVersion = $applicationVersion;
+
+        return $this;
+    }
+
+    public function getPhpVersion(): ?string
+    {
+        return $this->phpVersion;
+    }
+
+    public function setPhpVersion(?string $phpVersion): HandshakeResponseInterface
+    {
+        $this->phpVersion = $phpVersion;
 
         return $this;
     }
@@ -669,6 +705,13 @@ interface ModuleListInterface
     public function getOne($name);
 }
 
+namespace Magento\Framework\App;
+
+interface ProductMetadataInterface
+{
+    public function getVersion(): string;
+}
+
 namespace Magento\Catalog\Api\Data;
 
 interface ProductInterface {}
@@ -752,6 +795,7 @@ use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Catalog\Model\Product\Gallery\UpdateHandler;
 use Magento\Catalog\Model\Product\Media\Config as ProductMediaConfig;
 use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
+use Magento\Framework\App\ProductMetadataInterface;
 use Magento\Framework\App\ResourceConnection;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\Framework\EntityManager\CallbackHandler;
@@ -821,6 +865,13 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
                     return [];
                 }
             },
+            new class implements ProductMetadataInterface
+            {
+                public function getVersion(): string
+                {
+                    return '2.4.0';
+                }
+            },
         );
 
         $this->expectException(LocalizedException::class);
@@ -839,6 +890,13 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
                 public function getOne($name)
                 {
                     return ['setup_version' => '0.0.0'];
+                }
+            },
+            new class implements ProductMetadataInterface
+            {
+                public function getVersion(): string
+                {
+                    return '2.4.0';
                 }
             },
         );
@@ -1178,6 +1236,13 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
                     return ['setup_version' => '0.2.1'];
                 }
             },
+            new class implements ProductMetadataInterface
+            {
+                public function getVersion(): string
+                {
+                    return '2.4.7-p1';
+                }
+            },
         );
 
         $handshake = $management->handshake();
@@ -1188,6 +1253,8 @@ final class MagentoSafeSyncModuleLogicTest extends TestCase
             'entity_bound_product_read',
             'entity_bound_simple_product_write',
         ], $handshake->getSupportedOperationFamilies());
+        $this->assertSame('2.4.7-p1', $handshake->getApplicationVersion());
+        $this->assertSame(phpversion(), $handshake->getPhpVersion());
     }
 
     #[Test]

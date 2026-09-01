@@ -101,7 +101,7 @@ vocabulary maps close to 1:1, not collapsed into four states:
 | Enum case | Merchant label | Meaning |
 |---|---|---|
 | `Untested` | **Не перевірено** | Configured, no check has completed yet — *not* "checking now" (see §3) |
-| `Connected` | **Працює** | Last check succeeded (a historical fact — see §7, no freshness threshold exists or should be invented) |
+| `Connected` | **Підключення перевірено** | Last check succeeded (a historical fact — see §7, no freshness threshold exists or should be invented) |
 | `AttentionRequired` | **Потребує уваги** | Last check failed in a way needing merchant action |
 | `TemporarilyUnavailable` | **Тимчасова проблема** | Last check failed in a way the system retries automatically — no action button, no elevated alarm styling |
 | `Disabled` | **Вимкнено** | See §8 — currently unreachable in the real application; the vocabulary is defined now so no future rework is needed once a disable mechanism ships |
@@ -125,7 +125,7 @@ rows. Page-specific stable labels/colors come from
 last-known stable state, never as a state substitution:
 
 ```
-Працює
+Підключення перевірено
 Виконується перевірка…
 ```
 
@@ -202,7 +202,7 @@ otherwise, evaluate ENABLED accounts only:
   any AttentionRequired          → Потребує уваги
   else any TemporarilyUnavailable → Тимчасова проблема
   else any Untested                → Не перевірено
-  else all Connected                → Працює
+  else all Connected                → Підключення перевірено
 ```
 
 Disabled accounts are excluded from the health evaluation entirely and
@@ -212,7 +212,7 @@ surfaced only in the secondary line:
 Magento — Потребує уваги
 3 підключення · 1 потребує уваги
 
-Magento — Працює
+Magento — Підключення перевірено
 2 активні · 1 вимкнено
 ```
 
@@ -239,7 +239,7 @@ connection health is a separate, later decision — not designed here.
 `ConnectorDiscoveryRunPersistence.php`) applies only to `Queued`/
 `Running` rows for orphan/recovery detection and explicitly returns
 `false` for any terminal state. **No freshness/staleness concept
-exists for a successful `Connected` result.** "Працює" means "the last
+exists for a successful `Connected` result.** "Підключення перевірено" means "the last
 check succeeded," a historical fact, not "currently proven reachable
 this second." This contract does not introduce a staleness threshold —
 doing so would be new product/runtime behavior requiring its own
@@ -312,7 +312,7 @@ Magento
 ### 1-account, Connected
 
 ```
-Magento          Працює
+Magento          Підключення перевірено
 Останню перевірку виконано: сьогодні, 14:20
 
 [Відкрити]
@@ -330,7 +330,7 @@ Magento          Не перевірено
 ### 1-account, active check running (§3 overlay)
 
 ```
-Magento          Працює
+Magento          Підключення перевірено
 Виконується перевірка…
 
 [Відкрити]
@@ -502,7 +502,7 @@ unchanged; this is presentation vocabulary only.
    `ConnectorCapability::AccountSetup` — no UI-local profile map, no
    Coming Soon cards for Active-but-not-connectable definitions.
 10. Rollup must never treat `is_enabled=true` +
-    `connection_status=Disabled` as Connected / "Працює" (defensive
+    `connection_status=Disabled` as Connected / "Підключення перевірено" (defensive
     invariant; no enable/disable write path added — §8 Option B).
 11. Implementation MUST NOT introduce a new enable/disable action or
    write path as part of this page's task (§8's settled Option B) —

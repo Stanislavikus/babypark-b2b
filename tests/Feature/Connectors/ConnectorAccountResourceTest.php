@@ -593,6 +593,150 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
+    public function inline_store_setup_ready_state_renders_optional_environment_details_when_available(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+        $stub = new AdobeSafeSyncComponentReadinessResolverStub;
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            connectionResult: ConnectorConnectionCheckResult::success(),
+            componentReadiness: ConnectorComponentReadiness::Ready,
+            moduleVersion: '0.2.1',
+            applicationVersion: '2.4.7-p1',
+            phpVersion: '8.3.10',
+        );
+        $this->bindReadinessResolverStub($stub);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSee('Magento 2.4.7-p1')
+            ->assertSee('PHP 8.3.10')
+            ->assertSee('Розширення 0.2.1');
+    }
+
+    #[Test]
+    public function store_setup_developer_handoff_renders_canonical_requirements_from_manifest(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+
+        $manifestPath = dirname(__DIR__, 3).'/integrations/magento-safe-sync/composer.json';
+        $raw = file_get_contents($manifestPath);
+        $this->assertNotFalse($raw);
+
+        $manifest = json_decode($raw, true);
+        $this->assertIsArray($manifest);
+        $require = $manifest['require'] ?? [];
+        $this->assertIsArray($require);
+
+        $expected = array_values(array_filter([
+            $require['php'] ?? null,
+            $require['magento/framework'] ?? null,
+            $require['magento/module-catalog'] ?? null,
+        ], fn ($value): bool => is_string($value) && $value !== ''));
+
+        $component = Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSee(__('connectors.ui.readiness.developer.summary'))
+            ->assertSee(__('connectors.ui.readiness.developer.requirements.title'));
+
+        foreach ($expected as $constraint) {
+            $component->assertSee($constraint);
+        }
+    }
+
+    #[Test]
+    public function store_setup_developer_handoff_packet_is_copy_safe_and_does_not_expose_credentials_or_base_url_or_settings(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount(overrides: [
+            'name' => 'Store Copy Packet',
+            'base_url' => 'https://secret-shop.example.com',
+            'store_code' => 'secret-store-code',
+            'tenant_context' => 'secret-tenant',
+            'settings' => ['secret_setting' => 'CANARY_PACKET_SETTING'],
+            'credentials' => ['token' => 'CANARY_PACKET_CREDENTIAL'],
+            'last_successful_check_at' => now(),
+        ]);
+
+        $iso = $account->last_successful_check_at?->toIso8601String();
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSee(__('connectors.ui.readiness.developer.packet.title'))
+            ->assertSee('Store Copy Packet')
+            ->assertSee($iso)
+            ->assertDontSee('secret-shop.example.com')
+            ->assertDontSee('CANARY_PACKET_SETTING')
+            ->assertDontSee('CANARY_PACKET_CREDENTIAL');
+    }
+
+    #[Test]
+    public function store_setup_developer_handoff_packet_updates_next_action_per_readiness_state(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+        $stub = new AdobeSafeSyncComponentReadinessResolverStub;
+        $this->bindReadinessResolverStub($stub);
+
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            connectionResult: ConnectorConnectionCheckResult::success(),
+            componentReadiness: ConnectorComponentReadiness::SetupRequired,
+        );
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSet('storeSetupState', 'SETUP_REQUIRED')
+            ->assertSee(__('connectors.ui.readiness.developer.packet.next_action.setup_required'));
+
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            connectionResult: ConnectorConnectionCheckResult::success(),
+            componentReadiness: ConnectorComponentReadiness::UpdateRequired,
+        );
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSet('storeSetupState', 'UPDATE_REQUIRED')
+            ->assertSee(__('connectors.ui.readiness.developer.packet.next_action.update_required'));
+
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            connectionResult: ConnectorConnectionCheckResult::success(),
+            componentReadiness: ConnectorComponentReadiness::Ready,
+        );
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSet('storeSetupState', 'READY')
+            ->assertSee(__('connectors.ui.readiness.developer.packet.next_action.ready'));
+    }
+
+    #[Test]
+    public function store_setup_developer_handoff_packet_tolerates_backward_handshake_without_versions(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+        $stub = new AdobeSafeSyncComponentReadinessResolverStub;
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            connectionResult: ConnectorConnectionCheckResult::success(),
+            componentReadiness: ConnectorComponentReadiness::Ready,
+            moduleVersion: null,
+            applicationVersion: null,
+            phpVersion: null,
+        );
+        $this->bindReadinessResolverStub($stub);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSet('storeSetupState', 'READY')
+            ->assertSee(__('connectors.ui.readiness.developer.packet.value.unknown', locale: 'uk'));
+    }
+
+    #[Test]
     public function inline_store_setup_baseline_failure_stays_inline_without_generic_notification(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
