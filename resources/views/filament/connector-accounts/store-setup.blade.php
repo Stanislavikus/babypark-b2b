@@ -20,6 +20,89 @@
             : null,
     ], fn (?string $value): bool => filled($value)));
 
+    $record = $this->record;
+    $accountName = is_object($record) && isset($record->name) ? (string) $record->name : null;
+    $platformName = is_object($record) && method_exists($record, 'relationLoaded') && $record->relationLoaded('connectorDefinition') && $record->connectorDefinition
+        ? (string) $record->connectorDefinition->name
+        : null;
+
+    $connectionEvidenceAt = null;
+    if (is_object($record) && isset($record->last_successful_check_at) && $record->last_successful_check_at) {
+        $connectionEvidenceAt = $record->last_successful_check_at;
+    } elseif (is_object($record) && isset($record->last_checked_at) && $record->last_checked_at) {
+        $connectionEvidenceAt = $record->last_checked_at;
+    }
+
+    $evidenceIso = $connectionEvidenceAt ? $connectionEvidenceAt->toIso8601String() : null;
+
+    $stateLabel = match ($state) {
+        'READY' => __('connectors.ui.readiness.developer.packet.state.ready'),
+        'SETUP_REQUIRED' => __('connectors.ui.readiness.developer.packet.state.setup_required'),
+        'UPDATE_REQUIRED' => __('connectors.ui.readiness.developer.packet.state.update_required'),
+        'BASELINE_FAILURE' => __('connectors.ui.readiness.developer.packet.state.baseline_failure'),
+        default => __('connectors.ui.readiness.developer.packet.state.not_checked'),
+    };
+
+    $nextAction = match ($state) {
+        'READY' => __('connectors.ui.readiness.developer.packet.next_action.ready'),
+        'SETUP_REQUIRED' => __('connectors.ui.readiness.developer.packet.next_action.setup_required'),
+        'UPDATE_REQUIRED' => __('connectors.ui.readiness.developer.packet.next_action.update_required'),
+        'BASELINE_FAILURE' => __('connectors.ui.readiness.developer.packet.next_action.baseline_failure'),
+        default => __('connectors.ui.readiness.developer.packet.next_action.not_checked', [
+            'action' => $this->storeSetupState === 'NOT_CHECKED'
+                ? __('connectors.ui.readiness.check')
+                : __('connectors.ui.readiness.check_again'),
+        ]),
+    };
+
+    $unknown = __('connectors.ui.readiness.developer.packet.value.unknown');
+    $diagnosticLines = array_values(array_filter([
+        __('connectors.ui.readiness.developer.packet.diagnostics.operation', [
+            'operation' => __('connectors.ui.readiness.developer.packet.diagnostics.operation.simple_product_write'),
+        ]),
+        __('connectors.ui.readiness.developer.packet.diagnostics.magento', [
+            'value' => filled($applicationVersion) ? $applicationVersion : $unknown,
+        ]),
+        __('connectors.ui.readiness.developer.packet.diagnostics.php', [
+            'value' => filled($phpVersion) ? $phpVersion : $unknown,
+        ]),
+        __('connectors.ui.readiness.developer.packet.diagnostics.extension', [
+            'value' => filled($moduleVersion) ? $moduleVersion : $unknown,
+        ]),
+        $state === 'BASELINE_FAILURE' && filled($baselineMessage)
+            ? __('connectors.ui.readiness.developer.packet.diagnostics.failure', ['message' => $baselineMessage])
+            : null,
+    ], fn (?string $value): bool => filled($value)));
+
+    $packetLines = array_values(array_filter([
+        __('connectors.ui.readiness.developer.packet.title'),
+        $platformName
+            ? __('connectors.ui.readiness.developer.packet.platform', ['value' => $platformName])
+            : null,
+        $accountName
+            ? __('connectors.ui.readiness.developer.packet.account', ['value' => $accountName])
+            : null,
+        $evidenceIso
+            ? __('connectors.ui.readiness.developer.packet.connection_evidence_at', ['value' => $evidenceIso])
+            : __('connectors.ui.readiness.developer.packet.connection_evidence_at', ['value' => $unknown]),
+        __('connectors.ui.readiness.developer.packet.readiness_state', ['value' => $stateLabel]),
+        __('connectors.ui.readiness.developer.packet.next_action', ['value' => $nextAction]),
+        '',
+        __('connectors.ui.readiness.developer.packet.diagnostics.title'),
+        ...array_map(fn (string $line): string => '- '.$line, $diagnosticLines),
+        '',
+        __('connectors.ui.readiness.developer.packet.requirements.title'),
+        ...array_map(fn (string $line): string => '- '.$line, $requirementsLines !== [] ? $requirementsLines : [$unknown]),
+        '',
+        __('connectors.ui.readiness.developer.packet.recheck', [
+            'action' => $this->storeSetupState === 'NOT_CHECKED'
+                ? __('connectors.ui.readiness.check')
+                : __('connectors.ui.readiness.check_again'),
+        ]),
+    ], fn ($value): bool => is_string($value)));
+
+    $packetText = implode("\n", $packetLines);
+
     $detailsParts = array_values(array_filter([
         filled($applicationVersion) ? __('connectors.ui.readiness.details.magento', ['version' => $applicationVersion]) : null,
         filled($phpVersion) ? __('connectors.ui.readiness.details.php', ['version' => $phpVersion]) : null,
@@ -127,6 +210,24 @@
 
                 <div class="mt-3 space-y-3 rounded-lg border border-gray-200 bg-white/60 p-3 text-sm text-gray-700 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
                     <p>{{ __('connectors.ui.readiness.developer.body') }}</p>
+
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">
+                            {{ __('connectors.ui.readiness.developer.packet.title') }}
+                        </p>
+
+                        <x-filament::button
+                            color="gray"
+                            size="sm"
+                            icon="heroicon-o-clipboard-document"
+                            x-data="{}"
+                            x-on:click="navigator.clipboard?.writeText(@js($packetText))"
+                        >
+                            {{ __('connectors.ui.readiness.developer.packet.copy') }}
+                        </x-filament::button>
+                    </div>
+
+                    <pre class="whitespace-pre-wrap rounded-md border border-gray-200 bg-white p-3 text-xs leading-5 text-gray-900 dark:border-white/10 dark:bg-black/20 dark:text-gray-100">{{ $packetText }}</pre>
 
                     @if ($requirementsLines !== [])
                         <div class="space-y-1">
