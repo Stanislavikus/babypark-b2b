@@ -581,6 +581,32 @@ class ConnectorAccountResourceTest extends TestCase
         $effects = json_encode($component->effects, JSON_THROW_ON_ERROR);
         $this->assertStringNotContainsString(__('connectors.ui.notifications.action_failed'), $effects);
         $this->assertStringNotContainsString(__('connectors.ui.notifications.check_failed'), $effects);
+
+        $this->assertStringNotContainsString(
+            "mountAction('checkStoreSetup'",
+            $component->html(),
+        );
+    }
+
+    #[Test]
+    public function connector_account_overview_exposes_secondary_manual_connection_recheck_for_management_actor(): void
+    {
+        $account = $this->createConnectorAccount();
+
+        $manager = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+
+        Livewire::actingAs($manager)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSuccessful()
+            ->assertActionEnabled('runConnectionCheck');
+
+        $viewer = $this->createStaffUser(UserRole::Manager);
+        $this->grantConnectorView($this->defaultWorkspace(), $viewer);
+
+        Livewire::actingAs($viewer)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSuccessful()
+            ->assertActionDoesNotExist('runConnectionCheck');
     }
 
     #[Test]
@@ -678,11 +704,19 @@ class ConnectorAccountResourceTest extends TestCase
             baselineSucceeded: true,
         );
 
-        Livewire::actingAs($admin)
+        $setupComponent = Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->callAction('checkStoreSetup')
             ->assertSet('storeSetupState', 'SETUP_REQUIRED')
             ->assertSee(__('connectors.ui.readiness.developer.packet.next_action.setup_required'));
+
+        $this->assertGreaterThanOrEqual(
+            2,
+            substr_count(
+                $setupComponent->html(),
+                __('connectors.ui.readiness.developer.packet.copy'),
+            ),
+        );
 
         $stub->result = new AdobeSafeSyncReadinessResult(
             connectionResult: ConnectorConnectionCheckResult::success(),
@@ -690,11 +724,19 @@ class ConnectorAccountResourceTest extends TestCase
             baselineSucceeded: true,
         );
 
-        Livewire::actingAs($admin)
+        $updateComponent = Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->callAction('checkStoreSetup')
             ->assertSet('storeSetupState', 'UPDATE_REQUIRED')
             ->assertSee(__('connectors.ui.readiness.developer.packet.next_action.update_required'));
+
+        $this->assertGreaterThanOrEqual(
+            2,
+            substr_count(
+                $updateComponent->html(),
+                __('connectors.ui.readiness.developer.packet.copy'),
+            ),
+        );
 
         $stub->result = new AdobeSafeSyncReadinessResult(
             connectionResult: ConnectorConnectionCheckResult::success(),

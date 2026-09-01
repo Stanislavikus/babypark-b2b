@@ -179,7 +179,7 @@
                             <x-filament.clipboard-copy-button
                                 :text="$presentedOutput"
                                 :label="__('price_inspector.section.copy_diagnostics')"
-                                :copied-label="__('price_inspector.section.copied')"
+                                :copied-label="__('ui.clipboard.copied')"
                             />
                             <pre class="mt-2 overflow-x-auto rounded bg-gray-50 p-4 text-xs dark:bg-gray-900"
                                  id="price-inspector-diagnostics">{{ $presentedOutput }}</pre>

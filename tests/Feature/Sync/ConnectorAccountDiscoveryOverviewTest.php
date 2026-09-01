@@ -23,6 +23,7 @@ use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportTesting\Testable;
@@ -68,6 +69,7 @@ class ConnectorAccountDiscoveryOverviewTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         Http::preventStrayRequests();
         App::setLocale('uk');
+        Config::set('connectors.discovery.manual_trigger_enabled', true);
     }
 
     #[Test]

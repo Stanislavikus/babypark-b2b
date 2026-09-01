@@ -388,7 +388,8 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
 
         $this->canMutate = $this->workspaceAllowsMutation($user, $workspace);
 
-        $this->showDiscoveryRefreshAction = app(ConnectorAuthorization::class)->canDiscoveryControl($user, $workspace);
+        $this->showDiscoveryRefreshAction = app(ConnectorAuthorization::class)->canDiscoveryControl($user, $workspace)
+            && config('connectors.discovery.manual_trigger_enabled');
 
         $account = ConnectorAccount::withoutWorkspaceScope()
             ->where('workspace_id', $workspace->id)

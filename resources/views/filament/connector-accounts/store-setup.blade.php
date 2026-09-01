@@ -172,40 +172,43 @@
                         <p>{{ $baselineMessage }}</p>
                         <p>{{ __('connectors.ui.readiness.baseline_failure.guidance') }}</p>
                     </div>
-
-                    <div class="flex flex-wrap items-center gap-3">
-                        {{ $this->checkStoreSetupAction }}
-
-                        @if (filled($actionState['disabled_reason']))
-                            <span class="text-sm text-gray-600 dark:text-gray-400">
-                                {{ $actionState['disabled_reason'] }}
-                            </span>
-                        @endif
-                    </div>
                 </div>
             @else
                 <div class="space-y-3">
                     <p class="text-sm text-gray-700 dark:text-gray-300">
                         {{ __('connectors.ui.readiness.not_checked.body') }}
                     </p>
-
-                    <div class="flex flex-wrap items-center gap-3">
-                        {{ $this->checkStoreSetupAction }}
-
-                        @if (filled($actionState['disabled_reason']))
-                            <span class="text-sm text-gray-600 dark:text-gray-400">
-                                {{ $actionState['disabled_reason'] }}
-                            </span>
-                        @endif
-                    </div>
                 </div>
             @endif
 
-            @if ($bodyKey !== null)
+            @if ($state !== 'READY')
                 <div class="flex flex-wrap items-center gap-3">
-                    {{ $this->checkStoreSetupAction }}
+                    @if ($state === 'BASELINE_CONNECTION_FAILED')
+                        <x-filament::button
+                            type="button"
+                            color="gray"
+                            size="sm"
+                            icon="heroicon-o-arrow-path"
+                            :disabled="! $actionState['enabled']"
+                            wire:click="mountAction('runConnectionCheck')"
+                        >
+                            {{ $actionState['label'] }}
+                        </x-filament::button>
+                    @elseif (in_array($state, ['SETUP_REQUIRED', 'UPDATE_REQUIRED'], true))
+                        <x-filament.clipboard-copy-button
+                            :text="$packetText"
+                            :label="__('connectors.ui.readiness.developer.packet.copy')"
+                            :copied-label="__('ui.clipboard.copied')"
+                            color="primary"
+                            icon="heroicon-o-clipboard-document"
+                        />
 
-                    @if (filled($actionState['disabled_reason']))
+                        {{ $this->checkStoreSetupAction }}
+                    @else
+                        {{ $this->checkStoreSetupAction }}
+                    @endif
+
+                    @if (filled($actionState['disabled_reason']) && ! $actionState['enabled'])
                         <span class="text-sm text-gray-600 dark:text-gray-400">
                             {{ $actionState['disabled_reason'] }}
                         </span>
@@ -229,7 +232,7 @@
                         <x-filament.clipboard-copy-button
                             :text="$packetText"
                             :label="__('connectors.ui.readiness.developer.packet.copy')"
-                            :copied-label="__('price_inspector.section.copied')"
+                            :copied-label="__('ui.clipboard.copied')"
                             icon="heroicon-o-clipboard-document"
                         />
                     </div>

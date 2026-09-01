@@ -21,7 +21,14 @@
         :color="$color"
         :size="$size"
         :icon="$icon"
-        x-on:click="navigator.clipboard?.writeText(@js($text)); copied = true; setTimeout(() => copied = false, {{ (int) $timeoutMs }})"
+        x-on:click="(async () => {
+            if (! navigator?.clipboard?.writeText) return;
+            try {
+                await navigator.clipboard.writeText(@js($text));
+                copied = true;
+                setTimeout(() => copied = false, {{ (int) $timeoutMs }});
+            } catch (e) {}
+        })()"
     >
         <span x-show="!copied">{{ $label }}</span>
         <span x-show="copied" x-cloak>{{ $copiedLabel }}</span>
