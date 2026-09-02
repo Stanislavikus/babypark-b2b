@@ -142,7 +142,7 @@
     "connectors.ui.readiness.check": "Проверить готовность",
     "connectors.ui.readiness.check_again": "Проверить снова",
     "connectors.ui.readiness.checking": "Проверяем готовность…",
-    "connectors.ui.readiness.not_checked.body": "Проверьте, готов ли этот магазин принимать изменения товаров.",
+    "connectors.ui.readiness.not_checked.title": "Готовность к автоматической синхронизации ещё не проверена",
     "connectors.ui.readiness.ready.title": "Передача изменений товаров в Magento готова",
     "connectors.ui.readiness.ready.body": "Мы подтвердили, что этот магазин может принимать изменения простых товаров из платформы.",
     "connectors.ui.readiness.setup_required.title": "Нужно завершить настройку в Magento",

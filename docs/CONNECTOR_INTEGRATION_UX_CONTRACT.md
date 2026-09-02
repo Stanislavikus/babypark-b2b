@@ -625,3 +625,10 @@ Therefore link-first + entity trust + informed confirmation are **required** but
 **not sufficient** for exemplary consequential Live. Truth flip waits for proven
 first-party Magento entity-bound Safe Sync component across every advertised V1 Live
 mutation category (Stage 3E runtime blocker).
+
+
+## Magento Product-aligned automatic synchronization readiness (Resolved — 2026-09-02)
+
+The merchant concept is **Автоматична синхронізація даних**. A successful Product-aligned Magento baseline remains distinct from the following transient Safe Sync handshake. `SETUP_REQUIRED` on an exact handshake HTTP 404 says only that the required component endpoint is currently unavailable; it does not prove physical module absence or Magento/PHP incompatibility. A fresh readiness failure must retain the older successful connection timestamp and show the current cause-specific safe classification, never relabel that historical evidence as a broken connection.
+
+The developer packet is titled **Вимоги компонента інтеграції Magento** and distinguishes last successful Magento connection, current probe family/result, detected versions when available, manifest requirements, and allowlisted technical facts (HTTP status, stable error code, expected/observed ACL identifiers, recognized OAuth problem, safe vendor request ID, response-shape class). It never includes raw response bodies, credentials, or Authorization headers. If handshake versions were unavailable, the packet explains that the handshake did not return them rather than presenting context-free unknown values.

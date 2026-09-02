@@ -42,6 +42,9 @@ class ViewConnectorAccount extends ViewRecord
 
     public ?string $storeSetupPhpVersion = null;
 
+    /** @var array<string, int|string|array|null> */
+    public array $storeSetupDiagnostics = [];
+
     public function getSubheading(): string|Htmlable|null
     {
         return null;
@@ -146,6 +149,7 @@ class ViewConnectorAccount extends ViewRecord
         $this->storeSetupModuleVersion = null;
         $this->storeSetupApplicationVersion = null;
         $this->storeSetupPhpVersion = null;
+        $this->storeSetupDiagnostics = [];
 
         try {
             $actor = auth()->user();
@@ -170,6 +174,17 @@ class ViewConnectorAccount extends ViewRecord
             );
 
             $readiness = $result->componentReadiness;
+            $connectionResult = $result->connectionResult;
+            $this->storeSetupDiagnostics = array_filter([
+                'probe_family' => $connectionResult->probeFamily ?? ($result->baselineSucceeded ? 'safe_sync_handshake' : 'magento_products'),
+                'http_status' => $connectionResult->httpStatus,
+                'error_code' => $connectionResult->errorCode?->value,
+                'expected_acl_resource' => $connectionResult->expectedAclResource,
+                'observed_acl_resources' => $connectionResult->observedAclResources,
+                'oauth_problem' => $connectionResult->recognizedOAuthProblem,
+                'vendor_request_id' => $connectionResult->vendorRequestId,
+                'response_shape' => $connectionResult->responseShape,
+            ], static fn (mixed $value): bool => $value !== null && $value !== []);
 
             if ($readiness !== null) {
                 $this->storeSetupState = strtoupper($readiness->value);
