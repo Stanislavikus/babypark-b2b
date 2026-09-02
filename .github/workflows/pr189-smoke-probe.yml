@@ -27,10 +27,10 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script_stop: true
           script: |
-            set -eu
+            set -euo pipefail
             SMOKE=/var/www/babypark-b2b-smoke
-            EXPECTED_APP_HEAD=95670c67e96081c0098b81400853061865fb9759
-            WT="/tmp/b2b-pr189-smoke-$$"
+            EXPECTED_APP_HEAD=${{ github.sha }}
+            WT="/var/www/b2b-pr189-smoke-$$"
             PROBE="/tmp/b2b-pr189-probe-$$.php"
 
             cleanup() {
@@ -51,7 +51,7 @@ jobs:
             git -C "$SMOKE" worktree add --detach "$WT" "$EXPECTED_APP_HEAD" >/dev/null
             ln -s "$SMOKE/.env" "$WT/.env"
             rm -rf "$WT/vendor" "$WT/storage"
-            cp -al "$SMOKE/vendor" "$WT/vendor"
+            ln -s "$SMOKE/vendor" "$WT/vendor"
             ln -s "$SMOKE/storage" "$WT/storage"
             mkdir -p "$WT/bootstrap/cache"
 

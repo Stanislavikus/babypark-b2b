@@ -628,9 +628,11 @@ class ConnectorAccountResourceTest extends TestCase
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->callAction('checkStoreSetup')
-            ->assertSee('Magento 2.4.7-p1')
-            ->assertSee('PHP 8.3.10')
-            ->assertSee('Розширення 0.2.1');
+            ->assertSee('Ваша версія: 2.4.7-p1')
+            ->assertSee('Ваша версія: 8.3.10')
+            ->assertSee('Встановлена версія: 0.2.1')
+            ->assertSee('Оновіть Adobe Commerce до 2.4.9, 2.4.8-p5.')
+            ->assertSee('Оновіть PHP до 8.4, 8.5.');
     }
 
     #[Test]
@@ -711,12 +713,14 @@ class ConnectorAccountResourceTest extends TestCase
             ->assertSee(__('connectors.ui.readiness.developer.packet.next_action.setup_required'));
 
         $this->assertGreaterThanOrEqual(
-            2,
+            1,
             substr_count(
                 $setupComponent->html(),
-                __('connectors.ui.readiness.developer.packet.copy'),
+                __('connectors.ui.readiness.actions.copy_requirements'),
             ),
         );
+
+        $setupComponent->assertSee(__('connectors.ui.readiness.developer.packet.copy'));
 
         $stub->result = new AdobeSafeSyncReadinessResult(
             connectionResult: ConnectorConnectionCheckResult::success(),
@@ -731,12 +735,14 @@ class ConnectorAccountResourceTest extends TestCase
             ->assertSee(__('connectors.ui.readiness.developer.packet.next_action.update_required'));
 
         $this->assertGreaterThanOrEqual(
-            2,
+            1,
             substr_count(
                 $updateComponent->html(),
-                __('connectors.ui.readiness.developer.packet.copy'),
+                __('connectors.ui.readiness.actions.copy_requirements'),
             ),
         );
+
+        $updateComponent->assertSee(__('connectors.ui.readiness.developer.packet.copy'));
 
         $stub->result = new AdobeSafeSyncReadinessResult(
             connectionResult: ConnectorConnectionCheckResult::success(),
@@ -764,6 +770,7 @@ class ConnectorAccountResourceTest extends TestCase
             moduleVersion: null,
             applicationVersion: null,
             phpVersion: null,
+            stockMagentoVersionEvidence: 'Magento/2.4 (Community)',
         );
         $this->bindReadinessResolverStub($stub);
 
@@ -771,7 +778,41 @@ class ConnectorAccountResourceTest extends TestCase
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->callAction('checkStoreSetup')
             ->assertSet('storeSetupState', 'READY')
-            ->assertSee(__('connectors.ui.readiness.developer.packet.value.unknown', locale: 'uk'));
+            ->assertSee('Magento 2.4 (Community)')
+            ->assertSee(__('connectors.ui.readiness.exact_version_pending'))
+            ->assertDontSee(__('connectors.ui.readiness.compatibility.unsupported', locale: 'uk'));
+    }
+
+    #[Test]
+    public function setup_required_state_preserves_connection_truth_and_shows_stock_magento_evidence(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount(overrides: [
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+            'last_successful_check_at' => now(),
+        ]);
+
+        $stub = new AdobeSafeSyncComponentReadinessResolverStub;
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            connectionResult: ConnectorConnectionCheckResult::httpFailure(
+                ConnectorConnectionCheckErrorCode::AdobeInvalidOrUnsupportedEndpoint,
+                404,
+            ),
+            componentReadiness: ConnectorComponentReadiness::SetupRequired,
+            baselineSucceeded: true,
+            stockMagentoVersionEvidence: 'Magento/2.4 (Community)',
+        );
+        $this->bindReadinessResolverStub($stub);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSet('storeSetupState', 'SETUP_REQUIRED')
+            ->assertSee(__('connectors.ui.readiness.connection_verified'))
+            ->assertSee(__('connectors.ui.readiness.setup_required.title'))
+            ->assertSee('Magento 2.4 (Community)')
+            ->assertSee(__('connectors.ui.readiness.exact_version_pending'))
+            ->assertDontSee(__('connectors.ui.readiness.baseline_failure.title'));
     }
 
     #[Test]

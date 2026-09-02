@@ -43,6 +43,8 @@ class ViewConnectorAccount extends ViewRecord
 
     public ?string $storeSetupPhpVersion = null;
 
+    public ?string $storeSetupStockMagentoVersionEvidence = null;
+
     /** @var array<string, int|string|array|null> */
     public array $storeSetupDiagnostics = [];
 
@@ -150,6 +152,7 @@ class ViewConnectorAccount extends ViewRecord
         $this->storeSetupModuleVersion = null;
         $this->storeSetupApplicationVersion = null;
         $this->storeSetupPhpVersion = null;
+        $this->storeSetupStockMagentoVersionEvidence = null;
         $this->storeSetupDiagnostics = [];
 
         try {
@@ -174,6 +177,7 @@ class ViewConnectorAccount extends ViewRecord
                 AdobeSafeSyncRequiredOperation::SimpleProductWrite,
             );
 
+            $this->storeSetupStockMagentoVersionEvidence = $result->stockMagentoVersionEvidence;
             $readiness = $result->componentReadiness;
             $connectionResult = $result->connectionResult;
             $this->storeSetupDiagnostics = array_filter([

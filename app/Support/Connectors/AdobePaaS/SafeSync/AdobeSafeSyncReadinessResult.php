@@ -14,5 +14,6 @@ final readonly class AdobeSafeSyncReadinessResult
         public ?string $moduleVersion = null,
         public ?string $applicationVersion = null,
         public ?string $phpVersion = null,
+        public ?string $stockMagentoVersionEvidence = null,
     ) {}
 }

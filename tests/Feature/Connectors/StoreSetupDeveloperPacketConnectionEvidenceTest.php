@@ -26,18 +26,11 @@ class StoreSetupDeveloperPacketConnectionEvidenceTest extends TestCase
             'last_successful_check_at' => null,
         ]);
 
-        $unknown = __('connectors.ui.readiness.developer.packet.value.unknown');
-        $expectedEvidenceLine = __('connectors.ui.readiness.developer.packet.connection_evidence_at', [
-            'value' => $unknown,
-        ]);
-
-        $forbiddenEvidenceLine = __('connectors.ui.readiness.developer.packet.connection_evidence_at', [
-            'value' => $account->last_checked_at->toIso8601String(),
-        ]);
+        $expectedEvidenceLine = __('connectors.ui.readiness.developer.packet.connection_evidence_missing');
 
         Livewire::test(StoreSetupPacketHarness::class, ['record' => $account])
             ->assertSee($expectedEvidenceLine)
-            ->assertDontSee($forbiddenEvidenceLine);
+            ->assertDontSee($account->last_checked_at->toIso8601String());
     }
 
     #[Test]
@@ -78,6 +71,11 @@ class StoreSetupPacketHarness extends Component
     public ?string $storeSetupApplicationVersion = null;
 
     public ?string $storeSetupPhpVersion = null;
+
+    public ?string $storeSetupStockMagentoVersionEvidence = null;
+
+    /** @var array<string, mixed> */
+    public array $storeSetupDiagnostics = [];
 
     public function mount(ConnectorAccount $record): void
     {

@@ -61,7 +61,7 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
             'Ready to send product changes to Magento',
             __('connectors.ui.readiness.ready.title', locale: 'en'),
         );
-        $this->assertSame('Automatic synchronization needs technical preparation', __('connectors.ui.readiness.setup_required.title', locale: 'en'));
+        $this->assertSame('Sending product changes to Magento needs technical preparation', __('connectors.ui.readiness.setup_required.title', locale: 'en'));
         $this->assertSame('The synchronization component must be updated', __('connectors.ui.readiness.update_required.title', locale: 'en'));
 
         $this->assertStringContainsString('does not change Magento data', __('connectors.ui.readiness.not_checked.body', locale: 'en'));
@@ -69,9 +69,9 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
             'We confirmed that this store can receive simple product changes from the platform.',
             __('connectors.ui.readiness.ready.body', locale: 'en'),
         );
-        $this->assertStringContainsString('Magento connection works', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
-        $this->assertStringContainsString('technical instructions', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
-        $this->assertStringContainsString('Connection to Magento works', __('connectors.ui.readiness.update_required.body', locale: 'en'));
+        $this->assertStringContainsString('technical requirements', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
+        $this->assertStringContainsString('currently unavailable', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
+        $this->assertStringContainsString('technical requirements', __('connectors.ui.readiness.update_required.body', locale: 'en'));
         $this->assertStringContainsString('Magento connection', __('connectors.ui.readiness.baseline_failure.guidance', locale: 'en'));
         $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.not_checked.body', locale: 'en'));
         $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.ready.body', locale: 'en'));
@@ -105,6 +105,7 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
         $this->assertStringContainsString("'connectors.ui.readiness.ready.title'", $view);
         $this->assertStringContainsString("'connectors.ui.readiness.ready.body'", $view);
         $this->assertStringContainsString('$baselineMessage = $this->storeSetupBaselineMessage;', $view);
+        $this->assertStringContainsString('$stockMagentoVersionEvidence = $this->storeSetupStockMagentoVersionEvidence;', $view);
         $this->assertStringNotContainsString('$livewire->storeSetupBaselineMessage', $view);
         $this->assertStringNotContainsString('wire:click="checkStoreSetup"', $view);
         $this->assertStringNotContainsString('ConnectorAccount::update', $resolver);
