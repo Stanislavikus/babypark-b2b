@@ -149,6 +149,19 @@ class AdobePaaSConnectionCheckResponseMapperTest extends TestCase
         $this->assertSame('req-123', $result->vendorRequestId);
     }
 
+    #[Test]
+    public function does_not_assume_protected_rest_exposes_an_oauth_problem_field(): void
+    {
+        $result = $this->mapper->map(new ConnectorHttpResult(
+            403,
+            [],
+            '{"message":"oauth_problem=consumer_key_invalid"}',
+        ));
+
+        $this->assertSame(ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError, $result->errorCode);
+        $this->assertNull($result->recognizedOAuthProblem);
+    }
+
     public static function structuredProtectedRestErrorProvider(): iterable
     {
         $acl = static fn (mixed $resources): string => json_encode([

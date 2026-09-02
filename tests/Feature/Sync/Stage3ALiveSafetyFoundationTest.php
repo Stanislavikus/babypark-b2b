@@ -32,6 +32,7 @@ use App\Support\Sync\ConnectorExecutionConfiguration;
 use App\Support\Sync\Exceptions\SyncLiveAdmissionException;
 use App\Support\Sync\Exceptions\SyncPreviewAdmissionException;
 use App\Support\Sync\Exceptions\SyncRuntimeTimingConfigurationException;
+use App\Support\Sync\Live\ConnectorLiveRuntimeReadiness;
 use App\Support\Sync\Live\SyncLiveConnectorCapabilityResolver;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
 use App\Support\Sync\Preview\SyncPreviewConnectorCapabilityResolver;
@@ -44,6 +45,7 @@ use Illuminate\Contracts\Queue\Interruptible;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
@@ -74,6 +76,35 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
             [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
             [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live],
         ]);
+    }
+
+    #[Test]
+    public function live_admission_runs_fresh_runtime_readiness_outside_the_database_transaction(): void
+    {
+        $readiness = new class(DB::transactionLevel()) implements ConnectorLiveRuntimeReadiness
+        {
+            /** @var list<int> */
+            public array $transactionLevels = [];
+
+            public function __construct(public readonly int $outerTransactionLevel) {}
+
+            public function isReady(ConnectorAccount $account): bool
+            {
+                $this->transactionLevels[] = DB::transactionLevel();
+
+                return true;
+            }
+        };
+        $this->app->instance(ConnectorLiveRuntimeReadiness::class, $readiness);
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->grantLivePermission($account->workspace);
+        $this->seedCompletedPreview($account, $configuration);
+
+        app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+
+        $this->assertSame([$readiness->outerTransactionLevel], $readiness->transactionLevels);
     }
 
     #[Test]

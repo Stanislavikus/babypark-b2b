@@ -12,6 +12,7 @@ use App\Models\SyncConfiguration;
 use App\Models\SyncRun;
 use App\Models\SyncRunItem;
 use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
+use App\Support\Sync\Live\ConnectorLiveRuntimeReadiness;
 use App\Support\Sync\Live\SyncLiveConnectorCapabilityResolver;
 use App\Support\Sync\Live\SyncRunConsequentialWriteGate;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
@@ -65,9 +66,10 @@ class SyncLiveRunJob implements Interruptible, ShouldQueue
     public function handle(
         ProductExecutionAggregateBuilder $aggregateBuilder,
         SyncLiveConnectorCapabilityResolver $capabilityResolver,
+        ?ConnectorLiveRuntimeReadiness $liveRuntimeReadiness = null,
     ): void {
         try {
-            $this->execute($aggregateBuilder, $capabilityResolver);
+            $this->execute($aggregateBuilder, $capabilityResolver, $liveRuntimeReadiness ?? app(ConnectorLiveRuntimeReadiness::class));
         } catch (\Throwable) {
             $this->terminalizeFailedRun();
 
@@ -78,6 +80,7 @@ class SyncLiveRunJob implements Interruptible, ShouldQueue
     private function execute(
         ProductExecutionAggregateBuilder $aggregateBuilder,
         SyncLiveConnectorCapabilityResolver $capabilityResolver,
+        ConnectorLiveRuntimeReadiness $liveRuntimeReadiness,
     ): void {
         $reserved = DB::transaction(function (): ?SyncRun {
             $run = SyncRun::withoutWorkspaceScope()
@@ -173,6 +176,16 @@ class SyncLiveRunJob implements Interruptible, ShouldQueue
         );
 
         $writeGate = new SyncRunConsequentialWriteGate($this->workspaceId, $this->syncRunId);
+
+        if ($aggregates !== []) {
+            // Fresh remote readiness follows writer lease acquisition and is
+            // immediately followed by the DB-fresh consequential-write gate.
+            if (! $liveRuntimeReadiness->isReady($account) || ! $writeGate->permitsConsequentialWrite()) {
+                $this->terminalizeFailedRun();
+
+                return;
+            }
+        }
 
         foreach ($aggregates as $aggregate) {
             if (! $writeGate->permitsProductExecution()) {
