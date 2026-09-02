@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Inspect PR189 in isolated smoke worktree
+      - name: Run real Product baseline and Safe Sync readiness on smoke
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -31,36 +31,27 @@ jobs:
             SMOKE=/var/www/babypark-b2b-smoke
             EXPECTED_APP_HEAD=95670c67e96081c0098b81400853061865fb9759
             WT="/tmp/b2b-pr189-smoke-$$"
-            INVENTORY="/tmp/b2b-pr189-inventory-$$.php"
+            PROBE="/tmp/b2b-pr189-probe-$$.php"
 
             cleanup() {
               git -C "$SMOKE" worktree remove --force "$WT" >/dev/null 2>&1 || true
-              rm -rf "$WT" "$INVENTORY" >/dev/null 2>&1 || true
+              rm -rf "$WT" "$PROBE" >/dev/null 2>&1 || true
             }
             trap cleanup EXIT
 
             test -d "$SMOKE"
             test -f "$SMOKE/.env"
             test -d "$SMOKE/vendor"
-
             echo "SMOKE_HOST=$(hostname)"
-            echo "SMOKE_PATH=$SMOKE"
             echo "PRIMARY_SMOKE_HEAD=$(git -C "$SMOKE" rev-parse HEAD)"
-            echo "PRIMARY_SMOKE_BRANCH=$(git -C "$SMOKE" branch --show-current || true)"
-            if [ -n "$(git -C "$SMOKE" status --porcelain)" ]; then
-              echo "PRIMARY_SMOKE_TREE=DIRTY_PRESERVED"
-            else
-              echo "PRIMARY_SMOKE_TREE=CLEAN"
-            fi
+            echo "PRIMARY_SMOKE_TREE=$(test -z "$(git -C "$SMOKE" status --porcelain)" && echo CLEAN || echo DIRTY_PRESERVED)"
 
             git -C "$SMOKE" fetch origin codex/implement-magento-product-campaign
             git -C "$SMOKE" cat-file -e "${EXPECTED_APP_HEAD}^{commit}"
             git -C "$SMOKE" worktree add --detach "$WT" "$EXPECTED_APP_HEAD" >/dev/null
-
             ln -s "$SMOKE/.env" "$WT/.env"
-            rm -rf "$WT/vendor"
+            rm -rf "$WT/vendor" "$WT/storage"
             ln -s "$SMOKE/vendor" "$WT/vendor"
-            rm -rf "$WT/storage"
             ln -s "$SMOKE/storage" "$WT/storage"
             mkdir -p "$WT/bootstrap/cache"
 
@@ -68,13 +59,6 @@ jobs:
             echo "VALIDATION_HEAD=$(git rev-parse HEAD)"
             php artisan --version
 
-            if APP_ENV=stage3e-validation php artisan list --raw | grep -q '^adobe:stage3e-validate'; then
-              echo "STAGE3E_COMMAND=AVAILABLE"
-            else
-              echo "STAGE3E_COMMAND=MISSING"
-              exit 22
-            fi
+            echo 'PD9waHAKJHd0ID0gZ2V0ZW52KCdWQUxJREFUSU9OX1dUJyk7CmNoZGlyKCR3dCk7CnJlcXVpcmUgJHd0LicvdmVuZG9yL2F1dG9sb2FkLnBocCc7CiRhcHAgPSByZXF1aXJlICR3dC4nL2Jvb3RzdHJhcC9hcHAucGhwJzsKJGFwcC0+bWFrZShJbGx1bWluYXRlXENvbnRyYWN0c1xDb25zb2xlXEtlcm5lbDo6Y2xhc3MpLT5ib290c3RyYXAoKTsKCiRhY2NvdW50ID0gQXBwXE1vZGVsc1xDb25uZWN0b3JBY2NvdW50Ojp3aXRob3V0V29ya3NwYWNlU2NvcGUoKQogICAgLT53aGVyZSgnYXV0aF9wcm9maWxlJywgJ2Fkb2JlX2NvbW1lcmNlX3BhYXNfb2F1dGgxX2ludGVncmF0aW9uJykKICAgIC0+d2hlcmUoJ2lzX2VuYWJsZWQnLCB0cnVlKQogICAgLT5maXJzdE9yRmFpbCgpOwoKJHJlc3VsdCA9ICRhcHAtPm1ha2UoQXBwXFNlcnZpY2VzXENvbm5lY3RvcnNcQWRvYmVTYWZlU3luY0NvbXBvbmVudFJlYWRpbmVzc1Jlc29sdmVyOjpjbGFzcykKICAgIC0+cmVzb2x2ZSgKICAgICAgICAoc3RyaW5nKSAkYWNjb3VudC0+d29ya3NwYWNlX2lkLAogICAgICAgIChzdHJpbmcpICRhY2NvdW50LT5pZCwKICAgICAgICBBcHBcU3VwcG9ydFxDb25uZWN0b3JzXEFkb2JlUGFhU1xTYWZlU3luY1xBZG9iZVNhZmVTeW5jUmVxdWlyZWRPcGVyYXRpb246OlNpbXBsZVByb2R1Y3RXcml0ZQogICAgKTsKCiRjb25uZWN0aW9uID0gJHJlc3VsdC0+Y29ubmVjdGlvblJlc3VsdDsKZWNobyAnUkVBTF9QUk9CRSBiYXNlbGluZV9zdWNjZWVkZWQ9Jy4oJHJlc3VsdC0+YmFzZWxpbmVTdWNjZWVkZWQgPyAnMScgOiAnMCcpCiAgICAuJyBjb25uZWN0aW9uX3Jlc3VsdF9zdWNjZWVkZWQ9Jy4oJGNvbm5lY3Rpb24tPnN1Y2NlZWRlZCA/ICcxJyA6ICcwJykKICAgIC4nIHJlYWRpbmVzcz0nLigkcmVzdWx0LT5jb21wb25lbnRSZWFkaW5lc3M/LT52YWx1ZSA/PyAnbnVsbCcpCiAgICAuJyBodHRwX3N0YXR1cz0nLigkY29ubmVjdGlvbi0+aHR0cFN0YXR1cyA/PyAnbnVsbCcpCiAgICAuJyBlcnJvcl9jb2RlPScuKCRjb25uZWN0aW9uLT5lcnJvckNvZGU/LT52YWx1ZSA/PyAnbnVsbCcpCiAgICAuJyBjYXVzZT0nLigkY29ubmVjdGlvbi0+Y2F1c2UoKT8tPnZhbHVlID8/ICdudWxsJykKICAgIC4nIGFjdGlvbmFiaWxpdHk9Jy4oJGNvbm5lY3Rpb24tPmFjdGlvbmFiaWxpdHkoKT8tPnZhbHVlID8/ICdudWxsJykKICAgIC4nIHByb2JlX2ZhbWlseT0nLigkY29ubmVjdGlvbi0+cHJvYmVGYW1pbHkgPz8gJ251bGwnKQogICAgLicgZXhwZWN0ZWRfYWNsPScuKCRjb25uZWN0aW9uLT5leHBlY3RlZEFjbFJlc291cmNlID8/ICdudWxsJykKICAgIC4nIHJlc3BvbnNlX3NoYXBlPScuKCRjb25uZWN0aW9uLT5yZXNwb25zZVNoYXBlID8/ICdudWxsJykKICAgIC4nIG1vZHVsZV92ZXJzaW9uPScuKCRyZXN1bHQtPm1vZHVsZVZlcnNpb24gPz8gJ251bGwnKQogICAgLicgYXBwbGljYXRpb25fdmVyc2lvbj0nLigkcmVzdWx0LT5hcHBsaWNhdGlvblZlcnNpb24gPz8gJ251bGwnKQogICAgLicgcGhwX3ZlcnNpb249Jy4oJHJlc3VsdC0+cGhwVmVyc2lvbiA/PyAnbnVsbCcpCiAgICAuUEhQX0VPTDsK' | base64 -d > "$PROBE"
 
-            echo 'PD9waHAKJHd0ID0gZ2V0ZW52KCdWQUxJREFUSU9OX1dUJyk7CmlmICghaXNfc3RyaW5nKCR3dCkgfHwgJHd0ID09PSAnJykgewogICAgZndyaXRlKFNUREVSUiwgInZhbGlkYXRpb25fd29ya3RyZWVfbWlzc2luZ1xuIik7CiAgICBleGl0KDMxKTsKfQpjaGRpcigkd3QpOwpyZXF1aXJlICR3dC4nL3ZlbmRvci9hdXRvbG9hZC5waHAnOwokYXBwID0gcmVxdWlyZSAkd3QuJy9ib290c3RyYXAvYXBwLnBocCc7CiRhcHAtPm1ha2UoSWxsdW1pbmF0ZVxDb250cmFjdHNcQ29uc29sZVxLZXJuZWw6OmNsYXNzKS0+Ym9vdHN0cmFwKCk7CgokYWNjb3VudHMgPSBBcHBcTW9kZWxzXENvbm5lY3RvckFjY291bnQ6OndpdGhvdXRXb3Jrc3BhY2VTY29wZSgpCiAgICAtPndoZXJlKCdhdXRoX3Byb2ZpbGUnLCAnYWRvYmVfY29tbWVyY2VfcGFhc19vYXV0aDFfaW50ZWdyYXRpb24nKQogICAgLT5nZXQoKTsKCmZvcmVhY2ggKCRhY2NvdW50cyBhcyAkYWNjb3VudCkgewogICAgJGhvc3QgPSBwYXJzZV91cmwoKHN0cmluZykgJGFjY291bnQtPmJhc2VfdXJsLCBQSFBfVVJMX0hPU1QpOwogICAgZWNobyAnQUNDT1VOVCBpZD0nLiRhY2NvdW50LT5pZAogICAgICAgIC4nIHdvcmtzcGFjZT0nLiRhY2NvdW50LT53b3Jrc3BhY2VfaWQKICAgICAgICAuJyBlbmFibGVkPScuKCRhY2NvdW50LT5pc19lbmFibGVkID8gJzEnIDogJzAnKQogICAgICAgIC4nIHN0b3JlPScuKHN0cmluZykgJGFjY291bnQtPnN0b3JlX2NvZGUKICAgICAgICAuJyBob3N0PScuKGlzX3N0cmluZygkaG9zdCkgPyBzdHJ0b2xvd2VyKCRob3N0KSA6ICdJTlZBTElEJykKICAgICAgICAuUEhQX0VPTDsKfQoKJHZhcmlhbnRzID0gQXBwXE1vZGVsc1xQcm9kdWN0VmFyaWFudDo6d2l0aG91dFdvcmtzcGFjZVNjb3BlKCkKICAgIC0+d2hlcmVOb3ROdWxsKCdza3UnKQogICAgLT53aGVyZSgnc2t1JywgJ2xpa2UnLCAnQjJCVkFMLSUnKQogICAgLT5nZXQoKTsKCmZvcmVhY2ggKCR2YXJpYW50cyBhcyAkdmFyaWFudCkgewogICAgJGxpbmtzID0gQXBwXE1vZGVsc1xFeHRlcm5hbFJlY29yZExpbms6OndpdGhvdXRXb3Jrc3BhY2VTY29wZSgpCiAgICAgICAgLT53aGVyZSgncHJvZHVjdF92YXJpYW50X2lkJywgJHZhcmlhbnQtPmlkKQogICAgICAgIC0+Z2V0KCk7CiAgICBmb3JlYWNoICgkbGlua3MgYXMgJGxpbmspIHsKICAgICAgICBlY2hvICdDQU5ESURBVEUgdmFyaWFudD0nLiR2YXJpYW50LT5pZAogICAgICAgICAgICAuJyB3b3Jrc3BhY2U9Jy4kdmFyaWFudC0+d29ya3NwYWNlX2lkCiAgICAgICAgICAgIC4nIHNrdT0nLiR2YXJpYW50LT5za3UKICAgICAgICAgICAgLicgbGluaz0nLiRsaW5rLT5pZAogICAgICAgICAgICAuJyBhY2NvdW50PScuJGxpbmstPmNvbm5lY3Rvcl9hY2NvdW50X2lkCiAgICAgICAgICAgIC4nIHRydXN0ZWQ9Jy4oJGxpbmstPmhhc01lcmNoYW50Q29uZmlybWVkVHJ1c3QoKSA/ICcxJyA6ICcwJykKICAgICAgICAgICAgLicgZGlzY3JpbWluYXRvcj0nLihzdHJpbmcpICRsaW5rLT5leHRlcm5hbF9yZWNvcmRfZGlzY3JpbWluYXRvcgogICAgICAgICAgICAuUEhQX0VPTDsKICAgIH0KfQo=' | base64 -d > "$INVENTORY"
-
-            APP_ENV=stage3e-validation VALIDATION_WT="$WT" php "$INVENTORY"
+            APP_ENV=stage3e-validation VALIDATION_WT="$WT" php "$PROBE"
