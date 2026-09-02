@@ -51,7 +51,7 @@ jobs:
             git -C "$SMOKE" worktree add --detach "$WT" "$EXPECTED_APP_HEAD" >/dev/null
             ln -s "$SMOKE/.env" "$WT/.env"
             rm -rf "$WT/vendor" "$WT/storage"
-            ln -s "$SMOKE/vendor" "$WT/vendor"
+            cp -al "$SMOKE/vendor" "$WT/vendor"
             ln -s "$SMOKE/storage" "$WT/storage"
             mkdir -p "$WT/bootstrap/cache"
 
