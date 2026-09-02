@@ -17,9 +17,9 @@ concurrency:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
-      - name: Verify smoke SSH and checkout
+      - name: Inspect PR189 in isolated smoke worktree
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -29,30 +29,77 @@ jobs:
           script: |
             set -eu
             SMOKE=/var/www/babypark-b2b-smoke
-            EXPECTED_PR_HEAD=95670c67e96081c0098b81400853061865fb9759
+            EXPECTED_APP_HEAD=95670c67e96081c0098b81400853061865fb9759
+            WT="/tmp/b2b-pr189-smoke-$$"
+
+            cleanup() {
+              git -C "$SMOKE" worktree remove --force "$WT" >/dev/null 2>&1 || true
+              rm -rf "$WT" >/dev/null 2>&1 || true
+            }
+            trap cleanup EXIT
 
             test -d "$SMOKE"
-            cd "$SMOKE"
+            test -f "$SMOKE/.env"
+            test -d "$SMOKE/vendor"
 
             echo "SMOKE_HOST=$(hostname)"
-            echo "SMOKE_PATH=$(pwd)"
-            echo "SMOKE_HEAD=$(git rev-parse HEAD)"
-            echo "SMOKE_BRANCH=$(git branch --show-current || true)"
-
-            if [ -n "$(git status --porcelain)" ]; then
-              echo "SMOKE_TREE=CLEAN_FALSE"
-              exit 21
+            echo "SMOKE_PATH=$SMOKE"
+            echo "PRIMARY_SMOKE_HEAD=$(git -C "$SMOKE" rev-parse HEAD)"
+            echo "PRIMARY_SMOKE_BRANCH=$(git -C "$SMOKE" branch --show-current || true)"
+            if [ -n "$(git -C "$SMOKE" status --porcelain)" ]; then
+              echo "PRIMARY_SMOKE_TREE=DIRTY_PRESERVED"
+            else
+              echo "PRIMARY_SMOKE_TREE=CLEAN"
             fi
-            echo "SMOKE_TREE=CLEAN_TRUE"
 
-            git fetch origin codex/implement-magento-product-campaign
-            git cat-file -e "${EXPECTED_PR_HEAD}^{commit}"
-            echo "PR189_HEAD_AVAILABLE=${EXPECTED_PR_HEAD}"
+            git -C "$SMOKE" fetch origin codex/implement-magento-product-campaign
+            git -C "$SMOKE" cat-file -e "${EXPECTED_APP_HEAD}^{commit}"
+            git -C "$SMOKE" worktree add --detach "$WT" "$EXPECTED_APP_HEAD" >/dev/null
 
+            ln -s "$SMOKE/.env" "$WT/.env"
+            rm -rf "$WT/vendor"
+            ln -s "$SMOKE/vendor" "$WT/vendor"
+            rm -rf "$WT/storage"
+            ln -s "$SMOKE/storage" "$WT/storage"
+            mkdir -p "$WT/bootstrap/cache"
+
+            cd "$WT"
+            echo "VALIDATION_HEAD=$(git rev-parse HEAD)"
+            echo "VALIDATION_TREE=$(test -z "$(git status --porcelain)" && echo CLEAN || echo DIRTY)"
             php artisan --version
-            if php artisan list --raw | grep -q '^adobe:stage3e-validate'; then
+
+            if APP_ENV=stage3e-validation php artisan list --raw | grep -q '^adobe:stage3e-validate'; then
               echo "STAGE3E_COMMAND=AVAILABLE"
             else
               echo "STAGE3E_COMMAND=MISSING"
               exit 22
             fi
+
+            APP_ENV=stage3e-validation php -r '
+              require "vendor/autoload.php";
+              $app = require "bootstrap/app.php";
+              $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+              $accounts = App\Models\ConnectorAccount::withoutWorkspaceScope()
+                ->where("auth_profile", "adobe_commerce_paas_oauth1_integration")
+                ->get();
+
+              foreach ($accounts as $account) {
+                $host = parse_url((string) $account->base_url, PHP_URL_HOST);
+                echo "ACCOUNT id={$account->id} workspace={$account->workspace_id} enabled=".($account->is_enabled ? "1" : "0")." store=".(string)$account->store_code." host=".(is_string($host) ? strtolower($host) : "INVALID").PHP_EOL;
+              }
+
+              $variants = App\Models\ProductVariant::withoutWorkspaceScope()
+                ->whereNotNull("sku")
+                ->where("sku", "like", "B2BVAL-%")
+                ->get();
+
+              foreach ($variants as $variant) {
+                $links = App\Models\ExternalRecordLink::withoutWorkspaceScope()
+                  ->where("product_variant_id", $variant->id)
+                  ->get();
+                foreach ($links as $link) {
+                  echo "CANDIDATE variant={$variant->id} workspace={$variant->workspace_id} sku={$variant->sku} link={$link->id} account={$link->connector_account_id} trusted=".($link->hasMerchantConfirmedTrust() ? "1" : "0")." discriminator=".(string)$link->external_record_discriminator.PHP_EOL;
+                }
+              }
+            '
