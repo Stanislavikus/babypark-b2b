@@ -75,52 +75,6 @@ jobs:
               exit 22
             fi
 
-            cat > "$INVENTORY" <<'PHP'
-            <?php
-            $wt = getenv('VALIDATION_WT');
-            if (!is_string($wt) || $wt === '') {
-                fwrite(STDERR, "validation_worktree_missing\n");
-                exit(31);
-            }
-            chdir($wt);
-            require $wt.'/vendor/autoload.php';
-            $app = require $wt.'/bootstrap/app.php';
-            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-
-            $accounts = App\Models\ConnectorAccount::withoutWorkspaceScope()
-                ->where('auth_profile', 'adobe_commerce_paas_oauth1_integration')
-                ->get();
-
-            foreach ($accounts as $account) {
-                $host = parse_url((string) $account->base_url, PHP_URL_HOST);
-                echo 'ACCOUNT id='.$account->id
-                    .' workspace='.$account->workspace_id
-                    .' enabled='.($account->is_enabled ? '1' : '0')
-                    .' store='.(string) $account->store_code
-                    .' host='.(is_string($host) ? strtolower($host) : 'INVALID')
-                    .PHP_EOL;
-            }
-
-            $variants = App\Models\ProductVariant::withoutWorkspaceScope()
-                ->whereNotNull('sku')
-                ->where('sku', 'like', 'B2BVAL-%')
-                ->get();
-
-            foreach ($variants as $variant) {
-                $links = App\Models\ExternalRecordLink::withoutWorkspaceScope()
-                    ->where('product_variant_id', $variant->id)
-                    ->get();
-                foreach ($links as $link) {
-                    echo 'CANDIDATE variant='.$variant->id
-                        .' workspace='.$variant->workspace_id
-                        .' sku='.$variant->sku
-                        .' link='.$link->id
-                        .' account='.$link->connector_account_id
-                        .' trusted='.($link->hasMerchantConfirmedTrust() ? '1' : '0')
-                        .' discriminator='.(string) $link->external_record_discriminator
-                        .PHP_EOL;
-                }
-            }
-            PHP
+            echo 'PD9waHAKJHd0ID0gZ2V0ZW52KCdWQUxJREFUSU9OX1dUJyk7CmlmICghaXNfc3RyaW5nKCR3dCkgfHwgJHd0ID09PSAnJykgewogICAgZndyaXRlKFNUREVSUiwgInZhbGlkYXRpb25fd29ya3RyZWVfbWlzc2luZ1xuIik7CiAgICBleGl0KDMxKTsKfQpjaGRpcigkd3QpOwpyZXF1aXJlICR3dC4nL3ZlbmRvci9hdXRvbG9hZC5waHAnOwokYXBwID0gcmVxdWlyZSAkd3QuJy9ib290c3RyYXAvYXBwLnBocCc7CiRhcHAtPm1ha2UoSWxsdW1pbmF0ZVxDb250cmFjdHNcQ29uc29sZVxLZXJuZWw6OmNsYXNzKS0+Ym9vdHN0cmFwKCk7CgokYWNjb3VudHMgPSBBcHBcTW9kZWxzXENvbm5lY3RvckFjY291bnQ6OndpdGhvdXRXb3Jrc3BhY2VTY29wZSgpCiAgICAtPndoZXJlKCdhdXRoX3Byb2ZpbGUnLCAnYWRvYmVfY29tbWVyY2VfcGFhc19vYXV0aDFfaW50ZWdyYXRpb24nKQogICAgLT5nZXQoKTsKCmZvcmVhY2ggKCRhY2NvdW50cyBhcyAkYWNjb3VudCkgewogICAgJGhvc3QgPSBwYXJzZV91cmwoKHN0cmluZykgJGFjY291bnQtPmJhc2VfdXJsLCBQSFBfVVJMX0hPU1QpOwogICAgZWNobyAnQUNDT1VOVCBpZD0nLiRhY2NvdW50LT5pZAogICAgICAgIC4nIHdvcmtzcGFjZT0nLiRhY2NvdW50LT53b3Jrc3BhY2VfaWQKICAgICAgICAuJyBlbmFibGVkPScuKCRhY2NvdW50LT5pc19lbmFibGVkID8gJzEnIDogJzAnKQogICAgICAgIC4nIHN0b3JlPScuKHN0cmluZykgJGFjY291bnQtPnN0b3JlX2NvZGUKICAgICAgICAuJyBob3N0PScuKGlzX3N0cmluZygkaG9zdCkgPyBzdHJ0b2xvd2VyKCRob3N0KSA6ICdJTlZBTElEJykKICAgICAgICAuUEhQX0VPTDsKfQoKJHZhcmlhbnRzID0gQXBwXE1vZGVsc1xQcm9kdWN0VmFyaWFudDo6d2l0aG91dFdvcmtzcGFjZVNjb3BlKCkKICAgIC0+d2hlcmVOb3ROdWxsKCdza3UnKQogICAgLT53aGVyZSgnc2t1JywgJ2xpa2UnLCAnQjJCVkFMLSUnKQogICAgLT5nZXQoKTsKCmZvcmVhY2ggKCR2YXJpYW50cyBhcyAkdmFyaWFudCkgewogICAgJGxpbmtzID0gQXBwXE1vZGVsc1xFeHRlcm5hbFJlY29yZExpbms6OndpdGhvdXRXb3Jrc3BhY2VTY29wZSgpCiAgICAgICAgLT53aGVyZSgncHJvZHVjdF92YXJpYW50X2lkJywgJHZhcmlhbnQtPmlkKQogICAgICAgIC0+Z2V0KCk7CiAgICBmb3JlYWNoICgkbGlua3MgYXMgJGxpbmspIHsKICAgICAgICBlY2hvICdDQU5ESURBVEUgdmFyaWFudD0nLiR2YXJpYW50LT5pZAogICAgICAgICAgICAuJyB3b3Jrc3BhY2U9Jy4kdmFyaWFudC0+d29ya3NwYWNlX2lkCiAgICAgICAgICAgIC4nIHNrdT0nLiR2YXJpYW50LT5za3UKICAgICAgICAgICAgLicgbGluaz0nLiRsaW5rLT5pZAogICAgICAgICAgICAuJyBhY2NvdW50PScuJGxpbmstPmNvbm5lY3Rvcl9hY2NvdW50X2lkCiAgICAgICAgICAgIC4nIHRydXN0ZWQ9Jy4oJGxpbmstPmhhc01lcmNoYW50Q29uZmlybWVkVHJ1c3QoKSA/ICcxJyA6ICcwJykKICAgICAgICAgICAgLicgZGlzY3JpbWluYXRvcj0nLihzdHJpbmcpICRsaW5rLT5leHRlcm5hbF9yZWNvcmRfZGlzY3JpbWluYXRvcgogICAgICAgICAgICAuUEhQX0VPTDsKICAgIH0KfQo=' | base64 -d > "$INVENTORY"
 
             APP_ENV=stage3e-validation VALIDATION_WT="$WT" php "$INVENTORY"
