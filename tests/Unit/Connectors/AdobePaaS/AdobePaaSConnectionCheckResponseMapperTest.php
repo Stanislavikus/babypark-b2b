@@ -162,6 +162,32 @@ class AdobePaaSConnectionCheckResponseMapperTest extends TestCase
         $this->assertNull($result->recognizedOAuthProblem);
     }
 
+    #[Test]
+    #[DataProvider('incompatibleOAuthStatusProvider')]
+    public function recognized_oauth_problem_with_uncertified_status_falls_back_without_throwing(
+        int $status,
+        string $oauthProblem,
+        ConnectorConnectionCheckErrorCode $expectedCode,
+    ): void {
+        $result = $this->mapper->map(new ConnectorHttpResult(
+            $status,
+            [],
+            json_encode(['oauth_problem' => $oauthProblem], JSON_THROW_ON_ERROR),
+        ));
+
+        $this->assertSame($expectedCode, $result->errorCode);
+        $this->assertSame($status, $result->httpStatus);
+        $this->assertNull($result->recognizedOAuthProblem);
+        $this->assertSame('uncertified_oauth_problem_status', $result->responseShape);
+    }
+
+    public static function incompatibleOAuthStatusProvider(): iterable
+    {
+        yield 'recognized OAuth field on vendor failure' => [500, 'consumer_key_invalid', ConnectorConnectionCheckErrorCode::AdobeVendorUnavailable];
+        yield '403 with identifier certified only for 401' => [403, 'signature_invalid', ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError];
+        yield '401 with identifier certified only for 403' => [401, 'permission_denied', ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError];
+    }
+
     public static function structuredProtectedRestErrorProvider(): iterable
     {
         $acl = static fn (mixed $resources): string => json_encode([

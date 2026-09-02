@@ -76,6 +76,13 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
             [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
             [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live],
         ]);
+        $this->app->instance(ConnectorLiveRuntimeReadiness::class, new class implements ConnectorLiveRuntimeReadiness
+        {
+            public function isReady(ConnectorAccount $account): bool
+            {
+                return true;
+            }
+        });
     }
 
     #[Test]

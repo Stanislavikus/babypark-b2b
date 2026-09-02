@@ -806,6 +806,37 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
+    public function structured_product_acl_denial_uses_permission_copy_and_readiness_retry(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+        $stub = new AdobeSafeSyncComponentReadinessResolverStub;
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            ConnectorConnectionCheckResult::httpFailure(
+                ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions,
+                403,
+                probeFamily: 'magento_products',
+                expectedAclResource: 'Magento_Catalog::products',
+                observedAclResources: ['Magento_Catalog::products'],
+                responseShape: 'magento_acl_resource_string',
+            ),
+            null,
+            false,
+        );
+        $this->bindReadinessResolverStub($stub);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSet('storeSetupState', 'BASELINE_PRODUCT_PERMISSION_REQUIRED')
+            ->assertSee(__('connectors.ui.readiness.product_permission_required.title'))
+            ->assertSee(__('connectors.ui.readiness.product_permission_required.body'))
+            ->assertSee(__('connectors.ui.readiness.check_again'))
+            ->assertDontSee(__('connectors.ui.readiness.baseline_failure.title'))
+            ->assertDontSee(__('connectors.ui.readiness.baseline_failure.guidance'));
+    }
+
+    #[Test]
     public function baseline_success_with_probe_failure_preserves_connection_truth_and_maps_to_readiness_undetermined(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
