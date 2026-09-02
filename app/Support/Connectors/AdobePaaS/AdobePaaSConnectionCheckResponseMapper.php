@@ -70,6 +70,12 @@ final class AdobePaaSConnectionCheckResponseMapper
         $structured = $this->classifyStructuredError($result->body);
         $errorCode = $structured['oauth_code'];
 
+        if ($errorCode !== null && ! $errorCode->acceptsHttpStatus($status)) {
+            $errorCode = null;
+            $structured['oauth_problem'] = null;
+            $structured['shape'] = 'uncertified_oauth_problem_status';
+        }
+
         if ($errorCode === null && in_array($status, [401, 403], true)
             && in_array(self::EXPECTED_ACL_RESOURCE, $structured['resources'], true)) {
             $errorCode = ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions;

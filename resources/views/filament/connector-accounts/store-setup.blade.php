@@ -121,7 +121,7 @@
 
     $containerClasses = match ($state) {
         'READY' => 'border-success-200 bg-success-50/70 dark:border-success-500/30 dark:bg-success-500/10',
-        'SETUP_REQUIRED', 'UPDATE_REQUIRED' => 'border-warning-200 bg-warning-50/70 dark:border-warning-500/30 dark:bg-warning-500/10',
+        'SETUP_REQUIRED', 'UPDATE_REQUIRED', 'BASELINE_PRODUCT_PERMISSION_REQUIRED' => 'border-warning-200 bg-warning-50/70 dark:border-warning-500/30 dark:bg-warning-500/10',
         'BASELINE_CONNECTION_FAILED' => 'border-danger-200 bg-danger-50/70 dark:border-danger-500/30 dark:bg-danger-500/10',
         'READINESS_TEMPORARY_PROBLEM' => 'border-gray-200 bg-gray-50/80 dark:border-white/10 dark:bg-white/5',
         'BASELINE_OK_READINESS_UNDETERMINED' => 'border-gray-200 bg-gray-50/80 dark:border-white/10 dark:bg-white/5',
@@ -132,6 +132,7 @@
         'READY' => 'connectors.ui.readiness.ready.title',
         'SETUP_REQUIRED' => 'connectors.ui.readiness.setup_required.title',
         'UPDATE_REQUIRED' => 'connectors.ui.readiness.update_required.title',
+        'BASELINE_PRODUCT_PERMISSION_REQUIRED' => 'connectors.ui.readiness.product_permission_required.title',
         'BASELINE_CONNECTION_FAILED' => 'connectors.ui.readiness.baseline_failure.title',
         'READINESS_TEMPORARY_PROBLEM' => 'connectors.ui.readiness.temporary_problem.title',
         'BASELINE_OK_READINESS_UNDETERMINED' => 'connectors.ui.readiness.readiness_undetermined.title',
@@ -142,6 +143,7 @@
         'READY' => 'connectors.ui.readiness.ready.body',
         'SETUP_REQUIRED' => 'connectors.ui.readiness.setup_required.body',
         'UPDATE_REQUIRED' => 'connectors.ui.readiness.update_required.body',
+        'BASELINE_PRODUCT_PERMISSION_REQUIRED' => 'connectors.ui.readiness.product_permission_required.body',
         'READINESS_TEMPORARY_PROBLEM' => 'connectors.ui.readiness.temporary_problem.body',
         'BASELINE_OK_READINESS_UNDETERMINED' => 'connectors.ui.readiness.readiness_undetermined.body',
         default => null,

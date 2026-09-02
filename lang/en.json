@@ -152,6 +152,8 @@
     "connectors.ui.readiness.update_required.body": "Connection to Magento works, but the detected integration module is not ready to send product changes. Share the developer instructions, then check again.",
     "connectors.ui.readiness.baseline_failure.title": "We couldn't connect to Magento",
     "connectors.ui.readiness.baseline_failure.guidance": "Check the Magento connection and try again.",
+    "connectors.ui.readiness.product_permission_required.title": "Product access is required in Magento",
+    "connectors.ui.readiness.product_permission_required.body": "Magento responded, but this integration has not been granted access to Products. Grant the integration Product permission and run the readiness check again.",
     "connectors.ui.readiness.temporary_problem.title": "Temporary problem during the check",
     "connectors.ui.readiness.temporary_problem.body": "Connection to Magento remains verified, but we couldn't confirm readiness to send product changes right now. Try again later.",
     "connectors.ui.readiness.readiness_undetermined.title": "We couldn't complete the current readiness check",

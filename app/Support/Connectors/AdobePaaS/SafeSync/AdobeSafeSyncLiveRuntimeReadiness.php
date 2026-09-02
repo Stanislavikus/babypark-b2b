@@ -18,7 +18,7 @@ final class AdobeSafeSyncLiveRuntimeReadiness implements ConnectorLiveRuntimeRea
     public function isReady(ConnectorAccount $account): bool
     {
         if ($account->auth_profile !== self::ADOBE_AUTH_PROFILE) {
-            return true;
+            return false;
         }
 
         $result = $this->readinessResolver->resolve(

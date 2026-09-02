@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ConnectorAccountResource\Pages;
 
+use App\Enums\ConnectorConnectionCheckErrorCode;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Enums\ConnectorErrorActionability;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
@@ -202,6 +203,12 @@ class ViewConnectorAccount extends ViewRecord
             );
 
             if (! $result->baselineSucceeded) {
+                if ($result->connectionResult->errorCode === ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions) {
+                    $this->storeSetupState = 'BASELINE_PRODUCT_PERMISSION_REQUIRED';
+
+                    return;
+                }
+
                 $this->storeSetupState = 'BASELINE_CONNECTION_FAILED';
 
                 return;

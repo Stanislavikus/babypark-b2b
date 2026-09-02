@@ -152,6 +152,8 @@
     "connectors.ui.readiness.update_required.body": "Підключення до Magento працює, але поточна версія модуля не готова для передачі змін товарів. Передайте інструкцію розробнику, а потім перевірте ще раз.",
     "connectors.ui.readiness.baseline_failure.title": "Не вдалося підключитися до Magento",
     "connectors.ui.readiness.baseline_failure.guidance": "Перевірте підключення до Magento і спробуйте ще раз.",
+    "connectors.ui.readiness.product_permission_required.title": "Потрібен доступ до товарів у Magento",
+    "connectors.ui.readiness.product_permission_required.body": "Magento відповіла, але цій інтеграції не надано доступ до товарів. Надайте інтеграції дозвіл на товари й повторіть перевірку готовності.",
     "connectors.ui.readiness.temporary_problem.title": "Тимчасова проблема під час перевірки",
     "connectors.ui.readiness.temporary_problem.body": "Підключення до Magento залишається перевіреним, але зараз не вдалося підтвердити готовність передачі змін товарів. Спробуйте ще раз пізніше.",
     "connectors.ui.readiness.readiness_undetermined.title": "Не вдалося завершити поточну перевірку готовності",
