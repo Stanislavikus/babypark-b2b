@@ -55,4 +55,9 @@ final class SyncLiveAdmissionException extends RuntimeException
     {
         return new self('Live execution timing configuration is unsafe and cannot admit runs.');
     }
+
+    public static function runtimeNotReady(): self
+    {
+        return new self('Connector live runtime readiness could not be confirmed.');
+    }
 }

@@ -21,7 +21,9 @@ use App\Support\Connectors\AdobePaaS\Command\ConservativeAdobeProductOwnershipTr
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClient;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncHandshakeProbe;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncHandshakeProbeCapability;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncLiveRuntimeReadiness;
 use App\Support\Connectors\ConnectorProfileRegistry;
+use App\Support\Sync\Live\ConnectorLiveRuntimeReadiness;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspaceMembership;
 use Filament\Actions\Action;
@@ -37,6 +39,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(AdobeSafeSyncHandshakeProbeCapability::class, AdobeSafeSyncHandshakeProbe::class);
+        $this->app->bind(ConnectorLiveRuntimeReadiness::class, AdobeSafeSyncLiveRuntimeReadiness::class);
         $this->app->singleton(WorkspaceContext::class);
         $this->app->singleton(ConnectorProfileRegistry::class);
         $this->app->singleton(WorkspaceMembership::class);

@@ -17,6 +17,7 @@ use App\Support\Connectors\ConnectorSyncSupportResolver;
 use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
 use App\Support\Sync\Exceptions\SyncLiveAdmissionException;
 use App\Support\Sync\Exceptions\SyncRuntimeTimingConfigurationException;
+use App\Support\Sync\Live\ConnectorLiveRuntimeReadiness;
 use App\Support\Sync\Preview\SyncPreviewConfigurationReadinessResolver;
 use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Support\Facades\DB;
@@ -32,6 +33,7 @@ final class SyncLiveAdmissionService
         private readonly SyncPreviewConfigurationReadinessResolver $readinessResolver,
         private readonly SyncRunActiveRecoveryService $activeRecoveryService,
         private readonly SyncRuntimeTimingResolver $timingResolver,
+        private readonly ConnectorLiveRuntimeReadiness $liveRuntimeReadiness,
     ) {}
 
     public function admit(
@@ -41,6 +43,22 @@ final class SyncLiveAdmissionService
     ): SyncRun {
         if (DB::transactionLevel() > 0 && ! app()->environment('testing')) {
             throw new \RuntimeException('Sync live admission must not run inside a nested transaction.');
+        }
+
+        $preflightWorkspace = Workspace::query()->findOrFail($account->workspace_id);
+        if (! $this->authorization->allows($actor, $preflightWorkspace, WorkspacePermissions::RUN_SYNC_LIVE)) {
+            throw SyncLiveAdmissionException::notAuthorized();
+        }
+
+        // Remote readiness must never hold database locks. Static support is
+        // checked first so dormant/unsupported Live paths perform no probe.
+        if ($this->syncSupportResolver->supports(
+            $account,
+            SyncDataDomain::Products,
+            SyncSemanticOperation::Export,
+            SyncRunMode::Live,
+        ) && ! $this->liveRuntimeReadiness->isReady($account)) {
+            throw SyncLiveAdmissionException::runtimeNotReady();
         }
 
         $run = null;

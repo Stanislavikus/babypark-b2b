@@ -4274,8 +4274,11 @@ Raw vendor response bodies are never user-facing. For bounded JSON protected-RES
 #### Adobe OAuth identifier vocabulary (Task 4B-2a-2b)
 
 Protected REST API failures are classified only from the certified, bounded JSON
-fields above. A present top-level `oauth_problem` must exactly match the identifier
-vocabulary below; localized `message` text is never parsed. When neither a
+fields above. The defensive top-level `oauth_problem` parser applies only when
+that machine-readable field is actually present in an explicitly certified or
+observed representation; this contract does not claim Magento protected REST
+universally emits it. Its value must exactly match the identifier vocabulary
+below; localized `message` text is never parsed. When neither a
 recognized OAuth identifier nor the exact Product ACL resource is present, 401/403
 fail closed to the unknown/support result rather than a status-only authentication
 or permission guess.
@@ -7303,8 +7306,11 @@ outcome only).
   after the run has its writer lease/deadline; DB-fresh
   `SyncRunConsequentialWriteGate` is rechecked after handshake
 
-Current seams to extend (runtime follow-on): `SyncLiveAdmissionService`,
-`SyncLiveRunJob`, `SyncRunConsequentialWriteGate`.
+Implemented seams: `ConnectorLiveRuntimeReadiness` resolves the existing Safe Sync
+readiness primitive without persistence; `SyncLiveAdmissionService` probes before
+its DB admission transaction; `SyncLiveRunJob` probes after writer lease/deadline
+and immediately before the first consequential write, then rechecks
+`SyncRunConsequentialWriteGate` from fresh DB state.
 
 #### Failure semantics (frozen)
 
@@ -7892,7 +7898,7 @@ point for the `support = true` flip.
 | Disposable validation harness | **Implemented (internal; validation-only)** — Decision 9 step 3 landed; no real-target certification executed in this PR |
 | Isolated simple writer real-target certification (2.4.9 / 8.5; 2.4.9 / 8.4; 2.4.8-p5 / 8.4) | **Pending** — Decision 9 step 4 |
 | Content Staging / Galera / entity-bound lifecycle / configurable / media proofs | **Pending** — Decision 9 steps 5–9 |
-| `ConnectorLiveRuntimeReadiness` integration | **Pending** — Decision 9 step 10 |
+| `ConnectorLiveRuntimeReadiness` integration | **Implemented (internal; support false)** — stateless Start Live probe outside admission transaction; worker probe after writer lease/deadline followed by DB-fresh consequential-write gate recheck |
 | Live consumption completion (configurable/media + remove remaining stock SKU-addressed consequential paths) | **Pending** — Decision 9 step 11 |
 | Final truth-flip gate / `support = true` | **Pending** — Decision 9 step 12 |
 | Adobe Products / Export / Live | **FALSE** |
