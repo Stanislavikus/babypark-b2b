@@ -1,0 +1,58 @@
+name: PR189 smoke access probe
+
+on:
+  push:
+    branches:
+      - codex/implement-magento-product-campaign
+    paths:
+      - .github/workflows/pr189-smoke-probe.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr189-smoke-probe
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify smoke SSH and checkout
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -eu
+            SMOKE=/var/www/babypark-b2b-smoke
+            EXPECTED_PR_HEAD=95670c67e96081c0098b81400853061865fb9759
+
+            test -d "$SMOKE"
+            cd "$SMOKE"
+
+            echo "SMOKE_HOST=$(hostname)"
+            echo "SMOKE_PATH=$(pwd)"
+            echo "SMOKE_HEAD=$(git rev-parse HEAD)"
+            echo "SMOKE_BRANCH=$(git branch --show-current || true)"
+
+            if [ -n "$(git status --porcelain)" ]; then
+              echo "SMOKE_TREE=CLEAN_FALSE"
+              exit 21
+            fi
+            echo "SMOKE_TREE=CLEAN_TRUE"
+
+            git fetch origin codex/implement-magento-product-campaign
+            git cat-file -e "${EXPECTED_PR_HEAD}^{commit}"
+            echo "PR189_HEAD_AVAILABLE=${EXPECTED_PR_HEAD}"
+
+            php artisan --version
+            if php artisan list --raw | grep -q '^adobe:stage3e-validate'; then
+              echo "STAGE3E_COMMAND=AVAILABLE"
+            else
+              echo "STAGE3E_COMMAND=MISSING"
+              exit 22
+            fi
