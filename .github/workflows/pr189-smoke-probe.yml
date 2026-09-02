@@ -31,10 +31,11 @@ jobs:
             SMOKE=/var/www/babypark-b2b-smoke
             EXPECTED_APP_HEAD=95670c67e96081c0098b81400853061865fb9759
             WT="/tmp/b2b-pr189-smoke-$$"
+            INVENTORY="/tmp/b2b-pr189-inventory-$$.php"
 
             cleanup() {
               git -C "$SMOKE" worktree remove --force "$WT" >/dev/null 2>&1 || true
-              rm -rf "$WT" >/dev/null 2>&1 || true
+              rm -rf "$WT" "$INVENTORY" >/dev/null 2>&1 || true
             }
             trap cleanup EXIT
 
@@ -65,7 +66,6 @@ jobs:
 
             cd "$WT"
             echo "VALIDATION_HEAD=$(git rev-parse HEAD)"
-            echo "VALIDATION_TREE=$(test -z "$(git status --porcelain)" && echo CLEAN || echo DIRTY)"
             php artisan --version
 
             if APP_ENV=stage3e-validation php artisan list --raw | grep -q '^adobe:stage3e-validate'; then
@@ -75,31 +75,52 @@ jobs:
               exit 22
             fi
 
-            APP_ENV=stage3e-validation php -r '
-              require "vendor/autoload.php";
-              $app = require "bootstrap/app.php";
-              $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+            cat > "$INVENTORY" <<'PHP'
+            <?php
+            $wt = getenv('VALIDATION_WT');
+            if (!is_string($wt) || $wt === '') {
+                fwrite(STDERR, "validation_worktree_missing\n");
+                exit(31);
+            }
+            chdir($wt);
+            require $wt.'/vendor/autoload.php';
+            $app = require $wt.'/bootstrap/app.php';
+            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
-              $accounts = App\Models\ConnectorAccount::withoutWorkspaceScope()
-                ->where("auth_profile", "adobe_commerce_paas_oauth1_integration")
+            $accounts = App\Models\ConnectorAccount::withoutWorkspaceScope()
+                ->where('auth_profile', 'adobe_commerce_paas_oauth1_integration')
                 ->get();
 
-              foreach ($accounts as $account) {
+            foreach ($accounts as $account) {
                 $host = parse_url((string) $account->base_url, PHP_URL_HOST);
-                echo "ACCOUNT id={$account->id} workspace={$account->workspace_id} enabled=".($account->is_enabled ? "1" : "0")." store=".(string)$account->store_code." host=".(is_string($host) ? strtolower($host) : "INVALID").PHP_EOL;
-              }
+                echo 'ACCOUNT id='.$account->id
+                    .' workspace='.$account->workspace_id
+                    .' enabled='.($account->is_enabled ? '1' : '0')
+                    .' store='.(string) $account->store_code
+                    .' host='.(is_string($host) ? strtolower($host) : 'INVALID')
+                    .PHP_EOL;
+            }
 
-              $variants = App\Models\ProductVariant::withoutWorkspaceScope()
-                ->whereNotNull("sku")
-                ->where("sku", "like", "B2BVAL-%")
+            $variants = App\Models\ProductVariant::withoutWorkspaceScope()
+                ->whereNotNull('sku')
+                ->where('sku', 'like', 'B2BVAL-%')
                 ->get();
 
-              foreach ($variants as $variant) {
+            foreach ($variants as $variant) {
                 $links = App\Models\ExternalRecordLink::withoutWorkspaceScope()
-                  ->where("product_variant_id", $variant->id)
-                  ->get();
+                    ->where('product_variant_id', $variant->id)
+                    ->get();
                 foreach ($links as $link) {
-                  echo "CANDIDATE variant={$variant->id} workspace={$variant->workspace_id} sku={$variant->sku} link={$link->id} account={$link->connector_account_id} trusted=".($link->hasMerchantConfirmedTrust() ? "1" : "0")." discriminator=".(string)$link->external_record_discriminator.PHP_EOL;
+                    echo 'CANDIDATE variant='.$variant->id
+                        .' workspace='.$variant->workspace_id
+                        .' sku='.$variant->sku
+                        .' link='.$link->id
+                        .' account='.$link->connector_account_id
+                        .' trusted='.($link->hasMerchantConfirmedTrust() ? '1' : '0')
+                        .' discriminator='.(string) $link->external_record_discriminator
+                        .PHP_EOL;
                 }
-              }
-            '
+            }
+            PHP
+
+            APP_ENV=stage3e-validation VALIDATION_WT="$WT" php "$INVENTORY"
