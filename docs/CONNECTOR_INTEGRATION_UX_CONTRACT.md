@@ -803,7 +803,7 @@ freeze.
 Preview-first architecture is preserved.
 
 - The merchant wording for the action is **`Створити пробну
-синхронізацію`**.
+  синхронізацію`**.
 - The Preview page must state, in the same surface, the exact
   reassurance: **"Пробна синхронізація не змінює дані в Magento"**.
 - A short second sentence may explain that Preview only inspects and

@@ -265,8 +265,8 @@ re-classified as:
 
 - **Optional "Enhanced Safety" candidate**, not a baseline connector
   prerequisite;
-- an advanced / paid-tier add-on, installed and certified separately
-  per merchant;
+- an opt-in component, installed and certified separately only when
+  Enhanced Safety is selected;
 - an implementation-true, legitimate primitive whose entity-bound
   read + write boundary remains a durable repository artifact.
 
