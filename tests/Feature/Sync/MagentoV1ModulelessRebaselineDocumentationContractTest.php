@@ -378,43 +378,28 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
     {
         $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
 
-        // Per the Post-#168 / Post-D6 moduleless-by-default decision, the
-        // first-party Magento entity-bound Safe Sync implementation is an
-        // OPTIONAL Enhanced Safety primitive / current-runtime evidence,
-        // NOT a mandatory product prerequisite. The §13 boundary, §18
-        // seam, and §19 Link-first seam must NOT list it as a required
-        // truth-flip gate or "Stage 3E runtime blocker" prerequisite.
         $this->assertStringNotContainsString(
-            'first-party Magento entity-bound Safe Sync component',
+            'truthful flip of Adobe Products/Export/Live advertised support still requires:',
             $content,
         );
-        $this->assertStringNotContainsString(
-            'first-party Magento entity-bound Safe Sync runtime component',
-            $content,
-        );
-        $this->assertStringNotContainsString('Stage 3E runtime blocker', $content);
 
-        // The corrected §13 boundary / §18 seam / §19 Link-first seam
-        // must each anchor truth-flip on real-target certification of
-        // the actual standard shipping implementation, with Safe Sync
-        // relegated to current-runtime evidence / optional Enhanced
-        // Safety primitive.
+        $this->assertStringNotContainsString('Until both land', $content);
+
+        $link_first = $this->extractSection($content, '### Link-first necessary but not sufficient', '---');
+
+        $this->assertStringNotContainsString('Truth flip waits for proven', $link_first);
+        $this->assertStringNotContainsString('Stage 3E runtime blocker', $link_first);
+
+        $this->assertStringContainsString('real-target certification', $content);
+        $this->assertStringContainsString('actual standard shipping implementation', $content);
+        $this->assertStringContainsString('optional Enhanced Safety primitive', $content);
         $this->assertStringContainsString(
-            'real-target certification',
+            'is **not** a mandatory product prerequisite under the Post-#168 / Post-D6 moduleless-by-default decision',
             $content,
         );
-        $this->assertStringContainsString(
-            'actual standard shipping implementation',
-            $content,
-        );
-        $this->assertStringContainsString(
-            'optional Enhanced Safety primitive',
-            $content,
-        );
-        $this->assertStringContainsString(
-            'not** a mandatory product prerequisite under the Post-#168 / Post-D6 moduleless-by-default decision',
-            $content,
-        );
+
+        $this->assertStringContainsString('real-target certification', $link_first);
+        $this->assertStringContainsString('actual consequential WRITE', $link_first);
     }
 
     #[Test]

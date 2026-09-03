@@ -273,7 +273,6 @@ Before a connector UI surface may be merged, it must satisfy all of the followin
 2. Two distinct checks, not one conflated check:
     - **Merchant vocabulary (§13):** no Layer A/B page renders any term from §13's forbidden list in user-visible rendered content — labels, accessible text, notifications, validation/empty/error messages. This does not extend to internal property/variable names (e.g. a `snapshotId` Livewire property) that are never rendered as content; those are implementation detail, not a vocabulary violation.
     - **Sensitive-data enforcement is layer-specific, per §12.** A/B tests assert that data §12 permits only in C/D (canonical hash, technical summary, raw error code, credentials, endpoint path, etc.) never enters merchant-rendered content _or_ serialized Livewire snapshot/effects state on an A/B surface — the existing, stricter canary-test pattern already used for sensitive-field absence applies here unchanged. A future Layer C surface is tested the same way against whatever §12 permits only in D (credentials, raw request/response bodies). Secret-redaction, credential-encryption, and workspace-isolation rules apply at every layer without exception (§1) — canary tests target the specific data forbidden on the surface under test, not every technical attribute globally regardless of layer.
-
 3. Layer boundary (§12) is respected — a merchant role cannot reach Layer C/D content through any route, relation manager, or table action, verified by an authorization/workspace-isolation test following the existing project pattern.
 4. Every error surfaced to Layer A/B maps to one of §10's categories — no raw code path reaches merchant-facing text.
 5. Any issue category exceeding the bulk threshold offers a bulk action (§11), or explicitly documents why it cannot.
@@ -709,7 +708,12 @@ The approved primary connection line is:
 Magento · [account name]
 🟢 Підключено
 Перевірено [time]
-[Перевірити ще раз]      ← secondary action; shown / usable when existing authorization permits a re-check and no active check is running
+[Перевірити ще раз]      ← secondary action; shown / usable when existing
+                         authorization / capability / action-state
+                         permits it, and disabled or unavailable while
+                         a check is already active or when existing
+                         runtime rules disallow it. No new authorization
+                         logic is introduced by this freeze.
 Перевірка не змінює дані в Magento
 ```
 
@@ -786,15 +790,20 @@ from the following sequence in this order:
    seen a real Preview and is on the explicit first-Live path.
 
 Do not show all three at once. Do not invent extra primary actions on
-the standard path. `Перевірити ще раз` is a conditional secondary
-action (see §19.3); it is not a substitute for the next primary action.
+the standard path. `Перевірити ще раз` is a secondary action and
+follows the same "shown / usable when existing authorization /
+capability / action-state permits it, and disabled or unavailable
+while a check is already active or when existing runtime rules
+disallow it" rule as in §19.3; it is not a substitute for the next
+primary action. No new authorization logic is introduced by this
+freeze.
 
 ### 19.7 Preview / "Пробна синхронізація"
 
 Preview-first architecture is preserved.
 
 - The merchant wording for the action is **`Створити пробну
-  синхронізацію`**.
+синхронізацію`**.
 - The Preview page must state, in the same surface, the exact
   reassurance: **"Пробна синхронізація не змінює дані в Magento"**.
 - A short second sentence may explain that Preview only inspects and
@@ -810,16 +819,28 @@ Preview-first architecture is preserved.
 ### 19.8 First real sync
 
 Only after Preview may the merchant explicitly initiate the first real
-sync through **`Виконати першу синхронізацію`**. The first real sync:
+sync through **`Виконати першу синхронізацію`**. On the standard
+merchant journey, the first real sync is the **first / earliest
+point** at which a real Magento mutation may occur.
 
-- is the first / earliest point at which a real Magento mutation may
-  occur on the standard path;
-- is the first / earliest point at which Overview may update to a
-  "first sync completed" state;
-- must not be presented as the only point at which a real Magento
-  mutation is allowed; subsequent Live runs follow the same
-  Preview-first admission contract without re-inventing a fresh-Preview
-  acknowledgement rule beyond the existing admission rules.
+Rules that this freeze does **not** invent or override:
+
+- Preview must happen before the first real Live. The existing
+  Preview / Live authorization and admission contracts remain
+  authoritative for both flows and are the single source of truth
+  for what must happen between Preview and any later Live.
+- Subsequent approved Live syncs continue to be governed by the
+  existing Sync runtime contracts. This freeze does **not** imply
+  that later approved Live syncs are forbidden from mutating
+  Magento.
+- Overview may update to a "first sync completed" state only after
+  this first real sync, not before.
+
+This freeze does **not** introduce a new fresh-Preview or
+explicit-merchant-acknowledgement mechanism between Preview and
+later Live. The existing Preview / Live authorization and admission
+contracts remain the single source of truth for what must happen
+between Preview and any later Live.
 
 ### 19.9 What this freeze does NOT do
 

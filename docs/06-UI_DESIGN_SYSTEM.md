@@ -1879,8 +1879,11 @@ Summary rules for unlinked or trust-insufficient Products in the Live surface:
   Layer A/B.
 - **Link-first ≠ Live-ready** — merchant-confirmed link establishes ENTITY TRUST
   but does **not** by itself authorize consequential Live; exemplary Live support
-  flip waits for proven first-party Magento entity-bound Safe Sync component
-  (Stage 3E runtime blocker).
+  flip waits for real-target certification of the actual consequential WRITE
+  implementation against all still-frozen safety invariants for every advertised
+  V1 Live mutation category. The current first-party Magento entity-bound Safe
+  Sync implementation may remain current-runtime evidence and / or an optional
+  Enhanced Safety primitive, but it is **not** a mandatory product prerequisite.
 - **Account readiness** — `ConnectorSyncOperationSupport` (static capability) and
   `ConnectorLiveRuntimeReadiness` (fresh account prerequisite) are separate; cached
   handshake is presentation-only; do not persist handshake evidence on
