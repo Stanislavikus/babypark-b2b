@@ -53,7 +53,7 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
     #[Test]
     public function english_readiness_copy_uses_merchant_safe_phrasing(): void
     {
-        $this->assertSame('Automatic data synchronization', __('connectors.ui.readiness.store_setup', locale: 'en'));
+        $this->assertSame('Send product changes to Magento', __('connectors.ui.readiness.store_setup', locale: 'en'));
         $this->assertSame('Check readiness', __('connectors.ui.readiness.check', locale: 'en'));
         $this->assertSame('Check again', __('connectors.ui.readiness.check_again', locale: 'en'));
         $this->assertSame('Checking readiness…', __('connectors.ui.readiness.checking', locale: 'en'));
@@ -77,6 +77,17 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
         $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.ready.body', locale: 'en'));
         $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
         $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.update_required.body', locale: 'en'));
+    }
+
+    #[Test]
+    public function readiness_contract_keeps_the_concrete_business_operation_vocabulary(): void
+    {
+        $contract = file_get_contents(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
+
+        $this->assertNotFalse($contract);
+        $this->assertStringContainsString('Передача змін товарів у Magento', $contract);
+        $this->assertStringNotContainsString('Magento Product-aligned automatic synchronization readiness', $contract);
+        $this->assertStringNotContainsString('Автоматична синхронізація даних', $contract);
     }
 
     #[Test]
@@ -106,6 +117,10 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
         $this->assertStringContainsString("'connectors.ui.readiness.ready.body'", $view);
         $this->assertStringContainsString('$baselineMessage = $this->storeSetupBaselineMessage;', $view);
         $this->assertStringContainsString('$stockMagentoVersionEvidence = $this->storeSetupStockMagentoVersionEvidence;', $view);
+        $this->assertStringContainsString('MagentoEnvironmentCertificationMatrix', $view);
+        $this->assertStringNotContainsString('storeSetupDiagnostics', $page);
+        $this->assertStringNotContainsString('HTTP status', $view);
+        $this->assertStringNotContainsString('Current probe', $view);
         $this->assertStringNotContainsString('$livewire->storeSetupBaselineMessage', $view);
         $this->assertStringNotContainsString('wire:click="checkStoreSetup"', $view);
         $this->assertStringNotContainsString('ConnectorAccount::update', $resolver);

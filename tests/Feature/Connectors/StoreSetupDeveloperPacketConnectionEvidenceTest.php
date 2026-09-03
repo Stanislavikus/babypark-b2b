@@ -74,9 +74,6 @@ class StoreSetupPacketHarness extends Component
 
     public ?string $storeSetupStockMagentoVersionEvidence = null;
 
-    /** @var array<string, mixed> */
-    public array $storeSetupDiagnostics = [];
-
     public function mount(ConnectorAccount $record): void
     {
         $this->record = $record;

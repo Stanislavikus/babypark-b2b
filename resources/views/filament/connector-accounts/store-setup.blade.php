@@ -7,7 +7,8 @@
     $applicationVersion = $this->storeSetupApplicationVersion;
     $phpVersion = $this->storeSetupPhpVersion;
     $stockMagentoVersionEvidence = $this->storeSetupStockMagentoVersionEvidence;
-    $safeDiagnostics = $this->storeSetupDiagnostics;
+    $certification = app(\App\Support\Connectors\AdobePaaS\SafeSync\MagentoEnvironmentCertificationMatrix::class)
+        ->evaluate($applicationVersion, $phpVersion);
 
     $requirements = app(\App\Support\Connectors\AdobePaaS\SafeSync\MagentoSafeSyncManifestReader::class)->requirements();
     $requirementsLines = array_values(array_filter([
@@ -37,25 +38,6 @@
     $stockMagentoDisplay = filled($stockMagentoVersionEvidence)
         ? preg_replace('/^Magento\//', 'Magento ', trim($stockMagentoVersionEvidence))
         : null;
-
-    $isExactMagentoSupported = static function (?string $version): bool {
-        if (! filled($version)) {
-            return false;
-        }
-
-        return preg_match('/^2\.4\.9(?:$|[-+])/', $version) === 1 || $version === '2.4.8-p5';
-    };
-
-    $isExactPhpSupported = static function (?string $version): bool {
-        if (! filled($version)) {
-            return false;
-        }
-
-        return preg_match('/^8\.(4|5)(?:\.|$)/', $version) === 1;
-    };
-
-    $supportedMagentoVersions = '2.4.9, 2.4.8-p5';
-    $supportedPhpVersions = '8.4, 8.5';
     $minimumModuleVersion = \App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncContract::SIMPLE_PRODUCT_WRITE_MINIMUM_MODULE_VERSION;
 
     $compatibilityRows = [];
@@ -64,10 +46,6 @@
         $compatibilityRows[] = [
             'label' => __('connectors.ui.readiness.compatibility.adobe'),
             'current' => __('connectors.ui.readiness.compatibility.your_version', ['value' => $applicationVersion]),
-            'supported' => $isExactMagentoSupported($applicationVersion),
-            'guidance' => $isExactMagentoSupported($applicationVersion)
-                ? null
-                : __('connectors.ui.readiness.compatibility.adobe.update_guidance', ['supported' => $supportedMagentoVersions]),
         ];
     }
 
@@ -75,12 +53,33 @@
         $compatibilityRows[] = [
             'label' => __('connectors.ui.readiness.compatibility.php'),
             'current' => __('connectors.ui.readiness.compatibility.your_version', ['value' => $phpVersion]),
-            'supported' => $isExactPhpSupported($phpVersion),
-            'guidance' => $isExactPhpSupported($phpVersion)
-                ? null
-                : __('connectors.ui.readiness.compatibility.php.update_guidance', ['supported' => $supportedPhpVersions]),
         ];
     }
+
+    $compatibilityRows[] = [
+        'label' => __('connectors.ui.readiness.compatibility.environment'),
+        'current' => $certification->hasExactVersions()
+            ? __('connectors.ui.readiness.compatibility.detected_pair', [
+                'magento' => $certification->magentoVersion,
+                'php' => $certification->phpVersion,
+            ])
+            : __('connectors.ui.readiness.compatibility.exact_pending'),
+        'supported' => $certification->isCertified(),
+        'status' => match ($certification->category) {
+            \App\Support\Connectors\AdobePaaS\SafeSync\MagentoEnvironmentCertificationAssessment::PRIMARY => __('connectors.ui.readiness.compatibility.status.primary'),
+            \App\Support\Connectors\AdobePaaS\SafeSync\MagentoEnvironmentCertificationAssessment::UPGRADE_COMPATIBILITY => __('connectors.ui.readiness.compatibility.status.upgrade_compatibility'),
+            \App\Support\Connectors\AdobePaaS\SafeSync\MagentoEnvironmentCertificationAssessment::PREVIOUS_CERTIFIED => __('connectors.ui.readiness.compatibility.status.previous_certified'),
+            \App\Support\Connectors\AdobePaaS\SafeSync\MagentoEnvironmentCertificationAssessment::NOT_CERTIFIED => __('connectors.ui.readiness.compatibility.status.not_certified'),
+            default => __('connectors.ui.readiness.compatibility.status.exact_pending'),
+        },
+        'guidance' => match ($certification->category) {
+            \App\Support\Connectors\AdobePaaS\SafeSync\MagentoEnvironmentCertificationAssessment::PRIMARY => __('connectors.ui.readiness.compatibility.guidance.primary'),
+            \App\Support\Connectors\AdobePaaS\SafeSync\MagentoEnvironmentCertificationAssessment::UPGRADE_COMPATIBILITY => __('connectors.ui.readiness.compatibility.guidance.upgrade_compatibility'),
+            \App\Support\Connectors\AdobePaaS\SafeSync\MagentoEnvironmentCertificationAssessment::PREVIOUS_CERTIFIED => __('connectors.ui.readiness.compatibility.guidance.previous_certified'),
+            \App\Support\Connectors\AdobePaaS\SafeSync\MagentoEnvironmentCertificationAssessment::NOT_CERTIFIED => __('connectors.ui.readiness.compatibility.guidance.not_certified'),
+            default => __('connectors.ui.readiness.compatibility.guidance.exact_pending'),
+        },
+    ];
 
     $componentCurrent = filled($moduleVersion)
         ? __('connectors.ui.readiness.compatibility.component.installed', ['version' => $moduleVersion])
@@ -101,6 +100,7 @@
             'label' => __('connectors.ui.readiness.compatibility.component'),
             'current' => $componentCurrent,
             'supported' => $componentSupported,
+            'status' => null,
             'guidance' => $state === 'UPDATE_REQUIRED'
                 ? __('connectors.ui.readiness.compatibility.component.update_guidance', ['version' => $minimumModuleVersion])
                 : null,
@@ -131,76 +131,41 @@
         ]),
     };
 
-    $probeFamily = $safeDiagnostics['probe_family'] ?? ($state === 'NOT_CHECKED' ? null : 'safe_sync_handshake');
-    $probeLabel = match ($probeFamily) {
-        'magento_products' => 'Magento Products API',
-        'safe_sync_handshake' => 'Safe Sync handshake',
-        null => null,
-        default => (string) $probeFamily,
-    };
-
-    $probeResult = match (true) {
-        isset($safeDiagnostics['http_status'], $safeDiagnostics['error_code']) => 'HTTP '.$safeDiagnostics['http_status'].' ('.$safeDiagnostics['error_code'].')',
-        isset($safeDiagnostics['http_status']) => 'HTTP '.$safeDiagnostics['http_status'],
-        default => null,
-    };
-
-    $diagnosticLabelMap = [
-        'http_status' => __('connectors.ui.readiness.developer.packet.diagnostics.http_status'),
-        'error_code' => __('connectors.ui.readiness.developer.packet.diagnostics.error_code'),
-        'expected_acl_resource' => __('connectors.ui.readiness.developer.packet.diagnostics.expected_acl_resource'),
-        'observed_acl_resources' => __('connectors.ui.readiness.developer.packet.diagnostics.observed_acl_resources'),
-        'oauth_problem' => __('connectors.ui.readiness.developer.packet.diagnostics.oauth_problem'),
-        'vendor_request_id' => __('connectors.ui.readiness.developer.packet.diagnostics.vendor_request_id'),
-        'response_shape' => __('connectors.ui.readiness.developer.packet.diagnostics.response_shape'),
-    ];
-
-    $diagnosticLines = array_values(array_filter([
-        __('connectors.ui.readiness.developer.packet.diagnostics.operation', [
-            'operation' => __('connectors.ui.readiness.developer.packet.diagnostics.operation.simple_product_write'),
+    $packetFactLines = array_values(array_filter([
+        __('connectors.ui.readiness.developer.packet.operation', [
+            'operation' => __('connectors.ui.readiness.store_setup'),
         ]),
-        filled($probeLabel)
-            ? __('connectors.ui.readiness.developer.packet.diagnostics.current_probe', ['value' => $probeLabel])
-            : null,
-        filled($probeResult)
-            ? __('connectors.ui.readiness.developer.packet.diagnostics.current_result', ['value' => $probeResult])
-            : null,
         filled($stockMagentoDisplay)
             ? __('connectors.ui.readiness.developer.packet.detected_magento', ['value' => $stockMagentoDisplay])
             : null,
         filled($applicationVersion)
-            ? __('connectors.ui.readiness.developer.packet.diagnostics.magento', ['value' => $applicationVersion])
+            ? __('connectors.ui.readiness.developer.packet.magento', ['value' => $applicationVersion])
             : null,
         blank($applicationVersion) && filled($stockMagentoDisplay)
             ? __('connectors.ui.readiness.developer.packet.exact_magento_pending')
             : null,
         filled($phpVersion)
-            ? __('connectors.ui.readiness.developer.packet.diagnostics.php', ['value' => $phpVersion])
+            ? __('connectors.ui.readiness.developer.packet.php', ['value' => $phpVersion])
             : null,
         filled($moduleVersion)
-            ? __('connectors.ui.readiness.developer.packet.diagnostics.extension', ['value' => $moduleVersion])
+            ? __('connectors.ui.readiness.developer.packet.extension', ['value' => $moduleVersion])
             : match ($state) {
                 'SETUP_REQUIRED' => __('connectors.ui.readiness.developer.packet.component.setup_required'),
                 'UPDATE_REQUIRED' => __('connectors.ui.readiness.developer.packet.component.update_required'),
                 default => null,
             },
         in_array($state, ['BASELINE_CONNECTION_FAILED', 'READINESS_TEMPORARY_PROBLEM', 'BASELINE_OK_READINESS_UNDETERMINED'], true) && filled($baselineMessage)
-            ? __('connectors.ui.readiness.developer.packet.diagnostics.failure', ['message' => $baselineMessage])
+            ? __('connectors.ui.readiness.developer.packet.failure', ['message' => $baselineMessage])
             : null,
-        ...array_map(
-            fn (string $key, mixed $value): ?string => isset($diagnosticLabelMap[$key])
-                ? $diagnosticLabelMap[$key].': '.(is_array($value) ? implode(', ', $value) : (string) $value)
-                : null,
-            array_keys($safeDiagnostics),
-            array_values($safeDiagnostics),
-        ),
     ], fn (?string $value): bool => filled($value)));
 
     $compatibilityPacketLines = [];
     foreach ($compatibilityRows as $row) {
         $compatibilityPacketLines[] = '- '.$row['label'].': '.$row['current'];
 
-        if (($row['supported'] ?? null) !== null) {
+        if (filled($row['status'] ?? null)) {
+            $compatibilityPacketLines[] = '  - '.$row['status'];
+        } elseif (($row['supported'] ?? null) !== null) {
             $compatibilityPacketLines[] = '  - '.(($row['supported'] ?? false)
                 ? __('connectors.ui.readiness.developer.packet.compatibility.supported')
                 : __('connectors.ui.readiness.developer.packet.compatibility.unsupported'));
@@ -225,8 +190,8 @@
         __('connectors.ui.readiness.developer.packet.readiness_state', ['value' => $stateLabel]),
         __('connectors.ui.readiness.developer.packet.next_action', ['value' => $nextAction]),
         '',
-        __('connectors.ui.readiness.developer.packet.diagnostics.title'),
-        ...array_map(fn (string $line): string => '- '.$line, $diagnosticLines),
+        __('connectors.ui.readiness.developer.packet.facts.title'),
+        ...array_map(fn (string $line): string => '- '.$line, $packetFactLines),
         filled($stockMagentoDisplay) && blank($applicationVersion)
             ? '- '.__('connectors.ui.readiness.exact_version_pending')
             : null,
@@ -331,7 +296,7 @@
                         {{ __('connectors.ui.readiness.compatibility.title') }}
                     </p>
 
-                    <div class="grid gap-3 md:grid-cols-3">
+                    <div class="grid gap-3 md:grid-cols-4">
                         @foreach ($compatibilityRows as $row)
                             <div class="rounded-lg border border-gray-200 bg-white/70 p-3 dark:border-white/10 dark:bg-black/10">
                                 <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
@@ -342,7 +307,11 @@
                                     {{ $row['current'] }}
                                 </p>
 
-                                @if (($row['supported'] ?? null) !== null)
+                                @if (filled($row['status'] ?? null))
+                                    <p class="mt-2 text-xs font-medium {{ ($row['supported'] ?? null) === false ? 'text-danger-700 dark:text-danger-300' : 'text-success-700 dark:text-success-300' }}">
+                                        {{ $row['status'] }}
+                                    </p>
+                                @elseif (($row['supported'] ?? null) !== null)
                                     <p class="mt-2 text-xs font-medium {{ ($row['supported'] ?? false) ? 'text-success-700 dark:text-success-300' : 'text-danger-700 dark:text-danger-300' }}">
                                         {{ ($row['supported'] ?? false)
                                             ? __('connectors.ui.readiness.compatibility.supported')

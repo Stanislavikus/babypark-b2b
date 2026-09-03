@@ -620,19 +620,94 @@ class ConnectorAccountResourceTest extends TestCase
             componentReadiness: ConnectorComponentReadiness::Ready,
             baselineSucceeded: true,
             moduleVersion: '0.2.1',
-            applicationVersion: '2.4.7-p1',
-            phpVersion: '8.3.10',
+            applicationVersion: '2.4.9',
+            phpVersion: '8.5.1',
         );
         $this->bindReadinessResolverStub($stub);
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->callAction('checkStoreSetup')
-            ->assertSee('Ваша версія: 2.4.7-p1')
-            ->assertSee('Ваша версія: 8.3.10')
+            ->assertSee('Ваша версія: 2.4.9')
+            ->assertSee('Ваша версія: 8.5.1')
             ->assertSee('Встановлена версія: 0.2.1')
-            ->assertSee('Оновіть Adobe Commerce до 2.4.9, 2.4.8-p5.')
-            ->assertSee('Оновіть PHP до 8.4, 8.5.');
+            ->assertSee('Adobe Commerce 2.4.9 + PHP 8.5.1')
+            ->assertSee('Поточна production-ціль');
+    }
+
+    #[Test]
+    public function decision_six_matrix_distinguishes_primary_upgrade_previous_and_not_certified_states(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+        $stub = new AdobeSafeSyncComponentReadinessResolverStub;
+        $this->bindReadinessResolverStub($stub);
+
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            connectionResult: ConnectorConnectionCheckResult::success(),
+            componentReadiness: ConnectorComponentReadiness::Ready,
+            baselineSucceeded: true,
+            applicationVersion: '2.4.9',
+            phpVersion: '8.5.2',
+        );
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSee('Поточна production-ціль');
+
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            connectionResult: ConnectorConnectionCheckResult::success(),
+            componentReadiness: ConnectorComponentReadiness::Ready,
+            baselineSucceeded: true,
+            applicationVersion: '2.4.9',
+            phpVersion: '8.4.9',
+        );
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSee('Лише upgrade-compatibility')
+            ->assertDontSee(__('connectors.ui.readiness.compatibility.guidance.primary'));
+
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            connectionResult: ConnectorConnectionCheckResult::success(),
+            componentReadiness: ConnectorComponentReadiness::Ready,
+            baselineSucceeded: true,
+            applicationVersion: '2.4.8-p5',
+            phpVersion: '8.4.4',
+        );
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSee('Попередня сертифікована ціль');
+
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            connectionResult: ConnectorConnectionCheckResult::success(),
+            componentReadiness: ConnectorComponentReadiness::Ready,
+            baselineSucceeded: true,
+            applicationVersion: '2.4.8-p5',
+            phpVersion: '8.5.0',
+        );
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSee('Не сертифіковано');
+
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            connectionResult: ConnectorConnectionCheckResult::success(),
+            componentReadiness: ConnectorComponentReadiness::Ready,
+            baselineSucceeded: true,
+            applicationVersion: '2.4.9',
+            phpVersion: '8.3.18',
+        );
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSee('Не сертифіковано');
     }
 
     #[Test]
@@ -780,7 +855,7 @@ class ConnectorAccountResourceTest extends TestCase
             ->assertSet('storeSetupState', 'READY')
             ->assertSee('Magento 2.4 (Community)')
             ->assertSee(__('connectors.ui.readiness.exact_version_pending'))
-            ->assertDontSee(__('connectors.ui.readiness.compatibility.unsupported', locale: 'uk'));
+            ->assertDontSee('Не сертифіковано');
     }
 
     #[Test]
@@ -813,6 +888,53 @@ class ConnectorAccountResourceTest extends TestCase
             ->assertSee('Magento 2.4 (Community)')
             ->assertSee(__('connectors.ui.readiness.exact_version_pending'))
             ->assertDontSee(__('connectors.ui.readiness.baseline_failure.title'));
+    }
+
+    #[Test]
+    public function merchant_overview_does_not_render_or_copy_raw_layer_c_diagnostics(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount(overrides: [
+            'name' => 'No Raw Diagnostics',
+            'last_successful_check_at' => now(),
+        ]);
+        $stub = new AdobeSafeSyncComponentReadinessResolverStub;
+        $stub->result = new AdobeSafeSyncReadinessResult(
+            ConnectorConnectionCheckResult::httpFailure(
+                ConnectorConnectionCheckErrorCode::AdobeInvalidOrUnsupportedEndpoint,
+                404,
+                vendorRequestId: 'vendor-request-777',
+                probeFamily: 'safe_sync_handshake',
+                expectedAclResource: 'Magento_Catalog::products',
+                observedAclResources: ['Magento_Catalog::products'],
+                recognizedOAuthProblem: 'signature_invalid',
+                responseShape: 'recognized_oauth_problem',
+            ),
+            ConnectorComponentReadiness::SetupRequired,
+            true,
+            stockMagentoVersionEvidence: 'Magento/2.4 (Community)',
+        );
+        $this->bindReadinessResolverStub($stub);
+
+        $component = Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('checkStoreSetup')
+            ->assertSee('Передача змін товарів у Magento')
+            ->assertDontSee('HTTP 404')
+            ->assertDontSee('adobe_invalid_or_unsupported_endpoint')
+            ->assertDontSee('Magento_Catalog::products')
+            ->assertDontSee('signature_invalid')
+            ->assertDontSee('vendor-request-777')
+            ->assertDontSee('Safe Sync handshake')
+            ->assertDontSee('Magento Products API');
+
+        $snapshot = json_encode($component->snapshot, JSON_THROW_ON_ERROR);
+        $html = $component->html();
+
+        $this->assertStringNotContainsString('vendor-request-777', $snapshot);
+        $this->assertStringNotContainsString('Magento_Catalog::products', $snapshot);
+        $this->assertStringNotContainsString('signature_invalid', $snapshot);
+        $this->assertStringNotContainsString('HTTP 404', $html);
     }
 
     #[Test]
