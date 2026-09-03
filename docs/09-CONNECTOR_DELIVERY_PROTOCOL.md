@@ -294,7 +294,9 @@ proof that:
    and is not merely developer preference;
 5. proposes the smallest possible deployment surface (for example:
    opt-in module, opt-in webhook, opt-in storefront event) and
-   presents it to the merchant as optional or paid, never as baseline.
+   presents it to the merchant as **optional, never as baseline**.
+   **Commercial packaging, pricing, and paid tiers are explicitly
+   UNDECIDED and out of scope of this delivery protocol.**
 
 A future campaign that cannot produce items 1–5 above MUST NOT
 re-position the first-party component as a precondition for the

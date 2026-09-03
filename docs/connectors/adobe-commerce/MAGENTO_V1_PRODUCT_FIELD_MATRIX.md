@@ -233,9 +233,21 @@ merchant path is:
   component for connection, READ, field discovery, mapping, Preview,
   or normal Magento V1 operation once the stock public REST path is
   separately certified for the relevant operation.
-- **Stock public REST as default runtime**: the standard path is
-  expected to consume vendor stock public REST for connection, READ,
-  field discovery, mapping, and Preview.
+- **Target seam separation** (this record does **not** redesign any
+  of these seams):
+  - **Magento stock API** is the **connector remote transport** for
+    account connection, standard Product READ, field discovery, and
+    the candidate future consequential WRITE. It is the only
+    connector-side seam that talks to the merchant's Magento over
+    the network on the standard path.
+  - **Mapping** is a **platform-owned workflow** that operates over
+    the **persisted and normalised discovered metadata** that field
+    discovery has already produced. Mapping does **not** itself
+    consume vendor stock REST as a runtime.
+  - **Preview** is a **platform-owned orchestration** that follows
+    the existing Preview contracts. It may perform **bounded
+    remote reads** only where those existing contracts already
+    require such reads, and it does **not** redesign those contracts.
 - **Safe Sync reclassified as optional Enhanced Safety candidate**:
   the first-party component remains a legitimate, implementation-true
   primitive, but it is no longer a basic connector prerequisite.

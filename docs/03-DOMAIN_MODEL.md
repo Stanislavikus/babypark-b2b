@@ -7948,7 +7948,11 @@ amendment**.
 It is re-classified for the standard product path as:
 
 - **Optional "Enhanced Safety" candidate** — installed and certified
-  separately when the merchant requires it as an advanced or paid tier;
+  separately when the merchant requires this enhanced safety
+  capability. **Commercial packaging, pricing, and paid tiers are
+  explicitly UNDECIDED and out of scope of this rebaseline;** this
+  amendment is a technical and architectural re-classification, not a
+  product packaging decision;
 - a documented differentiator for capabilities the vendor stock API
   cannot provide (for example: in-Magento transactional identity / SKU
   verification, atomic mutation with rollback, and postcondition proof
