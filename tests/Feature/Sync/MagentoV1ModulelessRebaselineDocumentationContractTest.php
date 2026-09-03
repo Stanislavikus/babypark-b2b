@@ -69,14 +69,21 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
 
         $new_section = $this->extractMagentoV1ModulelessSection($content);
+        $normalized_new_section = $this->normalizeDocWhitespace($new_section);
 
         // Safe Sync is reclassified as an optional "Enhanced Safety" candidate /
         // capability. The "advanced or paid tier" framing was removed in the
         // correction pass.
         $this->assertStringContainsString('Optional "Enhanced Safety" candidate', $new_section);
         $this->assertStringNotContainsString('advanced or paid tier', $new_section);
-        $this->assertStringContainsString('Commercial packaging, pricing, and paid tiers are explicitly', $new_section);
-        $this->assertStringContainsString('UNDECIDED and out of scope of this rebaseline', $new_section);
+        $this->assertStringContainsString(
+            'Commercial packaging, pricing, and paid tiers are explicitly',
+            $normalized_new_section,
+        );
+        $this->assertStringContainsString(
+            'UNDECIDED and out of scope of this rebaseline',
+            $normalized_new_section,
+        );
     }
 
     #[Test]
