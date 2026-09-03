@@ -44,7 +44,7 @@ class AdobePaaSConnectionCheckRequestFactoryTest extends TestCase
         );
 
         $request = $this->factory->build($context, $this->signingContext);
-        $expectedUrl = 'https://shop.example.com/rest/default/V1/products/attributes?searchCriteria%5BpageSize%5D=1';
+        $expectedUrl = 'https://shop.example.com/rest/default/V1/products?searchCriteria%5BpageSize%5D=1';
         $expectedAuthorization = (new OAuth1RequestSigner)->sign(
             'GET',
             $expectedUrl,
@@ -87,7 +87,7 @@ class AdobePaaSConnectionCheckRequestFactoryTest extends TestCase
             $this->signingContext,
         );
 
-        $expectedUrl = 'https://commerce.example.test/magento/rest/default/V1/products/attributes?searchCriteria%5BpageSize%5D=1';
+        $expectedUrl = 'https://commerce.example.test/magento/rest/default/V1/products?searchCriteria%5BpageSize%5D=1';
 
         $this->assertSame($expectedUrl, (string) $withoutSlash->getUri());
         $this->assertSame($expectedUrl, (string) $withSlash->getUri());
@@ -149,7 +149,7 @@ class AdobePaaSConnectionCheckRequestFactoryTest extends TestCase
 
             $this->assertSame('shop.example.com', $uri->getHost(), 'Store code must not change host for ['.$storeCode.'].');
             $this->assertStringStartsWith(
-                'https://shop.example.com/rest/'.rawurlencode($storeCode).'/V1/products/attributes',
+                'https://shop.example.com/rest/'.rawurlencode($storeCode).'/V1/products',
                 (string) $uri,
                 'Store code must remain a single encoded path segment for ['.$storeCode.'].',
             );

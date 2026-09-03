@@ -6,6 +6,7 @@
     $moduleVersion = $this->storeSetupModuleVersion;
     $applicationVersion = $this->storeSetupApplicationVersion;
     $phpVersion = $this->storeSetupPhpVersion;
+    $safeDiagnostics = $this->storeSetupDiagnostics;
 
     $requirements = app(\App\Support\Connectors\AdobePaaS\SafeSync\MagentoSafeSyncManifestReader::class)->requirements();
     $requirementsLines = array_values(array_filter([
@@ -74,6 +75,11 @@
         in_array($state, ['BASELINE_CONNECTION_FAILED', 'READINESS_TEMPORARY_PROBLEM', 'BASELINE_OK_READINESS_UNDETERMINED'], true) && filled($baselineMessage)
             ? __('connectors.ui.readiness.developer.packet.diagnostics.failure', ['message' => $baselineMessage])
             : null,
+        ...array_map(
+            fn (string $key, mixed $value): string => $key.': '.(is_array($value) ? implode(', ', $value) : (string) $value),
+            array_keys($safeDiagnostics),
+            array_values($safeDiagnostics),
+        ),
     ], fn (?string $value): bool => filled($value)));
 
     $packetLines = array_values(array_filter([
@@ -129,7 +135,7 @@
         'BASELINE_CONNECTION_FAILED' => 'connectors.ui.readiness.baseline_failure.title',
         'READINESS_TEMPORARY_PROBLEM' => 'connectors.ui.readiness.temporary_problem.title',
         'BASELINE_OK_READINESS_UNDETERMINED' => 'connectors.ui.readiness.readiness_undetermined.title',
-        default => null,
+        default => 'connectors.ui.readiness.not_checked.title',
     };
 
     $bodyKey = match ($state) {

@@ -47,7 +47,7 @@ final class AdobePaaSConnectionCheckRequestFactory
         }
 
         $path = rtrim($parsed['path'] ?? '', '/');
-        $path .= '/rest/'.rawurlencode($context->storeCode).'/V1/products/attributes';
+        $path .= '/rest/'.rawurlencode($context->storeCode).'/V1/products';
 
         $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
         $urlWithoutQuery = $parsed['scheme'].'://'.$parsed['host'].$port.$path;

@@ -16,6 +16,11 @@ final readonly class ConnectorConnectionCheckResult
         public ?TimeoutPhase $timeoutPhase,
         public ?string $vendorRequestId,
         public ?int $retryAfterSeconds,
+        public ?string $probeFamily = null,
+        public ?string $expectedAclResource = null,
+        public array $observedAclResources = [],
+        public ?string $recognizedOAuthProblem = null,
+        public ?string $responseShape = null,
     ) {}
 
     public static function success(): self
@@ -27,6 +32,12 @@ final readonly class ConnectorConnectionCheckResult
         ConnectorConnectionCheckErrorCode $errorCode,
         int $httpStatus,
         ?int $retryAfterSeconds = null,
+        ?string $vendorRequestId = null,
+        ?string $probeFamily = null,
+        ?string $expectedAclResource = null,
+        array $observedAclResources = [],
+        ?string $recognizedOAuthProblem = null,
+        ?string $responseShape = null,
     ): self {
         if ($httpStatus < 100 || $httpStatus > 599) {
             throw new \InvalidArgumentException('Invalid HTTP status.');
@@ -46,7 +57,19 @@ final readonly class ConnectorConnectionCheckResult
             }
         }
 
-        return new self(false, $httpStatus, $errorCode, null, null, $retryAfterSeconds);
+        return new self(
+            false,
+            $httpStatus,
+            $errorCode,
+            null,
+            $vendorRequestId,
+            $retryAfterSeconds,
+            $probeFamily,
+            $expectedAclResource,
+            $observedAclResources,
+            $recognizedOAuthProblem,
+            $responseShape,
+        );
     }
 
     public static function transportFailure(
@@ -67,6 +90,23 @@ final readonly class ConnectorConnectionCheckResult
     public function cause(): ?ConnectorErrorCause
     {
         return $this->errorCode?->cause();
+    }
+
+    public function withProbeFamily(string $probeFamily): self
+    {
+        return new self(
+            $this->succeeded,
+            $this->httpStatus,
+            $this->errorCode,
+            $this->timeoutPhase,
+            $this->vendorRequestId,
+            $this->retryAfterSeconds,
+            $probeFamily,
+            $this->expectedAclResource,
+            $this->observedAclResources,
+            $this->recognizedOAuthProblem,
+            $this->responseShape,
+        );
     }
 
     public function actionability(): ?ConnectorErrorActionability

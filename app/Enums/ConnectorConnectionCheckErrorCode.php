@@ -242,14 +242,14 @@ enum ConnectorConnectionCheckErrorCode: string
             self::AdobeRedirectResponse => $status >= 300 && $status <= 399,
             self::AdobeUnrecognizedBadRequest => $status === 400,
             self::AdobeInvalidCredentials => $status === 401,
-            self::AdobeInsufficientPermissions => $status === 403,
+            self::AdobeInsufficientPermissions => $status === 401 || $status === 403,
             self::AdobeInvalidOrUnsupportedEndpoint => $status === 404 || $status === 405,
             self::AdobeRequestTimeout => $status === 408,
             self::AdobeRateLimited => $status === 429,
             self::AdobeVendorUnavailable => $status >= 500 && $status <= 599,
             self::AdobeUnexpectedResponse => $status === 200,
             self::AdobeUnrecognizedClientError => $status >= 400 && $status <= 499
-                && ! in_array($status, [400, 401, 403, 404, 405, 408, 429], true),
+                && ! in_array($status, [400, 404, 405, 408, 429], true),
             default => false,
         };
     }
