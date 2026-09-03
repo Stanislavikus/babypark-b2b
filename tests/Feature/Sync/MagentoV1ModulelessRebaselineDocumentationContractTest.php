@@ -374,6 +374,50 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
     }
 
     #[Test]
+    public function ux_contract_does_not_gate_truth_flip_on_mandatory_first_party_safe_sync_component(): void
+    {
+        $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
+
+        // Per the Post-#168 / Post-D6 moduleless-by-default decision, the
+        // first-party Magento entity-bound Safe Sync implementation is an
+        // OPTIONAL Enhanced Safety primitive / current-runtime evidence,
+        // NOT a mandatory product prerequisite. The §13 boundary, §18
+        // seam, and §19 Link-first seam must NOT list it as a required
+        // truth-flip gate or "Stage 3E runtime blocker" prerequisite.
+        $this->assertStringNotContainsString(
+            'first-party Magento entity-bound Safe Sync component',
+            $content,
+        );
+        $this->assertStringNotContainsString(
+            'first-party Magento entity-bound Safe Sync runtime component',
+            $content,
+        );
+        $this->assertStringNotContainsString('Stage 3E runtime blocker', $content);
+
+        // The corrected §13 boundary / §18 seam / §19 Link-first seam
+        // must each anchor truth-flip on real-target certification of
+        // the actual standard shipping implementation, with Safe Sync
+        // relegated to current-runtime evidence / optional Enhanced
+        // Safety primitive.
+        $this->assertStringContainsString(
+            'real-target certification',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'actual standard shipping implementation',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'optional Enhanced Safety primitive',
+            $content,
+        );
+        $this->assertStringContainsString(
+            'not** a mandatory product prerequisite under the Post-#168 / Post-D6 moduleless-by-default decision',
+            $content,
+        );
+    }
+
+    #[Test]
     public function field_matrix_target_arch_keeps_seam_separation_no_mapping_consumes_stock_rest(): void
     {
         $content = File::get(base_path('docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md'));
