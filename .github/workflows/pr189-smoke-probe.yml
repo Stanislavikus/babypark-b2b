@@ -84,18 +84,90 @@ jobs:
           use App\Models\ConnectorAccount;
           use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapability;
           use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckRequestFactory;
+          use App\Support\Connectors\AdobePaaS\AdobePaaSBaseUrl;
           use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapability;
           use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
+          use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
+          use App\Support\Connectors\AdobePaaS\Command\AdobeProductCommandRequestFactory;
+          use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateNormalizer;
           use App\Support\Connectors\AdobePaaS\AdobeStoreConfigReader;
           use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReader;
+          use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
           use App\Support\Connectors\OAuth1\OAuth1SigningContext;
           use App\Support\Connectors\Transport\ConnectorHttpTransport;
           use App\Support\Connectors\Transport\ConnectorOutboundRequest;
           use App\Support\Connectors\Transport\ConnectorTransportLimits;
+          use GuzzleHttp\Psr7\Request;
 
           function println(string $line): void
           {
               echo $line.PHP_EOL;
+          }
+
+          /**
+           * @param  array<string, mixed>|null  $searchCriteria
+           */
+          function buildAbsoluteUrl(AdobePaaSRequestContext $context, string $endpointPath, ?array $searchCriteria): string
+          {
+              $baseUrl = AdobePaaSBaseUrl::parse($context->baseUrl);
+              $parsed = parse_url($baseUrl->value);
+              if ($parsed === false || ! isset($parsed['scheme'], $parsed['host'])) {
+                  throw new RuntimeException('BLOCKER invalid_base_url');
+              }
+
+              $path = rtrim($parsed['path'] ?? '', '/');
+              $path .= '/rest/'.rawurlencode($context->storeCode).$endpointPath;
+              $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
+              $urlWithoutQuery = $parsed['scheme'].'://'.$parsed['host'].$port.$path;
+
+              if ($searchCriteria === null) {
+                  return $urlWithoutQuery;
+              }
+
+              $query = http_build_query(
+                  ['searchCriteria' => $searchCriteria],
+                  '',
+                  '&',
+                  PHP_QUERY_RFC3986,
+              );
+
+              return $urlWithoutQuery.'?'.$query;
+          }
+
+          /**
+           * @param  array<string, mixed>|null  $searchCriteria
+           */
+          function signedGet(
+              ConnectorHttpTransport $transport,
+              OAuth1RequestSigner $signer,
+              AdobePaaSRequestContext $context,
+              OAuth1SigningContext $signingContext,
+              string $endpointPath,
+              ?array $searchCriteria,
+              float $totalTimeoutSeconds = 30.0,
+              int $maxResponseBodyBytes = 256000,
+          ): object {
+              $absoluteUrl = buildAbsoluteUrl($context, $endpointPath, $searchCriteria);
+              $request = new Request('GET', $absoluteUrl);
+              $authorizationHeader = $signer->sign(
+                  $request->getMethod(),
+                  (string) $request->getUri(),
+                  null,
+                  null,
+                  $context->credentials,
+                  $signingContext,
+              );
+
+              $outboundRequest = new ConnectorOutboundRequest(
+                  $request->withHeader('Authorization', $authorizationHeader),
+                  new ConnectorTransportLimits(
+                      connectTimeoutSeconds: 5.0,
+                      totalTimeoutSeconds: $totalTimeoutSeconds,
+                      maxResponseBodyBytes: $maxResponseBodyBytes,
+                  ),
+              );
+
+              return $transport->send($outboundRequest);
           }
 
           $account = ConnectorAccount::withoutWorkspaceScope()
@@ -226,6 +298,185 @@ jobs:
               println('E3 keys product_links='.((is_array($productLinks) && array_is_list($productLinks)) ? (string) count($productLinks) : 'null'));
               println('E3 keys media_gallery_entries='.((is_array($mediaGallery) && array_is_list($mediaGallery)) ? (string) count($mediaGallery) : 'null'));
               println('E3 keys tier_prices='.((is_array($tierPrices) && array_is_list($tierPrices)) ? (string) count($tierPrices) : 'null'));
+
+              $stockItem = null;
+              $quantityAndStockStatus = null;
+
+              if (is_array($extensionAttributes)) {
+                  $stockItem = $extensionAttributes['stock_item'] ?? null;
+                  $quantityAndStockStatus = $extensionAttributes['quantity_and_stock_status'] ?? null;
+              }
+
+              $price = $payload['price'] ?? null;
+              println('E8 capability=pricing_inventory_surfaces seam=product_payload status=PASS price='.(is_numeric($price) ? (string) $price : 'null').' stock_item='.(is_array($stockItem) ? 'present' : 'null').' quantity_and_stock_status='.(is_array($quantityAndStockStatus) ? 'present' : 'null'));
+
+              $commandFactory = app(AdobeProductCommandRequestFactory::class);
+              $mediaEntryId = null;
+
+              if (is_array($mediaGallery) && array_is_list($mediaGallery) && isset($mediaGallery[0]) && is_array($mediaGallery[0])) {
+                  $candidateId = $mediaGallery[0]['id'] ?? null;
+                  if (is_int($candidateId)) {
+                      $mediaEntryId = $candidateId;
+                  } elseif (is_numeric($candidateId)) {
+                      $mediaEntryId = (int) $candidateId;
+                  }
+              }
+
+              if ($mediaEntryId === null) {
+                  println('E6 capability=product_media_entry_get endpoint=/V1/products/{sku}/media/{id} status=SKIPPED reason=no_media_entry');
+              } else {
+                  $mediaRequest = $commandFactory->buildGetMediaEntry(
+                      $context,
+                      $firstSku,
+                      $mediaEntryId,
+                      new OAuth1SigningContext(bin2hex(random_bytes(16)), time()),
+                  );
+
+                  $mediaOutbound = new ConnectorOutboundRequest(
+                      $mediaRequest,
+                      new ConnectorTransportLimits(
+                          connectTimeoutSeconds: 5.0,
+                          totalTimeoutSeconds: 30.0,
+                          maxResponseBodyBytes: 256 * 1024,
+                      ),
+                  );
+
+                  try {
+                      $mediaResult = $transport->send($mediaOutbound);
+                  } catch (\Throwable) {
+                      println('E6 capability=product_media_entry_get endpoint=/V1/products/{sku}/media/{id} status=FAIL http=null sku='.$firstSku.' entry_id='.$mediaEntryId);
+                      exit(1);
+                  }
+
+                  println('E6 capability=product_media_entry_get endpoint=/V1/products/{sku}/media/{id} status='.($mediaResult->statusCode === 200 ? 'PASS' : 'FAIL').' http='.$mediaResult->statusCode.' sku='.$firstSku.' entry_id='.$mediaEntryId);
+
+                  if ($mediaResult->statusCode !== 200) {
+                      exit(1);
+                  }
+              }
+
+              if ($doc->typeId === 'configurable') {
+                  $childrenRequest = $commandFactory->buildGetConfigurableChildren(
+                      $context,
+                      $firstSku,
+                      new OAuth1SigningContext(bin2hex(random_bytes(16)), time()),
+                  );
+
+                  $childrenOutbound = new ConnectorOutboundRequest(
+                      $childrenRequest,
+                      new ConnectorTransportLimits(
+                          connectTimeoutSeconds: 5.0,
+                          totalTimeoutSeconds: 30.0,
+                          maxResponseBodyBytes: 512 * 1024,
+                      ),
+                  );
+
+                  try {
+                      $childrenResult = $transport->send($childrenOutbound);
+                  } catch (\Throwable) {
+                      println('E7 capability=configurable_children_get endpoint=/V1/configurable-products/{sku}/children status=FAIL http=null sku='.$firstSku);
+                      exit(1);
+                  }
+
+                  println('E7 capability=configurable_children_get endpoint=/V1/configurable-products/{sku}/children status='.($childrenResult->statusCode === 200 ? 'PASS' : 'FAIL').' http='.$childrenResult->statusCode.' sku='.$firstSku);
+
+                  if ($childrenResult->statusCode !== 200) {
+                      exit(1);
+                  }
+
+                  $optionsRequest = $commandFactory->buildGetConfigurableOptions(
+                      $context,
+                      $firstSku,
+                      new OAuth1SigningContext(bin2hex(random_bytes(16)), time()),
+                  );
+
+                  $optionsOutbound = new ConnectorOutboundRequest(
+                      $optionsRequest,
+                      new ConnectorTransportLimits(
+                          connectTimeoutSeconds: 5.0,
+                          totalTimeoutSeconds: 30.0,
+                          maxResponseBodyBytes: 512 * 1024,
+                      ),
+                  );
+
+                  try {
+                      $optionsResult = $transport->send($optionsOutbound);
+                  } catch (\Throwable) {
+                      println('E7 capability=configurable_options_get endpoint=/V1/configurable-products/{sku}/options/all status=FAIL http=null sku='.$firstSku);
+                      exit(1);
+                  }
+
+                  println('E7 capability=configurable_options_get endpoint=/V1/configurable-products/{sku}/options/all status='.($optionsResult->statusCode === 200 ? 'PASS' : 'FAIL').' http='.$optionsResult->statusCode.' sku='.$firstSku);
+
+                  if ($optionsResult->statusCode !== 200) {
+                      exit(1);
+                  }
+              } else {
+                  println('E7 capability=configurable_children_get endpoint=/V1/configurable-products/{sku}/children status=SKIPPED reason=not_configurable sku='.$firstSku);
+                  println('E7 capability=configurable_options_get endpoint=/V1/configurable-products/{sku}/options/all status=SKIPPED reason=not_configurable sku='.$firstSku);
+              }
+
+              $signer = app(OAuth1RequestSigner::class);
+
+              try {
+                  $stockResult = signedGet(
+                      $transport,
+                      $signer,
+                      $context,
+                      new OAuth1SigningContext(bin2hex(random_bytes(16)), time()),
+                      '/V1/stockItems/'.rawurlencode($firstSku),
+                      null,
+                      totalTimeoutSeconds: 30.0,
+                      maxResponseBodyBytes: 256 * 1024,
+                  );
+              } catch (\Throwable) {
+                  println('E8 capability=inventory_stock_item_get endpoint=/V1/stockItems/{sku} status=FAIL http=null sku='.$firstSku);
+                  exit(1);
+              }
+
+              println('E8 capability=inventory_stock_item_get endpoint=/V1/stockItems/{sku} status='.($stockResult->statusCode === 200 ? 'PASS' : 'INCONCLUSIVE').' http='.$stockResult->statusCode.' sku='.$firstSku);
+
+              try {
+                  $msiResult = signedGet(
+                      $transport,
+                      $signer,
+                      $context,
+                      new OAuth1SigningContext(bin2hex(random_bytes(16)), time()),
+                      '/V1/inventory/source-items',
+                      [
+                          'pageSize' => 1,
+                          'currentPage' => 1,
+                          'filterGroups' => [
+                              [
+                                  'filters' => [
+                                      [
+                                          'field' => 'sku',
+                                          'value' => $firstSku,
+                                          'conditionType' => 'eq',
+                                      ],
+                                  ],
+                              ],
+                          ],
+                      ],
+                      totalTimeoutSeconds: 30.0,
+                      maxResponseBodyBytes: 512 * 1024,
+                  );
+              } catch (\Throwable) {
+                  println('E8 capability=inventory_source_items_get endpoint=/V1/inventory/source-items status=FAIL http=null sku='.$firstSku);
+                  exit(1);
+              }
+
+              println('E8 capability=inventory_source_items_get endpoint=/V1/inventory/source-items status='.($msiResult->statusCode === 200 ? 'PASS' : 'INCONCLUSIVE').' http='.$msiResult->statusCode.' sku='.$firstSku);
+
+              $normalizer = app(AdobeProductRemoteStateNormalizer::class);
+              $observed = $normalizer->normalize($payload, $firstSku);
+
+              if ($observed === null) {
+                  println('E9 capability=normalize_product_observed_state seam=remote_state_normalizer status=FAIL sku='.$firstSku);
+                  exit(1);
+              }
+
+              println('E9 capability=normalize_product_observed_state seam=remote_state_normalizer status=PASS sku='.$firstSku.' custom_attributes='.count($observed->customAttributes));
           }
 
           $discovery = app(AdobePaaSDiscoveryCapability::class)->discover($context, '/V1/products/attributes');
@@ -248,6 +499,49 @@ jobs:
           }
 
           println('E5 capability=store_config endpoint=/V1/store/storeConfigs status=PASS base_currency='.$baseCurrency);
+
+          $signer = app(OAuth1RequestSigner::class);
+
+          try {
+              $websites = signedGet(
+                  $transport,
+                  $signer,
+                  $context,
+                  new OAuth1SigningContext(bin2hex(random_bytes(16)), time()),
+                  '/V1/store/websites',
+                  null,
+              );
+          } catch (\Throwable) {
+              println('E5 capability=store_websites endpoint=/V1/store/websites status=FAIL http=null');
+              exit(1);
+          }
+
+          println('E5 capability=store_websites endpoint=/V1/store/websites status='.($websites->statusCode === 200 ? 'PASS' : 'FAIL').' http='.$websites->statusCode);
+
+          if ($websites->statusCode !== 200) {
+              exit(1);
+          }
+
+          try {
+              $storeViews = signedGet(
+                  $transport,
+                  $signer,
+                  $context,
+                  new OAuth1SigningContext(bin2hex(random_bytes(16)), time()),
+                  '/V1/store/storeViews',
+                  null,
+              );
+          } catch (\Throwable) {
+              println('E5 capability=store_storeViews endpoint=/V1/store/storeViews status=FAIL http=null');
+              exit(1);
+          }
+
+          println('E5 capability=store_storeViews endpoint=/V1/store/storeViews status='.($storeViews->statusCode === 200 ? 'PASS' : 'FAIL').' http='.$storeViews->statusCode);
+
+          if ($storeViews->statusCode !== 200) {
+              exit(1);
+          }
+
           println('DONE');
           PHP
 
