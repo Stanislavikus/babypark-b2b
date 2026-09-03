@@ -321,6 +321,7 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
         $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
 
         $section = $this->extractSection($content, '### 19.8 First real sync', '### 19.9');
+        $normalized_section = $this->normalizeDocWhitespace($section);
 
         // The corrected wording: first / earliest point at which a real
         // Magento mutation MAY occur on the standard merchant journey.
@@ -329,7 +330,7 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
         $this->assertStringContainsString('first / earliest', $section);
         $this->assertStringContainsString('point** at which a real Magento mutation may occur', $section);
         $this->assertStringContainsString('Subsequent approved Live syncs continue to be governed by the', $section);
-        $this->assertStringContainsString('are forbidden from mutating Magento', $section);
+        $this->assertStringContainsString('are forbidden from mutating Magento', $normalized_section);
 
         // The "only point" / "only ever allowed" framing is forbidden.
         $this->assertStringNotContainsString('the only point at which a real Magento mutation is allowed', $section);
@@ -361,6 +362,7 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
 
         $section_19_3 = $this->extractSection($content, '### 19.3 Approved primary connection presentation', '### 19.4');
         $section_19_6 = $this->extractSection($content, '### 19.6 Exactly one next action (adaptive sequence)', '### 19.7');
+        $normalized_19_3 = $this->normalizeDocWhitespace($section_19_3);
 
         // The "[Перевірити ще раз]" control is now a conditional secondary
         // action that follows existing authorization / capability /
@@ -370,7 +372,7 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
         $this->assertStringContainsString('shown / usable when existing', $section_19_3);
         $this->assertStringContainsString('authorization / capability / action-state', $section_19_3);
         $this->assertStringContainsString('disabled or unavailable while', $section_19_3);
-        $this->assertStringContainsString('No new authorization logic is introduced by this freeze', $section_19_3);
+        $this->assertStringContainsString('No new authorization logic is introduced by this freeze', $normalized_19_3);
     }
 
     #[Test]
@@ -412,6 +414,7 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
             '### Newly approved target architecture (direction only — not runtime)',
             '### Narrow distinction this record preserves',
         );
+        $normalized_section = $this->normalizeDocWhitespace($section);
 
         // The corrected Field Matrix must keep the three seams separate:
         // - Magento stock API is the connector remote transport.
@@ -424,7 +427,7 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
         $this->assertStringContainsString('Mapping does **not** itself', $section);
         $this->assertStringContainsString('consume vendor stock REST as a runtime', $section);
         $this->assertStringContainsString('**Preview** is a **platform-owned orchestration**', $section);
-        $this->assertStringContainsString('bounded remote reads', $section);
+        $this->assertStringContainsString('bounded remote reads', $normalized_section);
 
         // The earlier lumped "Stock public REST as default runtime" bullet
         // (which falsely implied Mapping and Preview themselves consume
@@ -454,8 +457,13 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
         return $this->extractSection(
             $content,
             '#### Magento V1 Moduleless-by-default Stop-and-Amend',
-            '#### ',
+            "\n#### ",
         );
+    }
+
+    private function normalizeDocWhitespace(string $content): string
+    {
+        return preg_replace('/\s+/u', ' ', trim($content));
     }
 
     /**
