@@ -7903,6 +7903,173 @@ point for the `support = true` flip.
 
 No Stage 3D-3. No Stage 3F. No new normative Stage.
 
+#### Magento V1 Moduleless-by-default Stop-and-Amend
+[Resolved — Post-#168 / Post-D6 rebaseline — 2026-09-03]
+
+This subsection is a superseding Product / Domain Decision that
+**re-baselines the Magento / Adobe Commerce V1 product direction**
+without removing, retiring, or invalidating any Stage 3E
+entity-bound Safe Sync runtime contract recorded above.
+
+It is **docs-only** and introduces **no migrations, no new tables, no
+new enums, no new runtime services, no Composer range change, and no
+support truth flip**.
+
+##### Normative product direction (freezes the V1 architecture for the standard connector path)
+
+Standard Magento / Adobe Commerce V1 is **MODULELESS BY DEFAULT**.
+
+For the normal merchant path, the standard connector MUST NOT require
+the first-party `B2BPlatform_MagentoSafeSync` Composer component for:
+
+- account connection / OAuth handshake;
+- standard Product READ;
+- field discovery and Mapping;
+- merchant Preview ("Створити пробну синхронізацію");
+- normal moduleless Magento V1 operation once the stock REST path is
+  certified.
+
+The installed first-party Safe Sync component is no longer a basic
+connector prerequisite. Its absence must not be reported as:
+
+- connector failure;
+- incomplete Magento setup;
+- a blocker of ordinary Layer A / Layer B onboarding;
+- a merchant-visible warning on the standard path.
+
+##### Safe Sync becomes an OPTIONAL Enhanced Safety candidate
+
+The entity-bound Safe Sync runtime contract documented in the Stage 3E
+Stop-and-Amend section above remains a **legitimate, valuable,
+implementation-true primitive** in this repository. It is **not
+deprecated, not retired, not deleted, and not refused by this
+amendment**.
+
+It is re-classified for the standard product path as:
+
+- **Optional "Enhanced Safety" candidate** — installed and certified
+  separately when the merchant requires it as an advanced or paid tier;
+- a documented differentiator for capabilities the vendor stock API
+  cannot provide (for example: in-Magento transactional identity / SKU
+  verification, atomic mutation with rollback, and postcondition proof
+  on the target);
+- **never** a precondition for basic read, mapping, preview, or normal
+  Magento V1 operation.
+
+The proven Safe Sync differentiator above is its current architectural
+strength. This amendment does **not** claim that this differentiator
+already applies to every Magento V1 capability today — stock public
+WRITE support remains `false` until Tier-1 real-target certification.
+
+This amendment does **not** claim that the Safe Sync component is
+useless. Its code paths, contracts, and entity-bound mutation boundary
+remain first-class, durable repository artifacts.
+
+##### Stock public WRITE is direction, not yet support truth
+
+The Magento / Adobe Commerce V1 connector direction is to use the
+vendor stock public REST API as the **default runtime** for the
+standard path.
+
+Until each individual operation (read, write, list, media, lifecycle,
+etc.) has been **separately certified against a real Adobe Commerce
+target**, the public connector support truth for any consequential
+operation remains `false`. The headline support table
+(`Adobe Products / Export / Live | **FALSE**`) is unchanged by this
+amendment and is the only authoritative public support claim.
+
+Do not claim that any stock public WRITE path is already certified.
+Do not claim that any stock public WRITE path is impossible.
+Treat each operation as: **direction = stock public API; support truth
+= still pending real-target certification**.
+
+##### Re-scope of Decision 6 (PHP / Adobe certification matrix)
+
+Decision 6's PHP / Adobe certification matrix is **re-scoped** to the
+remaining contexts where it is still relevant:
+
+- the current **Safe Sync install / certification envelope** (i.e. the
+  Composer constraint of the optional first-party component, when the
+  merchant chooses Enhanced Safety);
+- any future **optional Enhanced Safety** compatibility / certification
+  evidence.
+
+The matrix is **no longer** a normal moduleless connector readiness
+gate:
+
+- Standard SaaS-style connectors that talk only to the vendor stock
+  public API are not bound by a project-side PHP version, because no
+  project code runs inside the merchant's Magento.
+- Stock `GET /magento_version` (or equivalent stock evidence) does
+  **not** provide exact patch + PHP truth; it must not be used to make
+  "upgrade to X" recommendations to a merchant.
+- This amendment does **not** widen or relax the current Composer
+  compatibility of the first-party Safe Sync component. Any such
+  widening requires its own separate, narrowly-scoped decision and
+  must not be smuggled in via this docs change.
+
+##### Connection truth (re-statement)
+
+Connection truth and downstream capability / readiness truth are
+**separate** evidence dimensions.
+
+For the standard moduleless V1 path:
+
+- proving the connector can talk to Magento is a baseline, not a
+  guarantee of any specific operation;
+- the absence of an unrelated Product Attribute permission MUST NOT be
+  reported to a merchant as a basic Magento connection failure when
+  structured evidence proves the credentials reached Magento but the
+  specific resource is not permitted;
+- a standard, bounded Product read probe is the appropriate baseline
+  evidence for "Підключено";
+- an HTTP status code by itself is **not** a sufficient classification
+  for the merchant-facing presentation of a baseline connection
+  outcome.
+
+##### Inventory presence does not mean support
+
+The existing rules stand and are not weakened by this amendment:
+
+- inventory presence in any field or capability manifest does NOT
+  prove current connector support;
+- completeness is NOT proven by a magic stable-field count;
+- each public Adobe field/capability row is still resolved against the
+  current Magento V1 Product Field Matrix and the
+  `MagentoV1ProductFieldMatrixTest` mechanical contract.
+
+##### Narrow distinction for the current runtime owner
+
+The current runtime still consumes the entity-bound Safe Sync primitive
+for trusted simple Product WRITE in some internal seams. That is the
+**current runtime truth** and is recorded as such in
+`08-CONNECTOR_SYNC_RUNTIME_ATLAS.md`. It is not contradicted by this
+amendment, because this amendment describes the **approved target
+architecture** for the standard merchant path, not a claim that
+moduleless code already exists in production.
+
+This intentionally creates a current-runtime-vs-new-contract gap that
+must be closed by a later, separately designed runtime migration. That
+later migration is **out of scope** for this docs amendment and is
+**not** authorised by it.
+
+##### What this amendment does NOT do
+
+This amendment does not:
+
+- delete, deprecate, or invalidate any Safe Sync code;
+- change the entity-bound mutation boundary;
+- change the entity-bound read + write boundary on the first-party
+  component;
+- widen the Composer compatibility range of the first-party component;
+- authorise a real Magento mutation, deployment, or support flip;
+- introduce migrations, new tables, new enums, or new runtime services;
+- claim that stock public WRITE is already certified;
+- introduce mandatory in-customer-platform installation for the
+  standard connector path.
+
+---
+
 #### Merchant Preview Authorization & Remediation Contract
 [Resolved — Stage 2-0]
 
