@@ -182,3 +182,60 @@ Typical Atlas maintenance is a few-row edit in the same Connector/Sync PR:
 Only affected rows are updated. Do not require a full Atlas reread per PR.
 
 Mechanical coverage: documentation-contract tests verify that declared `app/`, `database/`, `config/`, and `tests/` owner paths exist. That proves referential integrity only — not semantic freshness.
+
+---
+
+## Current runtime vs new contract — intentional gap (Post-#168 / Post-D6 rebaseline)
+[Recorded — 2026-09-03]
+
+After the Post-#168 / Post-D6 rebaseline recorded in
+`docs/03-DOMAIN_MODEL.md` → **Magento V1 Moduleless-by-default
+Stop-and-Amend**, an intentional gap exists between this Atlas's
+**current runtime truth** and the **approved target architecture** for
+the standard merchant path.
+
+The Atlas continues to record current runtime truth. It is **not**
+silently rewritten to match the new contract. The relevant rows above
+already say, in their own words, that:
+
+- trusted simple Product execution currently consumes
+  `AdobeSafeSyncClient::writeSimpleProduct(...)` for the simple
+  Live path;
+- the first-party `B2BPlatform_MagentoSafeSync` component is
+  currently used internally in some seams;
+- Adobe Products/Export/Live public support remains `false`;
+- the dormant code-vs-docs discrepancies table from Stage 3E
+  Post-#168 still stands.
+
+The new contract changes **the product direction** — standard
+Magento V1 is **moduleless by default**, and the first-party Safe
+Sync component is an **optional "Enhanced Safety" candidate**, not a
+baseline connector prerequisite. It does **not** claim that the
+underlying runtime migration is already complete. The migration that
+would actually decouple the standard connector path from the
+first-party component is a separate, separately-designed task and is
+**not** authorised by the new contract.
+
+Therefore, while the new contract is in force, the following
+intentional current-runtime-vs-new-contract facts remain visible and
+are **not** silently hidden:
+
+- Current code still consumes the entity-bound Safe Sync primitive
+  for trusted simple Product WRITE in some internal seams.
+- The Connector Account Overview is currently rendered through
+  `AdobeSafeSyncComponentReadinessResolver` and the
+  `store-setup.blade.php` block; that surface is not yet a pure
+  Layer A "Підключено → Що ми перевірили → one next action" surface
+  per `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md` §19.
+- The standard connector path is **not yet** wiring through a
+  pure stock public REST read / write seam for the merchant
+  overview; that is a future, separately-designed runtime task.
+- The Composer compatibility envelope of the first-party component
+  is **not** widened by the new contract; the current envelope
+  stands until a separate, narrowly-scoped decision changes it.
+
+A future Atlas entry may move a row from "current code still
+consumes Safe Sync" to "current code consumes only stock public REST
+on the standard path" once that future runtime migration is designed,
+approved, and shipped in its own PR(s). Until then, the Atlas must
+not lie.
