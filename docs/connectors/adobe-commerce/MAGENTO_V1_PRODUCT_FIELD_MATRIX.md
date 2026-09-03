@@ -192,3 +192,75 @@ Any other `frontend_input` remains fail-closed until explicitly verified and map
 - no Safe Sync module rewrite
 - no real Magento write
 - no deploy
+
+---
+
+## Current runtime owner vs newly approved target architecture
+[Recorded — 2026-09-03]
+
+This matrix is a **current runtime / audit truth** snapshot. It must
+continue to be read that way until a separate runtime task actually
+changes the seams below.
+
+### Current runtime owner (unchanged by this record)
+
+- **`AdobeProductDocumentReader` reuses
+  `AdobeProductRemoteStateClient::sendReadOnlyGetWithContext()`** for
+  trusted full Product document READ.
+- **Trusted simple Product execution** consumes
+  `AdobeSafeSyncClient::writeSimpleProduct(...)`.
+- **Trusted Receive** remains entity-bound
+  `AdobeSafeSyncClient::readProduct(...)`.
+- The configurable child path remains fail-closed.
+- No duplicate Product GET transport, OAuth signer, or request factory
+  exists in the standard seam.
+- No trusted stock `PUT /V1/products/{sku}` consequential writer
+  exists.
+
+These runtime seams are not rewritten by this record. The matrix still
+correctly names them as the **current** owner of the relevant
+operations.
+
+### Newly approved target architecture (direction only — not runtime)
+
+After the Post-#168 / Post-D6 rebaseline recorded in
+`docs/03-DOMAIN_MODEL.md` → **Magento V1 Moduleless-by-default
+Stop-and-Amend**, the **approved product direction** for the standard
+merchant path is:
+
+- **Moduleless by default**: standard Magento V1 connector MUST NOT
+  require the first-party `B2BPlatform_MagentoSafeSync` Composer
+  component for connection, READ, field discovery, mapping, Preview,
+  or normal Magento V1 operation once the stock public REST path is
+  separately certified for the relevant operation.
+- **Stock public REST as default runtime**: the standard path is
+  expected to consume vendor stock public REST for connection, READ,
+  field discovery, mapping, and Preview.
+- **Safe Sync reclassified as optional Enhanced Safety candidate**:
+  the first-party component remains a legitimate, implementation-true
+  primitive, but it is no longer a basic connector prerequisite.
+
+### Narrow distinction this record preserves
+
+This record does **not** claim that:
+
+- a stock public REST writer is already in production;
+- stock public READ has been Tier-1 certified;
+- the standard path is already running moduleless in production;
+- any row's `safe_sync_write_state` is anything other than what
+  the matrix already records;
+- the first-party Composer envelope is widened.
+
+This record also does **not** introduce new support rows. The matrix
+itself remains the audit truth for what the **current** runtime
+actually does. The Post-#168 rebaseline only rebaselines the
+**product direction** for the future standard path; it does not
+forbid the matrix from continuing to describe the **current** runtime
+truth it audits.
+
+Future field-matrix revisions that move a row from
+"current runtime = Safe Sync consumption" to "current runtime = stock
+public REST" must be backed by the separately-designed runtime
+migration that actually changes the seam. Until that migration ships,
+the matrix must continue to record the current runtime owner for that
+row.
