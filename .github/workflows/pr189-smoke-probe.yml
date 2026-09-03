@@ -20,245 +20,242 @@ jobs:
     timeout-minutes: 8
     steps:
       - name: Run Magento V1 READ evidence harness on smoke
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script_stop: true
-          script: |
-            set -euo pipefail
-            SMOKE=/var/www/babypark-b2b-smoke
-            EXPECTED_APP_HEAD=${{ github.sha }}
-            WT="/var/www/b2b-pr189-smoke-$$"
-            PROBE="/tmp/b2b-pr189-probe-$$.php"
-            EVIDENCE="$SMOKE/storage/app/pr189-smoke-read-evidence-${EXPECTED_APP_HEAD}.log"
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          EXPECTED_APP_HEAD="${GITHUB_SHA}"
+          REMOTE_EVIDENCE="/var/www/babypark-b2b-smoke/storage/app/pr189-smoke-read-evidence-${EXPECTED_APP_HEAD}.log"
 
-            cleanup() {
-              git -C "$SMOKE" worktree remove --force "$WT" >/dev/null 2>&1 || true
-              rm -rf "$WT" "$PROBE" >/dev/null 2>&1 || true
-            }
-            trap cleanup EXIT
+          mkdir -p ~/.ssh
+          printf '%s\n' "${DEPLOY_SSH_KEY}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
 
-            test -d "$SMOKE"
-            test -f "$SMOKE/.env"
-            test -d "$SMOKE/vendor"
-            echo "SMOKE_HOST=$(hostname)"
-            echo "PRIMARY_SMOKE_HEAD=$(git -C "$SMOKE" rev-parse HEAD)"
-            echo "PRIMARY_SMOKE_TREE=$(test -z "$(git -C "$SMOKE" status --porcelain)" && echo CLEAN || echo DIRTY_PRESERVED)"
+          ssh -i ~/.ssh/id_rsa "${DEPLOY_USER}@${DEPLOY_HOST}" "EXPECTED_APP_HEAD='${EXPECTED_APP_HEAD}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          SMOKE=/var/www/babypark-b2b-smoke
+          WT="/var/www/b2b-pr189-smoke-$$"
+          PROBE="/tmp/b2b-pr189-probe-$$.php"
+          EVIDENCE="$SMOKE/storage/app/pr189-smoke-read-evidence-${EXPECTED_APP_HEAD}.log"
 
-            git -C "$SMOKE" fetch origin codex/implement-magento-product-campaign
-            git -C "$SMOKE" cat-file -e "${EXPECTED_APP_HEAD}^{commit}"
-            git -C "$SMOKE" worktree add --detach "$WT" "$EXPECTED_APP_HEAD" >/dev/null
-            ln -s "$SMOKE/.env" "$WT/.env"
-            rm -rf "$WT/vendor" "$WT/storage"
-            ln -s "$SMOKE/vendor" "$WT/vendor"
-            ln -s "$SMOKE/storage" "$WT/storage"
-            mkdir -p "$WT/bootstrap/cache"
+          cleanup() {
+            git -C "$SMOKE" worktree remove --force "$WT" >/dev/null 2>&1 || true
+            rm -rf "$WT" "$PROBE" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
 
-            cd "$WT"
-            echo "VALIDATION_HEAD=$(git rev-parse HEAD)"
-            php artisan --version
-            rm -f "$EVIDENCE"
-            cat > "$PROBE" <<'PHP'
-            <?php
-            
-            
-            $wt = getenv('VALIDATION_WT');
-            
-            if (! is_string($wt) || $wt === '') {
-                fwrite(STDERR, "BLOCKER VALIDATION_WT_missing\n");
-                exit(1);
-            }
-            
-            chdir($wt);
-            
-            require $wt.'/vendor/autoload.php';
-            $app = require $wt.'/bootstrap/app.php';
-            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
-            
-            use App\Models\ConnectorAccount;
-            use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapability;
-            use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckRequestFactory;
-            use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapability;
-            use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
-            use App\Support\Connectors\AdobePaaS\AdobeStoreConfigReader;
-            use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReader;
-            use App\Support\Connectors\OAuth1\OAuth1SigningContext;
-            use App\Support\Connectors\Transport\ConnectorHttpTransport;
-            use App\Support\Connectors\Transport\ConnectorOutboundRequest;
-            use App\Support\Connectors\Transport\ConnectorTransportLimits;
-            
-            function println(string $line): void
-            {
-                echo $line.PHP_EOL;
-            }
-            
-            $account = ConnectorAccount::withoutWorkspaceScope()
-                ->where('auth_profile', 'adobe_commerce_paas_oauth1_integration')
-                ->where('is_enabled', true)
-                ->first();
-            
-            if ($account === null) {
-                println('BLOCKER connector_account_not_found');
-                exit(1);
-            }
-            
-            $workspaceId = (string) $account->workspace_id;
-            $accountId = (string) $account->id;
-            
-            println('TARGET connector_account_id='.$accountId);
-            println('TARGET workspace_id='.$workspaceId);
-            
-            $context = app(AdobePaaSRequestContextFactory::class)->create($workspaceId, $accountId);
-            println('TARGET store_code='.$context->storeCode);
-            
-            $connection = app(AdobePaaSConnectionCheckCapability::class)->checkConnection($context);
-            println('E0 capability=connection_check endpoint=/V1/products/attributes status='.($connection->succeeded ? 'PASS' : 'FAIL').' http='.($connection->httpStatus ?? 'null').' error='.($connection->errorCode?->value ?? 'null'));
-            
-            $catalogTotalCount = null;
-            $params = $connection->safeMessageParameters();
-            
-            if (array_key_exists('catalog_total_count', $params) && is_int($params['catalog_total_count'])) {
-                $catalogTotalCount = $params['catalog_total_count'];
-                println('E0 catalog_total_count='.$catalogTotalCount);
-            }
-            
-            $requestFactory = app(AdobePaaSConnectionCheckRequestFactory::class);
-            $transport = app(ConnectorHttpTransport::class);
-            
-            $signingContext = new OAuth1SigningContext(
-                bin2hex(random_bytes(16)),
-                time(),
-            );
-            
-            $request = $requestFactory->buildProductsSearch(
-                $context,
-                $signingContext,
-                ['pageSize' => 2, 'currentPage' => 1],
-            );
-            
-            $outboundRequest = new ConnectorOutboundRequest(
-                $request,
-                new ConnectorTransportLimits(
-                    connectTimeoutSeconds: 5.0,
-                    totalTimeoutSeconds: 30.0,
-                    maxResponseBodyBytes: 256 * 1024,
-                ),
-            );
-            
-            try {
-                $result = $transport->send($outboundRequest);
-            } catch (\Throwable $exception) {
-                println('E1 capability=products_collection endpoint=/V1/products status=FAIL http=null error=transport_failure');
-                exit(1);
-            }
-            
-            println('E1 capability=products_collection endpoint=/V1/products http='.$result->statusCode);
-            
-            $firstSku = null;
-            $productsTotalCount = null;
-            $itemsCount = null;
-            $shape = 'unknown';
-            
-            if ($result->statusCode === 200) {
-                try {
-                    $decoded = json_decode($result->body, true, 512, JSON_THROW_ON_ERROR);
-                } catch (\Throwable) {
-                    $decoded = null;
-                    $shape = 'non_json';
-                }
-            
-                if (is_array($decoded) && ! array_is_list($decoded)
-                    && isset($decoded['items']) && is_array($decoded['items'])
-                    && isset($decoded['search_criteria']) && is_array($decoded['search_criteria'])
-                    && isset($decoded['total_count']) && is_int($decoded['total_count']) && $decoded['total_count'] >= 0) {
-                    $shape = 'search_result';
-                    $productsTotalCount = $decoded['total_count'];
-                    $itemsCount = count($decoded['items']);
-            
-                    if ($itemsCount > 0 && is_array($decoded['items'][0])) {
-                        $sku = $decoded['items'][0]['sku'] ?? null;
-                        if (is_string($sku) && $sku !== '') {
-                            $firstSku = $sku;
-                        }
-                    }
-                } elseif ($shape === 'unknown') {
-                    $shape = 'unexpected_json';
-                }
-            } else {
-                $shape = 'http_'.$result->statusCode;
-            }
-            
-            println('E1 shape='.$shape.' total_count='.($productsTotalCount === null ? 'null' : (string) $productsTotalCount).' items_count='.($itemsCount === null ? 'null' : (string) $itemsCount).' first_sku='.($firstSku ?? 'null'));
-            
-            if ($result->statusCode !== 200) {
-                println('E1 RESULT FAIL');
-                exit(1);
-            }
-            
-            if ($firstSku === null) {
-                println('E2 empty_catalog='.($productsTotalCount === 0 ? 'PASS' : 'INCONCLUSIVE'));
-            } else {
-                println('E2 empty_catalog=SKIPPED');
-            }
-            
-            if ($firstSku !== null) {
-                try {
-                    $doc = app(AdobeProductDocumentReader::class)->read($workspaceId, $accountId, $firstSku);
-                } catch (\Throwable) {
-                    println('E3 capability=product_get endpoint=/V1/products/{sku} status=FAIL sku='.$firstSku);
-                    exit(1);
-                }
-            
-                $payload = $doc->originalPayload;
-                $customAttributes = $payload['custom_attributes'] ?? null;
-                $extensionAttributes = $payload['extension_attributes'] ?? null;
-                $productLinks = $payload['product_links'] ?? null;
-                $mediaGallery = $payload['media_gallery_entries'] ?? null;
-                $tierPrices = $payload['tier_prices'] ?? null;
-            
-                println('E3 capability=product_get endpoint=/V1/products/{sku} status=PASS sku='.$doc->sku.' id='.$doc->logicalEntityId.' type_id='.$doc->typeId);
-                println('E3 keys custom_attributes='.((is_array($customAttributes) && array_is_list($customAttributes)) ? (string) count($customAttributes) : 'null'));
-                println('E3 keys extension_attributes='.(is_array($extensionAttributes) ? 'present' : 'null'));
-                println('E3 keys product_links='.((is_array($productLinks) && array_is_list($productLinks)) ? (string) count($productLinks) : 'null'));
-                println('E3 keys media_gallery_entries='.((is_array($mediaGallery) && array_is_list($mediaGallery)) ? (string) count($mediaGallery) : 'null'));
-                println('E3 keys tier_prices='.((is_array($tierPrices) && array_is_list($tierPrices)) ? (string) count($tierPrices) : 'null'));
-            }
-            
-            $discovery = app(AdobePaaSDiscoveryCapability::class)->discover($context, '/V1/products/attributes');
-            
-            if (! $discovery->succeeded) {
-                println('E4 capability=attributes_discovery endpoint=/V1/products/attributes status=FAIL http='.($discovery->httpStatus ?? 'null').' error='.($discovery->errorCode?->value ?? 'null'));
-                exit(1);
-            }
-            
-            $candidate = $discovery->snapshotCandidate;
-            $fieldsNormalized = $candidate?->fieldsNormalized();
-            $fieldsReceived = $candidate?->fieldsReceived();
-            println('E4 capability=attributes_discovery endpoint=/V1/products/attributes status=PASS fields_normalized='.($fieldsNormalized === null ? 'null' : (string) $fieldsNormalized).' fields_received='.($fieldsReceived === null ? 'null' : (string) $fieldsReceived));
-            
-            try {
-                $baseCurrency = app(AdobeStoreConfigReader::class)->readBaseCurrency($workspaceId, $accountId);
-            } catch (\Throwable) {
-                println('E5 capability=store_config endpoint=/V1/store/storeConfigs status=FAIL');
-                exit(1);
-            }
-            
-            println('E5 capability=store_config endpoint=/V1/store/storeConfigs status=PASS base_currency='.$baseCurrency);
-            println('DONE');
-            PHP
-            
-            APP_ENV=stage3e-validation VALIDATION_WT="$WT" php "$PROBE" | tee "$EVIDENCE"
+          test -d "$SMOKE"
+          test -f "$SMOKE/.env"
+          test -d "$SMOKE/vendor"
 
-      - name: Fetch smoke evidence log
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: /var/www/babypark-b2b-smoke/storage/app/pr189-smoke-read-evidence-${{ github.sha }}.log
-          target: evidence
+          git -C "$SMOKE" fetch origin codex/implement-magento-product-campaign
+          git -C "$SMOKE" cat-file -e "${EXPECTED_APP_HEAD}^{commit}"
+          git -C "$SMOKE" worktree add --detach "$WT" "$EXPECTED_APP_HEAD" >/dev/null
+          ln -s "$SMOKE/.env" "$WT/.env"
+          rm -rf "$WT/vendor" "$WT/storage"
+          ln -s "$SMOKE/vendor" "$WT/vendor"
+          ln -s "$SMOKE/storage" "$WT/storage"
+          mkdir -p "$WT/bootstrap/cache"
+
+          cd "$WT"
+          php artisan --version
+          rm -f "$EVIDENCE"
+
+          cat > "$PROBE" <<'PHP'
+          <?php
+
+          $wt = getenv('VALIDATION_WT');
+
+          if (! is_string($wt) || $wt === '') {
+              fwrite(STDERR, "BLOCKER VALIDATION_WT_missing\n");
+              exit(1);
+          }
+
+          chdir($wt);
+
+          require $wt.'/vendor/autoload.php';
+          $app = require $wt.'/bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+          use App\Models\ConnectorAccount;
+          use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapability;
+          use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckRequestFactory;
+          use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapability;
+          use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
+          use App\Support\Connectors\AdobePaaS\AdobeStoreConfigReader;
+          use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReader;
+          use App\Support\Connectors\OAuth1\OAuth1SigningContext;
+          use App\Support\Connectors\Transport\ConnectorHttpTransport;
+          use App\Support\Connectors\Transport\ConnectorOutboundRequest;
+          use App\Support\Connectors\Transport\ConnectorTransportLimits;
+
+          function println(string $line): void
+          {
+              echo $line.PHP_EOL;
+          }
+
+          $account = ConnectorAccount::withoutWorkspaceScope()
+              ->where('auth_profile', 'adobe_commerce_paas_oauth1_integration')
+              ->where('is_enabled', true)
+              ->first();
+
+          if ($account === null) {
+              println('BLOCKER connector_account_not_found');
+              exit(1);
+          }
+
+          $workspaceId = (string) $account->workspace_id;
+          $accountId = (string) $account->id;
+
+          println('TARGET connector_account_id='.$accountId);
+          println('TARGET workspace_id='.$workspaceId);
+
+          $context = app(AdobePaaSRequestContextFactory::class)->create($workspaceId, $accountId);
+          println('TARGET store_code='.$context->storeCode);
+
+          $connection = app(AdobePaaSConnectionCheckCapability::class)->checkConnection($context);
+          println('E0 capability=connection_check endpoint=/V1/products/attributes status='.($connection->succeeded ? 'PASS' : 'FAIL').' http='.($connection->httpStatus ?? 'null').' error='.($connection->errorCode?->value ?? 'null'));
+
+          $params = $connection->safeMessageParameters();
+
+          if (array_key_exists('catalog_total_count', $params) && is_int($params['catalog_total_count'])) {
+              println('E0 catalog_total_count='.$params['catalog_total_count']);
+          }
+
+          $requestFactory = app(AdobePaaSConnectionCheckRequestFactory::class);
+          $transport = app(ConnectorHttpTransport::class);
+
+          $signingContext = new OAuth1SigningContext(
+              bin2hex(random_bytes(16)),
+              time(),
+          );
+
+          $request = $requestFactory->buildProductsSearch(
+              $context,
+              $signingContext,
+              ['pageSize' => 2, 'currentPage' => 1],
+          );
+
+          $outboundRequest = new ConnectorOutboundRequest(
+              $request,
+              new ConnectorTransportLimits(
+                  connectTimeoutSeconds: 5.0,
+                  totalTimeoutSeconds: 30.0,
+                  maxResponseBodyBytes: 256 * 1024,
+              ),
+          );
+
+          try {
+              $result = $transport->send($outboundRequest);
+          } catch (\Throwable) {
+              println('E1 capability=products_collection endpoint=/V1/products status=FAIL http=null error=transport_failure');
+              exit(1);
+          }
+
+          println('E1 capability=products_collection endpoint=/V1/products http='.$result->statusCode);
+
+          $firstSku = null;
+          $productsTotalCount = null;
+          $itemsCount = null;
+          $shape = 'unknown';
+
+          if ($result->statusCode === 200) {
+              try {
+                  $decoded = json_decode($result->body, true, 512, JSON_THROW_ON_ERROR);
+              } catch (\Throwable) {
+                  $decoded = null;
+                  $shape = 'non_json';
+              }
+
+              if (is_array($decoded) && ! array_is_list($decoded)
+                  && isset($decoded['items']) && is_array($decoded['items'])
+                  && isset($decoded['search_criteria']) && is_array($decoded['search_criteria'])
+                  && isset($decoded['total_count']) && is_int($decoded['total_count']) && $decoded['total_count'] >= 0) {
+                  $shape = 'search_result';
+                  $productsTotalCount = $decoded['total_count'];
+                  $itemsCount = count($decoded['items']);
+
+                  if ($itemsCount > 0 && is_array($decoded['items'][0])) {
+                      $sku = $decoded['items'][0]['sku'] ?? null;
+                      if (is_string($sku) && $sku !== '') {
+                          $firstSku = $sku;
+                      }
+                  }
+              } elseif ($shape === 'unknown') {
+                  $shape = 'unexpected_json';
+              }
+          } else {
+              $shape = 'http_'.$result->statusCode;
+          }
+
+          println('E1 shape='.$shape.' total_count='.($productsTotalCount === null ? 'null' : (string) $productsTotalCount).' items_count='.($itemsCount === null ? 'null' : (string) $itemsCount).' first_sku='.($firstSku ?? 'null'));
+
+          if ($result->statusCode !== 200) {
+              println('E1 RESULT FAIL');
+              exit(1);
+          }
+
+          if ($firstSku === null) {
+              println('E2 empty_catalog='.($productsTotalCount === 0 ? 'PASS' : 'INCONCLUSIVE'));
+          } else {
+              println('E2 empty_catalog=SKIPPED');
+          }
+
+          if ($firstSku !== null) {
+              try {
+                  $doc = app(AdobeProductDocumentReader::class)->read($workspaceId, $accountId, $firstSku);
+              } catch (\Throwable) {
+                  println('E3 capability=product_get endpoint=/V1/products/{sku} status=FAIL sku='.$firstSku);
+                  exit(1);
+              }
+
+              $payload = $doc->originalPayload;
+              $customAttributes = $payload['custom_attributes'] ?? null;
+              $extensionAttributes = $payload['extension_attributes'] ?? null;
+              $productLinks = $payload['product_links'] ?? null;
+              $mediaGallery = $payload['media_gallery_entries'] ?? null;
+              $tierPrices = $payload['tier_prices'] ?? null;
+
+              println('E3 capability=product_get endpoint=/V1/products/{sku} status=PASS sku='.$doc->sku.' id='.$doc->logicalEntityId.' type_id='.$doc->typeId);
+              println('E3 keys custom_attributes='.((is_array($customAttributes) && array_is_list($customAttributes)) ? (string) count($customAttributes) : 'null'));
+              println('E3 keys extension_attributes='.(is_array($extensionAttributes) ? 'present' : 'null'));
+              println('E3 keys product_links='.((is_array($productLinks) && array_is_list($productLinks)) ? (string) count($productLinks) : 'null'));
+              println('E3 keys media_gallery_entries='.((is_array($mediaGallery) && array_is_list($mediaGallery)) ? (string) count($mediaGallery) : 'null'));
+              println('E3 keys tier_prices='.((is_array($tierPrices) && array_is_list($tierPrices)) ? (string) count($tierPrices) : 'null'));
+          }
+
+          $discovery = app(AdobePaaSDiscoveryCapability::class)->discover($context, '/V1/products/attributes');
+
+          if (! $discovery->succeeded) {
+              println('E4 capability=attributes_discovery endpoint=/V1/products/attributes status=FAIL http='.($discovery->httpStatus ?? 'null').' error='.($discovery->errorCode?->value ?? 'null'));
+              exit(1);
+          }
+
+          $candidate = $discovery->snapshotCandidate;
+          $fieldsNormalized = $candidate?->fieldsNormalized();
+          $fieldsReceived = $candidate?->fieldsReceived();
+          println('E4 capability=attributes_discovery endpoint=/V1/products/attributes status=PASS fields_normalized='.($fieldsNormalized === null ? 'null' : (string) $fieldsNormalized).' fields_received='.($fieldsReceived === null ? 'null' : (string) $fieldsReceived));
+
+          try {
+              $baseCurrency = app(AdobeStoreConfigReader::class)->readBaseCurrency($workspaceId, $accountId);
+          } catch (\Throwable) {
+              println('E5 capability=store_config endpoint=/V1/store/storeConfigs status=FAIL');
+              exit(1);
+          }
+
+          println('E5 capability=store_config endpoint=/V1/store/storeConfigs status=PASS base_currency='.$baseCurrency);
+          println('DONE');
+          PHP
+
+          APP_ENV=stage3e-validation VALIDATION_WT="$WT" php "$PROBE" | tee "$EVIDENCE"
+          REMOTE
+
+          mkdir -p evidence
+          scp -i ~/.ssh/id_rsa "${DEPLOY_USER}@${DEPLOY_HOST}:${REMOTE_EVIDENCE}" "evidence/pr189-smoke-read-evidence-${EXPECTED_APP_HEAD}.log"
 
       - name: Upload evidence artifact
         uses: actions/upload-artifact@v4
