@@ -32,6 +32,7 @@ jobs:
             EXPECTED_APP_HEAD=${{ github.sha }}
             WT="/var/www/b2b-pr189-smoke-$$"
             PROBE="/tmp/b2b-pr189-probe-$$.php"
+            EVIDENCE="$SMOKE/storage/app/pr189-smoke-read-evidence-${EXPECTED_APP_HEAD}.log"
 
             cleanup() {
               git -C "$SMOKE" worktree remove --force "$WT" >/dev/null 2>&1 || true
@@ -58,8 +59,10 @@ jobs:
             cd "$WT"
             echo "VALIDATION_HEAD=$(git rev-parse HEAD)"
             php artisan --version
+            rm -f "$EVIDENCE"
             cat > "$PROBE" <<'PHP'
             <?php
+            
             
             $wt = getenv('VALIDATION_WT');
             
@@ -246,4 +249,19 @@ jobs:
             println('DONE');
             PHP
             
-            APP_ENV=stage3e-validation VALIDATION_WT="$WT" php "$PROBE"
+            APP_ENV=stage3e-validation VALIDATION_WT="$WT" php "$PROBE" | tee "$EVIDENCE"
+
+      - name: Fetch smoke evidence log
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: /var/www/babypark-b2b-smoke/storage/app/pr189-smoke-read-evidence-${{ github.sha }}.log
+          target: evidence
+
+      - name: Upload evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr189-smoke-read-evidence
+          path: evidence/**
