@@ -248,6 +248,79 @@ Existing frozen safety/domain contracts remain mandatory. This protocol changes 
 
 ---
 
+## 12. Optional Safe Sync — future comparative certification contract
+[Resolved — Post-#168 rebaseline — 2026-09-03]
+
+This section records how the first-party `B2BPlatform_MagentoSafeSync`
+component is treated by the delivery protocol **after** the
+Post-#168 moduleless-by-default rebaseline. It does **not** remove,
+deprecate, or invalidate any existing Safe Sync contract; it binds any
+**future** work on that component to a comparative, evidence-first
+certification.
+
+### 12.1 Classification
+
+For the standard connector path, the first-party component is
+re-classified as:
+
+- **Optional "Enhanced Safety" candidate**, not a baseline connector
+  prerequisite;
+- an advanced / paid-tier add-on, installed and certified separately
+  per merchant;
+- an implementation-true, legitimate primitive whose entity-bound
+  read + write boundary remains a durable repository artifact.
+
+It is **not** required for connection, standard Product READ, field
+discovery, mapping, Preview, or normal Magento V1 operation once the
+stock public REST path is separately certified for the relevant
+operation.
+
+### 12.2 Future certification contract
+
+Any future campaign that re-introduces, expands, or re-frames the
+first-party component for any merchant-visible capability MUST, **before
+shipping the merchant-facing change**, present a documented comparative
+proof that:
+
+1. identifies the exact capability the stock public REST API does
+   not provide for the target operation;
+2. demonstrates that the first-party component provides that capability
+   in a way the stock API cannot match on the **same** real Adobe
+   Commerce target;
+3. measures the operational cost (install, upgrade, merchant trust,
+   support surface, operational risk) of the first-party path against
+   the stock path for the **same** operation;
+4. shows that the differentiator materially affects the Product Goal
+   and is not merely developer preference;
+5. proposes the smallest possible deployment surface (for example:
+   opt-in module, opt-in webhook, opt-in storefront event) and
+   presents it to the merchant as optional or paid, never as baseline.
+
+A future campaign that cannot produce items 1–5 above MUST NOT
+re-position the first-party component as a precondition for the
+standard connector path. Re-positioning without that evidence
+triggers the Stop and Amend Rule.
+
+### 12.3 Composer / version envelope
+
+This section does **not** widen, relax, or narrow the current
+Composer compatibility of the first-party component. Any such change
+remains a separate, narrowly-scoped decision and must not be
+smuggled in via a docs change.
+
+### 12.4 Runtime migration, when and if it happens
+
+The current code may still consume the first-party component for
+trusted simple Product WRITE in some internal seams. That is recorded
+as **current runtime truth** in
+`08-CONNECTOR_SYNC_RUNTIME_ATLAS.md`. A future runtime migration
+that actually decouples the standard connector path from the
+first-party component is a separate, separately-designed task. It is
+**not** authorised by this delivery-protocol section and is **not**
+part of this docs amendment.
+
+---
+
 ## Final Rule
 
 For connector work, the next task is chosen by the shortest path to field-complete real transport.
