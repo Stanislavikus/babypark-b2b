@@ -4241,17 +4241,17 @@ the production cutover; the separate production activation has now also complete
 ### Connection-check capability and error mapping (Resolved)
 
 PaaS connection check is a single staged call:
-`GET {base_url}/rest/{store_code}/V1/products?searchCriteria[pageSize]=1` —
-this proves OAuth signature validity and the Product read permission required by
-the Product integration (`Magento_Catalog::products`) in one round trip. Schema
-Discovery remains a separate read of `/V1/products/attributes`; connection
-readiness never requires `Magento_Catalog::attributes_attributes`.
+`GET {base_url}/rest/{store_code}/V1/products/attributes?searchCriteria[pageSize]=1` —
+this proves OAuth signature validity **and** product-attribute read permission
+in one round trip. A two-stage check (lighter probe first) is only added later
+if field testing shows the attribute-list endpoint is blocked while a lighter
+endpoint passes.
 
 | Vendor signal | HTTP | Cause | Actionability | User message key |
 |---|---|---|---|---|
 | Invalid/revoked token or consumer key | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_credentials` |
 | OAuth signature/nonce/timestamp | 401 | `authentication` | `user_action_required` | `connectors.errors.invalid_signature` |
-| Exact structured Product route ACL denial (`parameters.resources` contains `Magento_Catalog::products`) | 401/403 | `authorization` | `user_action_required` | `connectors.errors.insufficient_permissions` |
+| Authenticated, ACL denied on attributes | 403 | `authorization` | `user_action_required` | `connectors.errors.insufficient_permissions` |
 | Invalid base URL/store/path, or unsupported endpoint on an otherwise valid host | 404 | `configuration` | `user_action_required` | `connectors.errors.invalid_or_unsupported_endpoint` |
 | Timeout | 408 / curl timeout | `network` | `automatic_retry` | `connectors.errors.timeout` |
 | Rate limited | 429 | `rate_limit` | `automatic_retry` | `connectors.errors.rate_limited` |
@@ -4269,19 +4269,18 @@ cause/message-key does not pretend to know which specific configuration
 field is wrong. A future probe that can genuinely disambiguate these cases
 may split this category later — that is not part of this decision.
 
-Raw vendor response bodies are never user-facing. For bounded JSON protected-REST failures, only the allowlisted top-level `oauth_problem` and `parameters.resources` fields are inspected. Certified resource representations are a non-empty string or a list of non-empty strings. Exact recognized OAuth problems take precedence; Product ACL denial is inferred only when the normalized set contains `Magento_Catalog::products`. HTTP status, safe request ID, probe family, recognized problem/resource identifiers, and response-shape class may be retained transiently; raw bodies and authorization material are never persisted.
+Raw vendor response bodies are never user-facing.
 
 #### Adobe OAuth identifier vocabulary (Task 4B-2a-2b)
 
-Protected REST API failures are classified only from the certified, bounded JSON
-fields above. The defensive top-level `oauth_problem` parser applies only when
-that machine-readable field is actually present in an explicitly certified or
-observed representation; this contract does not claim Magento protected REST
-universally emits it. Its value must exactly match the identifier vocabulary
-below; localized `message` text is never parsed. When neither a
-recognized OAuth identifier nor the exact Product ACL resource is present, 401/403
-fail closed to the unknown/support result rather than a status-only authentication
-or permission guess.
+Protected REST API calls on Magento/Adobe Commerce use the Web API `ErrorProcessor`,
+which serializes authentication and authorization failures as JSON
+(`{"message": "..."}`), not the `oauth_problem=<identifier>` form-style body used
+only on OAuth token endpoints (`/oauth/token/request`, `/oauth/token/access`).
+Because no stable, machine-readable OAuth identifier can be extracted from
+protected-REST error responses, connection-check execution uses HTTP-status-only
+fallback for 401/403. The identifier vocabulary below is retained for enum
+completeness and future use if Adobe exposes a reliable extraction path.
 
 | Adobe identifier | HTTP | Cause | Actionability | Message key |
 |---|---|---|---|---|
@@ -4316,8 +4315,8 @@ unchanged.
 | `3xx` | `configuration`/`user_action_required`/`connectors.errors.invalid_or_unsupported_endpoint` |
 | `400`/`401`/`403`/`405` with a recognized Adobe identifier | per Adobe OAuth identifier table |
 | `400` unrecognized | `unknown`/`support_required`/`connectors.errors.connection_check_failed` |
-| `401` unrecognized | `unknown`/`support_required`/`connection_check_failed` |
-| `403` unrecognized (including HTML, malformed/generic JSON, unrelated or unsupported resource shape) | `unknown`/`support_required`/`connection_check_failed` |
+| `401` unrecognized | B7 row: `authentication`/`user_action_required`/`invalid_credentials` |
+| `403` unrecognized | B7 row: `authorization`/`user_action_required`/`insufficient_permissions` |
 | `404` | B7 row: exact single-category mapping |
 | `405` without a recognized OAuth identifier | `configuration`/`user_action_required`/`connectors.errors.invalid_or_unsupported_endpoint` |
 | `408` | B7 row: `network`/`automatic_retry`/`connectors.errors.timeout` |
@@ -7306,11 +7305,8 @@ outcome only).
   after the run has its writer lease/deadline; DB-fresh
   `SyncRunConsequentialWriteGate` is rechecked after handshake
 
-Implemented seams: `ConnectorLiveRuntimeReadiness` resolves the existing Safe Sync
-readiness primitive without persistence; `SyncLiveAdmissionService` probes before
-its DB admission transaction; `SyncLiveRunJob` probes after writer lease/deadline
-and immediately before the first consequential write, then rechecks
-`SyncRunConsequentialWriteGate` from fresh DB state.
+Current seams to extend (runtime follow-on): `SyncLiveAdmissionService`,
+`SyncLiveRunJob`, `SyncRunConsequentialWriteGate`.
 
 #### Failure semantics (frozen)
 
@@ -7898,7 +7894,7 @@ point for the `support = true` flip.
 | Disposable validation harness | **Implemented (internal; validation-only)** — Decision 9 step 3 landed; no real-target certification executed in this PR |
 | Isolated simple writer real-target certification (2.4.9 / 8.5; 2.4.9 / 8.4; 2.4.8-p5 / 8.4) | **Pending** — Decision 9 step 4 |
 | Content Staging / Galera / entity-bound lifecycle / configurable / media proofs | **Pending** — Decision 9 steps 5–9 |
-| `ConnectorLiveRuntimeReadiness` integration | **Implemented (internal; support false)** — stateless Start Live probe outside admission transaction; worker probe after writer lease/deadline followed by DB-fresh consequential-write gate recheck |
+| `ConnectorLiveRuntimeReadiness` integration | **Pending** — Decision 9 step 10 |
 | Live consumption completion (configurable/media + remove remaining stock SKU-addressed consequential paths) | **Pending** — Decision 9 step 11 |
 | Final truth-flip gate / `support = true` | **Pending** — Decision 9 step 12 |
 | Adobe Products / Export / Live | **FALSE** |
