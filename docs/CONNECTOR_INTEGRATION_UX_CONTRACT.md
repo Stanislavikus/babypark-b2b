@@ -625,3 +625,208 @@ Therefore link-first + entity trust + informed confirmation are **required** but
 **not sufficient** for exemplary consequential Live. Truth flip waits for proven
 first-party Magento entity-bound Safe Sync component across every advertised V1 Live
 mutation category (Stage 3E runtime blocker).
+
+---
+
+## 19. Connector Account Overview — verify-to-preview journey freeze
+[Resolved — Post-#168 / Post-D6 rebaseline — 2026-09-03]
+
+This section freezes the **canonical merchant journey** for the standard
+Connector Account Overview (Layer A) on the standard moduleless Magento
+V1 path. It is the **authority** for what the merchant sees and what the
+merchant does next. It is a UX contract; it does **not** claim that the
+underlying runtime migration is already complete. The current runtime
+truth is recorded in `08-CONNECTOR_SYNC_RUNTIME_ATLAS.md` and is not
+contradicted by this freeze.
+
+### 19.1 Frozen merchant journey
+
+The journey is exactly:
+
+```
+CONNECT
+   ↓
+safe VERIFY  (re-checks the standard baseline; never mutates Magento)
+   ↓
+"Що ми перевірили"  (the small list of what was safely looked at)
+   ↓
+ONE next action  (the only enabled primary action; adaptive to state)
+   ↓
+"Створити пробну синхронізацію"  (Preview — explicitly does NOT change Magento)
+   ↓
+"Виконати першу синхронізацію"  (the explicit first real sync, only after Preview)
+```
+
+Every connector Account Overview (Layer A) for the standard path MUST
+render this exact sequence in this exact order. No step is skippable.
+No two primary actions are shown at the same time on the standard path
+before the previous step is complete.
+
+### 19.2 Time-to-answer budget
+
+The Overview must answer, in approximately five seconds for an ordinary
+non-technical merchant, exactly these four questions and nothing more:
+
+1. **Am I connected?** — `Підключено` / `Не вдалося підключитися`,
+   never an internal status word and never a raw HTTP code.
+2. **What did the platform safely verify?** — the bounded
+   `Що ми перевірили` list (see §19.4), not a field count, not a
+   schema summary, not a raw snapshot.
+3. **Anything to fix?** — `Потребує уваги` with a single link to a
+   remediation surface, never a threat dashboard.
+4. **One next action** — the only primary action in the merchant's
+   current state (see §19.6), never a stack of three actions.
+
+### 19.3 Approved primary connection presentation
+
+The approved primary connection line is:
+
+```
+Magento · [account name]
+🟢 Підключено
+Перевірено [time]
+[Перевірити ще раз]      ← secondary action, always available to a connected merchant
+Перевірка не змінює дані в Magento
+```
+
+- Use **`Підключено`** as the merchant copy. Do not say "Magento
+  працює", "Magento готовий", or any equivalent that mixes connection
+  with operation readiness.
+- Do not show raw version / patch / PHP / module strings on Layer A.
+- The `[Перевірити ще раз]` control re-runs the safe baseline; it
+  must not start any mutating operation.
+- The "Перевірка не змінює дані в Magento" reassurance line is
+  mandatory on the standard path.
+
+### 19.4 "Що ми перевірили" (Layer A only)
+
+The `Що ми перевірили` heading is a Layer A list of what the platform
+safely looked at, not a discovery report. Each row uses the exact
+concrete business wording below. Do not show field counts, schema
+identifiers, snapshot identifiers, or endpoint paths on Layer A.
+
+| Item | Approved Layer-A copy |
+|---|---|
+| Каталог товарів | ✓ Доступ підтверджено · Знайдено N товарів |
+| Поля товарів | ✓ Доступ підтверджено · [Переглянути поля] → opens Mapping (Layer B supporting) |
+| Зображення | ✓ Доступ підтверджено |
+
+Rules:
+
+- Do not use the magic headline field count as proof of connector
+  completeness. N is a count, not a certification. The detailed field
+  information belongs to **Mapping → Available Fields** (Layer B
+  supporting), not to Overview.
+- An **empty catalogue is neutral** and is presented as
+  `Каталог поки порожній` — never as a warning or an error.
+- For image / media verification during ordinary Verify, prove a
+  bounded / cheap media accessibility check, not a full walk of the
+  entire catalogue. Do not count every image.
+- Layer A/B must not expose any of: HTTP status codes, OAuth / ACL
+  identifiers, endpoint paths, schema / discovery / snapshot /
+  canonical-hash vocabulary, "Safe Sync", PHP / Composer strings,
+  Decision 6 wording, or any internal readiness / probe / handshake
+  names.
+
+### 19.5 Connection truth is independent of capability truth
+
+A successful baseline connection MUST NOT become red merely because:
+
+- field-metadata permission is missing on the target;
+- an optional mapping aid (for example: Available Fields preview) is
+  not yet available;
+- another downstream concern (Preview, Live, first sync) is unresolved.
+
+The four categories of §10 are the **only** allowed merchant-facing
+classifications. A baseline connection failure maps to
+`Потрібно перевірити підключення` and is rendered as such. A
+downstream capability or permission concern maps to its own category;
+it must **not** rewrite the baseline connection.
+
+A Magento ACL denial (for example: missing Product Attribute read
+permission when the credentials themselves are correct) MUST NOT be
+presented to the merchant as bad credentials. The structural evidence
+proves the credentials reached Magento; the surface must respect that
+distinction.
+
+### 19.6 Exactly one next action (adaptive sequence)
+
+The Overview shows **exactly one** primary action at a time, picked
+from the following sequence in this order:
+
+1. **`Налаштувати синхронізацію`** — only when setup is required
+   before any Preview can run.
+2. **`Створити пробну синхронізацію`** — once setup exists and the
+   connection is healthy. This is the merchant wording for Preview.
+3. **`Виконати першу синхронізацію`** — only after the merchant has
+   seen a real Preview and is on the explicit first-Live path.
+
+Do not show all three at once. Do not invent extra primary actions on
+the standard path. `Перевірити ще раз` is always available as a
+secondary action; it is not a substitute for the next primary action.
+
+### 19.7 Preview / "Пробна синхронізація"
+
+Preview-first architecture is preserved.
+
+- The merchant wording for the action is **`Створити пробну
+  синхронізацію`**.
+- The Preview page must state, in the same surface, the exact
+  reassurance: **"Пробна синхронізація не змінює дані в Magento"**.
+- A short second sentence may explain that Preview only inspects and
+  classifies the relevant data; it must not promise that Preview
+  performs any real Magento write.
+- The actual ready / needs-attention / impossible counts belong to
+  Preview, not to Overview. Overview never displays these counts as a
+  health KPI.
+- The Overview MUST NOT show a "Синхронізація працює" or equivalent
+  success claim before the merchant has performed an explicit first
+  real sync with proven real-target evidence.
+
+### 19.8 First real sync
+
+Only after Preview may the merchant explicitly initiate the first real
+sync through **`Виконати першу синхронізацію`**. The first real sync:
+
+- requires a fresh Preview reference or an explicit merchant
+  acknowledgement that the most recent Preview is still valid;
+- is the only point at which a real Magento mutation is allowed on
+  the standard path;
+- is the only point at which Overview may update to a "first sync
+  completed" state.
+
+### 19.9 What this freeze does NOT do
+
+This freeze does not:
+
+- claim that the underlying runtime migration is already complete;
+- promote any optional / Enhanced Safety component to a baseline
+  prerequisite;
+- introduce new Layer-A surface elements that expose Layer-C / D
+  diagnostics;
+- replace the §12 visibility table or the §13 forbidden vocabulary;
+- weaken the existing Layer-A, Layer-B, Layer-C, Layer-D separation;
+- weaken the existing per-domain ownership question in §6.
+
+### 19.10 Acceptance test anchors
+
+The following assertions are the minimum mechanical protection of this
+freeze and are recorded here so a future PR that violates any of them
+triggers a documentation-contract test failure:
+
+- Overview shows exactly one primary action, picked adaptively from
+  §19.6.
+- "Підключено" / "Не вдалося підключитися" merchant copy is used;
+  no "Magento працює" / "Magento готовий" or equivalent.
+- "Що ми перевірили" uses the three Layer A rows from §19.4; no raw
+  field count; no "magic stable-field count" KPI.
+- "Пробна синхронізація не змінює дані в Magento" reassurance is
+  present on the Preview page.
+- No HTTP status code, OAuth / ACL identifier, endpoint path, schema
+  / discovery / snapshot / canonical-hash vocabulary, "Safe Sync",
+  PHP / Composer strings, Decision 6 wording, or internal
+  readiness / probe / handshake name is rendered on Layer A/B.
+- An empty catalogue is rendered as a neutral "Каталог поки
+  порожній" state, not as a warning or an error.
+- A baseline connection success is not re-coloured red solely because
+  of a missing Product Attribute read permission.
