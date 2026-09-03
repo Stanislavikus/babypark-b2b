@@ -903,12 +903,6 @@ class ConnectorAccountResourceTest extends TestCase
             ConnectorConnectionCheckResult::httpFailure(
                 ConnectorConnectionCheckErrorCode::AdobeInvalidOrUnsupportedEndpoint,
                 404,
-                vendorRequestId: 'vendor-request-777',
-                probeFamily: 'safe_sync_handshake',
-                expectedAclResource: 'Magento_Catalog::products',
-                observedAclResources: ['Magento_Catalog::products'],
-                recognizedOAuthProblem: 'signature_invalid',
-                responseShape: 'recognized_oauth_problem',
             ),
             ConnectorComponentReadiness::SetupRequired,
             true,
@@ -978,10 +972,6 @@ class ConnectorAccountResourceTest extends TestCase
             ConnectorConnectionCheckResult::httpFailure(
                 ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions,
                 403,
-                probeFamily: 'magento_products',
-                expectedAclResource: 'Magento_Catalog::products',
-                observedAclResources: ['Magento_Catalog::products'],
-                responseShape: 'magento_acl_resource_string',
             ),
             null,
             false,

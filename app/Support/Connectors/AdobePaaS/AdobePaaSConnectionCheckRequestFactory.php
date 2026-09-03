@@ -18,7 +18,7 @@ final class AdobePaaSConnectionCheckRequestFactory
         AdobePaaSRequestContext $context,
         OAuth1SigningContext $signingContext,
     ): RequestInterface {
-        $absoluteUrl = $this->buildAbsoluteUrl($context);
+        $absoluteUrl = $this->buildAbsoluteUrl($context, '/V1/products/attributes', ['pageSize' => 1]);
         $request = new Request('GET', $absoluteUrl);
 
         $authorizationHeader = $this->signer->sign(
@@ -33,7 +33,37 @@ final class AdobePaaSConnectionCheckRequestFactory
         return $request->withHeader('Authorization', $authorizationHeader);
     }
 
-    private function buildAbsoluteUrl(AdobePaaSRequestContext $context): string
+    /**
+     * @param  array<string, mixed>  $searchCriteria
+     */
+    public function buildProductsSearch(
+        AdobePaaSRequestContext $context,
+        OAuth1SigningContext $signingContext,
+        array $searchCriteria,
+    ): RequestInterface {
+        $absoluteUrl = $this->buildAbsoluteUrl($context, '/V1/products', $searchCriteria);
+        $request = new Request('GET', $absoluteUrl);
+
+        $authorizationHeader = $this->signer->sign(
+            $request->getMethod(),
+            (string) $request->getUri(),
+            null,
+            null,
+            $context->credentials,
+            $signingContext,
+        );
+
+        return $request->withHeader('Authorization', $authorizationHeader);
+    }
+
+    /**
+     * @param  array<string, mixed>  $searchCriteria
+     */
+    private function buildAbsoluteUrl(
+        AdobePaaSRequestContext $context,
+        string $endpointPath,
+        array $searchCriteria,
+    ): string
     {
         if ($context->storeCode === '') {
             throw new InvalidAdobePaaSRequestContextException('Adobe PaaS store code must not be empty.');
@@ -47,12 +77,12 @@ final class AdobePaaSConnectionCheckRequestFactory
         }
 
         $path = rtrim($parsed['path'] ?? '', '/');
-        $path .= '/rest/'.rawurlencode($context->storeCode).'/V1/products';
+        $path .= '/rest/'.rawurlencode($context->storeCode).$endpointPath;
 
         $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
         $urlWithoutQuery = $parsed['scheme'].'://'.$parsed['host'].$port.$path;
         $query = http_build_query(
-            ['searchCriteria' => ['pageSize' => 1]],
+            ['searchCriteria' => $searchCriteria],
             '',
             '&',
             PHP_QUERY_RFC3986,

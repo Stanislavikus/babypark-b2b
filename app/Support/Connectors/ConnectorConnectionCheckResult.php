@@ -16,28 +16,21 @@ final readonly class ConnectorConnectionCheckResult
         public ?TimeoutPhase $timeoutPhase,
         public ?string $vendorRequestId,
         public ?int $retryAfterSeconds,
-        public ?string $probeFamily = null,
-        public ?string $expectedAclResource = null,
-        public array $observedAclResources = [],
-        public ?string $recognizedOAuthProblem = null,
-        public ?string $responseShape = null,
+        public array $safeMessageParameters = [],
     ) {}
 
-    public static function success(): self
+    /**
+     * @param  array<string, mixed>  $safeMessageParameters
+     */
+    public static function success(array $safeMessageParameters = []): self
     {
-        return new self(true, 200, null, null, null, null);
+        return new self(true, 200, null, null, null, null, $safeMessageParameters);
     }
 
     public static function httpFailure(
         ConnectorConnectionCheckErrorCode $errorCode,
         int $httpStatus,
         ?int $retryAfterSeconds = null,
-        ?string $vendorRequestId = null,
-        ?string $probeFamily = null,
-        ?string $expectedAclResource = null,
-        array $observedAclResources = [],
-        ?string $recognizedOAuthProblem = null,
-        ?string $responseShape = null,
     ): self {
         if ($httpStatus < 100 || $httpStatus > 599) {
             throw new \InvalidArgumentException('Invalid HTTP status.');
@@ -62,13 +55,9 @@ final readonly class ConnectorConnectionCheckResult
             $httpStatus,
             $errorCode,
             null,
-            $vendorRequestId,
+            null,
             $retryAfterSeconds,
-            $probeFamily,
-            $expectedAclResource,
-            $observedAclResources,
-            $recognizedOAuthProblem,
-            $responseShape,
+            [],
         );
     }
 
@@ -84,29 +73,12 @@ final readonly class ConnectorConnectionCheckResult
             throw new \InvalidArgumentException('TimeoutPhase only applies to TransportTimeout.');
         }
 
-        return new self(false, null, $errorCode, $timeoutPhase, null, null);
+        return new self(false, null, $errorCode, $timeoutPhase, null, null, []);
     }
 
     public function cause(): ?ConnectorErrorCause
     {
         return $this->errorCode?->cause();
-    }
-
-    public function withProbeFamily(string $probeFamily): self
-    {
-        return new self(
-            $this->succeeded,
-            $this->httpStatus,
-            $this->errorCode,
-            $this->timeoutPhase,
-            $this->vendorRequestId,
-            $this->retryAfterSeconds,
-            $probeFamily,
-            $this->expectedAclResource,
-            $this->observedAclResources,
-            $this->recognizedOAuthProblem,
-            $this->responseShape,
-        );
     }
 
     public function actionability(): ?ConnectorErrorActionability
@@ -145,10 +117,10 @@ final readonly class ConnectorConnectionCheckResult
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
     public function safeMessageParameters(): array
     {
-        return [];
+        return $this->safeMessageParameters;
     }
 }

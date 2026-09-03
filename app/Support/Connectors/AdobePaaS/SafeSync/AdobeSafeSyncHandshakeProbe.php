@@ -41,7 +41,7 @@ final class AdobeSafeSyncHandshakeProbe implements AdobeSafeSyncHandshakeProbeCa
 
         if ($result->statusCode !== 200) {
             return AdobeSafeSyncHandshakeProbeResult::failed(
-                $this->responseMapper->map($result)->withProbeFamily('safe_sync_handshake'),
+                $this->responseMapper->map($result),
             );
         }
 
@@ -51,8 +51,6 @@ final class AdobeSafeSyncHandshakeProbe implements AdobeSafeSyncHandshakeProbeCa
             return AdobeSafeSyncHandshakeProbeResult::failed(ConnectorConnectionCheckResult::httpFailure(
                 ConnectorConnectionCheckErrorCode::AdobeUnexpectedResponse,
                 200,
-                probeFamily: 'safe_sync_handshake',
-                responseShape: 'invalid_handshake_json',
             ));
         }
     }

@@ -128,6 +128,24 @@ final class AdobeProductReceiveProposalException extends RuntimeException
         );
     }
 
+    public static function productReadFailed(string $reasonCode, ?\Throwable $previous = null): self
+    {
+        return new self(
+            $reasonCode,
+            'Stock Magento Product document read failed during Receive proposal build.',
+            $previous,
+        );
+    }
+
+    public static function productReadContextInvalid(?\Throwable $previous = null): self
+    {
+        return new self(
+            'product_read_context_invalid',
+            'Magento Product request context is invalid for Receive proposal build.',
+            $previous,
+        );
+    }
+
     public static function configurationChanged(): self
     {
         return new self(
