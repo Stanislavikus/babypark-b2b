@@ -10,18 +10,18 @@
 
 **Non-goal:** This contract does not itself authorize arbitrary backend work and is not the workspace-permission implementation specification beyond the approved domain authorization contract in `docs/03-DOMAIN_MODEL.md` → **Workspace access model and authorization (Resolved — Task 4C-1c-2a)** and **Preview-first Sync Execution Foundation Contract (Resolved — Task 4C-2a)** / **Merchant Preview Authorization & Remediation Contract (Resolved — Stage 2-0)**. Some underlying mechanisms are already shipped (for example `ConnectorCapability`, Discovery runtime, snapshot persistence, workspace isolation guards, Layer-B Mapping UI on `ManageSyncFieldMappings`, Mapping → Available Fields supporting reference with workspace-scoped Mapping authorization, Stage 1 Preview Engine with `run_sync_preview` and persisted zero-mutation Preview runs, Stage 2A-1 `manage_sync_configurations` runtime permission and Adobe Products Export Layer-B setup, Stage 2A-2 merchant Preview work surface and remediation presentation, **Stage 2B Option Mapping remediation UI on `ManageSyncFieldOptionMappings`**). Missing backend/runtime/security prerequisites require their own scoped tasks. Specifically, Task **4C-1c-2b** Layer-B Mapping UI and its Mapping-side Available Fields supporting path are shipped (PR #139, merge `9a4be2f`). Task **4C-2a** freezes Preview execution architecture (docs only); **`run_sync_preview` runtime and `SyncRun` Preview execution are implemented in Stage 1** (PR #145). **Stage 2-0** freezes merchant Preview authorization/remediation contract (docs only). **Stage 2A** (2A-1 + 2A-2) is **shipped** — `manage_sync_configurations`, non-mutating existence lookup, Adobe Products Export setup, merchant Preview UI, and contextual remediation presentation. **Stage 2B is shipped** — Option Mapping remediation on `ManageSyncFieldOptionMappings` using existing `view_sync_mappings` / `manage_sync_mappings` permissions only. Mechanisms that explicitly remain future include scheduling, issue aggregation/bulk resolution, sync-run history, ownership persistence/enforcement, broader Layer-C platform-support identity/gating, and **Stage 3B–3E** Live Engine implementation slices (**Stage 3A** Live Safety foundation is **shipped** — `run_sync_live`, stale active-run recovery, `ExternalRecordLink` persistence, Live admission/shell; **Stage 3-0** Live Safety contract is **Done (docs)**). Do **not** claim that historical pre-B-2 fixed `User.role` authorization satisfies this UX contract — that transitional behavior is historical evidence only under **GAP-026** / PR #102.
 
-**Existing-vs-future boundary:** This contract defines the *required UX* for synchronization, preview/dry-run, scheduling, mapping, issues, history, and bulk resolution *when those surfaces/concerns are implemented*. Normative sync domain shape is now settled in `docs/03-DOMAIN_MODEL.md` (Sync Domain Rebaseline: `SyncConfiguration` → `FieldMapping` + `SyncRun` → `SyncRunItem`, account-scoped `ExternalRecordLink`). **Preview computation/runtime is shipped** — Stage 1 Preview Engine delivers persisted zero-mutation Preview (`run_sync_preview`, admission, Preview `SyncRun` persistence). **Stage 2A-2 merchant Preview work surface and remediation presentation are shipped**; **Stage 2A is Done**. **Stage 2B Option Mapping remediation UI is shipped** on `ManageSyncFieldOptionMappings` (existing `view_sync_mappings` / `manage_sync_mappings` permissions only; authoritative persisted connector snapshot metadata on read with zero HTTP; `confirm`/`replace` retain connector external validation outside locked DB transaction; Preview findings remain historical after remediation; narrow stale/orphan option-mapping cleanup does **not** fix Product/Variant select value integrity). **Stage 3A Live Safety foundation is shipped** — `run_sync_live` runtime permission, stale active-run recovery, `ExternalRecordLink` persistence foundation, `SyncLiveAdmissionService`, and fail-closed Live job shell (no Adobe write, no merchant consequential Live UI). Merchant consequential Live execution (**Stage 3B–3E**; **Stage 3-0** docs contract **Done**) — including **Stage 3E-R2a per-item ownership/ERL-provenance rewrite and Stage 3E-R2b-1 backend link-trust services (`AdobeProductEntityTrustReviewService`, `AdobeProductEntityTrustConfirmationService`, `AdobeProductEntityTrustLinkReadinessProjector`, `AdobeProductEntityTrustAuthorizationService` dual-permission enforcement, `EntityTrustReviewEnvelopeService` 15-minute TTL envelopes, and target-snapshot binding via `ConnectorAccountSettingsService`)** and **Stage 3E-R2b-2 merchant-confirmed Filament/Livewire confirmation UI on `ManageAdobeProductsExportPreview`** (per-item readiness/remediation, opaque server-side review-flow store, exhaustive 19-case `EntityTrustFailureReason` presentation, and dual-permission Confirm/Review/Renew actions over the Stage 2-0 contract) — are **shipped**, but truthful flip of Adobe Products/Export/Live advertised support still requires: (a) the **first-party Magento entity-bound Safe Sync runtime component** for every advertised V1 Live mutation category, and (b) **real-target certification**. Until both land, merchant consequential Live action remains non-actionable and the **Magento** tile keeps the **false** truth flag for Adobe Products/Export/Live. Scheduling beyond Discovery, issue aggregation, bulk resolution, sync-run history, ownership persistence/enforcement, and broader merchant sync surfaces remain future implementation gaps requiring their own scoped passes before the corresponding UI ships. This contract does **not** assert that every entity or runtime mechanism exists beyond what is confirmed elsewhere in this document — but a reader must **not** conclude that dry-run/preview computation is still absent. Those platform-owned sync UX/orchestration concerns do **not** become `ConnectorCapability` cases merely because they are optional or future.
+**Existing-vs-future boundary:** This contract defines the _required UX_ for synchronization, preview/dry-run, scheduling, mapping, issues, history, and bulk resolution _when those surfaces/concerns are implemented_. Normative sync domain shape is now settled in `docs/03-DOMAIN_MODEL.md` (Sync Domain Rebaseline: `SyncConfiguration` → `FieldMapping` + `SyncRun` → `SyncRunItem`, account-scoped `ExternalRecordLink`). **Preview computation/runtime is shipped** — Stage 1 Preview Engine delivers persisted zero-mutation Preview (`run_sync_preview`, admission, Preview `SyncRun` persistence). **Stage 2A-2 merchant Preview work surface and remediation presentation are shipped**; **Stage 2A is Done**. **Stage 2B Option Mapping remediation UI is shipped** on `ManageSyncFieldOptionMappings` (existing `view_sync_mappings` / `manage_sync_mappings` permissions only; authoritative persisted connector snapshot metadata on read with zero HTTP; `confirm`/`replace` retain connector external validation outside locked DB transaction; Preview findings remain historical after remediation; narrow stale/orphan option-mapping cleanup does **not** fix Product/Variant select value integrity). **Stage 3A Live Safety foundation is shipped** — `run_sync_live` runtime permission, stale active-run recovery, `ExternalRecordLink` persistence foundation, `SyncLiveAdmissionService`, and fail-closed Live job shell (no Adobe write, no merchant consequential Live UI). Merchant consequential Live execution (**Stage 3B–3E**; **Stage 3-0** docs contract **Done**) — including **Stage 3E-R2a per-item ownership/ERL-provenance rewrite and Stage 3E-R2b-1 backend link-trust services (`AdobeProductEntityTrustReviewService`, `AdobeProductEntityTrustConfirmationService`, `AdobeProductEntityTrustLinkReadinessProjector`, `AdobeProductEntityTrustAuthorizationService` dual-permission enforcement, `EntityTrustReviewEnvelopeService` 15-minute TTL envelopes, and target-snapshot binding via `ConnectorAccountSettingsService`)** and **Stage 3E-R2b-2 merchant-confirmed Filament/Livewire confirmation UI on `ManageAdobeProductsExportPreview`** (per-item readiness/remediation, opaque server-side review-flow store, exhaustive 19-case `EntityTrustFailureReason` presentation, and dual-permission Confirm/Review/Renew actions over the Stage 2-0 contract) — are **shipped**, but truthful flip of Adobe Products/Export/Live advertised support remains **false** and still requires **real-target certification** of the **actual standard shipping implementation** for every advertised V1 consequential Live mutation category, proving all still-frozen safety and domain invariants. The current first-party Magento entity-bound Safe Sync implementation may remain current-runtime evidence and / or an optional Enhanced Safety primitive, but it is **not** a mandatory product prerequisite under the Post-#168 / Post-D6 moduleless-by-default decision. Until real-target certification is met, merchant consequential Live action remains non-actionable and the **Magento** tile keeps the **false** truth flag for Adobe Products/Export/Live. Scheduling beyond Discovery, issue aggregation, bulk resolution, sync-run history, ownership persistence/enforcement, and broader merchant sync surfaces remain future implementation gaps requiring their own scoped passes before the corresponding UI ships. This contract does **not** assert that every entity or runtime mechanism exists beyond what is confirmed elsewhere in this document — but a reader must **not** conclude that dry-run/preview computation is still absent. Those platform-owned sync UX/orchestration concerns do **not** become `ConnectorCapability` cases merely because they are optional or future.
 
 ---
 
 ## 1. Audiences and the four layers
 
-| Layer | Question it answers | Audience | Contains |
-|---|---|---|---|
-| **A — Щоденна робота** | "Is my integration okay right now?" | Workspace merchant users when authorized by workspace permissions | Status, last sync, count of items needing attention, one action |
-| **B — Налаштування даних** | "How do I control what/how this syncs?" | Workspace merchant users when authorized by workspace permissions | Direction per data type, schedule, field mapping, ownership, available-fields reference |
-| **C — Діагностика** | "What technically happened?" | **Platform support/operator** — separate identity; never any workspace merchant role/access profile | Discovery runs, snapshots, technical status codes, redacted diagnostic data (see rule below) |
-| **D — Каталог конекторів** | "How does our platform talk to X?" | Platform operator / developer | `ConnectorDefinition`, schema sources, endpoints, auth profiles, verification status |
+| Layer                      | Question it answers                     | Audience                                                                                            | Contains                                                                                     |
+| -------------------------- | --------------------------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **A — Щоденна робота**     | "Is my integration okay right now?"     | Workspace merchant users when authorized by workspace permissions                                   | Status, last sync, count of items needing attention, one action                              |
+| **B — Налаштування даних** | "How do I control what/how this syncs?" | Workspace merchant users when authorized by workspace permissions                                   | Direction per data type, schedule, field mapping, ownership, available-fields reference      |
+| **C — Діагностика**        | "What technically happened?"            | **Platform support/operator** — separate identity; never any workspace merchant role/access profile | Discovery runs, snapshots, technical status codes, redacted diagnostic data (see rule below) |
+| **D — Каталог конекторів** | "How does our platform talk to X?"      | Platform operator / developer                                                                       | `ConnectorDefinition`, schema sources, endpoints, auth profiles, verification status         |
 
 **Rule:** Layers A/B audience means workspace merchant **memberships** authorized by workspace-scoped atomic permissions defined in `docs/03-DOMAIN_MODEL.md` → **Workspace access model and authorization (Resolved — Task 4C-1c-2a)**. Business-owned role/access profile names (Admin, Director, Merchandiser, …) do **not** authorize connector, mapping, or Layer C access by themselves.
 
@@ -33,7 +33,7 @@
 
 **Rule:** Layer C does not mean "raw payloads become visible." Reaching Layer C never lifts the project's existing secret-redaction, credential-encryption, or workspace-isolation rules. Credentials never become support-visible merely because a person has a Layer C-capable identity. "Diagnostic" means redacted technical detail (status codes, cause categories, timestamps, non-secret identifiers) — not unredacted raw request/response bodies or decrypted credentials.
 
-**Rule:** The word **"Discovery"**, **"Знімок"**, **"Snapshot"**, and **"Schema source"** never appear in Layer A or Layer B UI text. They are Layer C vocabulary. A Layer B surface may show *derived* information (e.g. "коли ми востаннє перевіряли доступні поля") without naming the underlying mechanism.
+**Rule:** The word **"Discovery"**, **"Знімок"**, **"Snapshot"**, and **"Schema source"** never appear in Layer A or Layer B UI text. They are Layer C vocabulary. A Layer B surface may show _derived_ information (e.g. "коли ми востаннє перевіряли доступні поля") without naming the underlying mechanism.
 
 ---
 
@@ -55,7 +55,7 @@
 
 ## 3. `Інтеграції` — universal landing surface
 
-`Інтеграції` is the workspace/merchant surface for connecting and managing external systems. It answers conceptually: *is this external system connected?* It is not the merchant surface for catalog work and must not become the technical sync builder.
+`Інтеграції` is the workspace/merchant surface for connecting and managing external systems. It answers conceptually: _is this external system connected?_ It is not the merchant surface for catalog work and must not become the technical sync builder.
 
 Sync configuration, mapping, preview, first manual live run, schedule, results, and remediation belong to merchant sync/data-management surfaces. Normative sync domain model and merchant journey are defined by the Sync UX / Domain Rebaseline in `docs/03-DOMAIN_MODEL.md` (and summarized in `docs/06-UI_DESIGN_SYSTEM.md`). `Каталог і синхронізація` must not currently be represented as an established navigation group merely because it appears in the future roadmap; the current standalone top-level placement of `Інтеграції` is an intentional interim use of standard Filament ungrouped navigation behavior, not the final navigation IA.
 
@@ -86,17 +86,17 @@ Connection onboarding remains human-friendly and ends in plain confirmation, not
 
 1. **Підключення** — ask only the human-facing connection inputs required by that specific connector (a URL + token for Magento; OAuth + resource selection for Google Sheets; an API key for another connector type; file selection for yet another) — never schema source, auth profile, or endpoint path regardless of connector type. The exact input set is connector-specific by nature; what's constant is that it is always phrased in terms a human filling in a form understands, never internal connector configuration. Connection verification is part of this onboarding.
 2. **Що синхронізувати** — per data domain (Товари, Ціни, Залишки, ...), only for domains the connected runtime contract actually supports, phrased as directional sentences, never bare "Import/Export":
-   ```
-   Товари
-   ☑ Отримувати товари з Magento
-   ☑ Передавати зміни товарів у Magento
-   ```
-   These two checkboxes are **enabled semantic operations** on one
-   domain/context `SyncConfiguration`. They must **not** be translated into
-   two hidden SyncConfiguration records merely because import/export can be
-   enabled independently. Semantic field correspondence may remain shared
-   across the enabled operations. `ConnectorDefinition.direction` remains
-   coarse platform metadata and is not configuration capability truth.
+    ```
+    Товари
+    ☑ Отримувати товари з Magento
+    ☑ Передавати зміни товарів у Magento
+    ```
+    These two checkboxes are **enabled semantic operations** on one
+    domain/context `SyncConfiguration`. They must **not** be translated into
+    two hidden SyncConfiguration records merely because import/export can be
+    enabled independently. Semantic field correspondence may remain shared
+    across the enabled operations. `ConnectorDefinition.direction` remains
+    coarse platform metadata and is not configuration capability truth.
 3. **Перша перевірка** — a categorized Preview / dry-run before any real sync (`✓ готові · ⚠ потребує уваги · ⛔ неможливо`), never a silent first sync and never a bare "Sync? Yes/No." Preview language must remain distinct from completed synchronization and must never imply an external write occurred.
 
 **Rule:** Scheduling/automation is not offered until a successful Preview has been followed by at least one successful first manual live run path.
@@ -105,7 +105,7 @@ Connection onboarding remains human-friendly and ends in plain confirmation, not
 
 ## 5. Integration Overview — Layer A
 
-The default landing tab for an opened integration. Answers exactly one question truthfully: *is everything okay right now?*
+The default landing tab for an opened integration. Answers exactly one question truthfully: _is everything okay right now?_
 
 ```
 Magento          🟢 Підключення перевірено
@@ -139,11 +139,11 @@ Contains merchant sync-configuration concerns. Which data domains and semantic o
 - Schedule (simple merchant-appropriate controls; exact presets are a Product Owner decision).
 - `external_context` exposure (e.g. Magento website/store view) remains an open Product Owner MVP choice — architecture recognizes the concept; this contract does not silently settle one-default vs multi-context merchant UX.
 - **Per-data-domain ownership**, asked in plain language only when bidirectional sync ships, never as a global silent default and never using the term "ownership" or "source of truth" in merchant-facing copy:
-  ```
-  Де ви хочете керувати цінами?
-  ○ У нашій платформі      ○ У Magento
-  ```
-  Repeated per data domain (Ціни, Описи, Залишки, ...) that is bidirectionally enabled. No connector ships a hardcoded default answer — this is a per-merchant, per-domain product decision, not inferred silently. Do not introduce mandatory per-field authority before that product need exists. (Storage/enforcement mechanism remains a backend decision requiring its own scoping pass; this contract fixes the *question asked to the merchant*, not yet the storage/enforcement design.)
+    ```
+    Де ви хочете керувати цінами?
+    ○ У нашій платформі      ○ У Magento
+    ```
+    Repeated per data domain (Ціни, Описи, Залишки, ...) that is bidirectionally enabled. No connector ships a hardcoded default answer — this is a per-merchant, per-domain product decision, not inferred silently. Do not introduce mandatory per-field authority before that product need exists. (Storage/enforcement mechanism remains a backend decision requiring its own scoping pass; this contract fixes the _question asked to the merchant_, not yet the storage/enforcement design.)
 
 ---
 
@@ -209,12 +209,12 @@ Row click opens the run's own detail: affected items, per-item problem, per-item
 
 Every backend error family maps to exactly one of these categories before it may reach Layer A/B. Raw codes (`422 schema_validation_failed`, `HTTP 429`, `discovery_source_unavailable`, etc.) never render to a merchant under any circumstance.
 
-| Category | Merchant sees | Implies |
-|---|---|---|
-| Потрібно виправити товар | "У 18 товарів відсутній EAN" | Merchant edits source data |
-| Потрібно зіставити значення | "Magento не знає значення кольору «Ocean Blue»" | Merchant maps the value once |
-| Потрібно перевірити підключення | "Magento більше не дозволяє доступ" | Merchant reconnects |
-| Тимчасова проблема | "Наступна спроба через 5 хвилин" | System retries automatically |
+| Category                        | Merchant sees                                   | Implies                      |
+| ------------------------------- | ----------------------------------------------- | ---------------------------- |
+| Потрібно виправити товар        | "У 18 товарів відсутній EAN"                    | Merchant edits source data   |
+| Потрібно зіставити значення     | "Magento не знає значення кольору «Ocean Blue»" | Merchant maps the value once |
+| Потрібно перевірити підключення | "Magento більше не дозволяє доступ"             | Merchant reconnects          |
+| Тимчасова проблема              | "Наступна спроба через 5 хвилин"                | System retries automatically |
 
 **Rule:** Adding a new backend error code requires assigning it to one of these four categories (or proposing a fifth, with the same category-not-code discipline) before it may be surfaced anywhere in Layer A/B.
 
@@ -228,17 +228,17 @@ Every backend error family maps to exactly one of these categories before it may
 
 ## 12. Merchant/operator visibility boundary — explicit table
 
-| Concept | A | B | C | D |
-|---|---|---|---|---|
-| Connection status, last sync | ✓ | ✓ | ✓ | ✓ |
-| Sync direction, schedule | | ✓ | ✓ | ✓ |
-| Field mapping matrix, available fields | | ✓ | ✓ | ✓ |
-| Categorized issues, bulk fix | ✓ (summary) | ✓ (full) | ✓ | ✓ |
-| Sync run history | | ✓ | ✓ | ✓ |
-| Discovery run / snapshot identifiers | | | ✓ | ✓ |
-| Canonical hash, technical summary, raw error code | | | ✓ | ✓ |
-| Endpoint path, source kind, auth profile | | | | ✓ |
-| Connector definition, schema source catalog | | | | ✓ |
+| Concept                                           | A           | B        | C   | D   |
+| ------------------------------------------------- | ----------- | -------- | --- | --- |
+| Connection status, last sync                      | ✓           | ✓        | ✓   | ✓   |
+| Sync direction, schedule                          |             | ✓        | ✓   | ✓   |
+| Field mapping matrix, available fields            |             | ✓        | ✓   | ✓   |
+| Categorized issues, bulk fix                      | ✓ (summary) | ✓ (full) | ✓   | ✓   |
+| Sync run history                                  |             | ✓        | ✓   | ✓   |
+| Discovery run / snapshot identifiers              |             |          | ✓   | ✓   |
+| Canonical hash, technical summary, raw error code |             |          | ✓   | ✓   |
+| Endpoint path, source kind, auth profile          |             |          |     | ✓   |
+| Connector definition, schema source catalog       |             |          |     | ✓   |
 
 This table is authoritative. A page proposal that puts a row's concept in a column to the left of its marked cell is non-compliant with this contract and must be corrected before merge, not merged with a note to fix later (consistent with the project's existing rule that known regressions may not cross a merge boundary).
 
@@ -250,7 +250,7 @@ The following terms, and direct translations of them, must never appear in Layer
 
 `schema source` / `джерело схеми` · `snapshot` / `знімок` · `canonical hash` · `discovery run` · `account_api` / `live_fetch` / any `acquisition_mode` value · `schema_scope` value as a raw label (`global`/`website`/`store` must be translated to their §6/§7 human phrasing, never shown raw) · `endpoint path` · `auth profile` · raw HTTP status codes · raw backend error-code strings.
 
-These remain exactly as-is in Layer C/D and in code — this rule constrains *rendering*, not the domain model or internal naming.
+These remain exactly as-is in Layer C/D and in code — this rule constrains _rendering_, not the domain model or internal naming.
 
 ---
 
@@ -267,12 +267,12 @@ These remain exactly as-is in Layer C/D and in code — this rule constrains *re
 Before a connector UI surface may be merged, it must satisfy all of the following:
 
 1. Capability gating is scoped correctly (§2):
-   - sections whose availability genuinely depends on a connector capability are gated by a real `ConnectorCapability::supports()` check for the connected profile — verified by a test that asserts the section is absent for a profile lacking that capability;
-   - platform-owned optional sections (schedule, mapping UI, Preview, issue aggregation, bulk resolution, sync-run history, and similar) are governed by their appropriate Sync Domain / platform / authorization / product conditions instead;
-   - no platform-owned optional section is forced to introduce a `ConnectorCapability` case solely because it is optional.
+    - sections whose availability genuinely depends on a connector capability are gated by a real `ConnectorCapability::supports()` check for the connected profile — verified by a test that asserts the section is absent for a profile lacking that capability;
+    - platform-owned optional sections (schedule, mapping UI, Preview, issue aggregation, bulk resolution, sync-run history, and similar) are governed by their appropriate Sync Domain / platform / authorization / product conditions instead;
+    - no platform-owned optional section is forced to introduce a `ConnectorCapability` case solely because it is optional.
 2. Two distinct checks, not one conflated check:
-   - **Merchant vocabulary (§13):** no Layer A/B page renders any term from §13's forbidden list in user-visible rendered content — labels, accessible text, notifications, validation/empty/error messages. This does not extend to internal property/variable names (e.g. a `snapshotId` Livewire property) that are never rendered as content; those are implementation detail, not a vocabulary violation.
-   - **Sensitive-data enforcement is layer-specific, per §12.** A/B tests assert that data §12 permits only in C/D (canonical hash, technical summary, raw error code, credentials, endpoint path, etc.) never enters merchant-rendered content *or* serialized Livewire snapshot/effects state on an A/B surface — the existing, stricter canary-test pattern already used for sensitive-field absence applies here unchanged. A future Layer C surface is tested the same way against whatever §12 permits only in D (credentials, raw request/response bodies). Secret-redaction, credential-encryption, and workspace-isolation rules apply at every layer without exception (§1) — canary tests target the specific data forbidden on the surface under test, not every technical attribute globally regardless of layer.
+    - **Merchant vocabulary (§13):** no Layer A/B page renders any term from §13's forbidden list in user-visible rendered content — labels, accessible text, notifications, validation/empty/error messages. This does not extend to internal property/variable names (e.g. a `snapshotId` Livewire property) that are never rendered as content; those are implementation detail, not a vocabulary violation.
+    - **Sensitive-data enforcement is layer-specific, per §12.** A/B tests assert that data §12 permits only in C/D (canonical hash, technical summary, raw error code, credentials, endpoint path, etc.) never enters merchant-rendered content _or_ serialized Livewire snapshot/effects state on an A/B surface — the existing, stricter canary-test pattern already used for sensitive-field absence applies here unchanged. A future Layer C surface is tested the same way against whatever §12 permits only in D (credentials, raw request/response bodies). Secret-redaction, credential-encryption, and workspace-isolation rules apply at every layer without exception (§1) — canary tests target the specific data forbidden on the surface under test, not every technical attribute globally regardless of layer.
 3. Layer boundary (§12) is respected — a merchant role cannot reach Layer C/D content through any route, relation manager, or table action, verified by an authorization/workspace-isolation test following the existing project pattern.
 4. Every error surfaced to Layer A/B maps to one of §10's categories — no raw code path reaches merchant-facing text.
 5. Any issue category exceeding the bulk threshold offers a bulk action (§11), or explicitly documents why it cannot.
@@ -339,9 +339,9 @@ see a setup-required state without triggering `ensure*()` mutators.
 
 ### Setup-required UX
 
-Pre-Preview setup failure (admission/readiness): *Потрібно завершити налаштування
-перед перевіркою.* Without `manage_sync_configurations`: *У вас немає доступу до
-цієї настройки.* Do not convert admission failures into fake Product-level
+Pre-Preview setup failure (admission/readiness): _Потрібно завершити налаштування
+перед перевіркою._ Without `manage_sync_configurations`: _У вас немає доступу до
+цієї настройки._ Do not convert admission failures into fake Product-level
 findings. Completed Preview findings (e.g. `AttributeSetInvalid`) are a separate
 layer — route to connector setup remediation when authorized.
 
@@ -361,15 +361,15 @@ Presentation dimensions (no DB enum):
 
 ### No fake Fix
 
-Show *[Виправити]* only when an authorized edit surface exists for the affected
+Show _[Виправити]_ only when an authorized edit surface exists for the affected
 value. `NO_EDIT_SURFACE` is the dominant case for Product/Variant-data findings
-today. *[Відкрити товар]* may provide context without implying edit authority.
+today. _[Відкрити товар]_ may provide context without implying edit authority.
 
 ### Current vs historical rule
 
 When configuration drift makes a historical finding's remediation target unsafe,
-suppress the misleading action and recommend rerun: *Налаштування змінилися після
-цієї перевірки. Запустіть перевірку ще раз.* Matching `configuration_revision`
+suppress the misleading action and recommend rerun: _Налаштування змінилися після
+цієї перевірки. Запустіть перевірку ще раз._ Matching `configuration_revision`
 does not prove Product data is unchanged — explicit rerun required after Product
 edits.
 
@@ -456,10 +456,10 @@ during the fresh Live check will not be changed externally.
 ### Running and completed states
 
 Running: honest queued/running; optional processed Product count from persisted
-outcomes; no fake percentage. Completed vocabulary: *Синхронізовано* / *Не
-передано* / *Частково синхронізовано* / *Не вдалося підтвердити*. `AMBIGUOUS`:
-*Не вдалося підтвердити результат для N товарів. Не повторюйте передачу, доки
-їхній стан не буде перевірено.*
+outcomes; no fake percentage. Completed vocabulary: _Синхронізовано_ / _Не
+передано_ / _Частково синхронізовано_ / _Не вдалося підтвердити_. `AMBIGUOUS`:
+_Не вдалося підтвердити результат для N товарів. Не повторюйте передачу, доки
+їхній стан не буде перевірено._
 
 ### Forbidden merchant exposure
 
@@ -522,18 +522,31 @@ slices plus remaining truth-flip prerequisites.
   configurable-family support.
 
 Truthful Adobe Products/Export/Live advertised support remains **false**.
-Both R2b slices ship the *necessary* link-trust mechanism, but they are
+Both R2b slices ship the _necessary_ link-trust mechanism, but they are
 **not sufficient** for the exemplary consequential Live truth flip. The flip
 still requires:
 
-- the **first-party Magento entity-bound Safe Sync runtime component** for
-  every advertised V1 Live mutation category (Stage 3E runtime blocker);
-- **real-target certification** against an Adobe Commerce instance proving
-  the full per-item Live path end-to-end.
+- **real-target certification** of the **actual standard shipping
+  implementation** for every advertised V1 consequential Live mutation
+  category, proving all still-frozen safety and domain invariants
+  (entity trust; `ExternalRecordLink` / `entity_id` identity authority; SKU
+  equality/precondition; no blind ambiguous retry; Preview-first; no
+  automatic Product create V1; post-write verification; fail-closed
+  identity uncertainty);
+- the still-frozen authorization, verification, and merchant consent
+  contracts (Stage 2-0 / Stage 3-0 / Stage 3A admission, dual-permission
+  enforcement, opaque review-flow store, exhaustive `EntityTrustFailureReason`
+  presentation, post-write verification, and fail-closed Live
+  authorization) remaining effective against that certified implementation.
 
-Until both prerequisites land, merchant consequential Live action remains
-non-actionable and the **Magento** tile keeps the **false** truth flag for
-Adobe Products/Export/Live.
+The current first-party Magento entity-bound Safe Sync implementation may
+remain current-runtime evidence and / or an optional Enhanced Safety
+primitive, but it is **not** a mandatory product prerequisite under the
+Post-#168 / Post-D6 moduleless-by-default decision.
+
+Until real-target certification is met, merchant consequential Live action
+remains non-actionable and the **Magento** tile keeps the **false** truth
+flag for Adobe Products/Export/Live.
 
 ### Presentation boundary
 
@@ -622,6 +635,245 @@ Pre-trust candidate discovery may use bounded stock SKU lookup; final confirmati
 must freshly verify exact logical entity + expected SKU.
 
 Therefore link-first + entity trust + informed confirmation are **required** but
-**not sufficient** for exemplary consequential Live. Truth flip waits for proven
-first-party Magento entity-bound Safe Sync component across every advertised V1 Live
-mutation category (Stage 3E runtime blocker).
+**not sufficient** for exemplary consequential Live. Truth flip waits for
+**real-target certification** of the **actual consequential WRITE
+implementation** against all still-frozen safety invariants (entity trust;
+`ExternalRecordLink` / `entity_id` identity authority; SKU
+equality/precondition; no blind ambiguous retry; Preview-first; no
+automatic Product create V1; post-write verification; fail-closed identity
+uncertainty) for every advertised V1 Live mutation category.
+
+The current first-party Magento entity-bound Safe Sync implementation may
+remain current-runtime evidence and / or an optional Enhanced Safety
+primitive, but it is **not** a mandatory product prerequisite under the
+Post-#168 / Post-D6 moduleless-by-default decision.
+
+---
+
+## 19. Connector Account Overview — verify-to-preview journey freeze
+
+[Resolved — Post-#168 / Post-D6 rebaseline — 2026-09-03]
+
+This section freezes the **canonical merchant journey** for the standard
+Connector Account Overview (Layer A) on the standard moduleless Magento
+V1 path. It is the **authority** for what the merchant sees and what the
+merchant does next. It is a UX contract; it does **not** claim that the
+underlying runtime migration is already complete. The current runtime
+truth is recorded in `08-CONNECTOR_SYNC_RUNTIME_ATLAS.md` and is not
+contradicted by this freeze.
+
+### 19.1 Frozen merchant journey
+
+The journey is exactly:
+
+```
+CONNECT
+   ↓
+safe VERIFY  (re-checks the standard baseline; never mutates Magento)
+   ↓
+"Що ми перевірили"  (the small list of what was safely looked at)
+   ↓
+ONE next action  (the only enabled primary action; adaptive to state)
+   ↓
+"Створити пробну синхронізацію"  (Preview — explicitly does NOT change Magento)
+   ↓
+"Виконати першу синхронізацію"  (the explicit first real sync, only after Preview)
+```
+
+Every connector Account Overview (Layer A) for the standard path MUST
+render this exact sequence in this exact order. No step is skippable.
+No two primary actions are shown at the same time on the standard path
+before the previous step is complete.
+
+### 19.2 Time-to-answer budget
+
+The Overview must answer, in approximately five seconds for an ordinary
+non-technical merchant, exactly these four questions and nothing more:
+
+1. **Am I connected?** — `Підключено` / `Не вдалося підключитися`,
+   never an internal status word and never a raw HTTP code.
+2. **What did the platform safely verify?** — the bounded
+   `Що ми перевірили` list (see §19.4), not a field count, not a
+   schema summary, not a raw snapshot.
+3. **Anything to fix?** — `Потребує уваги` with a single link to a
+   remediation surface, never a threat dashboard.
+4. **One next action** — the only primary action in the merchant's
+   current state (see §19.6), never a stack of three actions.
+
+### 19.3 Approved primary connection presentation
+
+The approved primary connection line is:
+
+```
+Magento · [account name]
+🟢 Підключено
+Перевірено [time]
+[Перевірити ще раз]      ← secondary action; shown / usable when existing
+                         authorization / capability / action-state
+                         permits it, and disabled or unavailable while
+                         a check is already active or when existing
+                         runtime rules disallow it. No new authorization
+                         logic is introduced by this freeze.
+Перевірка не змінює дані в Magento
+```
+
+- Use **`Підключено`** as the merchant copy. Do not say "Magento
+  працює", "Magento готовий", or any equivalent that mixes connection
+  with operation readiness.
+- Do not show raw version / patch / PHP / module strings on Layer A.
+- The `[Перевірити ще раз]` control re-runs the safe baseline; it
+  must not start any mutating operation.
+- The "Перевірка не змінює дані в Magento" reassurance line is
+  mandatory on the standard path.
+
+### 19.4 "Що ми перевірили" (Layer A only)
+
+The `Що ми перевірили` heading is a Layer A list of what the platform
+safely looked at, not a discovery report. Each row uses the exact
+concrete business wording below. Do not show field counts, schema
+identifiers, snapshot identifiers, or endpoint paths on Layer A.
+
+| Item            | Approved Layer-A copy                                                           |
+| --------------- | ------------------------------------------------------------------------------- |
+| Каталог товарів | ✓ Доступ підтверджено · Знайдено N товарів                                      |
+| Поля товарів    | ✓ Доступ підтверджено · [Переглянути поля] → opens Mapping (Layer B supporting) |
+| Зображення      | ✓ Доступ підтверджено                                                           |
+
+Rules:
+
+- Do not use the magic headline field count as proof of connector
+  completeness. N is a count, not a certification. The detailed field
+  information belongs to **Mapping → Available Fields** (Layer B
+  supporting), not to Overview.
+- An **empty catalogue is neutral** and is presented as
+  `Каталог поки порожній` — never as a warning or an error.
+- For image / media verification during ordinary Verify, prove a
+  bounded / cheap media accessibility check, not a full walk of the
+  entire catalogue. Do not count every image.
+- Layer A/B must not expose any of: HTTP status codes, OAuth / ACL
+  identifiers, endpoint paths, schema / discovery / snapshot /
+  canonical-hash vocabulary, "Safe Sync", PHP / Composer strings,
+  Decision 6 wording, or any internal readiness / probe / handshake
+  names.
+
+### 19.5 Connection truth is independent of capability truth
+
+A successful baseline connection MUST NOT become red merely because:
+
+- field-metadata permission is missing on the target;
+- an optional mapping aid (for example: Available Fields preview) is
+  not yet available;
+- another downstream concern (Preview, Live, first sync) is unresolved.
+
+The four categories of §10 are the **only** allowed merchant-facing
+classifications. A baseline connection failure maps to
+`Потрібно перевірити підключення` and is rendered as such. A
+downstream capability or permission concern maps to its own category;
+it must **not** rewrite the baseline connection.
+
+A Magento ACL denial (for example: missing Product Attribute read
+permission when the credentials themselves are correct) MUST NOT be
+presented to the merchant as bad credentials. The structural evidence
+proves the credentials reached Magento; the surface must respect that
+distinction.
+
+### 19.6 Exactly one next action (adaptive sequence)
+
+The Overview shows **exactly one** primary action at a time, picked
+from the following sequence in this order:
+
+1. **`Налаштувати синхронізацію`** — only when setup is required
+   before any Preview can run.
+2. **`Створити пробну синхронізацію`** — once setup exists and the
+   connection is healthy. This is the merchant wording for Preview.
+3. **`Виконати першу синхронізацію`** — only after the merchant has
+   seen a real Preview and is on the explicit first-Live path.
+
+Do not show all three at once. Do not invent extra primary actions on
+the standard path. `Перевірити ще раз` is a secondary action and
+follows the same "shown / usable when existing authorization /
+capability / action-state permits it, and disabled or unavailable
+while a check is already active or when existing runtime rules
+disallow it" rule as in §19.3; it is not a substitute for the next
+primary action. No new authorization logic is introduced by this
+freeze.
+
+### 19.7 Preview / "Пробна синхронізація"
+
+Preview-first architecture is preserved.
+
+- The merchant wording for the action is **`Створити пробну
+  синхронізацію`**.
+- The Preview page must state, in the same surface, the exact
+  reassurance: **"Пробна синхронізація не змінює дані в Magento"**.
+- A short second sentence may explain that Preview only inspects and
+  classifies the relevant data; it must not promise that Preview
+  performs any real Magento write.
+- The actual ready / needs-attention / impossible counts belong to
+  Preview, not to Overview. Overview never displays these counts as a
+  health KPI.
+- The Overview MUST NOT show a "Синхронізація працює" or equivalent
+  success claim before the merchant has performed an explicit first
+  real sync with proven real-target evidence.
+
+### 19.8 First real sync
+
+Only after Preview may the merchant explicitly initiate the first real
+sync through **`Виконати першу синхронізацію`**. On the standard
+merchant journey, the first real sync is the **first / earliest
+point** at which a real Magento mutation may occur.
+
+Rules that this freeze does **not** invent or override:
+
+- Preview must happen before the first real Live. The existing
+  Preview / Live authorization and admission contracts remain
+  authoritative for both flows and are the single source of truth
+  for what must happen between Preview and any later Live.
+- Subsequent approved Live syncs continue to be governed by the
+  existing Sync runtime contracts. This freeze does **not** imply
+  that later approved Live syncs are forbidden from mutating
+  Magento.
+- Overview may update to a "first sync completed" state only after
+  this first real sync, not before.
+
+This freeze does **not** introduce a new fresh-Preview or
+explicit-merchant-acknowledgement mechanism between Preview and
+later Live. The existing Preview / Live authorization and admission
+contracts remain the single source of truth for what must happen
+between Preview and any later Live.
+
+### 19.9 What this freeze does NOT do
+
+This freeze does not:
+
+- claim that the underlying runtime migration is already complete;
+- promote any optional / Enhanced Safety component to a baseline
+  prerequisite;
+- introduce new Layer-A surface elements that expose Layer-C / D
+  diagnostics;
+- replace the §12 visibility table or the §13 forbidden vocabulary;
+- weaken the existing Layer-A, Layer-B, Layer-C, Layer-D separation;
+- weaken the existing per-domain ownership question in §6.
+
+### 19.10 Acceptance test anchors
+
+The following assertions are the minimum mechanical protection of this
+freeze and are recorded here so a future PR that violates any of them
+triggers a documentation-contract test failure:
+
+- Overview shows exactly one primary action, picked adaptively from
+  §19.6.
+- "Підключено" / "Не вдалося підключитися" merchant copy is used;
+  no "Magento працює" / "Magento готовий" or equivalent.
+- "Що ми перевірили" uses the three Layer A rows from §19.4; no raw
+  field count; no "magic stable-field count" KPI.
+- "Пробна синхронізація не змінює дані в Magento" reassurance is
+  present on the Preview page.
+- No HTTP status code, OAuth / ACL identifier, endpoint path, schema
+  / discovery / snapshot / canonical-hash vocabulary, "Safe Sync",
+  PHP / Composer strings, Decision 6 wording, or internal
+  readiness / probe / handshake name is rendered on Layer A/B.
+- An empty catalogue is rendered as a neutral "Каталог поки
+  порожній" state, not as a warning or an error.
+- A baseline connection success is not re-coloured red solely because
+  of a missing Product Attribute read permission.

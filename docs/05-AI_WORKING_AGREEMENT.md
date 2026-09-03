@@ -505,6 +505,51 @@ becomes the direct execution contract for those tests.
 
 ---
 
+## Connector Benchmark-First Rule
+
+A custom **mandatory** customer-side connector component (module, agent,
+proprietary protocol, runtime bridge, or in-customer-platform component)
+may be considered only after **all** of the following conditions are met:
+
+1. **Stock vendor integration / API research** — the vendor's
+   supported stock API / official integration mechanism has been
+   inspected and documented.
+2. **At least two mature benchmark patterns** — at least two relevant
+   mature SaaS, iPaaS, PIM, or marketplace connector patterns that
+   solve the same business problem have been inspected and compared.
+3. **Exact missing stock capability / invariant identified** — the
+   exact capability or invariant that the vendor stock API cannot
+   provide has been explicitly identified.
+4. **Material Product Goal impact proven** — the missing capability
+   has been demonstrated to materially affect this project's Product
+   Goal, not merely developer preference.
+5. **Explicit documentation-level Product / Architecture Decision** —
+   a `[Resolved]` documentation-level Product / Architecture Decision
+   has been recorded that explicitly authorises the custom
+   customer-side component as a precondition.
+
+AI reasoning alone is **never** sufficient. A custom connector
+component that does not satisfy **every** condition above MUST NOT be
+proposed as a baseline connector prerequisite on the standard
+merchant path. Proposing it as such triggers the Stop and Amend Rule.
+
+An installed first-party component may still be a legitimate,
+non-mandatory capability add-on (for example: a documented
+differentiation for an invariant the stock API cannot provide, in
+the sense of an "Enhanced Safety" candidate). In that case the
+component must still be presented to the merchant as **optional**,
+never as a baseline connector prerequisite.
+
+**Commercial packaging, pricing, and paid tiers are explicitly
+UNDECIDED and out of scope of this rule.** This rule is a technical
+and architectural gate, not a product packaging decision.
+
+A connector that requires merchant-side custom code as a precondition
+for basic read, mapping, preview, or ordinary operation fails this
+rule and triggers the Stop and Amend Rule.
+
+---
+
 ## User Interface and Terminology Rules
 
 The AI must protect approved user-facing terminology.

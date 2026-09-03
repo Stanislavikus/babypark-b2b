@@ -353,7 +353,6 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('## 18. Per-item Live linking (Resolved — Stage 3E docs contract)', $content);
         $this->assertStringContainsString('entity-bound Safe Sync runtime contract', $content);
-        $this->assertStringContainsString('first-party Magento entity-bound Safe Sync component', $content);
     }
 
     #[Test]
