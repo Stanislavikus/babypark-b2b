@@ -57,7 +57,19 @@ jobs:
           git -C "$SMOKE" worktree add --detach "$WT" "$EXPECTED_APP_HEAD" >/dev/null
           ln -s "$SMOKE/.env" "$WT/.env"
           rm -rf "$WT/vendor" "$WT/storage"
-          ln -s "$SMOKE/vendor" "$WT/vendor"
+
+          mkdir -p "$WT/vendor"
+          cp -a "$SMOKE/vendor/autoload.php" "$WT/vendor/autoload.php"
+          cp -a "$SMOKE/vendor/composer" "$WT/vendor/composer"
+
+          for entry in "$SMOKE/vendor/"*; do
+            base="$(basename "$entry")"
+            if [ "$base" = "autoload.php" ] || [ "$base" = "composer" ]; then
+              continue
+            fi
+            ln -s "$entry" "$WT/vendor/$base"
+          done
+
           ln -s "$SMOKE/storage" "$WT/storage"
           mkdir -p "$WT/bootstrap/cache"
 
