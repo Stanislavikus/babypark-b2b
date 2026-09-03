@@ -505,6 +505,47 @@ becomes the direct execution contract for those tests.
 
 ---
 
+## Connector Benchmark-First Rule
+
+Before proposing a custom mandatory connector-side:
+
+- module;
+- agent;
+- proprietary protocol;
+- runtime bridge;
+- in-customer-platform component;
+
+the AI / architect MUST first:
+
+1. inspect the vendor's supported stock API / official integration mechanism;
+2. inspect at least two relevant mature SaaS, iPaaS, PIM, or marketplace
+   connector patterns that solve the same business problem;
+3. identify the exact capability or invariant that the vendor stock API
+   cannot provide;
+4. demonstrate why that missing capability materially affects this
+   project's Product Goal (not just developer preference);
+5. prefer adapting proven vendor or SaaS patterns over inventing
+   project-specific connector infrastructure that must be installed
+   inside the customer's platform.
+
+AI reasoning by itself is NEVER sufficient justification for making custom
+software inside the customer's platform a mandatory prerequisite of a
+standard connector onboarding flow.
+
+An installed first-party component remains legitimate when it adds a
+capability the vendor does not expose (for example: atomic transactional
+locking and rollback on the target, storefront behavior, internal events
+unavailable through the public API, or any other bounded capability
+materially required by the Product Goal). In that case the component must
+still be presented to the merchant as optional or as an advanced / paid
+tier, not as a baseline connector prerequisite.
+
+A connector that requires merchant-side custom code as a precondition for
+basic read, mapping, preview, or ordinary operation fails this rule and
+triggers the Stop and Amend Rule.
+
+---
+
 ## User Interface and Terminology Rules
 
 The AI must protect approved user-facing terminology.
