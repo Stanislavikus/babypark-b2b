@@ -23,7 +23,7 @@ manifest.
     `AdobeProductRemoteStateClient::sendReadOnlyGetWithContext()`
   - trusted simple Product execution consumes
     `AdobeSafeSyncClient::writeSimpleProduct()`
-  - trusted Receive remains entity-bound `AdobeSafeSyncClient::readProduct()`
+- trusted Receive uses `AdobeProductDocumentReader` (stock `GET /V1/products/{sku}`)
   - configurable child remains fail-closed
   - no duplicate Product GET transport, OAuth signer, or request factory exists
   - no trusted stock `PUT /V1/products/{sku}` consequential writer exists
@@ -209,8 +209,8 @@ changes the seams below.
   trusted full Product document READ.
 - **Trusted simple Product execution** consumes
   `AdobeSafeSyncClient::writeSimpleProduct(...)`.
-- **Trusted Receive** remains entity-bound
-  `AdobeSafeSyncClient::readProduct(...)`.
+- **Trusted Receive** uses `AdobeProductDocumentReader` (stock
+  `GET /V1/products/{sku}`).
 - The configurable child path remains fail-closed.
 - No duplicate Product GET transport, OAuth signer, or request factory
   exists in the standard seam.

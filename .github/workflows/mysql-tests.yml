@@ -118,20 +118,10 @@ jobs:
         run: php artisan test --filter=CustomerRenameMigrationTest
 
       - name: Full test suite (MySQL)
-        shell: bash
-        run: |
-          set -euo pipefail
-          php artisan test 2>&1 | tee mysql-full-suite.log
+        run: php artisan test
 
       - name: Pint
         run: vendor/bin/pint --test
 
       - name: Git diff check
         run: git diff --check
-
-      - name: Upload MySQL suite log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mysql-full-suite-log
-          path: mysql-full-suite.log
