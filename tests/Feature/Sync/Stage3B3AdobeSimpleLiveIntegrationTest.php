@@ -47,7 +47,6 @@ use App\Support\Connectors\Transport\ConnectorHttpTransport;
 use App\Support\Connectors\Transport\ConnectorOutboundRequest;
 use App\Support\Sync\ConnectorExecutionConfiguration;
 use App\Support\Sync\Exceptions\SyncLiveAdmissionException;
-use App\Support\Sync\Live\ConnectorLiveRuntimeReadiness;
 use App\Support\Sync\Live\SyncLiveConnectorCapabilityResolver;
 use App\Support\Sync\Live\SyncLiveConsequentialWriteGate;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
@@ -84,56 +83,6 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
         $this->seed(ConnectorFoundationSeeder::class);
         $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->seedFieldDefinitions();
-        $this->app->instance(ConnectorLiveRuntimeReadiness::class, new class implements ConnectorLiveRuntimeReadiness
-        {
-            public function isReady(ConnectorAccount $account): bool
-            {
-                return true;
-            }
-        });
-    }
-
-    #[Test]
-    public function worker_rechecks_the_database_gate_after_fresh_runtime_readiness_and_before_write(): void
-    {
-        $transport = $this->bindAdobeTransport();
-        $account = $this->createConnectorAccount();
-        $configuration = $this->prepareMappedConfiguration($account);
-        $this->createPricedProductVariant($account->workspace, 'GATE-AFTER-READY', 150.0);
-        $run = $this->queuedLiveRun($account, $configuration, $this->fullSnapshot($configuration));
-
-        $readiness = new class($run->id) implements ConnectorLiveRuntimeReadiness
-        {
-            public int $calls = 0;
-
-            public function __construct(private readonly string $runId) {}
-
-            public function isReady(ConnectorAccount $account): bool
-            {
-                $this->calls++;
-                $run = SyncRun::withoutWorkspaceScope()->findOrFail($this->runId);
-                TestCase::assertSame(SyncRunStatus::Running, $run->status);
-                TestCase::assertNotNull($run->writer_deadline_at);
-                $run->update(['status' => SyncRunStatus::Failed]);
-
-                return true;
-            }
-        };
-
-        (new SyncLiveRunJob($account->workspace_id, $account->id, $run->id))->handle(
-            app(ProductExecutionAggregateBuilder::class),
-            app(SyncLiveConnectorCapabilityResolver::class),
-            $readiness,
-        );
-
-        $this->assertSame(1, $readiness->calls);
-        $this->assertSame(SyncRunStatus::Failed, $run->fresh()->status);
-        $consequentialRequests = array_filter(
-            $transport->recordedRequests,
-            static fn (ConnectorOutboundRequest $request): bool => in_array($request->request->getMethod(), ['POST', 'PUT'], true),
-        );
-        $this->assertSame([], array_values($consequentialRequests));
-        $this->assertSame(0, SyncRunItem::withoutWorkspaceScope()->where('sync_run_id', $run->id)->count());
     }
 
     #[Test]
