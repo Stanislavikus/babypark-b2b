@@ -16,10 +16,11 @@ class AdobeProductReceiveProposalServiceStructuralTest extends TestCase
         ));
 
         $this->assertStringContainsString('AdobeProductExternalRecordLinkGuard', $content);
-        $this->assertStringContainsString('AdobeSafeSyncClient', $content);
+        $this->assertStringContainsString('AdobeProductDocumentReader', $content);
         $this->assertStringContainsString('ReceiveProposalPlanner', $content);
         $this->assertStringContainsString('ReceiveProposalFlowStore', $content);
         $this->assertStringNotContainsString('handshake(', $content);
+        $this->assertStringNotContainsString('/V1/safe-sync/products', $content);
         $this->assertStringNotContainsString('GovernedDynamicFieldValueWriter', $content);
         $this->assertStringNotContainsString('GovernedProductVariantColumnMutationService::set', $content);
         $this->assertStringNotContainsString('GovernedProductVariantColumnMutationService::clear', $content);

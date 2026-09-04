@@ -92,7 +92,7 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
             ),
         );
 
-        $this->bindSafeSyncTransport(
+        $transport = $this->bindSafeSyncTransport(
             fn (): ConnectorHttpResult => $this->verifiedProductResponse(77, 'SKU-EQUAL', 'Local Product'),
         );
 
@@ -103,6 +103,12 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
             targetType: FieldObjectType::Product,
             targetId: $product->id,
         );
+
+        $this->assertSame(1, $transport->sendCount);
+        $this->assertCount(1, $transport->recordedRequests);
+        $this->assertSame('GET', $transport->recordedRequests[0]->request->getMethod());
+        $this->assertStringContainsString('/V1/products/SKU-EQUAL', (string) $transport->recordedRequests[0]->request->getUri());
+        $this->assertStringNotContainsString('/V1/safe-sync/products', (string) $transport->recordedRequests[0]->request->getUri());
 
         $this->assertSame((string) $configuration->refresh()->configuration_revision, $result->proposal->configurationRevision);
         $this->assertSame((string) $link->id, $result->proposal->trustedExternalLinkEvidenceId);
@@ -1265,7 +1271,7 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
     private function verifiedProductResponse(int $logicalEntityId, string $sku, string $name): ConnectorHttpResult
     {
         return new ConnectorHttpResult(200, [], json_encode([
-            'logical_entity_id' => $logicalEntityId,
+            'id' => $logicalEntityId,
             'sku' => $sku,
             'type_id' => 'simple',
             'name' => $name,
