@@ -11,13 +11,12 @@ use App\Models\ConnectorAccount;
 use App\Models\ConnectorDiscoveryRun;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
-use App\Services\Sync\AdobeProductsExportPreviewAuthorizationService;
 use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorUiFormatter;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\ViewAction;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\ViewEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -183,23 +182,47 @@ class ConnectorAccountResource extends Resource
 
     public static function infolist(Schema $schema): Schema
     {
+        $uiState = app(ConnectorAccountUiState::class);
+
         return $schema
             ->components([
-                Section::make()
+                Section::make(__('connectors.ui.sections.account'))
                     ->schema([
+                        TextEntry::make('connectorDefinition.name')
+                            ->label(__('connectors.ui.columns.platform'))
+                            ->formatStateUsing(fn (?string $state, ConnectorAccount $record): string => filled($state)
+                                ? $state
+                                : __('connectors.ui.common.dash')),
+                        TextEntry::make('name')
+                            ->label(__('connectors.ui.columns.account')),
+                        TextEntry::make('store_code')
+                            ->label(__('connectors.ui.columns.store_context'))
+                            ->formatStateUsing(fn ($state, ConnectorAccount $record): string => $uiState->storeContextLabel($record) ?? __('connectors.ui.common.dash'))
+                            ->visible(fn (): bool => static::actorCanManageConnectorAccounts()),
+                        ViewEntry::make('runtime_state')
+                            ->label(__('connectors.ui.columns.status'))
+                            ->view('filament.connector-accounts.runtime-state')
+                            ->viewData(fn (ConnectorAccount $record): array => [
+                                'record' => $record,
+                                'uiState' => $uiState,
+                                'showActiveConnectionCheck' => static::actorCanManageConnectorAccounts(),
+                            ]),
                         ViewEntry::make('store_setup')
                             ->label('')
                             ->view('filament.connector-accounts.store-setup')
-                            ->viewData(fn (ConnectorAccount $record): array => [
-                                'uiState' => app(ConnectorAccountUiState::class),
-                                'showActiveConnectionCheck' => static::actorCanManageConnectorAccounts(),
-                                'canConfigureSync' => static::canConfigureSync($record),
-                                'canCreatePreview' => static::canCreatePreview($record),
-                            ])
                             ->visible(fn (ConnectorAccount $record): bool => static::shouldShowStoreSetupEntry($record))
                             ->columnSpanFull(),
+                        TextEntry::make('last_successful_check_at')
+                            ->label(__('connectors.ui.columns.last_successful_check'))
+                            ->formatStateUsing(fn ($state): ?string => ConnectorUiFormatter::formatDateTime($state))
+                            ->placeholder(__('connectors.ui.common.dash')),
+                        TextEntry::make('last_error_message_key')
+                            ->label(__('connectors.ui.columns.attention'))
+                            ->formatStateUsing(fn ($state, ConnectorAccount $record): ?string => $uiState->attentionMessage($record))
+                            ->placeholder(__('connectors.ui.common.dash'))
+                            ->visible(fn (ConnectorAccount $record): bool => $uiState->attentionMessage($record) !== null),
                     ])
-                    ->columns(1),
+                    ->columns(2),
             ]);
     }
 
@@ -378,34 +401,21 @@ class ConnectorAccountResource extends Resource
         }
 
         $workspace = $record->workspace ?? Workspace::query()->findOrFail($record->workspace_id);
+        $presentation = static::capabilityPresentation();
         $currentWorkspace = app(WorkspaceContext::class)->current();
 
         if ($workspace->isNot($currentWorkspace)) {
             return false;
         }
 
-        if ($record->connectorDefinition?->code !== 'adobe_commerce') {
+        if (! $presentation->showActiveConnectionCheck($user, $workspace)) {
+            return false;
+        }
+
+        if ($record->auth_profile !== 'adobe_commerce_paas_oauth1_integration') {
             return false;
         }
 
         return true;
-    }
-
-    private static function canConfigureSync(ConnectorAccount $record): bool
-    {
-        $user = auth()->user();
-        $workspace = $record->workspace ?? Workspace::query()->findOrFail($record->workspace_id);
-
-        return $user instanceof User && app(AdobeProductExportSetupAuthorizationService::class)
-            ->isEligibleAdobeProductsExportSetupTarget($user, $workspace, $record->getKey());
-    }
-
-    private static function canCreatePreview(ConnectorAccount $record): bool
-    {
-        $user = auth()->user();
-        $workspace = $record->workspace ?? Workspace::query()->findOrFail($record->workspace_id);
-
-        return $user instanceof User && app(AdobeProductsExportPreviewAuthorizationService::class)
-            ->isEligiblePreviewTarget($user, $workspace, $record->getKey());
     }
 }

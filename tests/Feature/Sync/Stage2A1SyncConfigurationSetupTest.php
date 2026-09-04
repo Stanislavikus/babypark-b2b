@@ -176,7 +176,7 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
     }
 
     #[Test]
-    public function eligible_adobe_profile_with_safe_read_and_manage_sync_configurations_shows_overview_next_step(): void
+    public function eligible_adobe_profile_with_safe_read_and_manage_sync_configurations_shows_view_connector_setup_link(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->adobeAccount($workspace);
@@ -188,8 +188,7 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
         Livewire::actingAs($actor)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->assertOk()
-            ->assertActionDoesNotExist('openAdobeExportSetup')
-            ->assertSee(__('connectors.ui.layer_a.next_step.configure'));
+            ->assertActionExists('openAdobeExportSetup');
     }
 
     #[Test]
