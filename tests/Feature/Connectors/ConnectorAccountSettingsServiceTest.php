@@ -626,7 +626,7 @@ class ConnectorAccountSettingsServiceTest extends TestCase
 
         $expectedAuthorization = (new OAuth1RequestSigner)->sign(
             'GET',
-            'https://shop.example.com/rest/default/V1/products?searchCriteria%5BpageSize%5D=1',
+            'https://shop.example.com/rest/default/V1/products/attributes?searchCriteria%5BpageSize%5D=1',
             null,
             null,
             $context->credentials,

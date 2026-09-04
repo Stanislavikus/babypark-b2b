@@ -16,45 +16,37 @@ class StoreSetupDeveloperPacketConnectionEvidenceTest extends TestCase
     use RefreshDatabase;
 
     #[Test]
-    public function developer_packet_does_not_treat_failed_check_timestamp_as_verified_connection_evidence(): void
+    public function store_setup_overview_does_not_claim_catalog_access_without_successful_connection_check(): void
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));
-        app()->setLocale('en');
+        app()->setLocale('uk');
 
         $account = ConnectorAccount::factory()->create([
             'last_checked_at' => Carbon::parse('2026-09-01T10:11:12+00:00'),
             'last_successful_check_at' => null,
         ]);
 
-        $expectedEvidenceLine = __('connectors.ui.readiness.developer.packet.connection_evidence_missing');
-
         Livewire::test(StoreSetupPacketHarness::class, ['record' => $account])
-            ->assertSee($expectedEvidenceLine)
-            ->assertDontSee($account->last_checked_at->toIso8601String());
+            ->assertSee('Каталог')
+            ->assertSee('потребує уваги')
+            ->assertDontSee('Остання успішна перевірка:');
     }
 
     #[Test]
-    public function developer_packet_uses_last_successful_connection_check_timestamp_when_present(): void
+    public function store_setup_overview_shows_last_successful_connection_check_timestamp_when_present(): void
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));
-        app()->setLocale('en');
+        app()->setLocale('uk');
 
         $account = ConnectorAccount::factory()->create([
             'last_checked_at' => Carbon::parse('2026-09-01T10:11:12+00:00'),
             'last_successful_check_at' => Carbon::parse('2026-09-01T12:34:56+00:00'),
         ]);
 
-        $expectedEvidenceLine = __('connectors.ui.readiness.developer.packet.connection_evidence_at', [
-            'value' => $account->last_successful_check_at->toIso8601String(),
-        ]);
-
-        $forbiddenEvidenceLine = __('connectors.ui.readiness.developer.packet.connection_evidence_at', [
-            'value' => $account->last_checked_at->toIso8601String(),
-        ]);
-
         Livewire::test(StoreSetupPacketHarness::class, ['record' => $account])
-            ->assertSee($expectedEvidenceLine)
-            ->assertDontSee($forbiddenEvidenceLine);
+            ->assertSee('Каталог')
+            ->assertSee('доступ підтверджено')
+            ->assertSee('Остання успішна перевірка:');
     }
 }
 

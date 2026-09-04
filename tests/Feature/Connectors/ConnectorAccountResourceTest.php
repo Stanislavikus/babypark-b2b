@@ -456,7 +456,7 @@ class ConnectorAccountResourceTest extends TestCase
             ->test(ViewConnectorAccount::class, ['record' => $activeAccount->getKey()])
             ->assertActionDisabled('runConnectionCheck')
             ->assertSee('Перевірка не змінює дані в Magento.')
-            ->assertSee(__('connectors.ui.disabled_reasons.check_already_active'));
+            ->assertSee(__('connectors.ui.actions.check_already_active'));
     }
 
     #[Test]
