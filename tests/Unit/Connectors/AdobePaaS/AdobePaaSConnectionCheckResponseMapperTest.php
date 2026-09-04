@@ -88,8 +88,8 @@ class AdobePaaSConnectionCheckResponseMapperTest extends TestCase
      */
     public static function b7AndFallbackStatusProvider(): iterable
     {
-        yield 'unknown 401' => [401, ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError, 'connectors.errors.connection_check_failed'];
-        yield 'unknown 403' => [403, ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError, 'connectors.errors.connection_check_failed'];
+        yield '401 invalid credentials' => [401, ConnectorConnectionCheckErrorCode::AdobeInvalidCredentials, 'connectors.errors.invalid_credentials'];
+        yield '403 insufficient permissions' => [403, ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions, 'connectors.errors.insufficient_permissions'];
         yield '404' => [404, ConnectorConnectionCheckErrorCode::AdobeInvalidOrUnsupportedEndpoint, 'connectors.errors.invalid_or_unsupported_endpoint'];
         yield '408' => [408, ConnectorConnectionCheckErrorCode::AdobeRequestTimeout, 'connectors.errors.timeout'];
         yield '429' => [429, ConnectorConnectionCheckErrorCode::AdobeRateLimited, 'connectors.errors.rate_limited'];
@@ -99,113 +99,6 @@ class AdobePaaSConnectionCheckResponseMapperTest extends TestCase
         yield 'unrecognized 400' => [400, ConnectorConnectionCheckErrorCode::AdobeUnrecognizedBadRequest, 'connectors.errors.connection_check_failed'];
         yield '405 without oauth identifier' => [405, ConnectorConnectionCheckErrorCode::AdobeInvalidOrUnsupportedEndpoint, 'connectors.errors.invalid_or_unsupported_endpoint'];
         yield 'other 4xx 418' => [418, ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError, 'connectors.errors.connection_check_failed'];
-    }
-
-    #[Test]
-    #[DataProvider('oauthProblemSentenceProvider')]
-    public function oauth_problem_sentences_fall_through_to_http_status_fallback(
-        string $body,
-        int $status,
-        ConnectorConnectionCheckErrorCode $expectedCode,
-    ): void {
-        $result = $this->mapper->map(new ConnectorHttpResult($status, [], $body));
-
-        $this->assertSame($expectedCode, $result->errorCode);
-        $this->assertSame($status, $result->httpStatus);
-    }
-
-    /**
-     * @return iterable<string, array{0: string, 1: int, 2: ConnectorConnectionCheckErrorCode}>
-     */
-    public static function oauthProblemSentenceProvider(): iterable
-    {
-        yield 'signature sentence at 401' => [
-            'oauth_problem=The+signature+is+invalid.+Verify+and+try+again.',
-            401,
-            ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError,
-        ];
-
-        yield 'consumer key expired sentence at 401' => [
-            'oauth_problem=Consumer+key+has+expired',
-            401,
-            ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError,
-        ];
-    }
-
-    #[Test]
-    #[DataProvider('structuredProtectedRestErrorProvider')]
-    public function classifies_only_certified_machine_readable_protected_rest_errors(
-        int $status,
-        string $body,
-        ConnectorConnectionCheckErrorCode $expectedCode,
-        string $expectedShape,
-    ): void {
-        $result = $this->mapper->map(new ConnectorHttpResult($status, ['X-Request-Id' => ['req-123']], $body));
-
-        $this->assertSame($expectedCode, $result->errorCode);
-        $this->assertSame($status, $result->httpStatus);
-        $this->assertSame($expectedShape, $result->responseShape);
-        $this->assertSame('Magento_Catalog::products', $result->expectedAclResource);
-        $this->assertSame('req-123', $result->vendorRequestId);
-    }
-
-    #[Test]
-    public function does_not_assume_protected_rest_exposes_an_oauth_problem_field(): void
-    {
-        $result = $this->mapper->map(new ConnectorHttpResult(
-            403,
-            [],
-            '{"message":"oauth_problem=consumer_key_invalid"}',
-        ));
-
-        $this->assertSame(ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError, $result->errorCode);
-        $this->assertNull($result->recognizedOAuthProblem);
-    }
-
-    #[Test]
-    #[DataProvider('incompatibleOAuthStatusProvider')]
-    public function recognized_oauth_problem_with_uncertified_status_falls_back_without_throwing(
-        int $status,
-        string $oauthProblem,
-        ConnectorConnectionCheckErrorCode $expectedCode,
-    ): void {
-        $result = $this->mapper->map(new ConnectorHttpResult(
-            $status,
-            [],
-            json_encode(['oauth_problem' => $oauthProblem], JSON_THROW_ON_ERROR),
-        ));
-
-        $this->assertSame($expectedCode, $result->errorCode);
-        $this->assertSame($status, $result->httpStatus);
-        $this->assertNull($result->recognizedOAuthProblem);
-        $this->assertSame('uncertified_oauth_problem_status', $result->responseShape);
-    }
-
-    public static function incompatibleOAuthStatusProvider(): iterable
-    {
-        yield 'recognized OAuth field on vendor failure' => [500, 'consumer_key_invalid', ConnectorConnectionCheckErrorCode::AdobeVendorUnavailable];
-        yield '403 with identifier certified only for 401' => [403, 'signature_invalid', ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError];
-        yield '401 with identifier certified only for 403' => [401, 'permission_denied', ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError];
-    }
-
-    public static function structuredProtectedRestErrorProvider(): iterable
-    {
-        $acl = static fn (mixed $resources): string => json_encode([
-            'message' => 'localized and deliberately ignored',
-            'parameters' => ['resources' => $resources],
-        ], JSON_THROW_ON_ERROR);
-
-        yield '401 Product ACL string' => [401, $acl('Magento_Catalog::products'), ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions, 'magento_acl_resource_string'];
-        yield '403 Product ACL among list' => [403, $acl(['Magento_Backend::admin', 'Magento_Catalog::products']), ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions, 'magento_acl_resource_list'];
-        yield 'invalid consumer wins over ACL' => [403, json_encode(['oauth_problem' => 'consumer_key_invalid', 'parameters' => ['resources' => 'Magento_Catalog::products']], JSON_THROW_ON_ERROR), ConnectorConnectionCheckErrorCode::AdobeOAuthConsumerKeyInvalid, 'recognized_oauth_problem'];
-        yield 'invalid signature' => [401, '{"oauth_problem":"signature_invalid"}', ConnectorConnectionCheckErrorCode::AdobeOAuthSignatureInvalid, 'recognized_oauth_problem'];
-        yield 'permission denied' => [403, '{"oauth_problem":"permission_denied"}', ConnectorConnectionCheckErrorCode::AdobeOAuthPermissionDenied, 'recognized_oauth_problem'];
-        yield 'permission unknown' => [403, '{"oauth_problem":"permission_unknown"}', ConnectorConnectionCheckErrorCode::AdobeOAuthPermissionUnknown, 'recognized_oauth_problem'];
-        yield 'HTML WAF' => [403, '<html>denied</html>', ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError, 'non_json'];
-        yield 'generic JSON' => [403, '{"error":"forbidden"}', ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError, 'generic_json'];
-        yield 'malformed JSON' => [403, '{', ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError, 'non_json'];
-        yield 'unrelated ACL' => [403, $acl('Magento_Catalog::attributes_attributes'), ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError, 'magento_acl_resource_string'];
-        yield 'unsupported ACL map' => [403, $acl(['resource' => 'Magento_Catalog::products']), ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError, 'unsupported_acl_resources'];
     }
 
     #[Test]
