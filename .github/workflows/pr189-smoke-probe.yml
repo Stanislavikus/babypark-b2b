@@ -1,11 +1,10 @@
 name: PR189 smoke access probe
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - codex/implement-magento-product-campaign
-    paths:
-      - .github/workflows/pr189-smoke-probe.yml
 
 permissions:
   contents: read
