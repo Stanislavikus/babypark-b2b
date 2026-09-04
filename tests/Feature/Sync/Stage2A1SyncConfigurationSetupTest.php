@@ -188,7 +188,8 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
         Livewire::actingAs($actor)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->assertOk()
-            ->assertActionExists('openAdobeExportSetup');
+            ->assertActionDoesNotExist('openAdobeExportSetup')
+            ->assertSee(__('connectors.ui.layer_a.next_step.configure'));
     }
 
     #[Test]

@@ -52,8 +52,7 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
 
         $this->assertNotFalse($page);
         $this->assertStringContainsString("Action::make('runConnectionCheck')", $page);
-        $this->assertStringContainsString("Action::make('openAdobeExportSetup')", $page);
-        $this->assertStringContainsString("->color('primary')", $page);
+        $this->assertStringNotContainsString("Action::make('openAdobeExportSetup')", $page);
         $this->assertStringContainsString("->color('gray')", $page);
         $this->assertStringNotContainsString('checkStoreSetup', $page);
         $this->assertStringNotContainsString('AdobeSafeSyncComponentReadinessResolver', $page);
