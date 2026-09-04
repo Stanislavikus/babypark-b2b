@@ -288,6 +288,65 @@ jobs:
               println('E2 empty_catalog=SKIPPED');
           }
 
+          $configurableSku = null;
+
+          if ($productsTotalCount !== null && $productsTotalCount > 0) {
+              $configurableSigningContext = new OAuth1SigningContext(
+                  bin2hex(random_bytes(16)),
+                  time(),
+              );
+
+              $configurableRequest = $requestFactory->buildProductsSearch(
+                  $context,
+                  $configurableSigningContext,
+                  [
+                      'pageSize' => 1,
+                      'currentPage' => 1,
+                      'filterGroups' => [
+                          [
+                              'filters' => [
+                                  [
+                                      'field' => 'type_id',
+                                      'value' => 'configurable',
+                                      'conditionType' => 'eq',
+                                  ],
+                              ],
+                          ],
+                      ],
+                  ],
+              );
+
+              $configurableOutboundRequest = new ConnectorOutboundRequest(
+                  $configurableRequest,
+                  new ConnectorTransportLimits(
+                      connectTimeoutSeconds: 5.0,
+                      totalTimeoutSeconds: 30.0,
+                      maxResponseBodyBytes: 256 * 1024,
+                  ),
+              );
+
+              try {
+                  $configurableResult = $transport->send($configurableOutboundRequest);
+              } catch (\Throwable) {
+                  $configurableResult = null;
+              }
+
+              if ($configurableResult !== null && $configurableResult->statusCode === 200) {
+                  try {
+                      $decodedConfigurable = json_decode($configurableResult->body, true, 512, JSON_THROW_ON_ERROR);
+                  } catch (\Throwable) {
+                      $decodedConfigurable = null;
+                  }
+
+                  if (is_array($decodedConfigurable) && isset($decodedConfigurable['items']) && is_array($decodedConfigurable['items']) && count($decodedConfigurable['items']) > 0 && is_array($decodedConfigurable['items'][0])) {
+                      $sku = $decodedConfigurable['items'][0]['sku'] ?? null;
+                      if (is_string($sku) && $sku !== '') {
+                          $configurableSku = $sku;
+                      }
+                  }
+              }
+          }
+
           if ($firstSku !== null) {
               try {
                   $doc = app(AdobeProductDocumentReader::class)->read($workspaceId, $accountId, $firstSku);
@@ -366,10 +425,15 @@ jobs:
                   }
               }
 
-              if ($doc->typeId === 'configurable') {
+              if ($configurableSku === null && $doc->typeId === 'configurable') {
+                  $configurableSku = $firstSku;
+              }
+
+              if ($configurableSku !== null) {
+                  $configurableTargetSku = $configurableSku;
                   $childrenRequest = $commandFactory->buildGetConfigurableChildren(
                       $context,
-                      $firstSku,
+                      $configurableTargetSku,
                       new OAuth1SigningContext(bin2hex(random_bytes(16)), time()),
                   );
 
@@ -385,11 +449,11 @@ jobs:
                   try {
                       $childrenResult = $transport->send($childrenOutbound);
                   } catch (\Throwable) {
-                      println('E7 capability=configurable_children_get endpoint=/V1/configurable-products/{sku}/children status=FAIL http=null sku='.$firstSku);
+                      println('E7 capability=configurable_children_get endpoint=/V1/configurable-products/{sku}/children status=FAIL http=null sku='.$configurableTargetSku);
                       exit(1);
                   }
 
-                  println('E7 capability=configurable_children_get endpoint=/V1/configurable-products/{sku}/children status='.($childrenResult->statusCode === 200 ? 'PASS' : 'FAIL').' http='.$childrenResult->statusCode.' sku='.$firstSku);
+                  println('E7 capability=configurable_children_get endpoint=/V1/configurable-products/{sku}/children status='.($childrenResult->statusCode === 200 ? 'PASS' : 'FAIL').' http='.$childrenResult->statusCode.' sku='.$configurableTargetSku);
 
                   if ($childrenResult->statusCode !== 200) {
                       exit(1);
@@ -397,7 +461,7 @@ jobs:
 
                   $optionsRequest = $commandFactory->buildGetConfigurableOptions(
                       $context,
-                      $firstSku,
+                      $configurableTargetSku,
                       new OAuth1SigningContext(bin2hex(random_bytes(16)), time()),
                   );
 
@@ -413,18 +477,18 @@ jobs:
                   try {
                       $optionsResult = $transport->send($optionsOutbound);
                   } catch (\Throwable) {
-                      println('E7 capability=configurable_options_get endpoint=/V1/configurable-products/{sku}/options/all status=FAIL http=null sku='.$firstSku);
+                      println('E7 capability=configurable_options_get endpoint=/V1/configurable-products/{sku}/options/all status=FAIL http=null sku='.$configurableTargetSku);
                       exit(1);
                   }
 
-                  println('E7 capability=configurable_options_get endpoint=/V1/configurable-products/{sku}/options/all status='.($optionsResult->statusCode === 200 ? 'PASS' : 'FAIL').' http='.$optionsResult->statusCode.' sku='.$firstSku);
+                  println('E7 capability=configurable_options_get endpoint=/V1/configurable-products/{sku}/options/all status='.($optionsResult->statusCode === 200 ? 'PASS' : 'FAIL').' http='.$optionsResult->statusCode.' sku='.$configurableTargetSku);
 
                   if ($optionsResult->statusCode !== 200) {
                       exit(1);
                   }
               } else {
-                  println('E7 capability=configurable_children_get endpoint=/V1/configurable-products/{sku}/children status=SKIPPED reason=not_configurable sku='.$firstSku);
-                  println('E7 capability=configurable_options_get endpoint=/V1/configurable-products/{sku}/options/all status=SKIPPED reason=not_configurable sku='.$firstSku);
+                  println('E7 capability=configurable_children_get endpoint=/V1/configurable-products/{sku}/children status=SKIPPED reason=no_configurable_sku');
+                  println('E7 capability=configurable_options_get endpoint=/V1/configurable-products/{sku}/options/all status=SKIPPED reason=no_configurable_sku');
               }
 
               $signer = app(OAuth1RequestSigner::class);
