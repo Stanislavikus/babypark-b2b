@@ -680,5 +680,10 @@
     "entity_trust.mode.simple_variant": "Простой вариант",
     "entity_trust.mode.configurable_existing_parent": "Конфигурируемый товар с имеющимся родительским",
     "entity_trust.types.configurable": "Конфигурируемый товар",
-    "entity_trust.types.simple": "Простой товар"
+    "entity_trust.types.simple": "Простой товар",
+    "connectors.ui.layer_a.account_title": ":platform · :account",
+    "connectors.ui.layer_a.magento_name": "Magento",
+    "connectors.ui.layer_a.next_step.heading": "СЛЕДУЮЩИЙ ШАГ",
+    "connectors.ui.layer_a.next_step.configure": "Настроить синхронизацию",
+    "connectors.ui.layer_a.next_step.preview": "Создать пробную синхронизацию"
 }

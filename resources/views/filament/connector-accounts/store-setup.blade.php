@@ -7,7 +7,14 @@
     $catalogCountKnown = false;
     $imagesAccessConfirmed = false;
 
-    if ($record !== null) {
+    if (($connectionEvidenceLoaded ?? false) === true) {
+        $params = $connectionEvidence ?? null;
+        if (is_array($params) && array_key_exists('catalog_total_count', $params) && is_int($params['catalog_total_count'])) {
+            $catalogTotalCount = $params['catalog_total_count'];
+            $catalogCountKnown = true;
+        }
+        $imagesAccessConfirmed = is_array($params) && ($params['images_access_confirmed'] ?? false) === true;
+    } elseif ($record !== null) {
         $latestSuccessfulCheck = $record->connectionChecks()
             ->where('status', \App\Enums\ConnectorConnectionCheckStatus::Succeeded)
             ->latest('finished_at')
@@ -28,12 +35,9 @@
     $fieldsAccessConfirmed = $record?->last_successful_discovery_at !== null;
     $catalogAccessConfirmed = $catalogCountKnown;
 
-    $syncConfigurationId = null;
-    if ($record !== null) {
-        $syncConfigurationId = $record->syncConfigurations()
-            ->orderByDesc('created_at')
-            ->value('id');
-    }
+    $syncConfigurationId = $syncConfigurationId ?? null;
+    $canConfigureSync = $canConfigureSync ?? false;
+    $canCreatePreview = $canCreatePreview ?? false;
 @endphp
 
 <div class="space-y-4">
@@ -76,7 +80,7 @@
                         {{ $fieldsAccessConfirmed ? __('connectors.ui.layer_a.status.access_confirmed') : __('connectors.ui.layer_a.status.needs_attention') }}
                     </span>
                 </div>
-                @if ($syncConfigurationId !== null)
+                @if ($fieldsAccessConfirmed && $syncConfigurationId !== null)
                     <a
                         class="text-primary-600 hover:underline dark:text-primary-400"
                         href="{{ \App\Filament\Pages\Sync\ManageSyncFieldMappings::getUrl(['account' => (string) $record->id, 'configuration' => (string) $syncConfigurationId]) }}"
@@ -101,6 +105,19 @@
             <p class="text-xs text-gray-600 dark:text-gray-400">
                 {{ __('connectors.ui.layer_a.last_successful_check') }}: {{ \App\Support\Connectors\ConnectorUiFormatter::formatDateTime($lastSuccessfulCheckAt) }}
             </p>
+        @endif
+    </div>
+
+    <div class="space-y-3 rounded-xl border border-gray-200 p-4 dark:border-white/10">
+        <p class="text-sm font-medium text-gray-950 dark:text-white">{{ __('connectors.ui.layer_a.next_step.heading') }}</p>
+        @if ($syncConfigurationId === null && $canConfigureSync)
+            <x-filament::button tag="a" :href="\App\Filament\Pages\Sync\ManageAdobeProductsExportSetup::getUrl(['account' => $record->getKey()])">
+                {{ __('connectors.ui.layer_a.next_step.configure') }}
+            </x-filament::button>
+        @elseif ($syncConfigurationId !== null && $canCreatePreview)
+            <x-filament::button tag="a" :href="\App\Filament\Pages\Sync\ManageAdobeProductsExportPreview::getUrl(['account' => $record->getKey()])">
+                {{ __('connectors.ui.layer_a.next_step.preview') }}
+            </x-filament::button>
         @endif
     </div>
 </div>

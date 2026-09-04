@@ -697,5 +697,10 @@
     "entity_trust.mode.simple_variant": "Simple variant",
     "entity_trust.mode.configurable_existing_parent": "Configurable with existing parent",
     "entity_trust.types.configurable": "Configurable product",
-    "entity_trust.types.simple": "Simple product"
+    "entity_trust.types.simple": "Simple product",
+    "connectors.ui.layer_a.account_title": ":platform · :account",
+    "connectors.ui.layer_a.magento_name": "Magento",
+    "connectors.ui.layer_a.next_step.heading": "NEXT STEP",
+    "connectors.ui.layer_a.next_step.configure": "Configure synchronization",
+    "connectors.ui.layer_a.next_step.preview": "Create a test synchronization"
 }
