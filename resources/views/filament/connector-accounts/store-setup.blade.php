@@ -5,6 +5,7 @@
     $lastSuccessfulCheckAt = $record?->last_successful_check_at;
     $catalogTotalCount = null;
     $catalogCountKnown = false;
+    $imagesAccessConfirmed = false;
 
     if ($record !== null) {
         $latestSuccessfulCheck = $record->connectionChecks()
@@ -17,6 +18,9 @@
             if (is_array($params) && array_key_exists('catalog_total_count', $params) && is_int($params['catalog_total_count'])) {
                 $catalogTotalCount = $params['catalog_total_count'];
                 $catalogCountKnown = true;
+            }
+            if (is_array($params) && array_key_exists('images_access_confirmed', $params) && $params['images_access_confirmed'] === true) {
+                $imagesAccessConfirmed = true;
             }
         }
     }
@@ -48,7 +52,7 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="font-medium text-gray-950 dark:text-white">Каталог</span>
                     <span class="text-gray-600 dark:text-gray-400">—</span>
-                    <span>доступ підтверджено</span>
+                    <span>{{ $lastSuccessfulCheckAt !== null ? 'доступ підтверджено' : 'потребує уваги' }}</span>
                 </div>
                 @if ($catalogCountKnown)
                     <span class="text-gray-600 dark:text-gray-400">
@@ -77,7 +81,7 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="font-medium text-gray-950 dark:text-white">Зображення</span>
                     <span class="text-gray-600 dark:text-gray-400">—</span>
-                    <span>доступ підтверджено</span>
+                    <span>{{ $imagesAccessConfirmed ? 'доступ підтверджено' : 'не перевірено' }}</span>
                 </div>
             </div>
         </div>
