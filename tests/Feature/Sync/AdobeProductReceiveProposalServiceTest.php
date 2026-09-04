@@ -92,7 +92,7 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
             ),
         );
 
-        $this->bindSafeSyncTransport(
+        $transport = $this->bindSafeSyncTransport(
             fn (): ConnectorHttpResult => $this->verifiedProductResponse(77, 'SKU-EQUAL', 'Local Product'),
         );
 
@@ -103,6 +103,12 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
             targetType: FieldObjectType::Product,
             targetId: $product->id,
         );
+
+        $this->assertSame(1, $transport->sendCount);
+        $this->assertCount(1, $transport->recordedRequests);
+        $this->assertSame('GET', $transport->recordedRequests[0]->request->getMethod());
+        $this->assertStringContainsString('/V1/products/SKU-EQUAL', (string) $transport->recordedRequests[0]->request->getUri());
+        $this->assertStringNotContainsString('/V1/safe-sync/products', (string) $transport->recordedRequests[0]->request->getUri());
 
         $this->assertSame((string) $configuration->refresh()->configuration_revision, $result->proposal->configurationRevision);
         $this->assertSame((string) $link->id, $result->proposal->trustedExternalLinkEvidenceId);
@@ -397,7 +403,7 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
 
     #[Test]
     #[DataProvider('invalidSafeSyncContextProvider')]
-    public function invalid_safe_sync_context_is_normalized_into_bounded_receive_failure(
+    public function invalid_product_read_context_is_normalized_into_bounded_receive_failure(
         array $accountOverrides,
     ): void {
         $account = $this->createConnectorAccount($this->workspace, $accountOverrides);
@@ -429,9 +435,9 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
                 targetType: FieldObjectType::Product,
                 targetId: $product->id,
             );
-            $this->fail('Expected invalid Safe Sync context failure.');
+            $this->fail('Expected invalid Product read context failure.');
         } catch (AdobeProductReceiveProposalException $exception) {
-            $this->assertSame('safe_sync_context_invalid', $exception->reasonCode);
+            $this->assertSame('product_read_context_invalid', $exception->reasonCode);
         }
 
         $this->assertSame(0, $transport->sendCount);
@@ -475,10 +481,10 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
         );
 
         $this->assertSame(
-            'https://shop.example.com/rest/default/V1/safe-sync/products/777?expectedSku=123',
+            'https://shop.example.com/rest/default/V1/products/123',
             $capturedUri,
         );
-        $this->assertStringNotContainsString('/V1/products/123', $capturedUri);
+        $this->assertStringNotContainsString('/V1/safe-sync/products', $capturedUri);
     }
 
     #[Test]
@@ -546,7 +552,7 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
     }
 
     #[Test]
-    public function safe_sync_identity_mismatch_sku_mismatch_and_transport_failure_issue_no_flow(): void
+    public function trusted_external_link_changed_and_transport_failure_issue_no_flow(): void
     {
         $account = $this->createConnectorAccount($this->workspace);
         $configuration = $this->createReceiveConfiguration($account);
@@ -566,9 +572,9 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
         );
 
         foreach ([
-            'safe_sync_identity_mismatch' => fn (): ConnectorHttpResult => $this->verifiedProductResponse(602, 'SKU-R2', 'Mismatch'),
-            'safe_sync_sku_mismatch' => fn (): ConnectorHttpResult => $this->verifiedProductResponse(601, 'SKU-OTHER', 'Mismatch'),
-        ] as $expectedReason => $responder) {
+            fn (): ConnectorHttpResult => $this->verifiedProductResponse(602, 'SKU-R2', 'Mismatch'),
+            fn (): ConnectorHttpResult => $this->verifiedProductResponse(601, 'SKU-OTHER', 'Mismatch'),
+        ] as $responder) {
             $this->bindSafeSyncTransport($responder);
 
             try {
@@ -579,9 +585,9 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
                     targetType: FieldObjectType::Product,
                     targetId: $product->id,
                 );
-                $this->fail("Expected {$expectedReason} failure.");
+                $this->fail('Expected trusted external link change failure.');
             } catch (AdobeProductReceiveProposalException $exception) {
-                $this->assertSame($expectedReason, $exception->reasonCode);
+                $this->assertSame('trusted_external_link_changed', $exception->reasonCode);
             }
         }
 
@@ -603,7 +609,7 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
             );
             $this->fail('Expected transport failure.');
         } catch (AdobeProductReceiveProposalException $exception) {
-            $this->assertSame('safe_sync_transport_failure', $exception->reasonCode);
+            $this->assertSame('product_read_transport_failure', $exception->reasonCode);
         }
     }
 
@@ -1265,7 +1271,7 @@ class AdobeProductReceiveProposalServiceTest extends TestCase
     private function verifiedProductResponse(int $logicalEntityId, string $sku, string $name): ConnectorHttpResult
     {
         return new ConnectorHttpResult(200, [], json_encode([
-            'logical_entity_id' => $logicalEntityId,
+            'id' => $logicalEntityId,
             'sku' => $sku,
             'type_id' => 'simple',
             'name' => $name,

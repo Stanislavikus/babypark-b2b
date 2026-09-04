@@ -61,6 +61,32 @@ class AdobePaaSConnectionCheckRequestFactoryTest extends TestCase
     }
 
     #[Test]
+    public function builds_signed_products_search_request_matching_signer_output(): void
+    {
+        $context = new AdobePaaSRequestContext(
+            baseUrl: 'https://shop.example.com',
+            storeCode: 'default',
+            credentials: $this->credentials,
+        );
+
+        $request = $this->factory->buildProductsSearch($context, $this->signingContext, ['pageSize' => 1]);
+        $expectedUrl = 'https://shop.example.com/rest/default/V1/products?searchCriteria%5BpageSize%5D=1';
+        $expectedAuthorization = (new OAuth1RequestSigner)->sign(
+            'GET',
+            $expectedUrl,
+            null,
+            null,
+            $this->credentials,
+            $this->signingContext,
+        );
+
+        $this->assertSame('GET', $request->getMethod());
+        $this->assertSame($expectedUrl, (string) $request->getUri());
+        $this->assertCount(1, $request->getHeader('Authorization'));
+        self::assertSameOAuth1AuthorizationHeader($expectedAuthorization, $request->getHeaderLine('Authorization'));
+    }
+
+    #[Test]
     public function base_url_with_and_without_trailing_slash_produce_identical_endpoint_url(): void
     {
         $withoutSlash = $this->factory->build(

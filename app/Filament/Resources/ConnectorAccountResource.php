@@ -191,8 +191,8 @@ class ConnectorAccountResource extends Resource
                         TextEntry::make('connectorDefinition.name')
                             ->label(__('connectors.ui.columns.platform'))
                             ->formatStateUsing(fn (?string $state, ConnectorAccount $record): string => filled($state)
-                                ? $state.' ('.$record->connectorDefinition?->code.')'
-                                : ($record->connectorDefinition?->code ?? __('connectors.ui.common.dash'))),
+                                ? $state
+                                : __('connectors.ui.common.dash')),
                         TextEntry::make('name')
                             ->label(__('connectors.ui.columns.account')),
                         TextEntry::make('store_code')
@@ -208,7 +208,7 @@ class ConnectorAccountResource extends Resource
                                 'showActiveConnectionCheck' => static::actorCanManageConnectorAccounts(),
                             ]),
                         ViewEntry::make('store_setup')
-                            ->label(__('connectors.ui.readiness.store_setup'))
+                            ->label('')
                             ->view('filament.connector-accounts.store-setup')
                             ->visible(fn (ConnectorAccount $record): bool => static::shouldShowStoreSetupEntry($record))
                             ->columnSpanFull(),

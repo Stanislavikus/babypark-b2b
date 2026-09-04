@@ -25,7 +25,7 @@ use Tests\TestCase;
 class AdobePaaSConnectionCheckCapabilityImplTest extends TestCase
 {
     #[Test]
-    public function sends_request_with_b12_limits_exactly_once(): void
+    public function sends_baseline_request_with_b12_limits_and_then_optionally_probes_catalog_total_count(): void
     {
         $context = new AdobePaaSRequestContext(
             baseUrl: 'https://shop.example.com',
@@ -38,19 +38,25 @@ class AdobePaaSConnectionCheckCapabilityImplTest extends TestCase
             $context,
             new OAuth1SigningContext('fixednonce00000001', 1_700_000_000),
         );
+        $referenceProductsRequest = $requestFactory->buildProductsSearch(
+            $context,
+            new OAuth1SigningContext('fixednonce00000002', 1_700_000_000),
+            ['pageSize' => 1],
+        );
 
         $transport = new class($referenceRequest) implements ConnectorHttpTransport
         {
             public int $sendCount = 0;
 
-            public ?ConnectorOutboundRequest $captured = null;
+            /** @var list<ConnectorOutboundRequest> */
+            public array $captured = [];
 
             public function __construct(private readonly RequestInterface $referenceRequest) {}
 
             public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
             {
                 $this->sendCount++;
-                $this->captured = $request;
+                $this->captured[] = $request;
 
                 return new ConnectorHttpResult(200, [], json_encode([
                     'items' => [],
@@ -70,18 +76,23 @@ class AdobePaaSConnectionCheckCapabilityImplTest extends TestCase
         $result = $capability->checkConnection($context);
 
         $this->assertTrue($result->succeeded);
-        $this->assertSame(1, $transport->sendCount);
-        $this->assertNotNull($transport->captured);
-        $this->assertSame('GET', $transport->captured->request->getMethod());
-        $this->assertSame((string) $referenceRequest->getUri(), (string) $transport->captured->request->getUri());
-        $this->assertStringContainsString('oauth_consumer_key="ck_test"', $transport->captured->request->getHeaderLine('Authorization'));
+        $this->assertSame(2, $transport->sendCount);
+        $this->assertCount(2, $transport->captured);
+        $this->assertSame('GET', $transport->captured[0]->request->getMethod());
+        $this->assertSame((string) $referenceRequest->getUri(), (string) $transport->captured[0]->request->getUri());
+        $this->assertSame((string) $referenceProductsRequest->getUri(), (string) $transport->captured[1]->request->getUri());
+        $this->assertStringContainsString('oauth_consumer_key="ck_test"', $transport->captured[0]->request->getHeaderLine('Authorization'));
         $this->assertNotSame(
             $referenceRequest->getHeaderLine('Authorization'),
-            $transport->captured->request->getHeaderLine('Authorization'),
+            $transport->captured[0]->request->getHeaderLine('Authorization'),
         );
-        $this->assertSame(5.0, $transport->captured->limits->connectTimeoutSeconds);
-        $this->assertSame(30.0, $transport->captured->limits->totalTimeoutSeconds);
-        $this->assertSame(256 * 1024, $transport->captured->limits->maxResponseBodyBytes);
+        $this->assertSame(['catalog_total_count' => 0], $result->safeMessageParameters());
+        $this->assertSame(5.0, $transport->captured[0]->limits->connectTimeoutSeconds);
+        $this->assertSame(30.0, $transport->captured[0]->limits->totalTimeoutSeconds);
+        $this->assertSame(256 * 1024, $transport->captured[0]->limits->maxResponseBodyBytes);
+        $this->assertSame(5.0, $transport->captured[1]->limits->connectTimeoutSeconds);
+        $this->assertSame(30.0, $transport->captured[1]->limits->totalTimeoutSeconds);
+        $this->assertSame(256 * 1024, $transport->captured[1]->limits->maxResponseBodyBytes);
     }
 
     #[Test]

@@ -2,113 +2,61 @@
 
 namespace Tests\Feature\Connectors;
 
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AdobeSafeSyncReadinessPresentationTest extends TestCase
 {
-    public static function readinessLocaleProvider(): array
-    {
-        return [
-            'english' => ['en'],
-            'russian' => ['ru'],
-            'ukrainian' => ['uk'],
-        ];
-    }
-
     #[Test]
-    #[DataProvider('readinessLocaleProvider')]
-    public function readiness_copy_exposes_three_business_states_without_technical_vocabulary(string $locale): void
+    public function layer_a_overview_copy_avoids_technical_vocabulary(): void
     {
-        $copy = implode(' ', [
-            __('connectors.ui.readiness.store_setup', locale: $locale),
-            __('connectors.ui.readiness.check', locale: $locale),
-            __('connectors.ui.readiness.check_again', locale: $locale),
-            __('connectors.ui.readiness.checking', locale: $locale),
-            __('connectors.ui.readiness.not_checked.body', locale: $locale),
-            __('connectors.ui.readiness.ready.title', locale: $locale),
-            __('connectors.ui.readiness.ready.body', locale: $locale),
-            __('connectors.ui.readiness.setup_required.title', locale: $locale),
-            __('connectors.ui.readiness.setup_required.body', locale: $locale),
-            __('connectors.ui.readiness.update_required.title', locale: $locale),
-            __('connectors.ui.readiness.update_required.body', locale: $locale),
-            __('connectors.ui.readiness.baseline_failure.title', locale: $locale),
-            __('connectors.ui.readiness.baseline_failure.guidance', locale: $locale),
-        ]);
-
-        $this->assertNotSame(trim($copy), '');
-        $this->assertStringNotContainsString('Connector', $copy);
-        $this->assertStringNotContainsString('component', $copy);
-        $this->assertStringNotContainsString('компонент', $copy);
-
-        foreach ([
-            'PHP', '2.4.', 'Composer', 'B2BPlatform_MagentoSafeSync', 'HTTP',
-            'stage3e-r1', 'operation', 'entity_bound', 'AdobeInvalid', 'safe-sync',
-            'handshake', 'омпозер', 'андак',
-        ] as $forbidden) {
-            $this->assertStringNotContainsString($forbidden, $copy);
-        }
-    }
-
-    #[Test]
-    public function english_readiness_copy_uses_merchant_safe_phrasing(): void
-    {
-        $this->assertSame('Send product changes to Magento', __('connectors.ui.readiness.store_setup', locale: 'en'));
-        $this->assertSame('Check readiness', __('connectors.ui.readiness.check', locale: 'en'));
-        $this->assertSame('Check again', __('connectors.ui.readiness.check_again', locale: 'en'));
-        $this->assertSame('Checking readiness…', __('connectors.ui.readiness.checking', locale: 'en'));
-        $this->assertSame(
-            'Ready to send product changes to Magento',
-            __('connectors.ui.readiness.ready.title', locale: 'en'),
-        );
-        $this->assertSame('Magento setup is required', __('connectors.ui.readiness.setup_required.title', locale: 'en'));
-        $this->assertSame('Integration module update is required', __('connectors.ui.readiness.update_required.title', locale: 'en'));
-
-        $this->assertSame('Check whether this store is ready to receive product changes.', __('connectors.ui.readiness.not_checked.body', locale: 'en'));
-        $this->assertSame(
-            'We confirmed that this store can receive simple product changes from the platform.',
-            __('connectors.ui.readiness.ready.body', locale: 'en'),
-        );
-        $this->assertStringContainsString('Connection to Magento works', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
-        $this->assertStringContainsString('developer instructions', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
-        $this->assertStringContainsString('Connection to Magento works', __('connectors.ui.readiness.update_required.body', locale: 'en'));
-        $this->assertStringContainsString('Magento connection', __('connectors.ui.readiness.baseline_failure.guidance', locale: 'en'));
-        $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.not_checked.body', locale: 'en'));
-        $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.ready.body', locale: 'en'));
-        $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.setup_required.body', locale: 'en'));
-        $this->assertStringNotContainsString('safe product synchronization', __('connectors.ui.readiness.update_required.body', locale: 'en'));
-    }
-
-    #[Test]
-    public function connector_account_action_uses_transient_resolver_without_readiness_persistence(): void
-    {
-        $page = file_get_contents(app_path('Filament/Resources/ConnectorAccountResource/Pages/ViewConnectorAccount.php'));
-        $resource = file_get_contents(app_path('Filament/Resources/ConnectorAccountResource.php'));
-        $resolver = file_get_contents(app_path('Services/Connectors/AdobeSafeSyncComponentReadinessResolver.php'));
         $view = file_get_contents(resource_path('views/filament/connector-accounts/store-setup.blade.php'));
 
-        $this->assertStringContainsString('AdobeSafeSyncComponentReadinessResolver', $page);
-        $this->assertStringContainsString('AdobeSafeSyncRequiredOperation::SimpleProductWrite', $page);
-        $this->assertStringContainsString('public function checkStoreSetupAction(): Action', $page);
-        $this->assertStringContainsString('private function executeStoreSetupCheck(): void', $page);
-        $this->assertStringContainsString("Action::make('checkStoreSetup')", $page);
-        $this->assertStringContainsString("->authorize('runConnectionCheck')", $page);
-        $this->assertStringContainsString("->disabled(fn (): bool => ! \$this->storeSetupActionState()['enabled'])", $page);
-        $this->assertStringContainsString("\$this->storeSetupState = 'NOT_CHECKED';", $page);
-        $this->assertStringNotContainsString('public function checkStoreSetup(): void', $page);
-        $this->assertStringContainsString('shouldShowStoreSetupEntry', $resource);
-        $this->assertStringContainsString('->visible(fn (ConnectorAccount $record): bool => static::shouldShowStoreSetupEntry($record))', $resource);
-        $this->assertStringNotContainsString("Gate::forUser(\$user)->allows('runConnectionCheck', \$record);", $resource);
-        $this->assertStringContainsString('{{ $this->checkStoreSetupAction }}', $view);
-        $this->assertStringContainsString("__('connectors.ui.readiness.not_checked.body')", $view);
-        $this->assertStringContainsString("'connectors.ui.readiness.ready.title'", $view);
-        $this->assertStringContainsString("'connectors.ui.readiness.ready.body'", $view);
-        $this->assertStringContainsString('$baselineMessage = $this->storeSetupBaselineMessage;', $view);
-        $this->assertStringNotContainsString('$livewire->storeSetupBaselineMessage', $view);
-        $this->assertStringNotContainsString('wire:click="checkStoreSetup"', $view);
-        $this->assertStringNotContainsString('ConnectorAccount::update', $resolver);
-        $this->assertStringNotContainsString('save()', $resolver);
-        $this->assertSame([], glob(database_path('migrations/*readiness*')) ?: []);
+        $this->assertNotFalse($view);
+        $this->assertStringContainsString('connectors.ui.layer_a.check_does_not_mutate', $view);
+        $this->assertStringContainsString('connectors.ui.layer_a.what_we_checked_heading', $view);
+        $this->assertStringNotContainsString('Перевірка не змінює дані в Magento.', $view);
+        $this->assertStringNotContainsString('ЩО МИ ПЕРЕВІРИЛИ', $view);
+
+        foreach ([
+            'B2BPlatform_MagentoSafeSync',
+            'AdobeSafeSync',
+            'safe-sync',
+            'OAuth',
+            'ACL',
+            'Composer',
+            'PHP',
+            '/V1/safe-sync/',
+        ] as $forbidden) {
+            $this->assertStringNotContainsString($forbidden, $view);
+        }
+
+        $this->assertStringContainsString('connectors.ui.layer_a.status.not_checked', $view);
+    }
+
+    #[Test]
+    public function readiness_contract_keeps_the_concrete_business_operation_vocabulary(): void
+    {
+        $contract = file_get_contents(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
+
+        $this->assertNotFalse($contract);
+        $this->assertStringContainsString('Передача змін товарів у Magento', $contract);
+        $this->assertStringNotContainsString('Magento Product-aligned automatic synchronization readiness', $contract);
+        $this->assertStringNotContainsString('Автоматична синхронізація даних', $contract);
+    }
+
+    #[Test]
+    public function connector_account_page_has_only_expected_actions(): void
+    {
+        $page = file_get_contents(app_path('Filament/Resources/ConnectorAccountResource/Pages/ViewConnectorAccount.php'));
+
+        $this->assertNotFalse($page);
+        $this->assertStringContainsString("Action::make('runConnectionCheck')", $page);
+        $this->assertStringContainsString("Action::make('openAdobeExportSetup')", $page);
+        $this->assertStringContainsString("->color('primary')", $page);
+        $this->assertStringContainsString("->color('gray')", $page);
+        $this->assertStringNotContainsString('checkStoreSetup', $page);
+        $this->assertStringNotContainsString('AdobeSafeSyncComponentReadinessResolver', $page);
+        $this->assertStringNotContainsString('AdobeSafeSyncRequiredOperation::SimpleProductWrite', $page);
     }
 }

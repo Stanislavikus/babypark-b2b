@@ -16,11 +16,15 @@ final readonly class ConnectorConnectionCheckResult
         public ?TimeoutPhase $timeoutPhase,
         public ?string $vendorRequestId,
         public ?int $retryAfterSeconds,
+        public array $safeMessageParameters = [],
     ) {}
 
-    public static function success(): self
+    /**
+     * @param  array<string, mixed>  $safeMessageParameters
+     */
+    public static function success(array $safeMessageParameters = []): self
     {
-        return new self(true, 200, null, null, null, null);
+        return new self(true, 200, null, null, null, null, $safeMessageParameters);
     }
 
     public static function httpFailure(
@@ -46,7 +50,15 @@ final readonly class ConnectorConnectionCheckResult
             }
         }
 
-        return new self(false, $httpStatus, $errorCode, null, null, $retryAfterSeconds);
+        return new self(
+            false,
+            $httpStatus,
+            $errorCode,
+            null,
+            null,
+            $retryAfterSeconds,
+            [],
+        );
     }
 
     public static function transportFailure(
@@ -61,7 +73,7 @@ final readonly class ConnectorConnectionCheckResult
             throw new \InvalidArgumentException('TimeoutPhase only applies to TransportTimeout.');
         }
 
-        return new self(false, null, $errorCode, $timeoutPhase, null, null);
+        return new self(false, null, $errorCode, $timeoutPhase, null, null, []);
     }
 
     public function cause(): ?ConnectorErrorCause
@@ -105,10 +117,10 @@ final readonly class ConnectorConnectionCheckResult
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
     public function safeMessageParameters(): array
     {
-        return [];
+        return $this->safeMessageParameters;
     }
 }

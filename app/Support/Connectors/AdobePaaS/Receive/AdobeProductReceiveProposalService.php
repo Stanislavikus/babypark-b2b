@@ -26,8 +26,8 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkGuard
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductTrustedParentLinkLookup;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductTrustedVariantLinkLookup;
 use App\Support\Connectors\AdobePaaS\Exceptions\IncompleteAdobePaaSCredentialsException;
-use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClient;
-use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClientException;
+use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReader;
+use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReadException;
 use App\Support\Connectors\Exceptions\ConnectorAccountNotFoundException;
 use App\Support\Sync\Exceptions\FieldMappingValidationException;
 use App\Support\Sync\Receive\ReceiveFieldCandidate;
@@ -39,7 +39,7 @@ final class AdobeProductReceiveProposalService
 {
     public function __construct(
         private readonly AdobeProductExternalRecordLinkGuard $externalRecordLinkGuard,
-        private readonly AdobeSafeSyncClient $safeSyncClient,
+        private readonly AdobeProductDocumentReader $productDocumentReader,
         private readonly SyncConfigurationLookupService $configurationLookup,
         private readonly FieldMappingBindingValidator $fieldMappingBindingValidator,
         private readonly GovernedProductVariantColumnEligibility $columnEligibility,
@@ -86,20 +86,26 @@ final class AdobeProductReceiveProposalService
         $expectedSku = $this->parseExpectedSku($trustedLink->external_identifier);
 
         try {
-            $verifiedProduct = $this->safeSyncClient->readProduct(
+            $verifiedProduct = $this->productDocumentReader->read(
                 $workspaceId,
                 $connectorAccountId,
-                $logicalEntityId,
                 $expectedSku,
             );
         } catch (ConnectorAccountNotFoundException|IncompleteAdobePaaSCredentialsException $exception) {
-            throw AdobeProductReceiveProposalException::safeSyncContextInvalid($exception);
-        } catch (AdobeSafeSyncClientException $exception) {
-            throw AdobeProductReceiveProposalException::safeSyncReadFailed(
-                $this->classifySafeSyncReadFailure($exception),
+            throw AdobeProductReceiveProposalException::productReadContextInvalid($exception);
+        } catch (AdobeProductDocumentReadException $exception) {
+            throw AdobeProductReceiveProposalException::productReadFailed(
+                $this->classifyProductReadFailure($exception),
                 $exception,
             );
         }
+
+        if ($verifiedProduct->logicalEntityId !== $logicalEntityId || $verifiedProduct->sku !== $expectedSku) {
+            throw AdobeProductReceiveProposalException::trustedExternalLinkChanged();
+        }
+
+        $remoteName = $verifiedProduct->externalValue('name');
+        $remoteNameValue = is_string($remoteName['value'] ?? null) ? $remoteName['value'] : '';
 
         $revalidatedConfiguration = $this->revalidateConfiguration(
             account: $account,
@@ -125,14 +131,14 @@ final class AdobeProductReceiveProposalService
         );
         $mappingState = $this->applyNameValueExecutability(
             $mappingState,
-            $verifiedProduct->name,
+            $remoteNameValue,
         );
 
         $entries = $this->proposalPlanner->plan([
             $this->buildNameCandidate(
                 fieldBindingId: $mappingState['field_binding_id'],
                 localName: $freshLocalProduct->name,
-                remoteName: $verifiedProduct->name,
+                remoteName: $remoteNameValue,
                 isSupported: $mappingState['is_supported'],
                 blockedReasonCode: $mappingState['blocked_reason_code'],
             ),
@@ -567,13 +573,11 @@ final class AdobeProductReceiveProposalService
         );
     }
 
-    private function classifySafeSyncReadFailure(AdobeSafeSyncClientException $exception): string
+    private function classifyProductReadFailure(AdobeProductDocumentReadException $exception): string
     {
         return match ($exception->getMessage()) {
-            'Safe Sync request failed.' => 'safe_sync_transport_failure',
-            'Safe Sync logical entity identity mismatch.' => 'safe_sync_identity_mismatch',
-            'Safe Sync SKU mismatch.' => 'safe_sync_sku_mismatch',
-            default => 'safe_sync_read_failed',
+            'Magento Product document read transport failed.' => 'product_read_transport_failure',
+            default => 'product_read_failed',
         };
     }
 
