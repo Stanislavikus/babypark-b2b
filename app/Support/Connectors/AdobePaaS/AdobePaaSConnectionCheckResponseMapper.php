@@ -24,7 +24,10 @@ final class AdobePaaSConnectionCheckResponseMapper
             return ConnectorConnectionCheckResult::success();
         }
 
-        return ConnectorConnectionCheckResult::httpFailure(ConnectorConnectionCheckErrorCode::AdobeUnexpectedResponse, 200);
+        return ConnectorConnectionCheckResult::httpFailure(
+            ConnectorConnectionCheckErrorCode::AdobeUnexpectedResponse,
+            200,
+        );
     }
 
     private function isValidSearchResultsBody(#[\SensitiveParameter] string $body): bool

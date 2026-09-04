@@ -277,8 +277,8 @@ class ConnectorConnectionCheckErrorCodeTest extends TestCase
             ConnectorErrorActionability::UserActionRequired,
             'connectors.errors.insufficient_permissions',
             true,
+            403,
             401,
-            404,
         ];
 
         yield 'adobe_invalid_or_unsupported_endpoint' => [

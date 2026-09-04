@@ -445,7 +445,7 @@ class ConnectorAccountResourceTest extends TestCase
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $disabledAccount->getKey()])
             ->assertActionDisabled('runConnectionCheck')
-            ->assertSee('Перевірка не змінює дані в Magento.')
+            ->assertSee(__('connectors.ui.layer_a.check_does_not_mutate'))
             ->assertSee(__('connectors.ui.disabled_reasons.account_disabled'));
 
         $activeAccount = $this->createConnectorAccount();
@@ -453,7 +453,7 @@ class ConnectorAccountResourceTest extends TestCase
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $activeAccount->getKey()])
             ->assertActionDisabled('runConnectionCheck')
-            ->assertSee('Перевірка не змінює дані в Magento.')
+            ->assertSee(__('connectors.ui.layer_a.check_does_not_mutate'))
             ->assertSee(__('connectors.ui.actions.check_already_active'));
     }
 
@@ -502,19 +502,39 @@ class ConnectorAccountResourceTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertSee('Перевірка не змінює дані в Magento.')
-            ->assertSee('ЩО МИ ПЕРЕВІРИЛИ')
-            ->assertSee('Каталог')
-            ->assertSee('доступ підтверджено')
-            ->assertSee('Поля')
-            ->assertSee('потребує уваги')
-            ->assertSee('Зображення')
-            ->assertSee('не перевірено')
-            ->assertSee('Остання успішна перевірка:');
+            ->assertSee(__('connectors.ui.layer_a.check_does_not_mutate'))
+            ->assertSee(__('connectors.ui.layer_a.what_we_checked_heading'))
+            ->assertSee(__('connectors.ui.layer_a.catalog.label'))
+            ->assertSee(__('connectors.ui.layer_a.status.needs_attention'))
+            ->assertSee(__('connectors.ui.layer_a.fields.label'))
+            ->assertSee(__('connectors.ui.layer_a.images.label'))
+            ->assertSee(__('connectors.ui.layer_a.status.not_checked'))
+            ->assertSee(__('connectors.ui.layer_a.last_successful_check').':');
     }
 
     #[Test]
-    public function connector_account_overview_presents_empty_catalog_state_when_count_is_known(): void
+    public function connector_account_overview_does_not_claim_catalog_access_without_catalog_total_count_evidence(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount(overrides: [
+            'last_successful_check_at' => now(),
+        ]);
+
+        $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Succeeded, [
+            'safe_message_parameters' => [],
+            'finished_at' => now(),
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
+            ->assertSee(__('connectors.ui.layer_a.catalog.label'))
+            ->assertSee(__('connectors.ui.layer_a.status.needs_attention'))
+            ->assertDontSee(__('connectors.ui.layer_a.status.access_confirmed'))
+            ->assertSee(__('connectors.ui.layer_a.last_successful_check').':');
+    }
+
+    #[Test]
+    public function connector_account_overview_presents_empty_catalog_state_when_count_is_zero(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
@@ -530,7 +550,29 @@ class ConnectorAccountResourceTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee('Каталог поки порожній.');
+            ->assertSee(__('connectors.ui.layer_a.status.access_confirmed'))
+            ->assertSee(__('connectors.ui.layer_a.catalog.empty'));
+    }
+
+    #[Test]
+    public function connector_account_overview_presents_catalog_product_count_when_known(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount(overrides: [
+            'last_successful_check_at' => now(),
+        ]);
+
+        $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Succeeded, [
+            'safe_message_parameters' => [
+                'catalog_total_count' => 19,
+            ],
+            'finished_at' => now(),
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
+            ->assertSee(__('connectors.ui.layer_a.status.access_confirmed'))
+            ->assertSee(__('connectors.ui.layer_a.catalog.found_count', ['count' => 19]));
     }
 
     #[Test]
@@ -553,9 +595,26 @@ class ConnectorAccountResourceTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee('Поля')
-            ->assertSee('доступ підтверджено')
-            ->assertSee('Переглянути поля');
+            ->assertSee(__('connectors.ui.layer_a.fields.label'))
+            ->assertSee(__('connectors.ui.layer_a.status.access_confirmed'))
+            ->assertSee(__('connectors.ui.layer_a.actions.view_fields'));
+    }
+
+    #[Test]
+    public function connector_account_overview_renders_localized_layer_a_copy_in_english(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+
+        App::setLocale('en');
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSee('The check does not change data in Magento.')
+            ->assertSee('What we checked')
+            ->assertSee('Catalog')
+            ->assertSee('Fields')
+            ->assertSee('Images');
     }
 
     #[Test]

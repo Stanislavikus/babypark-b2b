@@ -4,7 +4,6 @@ namespace App\Services\Connectors;
 
 use App\Enums\ConnectorComponentReadiness;
 use App\Enums\ConnectorConnectionCheckErrorCode;
-use App\Support\Connectors\AdobePaaS\AdobeMagentoVersionProbeCapability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncContract;
@@ -17,7 +16,6 @@ final class AdobeSafeSyncComponentReadinessResolver
     public function __construct(
         private readonly AdobePaaSRequestContextFactory $contextFactory,
         private readonly AdobePaaSConnectionCheckCapability $connectionCheck,
-        private readonly AdobeMagentoVersionProbeCapability $magentoVersionProbe,
         private readonly AdobeSafeSyncHandshakeProbeCapability $handshakeProbe,
     ) {}
 
@@ -30,7 +28,6 @@ final class AdobeSafeSyncComponentReadinessResolver
             return new AdobeSafeSyncReadinessResult($baseline, null, false);
         }
 
-        $stockMagentoVersionEvidence = $this->magentoVersionProbe->probe($context);
         $probe = $this->handshakeProbe->probe($context);
 
         if (! $probe->connectionResult->succeeded) {
@@ -41,7 +38,6 @@ final class AdobeSafeSyncComponentReadinessResolver
                 $probe->connectionResult,
                 $setupRequired ? ConnectorComponentReadiness::SetupRequired : null,
                 true,
-                stockMagentoVersionEvidence: $stockMagentoVersionEvidence,
             );
         }
 
@@ -58,7 +54,6 @@ final class AdobeSafeSyncComponentReadinessResolver
             $handshake?->moduleVersion,
             $handshake?->applicationVersion,
             $handshake?->phpVersion,
-            $stockMagentoVersionEvidence,
         );
     }
 

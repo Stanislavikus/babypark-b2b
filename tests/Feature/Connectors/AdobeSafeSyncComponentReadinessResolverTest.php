@@ -5,7 +5,6 @@ namespace Tests\Feature\Connectors;
 use App\Enums\ConnectorComponentReadiness;
 use App\Enums\ConnectorConnectionCheckErrorCode;
 use App\Services\Connectors\AdobeSafeSyncComponentReadinessResolver;
-use App\Support\Connectors\AdobePaaS\AdobeMagentoVersionProbeCapability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncContract;
@@ -48,22 +47,6 @@ class AdobeSafeSyncComponentReadinessResolverTest extends TestCase
         $this->assertSame(ConnectorComponentReadiness::SetupRequired, $result->componentReadiness);
         $this->assertSame(404, $result->connectionResult->httpStatus);
         $this->assertTrue($result->baselineSucceeded);
-    }
-
-    #[Test]
-    public function baseline_success_carries_stock_magento_version_evidence_without_blocking_handshake_logic(): void
-    {
-        $result = $this->resolve(
-            ConnectorConnectionCheckResult::success(),
-            AdobeSafeSyncHandshakeProbeResult::failed(ConnectorConnectionCheckResult::httpFailure(
-                ConnectorConnectionCheckErrorCode::AdobeInvalidOrUnsupportedEndpoint,
-                404,
-            )),
-            stockMagentoVersionEvidence: 'Magento/2.4 (Community)',
-        );
-
-        $this->assertSame('Magento/2.4 (Community)', $result->stockMagentoVersionEvidence);
-        $this->assertSame(ConnectorComponentReadiness::SetupRequired, $result->componentReadiness);
     }
 
     #[Test]
@@ -201,7 +184,6 @@ class AdobeSafeSyncComponentReadinessResolverTest extends TestCase
         ConnectorConnectionCheckResult $baseline,
         ?AdobeSafeSyncHandshakeProbeResult $probe,
         AdobeSafeSyncRequiredOperation $operation = AdobeSafeSyncRequiredOperation::SimpleProductWrite,
-        ?string $stockMagentoVersionEvidence = null,
     ): AdobeSafeSyncReadinessResult {
         $account = $this->createConnectorAccount();
         $calls = (object) ['handshake' => 0];
@@ -211,15 +193,6 @@ class AdobeSafeSyncComponentReadinessResolverTest extends TestCase
             public function __construct(private ConnectorConnectionCheckResult $result) {}
 
             public function checkConnection(AdobePaaSRequestContext $context): ConnectorConnectionCheckResult
-            {
-                return $this->result;
-            }
-        });
-        $this->app->instance(AdobeMagentoVersionProbeCapability::class, new class($stockMagentoVersionEvidence) implements AdobeMagentoVersionProbeCapability
-        {
-            public function __construct(private ?string $result) {}
-
-            public function probe(AdobePaaSRequestContext $context): ?string
             {
                 return $this->result;
             }

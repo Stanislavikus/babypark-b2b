@@ -7,8 +7,6 @@ use App\Services\Connectors\ConnectorAccountSettingsService;
 use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
 use App\Services\Connectors\ConnectorDiscoveryRunDispatchService;
 use App\Services\Workspace\WorkspaceAuthorization;
-use App\Support\Connectors\AdobePaaS\AdobeMagentoVersionProbe;
-use App\Support\Connectors\AdobePaaS\AdobeMagentoVersionProbeCapability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapabilityImpl;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryCapability;
@@ -47,11 +45,6 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             AdobePaaSConnectionCheckCapability::class,
             AdobePaaSConnectionCheckCapabilityImpl::class,
-        );
-
-        $this->app->bind(
-            AdobeMagentoVersionProbeCapability::class,
-            AdobeMagentoVersionProbe::class,
         );
 
         $this->app->bind(

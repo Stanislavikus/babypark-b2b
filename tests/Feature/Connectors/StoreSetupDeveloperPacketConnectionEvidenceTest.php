@@ -27,9 +27,9 @@ class StoreSetupDeveloperPacketConnectionEvidenceTest extends TestCase
         ]);
 
         Livewire::test(StoreSetupPacketHarness::class, ['record' => $account])
-            ->assertSee('Каталог')
-            ->assertSee('потребує уваги')
-            ->assertDontSee('Остання успішна перевірка:');
+            ->assertSee(__('connectors.ui.layer_a.catalog.label'))
+            ->assertSee(__('connectors.ui.layer_a.status.needs_attention'))
+            ->assertDontSee(__('connectors.ui.layer_a.last_successful_check').':');
     }
 
     #[Test]
@@ -44,9 +44,9 @@ class StoreSetupDeveloperPacketConnectionEvidenceTest extends TestCase
         ]);
 
         Livewire::test(StoreSetupPacketHarness::class, ['record' => $account])
-            ->assertSee('Каталог')
-            ->assertSee('доступ підтверджено')
-            ->assertSee('Остання успішна перевірка:');
+            ->assertSee(__('connectors.ui.layer_a.catalog.label'))
+            ->assertSee(__('connectors.ui.layer_a.status.needs_attention'))
+            ->assertSee(__('connectors.ui.layer_a.last_successful_check').':');
     }
 }
 

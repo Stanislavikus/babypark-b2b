@@ -40,9 +40,7 @@ final class AdobeSafeSyncHandshakeProbe implements AdobeSafeSyncHandshakeProbeCa
         }
 
         if ($result->statusCode !== 200) {
-            return AdobeSafeSyncHandshakeProbeResult::failed(
-                $this->responseMapper->map($result),
-            );
+            return AdobeSafeSyncHandshakeProbeResult::failed($this->responseMapper->map($result));
         }
 
         try {

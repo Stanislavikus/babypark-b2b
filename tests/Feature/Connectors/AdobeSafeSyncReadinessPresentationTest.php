@@ -13,8 +13,10 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
         $view = file_get_contents(resource_path('views/filament/connector-accounts/store-setup.blade.php'));
 
         $this->assertNotFalse($view);
-        $this->assertStringContainsString('Перевірка не змінює дані в Magento.', $view);
-        $this->assertStringContainsString('ЩО МИ ПЕРЕВІРИЛИ', $view);
+        $this->assertStringContainsString('connectors.ui.layer_a.check_does_not_mutate', $view);
+        $this->assertStringContainsString('connectors.ui.layer_a.what_we_checked_heading', $view);
+        $this->assertStringNotContainsString('Перевірка не змінює дані в Magento.', $view);
+        $this->assertStringNotContainsString('ЩО МИ ПЕРЕВІРИЛИ', $view);
 
         foreach ([
             'B2BPlatform_MagentoSafeSync',
@@ -29,7 +31,7 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
             $this->assertStringNotContainsString($forbidden, $view);
         }
 
-        $this->assertStringContainsString('не перевірено', $view);
+        $this->assertStringContainsString('connectors.ui.layer_a.status.not_checked', $view);
     }
 
     #[Test]
