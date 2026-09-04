@@ -101,10 +101,10 @@
     "connectors.ui.actions.available_fields_refresh_active": "Refreshing available fields",
     "connectors.ui.layer_a.check_does_not_mutate": "The check does not change data in Magento.",
     "connectors.ui.layer_a.what_we_checked_heading": "What we checked",
-    "connectors.ui.layer_a.catalog.label": "Catalog",
-    "connectors.ui.layer_a.fields.label": "Fields",
+    "connectors.ui.layer_a.catalog.label": "Product catalog",
+    "connectors.ui.layer_a.fields.label": "Product fields",
     "connectors.ui.layer_a.images.label": "Images",
-    "connectors.ui.layer_a.status.access_confirmed": "access confirmed",
+    "connectors.ui.layer_a.status.access_confirmed": "✓ Access confirmed",
     "connectors.ui.layer_a.status.needs_attention": "needs attention",
     "connectors.ui.layer_a.status.not_checked": "not checked",
     "connectors.ui.layer_a.catalog.empty": "The catalog is empty.",
@@ -697,5 +697,9 @@
     "entity_trust.mode.simple_variant": "Simple variant",
     "entity_trust.mode.configurable_existing_parent": "Configurable with existing parent",
     "entity_trust.types.configurable": "Configurable product",
-    "entity_trust.types.simple": "Simple product"
+    "entity_trust.types.simple": "Simple product",
+    "connectors.ui.layer_a.checked_at": "Checked :time",
+    "connectors.ui.layer_a.next_step.heading": "NEXT STEP",
+    "connectors.ui.layer_a.next_step.configure": "Configure synchronization",
+    "connectors.ui.layer_a.next_step.preview": "Create a test synchronization"
 }

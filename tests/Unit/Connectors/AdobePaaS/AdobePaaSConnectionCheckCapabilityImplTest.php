@@ -25,6 +25,65 @@ use Tests\TestCase;
 class AdobePaaSConnectionCheckCapabilityImplTest extends TestCase
 {
     #[Test]
+    public function confirms_stock_media_surface_for_both_populated_and_empty_arrays(): void
+    {
+        foreach (['[]', '[{"id":1,"media_type":"image"}]'] as $mediaBody) {
+            $transport = $this->sequenceTransport([
+                new ConnectorHttpResult(200, [], '{"items":[],"search_criteria":{},"total_count":0}'),
+                new ConnectorHttpResult(200, [], '{"items":[{"sku":"SKU / 1"}],"search_criteria":{},"total_count":1}'),
+                new ConnectorHttpResult(200, [], $mediaBody),
+            ]);
+
+            $result = $this->capabilityWithTransport($transport)->checkConnection($this->sampleContext());
+
+            $this->assertTrue($result->succeeded);
+            $this->assertSame([
+                'catalog_total_count' => 1,
+                'images_access_confirmed' => true,
+            ], $result->safeMessageParameters());
+            $this->assertStringContainsString('/V1/products/SKU%20%2F%201/media', (string) $transport->captured[2]->request->getUri());
+        }
+    }
+
+    #[Test]
+    public function optional_media_failures_preserve_successful_baseline_and_catalogue_evidence(): void
+    {
+        $failures = [
+            new ConnectorHttpResult(403, [], '{}'),
+            new ConnectorHttpResult(200, [], '{malformed'),
+            new ConnectorTransportException(TransportFailureReason::Timeout),
+        ];
+
+        foreach ($failures as $failure) {
+            $transport = $this->sequenceTransport([
+                new ConnectorHttpResult(200, [], '{"items":[],"search_criteria":{},"total_count":0}'),
+                new ConnectorHttpResult(200, [], '{"items":[{"sku":"SKU-1"}],"search_criteria":{},"total_count":1}'),
+                $failure,
+            ]);
+
+            $result = $this->capabilityWithTransport($transport)->checkConnection($this->sampleContext());
+
+            $this->assertTrue($result->succeeded);
+            $this->assertSame(['catalog_total_count' => 1], $result->safeMessageParameters());
+        }
+    }
+
+    #[Test]
+    public function empty_catalogue_does_not_issue_a_media_probe(): void
+    {
+        $transport = $this->sequenceTransport([
+            new ConnectorHttpResult(200, [], '{"items":[],"search_criteria":{},"total_count":0}'),
+            new ConnectorHttpResult(200, [], '{"items":[],"search_criteria":{},"total_count":0}'),
+        ]);
+
+        $result = $this->capabilityWithTransport($transport)->checkConnection($this->sampleContext());
+
+        $this->assertTrue($result->succeeded);
+        $this->assertSame(['catalog_total_count' => 0], $result->safeMessageParameters());
+        $this->assertCount(2, $transport->captured);
+    }
+
+    #[Test]
     public function sends_baseline_request_with_b12_limits_and_then_optionally_probes_catalog_total_count(): void
     {
         $context = new AdobePaaSRequestContext(
@@ -157,6 +216,30 @@ class AdobePaaSConnectionCheckCapabilityImplTest extends TestCase
             new AdobePaaSConnectionCheckResponseMapper,
             new AdobePaaSConnectionCheckTransportMapper,
         );
+    }
+
+    /** @param list<ConnectorHttpResult|ConnectorTransportException> $outcomes */
+    private function sequenceTransport(array $outcomes): ConnectorHttpTransport
+    {
+        return new class($outcomes) implements ConnectorHttpTransport
+        {
+            /** @var list<ConnectorOutboundRequest> */
+            public array $captured = [];
+
+            public function __construct(private array $outcomes) {}
+
+            public function send(#[\SensitiveParameter] ConnectorOutboundRequest $request): ConnectorHttpResult
+            {
+                $this->captured[] = $request;
+                $outcome = array_shift($this->outcomes);
+
+                if ($outcome instanceof ConnectorTransportException) {
+                    throw $outcome;
+                }
+
+                return $outcome;
+            }
+        };
     }
 
     private function sampleContext(): AdobePaaSRequestContext

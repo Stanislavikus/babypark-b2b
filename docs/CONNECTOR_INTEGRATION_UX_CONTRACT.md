@@ -877,3 +877,34 @@ triggers a documentation-contract test failure:
   порожній" state, not as a warning or an error.
 - A baseline connection success is not re-coloured red solely because
   of a missing Product Attribute read permission.
+
+## 20. Connector Account Overview reference
+
+[Resolved — Connector Account Overview reference — 2026-09-04]
+
+The merchant Account Overview reference is the Magento implementation of the Layer-A
+contract: human integration/account identity, the existing connection status and last
+successful check, a secondary safe re-check with the reassurance that it does not change
+Magento data, the bounded `ЩО МИ ПЕРЕВІРИЛИ` catalogue/fields/images summary, and one
+`НАСТУПНИЙ КРОК` action.
+
+Catalogue access is confirmed only by an explicit integer `catalog_total_count`; a positive
+count is shown, zero is the calm `Каталог поки порожній` state, and missing evidence is not
+confirmed. Successful authoritative Discovery proves product-field access; field details link
+only to Mapping / Available Fields. Image access is confirmed only by one bounded stock REST
+`GET /rest/{store}/V1/products/{sku}/media` returning HTTP 200 with a valid JSON array; an
+empty array still proves readability. An optional media failure never changes successful
+baseline connection or catalogue evidence.
+
+The next step is derived from existing owners: no SyncConfiguration means `Налаштувати
+синхронізацію`; an existing configuration makes `Створити пробну синхронізацію` next. A first
+Live action may appear only after qualifying Preview evidence and when existing Live support
+and admission gates permit it. `Синхронізація працює` may appear only after persisted,
+confirmed successful Live evidence. In particular, no Live action is exposed while
+`ConnectorSyncOperationSupport(Products, Export, Live)` is false.
+
+Overview is confidence plus next step. Fields/details belong to Mapping; concrete products,
+findings, and errors belong to Preview/worklists; transport and evidence diagnostics belong to
+operator/support surfaces. Overview is neither a monitoring dashboard nor an execution
+console, and it exposes no connector codes, credentials/profile, endpoints, Safe Sync,
+framework/module versions, schemas/snapshots/discovery terms, raw HTTP, or internal enums.

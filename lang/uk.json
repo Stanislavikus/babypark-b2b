@@ -101,10 +101,10 @@
     "connectors.ui.actions.available_fields_refresh_active": "Оновлення доступних полів",
     "connectors.ui.layer_a.check_does_not_mutate": "Перевірка не змінює дані в Magento.",
     "connectors.ui.layer_a.what_we_checked_heading": "ЩО МИ ПЕРЕВІРИЛИ",
-    "connectors.ui.layer_a.catalog.label": "Каталог",
-    "connectors.ui.layer_a.fields.label": "Поля",
+    "connectors.ui.layer_a.catalog.label": "Каталог товарів",
+    "connectors.ui.layer_a.fields.label": "Поля товарів",
     "connectors.ui.layer_a.images.label": "Зображення",
-    "connectors.ui.layer_a.status.access_confirmed": "доступ підтверджено",
+    "connectors.ui.layer_a.status.access_confirmed": "✓ Доступ підтверджено",
     "connectors.ui.layer_a.status.needs_attention": "потребує уваги",
     "connectors.ui.layer_a.status.not_checked": "не перевірено",
     "connectors.ui.layer_a.catalog.empty": "Каталог поки порожній.",
@@ -697,5 +697,9 @@
     "entity_trust.mode.simple_variant": "Простий варіант",
     "entity_trust.mode.configurable_existing_parent": "Конфігурований товар з наявним батьківським",
     "entity_trust.types.configurable": "Конфігурований товар",
-    "entity_trust.types.simple": "Простий товар"
+    "entity_trust.types.simple": "Простий товар",
+    "connectors.ui.layer_a.checked_at": "Перевірено :time",
+    "connectors.ui.layer_a.next_step.heading": "НАСТУПНИЙ КРОК",
+    "connectors.ui.layer_a.next_step.configure": "Налаштувати синхронізацію",
+    "connectors.ui.layer_a.next_step.preview": "Створити пробну синхронізацію"
 }

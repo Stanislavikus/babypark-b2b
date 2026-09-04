@@ -101,10 +101,10 @@
     "connectors.ui.actions.available_fields_refresh_active": "Обновление доступных полей",
     "connectors.ui.layer_a.check_does_not_mutate": "Проверка не изменяет данные в Magento.",
     "connectors.ui.layer_a.what_we_checked_heading": "ЧТО МЫ ПРОВЕРИЛИ",
-    "connectors.ui.layer_a.catalog.label": "Каталог",
-    "connectors.ui.layer_a.fields.label": "Поля",
+    "connectors.ui.layer_a.catalog.label": "Каталог товаров",
+    "connectors.ui.layer_a.fields.label": "Поля товаров",
     "connectors.ui.layer_a.images.label": "Изображения",
-    "connectors.ui.layer_a.status.access_confirmed": "доступ подтвержден",
+    "connectors.ui.layer_a.status.access_confirmed": "✓ Доступ подтвержден",
     "connectors.ui.layer_a.status.needs_attention": "требует внимания",
     "connectors.ui.layer_a.status.not_checked": "не проверено",
     "connectors.ui.layer_a.catalog.empty": "Каталог пока пуст.",
@@ -680,5 +680,9 @@
     "entity_trust.mode.simple_variant": "Простой вариант",
     "entity_trust.mode.configurable_existing_parent": "Конфигурируемый товар с имеющимся родительским",
     "entity_trust.types.configurable": "Конфигурируемый товар",
-    "entity_trust.types.simple": "Простой товар"
+    "entity_trust.types.simple": "Простой товар",
+    "connectors.ui.layer_a.checked_at": "Проверено :time",
+    "connectors.ui.layer_a.next_step.heading": "СЛЕДУЮЩИЙ ШАГ",
+    "connectors.ui.layer_a.next_step.configure": "Настроить синхронизацию",
+    "connectors.ui.layer_a.next_step.preview": "Создать пробную синхронизацию"
 }

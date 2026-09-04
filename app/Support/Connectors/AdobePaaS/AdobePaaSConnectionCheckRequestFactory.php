@@ -56,6 +56,27 @@ final class AdobePaaSConnectionCheckRequestFactory
         return $request->withHeader('Authorization', $authorizationHeader);
     }
 
+    public function buildProductMedia(
+        AdobePaaSRequestContext $context,
+        OAuth1SigningContext $signingContext,
+        string $sku,
+    ): RequestInterface {
+        $absoluteUrl = $this->buildAbsoluteEndpointUrl(
+            $context,
+            '/V1/products/'.rawurlencode($sku).'/media',
+        );
+        $request = new Request('GET', $absoluteUrl);
+
+        return $request->withHeader('Authorization', $this->signer->sign(
+            $request->getMethod(),
+            (string) $request->getUri(),
+            null,
+            null,
+            $context->credentials,
+            $signingContext,
+        ));
+    }
+
     /**
      * @param  array<string, mixed>  $searchCriteria
      */
@@ -64,6 +85,23 @@ final class AdobePaaSConnectionCheckRequestFactory
         string $endpointPath,
         array $searchCriteria,
     ): string {
+        if ($context->storeCode === '') {
+            throw new InvalidAdobePaaSRequestContextException('Adobe PaaS store code must not be empty.');
+        }
+
+        $urlWithoutQuery = $this->buildAbsoluteEndpointUrl($context, $endpointPath);
+        $query = http_build_query(
+            ['searchCriteria' => $searchCriteria],
+            '',
+            '&',
+            PHP_QUERY_RFC3986,
+        );
+
+        return $urlWithoutQuery.'?'.$query;
+    }
+
+    private function buildAbsoluteEndpointUrl(AdobePaaSRequestContext $context, string $endpointPath): string
+    {
         if ($context->storeCode === '') {
             throw new InvalidAdobePaaSRequestContextException('Adobe PaaS store code must not be empty.');
         }
@@ -80,13 +118,7 @@ final class AdobePaaSConnectionCheckRequestFactory
 
         $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
         $urlWithoutQuery = $parsed['scheme'].'://'.$parsed['host'].$port.$path;
-        $query = http_build_query(
-            ['searchCriteria' => $searchCriteria],
-            '',
-            '&',
-            PHP_QUERY_RFC3986,
-        );
 
-        return $urlWithoutQuery.'?'.$query;
+        return $urlWithoutQuery;
     }
 }

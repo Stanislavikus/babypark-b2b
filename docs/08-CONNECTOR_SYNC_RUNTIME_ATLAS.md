@@ -227,8 +227,11 @@ are **not** silently hidden:
   standard Connection Check/Discovery evidence. It does **not**
   reintroduce developer-facing Safe Sync readiness diagnostics.
 - The standard connector path is now wired through stock public REST
-  READ seams (connection check, bounded probes, document read) for the
-  merchant overview evidence. Consequential WRITE remains internal and
+  READ seams (connection check, a one-product catalogue probe followed by at most
+  one `/V1/products/{sku}/media` readability probe, and document read) for the
+  merchant overview evidence. The optional media probe records only a merchant-safe
+  confirmation boolean and cannot overturn successful baseline/catalogue evidence.
+  Consequential WRITE remains internal and
   not publicly supported or real-target certified.
 - The Composer compatibility envelope of the first-party component
   is **not** widened by the new contract; the current envelope

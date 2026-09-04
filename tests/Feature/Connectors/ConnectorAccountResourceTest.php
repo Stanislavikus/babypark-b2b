@@ -505,11 +505,11 @@ class ConnectorAccountResourceTest extends TestCase
             ->assertSee(__('connectors.ui.layer_a.check_does_not_mutate'))
             ->assertSee(__('connectors.ui.layer_a.what_we_checked_heading'))
             ->assertSee(__('connectors.ui.layer_a.catalog.label'))
-            ->assertSee(__('connectors.ui.layer_a.status.needs_attention'))
+            ->assertSee(__('connectors.ui.layer_a.status.not_checked'))
             ->assertSee(__('connectors.ui.layer_a.fields.label'))
             ->assertSee(__('connectors.ui.layer_a.images.label'))
             ->assertSee(__('connectors.ui.layer_a.status.not_checked'))
-            ->assertSee(__('connectors.ui.layer_a.last_successful_check').':');
+            ->assertSee('Перевірено ');
     }
 
     #[Test]
@@ -528,9 +528,9 @@ class ConnectorAccountResourceTest extends TestCase
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
             ->assertSee(__('connectors.ui.layer_a.catalog.label'))
-            ->assertSee(__('connectors.ui.layer_a.status.needs_attention'))
+            ->assertSee(__('connectors.ui.layer_a.status.not_checked'))
             ->assertDontSee(__('connectors.ui.layer_a.status.access_confirmed'))
-            ->assertSee(__('connectors.ui.layer_a.last_successful_check').':');
+            ->assertSee('Перевірено ');
     }
 
     #[Test]
@@ -612,8 +612,8 @@ class ConnectorAccountResourceTest extends TestCase
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->assertSee('The check does not change data in Magento.')
             ->assertSee('What we checked')
-            ->assertSee('Catalog')
-            ->assertSee('Fields')
+            ->assertSee('Product catalog')
+            ->assertSee('Product fields')
             ->assertSee('Images');
     }
 
