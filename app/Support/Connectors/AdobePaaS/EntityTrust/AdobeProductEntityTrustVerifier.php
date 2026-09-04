@@ -3,8 +3,8 @@
 namespace App\Support\Connectors\AdobePaaS\EntityTrust;
 
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
-use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReadException;
 use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReader;
+use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReadException;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncVerifiedProduct;
 use App\Support\Sync\EntityTrust\Exceptions\EntityTrustException;
 

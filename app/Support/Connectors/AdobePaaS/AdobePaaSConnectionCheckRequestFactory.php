@@ -63,8 +63,7 @@ final class AdobePaaSConnectionCheckRequestFactory
         AdobePaaSRequestContext $context,
         string $endpointPath,
         array $searchCriteria,
-    ): string
-    {
+    ): string {
         if ($context->storeCode === '') {
             throw new InvalidAdobePaaSRequestContextException('Adobe PaaS store code must not be empty.');
         }

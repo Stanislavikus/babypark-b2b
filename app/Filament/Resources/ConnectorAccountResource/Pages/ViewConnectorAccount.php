@@ -2,9 +2,7 @@
 
 namespace App\Filament\Resources\ConnectorAccountResource\Pages;
 
-use App\Enums\ConnectorConnectionCheckErrorCode;
 use App\Enums\ConnectorConnectionCheckStatus;
-use App\Enums\ConnectorErrorActionability;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
 use App\Filament\Resources\ConnectorAccountResource;
 use App\Models\ConnectorAccount;
@@ -21,10 +19,8 @@ use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Gate;
 use Throwable;
 
 class ViewConnectorAccount extends ViewRecord

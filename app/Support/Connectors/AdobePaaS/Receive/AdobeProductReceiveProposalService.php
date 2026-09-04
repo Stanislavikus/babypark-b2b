@@ -26,8 +26,8 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkGuard
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductTrustedParentLinkLookup;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductTrustedVariantLinkLookup;
 use App\Support\Connectors\AdobePaaS\Exceptions\IncompleteAdobePaaSCredentialsException;
-use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReadException;
 use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReader;
+use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReadException;
 use App\Support\Connectors\Exceptions\ConnectorAccountNotFoundException;
 use App\Support\Sync\Exceptions\FieldMappingValidationException;
 use App\Support\Sync\Receive\ReceiveFieldCandidate;
