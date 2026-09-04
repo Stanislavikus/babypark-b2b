@@ -88,8 +88,8 @@ class AdobePaaSConnectionCheckResponseMapperTest extends TestCase
      */
     public static function b7AndFallbackStatusProvider(): iterable
     {
-        yield '401 invalid credentials' => [401, ConnectorConnectionCheckErrorCode::AdobeInvalidCredentials, 'connectors.errors.invalid_credentials'];
-        yield '403 insufficient permissions' => [403, ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions, 'connectors.errors.insufficient_permissions'];
+        yield 'unknown 401' => [401, ConnectorConnectionCheckErrorCode::AdobeInvalidCredentials, 'connectors.errors.invalid_credentials'];
+        yield 'unknown 403' => [403, ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions, 'connectors.errors.insufficient_permissions'];
         yield '404' => [404, ConnectorConnectionCheckErrorCode::AdobeInvalidOrUnsupportedEndpoint, 'connectors.errors.invalid_or_unsupported_endpoint'];
         yield '408' => [408, ConnectorConnectionCheckErrorCode::AdobeRequestTimeout, 'connectors.errors.timeout'];
         yield '429' => [429, ConnectorConnectionCheckErrorCode::AdobeRateLimited, 'connectors.errors.rate_limited'];
@@ -99,6 +99,37 @@ class AdobePaaSConnectionCheckResponseMapperTest extends TestCase
         yield 'unrecognized 400' => [400, ConnectorConnectionCheckErrorCode::AdobeUnrecognizedBadRequest, 'connectors.errors.connection_check_failed'];
         yield '405 without oauth identifier' => [405, ConnectorConnectionCheckErrorCode::AdobeInvalidOrUnsupportedEndpoint, 'connectors.errors.invalid_or_unsupported_endpoint'];
         yield 'other 4xx 418' => [418, ConnectorConnectionCheckErrorCode::AdobeUnrecognizedClientError, 'connectors.errors.connection_check_failed'];
+    }
+
+    #[Test]
+    #[DataProvider('oauthProblemSentenceProvider')]
+    public function oauth_problem_sentences_fall_through_to_http_status_fallback(
+        string $body,
+        int $status,
+        ConnectorConnectionCheckErrorCode $expectedCode,
+    ): void {
+        $result = $this->mapper->map(new ConnectorHttpResult($status, [], $body));
+
+        $this->assertSame($expectedCode, $result->errorCode);
+        $this->assertSame($status, $result->httpStatus);
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: int, 2: ConnectorConnectionCheckErrorCode}>
+     */
+    public static function oauthProblemSentenceProvider(): iterable
+    {
+        yield 'signature sentence at 401' => [
+            'oauth_problem=The+signature+is+invalid.+Verify+and+try+again.',
+            401,
+            ConnectorConnectionCheckErrorCode::AdobeInvalidCredentials,
+        ];
+
+        yield 'consumer key expired sentence at 401' => [
+            'oauth_problem=Consumer+key+has+expired',
+            401,
+            ConnectorConnectionCheckErrorCode::AdobeInvalidCredentials,
+        ];
     }
 
     #[Test]
