@@ -7,7 +7,14 @@
     $catalogCountKnown = false;
     $imagesAccessConfirmed = false;
 
-    if ($record !== null) {
+    if (($connectionEvidenceLoaded ?? false) === true) {
+        $params = $connectionEvidence ?? null;
+        if (is_array($params) && array_key_exists('catalog_total_count', $params) && is_int($params['catalog_total_count'])) {
+            $catalogTotalCount = $params['catalog_total_count'];
+            $catalogCountKnown = true;
+        }
+        $imagesAccessConfirmed = is_array($params) && ($params['images_access_confirmed'] ?? false) === true;
+    } elseif ($record !== null) {
         $latestSuccessfulCheck = $record->connectionChecks()
             ->where('status', \App\Enums\ConnectorConnectionCheckStatus::Succeeded)
             ->latest('finished_at')

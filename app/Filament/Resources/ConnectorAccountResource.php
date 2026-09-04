@@ -390,25 +390,20 @@ class ConnectorAccountResource extends Resource
         }
 
         $workspace = $record->workspace ?? Workspace::query()->findOrFail($record->workspace_id);
-        $presentation = static::capabilityPresentation();
         $currentWorkspace = app(WorkspaceContext::class)->current();
 
         if ($workspace->isNot($currentWorkspace)) {
             return false;
         }
 
-        if (! $presentation->showActiveConnectionCheck($user, $workspace)) {
-            return false;
-        }
-
-        if ($record->auth_profile !== 'adobe_commerce_paas_oauth1_integration') {
+        if ($record->connectorDefinition?->code !== 'adobe_commerce') {
             return false;
         }
 
         return true;
     }
 
-    /** @return array{syncConfigurationId: ?string, canConfigureSync: bool, canCreatePreview: bool} */
+    /** @return array{syncConfigurationId: ?string, canConfigureSync: bool, canCreatePreview: bool, connectionEvidenceLoaded: bool, connectionEvidence: ?array} */
     private static function overviewViewData(ConnectorAccount $record): array
     {
         $configuration = app(SyncConfigurationLookupService::class)->findProductsDefaultContext($record);
@@ -430,6 +425,10 @@ class ConnectorAccountResource extends Resource
             'syncConfigurationId' => $configuration?->getKey(),
             'canConfigureSync' => $canConfigure,
             'canCreatePreview' => $canPreview,
+            'connectionEvidenceLoaded' => true,
+            'connectionEvidence' => static::actorCanManageConnectorAccounts()
+                ? $record->connectionChecks()->where('status', ConnectorConnectionCheckStatus::Succeeded)->latest('finished_at')->value('safe_message_parameters')
+                : null,
         ];
     }
 }
