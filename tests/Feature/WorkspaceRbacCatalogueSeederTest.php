@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use App\Models\WorkspacePermission;
 use App\Models\WorkspaceRole;
 use App\Models\WorkspaceUser;
@@ -11,6 +12,7 @@ use Database\Seeders\WorkspacePermissionSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
@@ -34,9 +36,60 @@ class WorkspaceRbacCatalogueSeederTest extends TestCase
     public function target_seeder_is_idempotent(): void
     {
         $this->seed(WorkspaceRbacPermissionSeeder::class);
+
+        $this->seed(WorkspaceSeeder::class);
+        $workspaceId = DB::table('workspaces')->value('id');
+        $user = User::factory()->create(['is_active' => true]);
+        $membership = WorkspaceUser::query()->create([
+            'workspace_id' => $workspaceId,
+            'user_id' => $user->id,
+            'is_active' => true,
+        ]);
+        $role = WorkspaceRole::query()->create([
+            'workspace_id' => $workspaceId,
+            'name' => 'Existing restricted role',
+        ]);
+        $assignedPermission = WorkspacePermission::query()
+            ->where('code', WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS)
+            ->sole();
+        DB::table('workspace_role_permissions')->insert([
+            'workspace_id' => $workspaceId,
+            'workspace_role_id' => $role->id,
+            'workspace_permission_id' => $assignedPermission->id,
+        ]);
+        DB::table('workspace_user_roles')->insert([
+            'workspace_id' => $workspaceId,
+            'workspace_user_id' => $membership->id,
+            'workspace_role_id' => $role->id,
+        ]);
+
+        WorkspacePermission::query()
+            ->whereIn('code', [
+                WorkspacePermissions::RUN_SYNC_PREVIEW,
+                WorkspacePermissions::RUN_SYNC_LIVE,
+            ])
+            ->delete();
+
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->seed(WorkspaceRbacPermissionSeeder::class);
 
         $this->assertSame(10, WorkspacePermission::query()->count());
+        $this->assertEqualsCanonicalizing(
+            WorkspacePermissions::catalogue(),
+            WorkspacePermission::query()->pluck('code')->all(),
+        );
+        $this->assertDatabaseCount('workspace_roles', 1);
+        $this->assertDatabaseCount('workspace_users', 1);
+        $this->assertDatabaseCount('workspace_user_roles', 1);
+        $this->assertDatabaseCount('workspace_role_permissions', 1);
+        $this->assertDatabaseHas('workspace_user_roles', [
+            'workspace_user_id' => $membership->id,
+            'workspace_role_id' => $role->id,
+        ]);
+        $this->assertSame(
+            [WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS],
+            $role->permissions()->pluck('code')->all(),
+        );
     }
 
     #[Test]
