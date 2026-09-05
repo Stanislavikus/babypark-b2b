@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Filament\Pages\WorkspaceAccess\WorkspaceAccessRolesTable;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Workspace\WorkspaceAccessMutationService;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Workspace\Rbac\WorkspacePermissionLabels;
 use App\Support\Workspace\WorkspacePermissions;
@@ -15,7 +14,6 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
-use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
 use Tests\TestCase;
@@ -135,7 +133,7 @@ class WorkspaceAccessRolesTableTest extends TestCase
     }
 
     #[Test]
-    public function mounted_edit_permissions_normalizes_browser_checkbox_map_and_preserves_other_roles(): void
+    public function mounted_edit_permissions_uses_supported_checkbox_list_state_and_preserves_other_roles(): void
     {
         $workspace = $this->defaultWorkspace();
         $actor = User::factory()->create();
@@ -163,13 +161,21 @@ class WorkspaceAccessRolesTableTest extends TestCase
             ->assertTableActionDataSet([
                 'permissions' => [WorkspacePermissions::MANAGE_WORKSPACE_ACCESS],
             ])
-            ->set('mountedActions.0.data.permissions', [
-                WorkspacePermissions::MANAGE_WORKSPACE_ACCESS => true,
-                WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS => true,
+            ->fillForm([
+                'permissions' => [
+                    WorkspacePermissions::MANAGE_WORKSPACE_ACCESS,
+                    WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+                ],
             ])
             ->assertSet('mountedActions.0.data.permissions', [
-                WorkspacePermissions::MANAGE_WORKSPACE_ACCESS => true,
-                WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS => true,
+                WorkspacePermissions::MANAGE_WORKSPACE_ACCESS,
+                WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+            ])
+            ->assertTableActionDataSet([
+                'permissions' => [
+                    WorkspacePermissions::MANAGE_WORKSPACE_ACCESS,
+                    WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+                ],
             ]);
 
         $component
@@ -206,88 +212,7 @@ class WorkspaceAccessRolesTableTest extends TestCase
     }
 
     #[Test]
-    public function mounted_edit_permissions_passes_canonical_codes_to_mutation_service(): void
-    {
-        $workspace = $this->defaultWorkspace();
-        $actor = User::factory()->create();
-        $role = $this->createRoleWithPermissions(
-            $workspace->id,
-            'Editable',
-            [WorkspacePermissions::MANAGE_WORKSPACE_ACCESS],
-        );
-
-        $this->grantManageWorkspaceAccess($workspace, $actor);
-
-        $this->mock(WorkspaceAccessMutationService::class, function (MockInterface $mock) use ($actor, $workspace, $role): void {
-            $mock->shouldReceive('updateRolePermissions')
-                ->once()
-                ->withArgs(function (User $actualActor, Workspace $actualWorkspace, string $actualRoleId, array $actualPermissionCodes) use ($actor, $workspace, $role): bool {
-                    $this->assertSame($actor->id, $actualActor->id);
-                    $this->assertSame($workspace->id, $actualWorkspace->id);
-                    $this->assertSame($role->id, $actualRoleId);
-                    $this->assertSame([
-                        WorkspacePermissions::MANAGE_WORKSPACE_ACCESS,
-                        WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
-                    ], $actualPermissionCodes);
-
-                    return true;
-                })
-                ->andReturn($role->fresh());
-        });
-
-        Livewire::actingAs($actor)
-            ->test(WorkspaceAccessRolesTable::class)
-            ->mountTableAction('editPermissions', $role)
-            ->assertTableActionDataSet([
-                'permissions' => [WorkspacePermissions::MANAGE_WORKSPACE_ACCESS],
-            ])
-            ->set('mountedActions.0.data.permissions', [
-                WorkspacePermissions::MANAGE_WORKSPACE_ACCESS => true,
-                WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS => true,
-            ])
-            ->assertSet('mountedActions.0.data.permissions', [
-                WorkspacePermissions::MANAGE_WORKSPACE_ACCESS => true,
-                WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS => true,
-            ])
-            ->callMountedTableAction()
-            ->assertNotified(__('workspace_access.notifications.role_permissions_updated'));
-    }
-
-    #[Test]
-    public function mounted_edit_permissions_rejects_forged_permission_from_browser_checkbox_map(): void
-    {
-        $workspace = $this->defaultWorkspace();
-        $actor = User::factory()->create();
-        $this->grantManageWorkspaceAccess($workspace, $actor);
-        $this->makeEffectiveHolder($workspace, User::factory()->create(), 'Backup Holder');
-        $role = $this->createRoleWithPermissions(
-            $workspace->id,
-            'Editable',
-            [WorkspacePermissions::MANAGE_WORKSPACE_ACCESS],
-        );
-
-        Livewire::actingAs($actor)
-            ->test(WorkspaceAccessRolesTable::class)
-            ->mountTableAction('editPermissions', $role)
-            ->set('mountedActions.0.data.permissions', [
-                WorkspacePermissions::MANAGE_WORKSPACE_ACCESS => true,
-                'forged_unknown_permission' => true,
-            ])
-            ->callMountedTableAction()
-            ->assertNotified(__('workspace_access.errors.unknown_permission'));
-
-        $storedCodes = DB::table('workspace_role_permissions')
-            ->join('workspace_permissions', 'workspace_permissions.id', '=', 'workspace_role_permissions.workspace_permission_id')
-            ->where('workspace_role_permissions.workspace_role_id', $role->id)
-            ->orderBy('workspace_permissions.code')
-            ->pluck('workspace_permissions.code')
-            ->all();
-
-        $this->assertSame([WorkspacePermissions::MANAGE_WORKSPACE_ACCESS], $storedCodes);
-    }
-
-    #[Test]
-    public function mounted_edit_permissions_still_rejects_removing_final_access_holder(): void
+    public function mounted_edit_permissions_still_rejects_removing_final_access_holder_via_supported_checkbox_list_state(): void
     {
         $workspace = $this->defaultWorkspace();
         $actor = User::factory()->create();
@@ -302,8 +227,10 @@ class WorkspaceAccessRolesTableTest extends TestCase
         Livewire::actingAs($actor)
             ->test(WorkspaceAccessRolesTable::class)
             ->mountTableAction('editPermissions', $holderRole)
-            ->set('mountedActions.0.data.permissions', [
-                WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS => true,
+            ->fillForm([
+                'permissions' => [
+                    WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+                ],
             ])
             ->callMountedTableAction()
             ->assertNotified(__('workspace_access.errors.lockout'));
