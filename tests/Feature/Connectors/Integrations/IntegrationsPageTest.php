@@ -128,7 +128,7 @@ class IntegrationsPageTest extends TestCase
             ->test(Integrations::class)
             ->assertSuccessful()
             ->assertSee('Shopify')
-            ->assertSee('Підключення перевірено')
+            ->assertSee('Підключено')
             ->assertDontSee('незабаром буде доступне');
     }
 
@@ -148,7 +148,7 @@ class IntegrationsPageTest extends TestCase
         $html = Livewire::actingAs($user)
             ->test(Integrations::class)
             ->assertSuccessful()
-            ->assertSee('Підключення перевірено')
+            ->assertSee('Підключено')
             ->assertSee('Відкрити')
             ->assertDontSee('Отримання полів')
             ->assertDontSee('знімок')
@@ -190,7 +190,7 @@ class IntegrationsPageTest extends TestCase
         Livewire::actingAs($user)
             ->test(Integrations::class)
             ->assertSuccessful()
-            ->assertSee('Підключення перевірено')
+            ->assertSee('Підключено')
             ->assertSee('Відкрити')
             ->assertDontSeeHtml('>Вимкнено<');
     }
@@ -242,7 +242,7 @@ class IntegrationsPageTest extends TestCase
         Livewire::actingAs($user)
             ->test(Integrations::class)
             ->assertSuccessful()
-            ->assertSee('Підключення перевірено')
+            ->assertSee('Підключено')
             ->assertSee(__('connectors.ui.runtime.running'));
     }
 
@@ -350,7 +350,7 @@ class IntegrationsPageTest extends TestCase
         Livewire::actingAs($user)
             ->test(Integrations::class)
             ->assertSuccessful()
-            ->assertSee('Підключення перевірено')
+            ->assertSee('Підключено')
             ->assertDontSee(__('connectors.ui.runtime.running'));
 
         Livewire::actingAs($user)

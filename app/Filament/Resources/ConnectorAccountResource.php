@@ -403,7 +403,7 @@ class ConnectorAccountResource extends Resource
         return true;
     }
 
-    /** @return array{syncConfigurationId: ?string, canConfigureSync: bool, canCreatePreview: bool, connectionEvidenceLoaded: bool, connectionEvidence: ?array} */
+    /** @return array{syncConfigurationId: ?string, canConfigureSync: bool, canCreatePreview: bool, canManageSyncConfiguration: bool} */
     private static function overviewViewData(ConnectorAccount $record): array
     {
         $configuration = app(SyncConfigurationLookupService::class)->findProductsDefaultContext($record);
@@ -411,24 +411,25 @@ class ConnectorAccountResource extends Resource
         $workspace = $record->workspace ?? Workspace::query()->findOrFail($record->workspace_id);
 
         try {
-            $canConfigure = $user instanceof User && app(AdobeProductExportSetupAuthorizationService::class)
-                ->isEligibleAdobeProductsExportSetupTarget($user, $workspace, $record->getKey());
+            $setupAuthorization = app(AdobeProductExportSetupAuthorizationService::class);
+            $canManageSyncConfiguration = $user instanceof User
+                && $setupAuthorization->canAccess($user, $workspace);
+            $canConfigure = $canManageSyncConfiguration
+                && $setupAuthorization->isEligibleAdobeProductsExportSetupTarget($user, $workspace, $record->getKey());
             $canPreview = $user instanceof User && $configuration !== null
                 && app(AdobeProductsExportPreviewAuthorizationService::class)
                     ->isEligiblePreviewTarget($user, $workspace, $record->getKey());
         } catch (\Throwable) {
             $canConfigure = false;
             $canPreview = false;
+            $canManageSyncConfiguration ??= false;
         }
 
         return [
             'syncConfigurationId' => $configuration?->getKey(),
             'canConfigureSync' => $canConfigure,
             'canCreatePreview' => $canPreview,
-            'connectionEvidenceLoaded' => true,
-            'connectionEvidence' => static::actorCanManageConnectorAccounts()
-                ? $record->connectionChecks()->where('status', ConnectorConnectionCheckStatus::Succeeded)->latest('finished_at')->value('safe_message_parameters')
-                : null,
+            'canManageSyncConfiguration' => $canManageSyncConfiguration,
         ];
     }
 }

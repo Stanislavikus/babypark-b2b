@@ -223,9 +223,11 @@ are **not** silently hidden:
 - Current code still consumes the entity-bound Safe Sync primitive
   for trusted simple Product WRITE in some internal seams.
 - The Connector Account Overview is rendered through the
-  `store-setup.blade.php` Layer-A surface ("ЩО МИ ПЕРЕВІРИЛИ") and the
-  standard Connection Check/Discovery evidence. It does **not**
-  reintroduce developer-facing Safe Sync readiness diagnostics.
+  `store-setup.blade.php` Layer-A surface as connection confidence plus one
+  next step. The normal healthy Overview no longer projects catalogue, field, or media
+  certification evidence; the underlying Connection Check/Discovery collection and
+  persistence remain unchanged for runtime/support use. It does **not** reintroduce
+  developer-facing Safe Sync readiness diagnostics.
 - The standard connector path is now wired through stock public REST
   READ seams (connection check, a one-product catalogue probe followed by at most
   one `/V1/products/{sku}/media` readability probe, and document read) for the

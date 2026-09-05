@@ -14,13 +14,13 @@ final class ConnectorConnectionVocabularyTest extends TestCase
         $integrationStatusKey = 'connectors.ui.integrations.status.connected';
         $accountStatusKey = 'connectors.enums.account_connection_status.connected';
 
-        $this->assertSame('Підключення перевірено', $this->readLangValue($root.'/lang/uk.json', $integrationStatusKey));
-        $this->assertSame('Connection verified', $this->readLangValue($root.'/lang/en.json', $integrationStatusKey));
-        $this->assertSame('Подключение проверено', $this->readLangValue($root.'/lang/ru.json', $integrationStatusKey));
+        $this->assertSame('Підключено', $this->readLangValue($root.'/lang/uk.json', $integrationStatusKey));
+        $this->assertSame('Connected', $this->readLangValue($root.'/lang/en.json', $integrationStatusKey));
+        $this->assertSame('Подключено', $this->readLangValue($root.'/lang/ru.json', $integrationStatusKey));
 
-        $this->assertSame('Підключення перевірено', $this->readLangValue($root.'/lang/uk.json', $accountStatusKey));
-        $this->assertSame('Connection verified', $this->readLangValue($root.'/lang/en.json', $accountStatusKey));
-        $this->assertSame('Подключение проверено', $this->readLangValue($root.'/lang/ru.json', $accountStatusKey));
+        $this->assertSame('Підключено', $this->readLangValue($root.'/lang/uk.json', $accountStatusKey));
+        $this->assertSame('Connected', $this->readLangValue($root.'/lang/en.json', $accountStatusKey));
+        $this->assertSame('Подключено', $this->readLangValue($root.'/lang/ru.json', $accountStatusKey));
     }
 
     private function readLangValue(string $path, string $key): string

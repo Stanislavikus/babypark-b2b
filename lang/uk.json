@@ -47,7 +47,7 @@
     "Whoops!": "Упс!",
     "You are receiving this email because we received a password reset request for your account.": "Ви отримали цей електронний лист, оскільки ми отримали запит на скидання паролю для вашого облікового запису.",
     "connectors.enums.account_connection_status.untested": "Не перевірено",
-    "connectors.enums.account_connection_status.connected": "Підключення перевірено",
+    "connectors.enums.account_connection_status.connected": "Підключено",
     "connectors.enums.account_connection_status.attention_required": "Потрібна увага",
     "connectors.enums.account_connection_status.temporarily_unavailable": "Тимчасово недоступно",
     "connectors.enums.account_connection_status.disabled": "Вимкнено",
@@ -289,7 +289,7 @@
     "connectors.ui.integrations.empty": "Немає доступних платформ для підключення.",
     "connectors.ui.integrations.status.not_connected": "Ще не підключено",
     "connectors.ui.integrations.status.untested": "Не перевірено",
-    "connectors.ui.integrations.status.connected": "Підключення перевірено",
+    "connectors.ui.integrations.status.connected": "Підключено",
     "connectors.ui.integrations.status.attention_required": "Потребує уваги",
     "connectors.ui.integrations.status.temporarily_unavailable": "Тимчасова проблема",
     "connectors.ui.integrations.status.disabled": "Вимкнено",
@@ -702,5 +702,8 @@
     "connectors.ui.layer_a.magento_name": "Magento",
     "connectors.ui.layer_a.next_step.heading": "НАСТУПНИЙ КРОК",
     "connectors.ui.layer_a.next_step.configure": "Налаштувати синхронізацію",
-    "connectors.ui.layer_a.next_step.preview": "Створити пробну синхронізацію"
+    "connectors.ui.layer_a.next_step.preview": "Створити пробну синхронізацію",
+    "connectors.ui.layer_a.checked_at": "Перевірено :time",
+    "connectors.ui.layer_a.next_step.setup_admin_required": "Налаштування синхронізації має виконати уповноважений адміністратор робочого простору.",
+    "connectors.ui.layer_a.next_step.unavailable": "Наступний крок тимчасово недоступний. Зверніться до уповноваженого адміністратора робочого простору."
 }

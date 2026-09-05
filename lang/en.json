@@ -47,7 +47,7 @@
     "Whoops!": "Whoops!",
     "You are receiving this email because we received a password reset request for your account.": "You are receiving this email because we received a password reset request for your account.",
     "connectors.enums.account_connection_status.untested": "Not tested",
-    "connectors.enums.account_connection_status.connected": "Connection verified",
+    "connectors.enums.account_connection_status.connected": "Connected",
     "connectors.enums.account_connection_status.attention_required": "Attention required",
     "connectors.enums.account_connection_status.temporarily_unavailable": "Temporarily unavailable",
     "connectors.enums.account_connection_status.disabled": "Disabled",
@@ -289,7 +289,7 @@
     "connectors.ui.integrations.empty": "No platforms are available to connect.",
     "connectors.ui.integrations.status.not_connected": "Not connected yet",
     "connectors.ui.integrations.status.untested": "Not checked",
-    "connectors.ui.integrations.status.connected": "Connection verified",
+    "connectors.ui.integrations.status.connected": "Connected",
     "connectors.ui.integrations.status.attention_required": "Needs attention",
     "connectors.ui.integrations.status.temporarily_unavailable": "Temporary issue",
     "connectors.ui.integrations.status.disabled": "Disabled",
@@ -702,5 +702,8 @@
     "connectors.ui.layer_a.magento_name": "Magento",
     "connectors.ui.layer_a.next_step.heading": "NEXT STEP",
     "connectors.ui.layer_a.next_step.configure": "Configure synchronization",
-    "connectors.ui.layer_a.next_step.preview": "Create a test synchronization"
+    "connectors.ui.layer_a.next_step.preview": "Create a test synchronization",
+    "connectors.ui.layer_a.checked_at": "Checked :time",
+    "connectors.ui.layer_a.next_step.setup_admin_required": "Synchronization setup requires an authorized workspace administrator.",
+    "connectors.ui.layer_a.next_step.unavailable": "The next step is temporarily unavailable. Contact an authorized workspace administrator."
 }
