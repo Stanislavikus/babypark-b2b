@@ -7,7 +7,9 @@
         : null;
     $runtimeLabel = $uiState->runtimeStatusLabel($activeCheck);
     $runtimeColor = $uiState->runtimeStatusColor($activeCheck);
-    $stableLabel = $uiState->stableStatusLabel($record->connection_status);
+    $stableLabel = $record->connection_status === \App\Enums\ConnectorAccountConnectionStatus::Connected
+        ? __('connectors.ui.layer_a.status.connected')
+        : $uiState->stableStatusLabel($record->connection_status);
     $stableColor = $uiState->stableStatusColor($record->connection_status);
 @endphp
 

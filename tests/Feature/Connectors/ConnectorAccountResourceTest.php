@@ -518,6 +518,8 @@ class ConnectorAccountResourceTest extends TestCase
     #[Test]
     public function healthy_overview_shows_connection_confidence_without_certification_rows_or_counts(): void
     {
+        $previousLocale = App::getLocale();
+        App::setLocale('uk');
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
             'connection_status' => ConnectorAccountConnectionStatus::Connected,
@@ -532,19 +534,23 @@ class ConnectorAccountResourceTest extends TestCase
             'finished_at' => now(),
         ]);
 
-        Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee('Підключено')
-            ->assertSee('Перевірено')
-            ->assertSee(__('connectors.ui.layer_a.check_does_not_mutate'))
-            ->assertDontSee(__('connectors.ui.layer_a.what_we_checked_heading'))
-            ->assertDontSee(__('connectors.ui.layer_a.catalog.label'))
-            ->assertDontSee(__('connectors.ui.layer_a.fields.label'))
-            ->assertDontSee(__('connectors.ui.layer_a.images.label'))
-            ->assertDontSee('Поля потребують уваги')
-            ->assertDontSee('Виконати першу синхронізацію')
-            ->assertDontSee('Синхронізація працює')
-            ->assertDontSee(__('connectors.ui.layer_a.catalog.found_count', ['count' => 19]));
+        try {
+            Livewire::actingAs($admin)
+                ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
+                ->assertSee(__('connectors.ui.layer_a.status.connected'))
+                ->assertSee('Перевірено')
+                ->assertSee(__('connectors.ui.layer_a.check_does_not_mutate'))
+                ->assertDontSee(__('connectors.ui.layer_a.what_we_checked_heading'))
+                ->assertDontSee(__('connectors.ui.layer_a.catalog.label'))
+                ->assertDontSee(__('connectors.ui.layer_a.fields.label'))
+                ->assertDontSee(__('connectors.ui.layer_a.images.label'))
+                ->assertDontSee('Поля потребують уваги')
+                ->assertDontSee('Виконати першу синхронізацію')
+                ->assertDontSee('Синхронізація працює')
+                ->assertDontSee(__('connectors.ui.layer_a.catalog.found_count', ['count' => 19]));
+        } finally {
+            App::setLocale($previousLocale);
+        }
     }
 
     #[Test]
@@ -636,21 +642,26 @@ class ConnectorAccountResourceTest extends TestCase
     #[Test]
     public function connector_account_overview_renders_complete_localized_copy_in_english(): void
     {
+        $previousLocale = App::getLocale();
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
             'connection_status' => ConnectorAccountConnectionStatus::Connected,
             'last_successful_check_at' => now(),
         ]);
 
-        App::setLocale('en');
+        try {
+            App::setLocale('en');
 
-        Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertSee('Connected')
-            ->assertSee('Checked')
-            ->assertSee('The check does not change data in Magento.')
-            ->assertSee('Synchronization setup requires an authorized workspace administrator.')
-            ->assertDontSee('What we checked');
+            Livewire::actingAs($admin)
+                ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+                ->assertSee(__('connectors.ui.layer_a.status.connected'))
+                ->assertSee('Checked')
+                ->assertSee('The check does not change data in Magento.')
+                ->assertSee('Synchronization setup requires an authorized workspace administrator.')
+                ->assertDontSee('What we checked');
+        } finally {
+            App::setLocale($previousLocale);
+        }
     }
 
     private function createProductsConfiguration(ConnectorAccount $account): SyncConfiguration

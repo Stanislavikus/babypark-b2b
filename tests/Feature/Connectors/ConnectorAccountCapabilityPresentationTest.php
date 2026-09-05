@@ -474,6 +474,10 @@ class ConnectorAccountCapabilityPresentationTest extends TestCase
 
         $this->assertStringContainsString(
             e(__('connectors.enums.account_connection_status.connected')),
+            $listComponent->html(),
+        );
+        $this->assertStringContainsString(
+            e(__('connectors.ui.layer_a.status.connected')),
             $detailComponent->html(),
         );
         $this->assertStringNotContainsString(

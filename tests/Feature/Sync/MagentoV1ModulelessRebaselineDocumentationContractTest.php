@@ -194,18 +194,16 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
     }
 
     #[Test]
-    public function connector_ux_contract_documents_verify_to_preview_journey_freeze(): void
+    public function connector_ux_contract_documents_connection_confidence_and_one_next_step(): void
     {
         $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
 
-        $this->assertStringContainsString('## 19. Connector Account Overview — verify-to-preview journey freeze', $content);
-        $this->assertStringContainsString('[Resolved — Post-#168 / Post-D6 rebaseline — 2026-09-03]', $content);
-        $this->assertStringContainsString('CONNECT', $content);
-        $this->assertStringContainsString('safe VERIFY', $content);
-        $this->assertStringContainsString('"Що ми перевірили"', $content);
-        $this->assertStringContainsString('ONE next action', $content);
-        $this->assertStringContainsString('"Створити пробну синхронізацію"', $content);
-        $this->assertStringContainsString('"Виконати першу синхронізацію"', $content);
+        $this->assertStringContainsString('## 19. Connector Account Overview — connection confidence and one next step', $content);
+        $this->assertStringContainsString('[Resolved — production-validation rebaseline — 2026-09-05]', $content);
+        $this->assertStringContainsString('**connection confidence + one next step**', $content);
+        $this->assertStringContainsString('🟢 Підключено', $content);
+        $this->assertStringContainsString('**`Створити пробну синхронізацію`**', $content);
+        $this->assertStringNotContainsString('### 19.4 "Що ми перевірили"', $content);
     }
 
     #[Test]
@@ -213,11 +211,10 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
     {
         $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
 
-        $this->assertStringContainsString('Do not use the magic headline field count as proof of connector', $content);
-        $this->assertStringContainsString('N is a count, not a certification', $content);
-        $this->assertStringContainsString('An **empty catalogue is neutral**', $content);
-        $this->assertStringContainsString('`Каталог поки порожній`', $content);
-        $this->assertStringContainsString('"Пробна синхронізація не змінює дані в Magento" reassurance is', $content);
+        $this->assertStringContainsString('catalogue/field/image counts are not health KPIs', $content);
+        $this->assertStringContainsString('They are **not** permanent rows on a', $content);
+        $this->assertStringContainsString('Mapping / Available Fields', $content);
+        $this->assertStringContainsString('Preview/worklists', $content);
     }
 
     #[Test]
@@ -225,10 +222,10 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
     {
         $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
 
-        $this->assertStringContainsString('A successful baseline connection MUST NOT become red merely because', $content);
-        $this->assertStringContainsString('field-metadata permission is missing on the target', $content);
-        $this->assertStringContainsString('A Magento ACL denial', $content);
-        $this->assertStringContainsString('bad credentials', $content);
+        $this->assertStringContainsString('Connection truth is independent from downstream capability truth', $content);
+        $this->assertStringContainsString('must not turn an otherwise', $content);
+        $this->assertStringContainsString('a Magento ACL denial', $content);
+        $this->assertStringContainsString('not bad-credentials evidence', $content);
     }
 
     #[Test]
@@ -239,10 +236,10 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
         // The freeze extends the §13 forbidden vocabulary to also cover
         // connector-component names, PHP / Composer, Decision 6, and
         // internal readiness / probe / handshake names on Layer A/B.
-        $this->assertStringContainsString('"Safe Sync"', $content);
-        $this->assertStringContainsString('PHP / Composer strings', $content);
-        $this->assertStringContainsString('Decision 6 wording', $content);
-        $this->assertStringContainsString('internal readiness / probe / handshake', $content);
+        $this->assertStringContainsString('Safe Sync internals', $content);
+        $this->assertStringContainsString('framework or module', $content);
+        $this->assertStringContainsString('raw payloads', $content);
+        $this->assertStringContainsString('internal probe/handshake/readiness', $content);
     }
 
     #[Test]
@@ -250,9 +247,9 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
     {
         $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
 
-        $this->assertStringContainsString('"Пробна синхронізація не змінює дані в Magento"', $content);
-        $this->assertStringContainsString('Preview-first architecture is preserved', $content);
-        $this->assertStringContainsString('MUST NOT show a "Синхронізація працює"', $content);
+        $this->assertStringContainsString('**`Пробна синхронізація не змінює', $content);
+        $this->assertStringContainsString('Preview-first contracts remain authoritative', $content);
+        $this->assertStringContainsString('never claims', $content);
     }
 
     #[Test]
@@ -260,11 +257,11 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
     {
         $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
 
-        $this->assertStringContainsString('### 19.6 Exactly one next action (adaptive sequence)', $content);
+        $this->assertStringContainsString('### 19.3 Exactly one next step', $content);
         $this->assertStringContainsString('**`Налаштувати синхронізацію`**', $content);
         $this->assertStringContainsString('**`Створити пробну синхронізацію`**', $content);
-        $this->assertStringContainsString('**`Виконати першу синхронізацію`**', $content);
-        $this->assertStringContainsString('Do not show all three at once', $content);
+        $this->assertStringContainsString('is never empty.', $content);
+        $this->assertStringContainsString('first consequential Live', $content);
     }
 
     #[Test]
@@ -327,17 +324,16 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
     {
         $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
 
-        $section = $this->extractSection($content, '### 19.8 First real sync', '### 19.9');
+        $section = $this->extractSection($content, '### 19.3 Exactly one next step', '### 19.4');
         $normalized_section = $this->normalizeDocWhitespace($section);
 
         // The corrected wording: first / earliest point at which a real
         // Magento mutation MAY occur on the standard merchant journey.
         // Later approved Live syncs continue to be governed by existing
         // Sync runtime contracts.
-        $this->assertStringContainsString('first / earliest', $section);
-        $this->assertStringContainsString('point** at which a real Magento mutation may occur', $section);
-        $this->assertStringContainsString('Subsequent approved Live syncs continue to be governed by the', $section);
-        $this->assertStringContainsString('are forbidden from mutating Magento', $normalized_section);
+        $this->assertStringContainsString('first consequential Live', $section);
+        $this->assertStringContainsString('only after qualifying Preview evidence', $section);
+        $this->assertStringContainsString('every existing Live support, authorization, and admission gate', $normalized_section);
 
         // The "only point" / "only ever allowed" framing is forbidden.
         $this->assertStringNotContainsString('the only point at which a real Magento mutation is allowed', $section);
@@ -348,7 +344,7 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
     {
         $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
 
-        $section = $this->extractSection($content, '### 19.8 First real sync', '### 19.9');
+        $section = $this->extractSection($content, '### 19.3 Exactly one next step', '### 19.4');
 
         // The correction removed the invented fresh-Preview / explicit
         // merchant-acknowledgement requirement between Preview and the
@@ -357,9 +353,8 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
         $this->assertStringNotContainsString('merchant\n  acknowledgement that the most recent Preview is still valid', $section);
         $this->assertStringNotContainsString('most recent Preview is still valid', $section);
 
-        // The freeze explicitly disclaims inventing any such mechanism.
-        $this->assertStringContainsString('This freeze does **not** introduce a new fresh-Preview or', $section);
-        $this->assertStringContainsString('Preview / Live authorization and admission contracts', $section);
+        $this->assertStringContainsString('this Overview contract neither bypasses nor', $section);
+        $this->assertStringContainsString('redefines those owners', $section);
     }
 
     #[Test]
@@ -367,19 +362,15 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
     {
         $content = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
 
-        $section_19_3 = $this->extractSection($content, '### 19.3 Approved primary connection presentation', '### 19.4');
-        $section_19_6 = $this->extractSection($content, '### 19.6 Exactly one next action (adaptive sequence)', '### 19.7');
-        $normalized_19_3 = $this->normalizeDocWhitespace($section_19_3);
+        $section_19_1 = $this->extractSection($content, '### 19.1 Normal healthy presentation', '### 19.2');
 
         // The "[Перевірити ще раз]" control is now a conditional secondary
         // action that follows existing authorization / capability /
         // action-state rules, NOT literally always available.
-        $this->assertStringNotContainsString('always available to a connected merchant', $section_19_3);
-        $this->assertStringNotContainsString('always available as a secondary action', $section_19_6);
-        $this->assertStringContainsString('shown / usable when existing', $section_19_3);
-        $this->assertStringContainsString('authorization / capability / action-state', $section_19_3);
-        $this->assertStringContainsString('disabled or unavailable while', $section_19_3);
-        $this->assertStringContainsString('No new authorization logic is introduced by this freeze', $normalized_19_3);
+        $this->assertStringNotContainsString('always available to a connected merchant', $section_19_1);
+        $this->assertStringNotContainsString('always available as a secondary action', $section_19_1);
+        $this->assertStringContainsString('under existing authorization and active-check rules', $section_19_1);
+        $this->assertStringContainsString('must never mutate Magento', $section_19_1);
     }
 
     #[Test]

@@ -657,6 +657,8 @@ Post-#168 / Post-D6 moduleless-by-default decision.
 The normal Magento Connector Account Overview (Layer A) has one product purpose:
 **connection confidence + one next step**. This decision supersedes the earlier
 verify-to-preview Overview reference wherever it conflicts.
+It does not claim that the underlying runtime migration is already complete and does not
+change connector capability truth.
 
 ### 19.1 Normal healthy presentation
 
@@ -679,6 +681,11 @@ The account name remains the account-owned dynamic value. Overview must not expo
 internal `ConnectorAccount` enum wording when it differs from the approved merchant copy.
 Re-check remains a secondary action under existing authorization and active-check rules and
 is read-only: it must never mutate Magento.
+
+Connection truth is independent from downstream capability truth. A field-metadata,
+mapping, Preview, Live, or other downstream capability problem must not turn an otherwise
+successful baseline connection red. In particular, a Magento ACL denial for optional field
+metadata is not bad-credentials evidence and must not be presented as such.
 
 ### 19.2 Evidence and surface ownership
 
@@ -717,6 +724,17 @@ CTA while `ConnectorSyncOperationSupport(Products, Export, Live)` is false and n
 `Синхронізація працює` before persisted, successful real Live evidence. Preview remains
 read-only and Preview-first contracts remain authoritative.
 
+The merchant Preview surface must retain the reassurance **`Пробна синхронізація не змінює
+дані в Magento`**. Preview never implies an external write. The first consequential Live
+operation is available only after qualifying Preview evidence and every existing Live support,
+authorization, and admission gate permits it; this Overview contract neither bypasses nor
+redefines those owners.
+
+Layer A/B continue to forbid HTTP status codes, OAuth/ACL identifiers, endpoint paths,
+schema/snapshot/Discovery/canonical-hash vocabulary, Safe Sync internals, framework or module
+versions, raw payloads, and internal probe/handshake/readiness names. Such technical evidence
+belongs to authorized support/runtime diagnostics.
+
 ### 19.4 Acceptance anchors
 
 Mechanical protection must prove the approved connected and checked copy; safe secondary
@@ -741,3 +759,6 @@ Removal from Layer A is presentation-only and must not weaken those runtime/supp
 Mapping and Available Fields remain unchanged. No new authorization permission, role default,
 or broad grant is introduced: absence of `manage_sync_configurations` explains the
 non-actionable setup state instead of hiding an empty card.
+
+This implementation-specific copy does not rebaseline the separate `Інтеграції` landing
+surface: its page contract and evidence-scoped `Підключення перевірено` status remain intact.

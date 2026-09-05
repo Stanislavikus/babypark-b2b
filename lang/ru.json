@@ -47,7 +47,7 @@
     "Whoops!": "Упс!",
     "You are receiving this email because we received a password reset request for your account.": "Вы получили это письмо, потому что мы получили запрос на сброс пароля для Вашей учётной записи.",
     "connectors.enums.account_connection_status.untested": "Не проверено",
-    "connectors.enums.account_connection_status.connected": "Подключено",
+    "connectors.enums.account_connection_status.connected": "Подключение проверено",
     "connectors.enums.account_connection_status.attention_required": "Требуется внимание",
     "connectors.enums.account_connection_status.temporarily_unavailable": "Временно недоступно",
     "connectors.enums.account_connection_status.disabled": "Отключено",
@@ -289,7 +289,7 @@
     "connectors.ui.integrations.empty": "Нет доступных платформ для подключения.",
     "connectors.ui.integrations.status.not_connected": "Ещё не подключено",
     "connectors.ui.integrations.status.untested": "Не проверено",
-    "connectors.ui.integrations.status.connected": "Подключено",
+    "connectors.ui.integrations.status.connected": "Подключение проверено",
     "connectors.ui.integrations.status.attention_required": "Требует внимания",
     "connectors.ui.integrations.status.temporarily_unavailable": "Временная проблема",
     "connectors.ui.integrations.status.disabled": "Отключено",
@@ -688,5 +688,6 @@
     "connectors.ui.layer_a.next_step.preview": "Создать пробную синхронизацию",
     "connectors.ui.layer_a.checked_at": "Проверено :time",
     "connectors.ui.layer_a.next_step.setup_admin_required": "Настройку синхронизации должен выполнить уполномоченный администратор рабочего пространства.",
-    "connectors.ui.layer_a.next_step.unavailable": "Следующий шаг временно недоступен. Обратитесь к уполномоченному администратору рабочего пространства."
+    "connectors.ui.layer_a.next_step.unavailable": "Следующий шаг временно недоступен. Обратитесь к уполномоченному администратору рабочего пространства.",
+    "connectors.ui.layer_a.status.connected": "Подключено"
 }
