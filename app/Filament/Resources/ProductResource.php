@@ -2,23 +2,62 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\TagBulkOperation;
+use App\Exceptions\Catalog\InvalidTagBulkSelectionException;
+use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource\Pages;
+use App\Filament\Resources\ProductResource\Pages\EditProduct;
+use App\Filament\Resources\ProductResource\Pages\ListProducts;
+use App\Filament\Resources\ProductResource\Pages\ViewProduct;
+use App\Filament\Resources\ProductResource\Support\TagBulkUi;
 use App\Models\Product;
-use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Infolists;
-use Filament\Infolists\Infolist;
+use App\Models\Tag;
+use App\Services\Catalog\TagManager;
+use App\Services\Pricing\PricingSqlExpressions;
+use App\Services\Pricing\ProductPricingSummary;
+use App\Support\AdminAvailabilityPresenter;
+use App\Support\ProductFields\AdminProductMargin;
+use App\Support\ProductFields\MarginToggle;
+use App\Support\ProductFields\ProductColumnVisibility;
+use App\Support\ProductTableLink;
+use App\Support\Workspace\WorkspaceContext;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Schema;
+use Filament\Support\Exceptions\Halt;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
+use Illuminate\Support\HtmlString;
+use Livewire\Livewire;
+use LogicException;
 
 class ProductResource extends Resource
 {
+    use HasProductLightbox;
+
     protected static ?string $model = Product::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-cube';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-cube';
 
-    protected static ?string $navigationGroup = 'Каталог';
+    protected static string|\UnitEnum|null $navigationGroup = 'Каталог';
 
     protected static ?string $modelLabel = 'товар';
 
@@ -27,87 +66,78 @@ class ProductResource extends Resource
     protected static ?int $navigationSort = 3;
 
     // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    /**
-     * Returns extra <img> attributes for thumbnail that opens the shared JS lightbox
-     * (bpOpenLightbox injected by AdminPanelProvider::BODY_END renderHook).
-     *
-     * @return array<string, string>
-     */
-    public static function lightboxImgAttributes(Product $record): array
-    {
-        $url = self::firstImage($record);
-
-        if (! $url) {
-            return [
-                'class' => 'rounded object-cover',
-                'style' => 'cursor: default;',
-            ];
-        }
-
-        $safe  = e($url);
-        $title = e($record->name);
-
-        return [
-            'class'   => 'rounded object-cover',
-            'style'   => 'cursor: zoom-in;',
-            'title'   => 'Натисніть для збільшення',
-            // stopPropagation + preventDefault prevent the wrapping <a> row link from
-            // navigating to the view page when clicking the thumbnail.
-            'onclick' => "event.stopPropagation();event.preventDefault();bpOpenLightbox('{$safe}','{$title}')",
-        ];
-    }
-
-    /** Returns the first image URL from a product's images JSON, or null. */
-    public static function firstImage(Product $record): ?string
-    {
-        $images = $record->images;
-
-        // The Eloquent array cast normally decodes JSON automatically, but guard
-        // against cases where the raw JSON string bypasses the cast (e.g. when
-        // the model is constructed without going through the accessor pipeline).
-        if (is_string($images)) {
-            $images = json_decode($images, true);
-        }
-
-        return is_array($images) && count($images) > 0 ? $images[0] : null;
-    }
-
-    // -------------------------------------------------------------------------
     // Form (edit)
     // -------------------------------------------------------------------------
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Основне (з 1С)')->schema([
-                    Forms\Components\TextInput::make('sku')
+        return $schema
+            ->components([
+                Section::make('Основне (з 1С)')->schema([
+                    TextInput::make('sku')
                         ->label('Артикул')
                         ->disabled(),
-                    Forms\Components\TextInput::make('name')
+                    TextInput::make('name')
                         ->label('Назва')
                         ->disabled(),
-                    Forms\Components\TextInput::make('brand')
+                    TextInput::make('brand')
                         ->label('Бренд')
                         ->disabled(),
-                    Forms\Components\TextInput::make('category.name')
+                    TextInput::make('category.name')
                         ->label('Категорія')
                         ->disabled(),
+                    Placeholder::make('cost_price_summary')
+                        ->label('Вхідна ціна')
+                        ->content(fn (?Product $record): string => $record
+                            ? (app(ProductPricingSummary::class)->formatCostPrice($record) ?? '—')
+                            : '—'),
                 ])->columns(2),
 
-                Forms\Components\Section::make('Сайт')->schema([
+                Section::make('Класифікація')->schema([
+                    TextInput::make('merchant_type')
+                        ->label('Внутрішній тип товару')
+                        ->maxLength(255)
+                        ->datalist(fn (): array => Product::query()
+                            ->distinct()
+                            ->orderBy('merchant_type')
+                            ->whereNotNull('merchant_type')
+                            ->where('merchant_type', '!=', '')
+                            ->pluck('merchant_type')
+                            ->all())
+                        ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? trim($state) : null),
+                    Select::make('tags')
+                        ->label('Теги')
+                        ->multiple()
+                        ->relationship(titleAttribute: 'name')
+                        ->createOptionForm([
+                            TextInput::make('name')
+                                ->label('Назва')
+                                ->required()
+                                ->maxLength(255),
+                        ])
+                        ->createOptionUsing(function (array $data, ?Product $record): string {
+                            if ($record === null) {
+                                throw new LogicException('A persisted Product is required for inline tag creation.');
+                            }
+
+                            return app(TagManager::class)
+                                ->create($record->workspace_id, $data['name'])
+                                ->getKey();
+                        })
+                        ->preload()
+                        ->searchable(),
+                ])->columns(2),
+
+                Section::make('Сайт')->schema([
                     // Left column: URL field
-                    Forms\Components\Group::make([
-                        Forms\Components\TextInput::make('product_url')
+                    Group::make([
+                        TextInput::make('url')
                             ->label('URL товару на сайті')
                             ->url()
                             ->placeholder('https://babypark.ua/product/...')
                             ->maxLength(2048)
                             ->suffixAction(
-                                Forms\Components\Actions\Action::make('open_url')
+                                Action::make('open_url')
                                     ->icon('heroicon-m-arrow-top-right-on-square')
                                     ->url(fn (?string $state) => $state)
                                     ->openUrlInNewTab()
@@ -116,10 +146,10 @@ class ProductResource extends Resource
                     ]),
 
                     // Right column: photo preview
-                    Forms\Components\Group::make([
-                        Forms\Components\Placeholder::make('photo_preview')
+                    Group::make([
+                        Placeholder::make('photo_preview')
                             ->label('Фото товару')
-                            ->content(fn (Forms\Get $get, ?Product $record) => new \Illuminate\Support\HtmlString(
+                            ->content(fn (Get $get, ?Product $record) => new HtmlString(
                                 $record
                                     ? self::buildPhotoPreviewHtml($record)
                                     : self::buildPhotoPlaceholderHtml()
@@ -130,82 +160,65 @@ class ProductResource extends Resource
     }
 
     // -------------------------------------------------------------------------
-    // Infolist (view)
+    // Infolist (view) — used both on the dedicated view page and in the slideOver
     // -------------------------------------------------------------------------
 
-    public static function infolist(Infolist $infolist): Infolist
+    public static function infolist(Schema $schema): Schema
     {
-        return $infolist
-            ->schema([
-                Infolists\Components\Section::make('Основне (з 1С)')->schema([
-                    // Row 1: Артикул | Назва
-                    Infolists\Components\TextEntry::make('sku')->label('Артикул'),
-                    Infolists\Components\TextEntry::make('name')->label('Назва'),
-                    // Row 2: Бренд | Наявність (real admin quantity, no threshold)
-                    Infolists\Components\TextEntry::make('brand')->label('Бренд')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('admin_stock_status')
-                        ->label('Наявність')
-                        ->getStateUsing(function (Product $record): string {
-                            $totalQty = 0;
-                            $earliestExpectedDate = null;
-
-                            foreach ($record->variants as $variant) {
-                                foreach ($variant->stocks as $stock) {
-                                    $totalQty += (int) $stock->quantity;
-                                    if ($stock->expected_date !== null && ($earliestExpectedDate === null || $stock->expected_date < $earliestExpectedDate)) {
-                                        $earliestExpectedDate = $stock->expected_date;
-                                    }
-                                }
-                            }
-
-                            if ($totalQty > 0) {
-                                return "У наявності: {$totalQty} шт";
-                            }
-                            if ($earliestExpectedDate) {
-                                return 'Очікується ' . $earliestExpectedDate->format('d.m');
-                            }
-
-                            return 'Немає в наявності';
-                        })
-                        ->badge()
-                        ->color(fn (string $state): string => match (true) {
-                            str_starts_with($state, 'У наявності') => 'success',
-                            str_starts_with($state, 'Очікується')  => 'info',
-                            default                                 => 'gray',
-                        }),
-                    // Row 3: Категорія | РРЦ
-                    Infolists\Components\TextEntry::make('category.name')->label('Категорія')->placeholder('—'),
-                    Infolists\Components\TextEntry::make('admin_rrp')
-                        ->label('РРЦ')
-                        ->getStateUsing(function (Product $record): ?string {
-                            $maxRrp = null;
-                            foreach ($record->variants as $variant) {
-                                foreach ($variant->prices as $price) {
-                                    if (
-                                        $price->recommended_retail_price !== null
-                                        && ($maxRrp === null || $price->recommended_retail_price > $maxRrp)
-                                    ) {
-                                        $maxRrp = (float) $price->recommended_retail_price;
-                                    }
-                                }
-                            }
-
-                            return $maxRrp !== null
-                                ? '₴ ' . number_format($maxRrp, 2, '.', ' ')
-                                : null;
-                        })
+        return $schema
+            ->components([
+                Section::make('Основне (з 1С)')->schema([
+                    TextEntry::make('sku')->label('Артикул'),
+                    TextEntry::make('variant_ean')
+                        ->label('EAN')
+                        ->getStateUsing(fn (Product $record): ?string => $record->variants->first()?->barcode_ean)
                         ->placeholder('—'),
-                    // Row 4: Статус | (empty)
-                    Infolists\Components\TextEntry::make('admin_status')
+                    TextEntry::make('brand')->label('Бренд')->placeholder('—'),
+                    TextEntry::make('name')->label('Назва'),
+                    TextEntry::make('category.name')->label('Категорія')->placeholder('—'),
+                    TextEntry::make('admin_stock_status')
+                        ->label('Наявність')
+                        ->getStateUsing(fn (Product $record): string => AdminAvailabilityPresenter::adminLabel($record))
+                        ->badge()
+                        ->color(fn (string $state): string => AdminAvailabilityPresenter::badgeColor($state)),
+                    TextEntry::make('cost_price_summary')
+                        ->label('Вхідна ціна')
+                        ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatCostPrice($record))
+                        ->placeholder('—'),
+                    TextEntry::make('admin_rrp')
+                        ->label('РРЦ')
+                        ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatRrp($record))
+                        ->placeholder('—'),
+                    TextEntry::make('admin_margin')
+                        ->label(fn (): HtmlString => MarginToggle::labelHtml(
+                            Livewire::current()?->marginFormat ?? 'percent'
+                        ))
+                        ->getStateUsing(fn (Product $record): ?string => AdminProductMargin::formatted(
+                            $record,
+                            Livewire::current()?->marginFormat ?? 'percent'
+                        ))
+                        ->color(fn (Product $record): ?string => AdminProductMargin::isNegative($record) ? 'danger' : null)
+                        ->placeholder('—'),
+                    TextEntry::make('admin_status')
                         ->label('Статус')
                         ->getStateUsing(fn (Product $record): string => $record->is_active ? 'Активний' : 'Неактивний')
                         ->badge()
                         ->color(fn (string $state): string => $state === 'Активний' ? 'success' : 'gray'),
                 ])->columns(2),
 
-                Infolists\Components\Section::make('Сайт')->schema([
+                Section::make('Класифікація')->schema([
+                    TextEntry::make('merchant_type')
+                        ->label('Внутрішній тип товару')
+                        ->placeholder('—'),
+                    TextEntry::make('tags.name')
+                        ->label('Теги')
+                        ->badge()
+                        ->placeholder('—'),
+                ])->columns(2),
+
+                Section::make('Сайт')->schema([
                     // Left: clickable URL
-                    Infolists\Components\TextEntry::make('product_url')
+                    TextEntry::make('url')
                         ->label('URL товару на сайті')
                         ->placeholder('—')
                         ->url(fn (?string $state) => $state)
@@ -213,34 +226,32 @@ class ProductResource extends Resource
                         ->icon('heroicon-m-arrow-top-right-on-square')
                         ->iconColor('primary')
                         ->formatStateUsing(fn (?string $state) => $state
-                            ? parse_url($state, PHP_URL_HOST) . rtrim(parse_url($state, PHP_URL_PATH) ?? '', '/')
+                            ? parse_url($state, PHP_URL_HOST).rtrim(parse_url($state, PHP_URL_PATH) ?? '', '/')
                             : null),
 
                     // Right: 48×48 thumbnail — click opens the shared bpOpenLightbox() JS overlay.
-                    // HtmlString bypasses Filament's sanitisation (triggered by ->html()) that
-                    // would strip event handlers; Htmlable rendering via {{ }} keeps them intact.
-                    Infolists\Components\TextEntry::make('photo_preview')
+                    TextEntry::make('photo_preview')
                         ->label('Фото товару')
                         ->getStateUsing(function ($record) {
                             if (! $record) {
-                                return new \Illuminate\Support\HtmlString('');
+                                return new HtmlString('');
                             }
                             $url = self::firstImage($record);
 
                             if ($url) {
-                                $safe  = e($url);
+                                $safe = e($url);
                                 $title = e($record->name);
 
-                                return new \Illuminate\Support\HtmlString(
-                                    '<img src="' . $safe . '"' .
-                                    ' style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;cursor:zoom-in;"' .
-                                    ' title="Натисніть для збільшення"' .
-                                    ' onclick="bpOpenLightbox(\'' . $safe . '\',\'' . $title . '\')" />'
+                                return new HtmlString(
+                                    '<img src="'.$safe.'"'.
+                                    ' style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;cursor:zoom-in;"'.
+                                    ' title="Натисніть для збільшення"'.
+                                    ' onclick="bpOpenLightbox(\''.$safe.'\',\''.$title.'\')" />'
                                 );
                             }
 
-                            return new \Illuminate\Support\HtmlString(
-                                '<div style="width:48px;height:48px;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;display:flex;align-items:center;justify-content:center;">' .
+                            return new HtmlString(
+                                '<div style="width:48px;height:48px;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;display:flex;align-items:center;justify-content:center;">'.
                                 '<span style="color:#9ca3af;font-size:10px;">—</span></div>'
                             );
                         }),
@@ -254,194 +265,283 @@ class ProductResource extends Resource
 
     public static function table(Table $table): Table
     {
+        $panel = 'admin';
+        $toggleable = ProductColumnVisibility::toggleableColumns($panel);
+
         return $table
             ->columns([
-                // 48×48 thumbnail — toggleable; click opens the shared bpOpenLightbox() JS overlay
-                Tables\Columns\ImageColumn::make('first_image')
+                // --- Default visible columns (7 total) ---
+
+                // 1. Фото: thumbnail — click opens shared bpOpenLightbox(); does NOT trigger row action
+                ImageColumn::make('first_image')
                     ->label('Фото')
                     ->state(fn (Product $record): ?string => self::firstImage($record))
                     ->size(48)
-                    ->defaultImageUrl(fn () => 'data:image/svg+xml,' . rawurlencode(self::placeholderSvg(48)))
+                    ->defaultImageUrl(fn () => 'data:image/svg+xml,'.rawurlencode(self::placeholderSvg(48)))
                     ->extraImgAttributes(fn (Product $record): array => self::lightboxImgAttributes($record))
-                    ->toggleable(),
+                    ->toggleable(in_array('photo', $toggleable)),
 
-                Tables\Columns\TextColumn::make('sku')
-                    ->label('Артикул')
-                    ->searchable()
-                    ->sortable(),
-
-                Tables\Columns\TextColumn::make('name')
+                // 2. Назва
+                TextColumn::make('name')
                     ->label('Назва')
                     ->searchable()
                     ->sortable()
                     ->limit(50),
 
-                Tables\Columns\TextColumn::make('category.name')
-                    ->label('Категорія')
-                    ->sortable(),
-
-                Tables\Columns\TextColumn::make('brand')
-                    ->label('Бренд')
+                // 3. Артикул
+                TextColumn::make('sku')
+                    ->label('Артикул')
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('rrp')
-                    ->label('РРЦ')
-                    ->getStateUsing(function (Product $record): ?string {
-                        $maxRrp = null;
-                        foreach ($record->variants as $variant) {
-                            foreach ($variant->prices as $price) {
-                                if (
-                                    $price->recommended_retail_price !== null
-                                    && ($maxRrp === null || $price->recommended_retail_price > $maxRrp)
-                                ) {
-                                    $maxRrp = (float) $price->recommended_retail_price;
-                                }
-                            }
-                        }
+                // 4. Бренд — default visible; user may toggle it off
+                TextColumn::make('brand')
+                    ->label('Бренд')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(in_array('brand', $toggleable)),
 
-                        return $maxRrp !== null
-                            ? '₴ ' . number_format($maxRrp, 2, '.', ' ')
-                            : null;
-                    })
-                    ->placeholder('—')
-                    ->toggleable()
-                    ->sortable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $direction): \Illuminate\Database\Eloquent\Builder {
-                        return $query->orderByRaw(
-                            "COALESCE(
-                                (SELECT MAX(pr.recommended_retail_price)
-                                 FROM prices pr
-                                 INNER JOIN product_variants pv ON pr.variant_id = pv.id
-                                 WHERE pv.product_id = products.id),
-                                0
-                            ) {$direction}"
-                        );
-                    }),
+                // 5. Ціна — placeholder until admin/base sale price model is resolved (Follow-up 3)
+                TextColumn::make('admin_sale_price')
+                    ->label('Ціна')
+                    ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatDefaultSalePrice($record))
+                    ->placeholder('—'),
 
-                Tables\Columns\TextColumn::make('stock_status')
+                // 6. Наявність — uses AvailabilityResolver net qty; consistent with filter and infolist
+                TextColumn::make('stock_status')
                     ->label('Наявність')
-                    ->getStateUsing(function (Product $record): string {
-                        $totalQty = 0;
-                        $earliestExpectedDate = null;
-
-                        foreach ($record->variants as $variant) {
-                            foreach ($variant->stocks as $stock) {
-                                $totalQty += (int) $stock->quantity;
-                                if ($stock->expected_date !== null && ($earliestExpectedDate === null || $stock->expected_date < $earliestExpectedDate)) {
-                                    $earliestExpectedDate = $stock->expected_date;
-                                }
-                            }
-                        }
-
-                        if ($totalQty > 0) {
-                            return "У наявності: {$totalQty} шт";
-                        }
-                        if ($earliestExpectedDate) {
-                            return 'Очікується ' . $earliestExpectedDate->format('d.m');
-                        }
-
-                        return 'Немає в наявності';
-                    })
+                    ->getStateUsing(fn (Product $record): string => AdminAvailabilityPresenter::adminLabel($record))
                     ->badge()
-                    ->color(fn (string $state): string => match (true) {
-                        str_starts_with($state, 'У наявності') => 'success',
-                        str_starts_with($state, 'Очікується')  => 'info',
-                        default                                 => 'gray',
-                    })
-                    ->sortable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $direction): \Illuminate\Database\Eloquent\Builder {
-                        // Subquery expressions reused across ORDER BY clauses.
-                        $totalQty = "(SELECT COALESCE(SUM(s.quantity), 0)
-                                      FROM stocks s
-                                      INNER JOIN product_variants pv ON s.variant_id = pv.id
-                                      WHERE pv.product_id = products.id)";
-
-                        $minExpectedDate = "(SELECT MIN(s.expected_date)
-                                            FROM stocks s
-                                            INNER JOIN product_variants pv ON s.variant_id = pv.id
-                                            WHERE pv.product_id = products.id)";
+                    ->color(fn (string $state): string => AdminAvailabilityPresenter::badgeColor($state))
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        $netQty = AdminAvailabilityPresenter::netQtySql();
+                        $minExpectedDate = AdminAvailabilityPresenter::earliestExpectedDateSql();
 
                         // Priority bucket: 0 = У наявності, 1 = Очікується, 2 = Немає в наявності.
-                        // Sorting by $direction means asc→best-first, desc→worst-first.
                         $priorityExpr = "CASE
-                            WHEN {$totalQty} > 0 THEN 0
+                            WHEN {$netQty} > 0 THEN 0
                             WHEN {$minExpectedDate} IS NOT NULL THEN 1
                             ELSE 2
                         END";
 
                         return $query
                             ->orderByRaw("{$priorityExpr} {$direction}")
-                            // Within "У наявності" bucket: more stock first (fixed DESC).
-                            ->orderByRaw("{$totalQty} DESC")
-                            // Within "Очікується" bucket: soonest arrival first (fixed ASC).
+                            ->orderByRaw("{$netQty} DESC")
                             ->orderByRaw("{$minExpectedDate} ASC");
                     }),
 
-                // Clickable link column
-                Tables\Columns\TextColumn::make('product_url')
-                    ->label('URL на сайті')
-                    ->url(fn (?string $state) => $state)
-                    ->openUrlInNewTab()
-                    ->placeholder('—')
-                    ->icon('heroicon-m-arrow-top-right-on-square')
-                    ->iconColor('primary')
-                    ->limit(35)
-                    ->tooltip(fn (?string $state) => $state)
-                    ->toggleable(isToggledHiddenByDefault: true),
-
-                Tables\Columns\IconColumn::make('is_active')
+                // 7. Статус
+                IconColumn::make('is_active')
                     ->label('Статус')
                     ->boolean()
-                    ->sortable(query: function (\Illuminate\Database\Eloquent\Builder $query, string $direction): \Illuminate\Database\Eloquent\Builder {
-                        // Secondary sort by id keeps rows stable when all visible values are identical
-                        // (e.g. when a status filter is active and every row shares the same is_active value).
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderBy('is_active', $direction)->orderBy('id', $direction);
                     }),
+
+                // --- Optional / hidden by default columns ---
+
+                TextColumn::make('barcode_ean')
+                    ->label('EAN')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('—')
+                    ->toggleable(in_array('barcode_ean', $toggleable), isToggledHiddenByDefault: true),
+
+                TextColumn::make('category.name')
+                    ->label('Категорія')
+                    ->sortable()
+                    ->toggleable(in_array('category', $toggleable), isToggledHiddenByDefault: true),
+
+                TextColumn::make('rrp')
+                    ->label('РРЦ')
+                    ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatRrp($record))
+                    ->placeholder('—')
+                    ->toggleable(in_array('rrp', $toggleable), isToggledHiddenByDefault: true)
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderByRaw(
+                            'COALESCE('.PricingSqlExpressions::maxRrpSqlForProduct('products.id').", 0) {$direction}"
+                        );
+                    }),
+
+                TextColumn::make('cost_price_summary')
+                    ->label('Вхідна ціна')
+                    ->getStateUsing(fn (Product $record): ?string => app(ProductPricingSummary::class)->formatCostPrice($record))
+                    ->placeholder('—')
+                    ->toggleable(in_array('cost_price', $toggleable), isToggledHiddenByDefault: true)
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderByRaw(
+                            "(SELECT MIN(pv.cost_price)
+                              FROM product_variants pv
+                              WHERE pv.product_id = products.id
+                              AND pv.is_active = 1
+                              AND pv.cost_price IS NOT NULL) {$direction}"
+                        );
+                    }),
+
+                TextColumn::make('margin')
+                    ->label(fn (): HtmlString => MarginToggle::labelHtml(
+                        Livewire::current()?->marginFormat ?? 'percent'
+                    ))
+                    ->getStateUsing(fn (Product $record): ?string => AdminProductMargin::formatted(
+                        $record,
+                        Livewire::current()?->marginFormat ?? 'percent'
+                    ))
+                    ->color(fn (Product $record): ?string => AdminProductMargin::isNegative($record) ? 'danger' : null)
+                    ->placeholder('—')
+                    ->toggleable(in_array('margin', $toggleable), isToggledHiddenByDefault: true)
+                    ->sortable(query: function (Builder $query, string $direction): Builder {
+                        return $query->orderByRaw(
+                            PricingSqlExpressions::adminMarginSortSql('products.id')." {$direction}"
+                        );
+                    }),
+
+                // Clickable external link column
+                TextColumn::make('url')
+                    ->label('URL на сайті')
+                    ->formatStateUsing(fn (?string $state): HtmlString|string => ProductTableLink::externalUrlHtml($state))
+                    ->tooltip(fn (?string $state) => $state)
+                    ->disableClick()
+                    ->toggleable(in_array('url', $toggleable), isToggledHiddenByDefault: true),
+
+                TextColumn::make('merchant_type')
+                    ->label('Внутрішній тип товару')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('—')
+                    ->toggleable(in_array('merchant_type', $toggleable), isToggledHiddenByDefault: true),
+
+                TextColumn::make('tags.name')
+                    ->label('Теги')
+                    ->placeholder('—')
+                    ->toggleable(in_array('tags', $toggleable), isToggledHiddenByDefault: true),
             ])
             ->defaultSort('sku')
-            ->recordUrl(fn (Product $record): string => static::getUrl('view', ['record' => $record]))
+            ->toggleColumnsTriggerAction(
+                fn (Action $action) => $action
+                    ->label('Стовпці')
+                    ->tooltip('Стовпці')
+            )
+            // Neutral row click opens the ViewAction slideOver instead of navigating to full page.
+            ->recordUrl(null)
+            ->recordAction('view')
             ->filters([
-                Tables\Filters\SelectFilter::make('category_id')
+                SelectFilter::make('category_id')
                     ->label('Категорії')
                     ->relationship('category', 'name')
                     ->multiple()
                     ->preload(),
-                Tables\Filters\SelectFilter::make('brand')
+
+                SelectFilter::make('brand')
                     ->label('Бренди')
-                    ->options(fn (): array => \App\Models\Product::query()
+                    ->options(fn (): array => Product::query()
                         ->distinct()
                         ->orderBy('brand')
                         ->whereNotNull('brand')
                         ->pluck('brand', 'brand')
                         ->toArray())
                     ->multiple(),
-                Tables\Filters\SelectFilter::make('status')
+
+                SelectFilter::make('status')
                     ->label('Статус')
                     ->placeholder('Всі')
                     ->options([
-                        'active'   => 'Тільки активні',
+                        'active' => 'Тільки активні',
                         'inactive' => 'Тільки неактивні',
                     ])
                     ->default('active')
-                    ->query(function (\Illuminate\Database\Eloquent\Builder $query, array $data): \Illuminate\Database\Eloquent\Builder {
+                    ->query(function (Builder $query, array $data): Builder {
                         return match ($data['value'] ?? null) {
-                            'active'   => $query->where('is_active', true),
+                            'active' => $query->where('is_active', true),
                             'inactive' => $query->where('is_active', false),
-                            default    => $query,
+                            default => $query,
                         };
                     }),
+
+                // Availability filter — uses same net-qty calculation as the column and infolist.
+                // Status buckets: У наявності / Очікується / Немає в наявності.
+                // NOTE: Follow-up 1 — migrate to AvailabilityResolver when implemented.
+                SelectFilter::make('availability')
+                    ->label('Наявність')
+                    ->placeholder('Всі')
+                    ->options([
+                        'in_stock' => AdminAvailabilityPresenter::BUCKET_IN_STOCK,
+                        'expected' => AdminAvailabilityPresenter::BUCKET_EXPECTED,
+                        'out_of_stock' => AdminAvailabilityPresenter::BUCKET_OUT_OF_STOCK,
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        $netQty = AdminAvailabilityPresenter::netQtySql();
+                        $expectedDate = AdminAvailabilityPresenter::earliestExpectedDateSql();
+
+                        return match ($data['value'] ?? null) {
+                            'in_stock' => $query->whereRaw("{$netQty} > 0"),
+                            'expected' => $query->whereRaw("{$netQty} <= 0")
+                                ->whereRaw("{$expectedDate} IS NOT NULL"),
+                            'out_of_stock' => $query->whereRaw("{$netQty} <= 0")
+                                ->whereRaw("{$expectedDate} IS NULL"),
+                            default => $query,
+                        };
+                    }),
+
+                SelectFilter::make('tags')
+                    ->label('Теги')
+                    ->relationship('tags', 'name')
+                    ->multiple()
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('merchant_type')
+                    ->label('Внутрішній тип товару')
+                    ->options(fn (): array => Product::query()
+                        ->distinct()
+                        ->orderBy('merchant_type')
+                        ->whereNotNull('merchant_type')
+                        ->where('merchant_type', '!=', '')
+                        ->pluck('merchant_type', 'merchant_type')
+                        ->toArray())
+                    ->multiple(),
             ])
-            ->actions([])
-            ->bulkActions([]);
+            ->recordActions([
+                ViewAction::make()
+                    ->extraAttributes(['class' => 'bp-admin-row-view-action-hidden'])
+                    ->slideOver()
+                    ->extraModalFooterActions(fn (Product $record) => [
+                        Action::make('open_full_page_footer')
+                            ->label('Відкрити повну картку')
+                            ->icon('heroicon-m-arrow-top-right-on-square')
+                            ->color('gray')
+                            ->url(static::getUrl('view', ['record' => $record])),
+                    ]),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    self::makeTagBulkAction(
+                        operation: TagBulkOperation::Add,
+                        name: 'add_tags',
+                        label: 'Додати теги',
+                        icon: 'heroicon-o-plus-circle',
+                        successTitle: 'Теги додано',
+                        failureTitle: 'Не вдалося додати теги',
+                    ),
+                    self::makeTagBulkAction(
+                        operation: TagBulkOperation::Remove,
+                        name: 'remove_tags',
+                        label: 'Видалити теги',
+                        icon: 'heroicon-o-minus-circle',
+                        successTitle: 'Теги видалено',
+                        failureTitle: 'Не вдалося видалити теги',
+                    ),
+                ]),
+            ]);
     }
 
     // -------------------------------------------------------------------------
     // Eager loading
     // -------------------------------------------------------------------------
 
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['variants.stocks', 'variants.prices', 'category']);
+            ->with(['variants.stocks', 'category', 'tags']);
     }
 
     // -------------------------------------------------------------------------
@@ -451,19 +551,101 @@ class ProductResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListProducts::route('/'),
-            'view'  => Pages\ViewProduct::route('/{record}'),
+            'index' => ListProducts::route('/'),
+            'view' => ViewProduct::route('/{record}'),
+            'edit' => EditProduct::route('/{record}/edit'),
         ];
     }
 
-    public static function canCreate(): bool
-    {
-        return false;
-    }
+    // -------------------------------------------------------------------------
+    // Bulk tag actions
+    // -------------------------------------------------------------------------
 
-    public static function canDelete($record): bool
-    {
-        return false;
+    private static function makeTagBulkAction(
+        TagBulkOperation $operation,
+        string $name,
+        string $label,
+        string $icon,
+        string $successTitle,
+        string $failureTitle,
+    ): BulkAction {
+        return BulkAction::make($name)
+            ->label($label)
+            ->icon($icon)
+            ->schema([
+                Select::make('tag_ids')
+                    ->label('Теги')
+                    ->multiple()
+                    ->required()
+                    ->options(fn (): array => Tag::withoutWorkspaceScope()
+                        ->where('workspace_id', app(WorkspaceContext::class)->id())
+                        ->orderBy('name')
+                        ->pluck('name', 'id')
+                        ->all())
+                    ->searchable()
+                    ->preload()
+                    ->live(),
+                Placeholder::make('bulk_preview')
+                    ->label('Попередній перегляд')
+                    ->content(function (Get $get, ListProducts $livewire) use ($operation): string {
+                        $tagIds = $get('tag_ids') ?? [];
+
+                        if ($tagIds === []) {
+                            return 'Оберіть теги для попереднього перегляду.';
+                        }
+
+                        $productIds = $livewire->getSelectedTableRecords()->modelKeys();
+
+                        if ($productIds === []) {
+                            return 'Оберіть товари для попереднього перегляду.';
+                        }
+
+                        try {
+                            $metrics = TagBulkUi::assignmentService()->preview(
+                                app(WorkspaceContext::class)->id(),
+                                $productIds,
+                                $tagIds,
+                                $operation,
+                            );
+
+                            return TagBulkUi::formatPreviewText($metrics);
+                        } catch (InvalidTagBulkSelectionException $exception) {
+                            return $exception->getMessage();
+                        }
+                    })
+                    ->visible(fn (Get $get): bool => filled($get('tag_ids'))),
+            ])
+            ->action(function (Collection $records, array $data, ListProducts $livewire) use ($operation, $successTitle, $failureTitle): void {
+                $workspaceId = app(WorkspaceContext::class)->id();
+                $productIds = $livewire->getSelectedTableRecords()->modelKeys();
+                $tagIds = $data['tag_ids'] ?? [];
+
+                try {
+                    $metrics = TagBulkUi::assignmentService()->apply(
+                        $workspaceId,
+                        $productIds,
+                        $tagIds,
+                        $operation,
+                    );
+                } catch (InvalidTagBulkSelectionException $exception) {
+                    Notification::make()
+                        ->danger()
+                        ->title($failureTitle)
+                        ->body($exception->getMessage())
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                Notification::make()
+                    ->success()
+                    ->title($successTitle)
+                    ->body(TagBulkUi::formatResultNotification($metrics))
+                    ->send();
+
+                $livewire->deselectAllTableRecords();
+            })
+            ->deselectRecordsAfterCompletion(false);
     }
 
     // -------------------------------------------------------------------------
@@ -483,12 +665,11 @@ SVG;
     }
 
     /**
-     * HTML for the "no image" placeholder — styled to match other infolist/form fields
-     * (rounded border, muted background, consistent with Filament's field appearance).
+     * HTML for the "no image" placeholder — styled to match other infolist/form fields.
      */
     public static function buildPhotoPlaceholderHtml(): string
     {
-        return <<<HTML
+        return <<<'HTML'
 <div style="display:inline-flex; align-items:center; justify-content:center; width:200px; height:200px;
             border-radius:8px; border:1px solid #e5e7eb; background:#f9fafb; color:#9ca3af;">
     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
@@ -510,7 +691,7 @@ HTML;
         }
 
         $safe = e($url);
-        $alt  = e($record->name);
+        $alt = e($record->name);
 
         return <<<HTML
 <a href="{$safe}" target="_blank" rel="noopener" title="Відкрити у новій вкладці">
@@ -537,7 +718,7 @@ HTML;
         }
 
         $safe = e($url);
-        $alt  = e($record->name);
+        $alt = e($record->name);
 
         return <<<HTML
 <a href="{$safe}" target="_blank" rel="noopener noreferrer" title="Відкрити у новій вкладці">
@@ -552,5 +733,15 @@ HTML;
 </a>
 <span style="display:block; margin-top:4px; font-size:11px; color:#9ca3af;">🔍 Відкрити фото</span>
 HTML;
+    }
+
+    public static function getCreateAuthorizationResponse(): Response
+    {
+        return Response::deny();
+    }
+
+    public static function getDeleteAuthorizationResponse(Model $record): Response
+    {
+        return Response::deny();
     }
 }

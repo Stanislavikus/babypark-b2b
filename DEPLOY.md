@@ -1,17 +1,314 @@
 # Deployment Guide — DigitalOcean
 
-This guide covers deploying **BabyPark B2B** on DigitalOcean using a single Droplet with Docker Compose.  
-For managed databases and production hardening, see the sections below.
+This repository documents **two deployment families**. Read the section that matches
+your environment — they are not interchangeable.
+
+| Section | When to use |
+|---------|-------------|
+| **[Current Supervisor-based pilot deployment](#current-supervisor-based-pilot-deployment)** | **Active today** for the Babypark pilot: bare Ubuntu host, native PHP, MySQL, `database` queue driver, Supervisor-managed default worker (`babypark-queue`) and dedicated connector worker (`babypark-connector-queue`), repo-root `deploy.sh`. Connector Discovery is production-operational on the Babypark pilot (worker verified `RUNNING` and one successful manual UI Discovery completed 2026-08-15). |
+| **[Docker Compose reference deployment](#docker-compose-reference-deployment)** | Local full-stack parity and a possible future containerized layout. **Not** the current pilot's actual production setup (user-confirmed: production host does not run `docker compose`). |
 
 ---
 
-## Architecture Overview
+## Current Supervisor-based pilot deployment
+
+The Babypark pilot runs on a bare host (not Docker Compose). Two separate
+Supervisor queue workers are required and are both installed on the pilot host:
+`babypark-queue` (default lane) and `babypark-connector-queue` (connector lane).
+The default worker was verified `RUNNING` on 2026-07-31 (reconfirmed after
+GAP-026B cutover 2026-08-14). The dedicated connector worker was installed and
+verified `RUNNING` on 2026-08-15; Connector Discovery is production-operational
+on the Babypark pilot. Deploys use the repo-root `deploy.sh` script run directly
+on the server.
+
+### Architecture overview (pilot)
+
+```
+Internet → Nginx → PHP-FPM (Laravel, /var/www/babypark-b2b)
+                    ├── MySQL 8 (native or managed)
+                    ├── Cache / locks (`database` store — verified on pilot host 2026-07-31)
+                    ├── Supervisor: babypark-queue (default connection, short jobs)
+                    └── Supervisor: babypark-connector-queue (database_connectors / connectors lane — verified RUNNING 2026-08-15)
+```
+
+### Application path
+
+Typical checkout path (adjust if your host differs):
+
+```text
+/var/www/babypark-b2b
+```
+
+### Deploy (pilot)
+
+On the server, from the application directory:
+
+```bash
+cd /var/www/babypark-b2b
+./deploy.sh
+```
+
+`deploy.sh` checks out the explicitly authorized `origin/develop` SHA, runs
+`composer install --no-dev`, `npm ci`, `npm run build`, migrations, the additive
+canonical Workspace RBAC permission catalogue sync, `php artisan optimize:clear`,
+and **`php artisan queue:restart`** while the application remains in maintenance mode.
+
+**`queue:restart` dependencies (must be true on the host):**
+
+1. **Shared cache store** — restart signals are delivered through the cache layer.
+   The pilot host uses the `database` cache/lock store (`cache` + `cache_locks`
+   tables), verified on 2026-07-31 via `php artisan config:show cache`.
+2. **Supervisor `autorestart=true`** — each worker must exit gracefully after
+   `queue:restart` and be restarted by Supervisor (`babypark-queue` and
+   `babypark-connector-queue`).
+
+### Queue workers (pilot)
+
+Two separate workers are required for connector discovery execution — they must
+never be merged into one process. On the Babypark pilot host both workers are
+installed and verified `RUNNING` (connector worker activation completed
+2026-08-15).
+
+| Supervisor program | Status | Queue connection | Queue name | Worker command |
+|--------------------|--------|------------------|------------|----------------|
+| `babypark-queue` | **RUNNING** (verified 2026-08-15) | `database` (default) | `default` | *(read from `/etc/supervisor/conf.d/babypark-queue.conf` — illustrative only: `php artisan queue:work --sleep=3 --tries=3 --max-time=3600`)* |
+| `babypark-connector-queue` | **RUNNING** (verified 2026-08-15) | `database_connectors` | `connectors` | `/usr/bin/php /var/www/babypark-b2b/artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600` |
+
+Connection-check jobs stay on the **default** lane (45s job timeout, 90s
+`retry_after`). Discovery jobs use the **connector** lane (900s job
+timeout, 1200s `retry_after`). Both share the same account-level
+`WithoutOverlapping` lock key via the cache store.
+
+### Livewire 4 endpoint prefix (GAP-024 PR4)
+
+Livewire 4 serves update/upload endpoints under a hashed prefix derived from
+`APP_KEY`, for example `/livewire-{hash}/update` rather than the fixed
+`/livewire/update` path used in Livewire 3.
+
+- The hash depends on `APP_KEY`; rotating the key changes the prefix.
+- External WAF, CDN, or reverse-proxy allowlists must not assume the old fixed
+  `/livewire/*` paths.
+- The repository Nginx config uses generic front-controller routing and needs no
+  functional change for this behavior; verify any **host-level** rules outside the
+  repo if Livewire requests fail after upgrade.
+
+Ensure the `pcntl` PHP extension is installed (`php -m | grep -i '^pcntl$'`).
+
+### Verified current pilot state (post-GAP-024 PR4, 2026-08-09)
+
+Read-only verification on the pilot host after the GAP-024 framework migration
+programme (PR1–PR4). These facts are recorded here so repository tooling and CI
+assumptions align with the live deployment baseline.
+
+| Runtime | Verified value |
+|---------|----------------|
+| PHP CLI | 8.3.6 |
+| PHP-FPM | 8.3.6 |
+| Supervisor queue worker PHP binary | `/usr/bin/php8.3` |
+| `pcntl` | present |
+| Node.js | v22.22.2 |
+| npm | 10.9.7 |
+
+The main Supervisor queue worker (`babypark-queue`) was confirmed running.
+`babypark-connector-queue` was verified absent on the pilot host on 2026-08-14
+(historical) and installed/verified `RUNNING` on 2026-08-15 — see
+[Connector-worker production activation](#connector-worker-production-activation-completed-2026-08-15).
+
+A separate smoke checkout exists at `/var/www/babypark-b2b-smoke`. For the
+**2026-08-15 connector-worker production activation smoke baseline** it was
+synchronized to `1f0a106420fa82ac0ec4ce305ba32d7e7532d3d9` — a point-in-time
+activation baseline, not a claim about current `develop` HEAD. A two-pass real Adobe Commerce smoke Discovery succeeded on that baseline before permanent production activation completed. PHPUnit dev tooling and `pdo_sqlite` / `sqlite3`
+are available for CLI smoke runs.
+
+### Verified current pilot state (2026-07-31)
+
+Host-prerequisite verification was completed on 2026-07-31 using read-only commands
+on the pilot host.
+
+**Active production cache store** (`php artisan config:show cache`):
+
+- default: `database`
+- `stores.database.connection`: `null` (→ default DB connection)
+- `stores.database.lock_connection`: `null` (→ same DB connection, per
+  `Illuminate\Cache\CacheManager::createDatabaseDriver` in installed
+  `laravel/framework` v13.24.0: `$config['lock_connection'] ?? $config['connection'] ?? null`)
+- `stores.database.lock_table`: `null` (→ falls back to `cache_locks`, per the same
+  source: `$config['lock_table'] ?? 'cache_locks'`)
+
+**Cache tables confirmed present:**
+
+- `cache`: columns `key` (varchar 255), `value` (mediumtext), `expiration` (int);
+  primary key on `key`
+- `cache_locks`: columns `key` (varchar 255), `owner` (varchar 255),
+  `expiration` (int); primary key on `key`
+
+**Existing Supervisor worker:**
+
+- `babypark-queue` registered as `babypark-queue:babypark-queue_00` (due to
+  `process_name` templating), confirmed `RUNNING`
+- Supervisor `user`: `root` (from existing `babypark-queue.conf`)
+
+**PHP path:**
+
+- `command -v php` on the host resolves to `/usr/bin/php`
+- The live `babypark-queue.conf` currently contains
+  `command=php /var/www/babypark-b2b/artisan queue:work ...` (bare `php`, resolved
+  via `PATH` at runtime), **not** the absolute path
+- The live `babypark-connector-queue.conf` uses the verified absolute path
+  `/usr/bin/php` in its `command=` line (installed 2026-08-15)
+
+**`pcntl`:** installed (`php -m | grep -i '^pcntl$'` confirms `pcntl`)
+
+### Connector-worker production activation (completed 2026-08-15)
+
+On **2026-08-15** the Babypark pilot completed permanent `babypark-connector-queue`
+Supervisor activation and verified Connector Discovery end-to-end in production.
+
+**Worker installation and lane verification**
+
+- installed Supervisor program `babypark-connector-queue` and confirmed `RUNNING`;
+- verified dedicated command:
+  `/usr/bin/php /var/www/babypark-b2b/artisan queue:work database_connectors --queue=connectors --sleep=3 --tries=3 --timeout=900 --max-time=3600`;
+- verified production config: `APP_ENV=production`, database `babypark_b2b`,
+  connector queue `connectors`, `database_connectors.retry_after=1200`;
+- verified `babypark-queue` remains separately `RUNNING` on the default lane;
+- verified `php artisan queue:restart` caused both Supervisor workers to exit and
+  restart successfully with new PIDs (`autorestart=true`).
+
+**Manual Discovery enablement and production smoke**
+
+- enabled `CONNECTOR_DISCOVERY_MANUAL_TRIGGER_ENABLED=true` only after worker
+  verification;
+- executed one real merchant UI manual Discovery (`Отримати поля`) against Adobe
+  Commerce in production;
+- persisted discovery evidence:
+  - `RUN=a281b181-f478-4b0b-8c7d-295c26265020`
+  - `TRIGGER=manual`
+  - `STATUS=succeeded`
+  - `ATTEMPTS=1`
+  - `SNAPSHOT=a281b185-7618-4ce1-9c48-9ba5c8c87fca`
+  - `ERROR=NULL`
+  - `CONNECTOR_JOBS=0`
+  - `FAILED_JOBS=0`
+- dedicated worker log recorded:
+  `ConnectorDiscoveryRunJob ... RUNNING` then `ConnectorDiscoveryRunJob ... 832.26ms DONE`.
+
+**Historical:** on 2026-08-14 the dedicated worker was verified absent before
+installation. Connector Discovery is now production-operational on the Babypark
+pilot.
+
+**Next repository task:** Task **4C-1c-2b** (Layer B mapping UI) — authorization
+prerequisite satisfied (GAP-026B production cutover 2026-08-14).
+
+### GAP-026B one-time Workspace RBAC cutover
+
+> **Babypark pilot status:** one-time GAP-026B maintenance-window cutover **completed successfully on 2026-08-14** against commit `fb2c5a7a3f8a521a2bfca7583e57d1ae83e95bc9`.
+> Post-cutover: 7 canonical permissions; 1 default workspace; 1 effective
+> `manage_workspace_access` holder; 0 legacy Spatie assignments; maintenance mode OFF;
+> `babypark-queue` RUNNING after restart. The procedure below remains the operational
+> runbook for other environments.
+
+**Ordinary recurring deployment** (`./deploy.sh`) is **not** sufficient for the one-time
+GAP-026B workspace RBAC authority cutover and must **not** be used to expose GAP-026B-2
+authority-switching code to merchant traffic before cutover completion.
+
+Current `deploy.sh` runs migrations and additively synchronizes the canonical
+`workspace_permissions` catalogue with `WorkspaceRbacPermissionSeeder`. It does
+**not** run legacy backfill, alter role/user assignments, perform anti-lockout
+validation, or run cutover smoke checks. Do **not** silently turn every future deploy
+into a backfill attempt.
+
+**Repository merge ≠ production cutover.** Merging GAP-026B implementation into
+`develop` does not by itself activate workspace-permission authority in production.
+Activation requires the controlled one-time sequence documented in
+`docs/03-DOMAIN_MODEL.md` → **Workspace RBAC authority cutover (Resolved —
+GAP-026B-0, 2026-08-13)**.
+
+**Slice ownership (frozen)**
+
+- **CHECK-ONLY** — available from GAP-026B-1 (diagnostics only; no RBAC
+  assignment/materialization).
+- **EXECUTE** — ships only with GAP-026B-2 together with authority-switching runtime.
+  Production legacy backfill is structurally unavailable in a B-1-only release.
+
+**First B-2 production deployment = maintenance-window cutover**
+
+The first production deployment containing GAP-026B-2 authority-switching code must be
+this maintenance-window cutover deployment — not an ordinary `./deploy.sh` followed by
+later EXECUTE. Merchant traffic remains blocked from B-2 deployment through successful
+EXECUTE + anti-lockout validation + smoke verification. Pre-EXECUTE B-2 authority must
+never fall back to legacy roles.
+
+**One-time maintenance-window sequence (summary)**
+
+1. verified DB backup / snapshot;
+2. maintenance mode / block merchant writes;
+3. deploy the **complete** approved GAP-026B-1 + GAP-026B-2 authority-changing cutover
+   runtime while traffic is already blocked;
+4. run pending migrations;
+5. seed canonical `workspace_permissions` catalogue (`WorkspaceRbacPermissionSeeder`);
+6. run guarded RBAC cutover **CHECK-ONLY** via `php artisan workspace-rbac:cutover-check` (diagnostic/read-only; no assignments);
+7. if safe: **EXECUTE** deterministic legacy backfill (B-2 only);
+8. fresh anti-lockout validation;
+9. focused authorization/cutover smoke checks;
+10. clear/reload application state; restart queue workers;
+11. resume traffic.
+
+Failure at any preflight/smoke step: remain blocked for merchant writes; no partial
+authority fallback; no role-based Connector/Tax/Mapping fallback; reconcile while
+traffic remains blocked — not via authority fallback.
+
+**Cutover command contract**
+
+Implementation must provide a guarded one-time command/service with:
+
+- **CHECK-ONLY (B-1)** — `php artisan workspace-rbac:cutover-check`; diagnostic/read-only;
+  no RBAC assignments/materialization; may run before maintenance; may ship in a
+  B-1-only release. EXECUTE remains unavailable until GAP-026B-2.
+- **EXECUTE (B-2)** — `php artisan workspace-rbac:cutover-execute`; requires Laravel
+  maintenance mode; re-runs `WorkspaceRbacLegacyPreflight::assertSafe()`; invokes
+  `WorkspaceRbacLegacyBackfill::execute()` with deterministic merchant-safe bootstrap
+  display names; post-backfill `WorkspaceAccessEffectiveHolderQuery` anti-lockout
+  validation; fails non-zero on unsafe state or zero effective holders.
+
+Do **not** introduce persistent activation flags, marker tables, legacy/new authority
+selectors, or dual-authority policy modes to enforce this boundary.
+
+Implemented CHECK-ONLY command: `php artisan workspace-rbac:cutover-check`. This command
+wraps `WorkspaceRbacLegacyPreflight::evaluate()` only; it never invokes
+`WorkspaceRbacLegacyBackfill::execute()`.
+
+Implemented EXECUTE command: `php artisan workspace-rbac:cutover-execute`. This command
+refuses outside maintenance mode, runs preflight via `assertSafe()`, invokes backfill,
+then validates effective `manage_workspace_access` holders. It is separate from CHECK
+and exposes no `--apply` flag.
+
+**Queue worker quiescence**
+
+Because queue workers are long-running, verify no concurrent affected mutation during
+cutover. Maintenance mode plus worker quiescence/restart must be verified against the
+actual pilot Supervisor configuration (`babypark-queue` today). After cutover steps
+complete, ensure `php artisan queue:restart` (or Supervisor restart) so workers reload
+authorization state.
+
+---
+
+## Docker Compose reference deployment
+
+> **Reference only** — illustrates a containerized layout for local development and
+> possible future use. **Not** the Babypark pilot's current production mechanism.
+
+This guide covers deploying **BabyPark B2B** on DigitalOcean using a single Droplet with Docker Compose.
+For managed databases and production hardening, see the sections below.
+
+### Architecture Overview
 
 ```
 Internet → Nginx (port 80/443) → PHP-FPM (Laravel)
                                   ├── MySQL 8  (Docker volume)
                                   ├── Redis 7  (Docker volume)
-                                  ├── Queue worker (artisan queue:work)
+                                  ├── Queue worker (artisan queue:work — default lane)
+                                  ├── Connector queue worker (database_connectors / connectors lane)
                                   └── Scheduler (artisan schedule:run every 60s)
 ```
 

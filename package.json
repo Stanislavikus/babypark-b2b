@@ -1,17 +1,21 @@
 {
     "private": true,
     "type": "module",
+    "engines": {
+        "node": ">=22 <23"
+    },
     "scripts": {
         "build": "vite build",
         "dev": "vite"
     },
     "devDependencies": {
-        "autoprefixer": "^10.4.20",
+        "@tailwindcss/vite": "^4.3.3",
         "axios": "^1.7.4",
         "concurrently": "^9.0.1",
         "laravel-vite-plugin": "^1.2.0",
-        "postcss": "^8.4.47",
-        "tailwindcss": "^3.4.13",
+        "playwright": "^1.62.1",
+        "sharp": "^0.35.3",
+        "tailwindcss": "^4.3.3",
         "vite": "^6.0.11"
     }
 }

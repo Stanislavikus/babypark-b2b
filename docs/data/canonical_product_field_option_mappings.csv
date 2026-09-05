@@ -1,0 +1,13 @@
+option_mapping_id,option_id,channel,external_option_value,mapping_type,applicability_id,channel_schema_version,verification_status,evidence_subject_key
+om001,o001,google_merchant,new,direct,a006,unversioned,verified,option_mapping:om001
+om002,o002,google_merchant,used,direct,a006,unversioned,verified,option_mapping:om002
+om003,o003,google_merchant,refurbished,direct,a006,unversioned,verified,option_mapping:om003
+om004,o001,schema_org,NewCondition,renamed,a006,unversioned,partially_verified,option_mapping:om004
+om005,o009,google_merchant,newborn,direct,a029,unversioned,verified,option_mapping:om005
+om006,o010,google_merchant,infant,direct,a029,unversioned,verified,option_mapping:om006
+om007,o011,google_merchant,toddler,direct,a029,unversioned,verified,option_mapping:om007
+om008,o012,google_merchant,kids,direct,a029,unversioned,verified,option_mapping:om008
+om009,o013,google_merchant,adult,direct,a029,unversioned,verified,option_mapping:om009
+om010,o014,google_merchant,female,direct,a030,unversioned,verified,option_mapping:om010
+om011,o015,google_merchant,male,direct,a030,unversioned,verified,option_mapping:om011
+om012,o016,google_merchant,unisex,direct,a030,unversioned,verified,option_mapping:om012
