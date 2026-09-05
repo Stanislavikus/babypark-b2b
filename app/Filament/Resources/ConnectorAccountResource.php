@@ -198,6 +198,7 @@ class ConnectorAccountResource extends Resource
                                 'record' => $record,
                                 'uiState' => $uiState,
                                 'showActiveConnectionCheck' => static::actorCanManageConnectorAccounts(),
+                                'useMagentoOverviewConnectedCopy' => $record->connectorDefinition?->code === 'adobe_commerce',
                             ]),
                         ViewEntry::make('store_setup')
                             ->label('')
@@ -403,21 +404,31 @@ class ConnectorAccountResource extends Resource
         return true;
     }
 
-    /** @return array{syncConfigurationId: ?string, canConfigureSync: bool, canCreatePreview: bool, connectionEvidenceLoaded: bool, connectionEvidence: ?array} */
+    /** @return array{syncConfigurationId: ?string, canConfigureSync: bool, canCreatePreview: bool, canManageSyncConfiguration: bool, canRunPreview: bool} */
     private static function overviewViewData(ConnectorAccount $record): array
     {
         $configuration = app(SyncConfigurationLookupService::class)->findProductsDefaultContext($record);
         $user = auth()->user();
         $workspace = $record->workspace ?? Workspace::query()->findOrFail($record->workspace_id);
 
+        $setupAuthorization = app(AdobeProductExportSetupAuthorizationService::class);
+        $previewAuthorization = app(AdobeProductsExportPreviewAuthorizationService::class);
+        $canManageSyncConfiguration = $user instanceof User
+            && $setupAuthorization->canAccess($user, $workspace);
+        $canRunPreview = $user instanceof User
+            && $previewAuthorization->canAccess($user, $workspace);
+
         try {
-            $canConfigure = $user instanceof User && app(AdobeProductExportSetupAuthorizationService::class)
-                ->isEligibleAdobeProductsExportSetupTarget($user, $workspace, $record->getKey());
-            $canPreview = $user instanceof User && $configuration !== null
-                && app(AdobeProductsExportPreviewAuthorizationService::class)
-                    ->isEligiblePreviewTarget($user, $workspace, $record->getKey());
+            $canConfigure = $canManageSyncConfiguration
+                && $setupAuthorization->isEligibleAdobeProductsExportSetupTarget($user, $workspace, $record->getKey());
         } catch (\Throwable) {
             $canConfigure = false;
+        }
+
+        try {
+            $canPreview = $canRunPreview && $configuration !== null
+                && $previewAuthorization->isEligiblePreviewTarget($user, $workspace, $record->getKey());
+        } catch (\Throwable) {
             $canPreview = false;
         }
 
@@ -425,10 +436,8 @@ class ConnectorAccountResource extends Resource
             'syncConfigurationId' => $configuration?->getKey(),
             'canConfigureSync' => $canConfigure,
             'canCreatePreview' => $canPreview,
-            'connectionEvidenceLoaded' => true,
-            'connectionEvidence' => static::actorCanManageConnectorAccounts()
-                ? $record->connectionChecks()->where('status', ConnectorConnectionCheckStatus::Succeeded)->latest('finished_at')->value('safe_message_parameters')
-                : null,
+            'canManageSyncConfiguration' => $canManageSyncConfiguration,
+            'canRunPreview' => $canRunPreview,
         ];
     }
 }

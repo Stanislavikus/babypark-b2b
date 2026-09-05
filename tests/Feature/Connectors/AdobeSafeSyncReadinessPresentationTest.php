@@ -14,7 +14,7 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
 
         $this->assertNotFalse($view);
         $this->assertStringContainsString('connectors.ui.layer_a.check_does_not_mutate', $view);
-        $this->assertStringContainsString('connectors.ui.layer_a.what_we_checked_heading', $view);
+        $this->assertStringNotContainsString('connectors.ui.layer_a.what_we_checked_heading', $view);
         $this->assertStringNotContainsString('Перевірка не змінює дані в Magento.', $view);
         $this->assertStringNotContainsString('ЩО МИ ПЕРЕВІРИЛИ', $view);
 
@@ -31,7 +31,7 @@ class AdobeSafeSyncReadinessPresentationTest extends TestCase
             $this->assertStringNotContainsString($forbidden, $view);
         }
 
-        $this->assertStringContainsString('connectors.ui.layer_a.status.not_checked', $view);
+        $this->assertStringNotContainsString('connectors.ui.layer_a.status.not_checked', $view);
     }
 
     #[Test]

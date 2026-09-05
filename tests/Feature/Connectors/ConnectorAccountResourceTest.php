@@ -18,13 +18,16 @@ use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
 use App\Filament\Resources\ConnectorAccountResource\RelationManagers\ConnectionChecksRelationManager;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorConnectionCheck;
+use App\Models\ConnectorDefinition;
 use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
 use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
+use App\Services\Sync\AdobeProductsExportPreviewAuthorizationService;
 use App\Support\Connectors\AdobePaaS\AdobePaaSCredentialMapper;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
+use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -79,21 +82,51 @@ class ConnectorAccountResourceTest extends TestCase
         $this->app->instance(ConnectorConnectionCheckDispatchService::class, $stub);
     }
 
-    private function bindAdobeExportSetupAuthorizationStub(bool $eligible = false): void
+    private function bindAdobeExportSetupAuthorizationStub(bool $eligible = false, bool $canAccess = false): void
     {
         $this->app->instance(
             AdobeProductExportSetupAuthorizationService::class,
-            new class($eligible)
+            new class($eligible, $canAccess)
             {
                 public function __construct(
                     private readonly bool $eligible,
+                    private readonly bool $canAccess,
                 ) {}
+
+                public function canAccess(User $actor, Workspace $workspace): bool
+                {
+                    return $this->canAccess;
+                }
 
                 public function isEligibleAdobeProductsExportSetupTarget(
                     User $actor,
                     Workspace $workspace,
                     string $connectorAccountId,
                 ): bool {
+                    return $this->eligible;
+                }
+            },
+        );
+    }
+
+    private function bindAdobePreviewAuthorizationStub(bool $eligible, bool $canAccess = true): void
+    {
+        $this->app->instance(
+            AdobeProductsExportPreviewAuthorizationService::class,
+            new class($eligible, $canAccess)
+            {
+                public function __construct(
+                    private readonly bool $eligible,
+                    private readonly bool $canAccess,
+                ) {}
+
+                public function canAccess(User $actor, Workspace $workspace): bool
+                {
+                    return $this->canAccess;
+                }
+
+                public function isEligiblePreviewTarget(User $actor, Workspace $workspace, string $connectorAccountId): bool
+                {
                     return $this->eligible;
                 }
             },
@@ -492,98 +525,207 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
-    public function connector_account_overview_copy_is_truthful_and_does_not_claim_untested_evidence(): void
+    public function healthy_overview_shows_connection_confidence_without_certification_rows_or_counts(): void
     {
+        $previousLocale = App::getLocale();
+        App::setLocale('uk');
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount(overrides: [
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
             'last_successful_check_at' => now(),
-            'last_successful_discovery_at' => null,
+            'last_successful_discovery_at' => now(),
         ]);
-
-        Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertSee(__('connectors.ui.layer_a.check_does_not_mutate'))
-            ->assertSee(__('connectors.ui.layer_a.what_we_checked_heading'))
-            ->assertSee(__('connectors.ui.layer_a.catalog.label'))
-            ->assertSee(__('connectors.ui.layer_a.status.needs_attention'))
-            ->assertSee(__('connectors.ui.layer_a.fields.label'))
-            ->assertSee(__('connectors.ui.layer_a.images.label'))
-            ->assertSee(__('connectors.ui.layer_a.status.not_checked'))
-            ->assertSee(__('connectors.ui.layer_a.last_successful_check').':');
-    }
-
-    #[Test]
-    public function connector_account_overview_does_not_claim_catalog_access_without_catalog_total_count_evidence(): void
-    {
-        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
-        $account = $this->createConnectorAccount(overrides: [
-            'last_successful_check_at' => now(),
-        ]);
-
-        $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Succeeded, [
-            'safe_message_parameters' => [],
-            'finished_at' => now(),
-        ]);
-
-        Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee(__('connectors.ui.layer_a.catalog.label'))
-            ->assertSee(__('connectors.ui.layer_a.status.needs_attention'))
-            ->assertDontSee(__('connectors.ui.layer_a.status.access_confirmed'))
-            ->assertSee(__('connectors.ui.layer_a.last_successful_check').':');
-    }
-
-    #[Test]
-    public function connector_account_overview_presents_empty_catalog_state_when_count_is_zero(): void
-    {
-        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
-        $account = $this->createConnectorAccount(overrides: [
-            'last_successful_check_at' => now(),
-        ]);
-
-        $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Succeeded, [
-            'safe_message_parameters' => [
-                'catalog_total_count' => 0,
-            ],
-            'finished_at' => now(),
-        ]);
-
-        Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee(__('connectors.ui.layer_a.status.access_confirmed'))
-            ->assertSee(__('connectors.ui.layer_a.catalog.empty'));
-    }
-
-    #[Test]
-    public function connector_account_overview_presents_catalog_product_count_when_known(): void
-    {
-        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
-        $account = $this->createConnectorAccount(overrides: [
-            'last_successful_check_at' => now(),
-        ]);
-
         $this->createConnectionCheck($account, ConnectorConnectionCheckStatus::Succeeded, [
             'safe_message_parameters' => [
                 'catalog_total_count' => 19,
+                'images_access_confirmed' => true,
             ],
             'finished_at' => now(),
         ]);
 
-        Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee(__('connectors.ui.layer_a.status.access_confirmed'))
-            ->assertSee(__('connectors.ui.layer_a.catalog.found_count', ['count' => 19]));
+        try {
+            Livewire::actingAs($admin)
+                ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
+                ->assertSee(__('connectors.ui.layer_a.status.connected'))
+                ->assertSee('Перевірено')
+                ->assertSee(__('connectors.ui.layer_a.check_does_not_mutate'))
+                ->assertDontSee(__('connectors.ui.layer_a.what_we_checked_heading'))
+                ->assertDontSee(__('connectors.ui.layer_a.catalog.label'))
+                ->assertDontSee(__('connectors.ui.layer_a.fields.label'))
+                ->assertDontSee(__('connectors.ui.layer_a.images.label'))
+                ->assertDontSee('Поля потребують уваги')
+                ->assertDontSee('Виконати першу синхронізацію')
+                ->assertDontSee('Синхронізація працює')
+                ->assertDontSee(__('connectors.ui.layer_a.catalog.found_count', ['count' => 19]));
+        } finally {
+            App::setLocale($previousLocale);
+        }
     }
 
     #[Test]
-    public function connector_account_overview_shows_fields_link_when_sync_configuration_exists(): void
+    public function non_adobe_account_detail_keeps_shared_connected_vocabulary(): void
     {
+        $previousLocale = App::getLocale();
+        App::setLocale('uk');
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $shopify = ConnectorDefinition::query()->where('code', 'shopify')->firstOrFail();
         $account = $this->createConnectorAccount(overrides: [
-            'last_successful_discovery_at' => now(),
+            'connector_definition_id' => $shopify->id,
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
         ]);
 
+        try {
+            Livewire::actingAs($admin)
+                ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+                ->assertSee(__('connectors.enums.account_connection_status.connected'))
+                ->assertDontSee(__('connectors.ui.layer_a.status.connected'));
+        } finally {
+            App::setLocale($previousLocale);
+        }
+    }
+
+    #[Test]
+    public function authorized_setup_actor_gets_exactly_one_setup_cta(): void
+    {
+        $this->bindAdobeExportSetupAuthorizationStub(eligible: true, canAccess: true);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+
+        $html = Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSee(__('connectors.ui.layer_a.next_step.configure'))
+            ->assertDontSee(__('connectors.ui.layer_a.next_step.preview'))
+            ->html();
+
+        $this->assertSame(1, substr_count($html, __('connectors.ui.layer_a.next_step.configure')));
+    }
+
+    #[Test]
+    public function products_default_configuration_advances_to_exactly_one_preview_cta(): void
+    {
+        $this->bindAdobePreviewAuthorizationStub(true);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+        $this->createProductsConfiguration($account);
+
+        $html = Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
+            ->assertSee(__('connectors.ui.layer_a.next_step.preview'))
+            ->assertDontSee(__('connectors.ui.layer_a.next_step.configure'))
+            ->html();
+
+        $this->assertSame(1, substr_count($html, __('connectors.ui.layer_a.next_step.preview')));
+    }
+
+    #[Test]
+    public function unrelated_configuration_does_not_advance_overview_lifecycle(): void
+    {
+        $this->bindAdobeExportSetupAuthorizationStub(eligible: true, canAccess: true);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
         SyncConfiguration::query()->create([
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->getKey(),
+            'data_domain' => SyncDataDomain::Products,
+            'external_context' => ['store' => 'other'],
+            'enabled_operations' => [SyncSemanticOperation::Export->value],
+            'operational_state' => SyncConfigurationOperationalState::Enabled,
+            'configuration_revision' => 'rev-unrelated',
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
+            ->assertSee(__('connectors.ui.layer_a.next_step.configure'))
+            ->assertDontSee(__('connectors.ui.layer_a.next_step.preview'));
+    }
+
+    #[Test]
+    public function unauthorized_setup_actor_sees_explanation_instead_of_action_or_empty_next_step(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSee(__('connectors.ui.layer_a.next_step.heading'))
+            ->assertSee(__('connectors.ui.layer_a.next_step.setup_admin_required'))
+            ->assertDontSee(__('connectors.ui.layer_a.next_step.configure'));
+    }
+
+    #[Test]
+    public function missing_connector_profile_does_not_break_the_overview(): void
+    {
+        $this->app->forgetInstance(AdobeProductExportSetupAuthorizationService::class);
+        $admin = $this->createStaffUser(UserRole::Admin);
+        $workspace = $this->defaultWorkspace();
+        $this->grantExactWorkspacePermissions($workspace, $admin, [
+            WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+        ]);
+        $account = $this->createConnectorAccount(overrides: ['auth_profile' => 'missing-profile']);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertSuccessful()
+            ->assertSee(__('connectors.ui.layer_a.next_step.unavailable'));
+    }
+
+    #[Test]
+    public function configured_actor_without_preview_authority_sees_permission_explanation(): void
+    {
+        $this->bindAdobePreviewAuthorizationStub(eligible: false, canAccess: false);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+        $this->createProductsConfiguration($account);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
+            ->assertSee(__('connectors.ui.layer_a.next_step.preview_permission_required'))
+            ->assertDontSee(__('connectors.ui.layer_a.next_step.unavailable'));
+    }
+
+    #[Test]
+    public function preview_authorized_actor_with_technically_unavailable_target_sees_support_explanation(): void
+    {
+        $this->bindAdobePreviewAuthorizationStub(eligible: false, canAccess: true);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+        $this->createProductsConfiguration($account);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
+            ->assertSee(__('connectors.ui.layer_a.next_step.unavailable'))
+            ->assertDontSee(__('connectors.ui.layer_a.next_step.preview_permission_required'));
+    }
+
+    #[Test]
+    public function connector_account_overview_renders_complete_localized_copy_in_english(): void
+    {
+        $previousLocale = App::getLocale();
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount(overrides: [
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+            'last_successful_check_at' => now(),
+        ]);
+
+        try {
+            App::setLocale('en');
+
+            Livewire::actingAs($admin)
+                ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+                ->assertSee(__('connectors.ui.layer_a.status.connected'))
+                ->assertSee('Checked')
+                ->assertSee('The check does not change data in Magento.')
+                ->assertSee('Synchronization setup requires an authorized workspace administrator.')
+                ->assertDontSee('What we checked');
+        } finally {
+            App::setLocale($previousLocale);
+        }
+    }
+
+    private function createProductsConfiguration(ConnectorAccount $account): SyncConfiguration
+    {
+        return SyncConfiguration::query()->create([
             'workspace_id' => $account->workspace_id,
             'connector_account_id' => $account->getKey(),
             'data_domain' => SyncDataDomain::Products,
@@ -592,29 +734,6 @@ class ConnectorAccountResourceTest extends TestCase
             'operational_state' => SyncConfigurationOperationalState::Enabled,
             'configuration_revision' => 'rev-1',
         ]);
-
-        Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee(__('connectors.ui.layer_a.fields.label'))
-            ->assertSee(__('connectors.ui.layer_a.status.access_confirmed'))
-            ->assertSee(__('connectors.ui.layer_a.actions.view_fields'));
-    }
-
-    #[Test]
-    public function connector_account_overview_renders_localized_layer_a_copy_in_english(): void
-    {
-        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
-        $account = $this->createConnectorAccount();
-
-        App::setLocale('en');
-
-        Livewire::actingAs($admin)
-            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertSee('The check does not change data in Magento.')
-            ->assertSee('What we checked')
-            ->assertSee('Catalog')
-            ->assertSee('Fields')
-            ->assertSee('Images');
     }
 
     #[Test]

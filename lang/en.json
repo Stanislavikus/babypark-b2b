@@ -702,5 +702,10 @@
     "connectors.ui.layer_a.magento_name": "Magento",
     "connectors.ui.layer_a.next_step.heading": "NEXT STEP",
     "connectors.ui.layer_a.next_step.configure": "Configure synchronization",
-    "connectors.ui.layer_a.next_step.preview": "Create a test synchronization"
+    "connectors.ui.layer_a.next_step.preview": "Create a test synchronization",
+    "connectors.ui.layer_a.checked_at": "Checked :time",
+    "connectors.ui.layer_a.next_step.setup_admin_required": "Synchronization setup requires an authorized workspace administrator.",
+    "connectors.ui.layer_a.next_step.unavailable": "The next step is temporarily unavailable because of the connection setup. Contact support.",
+    "connectors.ui.layer_a.status.connected": "Connected",
+    "connectors.ui.layer_a.next_step.preview_permission_required": "Creating a test synchronization requires the appropriate access. Contact an authorized workspace administrator."
 }
