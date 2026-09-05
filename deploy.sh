@@ -69,6 +69,7 @@ composer install --no-dev --optimize-autoloader
 npm ci
 npm run build
 php artisan migrate --force
+php artisan db:seed --class=WorkspaceRbacPermissionSeeder --force
 php artisan optimize:clear
 php artisan queue:restart
 php artisan up

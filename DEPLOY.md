@@ -48,8 +48,10 @@ cd /var/www/babypark-b2b
 ./deploy.sh
 ```
 
-`deploy.sh` runs `git pull`, `composer install --no-dev`, `npm ci`, `npm run build`,
-`php artisan optimize:clear`, and **`php artisan queue:restart`**.
+`deploy.sh` checks out the explicitly authorized `origin/develop` SHA, runs
+`composer install --no-dev`, `npm ci`, `npm run build`, migrations, the additive
+canonical Workspace RBAC permission catalogue sync, `php artisan optimize:clear`,
+and **`php artisan queue:restart`** while the application remains in maintenance mode.
 
 **`queue:restart` dependencies (must be true on the host):**
 
@@ -210,10 +212,11 @@ prerequisite satisfied (GAP-026B production cutover 2026-08-14).
 GAP-026B workspace RBAC authority cutover and must **not** be used to expose GAP-026B-2
 authority-switching code to merchant traffic before cutover completion.
 
-Current `deploy.sh` only pulls, builds assets, clears cache, and restarts the queue.
-It does **not** run migrations, RBAC catalogue seeding, legacy backfill, anti-lockout
-validation, or cutover smoke checks. Do **not** silently turn every future deploy into
-a backfill attempt.
+Current `deploy.sh` runs migrations and additively synchronizes the canonical
+`workspace_permissions` catalogue with `WorkspaceRbacPermissionSeeder`. It does
+**not** run legacy backfill, alter role/user assignments, perform anti-lockout
+validation, or run cutover smoke checks. Do **not** silently turn every future deploy
+into a backfill attempt.
 
 **Repository merge ≠ production cutover.** Merging GAP-026B implementation into
 `develop` does not by itself activate workspace-permission authority in production.

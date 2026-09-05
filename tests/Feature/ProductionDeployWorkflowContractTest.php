@@ -66,6 +66,7 @@ class ProductionDeployWorkflowContractTest extends TestCase
         $this->assertStringContainsString('git merge --ff-only', $content);
         $this->assertStringContainsString('php artisan down', $content);
         $this->assertStringContainsString('php artisan migrate --force', $content);
+        $this->assertStringContainsString('php artisan db:seed --class=WorkspaceRbacPermissionSeeder --force', $content);
         $this->assertStringContainsString('php artisan queue:restart', $content);
         $this->assertStringContainsString('php artisan up', $content);
 
@@ -79,6 +80,7 @@ class ProductionDeployWorkflowContractTest extends TestCase
         $maintenancePosition = strpos($content, 'php artisan down');
         $mergePosition = strpos($content, 'git merge --ff-only');
         $migratePosition = strpos($content, 'php artisan migrate --force');
+        $permissionSyncPosition = strpos($content, 'php artisan db:seed --class=WorkspaceRbacPermissionSeeder --force');
         $queueRestartPosition = strpos($content, 'php artisan queue:restart');
         $upPosition = strpos($content, 'php artisan up');
         $maintenanceResetPosition = strpos($content, 'MAINTENANCE_ACTIVE=0', $upPosition);
@@ -88,6 +90,7 @@ class ProductionDeployWorkflowContractTest extends TestCase
         $this->assertNotFalse($maintenancePosition);
         $this->assertNotFalse($mergePosition);
         $this->assertNotFalse($migratePosition);
+        $this->assertNotFalse($permissionSyncPosition);
         $this->assertNotFalse($queueRestartPosition);
         $this->assertNotFalse($upPosition);
         $this->assertNotFalse($maintenanceResetPosition);
@@ -96,6 +99,8 @@ class ProductionDeployWorkflowContractTest extends TestCase
 
         $this->assertLessThan($mergePosition, $maintenancePosition, 'Maintenance mode must begin before code checkout.');
         $this->assertLessThan($queueRestartPosition, $migratePosition, 'Migrations must run before queue restart.');
+        $this->assertLessThan($permissionSyncPosition, $migratePosition, 'Migrations must run before the permission catalogue sync.');
+        $this->assertLessThan($upPosition, $permissionSyncPosition, 'The permission catalogue must be synchronized before leaving maintenance mode.');
         $this->assertLessThan($upPosition, $queueRestartPosition, 'php artisan up must run only after queue restart on the success path.');
         $this->assertLessThan($maintenanceResetPosition, $upPosition, 'Maintenance reset must occur only after successful php artisan up.');
         $this->assertLessThan($deploymentCompletedPosition, $maintenanceResetPosition, 'Final deployment evidence must not be emitted before maintenance reset.');
