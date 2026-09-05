@@ -203,7 +203,12 @@ class WorkspaceRbacCutoverDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('### GAP-026B one-time Workspace RBAC cutover', $deploy);
         $this->assertStringContainsString('Ordinary recurring deployment', $deploy);
-        $this->assertStringContainsString('does **not** run migrations', $deploy);
+        $this->assertStringContainsString(
+            'runs migrations and additively synchronizes the canonical',
+            $deploy,
+        );
+        $this->assertStringContainsString('WorkspaceRbacPermissionSeeder', $deploy);
+        $this->assertStringContainsString('**not** run legacy backfill', $deploy);
         $this->assertStringContainsString('Repository merge ≠ production cutover', $deploy);
         $this->assertStringContainsString('CHECK-ONLY', $deploy);
         $this->assertStringContainsString('EXECUTE', $deploy);
