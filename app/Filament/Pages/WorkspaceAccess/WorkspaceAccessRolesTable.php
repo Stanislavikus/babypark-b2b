@@ -116,6 +116,10 @@ class WorkspaceAccessRolesTable extends Component implements HasActions, HasSche
                 Action::make('editPermissions')
                     ->label(__('workspace_access.roles.actions.edit_permissions'))
                     ->icon('heroicon-o-adjustments-horizontal')
+                    ->mutateDataUsing(fn (array $data): array => [
+                        ...$data,
+                        'permissions' => $this->normalizeMountedEditPermissionSelection($data['permissions'] ?? []),
+                    ])
                     ->schema(fn (WorkspaceRole $record): array => [
                         CheckboxList::make('permissions')
                             ->label(__('workspace_access.roles.fields.permissions'))
@@ -177,6 +181,69 @@ class WorkspaceAccessRolesTable extends Component implements HasActions, HasSche
         $user = Auth::user();
 
         return $user;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function normalizeMountedEditPermissionSelection(mixed $validatedSelection): array
+    {
+        $rawSelection = null;
+
+        if (is_array($this->mountedActions) && $this->mountedActions !== []) {
+            $mountedAction = $this->mountedActions[array_key_last($this->mountedActions)] ?? null;
+
+            if (is_array($mountedAction)) {
+                $rawSelection = $mountedAction['data']['permissions'] ?? null;
+            }
+        }
+
+        if (is_array($rawSelection) && ! array_is_list($rawSelection)) {
+            $selectedPermissions = [];
+
+            foreach ($rawSelection as $permissionCode => $isSelected) {
+                if (! is_string($permissionCode)) {
+                    continue;
+                }
+
+                $isSelected = match (true) {
+                    is_bool($isSelected) => $isSelected,
+                    is_int($isSelected) => $isSelected === 1,
+                    is_string($isSelected) => in_array(strtolower($isSelected), ['1', 'true', 'on', 'yes'], true),
+                    default => false,
+                };
+
+                if (! $isSelected) {
+                    continue;
+                }
+
+                $selectedPermissions[] = $permissionCode;
+            }
+
+            return array_values(array_unique($selectedPermissions));
+        }
+
+        if (! is_array($validatedSelection)) {
+            return [];
+        }
+
+        $selectedPermissions = [];
+
+        foreach ($validatedSelection as $permissionCode) {
+            if ((! is_scalar($permissionCode)) && (! $permissionCode instanceof \Stringable)) {
+                continue;
+            }
+
+            $permissionCode = (string) $permissionCode;
+
+            if ($permissionCode === '') {
+                continue;
+            }
+
+            $selectedPermissions[] = $permissionCode;
+        }
+
+        return array_values(array_unique($selectedPermissions));
     }
 
     /**
