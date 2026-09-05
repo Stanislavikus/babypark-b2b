@@ -18,6 +18,7 @@ use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
 use App\Filament\Resources\ConnectorAccountResource\RelationManagers\ConnectionChecksRelationManager;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorConnectionCheck;
+use App\Models\ConnectorDefinition;
 use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
@@ -108,13 +109,21 @@ class ConnectorAccountResourceTest extends TestCase
         );
     }
 
-    private function bindAdobePreviewAuthorizationStub(bool $eligible): void
+    private function bindAdobePreviewAuthorizationStub(bool $eligible, bool $canAccess = true): void
     {
         $this->app->instance(
             AdobeProductsExportPreviewAuthorizationService::class,
-            new class($eligible)
+            new class($eligible, $canAccess)
             {
-                public function __construct(private readonly bool $eligible) {}
+                public function __construct(
+                    private readonly bool $eligible,
+                    private readonly bool $canAccess,
+                ) {}
+
+                public function canAccess(User $actor, Workspace $workspace): bool
+                {
+                    return $this->canAccess;
+                }
 
                 public function isEligiblePreviewTarget(User $actor, Workspace $workspace, string $connectorAccountId): bool
                 {
@@ -554,6 +563,28 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
+    public function non_adobe_account_detail_keeps_shared_connected_vocabulary(): void
+    {
+        $previousLocale = App::getLocale();
+        App::setLocale('uk');
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $shopify = ConnectorDefinition::query()->where('code', 'shopify')->firstOrFail();
+        $account = $this->createConnectorAccount(overrides: [
+            'connector_definition_id' => $shopify->id,
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+        ]);
+
+        try {
+            Livewire::actingAs($admin)
+                ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+                ->assertSee(__('connectors.enums.account_connection_status.connected'))
+                ->assertDontSee(__('connectors.ui.layer_a.status.connected'));
+        } finally {
+            App::setLocale($previousLocale);
+        }
+    }
+
+    #[Test]
     public function authorized_setup_actor_gets_exactly_one_setup_cta(): void
     {
         $this->bindAdobeExportSetupAuthorizationStub(eligible: true, canAccess: true);
@@ -637,6 +668,34 @@ class ConnectorAccountResourceTest extends TestCase
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->assertSuccessful()
             ->assertSee(__('connectors.ui.layer_a.next_step.unavailable'));
+    }
+
+    #[Test]
+    public function configured_actor_without_preview_authority_sees_permission_explanation(): void
+    {
+        $this->bindAdobePreviewAuthorizationStub(eligible: false, canAccess: false);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+        $this->createProductsConfiguration($account);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
+            ->assertSee(__('connectors.ui.layer_a.next_step.preview_permission_required'))
+            ->assertDontSee(__('connectors.ui.layer_a.next_step.unavailable'));
+    }
+
+    #[Test]
+    public function preview_authorized_actor_with_technically_unavailable_target_sees_support_explanation(): void
+    {
+        $this->bindAdobePreviewAuthorizationStub(eligible: false, canAccess: true);
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount();
+        $this->createProductsConfiguration($account);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
+            ->assertSee(__('connectors.ui.layer_a.next_step.unavailable'))
+            ->assertDontSee(__('connectors.ui.layer_a.next_step.preview_permission_required'));
     }
 
     #[Test]

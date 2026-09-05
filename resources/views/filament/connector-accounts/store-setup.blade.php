@@ -6,6 +6,7 @@
     $canConfigureSync = $canConfigureSync ?? false;
     $canCreatePreview = $canCreatePreview ?? false;
     $canManageSyncConfiguration = $canManageSyncConfiguration ?? false;
+    $canRunPreview = $canRunPreview ?? false;
 @endphp
 
 <div class="space-y-4">
@@ -27,6 +28,8 @@
             </x-filament::button>
         @elseif ($syncConfigurationId === null && ! $canManageSyncConfiguration)
             <p class="text-sm text-gray-700 dark:text-gray-300">{{ __('connectors.ui.layer_a.next_step.setup_admin_required') }}</p>
+        @elseif ($syncConfigurationId !== null && ! $canRunPreview)
+            <p class="text-sm text-gray-700 dark:text-gray-300">{{ __('connectors.ui.layer_a.next_step.preview_permission_required') }}</p>
         @else
             <p class="text-sm text-gray-700 dark:text-gray-300">{{ __('connectors.ui.layer_a.next_step.unavailable') }}</p>
         @endif

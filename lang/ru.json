@@ -688,6 +688,7 @@
     "connectors.ui.layer_a.next_step.preview": "Создать пробную синхронизацию",
     "connectors.ui.layer_a.checked_at": "Проверено :time",
     "connectors.ui.layer_a.next_step.setup_admin_required": "Настройку синхронизации должен выполнить уполномоченный администратор рабочего пространства.",
-    "connectors.ui.layer_a.next_step.unavailable": "Следующий шаг временно недоступен. Обратитесь к уполномоченному администратору рабочего пространства.",
-    "connectors.ui.layer_a.status.connected": "Подключено"
+    "connectors.ui.layer_a.next_step.unavailable": "Следующий шаг временно недоступен из-за технических настроек подключения. Обратитесь в поддержку.",
+    "connectors.ui.layer_a.status.connected": "Подключено",
+    "connectors.ui.layer_a.next_step.preview_permission_required": "Для создания пробной синхронизации нужен соответствующий доступ. Обратитесь к уполномоченному администратору рабочего пространства."
 }

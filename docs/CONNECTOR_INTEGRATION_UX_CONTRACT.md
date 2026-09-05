@@ -719,6 +719,12 @@ For the Products/default lifecycle, Overview renders exactly one outcome:
    an authorized workspace administrator must perform setup; the `НАСТУПНИЙ КРОК` container
    is never empty.
 
+An existing Products/default configuration follows the same distinction for Preview: an
+actor without `run_sync_preview` receives a permission/access explanation, while an actor
+with Preview authority whose target/profile eligibility cannot currently be resolved receives
+a technical-support/unavailable explanation. Technical unavailability must not be
+misclassified as an administrator-permission problem.
+
 An unrelated configuration must not advance this lifecycle. Overview exposes no first-Live
 CTA while `ConnectorSyncOperationSupport(Products, Export, Live)` is false and never claims
 `Синхронізація працює` before persisted, successful real Live evidence. Preview remains
