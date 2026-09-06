@@ -17,6 +17,7 @@ use App\Enums\SyncSemanticOperation;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorDefinition;
 use App\Models\ConnectorDiscoveryRun;
+use App\Models\ConnectorSchemaSnapshotField;
 use App\Models\ConnectorSchemaSource;
 use App\Models\FieldBinding;
 use App\Models\FieldDefinition;
@@ -102,7 +103,7 @@ class FieldMappingSuggestionReadModelTest extends TestCase
         $configuration = $this->createProductsSyncConfiguration($account);
         $this->publishAuthoritativeSnapshot($account, ['url_path']);
 
-        \App\Models\ConnectorSchemaSnapshotField::withoutWorkspaceScope()
+        ConnectorSchemaSnapshotField::withoutWorkspaceScope()
             ->where('workspace_id', $account->workspace_id)
             ->where('external_field_key', 'url_path')
             ->update(['external_label' => null]);
