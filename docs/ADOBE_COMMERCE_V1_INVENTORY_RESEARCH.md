@@ -120,6 +120,26 @@ Primary clusters currently include:
 - B2B Shared Catalog membership/pricing;
 - storefront-derived read-only Catalog Service representations.
 
+## Second research pass applied
+
+Lead arbitration over the GPT-5.4 and Sonnet blind reviews is now applied to the matrices.
+
+Current row-level coverage after correction: **181 top-level field/capability entries**, **128 structured-object subfields**, **28 cluster families**, **14 edition/API/source surfaces**, and **13 explicit alias rows**.
+
+Material corrections include:
+
+- explicit dynamic EAV `attribute_code + value` envelopes;
+- broader attribute applicability/filtering/storefront/swatch metadata;
+- category-link and grouped-child structured relations;
+- separate MSI topology (`Source`, `Stock`, `StockSourceLink`, `SalesChannel`) from per-SKU inventory;
+- custom file-option constraints and gift-card amount list shape;
+- explicit REST/EAV aliases `meta_keyword` and `tax_class_id`;
+- product URL redirect-preservation behavior;
+- Adobe-Commerce-only RMA and gift-wrap capability boundaries;
+- nested SKU references classified as object anchors rather than new canonical Product fields.
+
+The frozen project decision for Adobe `visibility` remains unchanged: runtime WRITE support does not turn it into a generic FieldMapping-owned semantic field.
+
 ## Current platform Field Dictionary — comparison input, not authority
 
 The existing `FieldDefinitionSeeder` provides a useful comparison vocabulary but must not define Adobe scope. Current seeded Product/ProductVariant definitions include:

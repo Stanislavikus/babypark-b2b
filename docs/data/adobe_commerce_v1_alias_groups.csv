@@ -1,0 +1,14 @@
+alias_group,semantic_concept,surface_key,source_surface,identity_rule,review_status
+product_type,product type discriminator,type_id,REST/ProductInterface,ID/code alias; keep connector-context ownership,SECOND_PASS_RESEARCH
+product_type,product type discriminator,product_type,Import API,bulk alias; keep separate source identity,SECOND_PASS_RESEARCH
+status,product enabled/disabled state,status,REST/EAV,semantic alias group,SECOND_PASS_RESEARCH
+status,product enabled/disabled state,product_online,Import API,"bulk values 1/2; translate, do not collapse raw identity",SECOND_PASS_RESEARCH
+meta_keyword,SEO meta keyword,meta_keyword,REST/EAV,singular REST/EAV key,SECOND_PASS_RESEARCH
+meta_keyword,SEO meta keyword,meta_keywords,Import API,plural bulk alias,SECOND_PASS_RESEARCH
+tax_class,tax classification,tax_class_id,REST/EAV,identifier form; resolve through tax configuration,SECOND_PASS_RESEARCH
+tax_class,tax classification,tax_class_name,Import API,label/name form; not raw-equal to ID,SECOND_PASS_RESEARCH
+attribute_set,Adobe attribute-set identity,attribute_set_id,REST,identifier form; connector context,SECOND_PASS_RESEARCH
+attribute_set,Adobe attribute-set identity,attribute_set_code,Import API,"code/name form; resolve, do not map as Product field",SECOND_PASS_RESEARCH
+website_assignment,website assignment,website_id,REST/pricing scope,website ID form,SECOND_PASS_RESEARCH
+website_assignment,website assignment,product_websites,Import API,website code list; requires code/ID resolution,SECOND_PASS_RESEARCH
+website_assignment,website assignment,website_assignment,Admin REST capability,structured assignment capability,SECOND_PASS_RESEARCH

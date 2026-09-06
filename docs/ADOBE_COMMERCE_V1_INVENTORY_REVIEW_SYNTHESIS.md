@@ -65,3 +65,15 @@ The shipped Magento matrix proves that current runtime can WRITE `visibility`, b
 ## Next action
 
 Apply the accepted/qualified corrections mechanically to the row-level master CSV, structured-object subfield CSV, cluster summary and source matrix. Then run a final internal consistency pass. Only after that decide whether a third blind reviewer is useful.
+
+## Lead primary-source follow-up refinements
+
+After applying reviewer findings, Lead primary-source verification additionally:
+- moved `tax_class_id` / `tax_class_name` to a dedicated Pricing/Tax-owned cluster per the shipped Magento matrix;
+- normalized swatches to nested `swatch_data { type, value }` rather than invented flat option fields;
+- added current Adobe attribute applicability/search/filter/storefront metadata;
+- added SaaS-specific file/image custom-attribute value implementations;
+- added explicit read-only URL projections (`url_rewrites`, `canonical_url`, `url_suffix`, deprecated `url_path`);
+- added a machine-readable alias matrix for source keys that share semantics but require ID/code/label translation.
+
+These refinements do not alter connector runtime or frozen domain ownership.

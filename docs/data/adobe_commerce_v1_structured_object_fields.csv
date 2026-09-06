@@ -27,13 +27,13 @@ media_video_content,video_metadata,structured_capability,optional vendor video m
 media_video_content,video_provider,structured_capability,video source/provider,core GraphQL 2.4.9 type reference,INITIAL_RESEARCH
 media_video_content,video_title,domain_value,video title; store-scope inheritance semantics exist,core GraphQL 2.4.9 + Admin REST store-scope docs,INITIAL_RESEARCH
 media_video_content,video_url,domain_value,external video URL,core GraphQL 2.4.9 type reference,INITIAL_RESEARCH
-product_link,sku,semantic_field,source product SKU,core GraphQL 2.4.9 ProductLinksInterface,INITIAL_RESEARCH
+product_link,sku,external_system_metadata,reference/object anchor identity; do not promote as separate canonical Product field,core GraphQL 2.4.9 ProductLinksInterface,SECOND_PASS_RESEARCH
 product_link,link_type,structured_capability,related/associated/upsell/crosssell relation type,core GraphQL 2.4.9 ProductLinksInterface,INITIAL_RESEARCH
-product_link,linked_product_sku,structured_capability,target product SKU,core GraphQL 2.4.9 ProductLinksInterface,INITIAL_RESEARCH
+product_link,linked_product_sku,external_system_metadata,reference/object anchor identity; do not promote as separate canonical Product field,core GraphQL 2.4.9 ProductLinksInterface,SECOND_PASS_RESEARCH
 product_link,linked_product_type,structured_capability,target product type,core GraphQL 2.4.9 ProductLinksInterface,INITIAL_RESEARCH
 product_link,position,domain_value,ordering inside relation list,core GraphQL 2.4.9 ProductLinksInterface,INITIAL_RESEARCH
 customizable_option,option_id,external_system_metadata,remote custom-option identity,Admin REST + core GraphQL,INITIAL_RESEARCH
-customizable_option,product_sku,semantic_field,parent product identity,Admin REST custom option endpoint,INITIAL_RESEARCH
+customizable_option,product_sku,external_system_metadata,reference/object anchor identity; do not promote as separate canonical Product field,Admin REST custom option endpoint,SECOND_PASS_RESEARCH
 customizable_option,title,domain_value,merchant-visible option title,Admin REST + core GraphQL,INITIAL_RESEARCH
 customizable_option,type,structured_capability,option type/shape,Admin REST custom option endpoint,INITIAL_RESEARCH
 customizable_option,sort_order,domain_value,option display order,Admin REST + core GraphQL,INITIAL_RESEARCH
@@ -49,24 +49,81 @@ customizable_option_value,sort_order,domain_value,value display order,core Graph
 customizable_option_value,price,domain_value,value price modifier,core GraphQL customizable option types,INITIAL_RESEARCH
 customizable_option_value,price_type,domain_value,value price modifier type,core GraphQL customizable option types,INITIAL_RESEARCH
 customizable_option_value,sku,domain_value,value-specific SKU,core GraphQL customizable option types,INITIAL_RESEARCH
-inventory_source_item,sku,semantic_field,product/variant identity,Inventory Management REST,INITIAL_RESEARCH
-inventory_source_item,source_code,domain_value,physical/source topology identity,Inventory Management REST,INITIAL_RESEARCH
+inventory_source_item,sku,external_system_metadata,reference/object anchor identity; do not promote as separate canonical Product field,Inventory Management REST,SECOND_PASS_RESEARCH
+inventory_source_item,source_code,connector_context,MSI source topology reference required by per-SKU source item,Inventory Management REST,SECOND_PASS_RESEARCH
 inventory_source_item,quantity,domain_value,per-source physical quantity,Inventory Management REST,INITIAL_RESEARCH
 inventory_source_item,status,domain_value,per-source in/out-of-stock status,Inventory Management REST,INITIAL_RESEARCH
-tier_price,sku,semantic_field,product identity,Catalog Pricing REST,INITIAL_RESEARCH
+tier_price,sku,external_system_metadata,reference/object anchor identity; do not promote as separate canonical Product field,Catalog Pricing REST,SECOND_PASS_RESEARCH
 tier_price,price,domain_value,tier amount or discount value,Catalog Pricing REST,INITIAL_RESEARCH
 tier_price,price_type,domain_value,fixed or discount,Catalog Pricing REST,INITIAL_RESEARCH
 tier_price,website_id,connector_context,website price scope,Catalog Pricing REST,INITIAL_RESEARCH
 tier_price,customer_group,domain_value,customer group qualification,Catalog Pricing REST,INITIAL_RESEARCH
 tier_price,quantity,domain_value,minimum quantity threshold,Catalog Pricing REST,INITIAL_RESEARCH
-special_price,sku,semantic_field,product identity,Catalog Pricing REST,INITIAL_RESEARCH
+special_price,sku,external_system_metadata,reference/object anchor identity; do not promote as separate canonical Product field,Catalog Pricing REST,SECOND_PASS_RESEARCH
 special_price,price,domain_value,special price amount,Catalog Pricing REST,INITIAL_RESEARCH
 special_price,store_id,connector_context,store price scope,Catalog Pricing REST,INITIAL_RESEARCH
 special_price,price_from,domain_value,effective-from timestamp; required in Adobe Commerce and optional in Magento Open Source,Catalog Pricing REST,INITIAL_RESEARCH
 special_price,price_to,domain_value,effective-to timestamp,Catalog Pricing REST,INITIAL_RESEARCH
-base_price,sku,semantic_field,product identity,Catalog Pricing REST,INITIAL_RESEARCH
+base_price,sku,external_system_metadata,reference/object anchor identity; do not promote as separate canonical Product field,Catalog Pricing REST,SECOND_PASS_RESEARCH
 base_price,price,domain_value,base price amount,Catalog Pricing REST,INITIAL_RESEARCH
 base_price,store_id,connector_context,store price scope,Catalog Pricing REST,INITIAL_RESEARCH
-cost_value,sku,semantic_field,product identity,Catalog Pricing REST,INITIAL_RESEARCH
+cost_value,sku,external_system_metadata,reference/object anchor identity; do not promote as separate canonical Product field,Catalog Pricing REST,SECOND_PASS_RESEARCH
 cost_value,cost,domain_value,internal cost amount,Catalog Pricing REST,INITIAL_RESEARCH
 cost_value,store_id,connector_context,store cost scope,Catalog Pricing REST,INITIAL_RESEARCH
+dynamic_attribute_value,attribute_code,schema_metadata,external attribute identity/key for one EAV value,Import + Admin REST + live discovery,SECOND_PASS_RESEARCH
+dynamic_attribute_value,value,semantic_field,actual merchant/product value carried by the external EAV envelope,Import + Admin REST + live discovery,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,apply_to,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,is_comparable,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,is_filterable,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,is_filterable_in_search,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,is_html_allowed_on_front,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,is_searchable,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,is_used_for_customer_segment,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,is_used_for_price_rules,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,is_used_for_promo_rules,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,is_visible_in_advanced_search,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,is_visible_on_front,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,is_wysiwyg_enabled,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,used_in_product_listing,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,swatch_input_type,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,update_product_preview_image,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+authoritative_attribute_metadata,use_product_image_for_swatch,schema_metadata,attribute applicability/storefront/filtering/swatch behavior metadata,customAttributeMetadataV2 current Adobe GraphQL reference,SECOND_PASS_RESEARCH
+attribute_storefront_properties,position,schema_metadata,storefront display/filter behavior for an attribute,Adobe GraphQL StorefrontProperties,SECOND_PASS_RESEARCH
+attribute_storefront_properties,use_in_layered_navigation,schema_metadata,storefront display/filter behavior for an attribute,Adobe GraphQL StorefrontProperties,SECOND_PASS_RESEARCH
+attribute_storefront_properties,use_in_product_listing,schema_metadata,storefront display/filter behavior for an attribute,Adobe GraphQL StorefrontProperties,SECOND_PASS_RESEARCH
+attribute_storefront_properties,use_in_search_results_layered_navigation,schema_metadata,storefront display/filter behavior for an attribute,Adobe GraphQL StorefrontProperties,SECOND_PASS_RESEARCH
+attribute_storefront_properties,visible_on_catalog_pages,schema_metadata,storefront display/filter behavior for an attribute,Adobe GraphQL StorefrontProperties,SECOND_PASS_RESEARCH
+attribute_option,value,schema_metadata,stable external option value/identity,Admin REST attribute options + Adobe attribute metadata,SECOND_PASS_RESEARCH
+attribute_option,label,schema_metadata,human option label; not stable identity,Admin REST attribute options + Adobe attribute metadata,SECOND_PASS_RESEARCH
+category_link,category_id,domain_value,target category identity in product-category relation,Admin REST extension_attributes.category_links,SECOND_PASS_RESEARCH
+category_link,position,domain_value,manual ordering position within category relation,Admin REST extension_attributes.category_links,SECOND_PASS_RESEARCH
+grouped_product_item,sku,external_system_metadata,child product reference identity,core GraphQL GroupedProduct.items + Import associated_skus,SECOND_PASS_RESEARCH
+grouped_product_item,qty,domain_value,default grouped child quantity,core GraphQL GroupedProduct.items + Import associated_skus,SECOND_PASS_RESEARCH
+grouped_product_item,position,domain_value,grouped child ordering position,core GraphQL GroupedProduct.items,SECOND_PASS_RESEARCH
+customizable_file_value,file_extension,domain_value,allowed file extension(s) for file custom option,GraphQL CustomizableFileValue / REST custom option,SECOND_PASS_RESEARCH
+customizable_file_value,image_size_x,domain_value,maximum image width constraint for file custom option,GraphQL CustomizableFileValue / REST custom option,SECOND_PASS_RESEARCH
+customizable_file_value,image_size_y,domain_value,maximum image height constraint for file custom option,GraphQL CustomizableFileValue / REST custom option,SECOND_PASS_RESEARCH
+giftcard_amount_list,amount,domain_value,one preset amount in repeating gift-card amount list,Import API giftcard_amount array,SECOND_PASS_RESEARCH
+inventory_source,source_code,connector_context,MSI source topology/account configuration; not Product FieldMapping,Inventory REST Manage Sources,SECOND_PASS_RESEARCH
+inventory_source,name,connector_context,MSI source topology/account configuration; not Product FieldMapping,Inventory REST Manage Sources,SECOND_PASS_RESEARCH
+inventory_source,enabled,connector_context,MSI source topology/account configuration; not Product FieldMapping,Inventory REST Manage Sources,SECOND_PASS_RESEARCH
+inventory_source,country_id,connector_context,MSI source topology/account configuration; not Product FieldMapping,Inventory REST Manage Sources,SECOND_PASS_RESEARCH
+inventory_source,region_id,connector_context,MSI source topology/account configuration; not Product FieldMapping,Inventory REST Manage Sources,SECOND_PASS_RESEARCH
+inventory_source,city,connector_context,MSI source topology/account configuration; not Product FieldMapping,Inventory REST Manage Sources,SECOND_PASS_RESEARCH
+inventory_source,postcode,connector_context,MSI source topology/account configuration; not Product FieldMapping,Inventory REST Manage Sources,SECOND_PASS_RESEARCH
+inventory_source,contact_name,connector_context,MSI source topology/account configuration; not Product FieldMapping,Inventory REST Manage Sources,SECOND_PASS_RESEARCH
+inventory_source,email,connector_context,MSI source topology/account configuration; not Product FieldMapping,Inventory REST Manage Sources,SECOND_PASS_RESEARCH
+inventory_source,phone,connector_context,MSI source topology/account configuration; not Product FieldMapping,Inventory REST Manage Sources,SECOND_PASS_RESEARCH
+inventory_source,latitude,connector_context,MSI source topology/account configuration; not Product FieldMapping,Inventory REST Manage Sources,SECOND_PASS_RESEARCH
+inventory_source,longitude,connector_context,MSI source topology/account configuration; not Product FieldMapping,Inventory REST Manage Sources,SECOND_PASS_RESEARCH
+inventory_stock,stock_id,external_system_metadata,remote stock identity,Inventory REST Manage Stocks,SECOND_PASS_RESEARCH
+inventory_stock,name,connector_context,MSI stock topology/account configuration,Inventory REST Manage Stocks,SECOND_PASS_RESEARCH
+inventory_stock,sales_channels,structured_capability,stock-to-sales-channel topology,Inventory REST Manage Stocks,SECOND_PASS_RESEARCH
+inventory_stock_source_link,source_code,connector_context,source reference in stock-source topology,Inventory REST Link Stocks and Sources,SECOND_PASS_RESEARCH
+inventory_stock_source_link,stock_id,external_system_metadata,stock reference in stock-source topology,Inventory REST Link Stocks and Sources,SECOND_PASS_RESEARCH
+inventory_stock_source_link,priority,connector_context,source-selection priority inside stock topology,Inventory REST Link Stocks and Sources,SECOND_PASS_RESEARCH
+inventory_sales_channel,type,connector_context,sales-channel topology type,Inventory REST Manage Stocks,SECOND_PASS_RESEARCH
+inventory_sales_channel,code,connector_context,sales-channel topology code,Inventory REST Manage Stocks,SECOND_PASS_RESEARCH
+attribute_option,swatch_data,structured_capability,nested swatch representation for selectable option,Adobe GraphQL configurable options / SwatchData,SECOND_PASS_RESEARCH
+swatch_data,type,schema_metadata,swatch representation type where surface exposes it,Adobe GraphQL SwatchData / Catalog Service,SECOND_PASS_RESEARCH
+swatch_data,value,schema_metadata,"color HEX, image link, or text swatch payload",Adobe GraphQL SwatchDataInterface,SECOND_PASS_RESEARCH

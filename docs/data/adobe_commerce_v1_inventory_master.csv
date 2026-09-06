@@ -29,7 +29,7 @@ name,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin 
 description,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
 short_description,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
 weight,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
-tax_class_name,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
+tax_class_name,domain_value,tax_configuration,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,SECOND_PASS_RESEARCH
 new_from_date,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
 new_to_date,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
 country_of_manufacture,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
@@ -42,8 +42,8 @@ downloadable_links,structured_capability,downloadable_assets,PaaS/Magento Open S
 downloadable_samples,structured_capability,downloadable_assets,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
 downloadable_link,structured_capability,downloadable_assets,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
 downloadable_sample,structured_capability,downloadable_assets,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
-additional_attributes,semantic_field,dynamic_attributes,Live target schema,Import + Admin REST + live discovery,INITIAL_RESEARCH
-custom_attributes,semantic_field,dynamic_attributes,Live target schema,Import + Admin REST + live discovery,INITIAL_RESEARCH
+additional_attributes,structured_capability,dynamic_attributes,Live target schema,Import + Admin REST + live discovery,SECOND_PASS_RESEARCH
+custom_attributes,structured_capability,dynamic_attributes,Live target schema,Admin REST + GraphQL + live discovery,SECOND_PASS_RESEARCH
 manufacturer,semantic_field,dynamic_attributes,Live target schema,Import + Admin REST + live discovery,INITIAL_RESEARCH
 material,semantic_field,dynamic_attributes,Live target schema,Import + Admin REST + live discovery,INITIAL_RESEARCH
 color,semantic_field,dynamic_attributes,Live target schema,Import + Admin REST + live discovery,INITIAL_RESEARCH
@@ -52,14 +52,14 @@ instructions,semantic_field,dynamic_attributes,Live target schema,Import + Admin
 gtin,semantic_field,dynamic_attributes,Live target schema,Import + Admin REST + live discovery,INITIAL_RESEARCH
 mpn,semantic_field,dynamic_attributes,Live target schema,Import + Admin REST + live discovery,INITIAL_RESEARCH
 brand,semantic_field,dynamic_attributes,Live target schema,Import + Admin REST + live discovery,INITIAL_RESEARCH
-returnable,semantic_field,fulfillment_policy,PaaS/Magento Open Source,Import / Admin REST TBD,INITIAL_RESEARCH
+rma_eligibility,structured_capability,fulfillment_policy,Adobe Commerce only,Experience League RMA configuration; exact Admin REST write key unresolved,QUALIFIED_RESEARCH
 gift_message_available,semantic_field,gift_and_merchandising,PaaS/Magento Open Source,Import / Admin REST,INITIAL_RESEARCH
-gift_wrapping,semantic_field,gift_and_merchandising,PaaS/Magento Open Source,Import / Admin REST,INITIAL_RESEARCH
+gift_wrapping_capability,structured_capability,gift_and_merchandising,Adobe Commerce only,Experience League product gift options; exact Admin REST write key unresolved,QUALIFIED_RESEARCH
 giftcard_type,structured_capability,gift_card_product,Adobe Commerce,Import + core GraphQL + Admin REST,INITIAL_RESEARCH
 giftcard_allow_open_amount,structured_capability,gift_card_product,Adobe Commerce,Import + core GraphQL + Admin REST,INITIAL_RESEARCH
 giftcard_open_amount_min,structured_capability,gift_card_product,Adobe Commerce,Import + core GraphQL + Admin REST,INITIAL_RESEARCH
 giftcard_open_amount_max,structured_capability,gift_card_product,Adobe Commerce,Import + core GraphQL + Admin REST,INITIAL_RESEARCH
-giftcard_amount,structured_capability,gift_card_product,Adobe Commerce,Import + core GraphQL + Admin REST,INITIAL_RESEARCH
+giftcard_amount,structured_capability,gift_card_product,Adobe Commerce,Import + core GraphQL + Admin REST,SECOND_PASS_RESEARCH
 use_config_is_redeemable,structured_capability,gift_card_product,Adobe Commerce,Import + core GraphQL + Admin REST,INITIAL_RESEARCH
 giftcard_is_redeemable,structured_capability,gift_card_product,Adobe Commerce,Import + core GraphQL + Admin REST,INITIAL_RESEARCH
 use_config_lifetime,structured_capability,gift_card_product,Adobe Commerce,Import + core GraphQL + Admin REST,INITIAL_RESEARCH
@@ -152,7 +152,7 @@ crosssell_skus,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Sou
 crosssell_position,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
 upsell_skus,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
 upsell_position,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
-product_links,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
+product_links,structured_capability,taxonomy_and_product_relations,PaaS/Magento Open Source,Admin REST + core GraphQL,SECOND_PASS_RESEARCH
 simple_product,structured_capability,product_type_family,PaaS/Magento Open Source,core GraphQL + Admin REST + Import,INITIAL_RESEARCH
 virtual_product,structured_capability,product_type_family,PaaS/Magento Open Source,core GraphQL + Admin REST + Import,INITIAL_RESEARCH
 configurable_product,structured_capability,product_type_family,PaaS/Magento Open Source,core GraphQL + Admin REST + Import,INITIAL_RESEARCH
@@ -160,3 +160,23 @@ grouped_product,structured_capability,product_type_family,PaaS/Magento Open Sour
 bundle_product,structured_capability,product_type_family,PaaS/Magento Open Source,core GraphQL + Admin REST + Import,INITIAL_RESEARCH
 downloadable_product,structured_capability,product_type_family,PaaS/Magento Open Source,core GraphQL + Admin REST + Import,INITIAL_RESEARCH
 gift_card_product_type,structured_capability,product_type_family,Adobe Commerce,core GraphQL + Admin REST + Import,INITIAL_RESEARCH
+meta_keyword,semantic_field,seo_routing,PaaS/Magento Open Source,Admin REST / stable EAV custom attribute,SECOND_PASS_RESEARCH
+tax_class_id,domain_value,tax_configuration,PaaS/Magento Open Source,Admin REST / stable EAV custom attribute,SECOND_PASS_RESEARCH
+save_rewrites_history,connector_context,seo_routing,PaaS/Magento Open Source,Import API / product URL rewrite behavior,SECOND_PASS_RESEARCH
+grouped_product_item,structured_capability,grouped_composition,PaaS/Magento Open Source,core GraphQL + Import API,SECOND_PASS_RESEARCH
+category_link,structured_capability,taxonomy_and_product_relations,PaaS/Magento Open Source,Admin REST extension_attributes.category_links,SECOND_PASS_RESEARCH
+inventory_source,structured_capability,inventory_topology_msi,PaaS/Magento Open Source where MSI is available,Inventory REST,SECOND_PASS_RESEARCH
+inventory_stock,structured_capability,inventory_topology_msi,PaaS/Magento Open Source where MSI is available,Inventory REST,SECOND_PASS_RESEARCH
+inventory_stock_source_link,structured_capability,inventory_topology_msi,PaaS/Magento Open Source where MSI is available,Inventory REST,SECOND_PASS_RESEARCH
+inventory_sales_channel,structured_capability,inventory_topology_msi,PaaS/Magento Open Source where MSI is available,Inventory REST,SECOND_PASS_RESEARCH
+has_options,external_system_metadata,customizable_options,PaaS/Magento Open Source,Admin REST custom_attributes + live discovery,QUALIFIED_RESEARCH
+required_options,external_system_metadata,customizable_options,PaaS/Magento Open Source,Admin REST custom_attributes + live discovery,QUALIFIED_RESEARCH
+is_returnable,derived_projection,fulfillment_policy,Adobe Commerce only,GraphQL/product READ representation,QUALIFIED_RESEARCH
+gift_wrapping_available,derived_projection,gift_and_merchandising,Adobe Commerce only,GraphQL/product READ representation,QUALIFIED_RESEARCH
+gift_wrapping_price,domain_value,gift_and_merchandising,Adobe Commerce only,GraphQL/product READ representation,QUALIFIED_RESEARCH
+saas_attribute_file_value,structured_capability,dynamic_attributes,Adobe Commerce as a Cloud Service,SaaS AttributeValueInterface / AttributeFile,SECOND_PASS_RESEARCH
+saas_attribute_image_value,structured_capability,dynamic_attributes,Adobe Commerce as a Cloud Service,SaaS AttributeValueInterface / AttributeImage,SECOND_PASS_RESEARCH
+url_rewrites,derived_projection,seo_routing,PaaS/Magento Open Source,core GraphQL ProductInterface READ,SECOND_PASS_RESEARCH
+canonical_url,derived_projection,seo_routing,PaaS/Magento Open Source + Adobe Commerce SaaS,GraphQL/storefront READ,SECOND_PASS_RESEARCH
+url_suffix,derived_projection,seo_routing,PaaS/Magento Open Source,core GraphQL ProductInterface READ,SECOND_PASS_RESEARCH
+url_path,derived_projection,seo_routing,PaaS/Magento Open Source,core GraphQL deprecated READ / live EAV,SECOND_PASS_RESEARCH
