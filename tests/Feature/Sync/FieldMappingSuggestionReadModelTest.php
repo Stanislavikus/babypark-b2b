@@ -17,6 +17,7 @@ use App\Enums\SyncSemanticOperation;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorDefinition;
 use App\Models\ConnectorDiscoveryRun;
+use App\Models\ConnectorSchemaSnapshotField;
 use App\Models\ConnectorSchemaSource;
 use App\Models\FieldBinding;
 use App\Models\FieldDefinition;
@@ -93,6 +94,26 @@ class FieldMappingSuggestionReadModelTest extends TestCase
         $this->assertTrue($model->discoveryAvailable);
         $this->assertSame('sku', $skuRow->suggestedExternalFieldKey);
         $this->assertNull($skuRow->existingExternalFieldKey);
+    }
+
+    #[Test]
+    public function projection_tolerates_discovered_field_without_external_label(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $this->publishAuthoritativeSnapshot($account, ['url_path']);
+
+        ConnectorSchemaSnapshotField::withoutWorkspaceScope()
+            ->where('workspace_id', $account->workspace_id)
+            ->where('external_field_key', 'url_path')
+            ->update(['external_label' => null]);
+
+        $model = $this->project($account, $configuration);
+        $choice = collect($model->discoveredExternalChoices)
+            ->first(fn ($choice) => $choice->externalFieldKey === 'url_path');
+
+        $this->assertNotNull($choice);
+        $this->assertSame('', $choice->externalLabel);
     }
 
     #[Test]
