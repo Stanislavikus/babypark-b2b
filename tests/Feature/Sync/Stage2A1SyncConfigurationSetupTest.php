@@ -77,6 +77,37 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
     }
 
     #[Test]
+    public function sync_data_setup_translations_interpolate_context_and_selection_placeholders(): void
+    {
+        $context = ['platform' => 'Adobe Commerce', 'account' => 'BabyPark'];
+
+        $this->assertSame(
+            'Platform: Adobe Commerce · Account: BabyPark',
+            trans('sync_data_setup.adobe_products_export.context', $context, 'en'),
+        );
+        $this->assertSame(
+            'Платформа: Adobe Commerce · Акаунт: BabyPark',
+            trans('sync_data_setup.adobe_products_export.context', $context, 'uk'),
+        );
+        $this->assertSame(
+            'Platform: Adobe Commerce · Account: BabyPark',
+            trans('sync_data_setup.page.target_context', $context, 'en'),
+        );
+        $this->assertSame(
+            'Платформа: Adobe Commerce · Акаунт: BabyPark',
+            trans('sync_data_setup.page.target_context', $context, 'uk'),
+        );
+        $this->assertSame(
+            'Current selection: Default',
+            trans('sync_data_setup.adobe_products_export.current_selection', ['name' => 'Default'], 'en'),
+        );
+        $this->assertSame(
+            'Поточний вибір: Default',
+            trans('sync_data_setup.adobe_products_export.current_selection', ['name' => 'Default'], 'uk'),
+        );
+    }
+
+    #[Test]
     public function permission_catalogue_contains_exactly_ten_permissions_with_manage_sync_configurations(): void
     {
         $this->assertCount(10, WorkspacePermissions::catalogue());

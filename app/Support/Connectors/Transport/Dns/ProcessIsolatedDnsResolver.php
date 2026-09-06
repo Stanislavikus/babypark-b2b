@@ -47,7 +47,7 @@ final class ProcessIsolatedDnsResolver implements DnsResolver
         }
 
         $process = $this->processFactory->create([
-            PHP_BINARY,
+            PHP_BINDIR.DIRECTORY_SEPARATOR.'php',
             $this->resolverScriptPath,
         ]);
 

@@ -81,6 +81,27 @@ class ProcessIsolatedDnsResolverTest extends TestCase
     }
 
     #[Test]
+    public function production_resolver_uses_php_cli_binary_instead_of_current_sapi_binary(): void
+    {
+        $factory = new RecordingDnsChildProcessFactory;
+        $resolver = new ProcessIsolatedDnsResolver(
+            $factory,
+            new DnsResponseParser,
+            new FakeMonotonicClock,
+            $this->fixturesPath.'/fake-resolver.php',
+        );
+
+        $result = $resolver->resolve('public.example.com', $this->longDeadline());
+
+        $this->assertTrue($result->success);
+        $this->assertSame(
+            PHP_BINDIR.DIRECTORY_SEPARATOR.'php',
+            $factory->lastCommand[0] ?? null,
+        );
+        $this->assertSame($this->fixturesPath.'/fake-resolver.php', $factory->lastCommand[1] ?? null);
+    }
+
+    #[Test]
     public function malformed_json_is_protocol_failure(): void
     {
         $resolver = $this->resolverForFixture('malformed-json-resolver.php');
@@ -198,5 +219,18 @@ final class AdvancingMonotonicClock implements MonotonicClock
         $this->now += $this->advancePerRead;
 
         return $this->now;
+    }
+}
+
+final class RecordingDnsChildProcessFactory implements DnsChildProcessFactory
+{
+    /** @var list<string> */
+    public array $lastCommand = [];
+
+    public function create(array $command): Process
+    {
+        $this->lastCommand = $command;
+
+        return new Process($command);
     }
 }
