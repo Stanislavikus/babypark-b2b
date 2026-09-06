@@ -109,7 +109,7 @@ class FieldMappingSuggestionReadModelTest extends TestCase
 
         $model = $this->project($account, $configuration);
         $choice = collect($model->discoveredExternalChoices)
-            ->first(fn($choice) => $choice->externalFieldKey === 'url_path');
+            ->first(fn ($choice) => $choice->externalFieldKey === 'url_path');
 
         $this->assertNotNull($choice);
         $this->assertSame('', $choice->externalLabel);
