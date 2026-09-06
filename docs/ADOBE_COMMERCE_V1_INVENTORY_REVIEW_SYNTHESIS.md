@@ -77,3 +77,15 @@ After applying reviewer findings, Lead primary-source verification additionally:
 - added a machine-readable alias matrix for source keys that share semantics but require ID/code/label translation.
 
 These refinements do not alter connector runtime or frozen domain ownership.
+
+## Gemini 3.1 final completeness arbitration
+
+Gemini reviewed corrected HEAD `2d55f5992b90e690a6d9f9b5460ebd3b96c6a901` and returned `REQUIRES ONE MORE CORRECTION PASS`. Lead rechecked material findings against current Adobe primary sources and project `[Resolved]` ownership.
+
+**Accepted:** exact Bundle option/link structures; exact Configurable option/value/child-link structures; Downloadable link/sample subfields; `media_gallery_entries` as structured capability; SaaS file/image as READ-only projections; scoped Gift Card amount READ representation.
+
+**Modified:** Bundle `*_type` / `*_view` values are scalar externally but remain domain-owned Bundle composition values. `[Resolved]` treats Bundle/Kit as a distinct product composition capability, so scalar shape does not make them generic `semantic_field` / FieldMapping candidates. Import keys such as `configurable_variations`, `associated_skus`, and `categories` remain real inventory entries and are related to REST/GraphQL shapes through explicit alias groups rather than deleted as duplicates.
+
+**Rejected:** `tier_price.customer_group_id` for the current Catalog Pricing storage surface. Current Adobe `TierPriceStorageInterface` uses `customer_group`; Import advanced pricing exposes `tier_price_customer_group`. A legacy ID-based endpoint is a different surface and must not be collapsed into this contract.
+
+No new platform persistence/domain entity was introduced by this pass.

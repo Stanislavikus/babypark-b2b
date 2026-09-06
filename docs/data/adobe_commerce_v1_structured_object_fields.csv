@@ -127,3 +127,64 @@ inventory_sales_channel,code,connector_context,sales-channel topology code,Inven
 attribute_option,swatch_data,structured_capability,nested swatch representation for selectable option,Adobe GraphQL configurable options / SwatchData,SECOND_PASS_RESEARCH
 swatch_data,type,schema_metadata,swatch representation type where surface exposes it,Adobe GraphQL SwatchData / Catalog Service,SECOND_PASS_RESEARCH
 swatch_data,value,schema_metadata,"color HEX, image link, or text swatch payload",Adobe GraphQL SwatchDataInterface,SECOND_PASS_RESEARCH
+bundle_product_option,option_id,external_system_metadata,remote bundle option identity,Adobe Admin REST BundleDataOptionInterface,THIRD_PASS_RESEARCH
+bundle_product_option,title,domain_value,bundle option title,Adobe Admin REST BundleDataOptionInterface,THIRD_PASS_RESEARCH
+bundle_product_option,type,domain_value,bundle option selection type,Adobe Admin REST BundleDataOptionInterface,THIRD_PASS_RESEARCH
+bundle_product_option,required,domain_value,whether a bundle option is required,Adobe Admin REST BundleDataOptionInterface,THIRD_PASS_RESEARCH
+bundle_product_option,position,domain_value,bundle option ordering,Adobe Admin REST BundleDataOptionInterface,THIRD_PASS_RESEARCH
+bundle_product_option,sku,external_system_metadata,parent product reference identity,Adobe Admin REST BundleDataOptionInterface,THIRD_PASS_RESEARCH
+bundle_product_option,product_links,structured_capability,nested bundle selections/links,Adobe Admin REST BundleDataOptionInterface,THIRD_PASS_RESEARCH
+bundle_product_link,id,external_system_metadata,remote bundle selection/link identity,Adobe Admin REST BundleDataLinkInterface,THIRD_PASS_RESEARCH
+bundle_product_link,sku,external_system_metadata,linked child SKU reference,Adobe Admin REST BundleDataLinkInterface,THIRD_PASS_RESEARCH
+bundle_product_link,option_id,external_system_metadata,parent bundle option reference,Adobe Admin REST BundleDataLinkInterface,THIRD_PASS_RESEARCH
+bundle_product_link,qty,domain_value,default linked quantity,Adobe Admin REST BundleDataLinkInterface,THIRD_PASS_RESEARCH
+bundle_product_link,position,domain_value,selection ordering,Adobe Admin REST BundleDataLinkInterface,THIRD_PASS_RESEARCH
+bundle_product_link,is_default,domain_value,default selection flag,Adobe Admin REST BundleDataLinkInterface,THIRD_PASS_RESEARCH
+bundle_product_link,price,domain_value,selection price/value,Adobe Admin REST BundleDataLinkInterface,THIRD_PASS_RESEARCH
+bundle_product_link,price_type,domain_value,selection price interpretation,Adobe Admin REST BundleDataLinkInterface,THIRD_PASS_RESEARCH
+bundle_product_link,can_change_quantity,domain_value,merchant/customer quantity mutability flag,Adobe Admin REST BundleDataLinkInterface,THIRD_PASS_RESEARCH
+bundle_import_value,name,domain_value,bundle option name/title in Import payload,Adobe catalog_product Import API bundle_values,THIRD_PASS_RESEARCH
+bundle_import_value,type,domain_value,bundle option selection type in Import payload,Adobe catalog_product Import API bundle_values,THIRD_PASS_RESEARCH
+bundle_import_value,required,domain_value,bundle option required flag in Import payload,Adobe catalog_product Import API bundle_values,THIRD_PASS_RESEARCH
+bundle_import_value,sku,external_system_metadata,linked child SKU reference,Adobe catalog_product Import API bundle_values,THIRD_PASS_RESEARCH
+bundle_import_value,price,domain_value,selection price/value in Import payload,Adobe catalog_product Import API bundle_values,THIRD_PASS_RESEARCH
+bundle_import_value,default,domain_value,default selection flag in Import payload,Adobe catalog_product Import API bundle_values,THIRD_PASS_RESEARCH
+bundle_import_value,default_qty,domain_value,default linked quantity in Import payload,Adobe catalog_product Import API bundle_values,THIRD_PASS_RESEARCH
+bundle_import_value,price_type,domain_value,selection price interpretation in Import payload,Adobe catalog_product Import API bundle_values,THIRD_PASS_RESEARCH
+bundle_import_value,can_change_qty,domain_value,quantity mutability in Import payload,Adobe catalog_product Import API bundle_values,THIRD_PASS_RESEARCH
+configurable_product_option,id,external_system_metadata,remote configurable option identity,Adobe Admin REST ConfigurableProductDataOptionInterface,THIRD_PASS_RESEARCH
+configurable_product_option,attribute_id,schema_metadata,Adobe EAV attribute identity used as variant dimension,Adobe Admin REST ConfigurableProductDataOptionInterface,THIRD_PASS_RESEARCH
+configurable_product_option,label,schema_metadata,configured option label,Adobe Admin REST ConfigurableProductDataOptionInterface,THIRD_PASS_RESEARCH
+configurable_product_option,position,domain_value,configurable option ordering,Adobe Admin REST ConfigurableProductDataOptionInterface,THIRD_PASS_RESEARCH
+configurable_product_option,is_use_default,domain_value,use-default label/configuration flag,Adobe Admin REST ConfigurableProductDataOptionInterface,THIRD_PASS_RESEARCH
+configurable_product_option,values,structured_capability,allowed option-value identities,Adobe Admin REST ConfigurableProductDataOptionInterface,THIRD_PASS_RESEARCH
+configurable_product_option_value,value_index,schema_metadata,external option value identity/index,Adobe Admin REST ConfigurableProductDataOptionValueInterface,THIRD_PASS_RESEARCH
+configurable_product_link,parent_sku,external_system_metadata,configurable parent SKU reference,Adobe Admin REST configurable child-link endpoint,THIRD_PASS_RESEARCH
+configurable_product_link,child_sku,external_system_metadata,simple child SKU reference,Adobe Admin REST configurable child-link endpoint,THIRD_PASS_RESEARCH
+downloadable_link,link_id,external_system_metadata,Import/downloadable link identity,Adobe catalog_product Import API / downloadable link contract,THIRD_PASS_RESEARCH
+downloadable_link,id,external_system_metadata,downloadable link identity on Admin REST-compatible surfaces,Adobe catalog_product Import API / downloadable link contract,THIRD_PASS_RESEARCH
+downloadable_link,uid,external_system_metadata,GraphQL downloadable link identity,Adobe GraphQL DownloadableProduct READ,THIRD_PASS_RESEARCH
+downloadable_link,title,domain_value,merchant-visible downloadable link title,Adobe catalog_product Import API / downloadable link contract,THIRD_PASS_RESEARCH
+downloadable_link,sort_order,domain_value,downloadable link ordering,Adobe catalog_product Import API / downloadable link contract,THIRD_PASS_RESEARCH
+downloadable_link,sample_type,domain_value,sample storage/reference type,Adobe catalog_product Import API / downloadable link contract,THIRD_PASS_RESEARCH
+downloadable_link,sample_file,domain_value,sample file reference,Adobe catalog_product Import API / downloadable link contract,THIRD_PASS_RESEARCH
+downloadable_link,sample_url,derived_projection,GraphQL READ sample URL,Adobe GraphQL DownloadableProduct READ,THIRD_PASS_RESEARCH
+downloadable_link,price,domain_value,downloadable link price,Adobe catalog_product Import API / downloadable link contract,THIRD_PASS_RESEARCH
+downloadable_link,number_of_downloads,domain_value,download limit,Adobe catalog_product Import API / downloadable link contract,THIRD_PASS_RESEARCH
+downloadable_link,is_shareable,domain_value,shareability flag,Adobe catalog_product Import API / downloadable link contract,THIRD_PASS_RESEARCH
+downloadable_link,link_type,domain_value,file/reference link type,Adobe catalog_product Import API / downloadable link contract,THIRD_PASS_RESEARCH
+downloadable_link,link_file,domain_value,downloadable file reference,Adobe catalog_product Import API / downloadable link contract,THIRD_PASS_RESEARCH
+downloadable_sample,sample_id,external_system_metadata,Import/downloadable sample identity,Adobe catalog_product Import API / downloadable sample contract,THIRD_PASS_RESEARCH
+downloadable_sample,id,external_system_metadata,downloadable sample identity on Admin REST-compatible surfaces,Adobe catalog_product Import API / downloadable sample contract,THIRD_PASS_RESEARCH
+downloadable_sample,uid,external_system_metadata,GraphQL downloadable sample identity,Adobe GraphQL DownloadableProduct READ,THIRD_PASS_RESEARCH
+downloadable_sample,title,domain_value,merchant-visible sample title,Adobe catalog_product Import API / downloadable sample contract,THIRD_PASS_RESEARCH
+downloadable_sample,sort_order,domain_value,sample ordering,Adobe catalog_product Import API / downloadable sample contract,THIRD_PASS_RESEARCH
+downloadable_sample,sample_type,domain_value,sample storage/reference type,Adobe catalog_product Import API / downloadable sample contract,THIRD_PASS_RESEARCH
+downloadable_sample,sample_file,domain_value,sample file reference,Adobe catalog_product Import API / downloadable sample contract,THIRD_PASS_RESEARCH
+downloadable_sample,sample_url,derived_projection,GraphQL READ sample URL,Adobe GraphQL DownloadableProduct READ,THIRD_PASS_RESEARCH
+giftcard_amount,uid,external_system_metadata,GraphQL gift-card amount identity,Adobe core GraphQL GiftCardAmounts READ,THIRD_PASS_RESEARCH
+giftcard_amount,value_id,external_system_metadata,deprecated GraphQL amount identity,Adobe core GraphQL GiftCardAmounts READ,THIRD_PASS_RESEARCH
+giftcard_amount,attribute_id,schema_metadata,gift-card amount attribute identity,Adobe core GraphQL GiftCardAmounts READ,THIRD_PASS_RESEARCH
+giftcard_amount,website_id,connector_context,website scope for displayed amount,Adobe core GraphQL GiftCardAmounts READ,THIRD_PASS_RESEARCH
+giftcard_amount,value,domain_value,base gift-card preset amount,Adobe core GraphQL GiftCardAmounts READ,THIRD_PASS_RESEARCH
+giftcard_amount,website_value,domain_value,website-scoped gift-card amount,Adobe core GraphQL GiftCardAmounts READ,THIRD_PASS_RESEARCH

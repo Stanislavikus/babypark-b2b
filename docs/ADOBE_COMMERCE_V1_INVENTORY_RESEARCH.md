@@ -1,6 +1,6 @@
-# Adobe Commerce / Magento V1 Product & Capability Inventory — Initial Research
+# Adobe Commerce / Magento V1 Product & Capability Inventory
 
-Status: **INITIAL_RESEARCH — NOT FROZEN**
+Status: **FINAL CORRECTION PASS — LEAD FREEZE GATE PENDING CI**
 
 This document is a review artifact for building the platform-wide Adobe Commerce / Magento product connector inventory. It deliberately does **not** use the current smoke store as the definition of Magento scope. A connected store is only live evidence for later validation.
 
@@ -124,7 +124,7 @@ Primary clusters currently include:
 
 Lead arbitration over the GPT-5.4 and Sonnet blind reviews is now applied to the matrices.
 
-Current row-level coverage after correction: **181 top-level field/capability entries**, **128 structured-object subfields**, **28 cluster families**, **14 edition/API/source surfaces**, and **13 explicit alias rows**.
+Current row-level coverage after correction: **183 top-level field/capability entries**, **189 structured-object subfields**, **28 cluster families**, **14 edition/API/source surfaces**, and **39 explicit alias rows**.
 
 Material corrections include:
 
@@ -139,6 +139,22 @@ Material corrections include:
 - nested SKU references classified as object anchors rather than new canonical Product fields.
 
 The frozen project decision for Adobe `visibility` remains unchanged: runtime WRITE support does not turn it into a generic FieldMapping-owned semantic field.
+
+## Final completeness correction pass applied
+
+Gemini 3.1 independently challenged the corrected second-pass inventory. Lead arbitration accepted remaining Bundle, Configurable, Downloadable, media and gift-card structural omissions while rejecting or modifying findings that conflicted with current primary sources or project ownership.
+
+Final corrected coverage: **183 top-level entries**, **189 structured subfields**, **28 clusters**, **14 source/API surfaces**, and **39 explicit alias rows**.
+
+Key final corrections:
+
+- exact Admin REST Bundle option/link and Configurable option/child-link structures;
+- Downloadable link/sample identity, ordering, file/sample and pricing subfields;
+- Bundle scalar settings remain domain-owned composition values rather than generic Product FieldMapping fields;
+- `media_gallery_entries` is a structured media capability;
+- SaaS file/image attribute representations are READ-only derived projections unless a separate write surface is proven;
+- Import composition/category/group/tier/gift-card keys remain inventoried and are related to REST/GraphQL representations through explicit non-raw-equal alias groups;
+- current Catalog Pricing REST uses `customer_group`, not `customer_group_id`.
 
 ## Current platform Field Dictionary — comparison input, not authority
 
@@ -170,6 +186,8 @@ For each Adobe field/capability, determine one of these outcomes:
 Only outcome (2) should expand the platform base field library, and only after semantic comparison with other major ecosystems.
 
 This later cross-platform pass should deliberately search for common concepts under different names, not copy source vocabulary. Examples to investigate include identifiers, dimensions/measurements, lifecycle/condition, manufacturer/brand/model, SEO, shipping/fulfillment, product relations, media roles, option/configuration semantics and channel-specific visibility.
+
+Gemini final review adds two especially valuable carry-forward comparison candidates without promoting them to FieldDefinitions: **product composition topology** (option/selection/variant/member relationships) and **tier/volume pricing scope** (quantity + customer-group/website context).
 
 ## Schema freshness model
 
@@ -212,22 +230,11 @@ The detailed technical inventory can remain internal/advanced by default.
 - No assumption that Adobe Import API names equal Admin REST field paths one-to-one.
 - No assumption that Catalog Service read-only fields imply write capability.
 - No assumption that every PaaS capability exists on Adobe Commerce SaaS, or vice versa.
-- No final cluster freeze until independent review.
+- No final cluster freeze until the final Lead consistency/CI gate completes.
 - No UX page implementation yet; first establish the inventory/ownership truth that the page should present.
 
-## Next review task
+## Next gate
 
-Give this document + three CSVs + current `develop` to independent reviewer(s), preferably Opus and/or Sonnet. Ask only for:
+No further frontier review is required unless the final consistency/CI gate reveals a new contradiction. GPT-5.4, Sonnet and Gemini 3.1 have already independently challenged the inventory.
 
-- missing Adobe Commerce / Magento product fields or capability families;
-- edition/version-specific surfaces that should be added or separated;
-- fields placed in the wrong cluster;
-- incorrect Product/ProductVariant/domain/connector/system ownership;
-- incorrect `semantic_field` / `domain_value` / `structured_capability` / `connector_context` / `schema_metadata` / `external_system_metadata` / `derived_projection` classification;
-- over-broad or under-broad clusters;
-- capabilities incorrectly treated as FieldMapping candidates;
-- useful universal field candidates that should later be compared with Shopify/Google/standards;
-- duplicates/aliases where multiple Adobe API surfaces represent the same semantic value;
-- claims of READ/WRITE support that need stronger primary-source evidence.
-
-Do **not** ask the reviewer to redesign the entire connector architecture unless it finds a concrete contradiction with authoritative project docs.
+Next: final Lead review of the corrected matrices, CI on the exact correction HEAD, then either freeze the Adobe inventory for platform-representation mapping or record a concrete remaining blocker.
