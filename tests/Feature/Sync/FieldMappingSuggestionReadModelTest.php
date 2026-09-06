@@ -96,6 +96,26 @@ class FieldMappingSuggestionReadModelTest extends TestCase
     }
 
     #[Test]
+    public function projection_tolerates_discovered_field_without_external_label(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $this->publishAuthoritativeSnapshot($account, ['url_path']);
+
+        \App\Models\ConnectorSchemaSnapshotField::withoutWorkspaceScope()
+            ->where('workspace_id', $account->workspace_id)
+            ->where('external_field_key', 'url_path')
+            ->update(['external_label' => null]);
+
+        $model = $this->project($account, $configuration);
+        $choice = collect($model->discoveredExternalChoices)
+            ->first(fn ($choice) => $choice->externalFieldKey === 'url_path');
+
+        $this->assertNotNull($choice);
+        $this->assertSame('', $choice->externalLabel);
+    }
+
+    #[Test]
     public function adobe_description_does_not_suggest_description_due_to_transport_path_mismatch(): void
     {
         $account = $this->createSyncSupportAccount();

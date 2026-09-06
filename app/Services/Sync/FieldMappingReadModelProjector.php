@@ -324,7 +324,7 @@ final class FieldMappingReadModelProjector
         foreach ($snapshotFieldsByKey as $field) {
             $choices[] = new DiscoveredExternalFieldChoice(
                 externalFieldKey: $field->external_field_key,
-                externalLabel: $field->external_label,
+                externalLabel: $field->external_label ?? '',
                 normalizedDataType: $field->normalized_data_type,
                 isRequired: $field->is_required,
                 isMultiValue: $field->is_multi_value,
