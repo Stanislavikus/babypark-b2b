@@ -1,0 +1,40 @@
+alias_group,semantic_concept,surface_key,source_surface,identity_rule,review_status
+product_type,product type discriminator,type_id,REST/ProductInterface,ID/code alias; keep connector-context ownership,SECOND_PASS_RESEARCH
+product_type,product type discriminator,product_type,Import API,bulk alias; keep separate source identity,SECOND_PASS_RESEARCH
+status,product enabled/disabled state,status,REST/EAV,semantic alias group,SECOND_PASS_RESEARCH
+status,product enabled/disabled state,product_online,Import API,"bulk values 1/2; translate, do not collapse raw identity",SECOND_PASS_RESEARCH
+meta_keyword,SEO meta keyword,meta_keyword,REST/EAV,singular REST/EAV key,SECOND_PASS_RESEARCH
+meta_keyword,SEO meta keyword,meta_keywords,Import API,plural bulk alias,SECOND_PASS_RESEARCH
+tax_class,tax classification,tax_class_id,REST/EAV,identifier form; resolve through tax configuration,SECOND_PASS_RESEARCH
+tax_class,tax classification,tax_class_name,Import API,label/name form; not raw-equal to ID,SECOND_PASS_RESEARCH
+attribute_set,Adobe attribute-set identity,attribute_set_id,REST,identifier form; connector context,SECOND_PASS_RESEARCH
+attribute_set,Adobe attribute-set identity,attribute_set_code,Import API,"code/name form; resolve, do not map as Product field",SECOND_PASS_RESEARCH
+website_assignment,website assignment,website_id,REST/pricing scope,website ID form,SECOND_PASS_RESEARCH
+website_assignment,website assignment,product_websites,Import API,website code list; requires code/ID resolution,SECOND_PASS_RESEARCH
+website_assignment,website assignment,website_assignment,Admin REST capability,structured assignment capability,SECOND_PASS_RESEARCH
+bundle_price_type,bundle price mode,bundle_price_type,Import API,bulk key; translate/compare with REST EAV value,THIRD_PASS_RESEARCH
+bundle_price_type,bundle price mode,price_type,Admin REST EAV/custom_attributes,REST/EAV key; not generic Product field,THIRD_PASS_RESEARCH
+bundle_sku_type,bundle SKU mode,bundle_sku_type,Import API,bulk key; related to REST EAV value,THIRD_PASS_RESEARCH
+bundle_sku_type,bundle SKU mode,sku_type,Admin REST EAV/custom_attributes,REST/EAV key; bundle-domain setting,THIRD_PASS_RESEARCH
+bundle_price_view,bundle price display mode,bundle_price_view,Import API,bulk key; related to REST EAV value,THIRD_PASS_RESEARCH
+bundle_price_view,bundle price display mode,price_view,Admin REST EAV/custom_attributes,REST/EAV key; bundle-domain setting,THIRD_PASS_RESEARCH
+bundle_weight_type,bundle weight mode,bundle_weight_type,Import API,bulk key; related to REST EAV value,THIRD_PASS_RESEARCH
+bundle_weight_type,bundle weight mode,weight_type,Admin REST EAV/custom_attributes,REST/EAV key; bundle-domain setting,THIRD_PASS_RESEARCH
+bundle_shipment_type,bundle shipment mode,bundle_shipment_type,Import API,bulk key; related to REST EAV value,THIRD_PASS_RESEARCH
+bundle_shipment_type,bundle shipment mode,shipment_type,Admin REST EAV/custom_attributes,REST/EAV key; bundle-domain setting,THIRD_PASS_RESEARCH
+bundle_composition,bundle option/selection composition,bundle_values,Import API,combined bulk option+selection representation; not raw-equal to REST objects,THIRD_PASS_RESEARCH
+bundle_composition,bundle option/selection composition,bundle_product_options,Admin REST,structured option objects,THIRD_PASS_RESEARCH
+bundle_composition,bundle option/selection composition,bundle_product_links,Admin REST,structured selection/link objects,THIRD_PASS_RESEARCH
+configurable_composition,configurable option/child composition,configurable_variations,Import API,bulk child+option-value representation,THIRD_PASS_RESEARCH
+configurable_composition,configurable option/child composition,configurable_variation_labels,Import API,bulk option-label representation,THIRD_PASS_RESEARCH
+configurable_composition,configurable option/child composition,configurable_product_options,Admin REST,structured configurable option objects,THIRD_PASS_RESEARCH
+configurable_composition,configurable option/child composition,configurable_product_links,Admin REST,parent-child link capability,THIRD_PASS_RESEARCH
+grouped_composition,grouped child composition,associated_skus,Import API,bulk SKU→qty representation,THIRD_PASS_RESEARCH
+grouped_composition,grouped child composition,product_links[link_type=associated],Admin REST,structured associated-product relation,THIRD_PASS_RESEARCH
+category_assignment,product category assignment,categories,Import API,category path/list representation; resolve to category identity,THIRD_PASS_RESEARCH
+category_assignment,product category assignment,category_link,Admin REST,category_id + position object; not raw-equal to path list,THIRD_PASS_RESEARCH
+category_assignment,product category assignment,categories,core GraphQL READ,read category object list; no WRITE inference,THIRD_PASS_RESEARCH
+tier_price_customer_group,tier price customer-group scope,tier_price_customer_group,Import advanced_pricing,bulk group label/code representation,THIRD_PASS_RESEARCH
+tier_price_customer_group,tier price customer-group scope,customer_group,Catalog Pricing REST,current TierPriceStorageInterface string field,THIRD_PASS_RESEARCH
+giftcard_amount,gift-card preset amount,giftcard_amount,Import API,flat preset amount array for bulk import,THIRD_PASS_RESEARCH
+giftcard_amount,gift-card preset amount,giftcard_amounts,core GraphQL READ,scoped amount objects; read representation only,THIRD_PASS_RESEARCH
