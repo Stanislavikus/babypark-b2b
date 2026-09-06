@@ -1,91 +1,107 @@
 alias_group,semantic_concept,surface_key,source_surface,identity_rule,review_status
-product_title,Product title/name,Product.title,Admin GraphQL,same merchant semantic; GraphQL current authority,INITIAL_RESEARCH
-product_title,Product title/name,Title,Product CSV,same merchant semantic; GraphQL current authority,INITIAL_RESEARCH
-product_title,Product title/name,title,legacy REST,same merchant semantic; GraphQL current authority,INITIAL_RESEARCH
-product_description,Product rich description,Product.descriptionHtml,Admin GraphQL,same rich description representation; plain Product.description is derived text,INITIAL_RESEARCH
-product_description,Product rich description,Description,Product CSV,same rich description representation; plain Product.description is derived text,INITIAL_RESEARCH
-product_description,Product rich description,body_html,legacy REST,same rich description representation; plain Product.description is derived text,INITIAL_RESEARCH
-vendor,Vendor/brand-like label,Product.vendor,Admin GraphQL,raw external equality does not prove canonical brand equivalence,INITIAL_RESEARCH
-vendor,Vendor/brand-like label,Vendor,Product CSV,raw external equality does not prove canonical brand equivalence,INITIAL_RESEARCH
-vendor,Vendor/brand-like label,vendor,legacy REST,raw external equality does not prove canonical brand equivalence,INITIAL_RESEARCH
-merchant_type,Merchant-defined product type,Product.productType,Admin GraphQL,merchant classification; distinct from platform ProductType template,INITIAL_RESEARCH
-merchant_type,Merchant-defined product type,Type,Product CSV,merchant classification; distinct from platform ProductType template,INITIAL_RESEARCH
-merchant_type,Merchant-defined product type,product_type,legacy REST,merchant classification; distinct from platform ProductType template,INITIAL_RESEARCH
-tags,Merchant tags,Product.tags,Admin GraphQL,multi-value representation differs by surface,INITIAL_RESEARCH
-tags,Merchant tags,Tags,Product CSV,multi-value representation differs by surface,INITIAL_RESEARCH
-tags,Merchant tags,tags,legacy REST,multi-value representation differs by surface,INITIAL_RESEARCH
-handle,Shopify product handle,Product.handle,Admin GraphQL,connector routing identity; not canonical absolute URL,INITIAL_RESEARCH
-handle,Shopify product handle,URL handle,Product CSV,connector routing identity; not canonical absolute URL,INITIAL_RESEARCH
-handle,Shopify product handle,handle,legacy REST,connector routing identity; not canonical absolute URL,INITIAL_RESEARCH
-product_status,Product lifecycle status,Product.status,Admin GraphQL,normalize enum per current GraphQL,INITIAL_RESEARCH
-product_status,Product lifecycle status,Status,Product CSV,normalize enum per current GraphQL,INITIAL_RESEARCH
-product_status,Product lifecycle status,status,legacy/admin representation,normalize enum per current GraphQL,INITIAL_RESEARCH
-taxonomy_category,Shopify taxonomy category,Product.category.id,Admin GraphQL,GID/category representation vs CSV taxonomy text; not merchant navigation category,INITIAL_RESEARCH
-taxonomy_category,Shopify taxonomy category,Product category,Product CSV,GID/category representation vs CSV taxonomy text; not merchant navigation category,INITIAL_RESEARCH
-variant_sku,Variant SKU,ProductVariant.inventoryItem.sku,Admin GraphQL current owner,variant/inventory-item representation alias,INITIAL_RESEARCH
-variant_sku,Variant SKU,SKU,Product CSV,variant/inventory-item representation alias,INITIAL_RESEARCH
-variant_sku,Variant SKU,variants.sku,legacy REST,variant/inventory-item representation alias,INITIAL_RESEARCH
-variant_barcode,Variant barcode,ProductVariant.barcode,Admin GraphQL,barcode/GTIN semantic candidate; validation required,INITIAL_RESEARCH
-variant_barcode,Variant barcode,Barcode,Product CSV,barcode/GTIN semantic candidate; validation required,INITIAL_RESEARCH
-variant_barcode,Variant barcode,variants.barcode,legacy REST,barcode/GTIN semantic candidate; validation required,INITIAL_RESEARCH
-variant_price,Variant base price,ProductVariant.price,Admin GraphQL,Pricing owner,INITIAL_RESEARCH
-variant_price,Variant base price,Price,Product CSV,Pricing owner,INITIAL_RESEARCH
-variant_price,Variant base price,variants.price,legacy REST,Pricing owner,INITIAL_RESEARCH
-variant_compare_at,Variant compare-at price,ProductVariant.compareAtPrice,Admin GraphQL,Pricing owner,INITIAL_RESEARCH
-variant_compare_at,Variant compare-at price,Compare-at price,Product CSV,Pricing owner,INITIAL_RESEARCH
-variant_compare_at,Variant compare-at price,variants.compare_at_price,legacy REST,Pricing owner,INITIAL_RESEARCH
-inventory_policy,Out-of-stock sell policy,ProductVariant.inventoryPolicy,Admin GraphQL,enum/boolean representation differs,INITIAL_RESEARCH
-inventory_policy,Out-of-stock sell policy,Continue selling when out of stock,Product CSV,enum/boolean representation differs,INITIAL_RESEARCH
-inventory_policy,Out-of-stock sell policy,variants.inventory_policy,legacy REST,enum/boolean representation differs,INITIAL_RESEARCH
-requires_shipping,Requires physical shipping,InventoryItem.requiresShipping,Admin GraphQL,fulfillment semantic,INITIAL_RESEARCH
-requires_shipping,Requires physical shipping,Requires shipping,Product CSV,fulfillment semantic,INITIAL_RESEARCH
-requires_shipping,Requires physical shipping,variants.requires_shipping,legacy REST,fulfillment semantic,INITIAL_RESEARCH
-unit_cost,Unit cost,InventoryItem.unitCost,Admin GraphQL READ,same internal cost semantic across read/write representations,INITIAL_RESEARCH
-unit_cost,Unit cost,InventoryItemInput.cost,Admin GraphQL WRITE,same internal cost semantic across read/write representations,INITIAL_RESEARCH
-unit_cost,Unit cost,Cost per item,Product CSV,same internal cost semantic across read/write representations,INITIAL_RESEARCH
-hs_code,Harmonized system code,InventoryItem.harmonizedSystemCode,Admin GraphQL,customs semantic,INITIAL_RESEARCH
-hs_code,Harmonized system code,HS code,Product CSV,customs semantic,INITIAL_RESEARCH
-origin_country,Country of origin,InventoryItem.countryCodeOfOrigin,Admin GraphQL,ISO code/value representation,INITIAL_RESEARCH
-origin_country,Country of origin,Country of origin,Product CSV,ISO code/value representation,INITIAL_RESEARCH
-taxable,Taxable flag,ProductVariant.taxable,Admin GraphQL,tax domain,INITIAL_RESEARCH
-taxable,Taxable flag,Charge tax,Product CSV,tax domain,INITIAL_RESEARCH
-taxable,Taxable flag,variants.taxable,legacy REST,tax domain,INITIAL_RESEARCH
-seo_title,SEO title,Product.seo.title,Admin GraphQL,SEO semantic,INITIAL_RESEARCH
-seo_title,SEO title,SEO title,Product CSV,SEO semantic,INITIAL_RESEARCH
-seo_description,SEO description,Product.seo.description,Admin GraphQL,SEO semantic,INITIAL_RESEARCH
-seo_description,SEO description,SEO description,Product CSV,SEO semantic,INITIAL_RESEARCH
-product_metafield,Product metafield,"Product.metafields[namespace,key]",Admin GraphQL,dynamic field identity by namespace+key; CSV Product only,INITIAL_RESEARCH
-product_metafield,Product metafield,product.metafields.<namespace>.<key>,Product CSV,dynamic field identity by namespace+key; CSV Product only,INITIAL_RESEARCH
-option_name_1,First option dimension,Product.options[position=1].name,Admin GraphQL,position-based CSV alias to option GID/name,INITIAL_RESEARCH
-option_name_1,First option dimension,Option1 name,Product CSV,position-based CSV alias to option GID/name,INITIAL_RESEARCH
-option_value_1,First option value,ProductVariant.selectedOptions[position=1],Admin GraphQL,position/name/value relation,INITIAL_RESEARCH
-option_value_1,First option value,Option1 value,Product CSV,position/name/value relation,INITIAL_RESEARCH
-image_source,Product image source,MediaImage/image originalSource mutation,Admin GraphQL,media transport surface differs,INITIAL_RESEARCH
-image_source,Product image source,Image URL,Product CSV,media transport surface differs,INITIAL_RESEARCH
-image_alt,Image alt text,Media.alt,Admin GraphQL,Media owner,INITIAL_RESEARCH
-image_alt,Image alt text,Image alt text,Product CSV,Media owner,INITIAL_RESEARCH
-variant_image,Variant media association,ProductVariant.media,Admin GraphQL,GraphQL supports richer media types than CSV,INITIAL_RESEARCH
-variant_image,Variant media association,Variant image URL,Product CSV,GraphQL supports richer media types than CSV,INITIAL_RESEARCH
-market_inclusion,Market product inclusion,Catalog.publication/Product publication,Admin GraphQL,non-raw-equal channel context representation,INITIAL_RESEARCH
-market_inclusion,Market product inclusion,Included / [Market],Product CSV,non-raw-equal channel context representation,INITIAL_RESEARCH
-market_price,Market-specific price,PriceList.prices,Admin GraphQL,non-raw-equal Pricing context,INITIAL_RESEARCH
-market_price,Market-specific price,Price / [Market],Product CSV,non-raw-equal Pricing context,INITIAL_RESEARCH
-market_compare_at,Market-specific compare-at,PriceList fixed price compareAtPrice,Admin GraphQL,non-raw-equal Pricing context,INITIAL_RESEARCH
-market_compare_at,Market-specific compare-at,Compare-at price / [Market],Product CSV,non-raw-equal Pricing context,INITIAL_RESEARCH
-publication,Channel publication,Publishable/resourcePublications,Admin GraphQL,CSV represents online store only; GraphQL publications are multi-channel,INITIAL_RESEARCH
-publication,Channel publication,Published on online store,Product CSV,CSV represents online store only; GraphQL publications are multi-channel,INITIAL_RESEARCH
-variant_publication,Variant publication,ProductVariant.resourcePublications,Admin GraphQL 2026-07,2026-07 adds variant Publishable; product publication precedence remains,INITIAL_RESEARCH
-variant_publication,Variant publication,ProductVariantsBulkInput.published,Admin GraphQL create input,2026-07 adds variant Publishable; product publication precedence remains,INITIAL_RESEARCH
-product_title,Product title/name,ProductSetInput.title,productSet,same semantic; productSet is write representation,INITIAL_RESEARCH
-product_variants,Product variant list,ProductSetInput.variants,productSet,same relationship; productSet list is replacement-style,INITIAL_RESEARCH
-product_variants,Product variant list,Product.variants,Admin GraphQL,same relationship; productSet list is replacement-style,INITIAL_RESEARCH
-product_metafields,Product metafields,ProductSetInput.metafields,productSet,same dynamic-field collection; productSet list replacement is consequential,INITIAL_RESEARCH
-product_metafields,Product metafields,Product.metafields,Admin GraphQL,same dynamic-field collection; productSet list replacement is consequential,INITIAL_RESEARCH
-product_collections,Product collection membership,ProductSetInput.collections,productSet,same relation; productSet list replacement vs join/leave mutation semantics differ,INITIAL_RESEARCH
-product_collections,Product collection membership,Product.collections,Admin GraphQL,same relation; productSet list replacement vs join/leave mutation semantics differ,INITIAL_RESEARCH
-product_files_media,Product files/media,ProductSetInput.files,productSet,write file input vs media read representation; not raw-equal,INITIAL_RESEARCH
-product_files_media,Product files/media,Product.media,Admin GraphQL,write file input vs media read representation; not raw-equal,INITIAL_RESEARCH
-gift_card_title,Gift-card product title,GiftCardProductSetInput.title,giftCardProductSet,specialized write surface maps to common Product title,INITIAL_RESEARCH
-gift_card_title,Gift-card product title,Product.title,Admin GraphQL,specialized write surface maps to common Product title,INITIAL_RESEARCH
-quantity_price_break,Quantity tier price,QuantityPriceBreak.minimumQuantity+price,Admin GraphQL,same Pricing-owned tier structure,INITIAL_RESEARCH
-quantity_price_break,Quantity tier price,PriceListPrice.quantityPriceBreaks,Admin GraphQL,same Pricing-owned tier structure,INITIAL_RESEARCH
+product_title,Product title/name,Product.title,admin_graphql_product,same merchant semantic; GraphQL current authority,INITIAL_RESEARCH
+product_title,Product title/name,Title,product_csv,same merchant semantic; GraphQL current authority,INITIAL_RESEARCH
+product_title,Product title/name,title,admin_rest_legacy,same merchant semantic; GraphQL current authority,INITIAL_RESEARCH
+product_description,Product rich description,Product.descriptionHtml,admin_graphql_product,same rich description representation; plain Product.description is derived text,INITIAL_RESEARCH
+product_description,Product rich description,Description,product_csv,same rich description representation; plain Product.description is derived text,INITIAL_RESEARCH
+product_description,Product rich description,body_html,admin_rest_legacy,same rich description representation; plain Product.description is derived text,INITIAL_RESEARCH
+vendor,Vendor/brand-like label,Product.vendor,admin_graphql_product,raw external equality does not prove canonical brand equivalence,INITIAL_RESEARCH
+vendor,Vendor/brand-like label,Vendor,product_csv,raw external equality does not prove canonical brand equivalence,INITIAL_RESEARCH
+vendor,Vendor/brand-like label,vendor,admin_rest_legacy,raw external equality does not prove canonical brand equivalence,INITIAL_RESEARCH
+merchant_type,Merchant-defined product type,Product.productType,admin_graphql_product,merchant classification; distinct from platform ProductType template,INITIAL_RESEARCH
+merchant_type,Merchant-defined product type,Type,product_csv,merchant classification; distinct from platform ProductType template,INITIAL_RESEARCH
+merchant_type,Merchant-defined product type,product_type,admin_rest_legacy,merchant classification; distinct from platform ProductType template,INITIAL_RESEARCH
+tags,Merchant tags,Product.tags,admin_graphql_product,multi-value representation differs by surface,INITIAL_RESEARCH
+tags,Merchant tags,Tags,product_csv,multi-value representation differs by surface,INITIAL_RESEARCH
+tags,Merchant tags,tags,admin_rest_legacy,multi-value representation differs by surface,INITIAL_RESEARCH
+handle,Shopify product handle,Product.handle,admin_graphql_product,connector routing identity; not canonical absolute URL,INITIAL_RESEARCH
+handle,Shopify product handle,URL handle,product_csv,connector routing identity; not canonical absolute URL,INITIAL_RESEARCH
+handle,Shopify product handle,handle,admin_rest_legacy,connector routing identity; not canonical absolute URL,INITIAL_RESEARCH
+product_status,Product lifecycle status,Product.status,admin_graphql_product,normalize enum per current GraphQL,INITIAL_RESEARCH
+product_status,Product lifecycle status,Status,product_csv,normalize enum per current GraphQL,INITIAL_RESEARCH
+product_status,Product lifecycle status,status,admin_rest_legacy,normalize enum per current GraphQL,INITIAL_RESEARCH
+taxonomy_category,Shopify taxonomy category,Product.category.id,admin_graphql_product,GID/category representation vs CSV taxonomy text; not merchant navigation category,INITIAL_RESEARCH
+taxonomy_category,Shopify taxonomy category,Product category,product_csv,GID/category representation vs CSV taxonomy text; not merchant navigation category,INITIAL_RESEARCH
+variant_sku,Variant SKU,ProductVariant.inventoryItem.sku,admin_graphql_variant,variant/inventory-item representation alias,INITIAL_RESEARCH
+variant_sku,Variant SKU,SKU,product_csv,variant/inventory-item representation alias,INITIAL_RESEARCH
+variant_sku,Variant SKU,variants.sku,admin_rest_legacy,variant/inventory-item representation alias,INITIAL_RESEARCH
+variant_barcode,Variant barcode,ProductVariant.barcode,admin_graphql_variant,barcode/GTIN semantic candidate; validation required,INITIAL_RESEARCH
+variant_barcode,Variant barcode,Barcode,product_csv,barcode/GTIN semantic candidate; validation required,INITIAL_RESEARCH
+variant_barcode,Variant barcode,variants.barcode,admin_rest_legacy,barcode/GTIN semantic candidate; validation required,INITIAL_RESEARCH
+variant_price,Variant base price,ProductVariant.price,admin_graphql_variant,Pricing owner,INITIAL_RESEARCH
+variant_price,Variant base price,Price,product_csv,Pricing owner,INITIAL_RESEARCH
+variant_price,Variant base price,variants.price,admin_rest_legacy,Pricing owner,INITIAL_RESEARCH
+variant_compare_at,Variant compare-at price,ProductVariant.compareAtPrice,admin_graphql_variant,Pricing owner,INITIAL_RESEARCH
+variant_compare_at,Variant compare-at price,Compare-at price,product_csv,Pricing owner,INITIAL_RESEARCH
+variant_compare_at,Variant compare-at price,variants.compare_at_price,admin_rest_legacy,Pricing owner,INITIAL_RESEARCH
+inventory_policy,Out-of-stock sell policy,ProductVariant.inventoryPolicy,admin_graphql_variant,enum/boolean representation differs,INITIAL_RESEARCH
+inventory_policy,Out-of-stock sell policy,Continue selling when out of stock,product_csv,enum/boolean representation differs,INITIAL_RESEARCH
+inventory_policy,Out-of-stock sell policy,variants.inventory_policy,admin_rest_legacy,enum/boolean representation differs,INITIAL_RESEARCH
+requires_shipping,Requires physical shipping,InventoryItem.requiresShipping,admin_graphql_inventory,fulfillment semantic,INITIAL_RESEARCH
+requires_shipping,Requires physical shipping,Requires shipping,product_csv,fulfillment semantic,INITIAL_RESEARCH
+requires_shipping,Requires physical shipping,variants.requires_shipping,admin_rest_legacy,fulfillment semantic,INITIAL_RESEARCH
+unit_cost,Unit cost,InventoryItem.unitCost,admin_graphql_inventory,same internal cost semantic across read/write representations,INITIAL_RESEARCH
+unit_cost,Unit cost,InventoryItemInput.cost,admin_graphql_inventory,same internal cost semantic across read/write representations,INITIAL_RESEARCH
+unit_cost,Unit cost,Cost per item,product_csv,same internal cost semantic across read/write representations,INITIAL_RESEARCH
+hs_code,Harmonized system code,InventoryItem.harmonizedSystemCode,admin_graphql_inventory,customs semantic,INITIAL_RESEARCH
+hs_code,Harmonized system code,HS code,product_csv,customs semantic,INITIAL_RESEARCH
+origin_country,Country of origin,InventoryItem.countryCodeOfOrigin,admin_graphql_inventory,ISO code/value representation,INITIAL_RESEARCH
+origin_country,Country of origin,Country of origin,product_csv,ISO code/value representation,INITIAL_RESEARCH
+taxable,Taxable flag,ProductVariant.taxable,admin_graphql_variant,tax domain,INITIAL_RESEARCH
+taxable,Taxable flag,Charge tax,product_csv,tax domain,INITIAL_RESEARCH
+taxable,Taxable flag,variants.taxable,admin_rest_legacy,tax domain,INITIAL_RESEARCH
+seo_title,SEO title,Product.seo.title,admin_graphql_product,SEO semantic,INITIAL_RESEARCH
+seo_title,SEO title,SEO title,product_csv,SEO semantic,INITIAL_RESEARCH
+seo_description,SEO description,Product.seo.description,admin_graphql_product,SEO semantic,INITIAL_RESEARCH
+seo_description,SEO description,SEO description,product_csv,SEO semantic,INITIAL_RESEARCH
+product_metafield,Product metafield,"Product.metafields[namespace,key]",admin_graphql_product,dynamic field identity by namespace+key; CSV Product only,INITIAL_RESEARCH
+product_metafield,Product metafield,product.metafields.<namespace>.<key>,product_csv,dynamic field identity by namespace+key; CSV Product only,INITIAL_RESEARCH
+option_name_1,First option dimension,Product.options[position=1].name,admin_graphql_product,position-based CSV alias to option GID/name,INITIAL_RESEARCH
+option_name_1,First option dimension,Option1 name,product_csv,position-based CSV alias to option GID/name,INITIAL_RESEARCH
+option_value_1,First option value,ProductVariant.selectedOptions[position=1],admin_graphql_variant,position/name/value relation,INITIAL_RESEARCH
+option_value_1,First option value,Option1 value,product_csv,position/name/value relation,INITIAL_RESEARCH
+image_source,Product image source,MediaImage/image originalSource mutation,admin_graphql_media,media transport surface differs,INITIAL_RESEARCH
+image_source,Product image source,Image URL,product_csv,media transport surface differs,INITIAL_RESEARCH
+image_alt,Image alt text,Media.alt,admin_graphql_media,Media owner,INITIAL_RESEARCH
+image_alt,Image alt text,Image alt text,product_csv,Media owner,INITIAL_RESEARCH
+variant_image,Variant media association,ProductVariant.media,admin_graphql_variant,GraphQL supports richer media types than CSV,INITIAL_RESEARCH
+variant_image,Variant media association,Variant image URL,product_csv,GraphQL supports richer media types than CSV,INITIAL_RESEARCH
+market_inclusion,Market product inclusion,Catalog.publication/Product publication,admin_graphql_catalogs_markets,non-raw-equal channel context representation,INITIAL_RESEARCH
+market_inclusion,Market product inclusion,Included / [Market],product_csv,non-raw-equal channel context representation,INITIAL_RESEARCH
+market_price,Market-specific price,PriceList.prices,admin_graphql_pricelists,non-raw-equal Pricing context,INITIAL_RESEARCH
+market_price,Market-specific price,Price / [Market],product_csv,non-raw-equal Pricing context,INITIAL_RESEARCH
+market_compare_at,Market-specific compare-at,PriceList fixed price compareAtPrice,admin_graphql_pricelists,non-raw-equal Pricing context,INITIAL_RESEARCH
+market_compare_at,Market-specific compare-at,Compare-at price / [Market],product_csv,non-raw-equal Pricing context,INITIAL_RESEARCH
+publication,Channel publication,Publishable/resourcePublications,admin_graphql_publication,CSV represents online store only; GraphQL publications are multi-channel,INITIAL_RESEARCH
+publication,Channel publication,Published on online store,product_csv,CSV represents online store only; GraphQL publications are multi-channel,INITIAL_RESEARCH
+variant_publication,Variant publication,ProductVariant.resourcePublications,admin_graphql_variant,2026-07 adds variant Publishable; product publication precedence remains,INITIAL_RESEARCH
+variant_publication,Variant publication,ProductVariantsBulkInput.published,admin_graphql_variant_bulk_input,2026-07 adds variant Publishable; product publication precedence remains,INITIAL_RESEARCH
+product_title,Product title/name,ProductSetInput.title,admin_graphql_product_set,same semantic; productSet is write representation,INITIAL_RESEARCH
+product_variants,Product variant list,ProductSetInput.variants,admin_graphql_product_set,same relationship; productSet list is replacement-style,INITIAL_RESEARCH
+product_variants,Product variant list,Product.variants,admin_graphql_product,same relationship; productSet list is replacement-style,INITIAL_RESEARCH
+product_metafields,Product metafields,ProductSetInput.metafields,admin_graphql_product_set,same dynamic-field collection; productSet list replacement is consequential,INITIAL_RESEARCH
+product_metafields,Product metafields,Product.metafields,admin_graphql_product,same dynamic-field collection; productSet list replacement is consequential,INITIAL_RESEARCH
+product_collections,Product collection membership,ProductSetInput.collections,admin_graphql_product_set,same relation; productSet list replacement vs join/leave mutation semantics differ,INITIAL_RESEARCH
+product_collections,Product collection membership,Product.collections,admin_graphql_product,same relation; productSet list replacement vs join/leave mutation semantics differ,INITIAL_RESEARCH
+product_files_media,Product files/media,ProductSetInput.files,admin_graphql_product_set,write file input vs media read representation; not raw-equal,INITIAL_RESEARCH
+product_files_media,Product files/media,Product.media,admin_graphql_media,write file input vs media read representation; not raw-equal,INITIAL_RESEARCH
+gift_card_title,Gift-card product title,GiftCardProductSetInput.title,admin_graphql_gift_card_product,specialized write surface maps to common Product title,INITIAL_RESEARCH
+gift_card_title,Gift-card product title,Product.title,admin_graphql_product,specialized write surface maps to common Product title,INITIAL_RESEARCH
+quantity_price_break,Quantity tier price,QuantityPriceBreak.minimumQuantity+price,admin_graphql_pricelists,same Pricing-owned tier structure,INITIAL_RESEARCH
+quantity_price_break,Quantity tier price,PriceListPrice.quantityPriceBreaks,admin_graphql_pricelists,same Pricing-owned tier structure,INITIAL_RESEARCH
+product_set_identity,Shopify Product upsert identity,ProductSetIdentifiers.id,admin_graphql_product_set,alternative external upsert selectors; not semantically interchangeable platform IDs,LEAD_COMPLETENESS_PASS
+product_set_identity,Shopify Product upsert identity,ProductSetIdentifiers.handle,admin_graphql_product_set,alternative external upsert selectors; not semantically interchangeable platform IDs,LEAD_COMPLETENESS_PASS
+product_set_identity,Shopify Product upsert identity,ProductSetIdentifiers.customId,admin_graphql_product_set,alternative external upsert selectors; not semantically interchangeable platform IDs,LEAD_COMPLETENESS_PASS
+collection_membership_model,Collection membership,Collection.sources,admin_graphql_collection_sources,current source/condition model supersedes legacy ruleSet,LEAD_COMPLETENESS_PASS
+collection_membership_model,Collection membership,CollectionLegacyRuleSet.ruleSet,admin_graphql_collections,current source/condition model supersedes legacy ruleSet,LEAD_COMPLETENESS_PASS
+quantity_rule,Context quantity rule,QuantityRule.minimum/maximum/increment,admin_graphql_pricelists,same Pricing-owned rule with read/write shapes,LEAD_COMPLETENESS_PASS
+quantity_rule,Context quantity rule,QuantityRuleInput.minimum/maximum/increment,admin_graphql_pricelists,same Pricing-owned rule with read/write shapes,LEAD_COMPLETENESS_PASS
+price_list_parent_adjustment,Relative price-list adjustment,PriceList.parent,admin_graphql_pricelists,same Pricing-owned relative adjustment hierarchy,LEAD_COMPLETENESS_PASS
+price_list_parent_adjustment,Relative price-list adjustment,PriceListParent.adjustment,admin_graphql_pricelists,same Pricing-owned relative adjustment hierarchy,LEAD_COMPLETENESS_PASS
+price_list_parent_adjustment,Relative price-list adjustment,PriceListParentCreateInput.adjustment,admin_graphql_pricelists,same Pricing-owned relative adjustment hierarchy,LEAD_COMPLETENESS_PASS
+generic_file_asset,Generic file/document asset,GenericFile.url,admin_graphql_files,file read object vs Product set file input; relation/ownership must be certified,LEAD_COMPLETENESS_PASS
+generic_file_asset,Generic file/document asset,ProductSetInput.files,admin_graphql_product_set,file read object vs Product set file input; relation/ownership must be certified,LEAD_COMPLETENESS_PASS
+product_freshness,Product state freshness,PRODUCTS_UPDATE,shopify_webhooks,webhook is hint; authoritative state fetched/reconciled from API,LEAD_COMPLETENESS_PASS
+product_freshness,Product state freshness,Product.updatedAt,admin_graphql_product,webhook is hint; authoritative state fetched/reconciled from API,LEAD_COMPLETENESS_PASS
+inventory_freshness,Inventory state freshness,INVENTORY_LEVELS_UPDATE,shopify_webhooks,webhook is hint; authoritative quantity state must be re-read/reconciled,LEAD_COMPLETENESS_PASS
+inventory_freshness,Inventory state freshness,InventoryLevel.quantities,admin_graphql_inventory,webhook is hint; authoritative quantity state must be re-read/reconciled,LEAD_COMPLETENESS_PASS

@@ -1,6 +1,6 @@
 # Shopify V1 Product & Capability Inventory Research
 
-Status: **INITIAL RESEARCH — NOT FROZEN**
+Status: **LEAD COMPLETENESS PASS — NOT FROZEN**
 
 ## Goal
 
@@ -21,13 +21,15 @@ This follows `docs/09-CONNECTOR_DELIVERY_PROTOCOL.md`: inventory first, then cla
 
 ## Current research coverage
 
-This initial pass currently contains:
+The current Lead completeness pass contains:
 
-- **488** top-level Shopify field/capability rows;
-- **235** structured-object/input subfield rows;
-- **31** capability clusters;
-- **29** primary source/API surfaces;
-- **90** cross-surface alias/representation rows;
+- **632** top-level Shopify field/capability rows;
+- **745** structured-object/input/mutation-argument subfield rows;
+- **34** capability clusters;
+- **35** primary source/API/event surfaces;
+- **106** cross-surface alias/representation rows;
+- **36** product-adjacent freshness event/topic rows;
+- **8** version/change boundary rows for 2026-07/current transition semantics;
 - **8556** normalized Shopify Standard Product Taxonomy attribute definitions;
 - **74820** controlled taxonomy value references represented by the pinned upstream taxonomy (not duplicated into this repository);
 - **15** current product-related standard metafield definitions explicitly inventoried.
@@ -43,6 +45,8 @@ Counts are research coverage, not claims that Shopify has exactly that many "pro
 - `docs/data/shopify_v1_alias_groups.csv` — GraphQL / CSV / legacy REST / specialized-write representation relationships.
 - `docs/data/shopify_v1_taxonomy_attribute_inventory.csv` — compact normalized inventory of all current Shopify taxonomy attributes.
 - `docs/data/shopify_v1_standard_metafield_definitions.csv` — current product-related standard metafield vocabulary.
+- `docs/data/shopify_v1_freshness_event_matrix.csv` — webhook/Event freshness hints and their authority caveats.
+- `docs/data/shopify_v1_version_change_matrix.csv` — version-specific changes/deprecations that alter Product-adjacent semantics.
 
 ## Source hierarchy
 
@@ -65,9 +69,11 @@ Primary sources for this pass are Shopify-owned sources:
 15. Delivery profiles.
 16. Translations / locales / market-localized content.
 17. Gift-card product specialized set surface.
-18. Official Shopify product CSV import/export representation.
-19. Storefront API only for buyer-facing READ representation comparison.
-20. API versioning and developer changelog for freshness/deprecations.
+18. ProductFeed / channel-feed configuration and resynchronization lifecycle.
+19. Webhooks plus current Events/metafield-trigger freshness surfaces.
+20. Official Shopify product CSV import/export representation.
+21. Storefront API only for buyer-facing READ representation comparison.
+22. API versioning and developer changelog for freshness/deprecations.
 
 ## Entry kinds
 
@@ -82,6 +88,16 @@ The master uses the same high-level research taxonomy as the frozen Adobe invent
 - `derived_projection` — aggregate/query/storefront/admin projections that are not direct merchant write values.
 
 The classification is provisional until independent review. It is deliberately conservative about WRITE.
+
+## Lead schema completeness evidence
+
+The current pass performs a field-by-field comparison against the official 2026-07 Admin GraphQL type reference for the primary Product/Variant object graph and the adjacent mutation/input surfaces that can materially affect Product state or connector behavior.
+
+The comparison currently covers **73 input-object families** and **22 primary READ object families**. For that checked set, the local inventory has **zero missing official fields**. This includes Product create/update/set inputs, variant bulk/set inputs, options and ordering, InventoryItem and multi-state quantity mutations, Metafield/Metaobject value and definition inputs, Collection current/legacy inputs, Publications, Markets/Catalogs/PriceLists/quantity pricing, files/media, Selling Plans, DeliveryProfile assignment, Bundles, translations, webhooks and ProductFeed configuration.
+
+This is completeness evidence for the declared checked surfaces, not a claim that every Shopify Admin type belongs in Product V1. Unrelated Shopify domains (orders, customers, payments, broad shipping-rate administration, etc.) remain outside this Product/capability inventory unless they directly define Product representation or connector execution context.
+
+The pass also corrected an important inventory-shape mistake: the top-level `InventorySetQuantitiesInput` / `InventoryAdjustQuantitiesInput` contracts are now kept separate from their nested `InventoryQuantityInput` / `InventoryChangeInput` rows. The 2026-07 quantity row uses `changeFromQuantity` as the compare-and-swap expectation; passing `null` disables CAS only for a source-of-truth use case.
 
 ## Important Shopify-specific findings already preserved
 
@@ -129,6 +145,26 @@ The compact local taxonomy inventory preserves every attribute definition's stab
 - `attributes.yml` blob `455818cf3a5ae41f1db23c244adf1b5694691b88`.
 
 This taxonomy is a channel/standard-classification input. It is not 8,556 new platform FieldDefinitions.
+
+### Collections use the 2026-07 sources model
+
+Shopify 2026-07 replaces the old single `Collection.ruleSet` authority with composable `CollectionSource` objects and typed inclusion/exclusion conditions. Deprecated `CollectionInput` / `ruleSet` shapes remain queryable for migration compatibility, so the inventory keeps them explicitly as legacy representations rather than silently deleting them. Current connector work must use the sources model as authority.
+
+### Markets and ProductFeed are channel context, not Product fields
+
+Shopify 2026-07 supports channel Markets and exposes ProductFeed resources for sales-channel feed configuration. Markets can combine catalogs, publication, pricing, currency and delivery context; ProductFeed binds a channel/country/language and supports explicit full-sync triggering. These capabilities belong to connector/channel or Pricing context. They must not create fake canonical Product fields.
+
+### DeliveryProfile authority is conditional in 2026-07
+
+App-owned DeliveryProfiles remain valid and can now use `coversAllItems`. Merchant-owned shipping configuration, however, is moving to `Market.delivery` under market-driven shipping. On migrated shops, merchant-owned DeliveryProfile reads can be stale and successful writes can fail to change the live merchant configuration. Real certification must therefore determine the effective shop shipping model before treating DeliveryProfile as authoritative.
+
+### Metaobject `values` has replacement semantics
+
+The 2026-07 streamlined Metaobject API adds JSON-style `values` reads/writes. It is not equivalent to patch-style `fields`: when `values` is supplied, omitted optional keys are cleared. The inventory preserves both representations so a future connector does not accidentally turn a partial update into destructive replacement.
+
+### Freshness events are hints, never state authority
+
+Classic webhook topics and the newer Events/metafield trigger surface can reduce polling and identify likely changes, including Product metafield changes. They do not prove the final Product/Variant/Inventory value. The connector must re-read authoritative Admin API state before deriving Receive/Export conclusions.
 
 ### Inventory is multi-state and location-scoped
 
@@ -207,9 +243,9 @@ This research pass does **not**:
 
 Before freezing this Shopify baseline:
 
-1. perform another Lead completeness pass over mutation inputs, standard definitions and version-specific changelog;
-2. verify row/source traceability and remove any weak or duplicate representations;
-3. create one frozen Draft PR research input;
-4. run independent adversarial review against that exact HEAD;
-5. Lead-arbitrate findings against Shopify primary sources and `[Resolved]` platform ownership;
+1. finish the final row/source/cluster consistency checks over the completed Lead schema pass;
+2. commit/push one exact review HEAD to the existing Draft PR;
+3. run independent adversarial review against that exact HEAD;
+4. Lead-arbitrate findings against Shopify primary sources and `[Resolved]` platform ownership;
+5. apply only evidence-backed corrections;
 6. only then freeze the Shopify inventory for cross-platform synthesis.

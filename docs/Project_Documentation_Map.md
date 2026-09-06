@@ -613,6 +613,27 @@ connector certification, import/export transport expansion, or real-target valid
 
 ---
 
+## Connector inventory research baselines
+
+### ADOBE_COMMERCE_V1_INVENTORY_RESEARCH.md / ADOBE_COMMERCE_V1_INVENTORY_REVIEW_SYNTHESIS.md
+
+Frozen Adobe Commerce / Magento Product field + capability research baseline and its
+review arbitration. Read these, plus the related `docs/data/adobe_commerce_v1_*.csv`,
+when comparing external commerce vocabularies, assigning platform ownership, or
+planning Adobe field/capability certification. The research inventory does not replace
+the normative Domain Model or the runtime/certification matrix.
+
+### SHOPIFY_V1_INVENTORY_RESEARCH.md
+
+Current Shopify Product / ProductVariant field + capability research baseline. Read it,
+plus the related `docs/data/shopify_v1_*.csv`, for Shopify connector research,
+cross-platform field-library synthesis, Shopify schema/version review, and future
+Shopify READ/WRITE certification. Shopify remains one external ecosystem and does not
+define platform core fields. Until its adversarial review/freeze gate is completed,
+treat the document's explicit status marker as authoritative.
+
+---
+
 ## Reading Order
 
 **For product decisions:**
@@ -635,6 +656,10 @@ connector certification, import/export transport expansion, or real-target valid
 - `docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md` — authoritative
   current-base Magento V1 Product field/capability inventory; cluster summaries are
   classification only, not field certification
+- `ADOBE_COMMERCE_V1_INVENTORY_RESEARCH.md` + review synthesis + related Adobe CSVs —
+  frozen cross-platform Adobe research baseline
+- `SHOPIFY_V1_INVENTORY_RESEARCH.md` + related Shopify CSVs — current Shopify research
+  baseline; obey its frozen/not-frozen status marker
 - `docs/prototypes/task-4b0-connector-account/` — Task 4B-0 visual contract
   (when implementing connector operational UI)
 
@@ -662,6 +687,9 @@ connector certification, import/export transport expansion, or real-target valid
 - `docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md` when the task
   touches Magento Product inventory, certification, stock Product reads, or entity-bound
   Safe Sync Product writes
+- `ADOBE_COMMERCE_V1_INVENTORY_RESEARCH.md` and `SHOPIFY_V1_INVENTORY_RESEARCH.md`
+  when the task touches cross-platform Product field/capability research or either
+  connector inventory baseline
 
 **For AI-assisted implementation (UI and frontend tasks):**
 
