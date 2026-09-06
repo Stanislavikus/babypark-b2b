@@ -47,7 +47,7 @@ The V1 inventory can share semantic clusters across these targets, but every fie
 
 ## Inventory entry kinds
 
-The review must not treat every Adobe name as the same kind of thing. Each eventual master-matrix row should be classified as one of:
+The review must not treat every Adobe name as the same kind of thing. Each master-matrix row is provisionally classified as one of:
 
 - **semantic_field** — a merchant/product value that may correspond to a platform field;
 - **domain_value** — a value owned by Pricing, Inventory/Availability, Media, taxonomy/relations, or another platform domain rather than generic FieldMapping;
@@ -61,7 +61,7 @@ This distinction is mandatory before deciding whether `FieldMapping`, `FieldOpti
 
 ## Product-type capability surface
 
-The baseline must explicitly cover product-type mechanics, not only common fields:
+The baseline explicitly includes product-type mechanics, not only common fields:
 
 - Simple;
 - Virtual;
@@ -71,7 +71,7 @@ The baseline must explicitly cover product-type mechanics, not only common field
 - Downloadable;
 - Gift Card (Adobe Commerce edition-specific).
 
-Adobe documents specialized attributes/mechanics for several of these types. They must be represented as capability families in the inventory even when the platform later decides that a capability is deferred or intentionally unsupported in Magento V1.
+Adobe documents specialized attributes/mechanics for several of these types. They are represented as capability-family rows even when the platform later decides that a capability is deferred or intentionally unsupported in Magento V1.
 
 ## Important boundary: finite baseline + live target schema
 
@@ -90,10 +90,11 @@ The live target does **not** define the platform-wide baseline. It proves which 
 
 See:
 
-- `docs/data/adobe_commerce_v1_capability_clusters.csv`
-- `docs/data/adobe_commerce_v1_inventory_source_matrix.csv`
+- `docs/data/adobe_commerce_v1_inventory_master.csv` — one row per current field/capability candidate;
+- `docs/data/adobe_commerce_v1_capability_clusters.csv` — cluster summary;
+- `docs/data/adobe_commerce_v1_inventory_source_matrix.csv` — edition/API source and freshness matrix.
 
-The first pass currently contains **154 named fields/capability entries grouped into 25 clusters/families**. This count intentionally mixes raw Adobe field names and named structured-capability entries; it is a research coverage count, not a claim that Adobe has exactly 154 Product attributes.
+The current pass contains **161 named field/capability entries grouped into 26 clusters/families**. This count intentionally mixes raw Adobe field names and named structured-capability entries; it is a research coverage count, not a claim that Adobe has exactly 161 Product attributes.
 
 Primary clusters currently include:
 
@@ -103,6 +104,7 @@ Primary clusters currently include:
 - dynamic EAV attributes;
 - select/multiselect option identity;
 - catalog/store/website/Attribute-Set execution context;
+- product-type family capabilities;
 - SEO/routing;
 - pricing;
 - inventory/availability and MSI source topology;
@@ -195,7 +197,7 @@ The detailed technical inventory can remain internal/advanced by default.
 
 ## Next review task
 
-Give this document + both CSVs + current `develop` to independent reviewer(s), preferably Opus and/or Sonnet. Ask only for:
+Give this document + three CSVs + current `develop` to independent reviewer(s), preferably Opus and/or Sonnet. Ask only for:
 
 - missing Adobe Commerce / Magento product fields or capability families;
 - edition/version-specific surfaces that should be added or separated;
