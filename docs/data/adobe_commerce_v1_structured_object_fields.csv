@@ -1,0 +1,72 @@
+object_family,subfield,entry_kind,semantic_note,source_surface,review_status
+authoritative_attribute_metadata,code,schema_metadata,stable attribute code/identity,GraphQL attribute metadata + Admin REST attribute APIs,INITIAL_RESEARCH
+authoritative_attribute_metadata,default_value,schema_metadata,attribute default value,GraphQL attribute metadata + Admin REST attribute APIs,INITIAL_RESEARCH
+authoritative_attribute_metadata,entity_type,schema_metadata,entity type such as catalog product,GraphQL attribute metadata,INITIAL_RESEARCH
+authoritative_attribute_metadata,frontend_class,schema_metadata,frontend validation/class hint,GraphQL attribute metadata,INITIAL_RESEARCH
+authoritative_attribute_metadata,frontend_input,schema_metadata,input/data-shape hint used for normalization,GraphQL attribute metadata + Admin REST attribute APIs,INITIAL_RESEARCH
+authoritative_attribute_metadata,is_required,schema_metadata,requiredness metadata,GraphQL attribute metadata + Admin REST attribute APIs,INITIAL_RESEARCH
+authoritative_attribute_metadata,is_unique,schema_metadata,uniqueness metadata,GraphQL attribute metadata,INITIAL_RESEARCH
+authoritative_attribute_metadata,label,schema_metadata,human label not stable identity,GraphQL attribute metadata,INITIAL_RESEARCH
+authoritative_attribute_metadata,options,schema_metadata,select/multiselect option vocabulary,GraphQL attribute metadata + Admin REST attribute options,INITIAL_RESEARCH
+media_gallery_entry,id,external_system_metadata,legacy numeric media entry identity; GraphQL deprecates in favor of uid,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
+media_gallery_entry,uid,external_system_metadata,GraphQL media entry identity,core GraphQL 2.4.9,INITIAL_RESEARCH
+media_gallery_entry,media_type,domain_value,image or video kind,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
+media_gallery_entry,label,domain_value,alt/display label with store-scope inheritance semantics,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
+media_gallery_entry,position,domain_value,ordered media position with store-scope inheritance semantics,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
+media_gallery_entry,disabled,domain_value,visibility flag with store-scope inheritance semantics,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
+media_gallery_entry,types,domain_value,media roles such as image/small_image/thumbnail,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
+media_gallery_entry,file,domain_value,server-side media path,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
+media_gallery_entry,content,structured_capability,binary upload content object,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
+media_gallery_entry,video_content,structured_capability,external-video metadata object,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
+media_content,base64_encoded_data,structured_capability,image binary content for write payload,core GraphQL type reference + Admin REST media writes,INITIAL_RESEARCH
+media_content,name,structured_capability,file name,core GraphQL 2.4.9 type reference,INITIAL_RESEARCH
+media_content,type,structured_capability,MIME type,core GraphQL 2.4.9 type reference,INITIAL_RESEARCH
+media_video_content,media_type,structured_capability,external-video marker,core GraphQL 2.4.9 type reference,INITIAL_RESEARCH
+media_video_content,video_description,domain_value,video description; store-scope inheritance semantics exist,core GraphQL 2.4.9 + Admin REST store-scope docs,INITIAL_RESEARCH
+media_video_content,video_metadata,structured_capability,optional vendor video metadata,core GraphQL 2.4.9 type reference,INITIAL_RESEARCH
+media_video_content,video_provider,structured_capability,video source/provider,core GraphQL 2.4.9 type reference,INITIAL_RESEARCH
+media_video_content,video_title,domain_value,video title; store-scope inheritance semantics exist,core GraphQL 2.4.9 + Admin REST store-scope docs,INITIAL_RESEARCH
+media_video_content,video_url,domain_value,external video URL,core GraphQL 2.4.9 type reference,INITIAL_RESEARCH
+product_link,sku,semantic_field,source product SKU,core GraphQL 2.4.9 ProductLinksInterface,INITIAL_RESEARCH
+product_link,link_type,structured_capability,related/associated/upsell/crosssell relation type,core GraphQL 2.4.9 ProductLinksInterface,INITIAL_RESEARCH
+product_link,linked_product_sku,structured_capability,target product SKU,core GraphQL 2.4.9 ProductLinksInterface,INITIAL_RESEARCH
+product_link,linked_product_type,structured_capability,target product type,core GraphQL 2.4.9 ProductLinksInterface,INITIAL_RESEARCH
+product_link,position,domain_value,ordering inside relation list,core GraphQL 2.4.9 ProductLinksInterface,INITIAL_RESEARCH
+customizable_option,option_id,external_system_metadata,remote custom-option identity,Admin REST + core GraphQL,INITIAL_RESEARCH
+customizable_option,product_sku,semantic_field,parent product identity,Admin REST custom option endpoint,INITIAL_RESEARCH
+customizable_option,title,domain_value,merchant-visible option title,Admin REST + core GraphQL,INITIAL_RESEARCH
+customizable_option,type,structured_capability,option type/shape,Admin REST custom option endpoint,INITIAL_RESEARCH
+customizable_option,sort_order,domain_value,option display order,Admin REST + core GraphQL,INITIAL_RESEARCH
+customizable_option,is_require,domain_value,REST requiredness field,Admin REST custom option endpoint,INITIAL_RESEARCH
+customizable_option,required,domain_value,GraphQL requiredness representation,core GraphQL CustomizableOptionInterface,INITIAL_RESEARCH
+customizable_option,price,domain_value,option price modifier,Pricing/custom-option semantics via Admin REST + GraphQL,INITIAL_RESEARCH
+customizable_option,price_type,domain_value,fixed/percent/dynamic modifier semantics,Admin REST + core GraphQL,INITIAL_RESEARCH
+customizable_option,sku,domain_value,option-specific SKU suffix/identity,Admin REST + core GraphQL,INITIAL_RESEARCH
+customizable_option,max_characters,domain_value,text-field constraint,Admin REST + core GraphQL,INITIAL_RESEARCH
+customizable_option_value,option_type_id,external_system_metadata,remote selectable option-value identity,core GraphQL customizable option types,INITIAL_RESEARCH
+customizable_option_value,title,domain_value,selectable option value label,core GraphQL customizable option types,INITIAL_RESEARCH
+customizable_option_value,sort_order,domain_value,value display order,core GraphQL customizable option types,INITIAL_RESEARCH
+customizable_option_value,price,domain_value,value price modifier,core GraphQL customizable option types,INITIAL_RESEARCH
+customizable_option_value,price_type,domain_value,value price modifier type,core GraphQL customizable option types,INITIAL_RESEARCH
+customizable_option_value,sku,domain_value,value-specific SKU,core GraphQL customizable option types,INITIAL_RESEARCH
+inventory_source_item,sku,semantic_field,product/variant identity,Inventory Management REST,INITIAL_RESEARCH
+inventory_source_item,source_code,domain_value,physical/source topology identity,Inventory Management REST,INITIAL_RESEARCH
+inventory_source_item,quantity,domain_value,per-source physical quantity,Inventory Management REST,INITIAL_RESEARCH
+inventory_source_item,status,domain_value,per-source in/out-of-stock status,Inventory Management REST,INITIAL_RESEARCH
+tier_price,sku,semantic_field,product identity,Catalog Pricing REST,INITIAL_RESEARCH
+tier_price,price,domain_value,tier amount or discount value,Catalog Pricing REST,INITIAL_RESEARCH
+tier_price,price_type,domain_value,fixed or discount,Catalog Pricing REST,INITIAL_RESEARCH
+tier_price,website_id,connector_context,website price scope,Catalog Pricing REST,INITIAL_RESEARCH
+tier_price,customer_group,domain_value,customer group qualification,Catalog Pricing REST,INITIAL_RESEARCH
+tier_price,quantity,domain_value,minimum quantity threshold,Catalog Pricing REST,INITIAL_RESEARCH
+special_price,sku,semantic_field,product identity,Catalog Pricing REST,INITIAL_RESEARCH
+special_price,price,domain_value,special price amount,Catalog Pricing REST,INITIAL_RESEARCH
+special_price,store_id,connector_context,store price scope,Catalog Pricing REST,INITIAL_RESEARCH
+special_price,price_from,domain_value,effective-from timestamp; required in Adobe Commerce and optional in Magento Open Source,Catalog Pricing REST,INITIAL_RESEARCH
+special_price,price_to,domain_value,effective-to timestamp,Catalog Pricing REST,INITIAL_RESEARCH
+base_price,sku,semantic_field,product identity,Catalog Pricing REST,INITIAL_RESEARCH
+base_price,price,domain_value,base price amount,Catalog Pricing REST,INITIAL_RESEARCH
+base_price,store_id,connector_context,store price scope,Catalog Pricing REST,INITIAL_RESEARCH
+cost_value,sku,semantic_field,product identity,Catalog Pricing REST,INITIAL_RESEARCH
+cost_value,cost,domain_value,internal cost amount,Catalog Pricing REST,INITIAL_RESEARCH
+cost_value,store_id,connector_context,store cost scope,Catalog Pricing REST,INITIAL_RESEARCH
