@@ -1,6 +1,6 @@
 # Adobe Commerce / Magento V1 Product & Capability Inventory
 
-Status: **FINAL CORRECTION PASS — LEAD FREEZE GATE PENDING CI**
+Status: **FROZEN RESEARCH BASELINE — MERGE GATE PENDING**
 
 This document is a review artifact for building the platform-wide Adobe Commerce / Magento product connector inventory. It deliberately does **not** use the current smoke store as the definition of Magento scope. A connected store is only live evidence for later validation.
 
@@ -94,7 +94,7 @@ See:
 - `docs/data/adobe_commerce_v1_capability_clusters.csv` — cluster summary;
 - `docs/data/adobe_commerce_v1_inventory_source_matrix.csv` — edition/API source and freshness matrix.
 
-The current pass contains **161 named field/capability entries grouped into 26 clusters/families**. This count intentionally mixes raw Adobe field names and named structured-capability entries; it is a research coverage count, not a claim that Adobe has exactly 161 Product attributes.
+The corrected baseline contains **183 top-level field/capability entries grouped into 28 clusters/families**, plus **189 structured-object subfields**, **14 edition/API/source surfaces**, and **39 explicit cross-surface alias/representation rows**. These are research coverage counts, not a claim that Adobe has exactly 183 Product attributes.
 
 Primary clusters currently include:
 
@@ -181,7 +181,7 @@ For each Adobe field/capability, determine one of these outcomes:
 3. belongs to an existing domain owner (Pricing, Availability/Inventory, Media, Category/relations, Product family/composition) and therefore is not a generic FieldDefinition;
 4. belongs to connector/channel configuration (Attribute Set, website/store/store-view context, visibility or vendor-specific execution metadata);
 5. is external/system-owned or derived/read-only;
-6. remains unresolved pending Shopify/Google/standards comparison or independent review.
+6. remains unresolved pending Shopify/Google/standards comparison or explicit future validation.
 
 Only outcome (2) should expand the platform base field library, and only after semantic comparison with other major ecosystems.
 
@@ -230,7 +230,7 @@ The detailed technical inventory can remain internal/advanced by default.
 - No assumption that Adobe Import API names equal Admin REST field paths one-to-one.
 - No assumption that Catalog Service read-only fields imply write capability.
 - No assumption that every PaaS capability exists on Adobe Commerce SaaS, or vice versa.
-- No final cluster freeze until the final Lead consistency/CI gate completes.
+- The Adobe inventory/cluster research baseline is frozen by Lead synthesis; later changes require new primary-source evidence, a newer Adobe surface/version, or a proven connector blocker.
 - No UX page implementation yet; first establish the inventory/ownership truth that the page should present.
 
 ## Next gate
