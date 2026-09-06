@@ -14,14 +14,11 @@ final class ProcessIsolatedDnsResolver implements DnsResolver
 {
     private readonly string $resolverScriptPath;
 
-    private readonly string $phpBinary;
-
     public function __construct(
         private readonly DnsChildProcessFactory $processFactory,
         private readonly DnsResponseParser $responseParser,
         private readonly MonotonicClock $clock = new SystemMonotonicClock,
         ?string $resolverScriptPath = null,
-        ?string $phpBinary = null,
     ) {
         if (PHP_OS_FAMILY !== 'Linux') {
             throw new TransportConfigurationException(TransportConfigurationFailureReason::UnsupportedPlatform);
@@ -29,8 +26,6 @@ final class ProcessIsolatedDnsResolver implements DnsResolver
 
         $this->resolverScriptPath = $resolverScriptPath
             ?? dirname(__DIR__).'/Scripts/connector-dns-resolve.php';
-        $this->phpBinary = $phpBinary
-            ?? PHP_BINDIR.DIRECTORY_SEPARATOR.'php';
     }
 
     public function resolve(
@@ -52,7 +47,7 @@ final class ProcessIsolatedDnsResolver implements DnsResolver
         }
 
         $process = $this->processFactory->create([
-            $this->phpBinary,
+            PHP_BINDIR.DIRECTORY_SEPARATOR.'php',
             $this->resolverScriptPath,
         ]);
 

@@ -78,7 +78,8 @@ class TransportStaticChecksTest extends TestCase
     {
         $contents = file_get_contents(base_path('app/Support/Connectors/Transport/Dns/ProcessIsolatedDnsResolver.php'));
         $this->assertIsString($contents);
-        $this->assertStringContainsString('PHP_BINARY', $contents);
+        $this->assertStringContainsString('PHP_BINDIR', $contents);
+        $this->assertStringNotContainsString('PHP_BINARY', $contents);
         $this->assertStringContainsString('disableOutput()', $contents);
     }
 
