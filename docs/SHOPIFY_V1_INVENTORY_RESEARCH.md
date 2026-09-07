@@ -122,6 +122,10 @@ This matters directly to later Safe Sync design. A connector must never translat
 
 Therefore Product lifecycle status, Product publication and Variant publication are separate concepts in the inventory.
 
+### Product CSV option edits can recreate Variant identity
+
+Shopify Help explicitly warns that changing Option1/Option2/Option3 values in a Product CSV deletes existing variant IDs and creates new variant IDs. CSV overwrite mode can also replace existing values for included columns when matching by handle. CSV therefore remains a bulk representation with consequential reconciliation semantics, not a safe field-by-field PATCH transport.
+
 ### Product/Variant options are structured identities
 
 Shopify options are not plain `option1/option2/option3` strings in the current Admin GraphQL model. ProductOption and ProductOptionValue have GIDs, ordering, values, translations, swatches and linked-metafield/taxonomy semantics. Product CSV still exposes positional Option1..3 columns, so these are recorded as cross-surface representations rather than treated as one raw field.
