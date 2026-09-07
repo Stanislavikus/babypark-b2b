@@ -23,13 +23,13 @@ This follows `docs/09-CONNECTOR_DELIVERY_PROTOCOL.md`: inventory first, then cla
 
 The current Lead completeness pass contains:
 
-- **632** top-level Shopify field/capability rows;
+- **738** top-level Shopify field/capability rows;
 - **745** structured-object/input/mutation-argument subfield rows;
-- **34** capability clusters;
+- **35** capability clusters;
 - **35** primary source/API/event surfaces;
 - **106** cross-surface alias/representation rows;
 - **36** product-adjacent freshness event/topic rows;
-- **8** version/change boundary rows for 2026-07/current transition semantics;
+- **9** version/change boundary rows for 2026-07/current transition semantics;
 - **8556** normalized Shopify Standard Product Taxonomy attribute definitions;
 - **74820** controlled taxonomy value references represented by the pinned upstream taxonomy (not duplicated into this repository);
 - **15** current product-related standard metafield definitions explicitly inventoried.
@@ -93,7 +93,7 @@ The classification is provisional until independent review. It is deliberately c
 
 The current pass performs a field-by-field comparison against the official 2026-07 Admin GraphQL type reference for the primary Product/Variant object graph and the adjacent mutation/input surfaces that can materially affect Product state or connector behavior.
 
-The comparison currently covers **73 input-object families** and **22 primary READ object families**. For that checked set, the local inventory has **zero missing official fields**. This includes Product create/update/set inputs, variant bulk/set inputs, options and ordering, InventoryItem and multi-state quantity mutations, Metafield/Metaobject value and definition inputs, Collection current/legacy inputs, Publications, Markets/Catalogs/PriceLists/quantity pricing, files/media, Selling Plans, DeliveryProfile assignment, Bundles, translations, webhooks and ProductFeed configuration.
+The comparison currently covers **104 input-object families** and **45 primary READ/interface object families**. For that checked set, the local inventory has **zero missing official fields**. This includes Product create/update/set inputs, variant bulk/set inputs, options and ordering, InventoryItem and multi-state quantity mutations, Metafield/Metaobject value and definition inputs, Collection current/legacy inputs, Publications, Markets/Catalogs/PriceLists/quantity pricing, files/media, Selling Plans, DeliveryProfile assignment, Bundles, translations, webhooks and ProductFeed configuration.
 
 This is completeness evidence for the declared checked surfaces, not a claim that every Shopify Admin type belongs in Product V1. Unrelated Shopify domains (orders, customers, payments, broad shipping-rate administration, etc.) remain outside this Product/capability inventory unless they directly define Product representation or connector execution context.
 
@@ -153,6 +153,10 @@ Shopify 2026-07 replaces the old single `Collection.ruleSet` authority with comp
 ### Markets and ProductFeed are channel context, not Product fields
 
 Shopify 2026-07 supports channel Markets and exposes ProductFeed resources for sales-channel feed configuration. Markets can combine catalogs, publication, pricing, currency and delivery context; ProductFeed binds a channel/country/language and supports explicit full-sync triggering. These capabilities belong to connector/channel or Pricing context. They must not create fake canonical Product fields.
+
+### Sub-region Markets are first-class in 2026-07
+
+`MarketRegionSubdivision` can appear in Market region conditions. `Market.conditions.regionsCondition.regions` is the authority for region membership; deprecated region shortcuts can omit subdivision regions. The connector must not assume every Market is country-only.
 
 ### DeliveryProfile authority is conditional in 2026-07
 
