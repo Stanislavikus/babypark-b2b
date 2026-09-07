@@ -1,6 +1,6 @@
 # Shopify V1 Product & Capability Inventory Research
 
-Status: **LEAD COMPLETENESS PASS — NOT FROZEN**
+Status: **FROZEN RESEARCH BASELINE — Lead-reviewed, 2026-09-07**
 
 ## Goal
 
@@ -87,7 +87,7 @@ The master uses the same high-level research taxonomy as the frozen Adobe invent
 - `external_system_metadata` — Shopify GIDs, legacy IDs, timestamps, cursors and system identities;
 - `derived_projection` — aggregate/query/storefront/admin projections that are not direct merchant write values.
 
-The classification is provisional until independent review. It is deliberately conservative about WRITE.
+The classification is frozen as the Shopify 2026-07 research baseline. It remains deliberately conservative about WRITE; connected-shop entitlement and real-target certification are still required before runtime support claims.
 
 ## Lead schema completeness evidence
 
@@ -263,13 +263,18 @@ This research pass does **not**:
 - use a smoke Shopify store as global schema authority;
 - decide merchant-facing mapping UX.
 
-## Next gate
+## Freeze gate and final Lead arbitration
 
-Before freezing this Shopify baseline:
+This Shopify 2026-07 research baseline is frozen for cross-platform synthesis. Freeze evidence:
 
-1. finish the final row/source/cluster consistency checks over the completed Lead schema pass;
-2. commit/push one exact review HEAD to the existing Draft PR;
-3. run independent adversarial review against that exact HEAD;
-4. Lead-arbitrate findings against Shopify primary sources and `[Resolved]` platform ownership;
-5. apply only evidence-backed corrections;
-6. only then freeze the Shopify inventory for cross-platform synthesis.
+- declared schema exact-match gate: **PASS** for **104 input-object families** and **45 primary READ/interface families** — zero missing fields, zero extra/mis-nested fields and zero source-fetch errors in the checked set;
+- inventory consistency: **PASS** — no duplicate master/structured/alias/version keys, all used source and cluster IDs resolve, and cluster counts match;
+- authoritative source traceability: **34/35** source URLs returned HTTP 200 to the automated probe; the sole exception is the official Shopify Help Product CSV page returning automated-client 403 rather than a missing/dead source;
+- exact reviewed pre-freeze HEAD `2d7568d4c41fa2e6ef777cfd49e162f05670500f`: GitHub Actions **MySQL tests #394 SUCCESS**, including full MySQL suite, Pint and `git diff --check`;
+- Lead domain arbitration found no conflict with `[Resolved]` platform ownership: Shopify Markets/shipping/publication/gift-card/transport mechanics remain connector/domain context; Shopify-specific identities do not become platform identity authority; standard metafields/taxonomy remain cross-platform candidates rather than automatic core fields.
+
+No separate frontier-model review is required for this freeze under the current routing rules: this is a GREEN docs/data research campaign, the architecture is unchanged/frozen, primary-source/schema checks are exhaustive for the declared surface, and no new DB/auth/isolation/concurrency/transaction/domain ambiguity was found. If later cross-platform synthesis exposes a real contradiction, reopen only that concrete classification under the normal Stop & Amend rules.
+
+## Next campaign
+
+Use the frozen Adobe Commerce + Shopify baselines for cross-platform ownership/representation synthesis and universal Product Field Library candidate selection. Do not begin Shopify runtime implementation from vendor field names directly; first map each frozen Shopify row to platform owner/representation and then follow `09-CONNECTOR_DELIVERY_PROTOCOL.md`.

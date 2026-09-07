@@ -658,7 +658,7 @@ treat the document's explicit status marker as authoritative.
   classification only, not field certification
 - `ADOBE_COMMERCE_V1_INVENTORY_RESEARCH.md` + review synthesis + related Adobe CSVs —
   frozen cross-platform Adobe research baseline
-- `SHOPIFY_V1_INVENTORY_RESEARCH.md` + related Shopify CSVs — current Shopify research
+- `SHOPIFY_V1_INVENTORY_RESEARCH.md` + related Shopify CSVs — frozen Shopify 2026-07 Product/capability research baseline
   baseline; obey its frozen/not-frozen status marker
 - `docs/prototypes/task-4b0-connector-account/` — Task 4B-0 visual contract
   (when implementing connector operational UI)
