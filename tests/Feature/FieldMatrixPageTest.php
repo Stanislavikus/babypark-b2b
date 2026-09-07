@@ -71,7 +71,6 @@ class FieldMatrixPageTest extends TestCase
             ->test(FieldMatrix::class)
             ->instance();
 
-
         $checkboxList = $component->getForm('form')->getComponent(
             fn (Component $field): bool => $field instanceof CheckboxList
                 && method_exists($field, 'getName')
