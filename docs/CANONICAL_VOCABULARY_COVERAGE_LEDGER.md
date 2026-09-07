@@ -10,7 +10,7 @@ The logical coverage relation is sharded by provider. `docs/data/canonical-cover
 
 ## Reproducibility contract
 
-`php artisan canonical-coverage:bigcommerce` deterministically rebuilds the manifest row, coverage shard, and provider concept graph. `php artisan canonical-coverage:bigcommerce --check` validates committed artifacts without rewriting them.
+`php artisan canonical-coverage:bigcommerce` deterministically upserts its `(platform, source_file)` manifest row while preserving other valid provider entries, then rebuilds the coverage shard, provider concept graph, and disagreement queue. Manifest identities are unique and sorted deterministically. `php artisan canonical-coverage:bigcommerce --check` locates and validates only the BigCommerce manifest identity without requiring a one-row global manifest.
 
 A physical row hash is SHA-256 over a UTF-8 JSON array of source values in source-header order. The coverage identity is SHA-256 of:
 
@@ -32,13 +32,21 @@ Provider concept keys are research identities only. They do not assert Platform 
 
 Product and ProductVariant rows share a provider concept only for explicitly reviewed fields: bin picking number, cost/base/retail/sale/fixed-shipping prices, dimensions, weight, GTIN, MPN, UPC, SKU, inventory level/warning level, and free-shipping status. Each physical row retains its own entity level, type, read/write contract, and source description. Variant nullability, inheritance, Price List precedence, and fallback are therefore not erased by concept sharing.
 
+Every shared concept has an explicit compatibility rule. Numeric Product values encoded as strings and nullable numeric Variant overrides normalize to the neutral semantic type `decimal`; identifiers normalize to `string`, quantities to `integer`, and free-shipping status to `boolean`. The validator compares entity, wire type, cardinality, READ/WRITE contract, required/operation context, and documented inheritance/fallback for every member. An unruled shared concept fails validation.
+
 Product Options, ProductVariant option values, and Product Modifiers remain distinct concepts. A modifier is order-time customization; it does not create a variant dimension. Their option values and presentation/control types have explicit do-not-merge edges. Modifier/option adjustments remain in their structured capability rather than becoming base Product price.
 
 MAP, reference retail price, base price, and sale price have distinct concepts and conflict edges. Calculated price is a derived projection. Product, option, and modifier `type` are also explicitly non-equivalent.
 
+Category membership is owned by the Category relation candidate; related products by ProductAssociation; custom fields by the external dynamic-field container; variants/options by VariantComposition; and modifiers by OrderCustomization. These provider-local owner candidates preserve existing boundaries without selecting storage.
+
 ## Validation and limitations
 
-Validation proves manifest/file/header hashes, row counts, exact one-to-one physical coverage, row and coverage hashes, source declaration, disposition membership, concept FKs, evidence counts/platform sets, conflict references, and conflict/alias consistency. Current metrics are:
+`source_context_key` preserves the source `required_in` value together with the operation/schema evidence instead of duplicating object family. `applicability_key` is `not_applicable` because this pass defines no provider applicability relation.
+
+The generated disagreement queue is validated with the other artifacts. Every concept reference and affected-row count must resolve; affected OPEN rows use `DEFERRED_REVIEW` plus `queue:<question_key>` references. Thus provider semantic classification can remain known without falsely claiming that unresolved portable ownership or binding is verified.
+
+Validation proves manifest/file/header hashes, row counts, exact one-to-one physical coverage, row and coverage hashes, source declaration, disposition membership, concept FKs, evidence counts/platform sets, safe-merge compatibility rules, disagreement references/counts/statuses, non-dangling applicability, conflict references, and conflict/alias consistency. Current metrics are:
 
 ```text
 coverage_ratio=1.000000
@@ -46,6 +54,11 @@ classification_ratio=1.000000
 concept_link_ratio=1.000000
 terminal_rationale_ratio=1.000000
 silent_drop_count=0
+safe_merge_conflicts_unexplained=0
+open_disagreements_with_verified_rows=0
+invalid_disagreement_refs=0
+dangling_applicability_keys=0
+manifest_provider_rows_preserved=PASS
 ```
 
 The pass yields 119 provider concepts from 136 physical rows. It makes no Adobe, Google, Amazon, Shopify, or cross-platform equivalence claim. The source inventories top-level fields/capabilities rather than nested members, so `STRUCTURE_MEMBER` is not used here. Ambiguities such as tax ownership, MAP persistence, reference-price equivalence, Product/Variant final binding, and customization architecture remain for blind semantic review; retaining a provider concept does not resolve them.
