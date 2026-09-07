@@ -1,6 +1,6 @@
-# Canonical Product Field Registry v7
+# Canonical Product Field Registry v8
 
-Self-contained contract for universal reusable product-data concepts within this Product Data Platform research coverage. Snapshot date: **2026-07-15**.
+Self-contained contract for universal reusable product-data concepts within this Product Data Platform research coverage. Snapshot date: **2026-09-07**.
 
 ## Purpose and scope
 
@@ -19,6 +19,11 @@ This registry defines canonical product field semantics, channel mappings, alias
 - B2B-relevant fields
 - Compliance semantics (EU legal claims require normative acts)
 - Channel mappings for: `google_merchant`, `shopify`, `adobe_commerce`, `bigcommerce`, `amazon`, `rozetka`, `schema_org`
+- Frozen Adobe Commerce and Shopify inventory evidence
+- Google Merchant Products v1 strongly typed ProductAttributes/ProductInput evidence
+- BigCommerce current OpenAPI 3.1 Product/Variant/Options/Modifiers/Pricing/Inventory evidence
+- Amazon Product Type Definitions meta-model plus a representative public LUGGAGE PTD corpus
+- Cross-platform semantic synthesis used to decide platform/domain/channel ownership before runtime work
 
 ### Explicitly excluded
 
@@ -36,8 +41,15 @@ Campaign, merchant-account, shipping-account, returns, loyalty, destinations, an
 | `docs/data/canonical_product_field_option_mappings.csv` | Channel option mappings |
 | `docs/data/canonical_product_field_constraints.csv` | Validation constraints |
 | `docs/data/canonical_product_field_applicability.csv` | Context-specific applicability |
+| `docs/data/canonical_product_field_channel_decisions.csv` | Explicit per-channel defer/account-specific/unsupported decisions |
+| `docs/data/cross_platform_product_field_synthesis.csv` | Cross-platform semantic ownership/canonicalization working set (research, not runtime registry) |
+| `docs/data/google_merchant_products_v1_attribute_inventory.csv` | Google Merchant Products v1 strongly typed attribute evidence |
+| `docs/data/google_merchant_products_v1_product_input_inventory.csv` | Google Merchant ProductInput wrapper/context evidence |
+| `docs/data/bigcommerce_v3_product_capability_inventory.csv` | BigCommerce OpenAPI Product-adjacent evidence |
+| `docs/data/amazon_product_type_definitions_meta_model_inventory.csv` | Amazon PTD schema/meta-model evidence |
+| `docs/data/amazon_listings_v1_public_ptd_luggage_inventory.csv` | Representative Amazon LUGGAGE Product Type evidence |
 
-Every file includes **`evidence_subject_key`** with identical column name across all eight files (v7 fix: formerly `subject_key` in sources).
+All **nine canonical governance CSVs** include `evidence_subject_key`; the additional inventory/synthesis CSVs are research evidence and are not runtime/account mapping state.
 
 ## Evidence standard (typed)
 
@@ -58,7 +70,7 @@ channel: google_merchant | shopify | adobe_commerce | bigcommerce |
 
 `schema_org` is treated as a mapping source at parity with sales channels for this registry (conscious simplification — do not revisit without explicit decision).
 
-## Enum extensions (v7)
+## Enum extensions (v8)
 
 Real project enums extended with `_or_state` values:
 
@@ -70,6 +82,12 @@ data_type_or_state: text | long_text | number | decimal | money |
 field_group_or_state: basic_information | identifiers | pricing |
   availability | images_media | descriptions | characteristics | b2b |
   seo | logistics | internal | not_applicable | undecided
+
+context_type: global | channel | category | product_type
+
+recommended_action: add_to_platform_library | add_to_product_model |
+  computed_not_editable | connector_mapping_only | covered_by_existing_domain |
+  external_identity_only | keep_as_is | needs_legal_review | relation_not_field
 ```
 
 New enum values require a Canonicalization decision entry.
@@ -275,7 +293,7 @@ FK/semantic-FK integrity, but not enum membership.
 - `storage_owner` (observed, extend via DEC): `Category | ConnectorMapping | ExternalRecordLink | FieldDefinition | MediaAsset | PriceListItem | Product | ProductAssociation | ProductVariant | calculated | not_implemented`
 - `field_definition_eligibility` (observed): `yes | no`
 - `verification_status` (observed, extend via DEC): `verified | partially_verified | needs_legal_review`
-- `recommended_action` (observed, extend via DEC): `add_to_platform_library | computed_not_editable | connector_mapping_only | covered_by_existing_domain | external_identity_only | keep_as_is | needs_legal_review | relation_not_field`
+- `recommended_action` (observed, extend via DEC): `add_to_platform_library | add_to_product_model | computed_not_editable | connector_mapping_only | covered_by_existing_domain | external_identity_only | keep_as_is | needs_legal_review | relation_not_field`
 - `is_localizable` / `value_localization_strategy` cross-column invariant as defined in "Cross-column invariants" above.
 - **Field-specific invariant:** `has_energy_consumption_details.data_type_or_state` MUST be `not_applicable`; its structured shape is represented only by `value_shape: structured_object`. (`data_type_or_state` and `value_shape` are distinct columns — structural shape belongs to `value_shape`, never to `data_type_or_state`.)
 
@@ -347,7 +365,7 @@ FK/semantic-FK integrity, but not enum membership.
 - Header: `applicability_id,internal_code,context_type,context_key,channel_or_state,market_or_state,country_or_state,product_type_or_state,category_taxonomy_or_state,category_code_or_state,entity_level,parentage_level,operation,requirement_level,effective_from,effective_to,schema_version,verification_status,evidence_subject_key`
 - Unique key: `applicability_id`
 - FK: `internal_code` → fields.csv
-- `context_type` (observed, extend via DEC): `global | channel | category`
+- `context_type` (observed, extend via DEC): `global | channel | category | product_type`
 - `entity_level` (observed, extend via DEC): `product | product_variant`
 - `parentage_level` (observed, extend via DEC): `not_applicable | child`
 - `operation` (observed, extend via DEC): `not_applicable | advertise | publish`
@@ -608,6 +626,24 @@ connector-account-specific external references, not global Registry data.
 - **mapping/transformation consequence:** do not add a FieldMapping or FieldDefinition for `onec_guid`. Physical `products.onec_guid` and `product_variants.onec_guid` remain legacy runtime debt until migrated behind the ConnectorAccount-scoped ExternalRecordLink boundary. This DEC does not implement ExternalRecordLink and does not freeze its persistence. 1C is not a declared mapping `channel` in this registry; that absence must not be "fixed" by promoting the GUID into Product core or into ConnectorMapping.
 - `evidence_subject_key: decision:DEC-011`
 
+### DEC-012 — Product Type applicability is distinct from category applicability
+
+- **decision:** extend canonical applicability `context_type` with `product_type`.
+- **evidence:** Amazon Product Type Definitions are schema/applicability contracts resolved for a Product Type with marketplace/version context; the representative LUGGAGE PTD demonstrates this directly.
+- **semantic boundary:** `product_type` is not a merchant/catalogue Category and is not merely generic channel scope. It describes an external schema family that determines which attributes/requirements apply.
+- **platform consequence:** this is governance/documentation semantics only. It does not create a Product column, redesign the platform `ProductType` template, or implement Standard Category/taxonomy persistence.
+- **mapping consequence:** Amazon PTD-derived applicability rows may use `context_type=product_type`; raw Amazon parentage vocabulary remains connector evidence while canonical state tokens follow this registry.
+- `evidence_subject_key: decision:DEC-012`
+
+### DEC-013 — Product-owned capability may use add_to_product_model
+
+- **decision:** extend `recommended_action` with `add_to_product_model` for an already-approved Product-owned semantic that is not a dynamic `FieldDefinition`, not connector-only, and not yet physically implemented.
+- **first use:** `tags`, whose Product-level role is already `[Resolved]` in the Domain Model Product classification decision.
+- **why not `keep_as_is`:** the semantic is approved but physical implementation is not present, so `keep_as_is` would incorrectly imply current runtime/storage completion.
+- **why not `add_to_platform_library`:** Tags are a Product-owned classification capability, not an EAV/dynamic reusable characteristic.
+- **platform consequence:** documentation/governance only; this decision does not add a migration, column, table, UI, or runtime behavior.
+- `evidence_subject_key: decision:DEC-013`
+
 ### DEC-002 — identifier_exists connector-only
 
 - **candidate concepts:** FieldDefinition boolean, connector transformation flag, inferred-from-empty-fields
@@ -739,10 +775,10 @@ Based on `database/seeders/FieldDefinitionSeeder.php` (develop@3c3f926) and `doc
 | Topic | Status |
 |---|---|
 | Rozetka public API schema | No official spec found; `partially_verified` |
-| Amazon product type JSON schemas | Not imported (per scope limit) |
+| Amazon Product Type Definitions | Representative PTD meta-model + public LUGGAGE corpus inventoried; full multi-Product-Type corpus remains intentionally out of scope |
 | EU energy label mandatory fields | `needs_legal_review` |
 | `manufacturer_identifier_status` enum | Not created — needs research |
-| Adobe Commerce / BigCommerce field mappings | Channels listed; mappings deferred to future pass |
+| Adobe Commerce / BigCommerce field mappings | Current verified canonical mapping rows exist; broader field-by-field runtime certification remains future work |
 
 ## What this delivery does NOT do
 
@@ -764,10 +800,13 @@ Full evidence in `canonical_product_field_sources.csv`. Key external sources:
 | Google identifier_exists | https://support.google.com/merchants/answer/6324478 |
 | schema.org Product | https://schema.org/Product |
 | GS1 GTIN | https://www.gs1.org/standards/id-keys/gtin |
-| Shopify Product API | https://shopify.dev/docs/api/admin-rest/latest/resources/product |
+| Shopify Admin GraphQL Product | https://shopify.dev/docs/api/admin-graphql/2026-07/objects/Product |
+| Google Merchant API Products discovery | https://merchantapi.googleapis.com/$discovery/rest?version=products_v1 |
+| BigCommerce Product OpenAPI | https://docs.bigcommerce.com/openapi/admin-catalog-products.json |
+| Amazon Product Type Definitions | https://developer-docs.amazon.com/sp-api/docs/product-type-definitions-api |
 
 Internal sources: `docs/02-ATTRIBUTE_DICTIONARY.md`, `docs/03-DOMAIN_MODEL.md`, `database/seeders/FieldDefinitionSeeder.php`.
 
 ---
 
-**Version:** v7 final · **verified_at snapshot:** 2026-07-15 · **Awaiting explicit merge approval.**
+**Version:** v8 review baseline · **verified_at snapshot:** 2026-09-07 · **Merge gate pending.**
