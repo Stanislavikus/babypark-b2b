@@ -88,7 +88,7 @@ class AdobeCommerceCoverageTest extends TestCase
             $this->assertStringContainsString('identity_rule=', $alias['source_context_key']);
         }
         $taxName = $this->find($aliases, 'external_key', 'tax_class_name');
-        $this->assertSame('alias_with_transformation', $taxName['representation_candidate']);
+        $this->assertSame('alias_with_id_name_resolution', $taxName['representation_candidate']);
     }
 
     #[Test]
@@ -161,6 +161,140 @@ class AdobeCommerceCoverageTest extends TestCase
         $this->assertSame('PASS', $metrics['manifest_provider_rows_preserved']);
     }
 
+    #[Test]
+    public function reusable_eav_semantics_are_not_swallowed_by_the_envelopes(): void
+    {
+        $master = $this->masterRows(dirname(__DIR__, 3));
+        foreach (['additional_attributes', 'custom_attributes'] as $container) {
+            $this->assertSame('DOMAIN_CAPABILITY', $master[$container]['disposition']);
+            $this->assertSame('DynamicField', $master[$container]['owner_candidate']);
+        }
+        foreach (['manufacturer', 'material', 'color', 'size', 'instructions', 'gtin', 'mpn', 'brand'] as $semantic) {
+            $this->assertSame('REUSABLE_SEMANTIC', $master[$semantic]['disposition']);
+            $this->assertSame('eav_bound_semantic_candidate', $master[$semantic]['representation_candidate']);
+        }
+    }
+
+    #[Test]
+    public function structured_roles_are_family_aware(): void
+    {
+        $members = $this->structuredRows(dirname(__DIR__, 3));
+
+        $this->assertSame('media_role_member', $members['media_gallery_entry:label']['representation_candidate']);
+        foreach (['authoritative_attribute_metadata:label', 'attribute_option:label', 'configurable_product_option:label'] as $label) {
+            $this->assertNotSame('media_role_member', $members[$label]['representation_candidate']);
+        }
+        $this->assertSame('reference_member', $members['product_link:sku']['representation_candidate']);
+        $this->assertSame('reference_member', $members['tier_price:sku']['representation_candidate']);
+        $this->assertSame('value_or_context_member', $members['customizable_option:sku']['representation_candidate']);
+        $this->assertSame('value_or_context_member', $members['customizable_option_value:sku']['representation_candidate']);
+        $this->assertSame('pricing_value_member', $members['tier_price:price']['representation_candidate']);
+        $this->assertSame('pricing_value_member', $members['base_price:price']['representation_candidate']);
+        $this->assertSame('price_modifier_member', $members['customizable_option:price']['representation_candidate']);
+        $this->assertSame('price_modifier_member', $members['bundle_product_link:price']['representation_candidate']);
+    }
+
+    #[Test]
+    public function structured_and_master_projections_are_conservatively_read_only(): void
+    {
+        $members = $this->structuredRows(dirname(__DIR__, 3));
+        foreach (['downloadable_link:sample_url', 'downloadable_sample:sample_url'] as $projection) {
+            $this->assertSame('read_projection', $members[$projection]['read_semantics']);
+            $this->assertSame('read_only', $members[$projection]['write_semantics']);
+            $this->assertStringContainsString('entry_kind=derived_projection', $members[$projection]['source_context_key']);
+        }
+        $master = $this->masterRows(dirname(__DIR__, 3));
+        foreach (['created_at', 'updated_at', 'has_options', 'required_options'] as $projection) {
+            $this->assertSame('DERIVED_PROJECTION', $master[$projection]['disposition']);
+            $this->assertSame('read_only', $master[$projection]['write_semantics']);
+        }
+    }
+
+    #[Test]
+    public function graphql_read_aliases_and_transformation_kinds_are_preserved(): void
+    {
+        $aliases = array_filter($this->coverage(dirname(__DIR__, 3)), fn ($row) => $row['source_file'] === AdobeCommerceCoverage::ALIASES);
+        foreach (['categories', 'giftcard_amounts'] as $key) {
+            $row = $this->find(array_filter($aliases, fn ($row) => str_contains($row['source_surface'], 'GraphQL')), 'external_key', $key);
+            $this->assertSame('read_projection', $row['read_semantics']);
+            $this->assertSame('read_only', $row['write_semantics']);
+        }
+        $this->assertSame('alias_with_id_code_resolution', $this->find($aliases, 'external_key', 'attribute_set_id')['representation_candidate']);
+        $this->assertSame('alias_with_id_name_resolution', $this->find($aliases, 'external_key', 'tax_class_name')['representation_candidate']);
+        $this->assertSame('alias_with_translated_value', $this->find($aliases, 'external_key', 'product_online')['representation_candidate']);
+    }
+
+    #[Test]
+    public function giftcard_and_dynamic_envelope_parent_lineage_is_source_accurate(): void
+    {
+        $master = $this->masterRows(dirname(__DIR__, 3));
+        $members = $this->structuredRows(dirname(__DIR__, 3));
+
+        $this->assertSame($master['giftcard_amount']['coverage_id'], $members['giftcard_amount_list:amount']['parent_coverage_id']);
+        $this->assertSame($master['giftcard_amounts']['coverage_id'], $members['giftcard_amount:value']['parent_coverage_id']);
+        foreach (['dynamic_attribute_value:attribute_code', 'dynamic_attribute_value:value'] as $member) {
+            $this->assertSame($master['custom_attributes']['coverage_id'], $members[$member]['parent_coverage_id']);
+            $this->assertStringContainsString('envelope_parents=additional_attributes|custom_attributes', $members[$member]['source_context_key']);
+        }
+    }
+
+    #[Test]
+    public function alias_concept_metadata_is_explicit_and_independent_of_source_order(): void
+    {
+        $source = dirname(__DIR__, 3);
+        $concepts = array_column($this->readCsv("$source/".AdobeCommerceCoverage::CONCEPTS), null, 'concept_key');
+        $this->assertSame('UnresolvedLifecycleOwner', $concepts['adobe:alias:status']['owner_candidate']);
+        $this->assertSame('GiftCard', $concepts['adobe:alias:giftcard_amount']['owner_candidate']);
+        $this->assertSame('PricingTax', $concepts['adobe:alias:tax_class']['owner_candidate']);
+        $this->assertSame('Connector', $concepts['adobe:alias:product_type']['owner_candidate']);
+
+        $root = $this->temporaryCorpus();
+        $master = $this->readCsv("$root/".AdobeCommerceCoverage::MASTER);
+        $this->writeCsv("$root/".AdobeCommerceCoverage::MASTER, ['adobe_key_or_capability', 'entry_kind', 'cluster', 'edition_scope', 'source_surface', 'review_status'], array_reverse($master));
+        (new AdobeCommerceCoverage)->generate($root);
+        $reordered = array_column($this->readCsv("$root/".AdobeCommerceCoverage::CONCEPTS), null, 'concept_key');
+        foreach (['status', 'giftcard_amount', 'tax_class', 'product_type'] as $group) {
+            $key = 'adobe:alias:'.$group;
+            foreach (['owner_candidate', 'representation_candidate', 'value_type', 'concept_status', 'review_status', 'review_note'] as $column) {
+                $this->assertSame($concepts[$key][$column], $reordered[$key][$column]);
+            }
+        }
+    }
+
+    #[Test]
+    public function contradictory_projection_write_and_incomplete_eav_scope_fail_validation(): void
+    {
+        $root = $this->temporaryCorpus();
+        $rows = $this->readCsv("$root/".AdobeCommerceCoverage::COVERAGE);
+        foreach ($rows as &$row) {
+            if ($row['source_file'] === AdobeCommerceCoverage::MASTER && $row['external_key'] === 'created_at') {
+                $row['write_semantics'] = 'surface_defined';
+            }
+            if ($row['source_file'] === AdobeCommerceCoverage::STRUCTURED && $row['source_object_family'] === 'dynamic_attribute_value') {
+                $row['source_context_key'] = str_replace('additional_attributes|custom_attributes', 'custom_attributes', $row['source_context_key']);
+            }
+        }
+        $this->writeCsv("$root/".AdobeCommerceCoverage::COVERAGE, BigCommerceCoverage::COVERAGE_HEADER, $rows);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('incorrect structured role/contract/context');
+        (new AdobeCommerceCoverage)->validate($root);
+    }
+
+    #[Test]
+    public function unknown_master_surface_family_fails_supporting_matrix_validation(): void
+    {
+        $root = $this->temporaryCorpus();
+        $master = $this->readCsv("$root/".AdobeCommerceCoverage::MASTER);
+        $master[0]['source_surface'] = 'Unknown provider surface';
+        $this->writeCsv("$root/".AdobeCommerceCoverage::MASTER, ['adobe_key_or_capability', 'entry_kind', 'cluster', 'edition_scope', 'source_surface', 'review_status'], $master);
+        (new AdobeCommerceCoverage)->generate($root);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('unresolved Adobe source surface');
+        (new AdobeCommerceCoverage)->validate($root);
+    }
+
     private function temporaryCorpus(): string
     {
         $source = dirname(__DIR__, 3);
@@ -186,6 +320,17 @@ class AdobeCommerceCoverageTest extends TestCase
         $rows = array_filter($this->coverage($root), fn ($row) => $row['source_file'] === AdobeCommerceCoverage::MASTER);
 
         return array_column($rows, null, 'external_key');
+    }
+
+    private function structuredRows(string $root): array
+    {
+        $rows = array_filter($this->coverage($root), fn ($row) => $row['source_file'] === AdobeCommerceCoverage::STRUCTURED);
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row['source_object_family'].':'.$row['external_key']] = $row;
+        }
+
+        return $result;
     }
 
     private function find(array $rows, string $column, string $value): array
