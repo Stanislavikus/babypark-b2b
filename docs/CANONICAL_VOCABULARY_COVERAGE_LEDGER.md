@@ -88,3 +88,9 @@ The corrected normalization keeps `additional_attributes` and `custom_attributes
 Gift Card parentage is surface-specific: Import `giftcard_amount_list.amount` belongs to the Import `giftcard_amount` representation, while GraphQL `giftcard_amount` members belong to `giftcard_amounts`. The shared dynamic EAV member shape uses `custom_attributes` as its technical parent and records `additional_attributes|custom_attributes` as the complete envelope scope; validation requires both parents to exist.
 
 All 17 alias groups have explicit compatibility contracts defining neutral owner, representation, value type, status, expected keys, and transformation rationale. Concept metadata is independent of physical row ordering. The composition disagreement now enumerates all matching configurable, bundle, and grouped top-level, alias, and structured concepts rather than only three alias nodes.
+
+## Google Merchant provider pass
+
+The Google pass covers 145 processed ProductAttributes and 11 ProductInput wrapper/context rows. Processed output is always modeled as Google publication state, with writes normalized to `conditional_write_by_data_spec`; it is never asserted as authoritative Product truth. ProductInput separately preserves offer identity, resource-name/encoding mechanics, publication context, submission containers, and concurrency version behavior.
+
+Vehicle and property fields remain 35 category/vertical-scoped candidates with scope in `source_context_key` and no invented applicability FK. Pricing, Media, Shipping/Returns, Compliance, relationships, taxonomy, and channel controls retain provider/domain ownership. Nine generated disagreement families preserve unresolved availability, taxonomy, vertical applicability, identifier governance, compliance, unit pricing, preorder date, URL, and processed-output ownership questions.
