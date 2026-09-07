@@ -29,7 +29,7 @@ The current Lead completeness pass contains:
 - **35** primary source/API/event surfaces;
 - **106** cross-surface alias/representation rows;
 - **36** product-adjacent freshness event/topic rows;
-- **9** version/change boundary rows for 2026-07/current transition semantics;
+- **14** version/change boundary rows for 2026-07/current transition semantics;
 - **8556** normalized Shopify Standard Product Taxonomy attribute definitions;
 - **74820** controlled taxonomy value references represented by the pinned upstream taxonomy (not duplicated into this repository);
 - **15** current product-related standard metafield definitions explicitly inventoried.
@@ -101,6 +101,10 @@ The pass also corrected an important inventory-shape mistake: the top-level `Inv
 
 ## Important Shopify-specific findings already preserved
 
+### Product update identifiers are connector identity tools, not platform identity
+
+Since Admin GraphQL `2026-04`, `productUpdate` accepts a separate identifier using Shopify `id`, `handle`, or a unique-metafield `customId`. This is useful for external-source reconciliation, but it does not make Shopify handle/custom metafield the platform identity authority. `ExternalRecordLink` and the platform identity contracts remain separate.
+
 ### `productSet` is a consequential sync surface
 
 Shopify explicitly positions `productSet` for synchronizing an external source into Shopify. Its mutation semantics are not ordinary PATCH semantics:
@@ -170,6 +174,14 @@ The 2026-07 streamlined Metaobject API adds JSON-style `values` reads/writes. It
 
 Classic webhook topics and the newer Events/metafield trigger surface can reduce polling and identify likely changes, including Product metafield changes. They do not prove the final Product/Variant/Inventory value. The connector must re-read authoritative Admin API state before deriving Receive/Export conclusions.
 
+### Physical inventory preview is intentionally outside the stable V1 baseline
+
+Shopify announced bins, physical counts and purchase-order primitives behind an `unstable` feature preview in July 2026. They are recorded as a future inventory/WMS boundary, not promoted into the stable Admin GraphQL `2026-07` Product connector inventory. This is an explicit exclusion, not an unknown gap.
+
+### Inventory writes are concurrency/idempotency-sensitive
+
+By the `2026-07` baseline, the earlier 2026-04 concurrency changes are already active: quantity mutations use explicit `changeFromQuantity` compare-and-swap semantics where applicable, and selected consequential inventory mutations require Shopify idempotency keys. A future connector must preserve command identity across retries and must not translate a timeout into a blind duplicate adjustment.
+
 ### Inventory is multi-state and location-scoped
 
 InventoryItem and InventoryLevel are kept separate from ProductVariant semantic fields. Location-specific quantity states include concepts such as available, incoming, committed, damaged, on-hand, quality-control, reserved and safety-stock. Absolute `inventorySetQuantities` uses compare-and-set semantics and is intended for a system acting as source of truth; delta adjustment is a separate mutation family.
@@ -183,6 +195,10 @@ Variant base price and compare-at price are only part of the pricing surface. Ca
 ### Media is richer than image URLs
 
 Shopify Product media includes images, hosted video, 3D models and external video. File/media processing fields are system projections. Variant association is separate from Product media ownership. Product CSV carries image URLs but does not represent the whole GraphQL media capability.
+
+### Gift-card local-currency settings are create-only
+
+`GiftCardProductSetInput.issuanceCurrency` and `crossCurrencyRedeemable` can be set when the gift-card Product is created, but cannot be changed afterward. They remain specialized gift-card capability state rather than ordinary mutable Product fields.
 
 ### Composition families stay separate
 
