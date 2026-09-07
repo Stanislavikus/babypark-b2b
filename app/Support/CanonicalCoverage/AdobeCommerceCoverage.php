@@ -391,6 +391,9 @@ final class AdobeCommerceCoverage
         if ($disposition === 'DERIVED_PROJECTION') {
             return ['read_projection', 'read_only'];
         }
+        if (str_contains(strtolower($row['source_surface']), 'exact admin rest write key unresolved')) {
+            return ['surface_defined', 'not_proven'];
+        }
         if (str_contains($row['source_surface'], 'GraphQL') && ! str_contains($row['source_surface'], 'Admin REST') && ! str_contains($row['source_surface'], 'Import')) {
             return ['readable', 'not_proven'];
         }

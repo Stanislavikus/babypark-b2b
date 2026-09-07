@@ -136,6 +136,12 @@ class AdobeCommerceCoverageTest extends TestCase
             $this->assertSame('DEFERRED_REVIEW', $master[$key]['review_status']);
             $this->assertStringContainsString('queue:adobe_', $master[$key]['decision_reference']);
         }
+        $this->assertSame('not_proven', $master['rma_eligibility']['write_semantics']);
+        $this->assertSame('not_proven', $master['gift_wrapping_capability']['write_semantics']);
+        $this->assertSame('read_only', $master['is_returnable']['write_semantics']);
+        $this->assertSame('read_only', $master['gift_wrapping_available']['write_semantics']);
+        $this->assertSame('not_proven', $master['gift_wrapping_price']['write_semantics']);
+        $this->assertNotSame('not_proven', $master['gift_message_available']['write_semantics']);
         $questions = $this->readCsv(dirname(__DIR__, 3).'/'.AdobeCommerceCoverage::DISAGREEMENTS);
         $this->assertCount(14, $questions);
     }
@@ -292,6 +298,23 @@ class AdobeCommerceCoverageTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('unresolved Adobe source surface');
+        (new AdobeCommerceCoverage)->validate($root);
+    }
+
+    #[Test]
+    public function unresolved_admin_write_identity_cannot_regress_to_surface_defined(): void
+    {
+        $root = $this->temporaryCorpus();
+        $rows = $this->readCsv("$root/".AdobeCommerceCoverage::COVERAGE);
+        foreach ($rows as &$row) {
+            if ($row['source_file'] === AdobeCommerceCoverage::MASTER && $row['external_key'] === 'rma_eligibility') {
+                $row['write_semantics'] = 'surface_defined';
+            }
+        }
+        $this->writeCsv("$root/".AdobeCommerceCoverage::COVERAGE, BigCommerceCoverage::COVERAGE_HEADER, $rows);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('incorrect master classification/contract');
         (new AdobeCommerceCoverage)->validate($root);
     }
 
