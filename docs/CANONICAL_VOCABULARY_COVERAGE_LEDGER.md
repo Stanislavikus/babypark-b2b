@@ -70,3 +70,15 @@ All 136 coverage rows were mechanically reconciled. High-risk row-level review c
 ## Gate 2 handoff
 
 After all five provider passes, blind reviewers receive the content-addressed manifest, provider shards, provider concept graphs, validator output, resolved-decision extracts, and a cross-platform disagreement queue. They may inspect source rows through file/ordinal/hash provenance. Cross-platform merge begins only then; this BigCommerce pass must not be treated as evidence that similarly named fields from another ecosystem are equivalent.
+
+## Adobe Commerce provider pass
+
+The Adobe pass adds three denominator files to the common manifest: 183 top-level inventory rows, 189 structured members, and 39 explicit alias representations. Capability clusters and the source/edition matrix remain supporting consistency evidence rather than duplicate coverage rows. The resulting shard contains 411 physical coverage rows and 359 provisional Adobe-local concepts.
+
+All structured families use an explicit mapping to a real top-level capability row. Nested IDs, UIDs, codes, and SKUs remain structure/reference members. All alias rows point to a valid top-level representation and retain the frozen `identity_rule`; ID/code/name translation is not treated as raw equality.
+
+Adobe-local ownership preserves the frozen boundaries: visibility/store/website context stays with Connector; Attribute Sets with schema/applicability; pricing and tax with Pricing/Tax; MSI topology with Inventory; salable quantity with Availability as a projection; media with Media; category membership with Category; links with ProductAssociation; and configurable, customizable, bundle, grouped, downloadable, Gift Card, and Shared Catalog capabilities remain distinct provider families.
+
+Fourteen generated OPEN disagreements cover lifecycle, tax, MAP, MSRP, weight, store scope/localization, RMA and gift-wrap write identity, customization/composition, execution Product Type, dynamic EAV, Shared Catalog, and Catalog Service projections. Every affected row is `DEFERRED_REVIEW` with an explicit queue reference; this does not reopen frozen visibility ownership or decide a cross-platform concept.
+
+Adobe validation additionally reconciles the 28 cluster counts and the 14-row source/edition matrix. Cross-provider tests run Adobe and BigCommerce generation in both directions and prove that the common manifest and both providers' generated shards remain byte-for-byte deterministic.

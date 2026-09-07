@@ -42,15 +42,25 @@ class BigCommerceCoverageTest extends TestCase
     {
         $root = $this->temporaryCorpus();
         $manifest = $this->readCsv("$root/".BigCommerceCoverage::MANIFEST);
+        $before = [];
+        foreach ($manifest as $entry) {
+            $before[$entry['platform'].'|'.$entry['source_file']] = $entry;
+        }
         $manifest[] = ['other-v1', BigCommerceCoverage::BASE_COMMIT, 'other', 'docs/data/other.csv', str_repeat('a', 64), str_repeat('b', 64), '1', 'test', '2026-09-07'];
         $this->writeCsv("$root/".BigCommerceCoverage::MANIFEST, BigCommerceCoverage::MANIFEST_HEADER, $manifest);
 
         (new BigCommerceCoverage)->generate($root);
         $after = $this->readCsv("$root/".BigCommerceCoverage::MANIFEST);
 
-        $this->assertCount(2, $after);
-        $this->assertSame(['bigcommerce', 'other'], array_column($after, 'platform'));
-        $this->assertSame('other-v1', $after[1]['snapshot_id']);
+        $this->assertCount(count($manifest), $after);
+        $afterByIdentity = [];
+        foreach ($after as $entry) {
+            $afterByIdentity[$entry['platform'].'|'.$entry['source_file']] = $entry;
+        }
+        $this->assertSame('other-v1', $afterByIdentity['other|docs/data/other.csv']['snapshot_id']);
+        foreach ($before as $identity => $entry) {
+            $this->assertSame($entry, $afterByIdentity[$identity]);
+        }
     }
 
     #[Test]
