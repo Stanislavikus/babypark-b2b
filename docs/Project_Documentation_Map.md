@@ -632,6 +632,25 @@ Shopify READ/WRITE certification. Shopify remains one external ecosystem and doe
 define platform core fields. Until its adversarial review/freeze gate is completed,
 treat the document's explicit status marker as authoritative.
 
+### Google Merchant / BigCommerce / Amazon synthesis research inputs
+
+For cross-platform Product vocabulary synthesis, also read the current data artifacts:
+
+- `docs/data/google_merchant_products_v1_attribute_inventory.csv` and
+  `google_merchant_products_v1_product_input_inventory.csv` — Google Merchant Products v1
+  publication vocabulary and wrapper/context evidence;
+- `docs/data/bigcommerce_v3_product_capability_inventory.csv` — current BigCommerce OpenAPI
+  Product/Variant/Options/Modifiers/Pricing/Inventory capability evidence;
+- `docs/data/amazon_product_type_definitions_meta_model_inventory.csv` and
+  `amazon_listings_v1_public_ptd_luggage_inventory.csv` — Amazon PTD meta-model and
+  representative Product Type schema challenger; not a static import of every Amazon type;
+- `docs/data/cross_platform_product_field_synthesis.csv` — semantic comparison/ownership
+  working set across project contracts and external ecosystems.
+
+These artifacts are research evidence, not account discovery state and not merchant-confirmed
+`FieldMapping` rows. `CANONICAL_PRODUCT_FIELD_REGISTRY.md` v8 remains the governance contract
+for what is promoted into canonical platform/domain/channel knowledge.
+
 ---
 
 ## Reading Order
@@ -658,8 +677,8 @@ treat the document's explicit status marker as authoritative.
   classification only, not field certification
 - `ADOBE_COMMERCE_V1_INVENTORY_RESEARCH.md` + review synthesis + related Adobe CSVs —
   frozen cross-platform Adobe research baseline
-- `SHOPIFY_V1_INVENTORY_RESEARCH.md` + related Shopify CSVs — frozen Shopify 2026-07 Product/capability research baseline
-  baseline; obey its frozen/not-frozen status marker
+- `SHOPIFY_V1_INVENTORY_RESEARCH.md` + related Shopify CSVs — frozen Shopify 2026-07 Product/capability research baseline; obey its frozen/not-frozen status marker
+- Google Merchant Products v1, BigCommerce OpenAPI, Amazon PTD and `cross_platform_product_field_synthesis.csv` artifacts above — current cross-platform canonical-synthesis evidence
 - `docs/prototypes/task-4b0-connector-account/` — Task 4B-0 visual contract
   (when implementing connector operational UI)
 
