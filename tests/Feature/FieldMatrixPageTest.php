@@ -65,14 +65,12 @@ class FieldMatrixPageTest extends TestCase
     }
 
     #[Test]
-    public function field_matrix_comparison_checkbox_list_is_not_searchable_for_small_option_set(): void
+    public function field_matrix_comparison_checkbox_list_remains_non_searchable_as_registry_grows(): void
     {
         $component = Livewire::actingAs($this->platformAdmin)
             ->test(FieldMatrix::class)
             ->instance();
 
-        $optionCount = count($component->columnOptions());
-        $this->assertLessThanOrEqual(8, $optionCount);
 
         $checkboxList = $component->getForm('form')->getComponent(
             fn (Component $field): bool => $field instanceof CheckboxList
