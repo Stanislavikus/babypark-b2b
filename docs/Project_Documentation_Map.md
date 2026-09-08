@@ -651,6 +651,14 @@ These artifacts are research evidence, not account discovery state and not merch
 `FieldMapping` rows. `CANONICAL_PRODUCT_FIELD_REGISTRY.md` v8 remains the governance contract
 for what is promoted into canonical platform/domain/channel knowledge.
 
+### CANONICAL_VOCABULARY_COVERAGE_LEDGER.md
+
+Gate 1 research contract for the machine-verifiable external-vocabulary coverage ledger.
+Read it with the provider shards and provisional provider concept graphs under
+`docs/data/canonical-coverage/` when auditing raw-row provenance, dispositions,
+provider-local semantic merges, or the disagreement queue. It does not freeze the
+cross-platform vocabulary or define runtime/storage behavior.
+
 ---
 
 ## Reading Order
