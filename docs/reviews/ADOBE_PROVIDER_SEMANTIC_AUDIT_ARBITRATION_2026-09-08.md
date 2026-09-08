@@ -238,3 +238,36 @@ Next gate:
 3. Squash-merge PR #203 with exact-head SHA gating.
 4. Verify authoritative `develop` points to the squash commit and declare `ADOBE PROVIDER REVIEW FREEZE`.
 5. Then move to Google Merchant with a fresh independent Sonnet/GPT pair.
+
+## Final Opus / neighbor-pattern correction pass
+
+A final narrow Opus attack after the first correction pass found additional cross-surface and provenance defects. Lead rechecked every material point against Magento 2.4-develop source, the real discovery fixture, and the Magento V1 runtime matrix rather than applying the Opus task literally.
+
+Accepted/clarified outcomes:
+
+- Physical Adobe source keys must not claim CSV + REST/GraphQL identity when Magento applies an explicit rename or structured translation.
+- Magento `CatalogImportExport\Model\Import\Product::$_fieldsMap` is retained as primary cross-surface evidence for date, media, MAP/MSRP, inventory-policy, relation, SEO, status, tax-class, product-type and attribute-set spellings.
+- Media is represented as distinct CSV bulk slots, system EAV attributes, and `media_gallery_entries` structure; generic gallery labels are not role-specific label aliases.
+- `media_video` is a structured media capability anchored by media-entry `video_content`, not an Import-only scalar field.
+- `minimal_price -> map_price`, `msrp -> msrp_price`, and `msrp_enabled -> map_enabled` are explicit Magento translations; no MSRP/MAP arbitration remains open.
+- `cost` remains a core-known Magento attribute even though the pilot target reported `is_user_defined=true`; target metadata is preserved as evidence, not used to downgrade the provider concept.
+- Legacy `StockItemInterface` is preserved only as deprecated compatibility evidence for bulk stock-policy translations and must not replace MSI topology ownership.
+- Flat CSV related/cross-sell/up-sell columns remain distinct from structured REST/GraphQL `product_links` objects.
+
+Final correction corpus and validation state:
+
+- semantic/source commit A: `7c65d469b68e69aeb9de2ba38620bc59ec793ea6`;
+- provenance/reproducibility commit B: `99d02962bf8cdeb475ba3298f6694b446f93b4f6`;
+- final Adobe denominator: 186 master + 189 structured + 98 aliases = **473 physical rows**;
+- generated Adobe concepts: **356**;
+- coverage/classification/concept-link ratios: **1.0**; silent drops/orphans/invalid aliases/unexplained merges: **0**;
+- targeted Adobe + Magento V1 matrix tests before B: **38 tests / 3,988 assertions PASS**;
+- full `tests/Unit/CanonicalCoverage` after B: **82 tests / 29,389 assertions PASS**;
+- Magento V1 matrix regression after B: **12 tests / 3,029 assertions PASS**;
+- local Pint PASS; local `git diff --check` PASS.
+
+Provenance is now executable rather than declarative: every manifest row is checked by reading `git show <repository_commit>:<source_file>` and comparing the exact SHA-256 to the committed manifest. The test is shallow-checkout safe: when a recorded historical commit is absent locally it fetches only that exact commit from `origin` before running `git show`, so no workflow permission change is required. The three corrected Adobe manifest rows point to exact source commit A; the other eleven provider rows continue to reproduce from their existing frozen commit.
+
+No GPT-5.4/Gemini arbitration was required in this pass. Apparent ambiguities were resolved by primary Magento source; where evidence remained insufficient (`gallery` vs `media_gallery` identity), the model fails closed and does not merge them.
+
+Next gate remains: push final chain, require green CI on the final PR head, recheck Codex/review threads and mergeability, then freeze Adobe before starting Google Merchant review.
