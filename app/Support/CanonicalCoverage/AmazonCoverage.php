@@ -72,9 +72,6 @@ final class AmazonCoverage
         if ($mh !== BigCommerceCoverage::MANIFEST_HEADER || $ch !== BigCommerceCoverage::COVERAGE_HEADER || $coh !== BigCommerceCoverage::CONCEPT_HEADER || $dh !== BigCommerceCoverage::DISAGREEMENT_HEADER) {
             $errors[] = 'shared provider contract mismatch';
         }
-        if (count($manifest) !== 8) {
-            $errors[] = 'manifest must contain exactly eight accepted source rows';
-        }
         $manifestIndex = [];
         foreach ($manifest as $row) {
             $key = $row['platform'].BigCommerceCoverage::SEPARATOR.$row['source_file'];
@@ -82,6 +79,11 @@ final class AmazonCoverage
                 $errors[] = "duplicate manifest identity $key";
             }
             $manifestIndex[$key] = $row;
+        }
+        foreach ($this->requiredPreAmazonManifestKeys() as $requiredKey) {
+            if (! isset($manifestIndex[$requiredKey])) {
+                $errors[] = "accepted pre-Amazon manifest identity missing $requiredKey";
+            }
         }
         $sources = [self::META => $meta, self::LUGGAGE => $luggage];
         foreach ($sources as $file => $rows) {
@@ -404,13 +406,18 @@ final class AmazonCoverage
     {
         [$header, $rows] = $this->readCsv("$root/".self::MANIFEST);
         $accepted = array_values(array_filter($rows, fn ($row) => $row['platform'] !== 'amazon'));
-        if ($header !== BigCommerceCoverage::MANIFEST_HEADER || count($accepted) !== 6 || ! in_array(count($rows), [6, 8], true)) {
-            throw new RuntimeException('accepted six-row manifest contract drift');
+        if ($header !== BigCommerceCoverage::MANIFEST_HEADER) {
+            throw new RuntimeException('accepted pre-Amazon manifest contract drift');
         }
         $before = $accepted;
         $index = [];
         foreach ($rows as $row) {
             $index[$row['platform'].BigCommerceCoverage::SEPARATOR.$row['source_file']] = $row;
+        }
+        foreach ($this->requiredPreAmazonManifestKeys() as $requiredKey) {
+            if (! isset($index[$requiredKey])) {
+                throw new RuntimeException("accepted pre-Amazon manifest identity missing $requiredKey");
+            }
         }
         foreach ($providerRows as $row) {
             $index[$row['platform'].BigCommerceCoverage::SEPARATOR.$row['source_file']] = $row;
@@ -424,6 +431,18 @@ final class AmazonCoverage
         }
 
         return $result;
+    }
+
+    private function requiredPreAmazonManifestKeys(): array
+    {
+        return [
+            'adobe_commerce'.BigCommerceCoverage::SEPARATOR.'docs/data/adobe_commerce_v1_alias_groups.csv',
+            'adobe_commerce'.BigCommerceCoverage::SEPARATOR.'docs/data/adobe_commerce_v1_inventory_master.csv',
+            'adobe_commerce'.BigCommerceCoverage::SEPARATOR.'docs/data/adobe_commerce_v1_structured_object_fields.csv',
+            'bigcommerce'.BigCommerceCoverage::SEPARATOR.'docs/data/bigcommerce_v3_product_capability_inventory.csv',
+            'google_merchant'.BigCommerceCoverage::SEPARATOR.'docs/data/google_merchant_products_v1_attribute_inventory.csv',
+            'google_merchant'.BigCommerceCoverage::SEPARATOR.'docs/data/google_merchant_products_v1_product_input_inventory.csv',
+        ];
     }
 
     private function shape(string $type): string

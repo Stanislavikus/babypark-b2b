@@ -207,6 +207,19 @@ class AmazonCoverageTest extends TestCase
         } fclose($h);
     }
 
+    #[Test]
+    public function missing_pre_amazon_provider_identity_fails_even_when_later_provider_rows_exist(): void
+    {
+        $root = $this->temporaryCorpus();
+        $manifest = $this->readCsv("$root/".AmazonCoverage::MANIFEST);
+        $manifest = array_values(array_filter($manifest, fn ($row) => $row['source_file'] !== 'docs/data/adobe_commerce_v1_alias_groups.csv'));
+        $this->writeCsv("$root/".AmazonCoverage::MANIFEST, BigCommerceCoverage::MANIFEST_HEADER, $manifest);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('accepted pre-Amazon manifest identity missing');
+        (new AmazonCoverage)->validate($root);
+    }
+
     private function temporaryCorpus(): string
     {
         $source = dirname(__DIR__, 3);

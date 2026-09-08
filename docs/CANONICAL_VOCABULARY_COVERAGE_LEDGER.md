@@ -1,4 +1,4 @@
-# Canonical vocabulary coverage ledger — BigCommerce provider pass
+# Canonical vocabulary coverage ledger — provider-local Gate 1 campaign
 
 This document records the first provider-local delivery of Gate 1. It is research and governance evidence, not a canonical vocabulary freeze, database design, or runtime mapping contract.
 
@@ -96,3 +96,59 @@ The Google pass covers 145 processed ProductAttributes and 11 ProductInput wrapp
 Vehicle and property applicability is now independent of semantic ownership: all 37 known vertical rows retain scope in `source_context_key`, while five vertical price/fee rows are Pricing-owned and five vehicle compliance rows remain explicitly deferred rather than being flattened into category attributes. No applicability FK is invented. The relationship family is split among ProductAssociation, VariantComposition, bundle composition, and deferred narrow multipack semantics.
 
 All six `channel_or_specialized_context` rows have explicit fates: vehicle registration/model are vehicle-scoped attributes, sell-on-Google quantity remains publication context, both unit-pricing measures are deferred to Pricing-or-Compliance review, and sustainability incentives are deferred Compliance candidates. `shortTitle` is likewise deferred between FieldDefinition and Content ownership. Twelve generated disagreement families preserve these decisions alongside unresolved availability, taxonomy, vertical applicability, identifier governance, compliance, preorder date, URL, and processed-output ownership questions.
+
+## Amazon Listings V1 provider pass — Gate 1D
+
+The Amazon pass adds two denominator files to the common manifest: 23 Product Type Definitions meta-model rows and 78 rows from the pinned public `LUGGAGE` PTD example, for 101 physical coverage rows. The PTD meta-model is schema/applicability evidence; it is not Product data. The representative LUGGAGE schema is product-type/marketplace/requirements scoped and cannot prove that a property exists for every Amazon product type or marketplace.
+
+The corrected Gate 1D normalization preserves the frozen applicability context (`product_type=LUGGAGE`, marketplace `ATVPDKIKX0DER`, requirements `LISTING`, parentage example and schema-version token) in `source_context_key` without inventing an applicability FK. PTD property presence is recorded as schema evidence, not as proof of live listing READ capability, and property writes remain PTD-conditioned rather than unconditional.
+
+Identity, taxonomy, pricing, availability, compliance/media and variant-composition fates remain separate. `condition_type` is a reusable Product-condition candidate while `condition_note` remains Amazon listing context; taxonomy keys remain connector taxonomy; offer structures remain Pricing; fulfillment-channel availability remains Availability; product-type-specific LUGGAGE attributes remain `CATEGORY_ATTRIBUTE`. The final pass contains 90 Amazon-local concepts and 13 disagreement families after semantic correction.
+
+The Amazon validator freezes the eight source identities accepted through Gate 1D but permits later provider passes to append new manifest identities. It still requires all pre-existing accepted rows to survive byte-for-byte; this is what allows Shopify Gate 1E to extend the common manifest without weakening Amazon provenance.
+
+## Shopify provider pass — Gate 1E
+
+The Shopify pass consumes the already frozen Shopify 2026-07 research baseline rather than re-researching the provider. Six physical source files form the denominator:
+
+- 738 master Product/ProductVariant/domain/capability rows;
+- 926 structured object/input/mutation members;
+- 106 explicit cross-surface alias/representation rows;
+- 8,556 pinned Shopify Standard Product Taxonomy attribute definitions;
+- 36 webhook/Events freshness facts;
+- 14 version/change boundaries.
+
+The exact denominator is 10,376 physical rows. `shopify_v1_capability_clusters.csv`, `shopify_v1_inventory_source_matrix.csv` and the 15-row standard-metafield detail file remain supporting evidence rather than duplicate denominator rows. The 15 standard metafield definitions are already represented in the master; the validator proves that every supporting namespace/key is present there. The taxonomy pin remains commit `ad206247ecc45a95fe4b01bce2ad2f0e7bec3c66`, blob `455818cf3a5ae41f1db23c244adf1b5694691b88`, with 8,240 base attributes, 316 extended attributes and 74,820 controlled-value references.
+
+Provider-local fate is intentionally narrower than the source inventory's `semantic_field` label. Shopify `semantic_field` means a meaningful value, not automatic Product Field Library membership. Product title/description, merchant type, lifecycle status, tags, SKU/barcode and selected logistics facts remain reusable provider candidates; Category, Media, Localization, Dynamic Metafield, Gift Card and Selling Plan values remain domain capabilities. `Product.vendor` remains Shopify channel semantics and is not promoted to brand/manufacturer.
+
+All 41 Product CSV master rows are `TRANSPORT_MECHANIC`. CSV is destructive/conditional bulk representation evidence; alias rows connect it to the relevant Product/Variant/domain semantics without creating a second canonical field set. Structured members remain `STRUCTURE_MEMBER` and no parent row is invented when the frozen input-object family has no single physical top-level parent. Nested IDs therefore remain structure/reference evidence rather than becoming top-level external identity authority.
+
+All 8,556 taxonomy definitions remain `CATEGORY_ATTRIBUTE` owned by `ConnectorTaxonomy`; none is promoted to a platform FieldDefinition by Gate 1E. Freshness rows remain transport hints and require authoritative Admin state to be re-read. Version rows remain applicability/schema metadata. Product/ProductVariant remote identities remain connector-owned external identity evidence, while async-operation and webhook-subscription IDs remain transport/configuration identities rather than business-record identity.
+
+Two platform-ownership questions remain intentionally open in the Shopify shard: standard Product subtitle/short-title ownership and unit-pricing measure ownership. These rows are `DEFER_DECISION` / `DEFERRED_REVIEW`; the pass does not manufacture a Content, Pricing or Compliance contract merely to close the queue.
+
+Current Gate 1E metrics are:
+
+```text
+master_rows=738
+structured_rows=926
+alias_rows=106
+taxonomy_rows=8556
+freshness_rows=36
+version_rows=14
+coverage_rows=10376
+concepts=10314
+disagreements=2
+coverage_ratio=1.000000
+classification_ratio=1.000000
+concept_link_ratio=1.000000
+silent_drop_count=0
+invalid_alias_reference_count=0
+invented_applicability_key_count=0
+taxonomy_attributes_promoted_to_platform_fields=0
+freshness_hints_promoted_to_state_authority=0
+manifest_provider_rows_preserved=PASS
+```
+
+The five provider generators are byte-deterministic as one campaign: BigCommerce → Adobe Commerce → Google Merchant → Amazon → Shopify generation followed by all five validators leaves the common manifest and every provider coverage/concept/disagreement artifact unchanged. With Gate 1A–1E represented in the ledger, the next step is cross-platform synthesis/reconciliation; provider-local concepts remain evidence and do not themselves select platform storage or runtime mapping behavior.
