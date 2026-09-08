@@ -45,6 +45,9 @@ class AmazonCoverageTest extends TestCase
     #[Test]
     public function luggage_context_and_capability_claims_are_conservative(): void
     {
+        foreach ($this->rows() as $row) {
+            $this->assertSame('not_applicable', $row['applicability_key']);
+        }
         foreach ($this->luggageRows() as $row) {
             foreach (['product_type=LUGGAGE', 'marketplace=ATVPDKIKX0DER', 'requirements=LISTING', 'property_group=', 'parentage=NONE example', 'schema_version_token=U8L4z4Ud95N16tZlR7rsmbQ=='] as $context) {
                 $this->assertStringContainsString($context, $row['source_context_key']);
@@ -53,6 +56,38 @@ class AmazonCoverageTest extends TestCase
             $this->assertSame('ptd_conditioned_write_not_unconditional', $row['write_semantics']);
             $this->assertStringNotContainsString('PRODUCT_ONLY', $row['source_context_key']);
             $this->assertStringNotContainsString('OFFER_ONLY', $row['source_context_key']);
+        }
+    }
+
+    #[Test]
+    public function condition_type_and_listing_note_have_distinct_semantics(): void
+    {
+        $rows = $this->luggageRows();
+        $type = $rows['condition_type'];
+        $note = $rows['condition_note'];
+
+        $this->assertSame('REUSABLE_SEMANTIC', $type['disposition']);
+        $this->assertSame('ProductData', $type['owner_candidate']);
+        $this->assertSame('product_condition_enum', $type['representation_candidate']);
+        $this->assertSame('CHANNEL_SEMANTIC', $note['disposition']);
+        $this->assertSame('ListingCondition', $note['owner_candidate']);
+        $this->assertSame('amazon_listing_condition_note', $note['representation_candidate']);
+        $this->assertNotSame($type['concept_key'], $note['concept_key']);
+        $this->assertNotSame($type['representation_candidate'], $note['representation_candidate']);
+        $this->assertNotSame('ProductLifecycle', $type['owner_candidate']);
+        $this->assertNotSame('ProductLifecycle', $note['owner_candidate']);
+    }
+
+    #[Test]
+    public function luggage_specific_attributes_remain_product_type_scoped(): void
+    {
+        $rows = $this->luggageRows();
+        foreach (['department', 'outer', 'fabric_type', 'lining_description', 'number_of_wheels', 'wheel', 'size_map'] as $key) {
+            $this->assertSame('CATEGORY_ATTRIBUTE', $rows[$key]['disposition']);
+            $this->assertSame('ProductTypeAttribute', $rows[$key]['owner_candidate']);
+            $this->assertSame('luggage_ptd_scoped_attribute', $rows[$key]['representation_candidate']);
+            $this->assertNotSame('REUSABLE_SEMANTIC', $rows[$key]['disposition']);
+            $this->assertNotSame('ProductData', $rows[$key]['owner_candidate']);
         }
     }
 
@@ -130,6 +165,17 @@ class AmazonCoverageTest extends TestCase
         (new AmazonCoverage)->validate($root);
     }
 
+    #[Test]
+    public function invented_applicability_key_regression_fails(): void
+    {
+        $root = $this->temporaryCorpus();
+        $rows = $this->readCsv("$root/".AmazonCoverage::COVERAGE);
+        $rows[0]['applicability_key'] = 'amazon:invented-applicability';
+        $this->writeCsv("$root/".AmazonCoverage::COVERAGE, BigCommerceCoverage::COVERAGE_HEADER, $rows);
+        $this->expectException(RuntimeException::class);
+        (new AmazonCoverage)->validate($root);
+    }
+
     private function luggageRows(): array
     {
         return array_column(array_filter($this->rows(), fn ($r) => $r['source_file'] === AmazonCoverage::LUGGAGE), null, 'external_key');
@@ -171,6 +217,6 @@ class AmazonCoverageTest extends TestCase
             } copy("$source/$file", "$root/$file");
         }
 
-return $root;
+        return $root;
     }
 }

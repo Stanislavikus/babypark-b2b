@@ -116,7 +116,7 @@ final class AmazonCoverage
             if (! isset($conceptIndex[$row['concept_key']]) || ! in_array($row['disposition'], BigCommerceCoverage::DISPOSITIONS, true)) {
                 $errors[] = "Amazon concept/disposition mismatch $physical";
             }
-            if ($row['applicability_key'] === '' || $row['applicability_key'] === 'not_applicable') {
+            if ($row['applicability_key'] !== 'not_applicable') {
                 $errors[] = "dangling Amazon applicability $physical";
             }
             if ($file === self::META) {
@@ -157,7 +157,7 @@ final class AmazonCoverage
         return $this->metrics($coverage, count($concepts), count($disagreements)) + [
             'duplicate_physical_source_row_count' => 0, 'source_hash_mismatch_count' => 0,
             'open_disagreements_with_verified_rows' => 0, 'invalid_disagreement_refs' => 0,
-            'dangling_applicability_keys' => 0, 'manifest_provider_rows_preserved' => 'PASS',
+            'dangling_applicability_keys' => $semantic['invented_applicability_key_count'], 'manifest_provider_rows_preserved' => 'PASS',
         ] + $semantic;
     }
 
@@ -191,7 +191,8 @@ final class AmazonCoverage
             'fulfillment_channel_availability' => ['DOMAIN_CAPABILITY', 'Availability', 'amazon_fulfillment_availability', $k],
             'purchasable_offer' => ['DOMAIN_CAPABILITY', 'Pricing', 'amazon_purchasable_offer', $k],
             'list_price' => ['DOMAIN_CAPABILITY', 'Pricing', 'recommended_retail_price_evidence', $k],
-            'condition_type', 'condition_note' => ['CHANNEL_SEMANTIC', 'ListingCondition', 'amazon_listing_condition', $k],
+            'condition_type' => ['REUSABLE_SEMANTIC', 'ProductData', 'product_condition_enum', $k],
+            'condition_note' => ['CHANNEL_SEMANTIC', 'ListingCondition', 'amazon_listing_condition_note', $k],
             'product_tax_code' => ['DEFER_DECISION', 'PricingOrCompliance', 'tax_classification_candidate', $k],
             'merchant_release_date' => ['DOMAIN_CAPABILITY', 'Availability', 'merchant_release_availability_date', $k],
             'merchant_shipping_group' => ['CHANNEL_SEMANTIC', 'Connector', 'amazon_shipping_publication_context', $k],
@@ -210,7 +211,8 @@ final class AmazonCoverage
             'merchant_suggested_asin' => ['CHANNEL_SEMANTIC', 'ConnectorIdentityReference', 'seller_suggested_asin_not_established_identity', $k],
             'item_type_keyword', 'item_type_name' => ['CHANNEL_SEMANTIC', 'ConnectorTaxonomy', 'amazon_taxonomy_context', 'amazon_taxonomy:'.$k],
             'bullet_point', 'special_feature' => ['REUSABLE_SEMANTIC', 'ProductData', 'product_highlight_evidence_distinct_representation', 'highlight:'.$k],
-            'style', 'product_description', 'department', 'target_gender', 'age_range_description', 'material', 'outer', 'fabric_type', 'lining_description', 'number_of_items', 'number_of_wheels', 'wheel', 'model_name', 'color', 'size', 'size_map', 'part_number' => ['REUSABLE_SEMANTIC', 'ProductData', 'ptd_scoped_'.$k, $k],
+            'department', 'outer', 'fabric_type', 'lining_description', 'number_of_wheels', 'wheel', 'size_map' => ['CATEGORY_ATTRIBUTE', 'ProductTypeAttribute', 'luggage_ptd_scoped_attribute', $k],
+            'style', 'product_description', 'target_gender', 'age_range_description', 'material', 'number_of_items', 'model_name', 'color', 'size', 'part_number' => ['REUSABLE_SEMANTIC', 'ProductData', 'ptd_scoped_'.$k, $k],
             default => throw new RuntimeException("Unreviewed Amazon LUGGAGE field $k"),
         };
     }
@@ -259,7 +261,7 @@ final class AmazonCoverage
             $file === self::META ? 'Product Type Definitions 2020-09-01' : $source['schema_version_token'], 'Selling Partner API PTD', $object, $key, 'not_applicable', $context,
             'not_applicable', 'amazon:atom:'.$this->slug($object).':'.$this->slug($key), $concept, $disposition, $owner, $representation,
             $file === self::META ? 'ProviderSchemaDiscovery' : 'PTDListingProperty', $shape, $read, $write,
-            $file === self::META ? 'amazon:ptd_meta_model' : 'amazon:ptd:LUGGAGE:ATVPDKIKX0DER:LISTING:'.$source['property_group'].':'.$source['schema_version_token'],
+            'not_applicable',
             'not_applicable', $evidence, $questions === [] ? 'not_applicable' : implode('|', array_map(fn ($q) => 'queue:'.$q, $questions)),
             $questions === [] ? 'PROVIDER_VERIFIED' : 'DEFERRED_REVIEW', 'Amazon provider-local schema evidence; no final cross-platform equivalence or runtime capability asserted.',
         ]);
@@ -333,8 +335,22 @@ final class AmazonCoverage
     {
         $meta = array_filter($coverage, fn ($r) => $r['source_file'] === self::META);
         $rows = array_column(array_filter($coverage, fn ($r) => $r['source_file'] === self::LUGGAGE), null, 'external_key');
+        $productTypeAttributes = ['department', 'outer', 'fabric_type', 'lining_description', 'number_of_wheels', 'wheel', 'size_map'];
 
         return [
+            'invented_applicability_key_count' => count(array_filter($coverage, fn ($r) => $r['applicability_key'] !== 'not_applicable')),
+            'invalid_condition_semantics_count' => count(array_filter([
+                $rows['condition_type']['disposition'] !== 'REUSABLE_SEMANTIC',
+                $rows['condition_type']['owner_candidate'] !== 'ProductData',
+                $rows['condition_type']['representation_candidate'] !== 'product_condition_enum',
+                $rows['condition_note']['disposition'] !== 'CHANNEL_SEMANTIC',
+                $rows['condition_note']['owner_candidate'] !== 'ListingCondition',
+                $rows['condition_note']['representation_candidate'] !== 'amazon_listing_condition_note',
+                $rows['condition_type']['concept_key'] === $rows['condition_note']['concept_key'],
+            ])),
+            'product_type_attribute_overpromotion_count' => count(array_filter($productTypeAttributes, fn ($key) => $rows[$key]['disposition'] !== 'CATEGORY_ATTRIBUTE'
+                || $rows[$key]['owner_candidate'] !== 'ProductTypeAttribute'
+                || $rows[$key]['representation_candidate'] !== 'luggage_ptd_scoped_attribute')),
             'meta_model_promoted_to_product_semantic_count' => count(array_filter($meta, fn ($r) => in_array($r['owner_candidate'], ['ProductData', 'ProductVariantData'], true) || $r['disposition'] === 'REUSABLE_SEMANTIC')),
             'ptd_property_promoted_to_unconditional_read_count' => count(array_filter($rows, fn ($r) => $r['read_semantics'] !== 'ptd_schema_presence_not_live_listing_read')),
             'ptd_property_promoted_to_unconditional_write_count' => count(array_filter($rows, fn ($r) => $r['write_semantics'] !== 'ptd_conditioned_write_not_unconditional')),
