@@ -99,6 +99,54 @@ class CanonicalCoverageIntegrityHardeningTest extends TestCase
         }
     }
 
+    #[Test]
+    public function every_manifest_row_reproduces_exact_source_bytes_from_its_recorded_commit(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $manifest = $this->readCsv($root.'/'.BigCommerceCoverage::MANIFEST);
+
+        foreach ($manifest as $row) {
+            $commit = $row['repository_commit'];
+            $commitCheck = proc_open(
+                ['git', '-C', $root, 'cat-file', '-e', $commit.'^{commit}'],
+                [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                $commitPipes,
+            );
+            stream_get_contents($commitPipes[1]);
+            stream_get_contents($commitPipes[2]);
+            fclose($commitPipes[1]);
+            fclose($commitPipes[2]);
+            if (proc_close($commitCheck) !== 0) {
+                $fetch = proc_open(
+                    ['git', '-C', $root, 'fetch', '--no-tags', 'origin', $commit],
+                    [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                    $fetchPipes,
+                );
+                stream_get_contents($fetchPipes[1]);
+                $fetchError = stream_get_contents($fetchPipes[2]);
+                fclose($fetchPipes[1]);
+                fclose($fetchPipes[2]);
+                $this->assertSame(0, proc_close($fetch), $commit.' '.$fetchError);
+            }
+
+            $spec = $commit.':'.$row['source_file'];
+            $process = proc_open(
+                ['git', '-C', $root, 'show', $spec],
+                [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                $pipes,
+            );
+            $this->assertIsResource($process, $spec);
+            $bytes = stream_get_contents($pipes[1]);
+            $stderr = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            $exitCode = proc_close($process);
+
+            $this->assertSame(0, $exitCode, $spec.' '.$stderr);
+            $this->assertSame($row['file_sha256'], hash('sha256', $bytes), $spec);
+        }
+    }
+
     /** @return list<string> */
     private function shopifyFiles(): array
     {

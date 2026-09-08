@@ -6,7 +6,7 @@ use RuntimeException;
 
 final class AdobeCommerceCoverage
 {
-    public const BASE_COMMIT = '5be3ec03ec915e6831ad86777d5284aa083be206';
+    public const BASE_COMMIT = '7c65d469b68e69aeb9de2ba38620bc59ec793ea6';
 
     public const MASTER = 'docs/data/adobe_commerce_v1_inventory_master.csv';
 
@@ -251,7 +251,7 @@ final class AdobeCommerceCoverage
                 }
             }
         }
-        if (count($seen) !== 411 || count($coverage) !== 411) {
+        if (count($seen) !== 473 || count($coverage) !== 473) {
             $errors[] = 'Adobe physical coverage mismatch';
         }
         $this->validateAliasSourceContracts($aliases, $errors);
@@ -293,6 +293,9 @@ final class AdobeCommerceCoverage
         $cluster = $row['cluster'];
         if ($cluster === 'dynamic_attributes' && in_array($row['adobe_key_or_capability'], ['manufacturer', 'material', 'color', 'size', 'instructions', 'gtin', 'mpn', 'brand'], true)) {
             return ['REUSABLE_SEMANTIC', 'ProductData', 'eav_bound_semantic_candidate'];
+        }
+        if ($row['entry_kind'] === 'connector_context') {
+            return ['CHANNEL_SEMANTIC', 'Connector', 'provider_scope_context'];
         }
         $owners = [
             'pricing' => 'Pricing', 'b2b_pricing' => 'Pricing', 'tax_configuration' => 'PricingTax',
@@ -460,7 +463,7 @@ final class AdobeCommerceCoverage
         if (in_array($row['alias_group'], ['bundle_price_type', 'bundle_sku_type', 'bundle_price_view', 'bundle_weight_type', 'bundle_shipment_type', 'status'], true) && $row['surface_key'] !== 'status') {
             return 'translated_value';
         }
-        if (in_array($row['alias_group'], ['bundle_composition', 'configurable_composition', 'grouped_composition', 'category_assignment', 'giftcard_amount'], true)) {
+        if (in_array($row['alias_group'], ['bundle_composition', 'configurable_composition', 'grouped_composition', 'category_assignment', 'giftcard_amount', 'media_base_role', 'media_small_role', 'media_thumbnail_role', 'media_additional_gallery', 'media_additional_labels', 'media_hidden_from_product_page'], true)) {
             return 'structured_equivalence';
         }
         $rule = strtolower($row['identity_rule']);
@@ -532,6 +535,29 @@ final class AdobeCommerceCoverage
             'category_assignment' => ['owner' => 'Category', 'representation' => 'id_list_object_resolution', 'value_type' => 'category_relation', 'status' => 'domain', 'explanation' => 'Import category forms, REST category links, and GraphQL categories preserve different read/write shapes.'],
             'tier_price_customer_group' => ['owner' => 'Pricing', 'representation' => 'id_code_resolution', 'value_type' => 'customer_group_reference', 'status' => 'domain', 'explanation' => 'Customer group code and Catalog Pricing representation require group identity resolution.'],
             'giftcard_amount' => ['owner' => 'GiftCard', 'representation' => 'import_graphql_amount_translation', 'value_type' => 'money_amount', 'status' => 'domain', 'explanation' => 'Import preset amounts and GraphQL read amount objects share Gift Card semantics through explicit shape translation.'],
+            'media_base_role' => ['owner' => 'Media', 'representation' => 'media_role_surface_equivalence', 'value_type' => 'media_role_assignment', 'status' => 'domain', 'explanation' => 'CSV base_image, system EAV/GraphQL image, and media-gallery image role membership are explicit related representations; filenames/paths and role tokens are not raw equal.'],
+            'media_small_role' => ['owner' => 'Media', 'representation' => 'media_role_surface_equivalence', 'value_type' => 'media_role_assignment', 'status' => 'domain', 'explanation' => 'CSV and system EAV/GraphQL both spell small_image but remain distinct surface values; media-gallery role membership is structured and not raw equal to the filename/path.'],
+            'media_thumbnail_role' => ['owner' => 'Media', 'representation' => 'media_role_surface_equivalence', 'value_type' => 'media_role_assignment', 'status' => 'domain', 'explanation' => 'CSV thumbnail_image, system EAV/GraphQL thumbnail, and media-gallery thumbnail role membership are explicit related representations and are not raw equal.'],
+            'media_additional_gallery' => ['owner' => 'Media', 'representation' => 'media_gallery_surface_equivalence', 'value_type' => 'media_entry_collection', 'status' => 'domain', 'explanation' => 'Import additional_images is a flat filename list while Admin REST represents additional images as media_gallery_entries whose role types may be empty; collection and entry shapes are not raw equal.'],
+            'media_additional_labels' => ['owner' => 'Media', 'representation' => 'media_gallery_surface_equivalence', 'value_type' => 'media_entry_label_collection', 'status' => 'domain', 'explanation' => 'Import additional_image_labels is a flat label list aligned to additional images while Admin REST stores label on each media gallery entry; list and member shapes are not raw equal.'],
+            'media_hidden_from_product_page' => ['owner' => 'Media', 'representation' => 'media_visibility_surface_equivalence', 'value_type' => 'media_entry_visibility', 'status' => 'domain', 'explanation' => 'Import hide_from_product_page is import media visibility service data while Admin REST stores disabled on each media gallery entry; the representations are not raw equal.'],
+            'media_swatch_role' => ['owner' => 'Media', 'representation' => 'media_role_surface_equivalence', 'value_type' => 'media_role_assignment', 'status' => 'domain', 'explanation' => 'CSV and system EAV swatch_image are explicit surface representations; no ordinary media_gallery_entries.types role equivalence is asserted.'],
+            'media_base_role_label' => ['owner' => 'Media', 'representation' => 'media_role_label_surface_alias', 'value_type' => 'text', 'status' => 'domain', 'explanation' => 'CSV base_image_label maps to system EAV image_label; generic gallery entry label remains a separate per-entry semantic.'],
+            'media_small_role_label' => ['owner' => 'Media', 'representation' => 'media_role_label_surface_alias', 'value_type' => 'text', 'status' => 'domain', 'explanation' => 'CSV and system EAV share small_image_label spelling but are retained as separate physical representations.'],
+            'media_thumbnail_role_label' => ['owner' => 'Media', 'representation' => 'media_role_label_surface_alias', 'value_type' => 'text', 'status' => 'domain', 'explanation' => 'CSV thumbnail_image_label maps to system EAV thumbnail_label; generic gallery entry label is not treated as a role-specific label alias.'],
+            'new_from_date_surface' => ['owner' => 'ProductData', 'representation' => 'surface_alias_with_eav_rename', 'value_type' => 'date_or_datetime', 'status' => 'reusable_candidate', 'explanation' => 'CSV/GraphQL new_from_date and system EAV news_from_date represent the same new-product merchandising start semantic through a documented rename.'],
+            'new_to_date_surface' => ['owner' => 'ProductData', 'representation' => 'surface_alias_with_eav_rename', 'value_type' => 'date_or_datetime', 'status' => 'reusable_candidate', 'explanation' => 'CSV/GraphQL new_to_date and system EAV news_to_date represent the same new-product merchandising end semantic through a documented rename.'],
+            'special_price_from_surface' => ['owner' => 'Pricing', 'representation' => 'pricing_window_surface_equivalence', 'value_type' => 'datetime', 'status' => 'domain', 'explanation' => 'CSV special_price_from_date, EAV/GraphQL special_from_date, and Special Price API price_from are explicit representations of one effective-from semantic.'],
+            'special_price_to_surface' => ['owner' => 'Pricing', 'representation' => 'pricing_window_surface_equivalence', 'value_type' => 'datetime', 'status' => 'domain', 'explanation' => 'CSV special_price_to_date, EAV/GraphQL special_to_date, and Special Price API price_to are explicit representations of one effective-to semantic.'],
+            'product_options_placement' => ['owner' => 'OrderCustomization', 'representation' => 'surface_alias_with_eav_rename', 'value_type' => 'provider_enum', 'status' => 'domain', 'explanation' => 'CSV display_product_options_in maps to system EAV/GraphQL options_container; this is presentation placement for customizable options.'],
+            'map_price_surface' => ['owner' => 'Pricing', 'representation' => 'pricing_surface_alias', 'value_type' => 'money_amount', 'status' => 'deferred', 'explanation' => 'CSV map_price maps to Magento system minimal_price in CatalogImportExport; portable MAP persistence remains governed by the open Adobe MAP question.'],
+            'msrp_price_surface' => ['owner' => 'Pricing', 'representation' => 'pricing_surface_alias', 'value_type' => 'money_amount', 'status' => 'deferred', 'explanation' => 'CSV msrp_price maps to the system EAV msrp amount; portable reference-price equivalence remains open.'],
+            'product_association_relations' => ['owner' => 'ProductAssociation', 'representation' => 'structured_surface_equivalence', 'value_type' => 'typed_product_relation_collection', 'status' => 'domain', 'explanation' => 'Flat typed CSV related/cross-sell/up-sell SKU and position columns translate to the structured product_links collection with link_type.'],
+            'legacy_stock_min_qty' => ['owner' => 'Availability', 'representation' => 'legacy_stockitem_compatibility', 'value_type' => 'number', 'status' => 'domain', 'explanation' => 'CSV out_of_stock_qty translates to deprecated StockItem min_qty; this is compatibility evidence only and does not replace MSI ownership.'],
+            'legacy_stock_backorders' => ['owner' => 'Availability', 'representation' => 'legacy_stockitem_compatibility', 'value_type' => 'provider_enum', 'status' => 'domain', 'explanation' => 'CSV allow_backorders translates to deprecated StockItem backorders; this is compatibility evidence only and does not replace MSI ownership.'],
+            'legacy_stock_min_sale_qty' => ['owner' => 'Availability', 'representation' => 'legacy_stockitem_compatibility', 'value_type' => 'number', 'status' => 'domain', 'explanation' => 'CSV min_cart_qty translates to deprecated StockItem min_sale_qty; this is compatibility evidence only and does not replace MSI ownership.'],
+            'legacy_stock_max_sale_qty' => ['owner' => 'Availability', 'representation' => 'legacy_stockitem_compatibility', 'value_type' => 'number', 'status' => 'domain', 'explanation' => 'CSV max_cart_qty translates to deprecated StockItem max_sale_qty; this is compatibility evidence only and does not replace MSI ownership.'],
+            'legacy_stock_notify_qty' => ['owner' => 'Availability', 'representation' => 'legacy_stockitem_compatibility', 'value_type' => 'number', 'status' => 'domain', 'explanation' => 'CSV notify_on_stock_below translates to deprecated StockItem notify_stock_qty; this is compatibility evidence only and does not replace MSI ownership.'],
         ];
     }
 
@@ -550,6 +576,29 @@ final class AdobeCommerceCoverage
             'category_assignment' => ['categories', 'categories', 'category_link'],
             'tier_price_customer_group' => ['customer_group', 'tier_price_customer_group'],
             'giftcard_amount' => ['giftcard_amount', 'giftcard_amounts'],
+            'media_base_role' => ['base_image', 'image', 'media_gallery_entries.types[image]'],
+            'media_small_role' => ['small_image', 'small_image', 'media_gallery_entries.types[small_image]'],
+            'media_thumbnail_role' => ['thumbnail', 'thumbnail_image', 'media_gallery_entries.types[thumbnail]'],
+            'media_additional_gallery' => ['additional_images', 'media_gallery_entries.file'],
+            'media_additional_labels' => ['additional_image_labels', 'media_gallery_entries.label'],
+            'media_hidden_from_product_page' => ['hide_from_product_page', 'media_gallery_entries.disabled'],
+            'media_swatch_role' => ['swatch_image', 'swatch_image'],
+            'media_base_role_label' => ['base_image_label', 'image_label'],
+            'media_small_role_label' => ['small_image_label', 'small_image_label'],
+            'media_thumbnail_role_label' => ['thumbnail_image_label', 'thumbnail_label'],
+            'new_from_date_surface' => ['new_from_date', 'news_from_date'],
+            'new_to_date_surface' => ['new_to_date', 'news_to_date'],
+            'special_price_from_surface' => ['special_price_from_date', 'special_from_date', 'special_from_date', 'special_price.price_from'],
+            'special_price_to_surface' => ['special_price_to_date', 'special_to_date', 'special_to_date', 'special_price.price_to'],
+            'product_options_placement' => ['display_product_options_in', 'options_container', 'options_container'],
+            'map_price_surface' => ['map_price', 'minimal_price'],
+            'msrp_price_surface' => ['msrp_price', 'msrp'],
+            'product_association_relations' => ['related_skus', 'related_position', 'crosssell_skus', 'crosssell_position', 'upsell_skus', 'upsell_position', 'product_links'],
+            'legacy_stock_min_qty' => ['out_of_stock_qty', 'min_qty'],
+            'legacy_stock_backorders' => ['allow_backorders', 'backorders'],
+            'legacy_stock_min_sale_qty' => ['min_cart_qty', 'min_sale_qty'],
+            'legacy_stock_max_sale_qty' => ['max_cart_qty', 'max_sale_qty'],
+            'legacy_stock_notify_qty' => ['notify_on_stock_below', 'notify_stock_qty'],
         ];
     }
 
@@ -600,7 +649,7 @@ final class AdobeCommerceCoverage
     private function disagreementDefinitions(): array
     {
         return [
-            'adobe_status_lifecycle' => ['status_lifecycle', 'Does Adobe enabled/disabled status map to platform lifecycle?', 'adobe:alias:status', 'unresolved-status-lifecycle'],
+            'adobe_status_lifecycle' => ['status_lifecycle', 'Does Adobe enabled/disabled status map to any future richer platform lifecycle beyond the current boolean active contract?', 'adobe:alias:status', 'DEC-010'],
             'adobe_tax_portability' => ['tax', 'What portable tax semantic and owner represent Adobe tax ID/name?', 'adobe:alias:tax_class', 'unresolved-tax-owner'],
             'adobe_map_policy' => ['map', 'How should Adobe MAP policy be persisted?', 'adobe:pricing:map_price|adobe:pricing:map_enabled', 'unresolved-map-persistence'],
             'adobe_msrp_equivalence' => ['reference_price', 'What is equivalent between Adobe MSRP and portable RRP/list price?', 'adobe:pricing:msrp_price|adobe:pricing:msrp_display_actual_price_type', 'unresolved-reference-price-equivalence'],
@@ -792,10 +841,10 @@ final class AdobeCommerceCoverage
         return [
             'master_rows' => $byFile[self::MASTER] ?? 0, 'structured_rows' => $byFile[self::STRUCTURED] ?? 0,
             'alias_rows' => $byFile[self::ALIASES] ?? 0, 'coverage_rows' => count($coverage), 'concepts' => $conceptCount,
-            'coverage_ratio' => (float) (count($coverage) / 411), 'classification_ratio' => (float) (count(array_filter($coverage, fn ($row) => $row['disposition'] !== '')) / count($coverage)),
+            'coverage_ratio' => (float) (count($coverage) / 473), 'classification_ratio' => (float) (count(array_filter($coverage, fn ($row) => $row['disposition'] !== '')) / count($coverage)),
             'concept_link_ratio' => (float) (count(array_filter($coverage, fn ($row) => $row['concept_key'] !== '')) / count($coverage)),
             'terminal_rationale_ratio' => 1.0,
-            'silent_drop_count' => 411 - count($coverage), 'dispositions' => array_count_values(array_column($coverage, 'disposition')),
+            'silent_drop_count' => 473 - count($coverage), 'dispositions' => array_count_values(array_column($coverage, 'disposition')),
         ];
     }
 
@@ -804,7 +853,7 @@ final class AdobeCommerceCoverage
         $bytes = file_get_contents("$root/$file");
         $hash = hash('sha256', $bytes);
 
-        return ['snapshot_id' => 'adobe-v1-'.substr($hash, 0, 16), 'repository_commit' => self::BASE_COMMIT, 'platform' => 'adobe_commerce', 'source_file' => $file, 'file_sha256' => $hash, 'header_sha256' => $this->headerHash($bytes), 'row_count' => (string) $count, 'schema_version_basis' => $basis, 'captured_at' => '2026-09-07'];
+        return ['snapshot_id' => 'adobe-v1-'.substr($hash, 0, 16), 'repository_commit' => self::BASE_COMMIT, 'platform' => 'adobe_commerce', 'source_file' => $file, 'file_sha256' => $hash, 'header_sha256' => $this->headerHash($bytes), 'row_count' => (string) $count, 'schema_version_basis' => $basis, 'captured_at' => '2026-09-08'];
     }
 
     private function upsertManifest(string $root, array $providerRows): array
@@ -835,7 +884,7 @@ final class AdobeCommerceCoverage
 
     private function assertDenominator(array $master, array $structured, array $aliases): void
     {
-        if (count($master) !== 183 || count($structured) !== 189 || count($aliases) !== 39) {
+        if (count($master) !== 186 || count($structured) !== 189 || count($aliases) !== 98) {
             throw new RuntimeException('Adobe frozen source drift');
         }
     }

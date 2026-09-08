@@ -4,18 +4,18 @@ attribute_set_membership,schema_metadata,attribute_schema,PaaS/Magento Open Sour
 attribute_definition,schema_metadata,attribute_schema,PaaS/Magento Open Source; live target,Admin REST + live discovery,INITIAL_RESEARCH
 shared_catalog_product_membership,structured_capability,b2b_catalog_visibility,Adobe Commerce B2B,B2B Shared Catalog REST,INITIAL_RESEARCH
 shared_catalog_tier_prices,domain_value,b2b_pricing,Adobe Commerce B2B,B2B Shared Catalog REST,INITIAL_RESEARCH
-bundle_price_type,domain_value,bundle_composition,PaaS/Magento Open Source,Import API + Admin REST EAV/custom_attributes,THIRD_PASS_RESEARCH
-bundle_sku_type,domain_value,bundle_composition,PaaS/Magento Open Source,Import API + Admin REST EAV/custom_attributes,THIRD_PASS_RESEARCH
-bundle_price_view,domain_value,bundle_composition,PaaS/Magento Open Source,Import API + Admin REST EAV/custom_attributes,THIRD_PASS_RESEARCH
-bundle_weight_type,domain_value,bundle_composition,PaaS/Magento Open Source,Import API + Admin REST EAV/custom_attributes,THIRD_PASS_RESEARCH
+bundle_price_type,domain_value,bundle_composition,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+bundle_sku_type,domain_value,bundle_composition,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+bundle_price_view,domain_value,bundle_composition,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+bundle_weight_type,domain_value,bundle_composition,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
 bundle_values,structured_capability,bundle_composition,PaaS/Magento Open Source,Import API bundle_values,THIRD_PASS_RESEARCH
-bundle_shipment_type,domain_value,bundle_composition,PaaS/Magento Open Source,Import API + Admin REST EAV/custom_attributes,THIRD_PASS_RESEARCH
+bundle_shipment_type,domain_value,bundle_composition,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
 bundle_product_options,structured_capability,bundle_composition,PaaS/Magento Open Source,Admin REST extension_attributes.bundle_product_options,THIRD_PASS_RESEARCH
-store_view_code,connector_context,catalog_scope_and_connector_context,PaaS/Magento Open Source,Import + Admin REST,INITIAL_RESEARCH
-attribute_set_code,connector_context,catalog_scope_and_connector_context,PaaS/Magento Open Source,Import + Admin REST,INITIAL_RESEARCH
-product_type,connector_context,catalog_scope_and_connector_context,PaaS/Magento Open Source,Import + Admin REST,INITIAL_RESEARCH
-product_websites,connector_context,catalog_scope_and_connector_context,PaaS/Magento Open Source,Import + Admin REST,INITIAL_RESEARCH
-product_online,semantic_field,catalog_scope_and_connector_context,PaaS/Magento Open Source,Import + Admin REST,INITIAL_RESEARCH
+store_view_code,connector_context,catalog_scope_and_connector_context,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+attribute_set_code,connector_context,catalog_scope_and_connector_context,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+product_type,connector_context,catalog_scope_and_connector_context,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+product_websites,connector_context,catalog_scope_and_connector_context,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+product_online,semantic_field,catalog_scope_and_connector_context,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
 visibility,connector_context,catalog_scope_and_connector_context,PaaS/Magento Open Source,Import + Admin REST,INITIAL_RESEARCH
 website_id,connector_context,catalog_scope_and_connector_context,PaaS/Magento Open Source,Import + Admin REST,INITIAL_RESEARCH
 attribute_set_id,connector_context,catalog_scope_and_connector_context,PaaS/Magento Open Source,Import + Admin REST,INITIAL_RESEARCH
@@ -29,13 +29,13 @@ name,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin 
 description,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
 short_description,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
 weight,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
-tax_class_name,domain_value,tax_configuration,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,SECOND_PASS_RESEARCH
-new_from_date,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
-new_to_date,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
+tax_class_name,domain_value,tax_configuration,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+new_from_date,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import API + core GraphQL READ,FIFTH_PASS_RESEARCH
+new_to_date,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import API + core GraphQL READ,FIFTH_PASS_RESEARCH
 country_of_manufacture,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
-status,semantic_field,core_product_scalar,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
-display_product_options_in,structured_capability,customizable_options,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
-product_options_container,structured_capability,customizable_options,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
+status,semantic_field,core_product_scalar,PaaS/Magento Open Source,Admin REST / system EAV,FIFTH_PASS_RESEARCH
+display_product_options_in,structured_capability,customizable_options,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+product_options_container,structured_capability,customizable_options,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
 custom_options,structured_capability,customizable_options,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
 custom_option_definition,structured_capability,customizable_options,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
 downloadable_links,structured_capability,downloadable_assets,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,INITIAL_RESEARCH
@@ -74,68 +74,68 @@ sku,semantic_field,identity_lifecycle,PaaS/Magento Open Source,Import + Admin RE
 created_at,external_system_metadata,identity_lifecycle,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
 updated_at,external_system_metadata,identity_lifecycle,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
 entity_id,external_system_metadata,identity_lifecycle,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
-qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-out_of_stock_qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-use_config_min_qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-is_qty_decimal,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-allow_backorders,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-use_config_backorders,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-min_cart_qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-use_config_min_sale_qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-max_cart_qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-use_config_max_sale_qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-is_in_stock,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-notify_on_stock_below,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-use_config_notify_stock_qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-manage_stock,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-use_config_manage_stock,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-use_config_qty_increments,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-qty_increments,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-use_config_enable_qty_inc,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-enable_qty_increments,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-is_decimal_divided,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-deferred_stock_update,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-use_config_deferred_stock_update,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-source_item,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-stock_and_source_assignment,domain_value,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
-salable_quantity,derived_projection,inventory_availability,PaaS/Magento Open Source,Import + Inventory REST,INITIAL_RESEARCH
+qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+out_of_stock_qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+use_config_min_qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+is_qty_decimal,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+allow_backorders,domain_value,inventory_availability,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+use_config_backorders,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+min_cart_qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+use_config_min_sale_qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+max_cart_qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+use_config_max_sale_qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+is_in_stock,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+notify_on_stock_below,domain_value,inventory_availability,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+use_config_notify_stock_qty,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+manage_stock,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+use_config_manage_stock,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+use_config_qty_increments,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+qty_increments,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+use_config_enable_qty_inc,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+enable_qty_increments,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+is_decimal_divided,domain_value,inventory_availability,PaaS/Magento Open Source,Import API + Admin REST legacy StockItem compatibility,FIFTH_PASS_RESEARCH
+deferred_stock_update,domain_value,inventory_availability,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+use_config_deferred_stock_update,domain_value,inventory_availability,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+source_item,domain_value,inventory_availability,PaaS/Magento Open Source,Inventory REST,FIFTH_PASS_RESEARCH
+stock_and_source_assignment,domain_value,inventory_availability,PaaS/Magento Open Source,Inventory REST,FIFTH_PASS_RESEARCH
+salable_quantity,derived_projection,inventory_availability,PaaS/Magento Open Source,Inventory REST,FIFTH_PASS_RESEARCH
 store_view_overrides,connector_context,localization_store_scope,PaaS/Magento Open Source,Admin REST / store scope,INITIAL_RESEARCH
-base_image,domain_value,media,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
-base_image_label,domain_value,media,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
-small_image,domain_value,media,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
-small_image_label,domain_value,media,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
-thumbnail_image,domain_value,media,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
-thumbnail_image_label,domain_value,media,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
-swatch_image,domain_value,media,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
-swatch_image_label,domain_value,media,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
-additional_images,domain_value,media,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
-additional_image_labels,domain_value,media,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
-hide_from_product_page,domain_value,media,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
+base_image,domain_value,media,PaaS/Magento Open Source,Import API,FOURTH_PASS_RESEARCH
+base_image_label,domain_value,media,PaaS/Magento Open Source,Import API,FOURTH_PASS_RESEARCH
+small_image,domain_value,media,PaaS/Magento Open Source,Import API,FOURTH_PASS_RESEARCH
+small_image_label,domain_value,media,PaaS/Magento Open Source,Import API,FOURTH_PASS_RESEARCH
+thumbnail_image,domain_value,media,PaaS/Magento Open Source,Import API,FOURTH_PASS_RESEARCH
+thumbnail_image_label,domain_value,media,PaaS/Magento Open Source,Import API,FOURTH_PASS_RESEARCH
+swatch_image,domain_value,media,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+swatch_image_label,domain_value,media,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+additional_images,domain_value,media,PaaS/Magento Open Source,Import API,FOURTH_PASS_RESEARCH
+additional_image_labels,domain_value,media,PaaS/Magento Open Source,Import API,FOURTH_PASS_RESEARCH
+hide_from_product_page,domain_value,media,PaaS/Magento Open Source,Import API,FOURTH_PASS_RESEARCH
 media_gallery_entries,structured_capability,media,PaaS/Magento Open Source,Admin REST GalleryManagement + product payload,THIRD_PASS_RESEARCH
-media_video,domain_value,media,PaaS/Magento Open Source,Import + Admin REST + Catalog Service READ,INITIAL_RESEARCH
-custom_design,connector_context,presentation_layout,PaaS/Magento Open Source,Import / Admin REST,INITIAL_RESEARCH
-custom_design_from,connector_context,presentation_layout,PaaS/Magento Open Source,Import / Admin REST,INITIAL_RESEARCH
-custom_design_to,connector_context,presentation_layout,PaaS/Magento Open Source,Import / Admin REST,INITIAL_RESEARCH
-custom_layout_update,connector_context,presentation_layout,PaaS/Magento Open Source,Import / Admin REST,INITIAL_RESEARCH
-page_layout,connector_context,presentation_layout,PaaS/Magento Open Source,Import / Admin REST,INITIAL_RESEARCH
-price,domain_value,pricing,PaaS/Magento Open Source,Import + Catalog Pricing REST + GraphQL,INITIAL_RESEARCH
-special_price,domain_value,pricing,PaaS/Magento Open Source,Import + Catalog Pricing REST + GraphQL,INITIAL_RESEARCH
-special_price_from_date,domain_value,pricing,PaaS/Magento Open Source,Import + Catalog Pricing REST + GraphQL,INITIAL_RESEARCH
-special_price_to_date,domain_value,pricing,PaaS/Magento Open Source,Import + Catalog Pricing REST + GraphQL,INITIAL_RESEARCH
-map_price,domain_value,pricing,PaaS/Magento Open Source,Import + Catalog Pricing REST + GraphQL,INITIAL_RESEARCH
-msrp_price,domain_value,pricing,PaaS/Magento Open Source,Import + Catalog Pricing REST + GraphQL,INITIAL_RESEARCH
-map_enabled,domain_value,pricing,PaaS/Magento Open Source,Import + Catalog Pricing REST + GraphQL,INITIAL_RESEARCH
-msrp_display_actual_price_type,domain_value,pricing,PaaS/Magento Open Source,Import + Catalog Pricing REST + GraphQL,INITIAL_RESEARCH
+media_video,domain_value,media,PaaS/Magento Open Source,Admin REST + core GraphQL,FIFTH_PASS_RESEARCH
+custom_design,connector_context,presentation_layout,PaaS/Magento Open Source,Import / Admin REST,FOURTH_PASS_RESEARCH
+custom_design_from,connector_context,presentation_layout,PaaS/Magento Open Source,Import / Admin REST,FOURTH_PASS_RESEARCH
+custom_design_to,connector_context,presentation_layout,PaaS/Magento Open Source,Import / Admin REST,FOURTH_PASS_RESEARCH
+custom_layout_update,connector_context,presentation_layout,PaaS/Magento Open Source,Import / Admin REST,FOURTH_PASS_RESEARCH
+page_layout,connector_context,presentation_layout,PaaS/Magento Open Source,Import / Admin REST,FOURTH_PASS_RESEARCH
+price,domain_value,pricing,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,FIFTH_PASS_RESEARCH
+special_price,domain_value,pricing,PaaS/Magento Open Source,Import + Admin REST + core GraphQL,FIFTH_PASS_RESEARCH
+special_price_from_date,domain_value,pricing,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+special_price_to_date,domain_value,pricing,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+map_price,domain_value,pricing,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+msrp_price,domain_value,pricing,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+map_enabled,domain_value,pricing,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+msrp_display_actual_price_type,domain_value,pricing,PaaS/Magento Open Source,Import API + Admin REST / system EAV,FIFTH_PASS_RESEARCH
 tier_prices,domain_value,pricing,PaaS/Magento Open Source,Import + Catalog Pricing REST + GraphQL,INITIAL_RESEARCH
-base_price_storage,domain_value,pricing,PaaS/Magento Open Source,Import + Catalog Pricing REST + GraphQL,INITIAL_RESEARCH
-special_price_storage,domain_value,pricing,PaaS/Magento Open Source,Import + Catalog Pricing REST + GraphQL,INITIAL_RESEARCH
-cost_storage,domain_value,pricing,PaaS/Magento Open Source,Import + Catalog Pricing REST + GraphQL,INITIAL_RESEARCH
+base_price_storage,domain_value,pricing,PaaS/Magento Open Source,Catalog Pricing REST,FIFTH_PASS_RESEARCH
+special_price_storage,domain_value,pricing,PaaS/Magento Open Source,Catalog Pricing REST,FIFTH_PASS_RESEARCH
+cost_storage,domain_value,pricing,PaaS/Magento Open Source,Catalog Pricing REST,FIFTH_PASS_RESEARCH
 rating_summary,derived_projection,reviews_ratings,PaaS/Magento Open Source,core GraphQL / storefront,INITIAL_RESEARCH
 review_count,derived_projection,reviews_ratings,PaaS/Magento Open Source,core GraphQL / storefront,INITIAL_RESEARCH
 attribute_options,schema_metadata,select_multiselect_options,PaaS/Magento Open Source,Admin REST + live discovery,INITIAL_RESEARCH
 url_key,semantic_field,seo_routing,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
 meta_title,semantic_field,seo_routing,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
-meta_keywords,semantic_field,seo_routing,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
+meta_keywords,semantic_field,seo_routing,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
 meta_description,semantic_field,seo_routing,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
 catalog_service_attributes,derived_projection,storefront_derived_readonly,PaaS Storefront Services + Adobe Commerce SaaS,Catalog Service / Storefront Services,INITIAL_RESEARCH
 catalog_service_images,derived_projection,storefront_derived_readonly,PaaS Storefront Services + Adobe Commerce SaaS,Catalog Service / Storefront Services,INITIAL_RESEARCH
@@ -146,12 +146,12 @@ catalog_service_price,derived_projection,storefront_derived_readonly,PaaS Storef
 catalog_service_variants,derived_projection,storefront_derived_readonly,PaaS Storefront Services + Adobe Commerce SaaS,Catalog Service / Storefront Services,INITIAL_RESEARCH
 catalog_service_videos,derived_projection,storefront_derived_readonly,PaaS Storefront Services + Adobe Commerce SaaS,Catalog Service / Storefront Services,INITIAL_RESEARCH
 categories,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import API + core GraphQL READ; REST uses category_link objects,THIRD_PASS_RESEARCH
-related_skus,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
-related_position,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
-crosssell_skus,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
-crosssell_position,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
-upsell_skus,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
-upsell_position,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import + Admin REST + GraphQL,INITIAL_RESEARCH
+related_skus,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+related_position,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+crosssell_skus,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+crosssell_position,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+upsell_skus,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
+upsell_position,domain_value,taxonomy_and_product_relations,PaaS/Magento Open Source,Import API,FIFTH_PASS_RESEARCH
 product_links,structured_capability,taxonomy_and_product_relations,PaaS/Magento Open Source,Admin REST + core GraphQL,SECOND_PASS_RESEARCH
 simple_product,structured_capability,product_type_family,PaaS/Magento Open Source,core GraphQL + Admin REST + Import,INITIAL_RESEARCH
 virtual_product,structured_capability,product_type_family,PaaS/Magento Open Source,core GraphQL + Admin REST + Import,INITIAL_RESEARCH
@@ -160,9 +160,9 @@ grouped_product,structured_capability,product_type_family,PaaS/Magento Open Sour
 bundle_product,structured_capability,product_type_family,PaaS/Magento Open Source,core GraphQL + Admin REST + Import,INITIAL_RESEARCH
 downloadable_product,structured_capability,product_type_family,PaaS/Magento Open Source,core GraphQL + Admin REST + Import,INITIAL_RESEARCH
 gift_card_product_type,structured_capability,product_type_family,Adobe Commerce,core GraphQL + Admin REST + Import,INITIAL_RESEARCH
-meta_keyword,semantic_field,seo_routing,PaaS/Magento Open Source,Admin REST / stable EAV custom attribute,SECOND_PASS_RESEARCH
+meta_keyword,semantic_field,seo_routing,PaaS/Magento Open Source,Admin REST / system EAV + core GraphQL READ,FIFTH_PASS_RESEARCH
 tax_class_id,domain_value,tax_configuration,PaaS/Magento Open Source,Admin REST / stable EAV custom attribute,SECOND_PASS_RESEARCH
-save_rewrites_history,connector_context,seo_routing,PaaS/Magento Open Source,Import API / product URL rewrite behavior,SECOND_PASS_RESEARCH
+save_rewrites_history,connector_context,seo_routing,PaaS/Magento Open Source,Import API / product URL rewrite behavior,FOURTH_PASS_RESEARCH
 grouped_product_item,structured_capability,grouped_composition,PaaS/Magento Open Source,core GraphQL + Import API,SECOND_PASS_RESEARCH
 category_link,structured_capability,taxonomy_and_product_relations,PaaS/Magento Open Source,Admin REST extension_attributes.category_links,SECOND_PASS_RESEARCH
 inventory_source,structured_capability,inventory_topology_msi,PaaS/Magento Open Source where MSI is available,Inventory REST,SECOND_PASS_RESEARCH
@@ -182,3 +182,6 @@ url_suffix,derived_projection,seo_routing,PaaS/Magento Open Source,core GraphQL 
 url_path,derived_projection,seo_routing,PaaS/Magento Open Source,core GraphQL deprecated READ / live EAV,SECOND_PASS_RESEARCH
 bundle_product_links,structured_capability,bundle_composition,PaaS/Magento Open Source,Admin REST BundleDataLinkInterface,THIRD_PASS_RESEARCH
 giftcard_amounts,derived_projection,gift_card_product,Adobe Commerce,core GraphQL GiftCardAmounts READ,THIRD_PASS_RESEARCH
+cost,domain_value,pricing,PaaS/Magento Open Source,Admin REST / stable EAV custom attribute,FOURTH_PASS_RESEARCH
+media_gallery,structured_capability,media,PaaS/Magento Open Source,Admin REST + live EAV discovery,FIFTH_PASS_RESEARCH
+gallery,structured_capability,media,PaaS/Magento Open Source,Admin REST + live EAV discovery,FIFTH_PASS_RESEARCH
