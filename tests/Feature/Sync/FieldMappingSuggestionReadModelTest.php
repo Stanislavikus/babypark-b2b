@@ -97,6 +97,41 @@ class FieldMappingSuggestionReadModelTest extends TestCase
     }
 
     #[Test]
+    public function google_products_v1_offer_id_mapping_uses_literal_snapshot_key_and_version_overlap_fails_closed(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $skuBinding = $this->productVariantBinding('sku');
+        $provider = app(CanonicalFieldMappingSuggestionProvider::class);
+
+        $currentOnly = $provider->suggest(
+            $workspace->id,
+            'google_merchant',
+            ['offerId' => true],
+            [],
+            [],
+        );
+        $this->assertSame('offerId', $currentOnly[$skuBinding->id] ?? null);
+
+        $legacyOnly = $provider->suggest(
+            $workspace->id,
+            'google_merchant',
+            ['id' => true],
+            [],
+            [],
+        );
+        $this->assertSame('id', $legacyOnly[$skuBinding->id] ?? null);
+
+        $bothSurfaces = $provider->suggest(
+            $workspace->id,
+            'google_merchant',
+            ['id' => true, 'offerId' => true],
+            [],
+            [],
+        );
+        $this->assertArrayNotHasKey($skuBinding->id, $bothSurfaces);
+    }
+
+    #[Test]
     public function projection_tolerates_discovered_field_without_external_label(): void
     {
         $account = $this->createSyncSupportAccount();

@@ -32,7 +32,9 @@ class CanonicalFinalArbitrationRegressionTest extends TestCase
         self::assertSame('KEEP_PLATFORM_CANONICAL', $row['canonical_decision']);
         self::assertStringContainsString('not absolute canonical URL equivalence', $row['adobe_evidence']);
         self::assertStringContainsString('handle is slug identity', $row['shopify_evidence']);
-        self::assertStringContainsString('equivalence remains provider/context-specific', $row['google_evidence']);
+        self::assertStringContainsString('primary merchant landing-page representation', $row['google_evidence']);
+        self::assertStringContainsString('canonicalLink/mobileLink', $row['google_evidence']);
+        self::assertStringContainsString('provider/context-specific', $row['google_evidence']);
         self::assertStringContainsString('transformation/context required', $row['bigcommerce_evidence']);
     }
 

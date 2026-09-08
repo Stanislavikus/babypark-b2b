@@ -189,6 +189,9 @@ final class GoogleMerchantCoverage
         if ($key === 'shortTitle') {
             return ['DEFER_DECISION', 'FieldDefinitionOrContent', 'short_title_candidate'];
         }
+        if (in_array($key, ['structuredTitle', 'structuredDescription'], true)) {
+            return ['DEFER_DECISION', 'FieldDefinitionOrContent', 'structured_content_with_digital_source_provenance'];
+        }
         if ($key === 'relatedProducts') {
             return ['DOMAIN_CAPABILITY', 'ProductAssociation', 'publication_relationship_capability'];
         }
@@ -207,6 +210,9 @@ final class GoogleMerchantCoverage
         if ($key === 'sellOnGoogleQuantity') {
             return ['CHANNEL_SEMANTIC', 'Connector', 'google_publication_quantity_control'];
         }
+        if ($key === 'numberOfUnits') {
+            return ['CATEGORY_ATTRIBUTE', 'PropertyVertical', 'vertical_scoped_availability_quantity'];
+        }
         if (in_array($key, ['unitPricingMeasure', 'unitPricingBaseMeasure'], true)) {
             return ['DEFER_DECISION', 'PricingOrCompliance', 'structured_unit_pricing_measure'];
         }
@@ -221,6 +227,12 @@ final class GoogleMerchantCoverage
         }
         if (in_array($key, ['identifierExists', 'canonicalLink', 'link', 'mobileLink'], true)) {
             return ['CHANNEL_SEMANTIC', 'Connector', 'publication_governance_or_link'];
+        }
+        if ($key === 'googleProductCategory') {
+            return ['CHANNEL_SEMANTIC', 'Connector', 'google_controlled_taxonomy_context'];
+        }
+        if ($key === 'productTypes') {
+            return ['CHANNEL_SEMANTIC', 'Connector', 'merchant_defined_category_path_text'];
         }
         if ($key === 'availability' || $key === 'availabilityDate') {
             return ['DOMAIN_CAPABILITY', 'Availability', 'publication_availability_binding'];
@@ -238,7 +250,7 @@ final class GoogleMerchantCoverage
             $class === 'media_domain' => ['DOMAIN_CAPABILITY', 'Media', 'publication_media_binding'],
             $class === 'shipping_returns_domain' => ['DOMAIN_CAPABILITY', 'ShippingReturns', 'publication_shipping_returns_capability'],
             $class === 'relationship_or_variant_capability' => throw new RuntimeException("Unreviewed Google relationship or variant capability $key"),
-            $class === 'taxonomy_context' => ['CHANNEL_SEMANTIC', 'Connector', 'google_taxonomy_context'],
+            $class === 'taxonomy_context' => throw new RuntimeException("Unreviewed Google taxonomy context $key"),
             default => throw new RuntimeException("Unknown Google classification $class"),
         };
     }
@@ -259,7 +271,13 @@ final class GoogleMerchantCoverage
     {
         $vertical = $this->verticalForAttribute($row);
 
-        return 'layer=processed_product_output;input_binding=ProductInput.productAttributes;write_condition=Product_Data_Specification;classification='.$row['classification'].';vertical='.$vertical;
+        $context = 'layer=processed_product_output;input_binding=ProductInput.productAttributes;write_condition=Product_Data_Specification;classification='.$row['classification'].';vertical='.$vertical;
+
+        if ($row['external_field'] === 'numberOfUnits') {
+            $context .= ';semantic_nature=property_availability_quantity';
+        }
+
+        return $context;
     }
 
     private function buildConcepts(array $coverage): array
@@ -285,7 +303,8 @@ final class GoogleMerchantCoverage
     {
         return [
             'google_availability' => ['availability', 'How does Google availability vocabulary relate to platform Availability without becoming lifecycle?', ['availability']],
-            'google_taxonomy' => ['taxonomy', 'How should Google taxonomy map without becoming platform Category authority?', ['googleProductCategory', 'productTypes']],
+            'google_taxonomy' => ['taxonomy', 'How should Google-controlled product category and merchant-defined product type paths map without becoming platform Category authority?', ['googleProductCategory', 'productTypes']],
+            'google_structured_content_provenance' => ['content_provenance', 'How should structured title/description content plus digital-source provenance relate to canonical title/description?', ['structuredTitle', 'structuredDescription']],
             'google_vertical_applicability' => ['verticals', 'How should vehicle/property applicability be represented portably?', []],
             'google_identifier_exists' => ['identifier_governance', 'How should identifierExists remain publication governance?', ['identifierExists']],
             'google_compliance' => ['compliance', 'Which Google compliance claims are portable evidence and who owns them?', ['adult', 'certifications', 'energyEfficiencyClass', 'minEnergyEfficiencyClass', 'maxEnergyEfficiencyClass', 'co2Emissions', 'emissionsStandard', 'energyConsumption', 'vehicleMandatoryInspectionIncluded', 'warranty']],
@@ -294,7 +313,7 @@ final class GoogleMerchantCoverage
             'google_sustainability_incentives' => ['compliance', 'Are sustainability incentive programs reusable Compliance evidence or Google publication context?', ['sustainabilityIncentives']],
             'google_multipack_ownership' => ['packaging', 'How does the narrow identical-product multipack quantity relate to Product and Packaging semantics?', ['multipack']],
             'google_preorder_date' => ['preorder', 'How does availabilityDate map to preorder/backorder semantics?', ['availabilityDate']],
-            'google_landing_url' => ['url', 'How do canonicalLink/link/mobileLink differ from ordinary Product URL?', ['canonicalLink', 'link', 'mobileLink']],
+            'google_landing_url' => ['url', 'How do canonicalLink and mobileLink relate to the already-mapped primary Product URL -> Google link representation?', ['canonicalLink', 'mobileLink']],
             'google_processed_ownership' => ['processed_output', 'Which processed-output semantics require owner arbitration?', ['popularityRank', 'questionsAndAnswers']],
         ];
     }
@@ -341,7 +360,7 @@ final class GoogleMerchantCoverage
         ]));
         $ambiguousContext = count(array_filter($rows, fn ($row) => str_contains($row['source_context_key'], 'classification=channel_or_specialized_context')
             && $row['representation_candidate'] === 'publication_channel_control'));
-        $frozenDeferredVerified = count(array_filter(['shortTitle', 'unitPricingMeasure', 'unitPricingBaseMeasure'], fn ($key) => $rows[$key]['review_status'] === 'PROVIDER_VERIFIED'));
+        $frozenDeferredVerified = count(array_filter(['shortTitle', 'structuredTitle', 'structuredDescription', 'unitPricingMeasure', 'unitPricingBaseMeasure'], fn ($key) => $rows[$key]['review_status'] === 'PROVIDER_VERIFIED'));
         $pricing = ['vehicleAllInPrice' => 'vehicle', 'vehicleExpenses' => 'vehicle', 'vehicleMsrp' => 'vehicle', 'vehiclePriceType' => 'vehicle', 'productFee' => 'property'];
         $invalidVerticalFate = count(array_filter($pricing, fn ($vertical, $key) => $rows[$key]['owner_candidate'] !== 'Pricing'
             || ! str_contains($rows[$key]['source_context_key'], "vertical=$vertical"), ARRAY_FILTER_USE_BOTH));
