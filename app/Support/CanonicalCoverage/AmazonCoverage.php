@@ -86,10 +86,14 @@ final class AmazonCoverage
             }
         }
         $sources = [self::META => $meta, self::LUGGAGE => $luggage];
+        $manifestBasis = [
+            self::META => 'Amazon Product Type Definitions meta-model',
+            self::LUGGAGE => 'Amazon Listings v1 public LUGGAGE PTD example',
+        ];
         foreach ($sources as $file => $rows) {
             $entry = $manifestIndex['amazon'.BigCommerceCoverage::SEPARATOR.$file] ?? null;
-            $bytes = file_get_contents("$root/$file");
-            if ($entry === null || $entry['file_sha256'] !== hash('sha256', $bytes) || $entry['header_sha256'] !== $this->headerHash($bytes) || (int) $entry['row_count'] !== count($rows)) {
+            $expectedManifest = $this->manifestRow($root, $file, $manifestBasis[$file]);
+            if ($entry === null || $entry !== $expectedManifest) {
                 $errors[] = "Amazon manifest mismatch $file";
             }
         }

@@ -200,6 +200,14 @@ final class ShopifyCoverage
             }
             $manifestIndex[$identity] = $row;
         }
+        $manifestBasis = [
+            self::MASTER => 'Shopify Admin GraphQL 2026-07 provider inventory master',
+            self::STRUCTURED => 'Shopify Admin GraphQL 2026-07 structured and input-object inventory',
+            self::ALIASES => 'Shopify cross-surface alias and representation inventory',
+            self::TAXONOMY => 'Shopify ProductTaxonomy 1.2.0 pinned attribute definitions',
+            self::FRESHNESS => 'Shopify webhook and Events freshness hints',
+            self::VERSIONS => 'Shopify 2026-07 version and change boundaries',
+        ];
         foreach ($sources as $file => $rows) {
             $entry = $manifestIndex['shopify'.BigCommerceCoverage::SEPARATOR.$file] ?? null;
             if ($entry === null) {
@@ -207,8 +215,8 @@ final class ShopifyCoverage
 
                 continue;
             }
-            $bytes = file_get_contents("$root/$file");
-            if ($entry['file_sha256'] !== hash('sha256', $bytes) || $entry['header_sha256'] !== $this->headerHash($bytes) || (int) $entry['row_count'] !== count($rows)) {
+            $expectedManifest = $this->manifestRow($root, $file, count($rows), $manifestBasis[$file]);
+            if ($entry !== $expectedManifest) {
                 $errors[] = "Shopify manifest integrity mismatch $file";
             }
         }
@@ -218,6 +226,34 @@ final class ShopifyCoverage
         }
         $conceptIndex = array_column($concepts, null, 'concept_key');
         $coverageById = array_column($coverage, null, 'coverage_id');
+        $targetLookup = [];
+        foreach ($coverage as $candidate) {
+            if ($candidate['source_file'] === self::MASTER) {
+                $source = $sources[self::MASTER][(int) $candidate['source_row_ordinal'] - 1] ?? null;
+                if ($source !== null) {
+                    $externalKey = $source['shopify_object'].'.'.$source['shopify_key_or_capability'];
+                    $this->indexTarget($targetLookup, $candidate, $source['source_surface'], [$externalKey, $source['shopify_key_or_capability']]);
+                }
+            } elseif ($candidate['source_file'] === self::STRUCTURED) {
+                $source = $sources[self::STRUCTURED][(int) $candidate['source_row_ordinal'] - 1] ?? null;
+                if ($source !== null) {
+                    $externalKey = $source['object_family'].'.'.$source['subfield'];
+                    $this->indexTarget($targetLookup, $candidate, $source['source_surface'], [$externalKey, $this->studly($source['object_family']).'.'.$source['subfield'], $source['subfield']]);
+                }
+            } elseif ($candidate['source_file'] === self::FRESHNESS) {
+                $source = $sources[self::FRESHNESS][(int) $candidate['source_row_ordinal'] - 1] ?? null;
+                if ($source !== null) {
+                    $this->indexTarget($targetLookup, $candidate, $source['source_surface'], [$source['topic_enum'], $source['topic']]);
+                }
+            }
+        }
+        $aliasTargetsByGroup = [];
+        foreach ($sources[self::ALIASES] as $aliasSource) {
+            $target = $this->resolveTarget($targetLookup, $aliasSource['source_surface'], $aliasSource['surface_key']);
+            if ($target !== null) {
+                $aliasTargetsByGroup[$aliasSource['alias_group']] ??= $target;
+            }
+        }
         $seen = [];
         foreach ($coverage as $row) {
             $file = $row['source_file'];
@@ -245,6 +281,19 @@ final class ShopifyCoverage
             if (! in_array($row['disposition'], BigCommerceCoverage::DISPOSITIONS, true) || ! isset($conceptIndex[$row['concept_key']])) {
                 $errors[] = "Shopify classification/concept mismatch $physical";
             }
+            if ($file === self::MASTER) {
+                [$expectedDisposition, $expectedOwner, $expectedRepresentation] = $this->classifyMaster($source);
+                if ($row['disposition'] !== $expectedDisposition
+                    || $row['owner_candidate'] !== $expectedOwner
+                    || $row['representation_candidate'] !== $expectedRepresentation
+                    || $row['source_context_key'] !== $this->masterContext($source)
+                    || $row['entity_level'] !== $this->entityLevel($source['shopify_object'])
+                    || $row['value_shape'] !== $this->masterValueShape($source)
+                    || $row['read_semantics'] !== $this->masterReadContract($source)
+                    || $row['write_semantics'] !== $this->writeContract($source['write_semantics'])) {
+                    $errors[] = "Shopify master contract mismatch $physical";
+                }
+            }
             if ($row['applicability_key'] !== 'not_applicable') {
                 $errors[] = "invented Shopify applicability FK $physical";
             }
@@ -260,8 +309,17 @@ final class ShopifyCoverage
             if ($file === self::VERSIONS && ($row['disposition'] !== 'APPLICABILITY_METADATA' || $row['owner_candidate'] !== 'ConnectorSchema')) {
                 $errors[] = "Shopify version fate mismatch $physical";
             }
-            if ($file === self::ALIASES && ($row['disposition'] !== 'ALIAS_REPRESENTATION' || ! isset($coverageById[$row['alias_of_coverage_id']]))) {
-                $errors[] = "Shopify alias target mismatch $physical";
+            if ($file === self::ALIASES) {
+                $expectedTarget = $this->resolveTarget($targetLookup, $source['source_surface'], $source['surface_key'])
+                    ?? ($aliasTargetsByGroup[$source['alias_group']] ?? null);
+                if ($row['disposition'] !== 'ALIAS_REPRESENTATION'
+                    || $expectedTarget === null
+                    || $row['alias_of_coverage_id'] !== $expectedTarget['coverage_id']
+                    || ! isset($coverageById[$row['alias_of_coverage_id']])
+                    || $row['owner_candidate'] !== $expectedTarget['owner_candidate']
+                    || $row['representation_candidate'] !== 'alias_with_'.$this->aliasRuleKind($source['identity_rule'])) {
+                    $errors[] = "Shopify alias target mismatch $physical";
+                }
             }
         }
 

@@ -34,18 +34,9 @@ final class BigCommerceCoverage
     public function generate(string $root): array
     {
         $sourcePath = "$root/".self::SOURCE;
-        [$header, $rows] = $this->readCsv($sourcePath);
-        $fileHash = hash_file('sha256', $sourcePath);
-        $snapshot = 'bigcommerce-v1-'.substr($fileHash, 0, 16);
-        $raw = file_get_contents($sourcePath);
-        $headerBytes = strstr($raw, "\n", true)."\n";
-        $manifestRow = [
-            'snapshot_id' => $snapshot, 'repository_commit' => self::BASE_COMMIT,
-            'platform' => 'bigcommerce', 'source_file' => self::SOURCE,
-            'file_sha256' => $fileHash, 'header_sha256' => hash('sha256', $headerBytes),
-            'row_count' => (string) count($rows), 'schema_version_basis' => 'OpenAPI 3.1.0 inventory snapshot',
-            'captured_at' => '2026-09-07',
-        ];
+        [, $rows] = $this->readCsv($sourcePath);
+        $manifestRow = $this->manifestRow($root, count($rows));
+        $snapshot = $manifestRow['snapshot_id'];
         $manifest = $this->upsertManifest($root, $manifestRow);
 
         $coverage = [];
@@ -113,6 +104,10 @@ final class BigCommerceCoverage
         }
         [$sourceHeader, $sourceRows] = $this->readCsv("$root/".self::SOURCE);
         $sourceBytes = file_get_contents("$root/".self::SOURCE);
+        $expectedManifest = $this->manifestRow($root, count($sourceRows));
+        if ($bigCommerceManifest !== $expectedManifest) {
+            $errors[] = 'BigCommerce manifest provenance mismatch';
+        }
         if ($bigCommerceManifest['file_sha256'] !== hash('sha256', $sourceBytes)) {
             $errors[] = 'source file hash mismatch';
         }
@@ -194,6 +189,24 @@ final class BigCommerceCoverage
             'invalid_disagreement_refs' => 0,
             'dangling_applicability_keys' => 0,
             'manifest_provider_rows_preserved' => 'PASS',
+        ];
+    }
+
+    private function manifestRow(string $root, int $count): array
+    {
+        $raw = file_get_contents("$root/".self::SOURCE);
+        $hash = hash('sha256', $raw);
+
+        return [
+            'snapshot_id' => 'bigcommerce-v1-'.substr($hash, 0, 16),
+            'repository_commit' => self::BASE_COMMIT,
+            'platform' => 'bigcommerce',
+            'source_file' => self::SOURCE,
+            'file_sha256' => $hash,
+            'header_sha256' => hash('sha256', strstr($raw, "\n", true)."\n"),
+            'row_count' => (string) $count,
+            'schema_version_basis' => 'OpenAPI 3.1.0 inventory snapshot',
+            'captured_at' => '2026-09-07',
         ];
     }
 

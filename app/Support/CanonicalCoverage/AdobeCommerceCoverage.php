@@ -142,6 +142,11 @@ final class AdobeCommerceCoverage
             }
             $manifestIndex[$identity] = $row;
         }
+        $manifestBasis = [
+            self::MASTER => 'Adobe inventory master v1',
+            self::STRUCTURED => 'Adobe structured object fields v1',
+            self::ALIASES => 'Adobe alias groups v1',
+        ];
         foreach ([self::MASTER => $master, self::STRUCTURED => $structured, self::ALIASES => $aliases] as $file => $rows) {
             $entry = $manifestIndex['adobe_commerce'.BigCommerceCoverage::SEPARATOR.$file] ?? null;
             if ($entry === null) {
@@ -149,8 +154,8 @@ final class AdobeCommerceCoverage
 
                 continue;
             }
-            $bytes = file_get_contents("$root/$file");
-            if ($entry['file_sha256'] !== hash('sha256', $bytes) || $entry['header_sha256'] !== $this->headerHash($bytes) || (int) $entry['row_count'] !== count($rows)) {
+            $expectedManifest = $this->manifestRow($root, $file, count($rows), $manifestBasis[$file]);
+            if ($entry !== $expectedManifest) {
                 $errors[] = "Adobe manifest integrity mismatch $file";
             }
         }
