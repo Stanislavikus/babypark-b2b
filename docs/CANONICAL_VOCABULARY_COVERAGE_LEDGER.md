@@ -152,3 +152,21 @@ manifest_provider_rows_preserved=PASS
 ```
 
 The five provider generators are byte-deterministic as one campaign: BigCommerce → Adobe Commerce → Google Merchant → Amazon → Shopify generation followed by all five validators leaves the common manifest and every provider coverage/concept/disagreement artifact unchanged. With Gate 1A–1E represented in the ledger, the next step is cross-platform synthesis/reconciliation; provider-local concepts remain evidence and do not themselves select platform storage or runtime mapping behavior.
+
+## Gate 2 five-provider synthesis reconciliation
+
+After Gate 1A–1E closed, the existing cross-platform synthesis was rechecked against the provider-local shards rather than rerunning broad provider research. The reconciliation changes only `docs/data/cross_platform_product_field_synthesis.csv`; it does not modify provider coverage, runtime Product/Variant storage, connector execution, FieldDefinitions, or merchant mappings.
+
+Eight narrow corrections remove ownership/representation shortcuts that the stricter provider passes disproved:
+
+- Product image collections remain Media-domain semantics even though current runtime persistence is the legacy/minimal `products.images` JSON field.
+- Google `multipack` remains a narrower deferred identical-product quantity concept and is not evidence that generic `package_quantity` is equivalent.
+- Google property and vehicle aggregates retain `PropertyVertical` / `VehicleVertical` category-attribute ownership; Pricing-owned and Compliance-deferred rows are explicitly excluded from those aggregates.
+- BigCommerce view/review/sales metrics are external derived projections, not connector configuration.
+- Amazon PTD `productType` is schema-applicability metadata and is separated from Amazon item-type taxonomy context.
+- Amazon `item_type_keyword` / `item_type_name` remain provider taxonomy semantics rather than Product Type or merchant Category.
+- The frozen Amazon evidence proves `merchant_suggested_asin` only as a seller-suggested reference; it does not establish authoritative Catalog ASIN identity.
+
+The synthesis working set therefore moves from 85 to 86 rows because the previous mixed Amazon schema/taxonomy row is split into two provider-only concepts. Existing canonical KEEP/ADD/DEFER decisions remain unchanged except for the corrected semantic owner/representation evidence above. A dedicated regression test cross-checks these boundaries against the provider-local coverage shards.
+
+This reconciliation is the input to final adversarial arbitration. Broad provider discovery is now frozen: future providers start from the stable canonical/provider evidence and may reopen the shared vocabulary only when a concrete, evidenced semantic gap is demonstrated.
