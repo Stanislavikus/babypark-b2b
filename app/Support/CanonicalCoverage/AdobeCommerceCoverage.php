@@ -6,7 +6,7 @@ use RuntimeException;
 
 final class AdobeCommerceCoverage
 {
-    public const BASE_COMMIT = '5be3ec03ec915e6831ad86777d5284aa083be206';
+    public const BASE_COMMIT = '7c65d469b68e69aeb9de2ba38620bc59ec793ea6';
 
     public const MASTER = 'docs/data/adobe_commerce_v1_inventory_master.csv';
 
@@ -853,7 +853,7 @@ final class AdobeCommerceCoverage
         $bytes = file_get_contents("$root/$file");
         $hash = hash('sha256', $bytes);
 
-        return ['snapshot_id' => 'adobe-v1-'.substr($hash, 0, 16), 'repository_commit' => self::BASE_COMMIT, 'platform' => 'adobe_commerce', 'source_file' => $file, 'file_sha256' => $hash, 'header_sha256' => $this->headerHash($bytes), 'row_count' => (string) $count, 'schema_version_basis' => $basis, 'captured_at' => '2026-09-07'];
+        return ['snapshot_id' => 'adobe-v1-'.substr($hash, 0, 16), 'repository_commit' => self::BASE_COMMIT, 'platform' => 'adobe_commerce', 'source_file' => $file, 'file_sha256' => $hash, 'header_sha256' => $this->headerHash($bytes), 'row_count' => (string) $count, 'schema_version_basis' => $basis, 'captured_at' => '2026-09-08'];
     }
 
     private function upsertManifest(string $root, array $providerRows): array
