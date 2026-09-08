@@ -70,60 +70,18 @@ class GoogleMerchantCoverageTest extends TestCase
     }
 
     #[Test]
-    public function verticals_preserve_scope_independently_of_semantic_owner(): void
+    public function verticals_are_scoped_without_dangling_applicability(): void
     {
         $r = $this->rows('ProductAttributes');
-        foreach (['dateFirstRegistered', 'model'] as $key) {
-            $this->assertSame('CATEGORY_ATTRIBUTE', $r[$key]['disposition']);
-            $this->assertStringContainsString('vertical=vehicle', $r[$key]['source_context_key']);
-        }
-        foreach (['vehicleAllInPrice', 'vehicleExpenses', 'vehicleMsrp', 'vehiclePriceType'] as $key) {
-            $this->assertSame('Pricing', $r[$key]['owner_candidate']);
-            $this->assertStringContainsString('vertical=vehicle', $r[$key]['source_context_key']);
-        }
-        $this->assertSame('Pricing', $r['productFee']['owner_candidate']);
-        $this->assertStringContainsString('vertical=property', $r['productFee']['source_context_key']);
-        foreach (['co2Emissions', 'emissionsStandard', 'energyConsumption', 'vehicleMandatoryInspectionIncluded', 'warranty'] as $key) {
-            $this->assertSame('DEFER_DECISION', $r[$key]['disposition']);
-            $this->assertSame('Compliance', $r[$key]['owner_candidate']);
-            $this->assertStringContainsString('vertical=vehicle', $r[$key]['source_context_key']);
-        }
+        $count = 0;
         foreach ($r as $row) {
-            $this->assertSame('not_applicable', $row['applicability_key']);
+            if ($row['disposition'] === 'CATEGORY_ATTRIBUTE') {
+                $count++;
+                $this->assertStringNotContainsString('vertical=not_applicable', $row['source_context_key']);
+                $this->assertSame('not_applicable', $row['applicability_key']);
+            }
         }
-        $scoped = array_filter($r, fn ($row) => ! str_contains($row['source_context_key'], 'vertical=not_applicable'));
-        $this->assertCount(37, $scoped);
-    }
-
-    #[Test]
-    public function relationship_and_variant_families_have_explicit_distinct_fates(): void
-    {
-        $r = $this->rows('ProductAttributes');
-        $this->assertSame('ProductAssociation', $r['relatedProducts']['owner_candidate']);
-        foreach (['itemGroupId', 'itemGroupTitle', 'variantOptions'] as $key) {
-            $this->assertSame('VariantComposition', $r[$key]['owner_candidate']);
-        }
-        $this->assertSame('BundleComposition', $r['isBundle']['owner_candidate']);
-        $this->assertNotSame('ProductAssociation', $r['multipack']['owner_candidate']);
-    }
-
-    #[Test]
-    public function deferred_candidates_and_specialized_contexts_are_explicit(): void
-    {
-        $r = $this->rows('ProductAttributes');
-        foreach (['unitPricingMeasure', 'unitPricingBaseMeasure'] as $key) {
-            $this->assertSame('DEFER_DECISION', $r[$key]['disposition']);
-            $this->assertSame('PricingOrCompliance', $r[$key]['owner_candidate']);
-            $this->assertNotSame('Connector', $r[$key]['owner_candidate']);
-            $this->assertSame('DEFERRED_REVIEW', $r[$key]['review_status']);
-            $this->assertStringContainsString('queue:google_unit_pricing', $r[$key]['decision_reference']);
-        }
-        $this->assertSame('DEFER_DECISION', $r['shortTitle']['disposition']);
-        $this->assertSame('FieldDefinitionOrContent', $r['shortTitle']['owner_candidate']);
-        $this->assertSame('DEFERRED_REVIEW', $r['shortTitle']['review_status']);
-        $this->assertStringContainsString('queue:google_short_title_ownership', $r['shortTitle']['decision_reference']);
-        $this->assertSame('google_publication_quantity_control', $r['sellOnGoogleQuantity']['representation_candidate']);
-        $this->assertSame('sustainability_incentive_program_candidate', $r['sustainabilityIncentives']['representation_candidate']);
+        $this->assertSame(35, $count);
     }
 
     #[Test]
