@@ -145,16 +145,22 @@ final class GoogleMerchantCoverage
             }
         }
         $this->validateDisagreements($coverage, $conceptIndex, $questions, $errors);
+        $semanticMetrics = $this->semanticValidationMetrics($coverage);
+        foreach ($semanticMetrics as $metric => $count) {
+            if ($count !== 0) {
+                $errors[] = "Google semantic validation failed $metric=$count";
+            }
+        }
         if ($errors !== []) {
             throw new RuntimeException(implode("\n", array_unique($errors)));
         }
 
         return $this->metrics($coverage, count($concepts)) + [
             'invalid_external_identity_count' => 0, 'processed_output_promoted_to_authoritative_count' => 0,
-            'unconditional_write_from_conditional_source_count' => 0, 'invalid_vertical_scope_count' => 0,
+            'unconditional_write_from_conditional_source_count' => 0,
             'open_disagreements_with_verified_rows' => 0, 'invalid_disagreement_refs' => 0,
             'dangling_applicability_keys' => 0, 'manifest_provider_rows_preserved' => 'PASS',
-        ];
+        ] + $semanticMetrics;
     }
 
     private function coverageRow(string $snapshot, string $file, int $ordinal, array $values, string $surface, string $key, string $context, string $concept, string $disposition, string $owner, string $representation, string $shape, string $read, string $write, array $questions, string $evidence): array
@@ -176,6 +182,39 @@ final class GoogleMerchantCoverage
     {
         $class = $row['classification'];
         $key = $row['external_field'];
+        if ($key === 'shortTitle') {
+            return ['DEFER_DECISION', 'FieldDefinitionOrContent', 'short_title_candidate'];
+        }
+        if ($key === 'relatedProducts') {
+            return ['DOMAIN_CAPABILITY', 'ProductAssociation', 'publication_relationship_capability'];
+        }
+        if (in_array($key, ['itemGroupId', 'itemGroupTitle', 'variantOptions'], true)) {
+            return ['DOMAIN_CAPABILITY', 'VariantComposition', 'variant_grouping_composition'];
+        }
+        if ($key === 'isBundle') {
+            return ['DOMAIN_CAPABILITY', 'BundleComposition', 'business_defined_bundle_composition'];
+        }
+        if ($key === 'multipack') {
+            return ['DEFER_DECISION', 'ProductOrPackaging', 'identical_product_multipack_quantity_candidate'];
+        }
+        if (in_array($key, ['dateFirstRegistered', 'model'], true)) {
+            return ['CATEGORY_ATTRIBUTE', 'VehicleVertical', 'vertical_scoped_publication_attribute'];
+        }
+        if ($key === 'sellOnGoogleQuantity') {
+            return ['CHANNEL_SEMANTIC', 'Connector', 'google_publication_quantity_control'];
+        }
+        if (in_array($key, ['unitPricingMeasure', 'unitPricingBaseMeasure'], true)) {
+            return ['DEFER_DECISION', 'PricingOrCompliance', 'structured_unit_pricing_measure'];
+        }
+        if ($key === 'sustainabilityIncentives') {
+            return ['DEFER_DECISION', 'Compliance', 'sustainability_incentive_program_candidate'];
+        }
+        if (in_array($key, ['vehicleAllInPrice', 'vehicleExpenses', 'vehicleMsrp', 'vehiclePriceType', 'productFee'], true)) {
+            return ['DOMAIN_CAPABILITY', 'Pricing', 'vertical_scoped_pricing_capability'];
+        }
+        if (in_array($key, ['co2Emissions', 'emissionsStandard', 'energyConsumption', 'vehicleMandatoryInspectionIncluded', 'warranty'], true)) {
+            return ['DEFER_DECISION', 'Compliance', 'vertical_compliance_candidate'];
+        }
         if (in_array($key, ['identifierExists', 'canonicalLink', 'link', 'mobileLink'], true)) {
             return ['CHANNEL_SEMANTIC', 'Connector', 'publication_governance_or_link'];
         }
@@ -188,12 +227,13 @@ final class GoogleMerchantCoverage
 
         return match (true) {
             $class === 'semantic_product_field', $class === 'identifier_or_identity_semantic' => ['REUSABLE_SEMANTIC', 'ProductData', 'processed_output_with_conditional_input_binding'],
-            $class === 'channel_context', $class === 'channel_or_specialized_context' => ['CHANNEL_SEMANTIC', 'Connector', 'publication_channel_control'],
+            $class === 'channel_context' => ['CHANNEL_SEMANTIC', 'Connector', 'publication_channel_control'],
+            $class === 'channel_or_specialized_context' => throw new RuntimeException("Unreviewed Google channel or specialized context $key"),
             str_starts_with($class, 'specialized_vertical_field:') => ['CATEGORY_ATTRIBUTE', str_ends_with($class, 'vehicle') ? 'VehicleVertical' : 'PropertyVertical', 'vertical_scoped_publication_attribute'],
             $class === 'pricing_or_commercial_domain' => ['DOMAIN_CAPABILITY', 'Pricing', 'publication_commercial_binding'],
             $class === 'media_domain' => ['DOMAIN_CAPABILITY', 'Media', 'publication_media_binding'],
             $class === 'shipping_returns_domain' => ['DOMAIN_CAPABILITY', 'ShippingReturns', 'publication_shipping_returns_capability'],
-            $class === 'relationship_or_variant_capability' => ['DOMAIN_CAPABILITY', 'ProductAssociation', 'publication_relationship_capability'],
+            $class === 'relationship_or_variant_capability' => throw new RuntimeException("Unreviewed Google relationship or variant capability $key"),
             $class === 'taxonomy_context' => ['CHANNEL_SEMANTIC', 'Connector', 'google_taxonomy_context'],
             default => throw new RuntimeException("Unknown Google classification $class"),
         };
@@ -213,7 +253,7 @@ final class GoogleMerchantCoverage
 
     private function attributeContext(array $row): string
     {
-        $vertical = str_contains($row['classification'], ':') ? explode(':', $row['classification'], 2)[1] : 'not_applicable';
+        $vertical = $this->verticalForAttribute($row);
 
         return 'layer=processed_product_output;input_binding=ProductInput.productAttributes;write_condition=Product_Data_Specification;classification='.$row['classification'].';vertical='.$vertical;
     }
@@ -244,8 +284,11 @@ final class GoogleMerchantCoverage
             'google_taxonomy' => ['taxonomy', 'How should Google taxonomy map without becoming platform Category authority?', ['googleProductCategory', 'productTypes']],
             'google_vertical_applicability' => ['verticals', 'How should vehicle/property applicability be represented portably?', []],
             'google_identifier_exists' => ['identifier_governance', 'How should identifierExists remain publication governance?', ['identifierExists']],
-            'google_compliance' => ['compliance', 'Which Google compliance claims are portable evidence and who owns them?', ['adult', 'certifications', 'energyEfficiencyClass', 'minEnergyEfficiencyClass', 'maxEnergyEfficiencyClass']],
+            'google_compliance' => ['compliance', 'Which Google compliance claims are portable evidence and who owns them?', ['adult', 'certifications', 'energyEfficiencyClass', 'minEnergyEfficiencyClass', 'maxEnergyEfficiencyClass', 'co2Emissions', 'emissionsStandard', 'energyConsumption', 'vehicleMandatoryInspectionIncluded', 'warranty']],
             'google_unit_pricing' => ['unit_pricing', 'What is the portable ownership of unit-pricing measures?', ['unitPricingMeasure', 'unitPricingBaseMeasure']],
+            'google_short_title_ownership' => ['content_ownership', 'Does shortTitle belong to FieldDefinition or a Content domain, and how is it localized?', ['shortTitle']],
+            'google_sustainability_incentives' => ['compliance', 'Are sustainability incentive programs reusable Compliance evidence or Google publication context?', ['sustainabilityIncentives']],
+            'google_multipack_ownership' => ['packaging', 'How does the narrow identical-product multipack quantity relate to Product and Packaging semantics?', ['multipack']],
             'google_preorder_date' => ['preorder', 'How does availabilityDate map to preorder/backorder semantics?', ['availabilityDate']],
             'google_landing_url' => ['url', 'How do canonicalLink/link/mobileLink differ from ordinary Product URL?', ['canonicalLink', 'link', 'mobileLink']],
             'google_processed_ownership' => ['processed_output', 'Which processed-output semantics require owner arbitration?', ['popularityRank', 'questionsAndAnswers']],
@@ -257,7 +300,7 @@ final class GoogleMerchantCoverage
         $key = str_replace('google_merchant:attribute:', '', $concept);
         $result = [];
         foreach ($this->disagreementDefinitions() as $question => [$family, $text, $keys]) {
-            if (($question === 'google_vertical_applicability' && (str_contains($concept, ':attribute:') && $this->isVerticalKey($key))) || in_array($key, array_map(fn ($x) => $this->slug($x), $keys), true)) {
+            if (($question === 'google_vertical_applicability' && str_contains($concept, ':attribute:') && $this->isVerticalKey($key)) || in_array($key, array_map(fn ($x) => $this->slug($x), $keys), true)) {
                 $result[] = $question;
             }
         }
@@ -268,8 +311,55 @@ final class GoogleMerchantCoverage
     private function isVerticalKey(string $slug): bool
     {
         return in_array($slug, array_map(fn ($key) => $this->slug($key), [
-            'amenityFeature', 'bodyStyle', 'certifiedPreOwned', 'co2Emissions', 'displayAddress', 'electricRange', 'emissionsStandard', 'energyConsumption', 'engine', 'fuelConsumption', 'fuelConsumptionDischargedBattery', 'latitude', 'leaseTerm', 'longitude', 'mileage', 'neighborhood', 'numberOfBathrooms', 'numberOfBedrooms', 'numberOfUnits', 'petPolicy', 'productFee', 'propertyName', 'propertyType', 'specialtyHousingType', 'trim', 'unitArea', 'utilitiesIncluded', 'vehicleAllInPrice', 'vehicleExpenses', 'vehicleMandatoryInspectionIncluded', 'vehicleMsrp', 'vehiclePriceType', 'vin', 'warranty', 'year',
+            'amenityFeature', 'bodyStyle', 'certifiedPreOwned', 'co2Emissions', 'dateFirstRegistered', 'displayAddress', 'electricRange', 'emissionsStandard', 'energyConsumption', 'engine', 'fuelConsumption', 'fuelConsumptionDischargedBattery', 'latitude', 'leaseTerm', 'longitude', 'mileage', 'model', 'neighborhood', 'numberOfBathrooms', 'numberOfBedrooms', 'numberOfUnits', 'petPolicy', 'productFee', 'propertyName', 'propertyType', 'specialtyHousingType', 'trim', 'unitArea', 'utilitiesIncluded', 'vehicleAllInPrice', 'vehicleExpenses', 'vehicleMandatoryInspectionIncluded', 'vehicleMsrp', 'vehiclePriceType', 'vin', 'warranty', 'year',
         ]), true);
+    }
+
+    private function verticalForAttribute(array $row): string
+    {
+        if (in_array($row['external_field'], ['dateFirstRegistered', 'model'], true)) {
+            return 'vehicle';
+        }
+
+        return str_starts_with($row['classification'], 'specialized_vertical_field:')
+            ? explode(':', $row['classification'], 2)[1]
+            : 'not_applicable';
+    }
+
+    private function semanticValidationMetrics(array $coverage): array
+    {
+        $rows = array_column(array_filter($coverage, fn ($row) => $row['source_object_family'] === 'ProductAttributes'), null, 'external_key');
+        $invalidRelationships = count(array_filter([
+            $rows['relatedProducts']['owner_candidate'] !== 'ProductAssociation',
+            ...array_map(fn ($key) => $rows[$key]['owner_candidate'] !== 'VariantComposition', ['itemGroupId', 'itemGroupTitle', 'variantOptions']),
+            $rows['isBundle']['owner_candidate'] !== 'BundleComposition',
+            $rows['multipack']['owner_candidate'] === 'ProductAssociation',
+        ]));
+        $ambiguousContext = count(array_filter($rows, fn ($row) => str_contains($row['source_context_key'], 'classification=channel_or_specialized_context')
+            && $row['representation_candidate'] === 'publication_channel_control'));
+        $frozenDeferredVerified = count(array_filter(['shortTitle', 'unitPricingMeasure', 'unitPricingBaseMeasure'], fn ($key) => $rows[$key]['review_status'] === 'PROVIDER_VERIFIED'));
+        $pricing = ['vehicleAllInPrice' => 'vehicle', 'vehicleExpenses' => 'vehicle', 'vehicleMsrp' => 'vehicle', 'vehiclePriceType' => 'vehicle', 'productFee' => 'property'];
+        $invalidVerticalFate = count(array_filter($pricing, fn ($vertical, $key) => $rows[$key]['owner_candidate'] !== 'Pricing'
+            || ! str_contains($rows[$key]['source_context_key'], "vertical=$vertical"), ARRAY_FILTER_USE_BOTH));
+        $compliance = ['co2Emissions', 'emissionsStandard', 'energyConsumption', 'vehicleMandatoryInspectionIncluded', 'warranty'];
+        $invalidVerticalFate += count(array_filter($compliance, fn ($key) => $rows[$key]['owner_candidate'] !== 'Compliance'
+            || $rows[$key]['disposition'] !== 'DEFER_DECISION'
+            || ! str_contains($rows[$key]['source_context_key'], 'vertical=vehicle')));
+        $invalidVerticalScope = count(array_filter($rows, function ($row) {
+            $slug = $this->slug($row['external_key']);
+            $expected = $this->isVerticalKey($slug);
+            $scoped = ! str_contains($row['source_context_key'], 'vertical=not_applicable');
+
+            return $expected !== $scoped;
+        }));
+
+        return [
+            'invalid_vertical_scope_count' => $invalidVerticalScope,
+            'invalid_relationship_family_mapping_count' => $invalidRelationships,
+            'ambiguous_channel_or_specialized_context_count' => $ambiguousContext,
+            'frozen_deferred_candidate_marked_verified_count' => $frozenDeferredVerified,
+            'invalid_vertical_domain_fate_count' => $invalidVerticalFate,
+        ];
     }
 
     private function buildDisagreements(array $coverage): array
