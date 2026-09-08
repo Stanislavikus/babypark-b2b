@@ -192,7 +192,7 @@ final class GoogleMerchantCoverage
             return ['DOMAIN_CAPABILITY', 'VariantComposition', 'variant_grouping_composition'];
         }
         if ($key === 'isBundle') {
-            return ['DOMAIN_CAPABILITY', 'VariantComposition', 'business_defined_bundle_composition'];
+            return ['DOMAIN_CAPABILITY', 'BundleComposition', 'business_defined_bundle_composition'];
         }
         if ($key === 'multipack') {
             return ['DEFER_DECISION', 'ProductOrPackaging', 'identical_product_multipack_quantity_candidate'];
@@ -331,7 +331,8 @@ final class GoogleMerchantCoverage
         $rows = array_column(array_filter($coverage, fn ($row) => $row['source_object_family'] === 'ProductAttributes'), null, 'external_key');
         $invalidRelationships = count(array_filter([
             $rows['relatedProducts']['owner_candidate'] !== 'ProductAssociation',
-            ...array_map(fn ($key) => $rows[$key]['owner_candidate'] !== 'VariantComposition', ['itemGroupId', 'itemGroupTitle', 'variantOptions', 'isBundle']),
+            ...array_map(fn ($key) => $rows[$key]['owner_candidate'] !== 'VariantComposition', ['itemGroupId', 'itemGroupTitle', 'variantOptions']),
+            $rows['isBundle']['owner_candidate'] !== 'BundleComposition',
             $rows['multipack']['owner_candidate'] === 'ProductAssociation',
         ]));
         $ambiguousContext = count(array_filter($rows, fn ($row) => str_contains($row['source_context_key'], 'classification=channel_or_specialized_context')

@@ -103,9 +103,8 @@ class GoogleMerchantCoverageTest extends TestCase
         foreach (['itemGroupId', 'itemGroupTitle', 'variantOptions'] as $key) {
             $this->assertSame('VariantComposition', $r[$key]['owner_candidate']);
         }
-        foreach (['isBundle', 'multipack'] as $key) {
-            $this->assertNotSame('ProductAssociation', $r[$key]['owner_candidate']);
-        }
+        $this->assertSame('BundleComposition', $r['isBundle']['owner_candidate']);
+        $this->assertNotSame('ProductAssociation', $r['multipack']['owner_candidate']);
     }
 
     #[Test]
