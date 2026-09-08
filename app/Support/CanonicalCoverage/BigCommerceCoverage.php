@@ -132,6 +132,12 @@ final class BigCommerceCoverage
             if ($row['source_row_ordinal'] !== (string) $ordinal || $row['source_row_sha256'] !== $rowHash || $row['coverage_id'] !== $expected) {
                 $errors[] = "row $ordinal provenance mismatch";
             }
+            if ($row['platform'] !== 'bigcommerce') {
+                $errors[] = "platform mismatch at row $ordinal";
+            }
+            if ($row['snapshot_id'] !== $bigCommerceManifest['snapshot_id']) {
+                $errors[] = "snapshot id mismatch at row $ordinal";
+            }
             $physical = $row['source_file'].'#'.$row['source_row_ordinal'];
             if (isset($seen[$physical])) {
                 $errors[] = "duplicate physical coverage $physical";

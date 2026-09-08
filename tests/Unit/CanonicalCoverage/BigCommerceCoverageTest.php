@@ -64,6 +64,32 @@ class BigCommerceCoverageTest extends TestCase
     }
 
     #[Test]
+    public function mismatched_coverage_platform_is_rejected(): void
+    {
+        $root = $this->temporaryCorpus();
+        $coverage = $this->readCsv("$root/".BigCommerceCoverage::COVERAGE);
+        $coverage[0]['platform'] = 'shopify';
+        $this->writeCsv("$root/".BigCommerceCoverage::COVERAGE, BigCommerceCoverage::COVERAGE_HEADER, $coverage);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('platform mismatch at row 1');
+        (new BigCommerceCoverage)->validate($root);
+    }
+
+    #[Test]
+    public function mismatched_coverage_snapshot_id_is_rejected(): void
+    {
+        $root = $this->temporaryCorpus();
+        $coverage = $this->readCsv("$root/".BigCommerceCoverage::COVERAGE);
+        $coverage[0]['snapshot_id'] = 'corrupted-snapshot';
+        $this->writeCsv("$root/".BigCommerceCoverage::COVERAGE, BigCommerceCoverage::COVERAGE_HEADER, $coverage);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('snapshot id mismatch at row 1');
+        (new BigCommerceCoverage)->validate($root);
+    }
+
+    #[Test]
     public function duplicate_manifest_identity_is_rejected(): void
     {
         $root = $this->temporaryCorpus();
