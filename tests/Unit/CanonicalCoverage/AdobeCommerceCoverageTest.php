@@ -15,11 +15,11 @@ class AdobeCommerceCoverageTest extends TestCase
     {
         $metrics = (new AdobeCommerceCoverage)->validate(dirname(__DIR__, 3));
 
-        $this->assertSame(184, $metrics['master_rows']);
+        $this->assertSame(186, $metrics['master_rows']);
         $this->assertSame(189, $metrics['structured_rows']);
-        $this->assertSame(51, $metrics['alias_rows']);
-        $this->assertSame(424, $metrics['coverage_rows']);
-        $this->assertSame(360, $metrics['concepts']);
+        $this->assertSame(98, $metrics['alias_rows']);
+        $this->assertSame(473, $metrics['coverage_rows']);
+        $this->assertSame(356, $metrics['concepts']);
         $this->assertEquals(1.0, $metrics['coverage_ratio']);
         $this->assertEquals(1.0, $metrics['classification_ratio']);
         $this->assertEquals(1.0, $metrics['concept_link_ratio']);
@@ -82,7 +82,7 @@ class AdobeCommerceCoverageTest extends TestCase
         $ids = array_column($rows, null, 'coverage_id');
         $aliases = array_filter($rows, fn ($row) => $row['source_file'] === AdobeCommerceCoverage::ALIASES);
 
-        $this->assertCount(51, $aliases);
+        $this->assertCount(98, $aliases);
         foreach ($aliases as $alias) {
             $this->assertSame('ALIAS_REPRESENTATION', $alias['disposition']);
             $this->assertArrayHasKey($alias['alias_of_coverage_id'], $ids);
@@ -145,14 +145,15 @@ class AdobeCommerceCoverageTest extends TestCase
             $this->assertSame('Import API', $master[$key]['source_surface']);
         }
 
-        $this->assertCount(12, $aliases);
+        $this->assertCount(23, $aliases);
         $this->assertSame(
-            ['media_base_role', 'media_small_role', 'media_thumbnail_role', 'media_additional_gallery', 'media_additional_labels', 'media_hidden_from_product_page'],
+            [
+                'media_base_role', 'media_small_role', 'media_thumbnail_role', 'media_swatch_role',
+                'media_base_role_label', 'media_small_role_label', 'media_thumbnail_role_label',
+                'media_additional_gallery', 'media_additional_labels', 'media_hidden_from_product_page',
+            ],
             array_values(array_unique(array_column($aliases, 'alias_group'))),
         );
-        foreach ($aliases as $alias) {
-            $this->assertStringContainsString('not raw-equal', $alias['identity_rule']);
-        }
 
         $structured = $this->structuredRows($root);
         $this->assertStringContainsString('additional_image_labels', $structured['media_gallery_entry:label']['review_note']);
@@ -160,9 +161,22 @@ class AdobeCommerceCoverageTest extends TestCase
         $this->assertStringContainsString('additional_images', $structured['media_gallery_entry:file']['review_note']);
         $this->assertStringContainsString('hide_from_product_page', $structured['media_gallery_entry:disabled']['review_note']);
         $this->assertStringContainsString('not raw-equal representations', $structured['media_gallery_entry:types']['review_note']);
-        foreach (['base_image_label', 'small_image_label', 'thumbnail_image_label'] as $roleLabel) {
-            $this->assertCount(0, array_filter($aliases, fn ($row) => $row['surface_key'] === $roleLabel));
+
+        $groups = [];
+        foreach ($aliases as $alias) {
+            $groups[$alias['alias_group']][] = $alias;
         }
+        $this->assertSame(['base_image', 'image', 'media_gallery_entries.types[image]'], array_column($groups['media_base_role'], 'surface_key'));
+        $this->assertSame(['thumbnail_image', 'thumbnail', 'media_gallery_entries.types[thumbnail]'], array_column($groups['media_thumbnail_role'], 'surface_key'));
+        $this->assertSame(['base_image_label', 'image_label'], array_column($groups['media_base_role_label'], 'surface_key'));
+        $this->assertSame(['thumbnail_image_label', 'thumbnail_label'], array_column($groups['media_thumbnail_role_label'], 'surface_key'));
+        $this->assertNotContains('media_gallery_entries.label', array_column($groups['media_base_role_label'], 'surface_key'));
+        $this->assertNotContains('media_gallery_entries.label', array_column($groups['media_thumbnail_role_label'], 'surface_key'));
+
+        $coverage = $this->masterRows($root);
+        $this->assertSame('Media', $coverage['media_gallery']['owner_candidate']);
+        $this->assertSame('Media', $coverage['gallery']['owner_candidate']);
+        $this->assertNotSame($coverage['media_gallery']['concept_key'], $coverage['gallery']['concept_key']);
     }
 
     #[Test]

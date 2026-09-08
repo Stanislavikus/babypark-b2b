@@ -217,6 +217,63 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
     }
 
     #[Test]
+    public function corrected_cross_surface_bindings_preserve_exact_provider_keys(): void
+    {
+        $items = array_column($this->manifest()['items'], null, 'id');
+        $rows = array_column($this->matrix()['rows'], null, 'id');
+
+        self::assertSame('product.custom_attributes.news_from_date', $items['eav-new-from-date']['exact_external_key_path_or_capability']);
+        self::assertSame('product.custom_attributes.news_to_date', $items['eav-new-to-date']['exact_external_key_path_or_capability']);
+        self::assertSame('product.custom_attributes.special_from_date', $items['eav-special-from-date']['exact_external_key_path_or_capability']);
+        self::assertSame('product.custom_attributes.special_to_date', $items['eav-special-to-date']['exact_external_key_path_or_capability']);
+        self::assertStringContainsString('new_from_date|new_to_date', $items['bulk-new-product-window']['exact_external_key_path_or_capability']);
+        self::assertStringContainsString('special_price_from_date|special_price_to_date', $items['bulk-special-price-window']['exact_external_key_path_or_capability']);
+        self::assertStringContainsString('price_from', $items['pricing-special-price-object']['exact_external_key_path_or_capability']);
+        self::assertStringContainsString('price_to', $items['pricing-special-price-object']['exact_external_key_path_or_capability']);
+
+        self::assertStringContainsString('minimal_price', $items['eav-map-msrp-attributes']['exact_external_key_path_or_capability']);
+        self::assertStringContainsString('msrp', $items['eav-map-msrp-attributes']['exact_external_key_path_or_capability']);
+        self::assertStringContainsString('map_price', $rows['pricing-map-msrp-fields']['external_field_key_path']);
+        self::assertStringContainsString('system minimal_price', $rows['pricing-map-msrp-fields']['external_field_key_path']);
+        self::assertStringContainsString('CSV msrp_price', $rows['pricing-map-msrp-fields']['external_field_key_path']);
+        self::assertStringContainsString('system msrp', $rows['pricing-map-msrp-fields']['external_field_key_path']);
+    }
+
+    #[Test]
+    public function media_system_eav_gallery_and_role_labels_do_not_collapse(): void
+    {
+        $items = array_column($this->manifest()['items'], null, 'id');
+        $rows = array_column($this->matrix()['rows'], null, 'id');
+        $media = $items['eav-media-system-attributes']['exact_external_key_path_or_capability'];
+
+        foreach (['image', 'small_image', 'thumbnail', 'swatch_image', 'image_label', 'small_image_label', 'thumbnail_label', 'media_gallery', 'gallery'] as $key) {
+            self::assertStringContainsString($key, $media);
+        }
+        self::assertStringContainsString('extension_attributes.video_content', $items['rest-product-media-gallery-entries']['exact_external_key_path_or_capability']);
+        self::assertStringContainsString('system EAV role fields', $rows['media-gallery-structure']['external_restrictions_or_system_owner']);
+        self::assertStringContainsString('role-specific labels', $rows['media-gallery-structure']['external_restrictions_or_system_owner']);
+        self::assertStringContainsString('retained as distinct schema anchors', $rows['eav-media-system-attributes']['external_restrictions_or_system_owner']);
+    }
+
+    #[Test]
+    public function legacy_stockitem_is_compatibility_evidence_and_does_not_replace_msi_ownership(): void
+    {
+        $items = array_column($this->manifest()['items'], null, 'id');
+        $rows = array_column($this->matrix()['rows'], null, 'id');
+        $legacy = $items['legacy-stockitem-compatibility'];
+        $matrix = $rows['inventory-bulk-stock-inputs'];
+
+        self::assertSame('deprecated_compatibility_only', $legacy['inventory_condition']);
+        foreach (['min_qty', 'backorders', 'min_sale_qty', 'max_sale_qty', 'notify_stock_qty'] as $key) {
+            self::assertStringContainsString($key, $legacy['exact_external_key_path_or_capability']);
+        }
+        self::assertSame('Availability', $matrix['platform_domain_owner']);
+        self::assertStringContainsString('deprecated', $legacy['source_version_marker']);
+        self::assertStringContainsString('replaced by MSI', $legacy['source_version_marker']);
+        self::assertStringContainsString('must not displace MSI', $matrix['external_write_contract']);
+    }
+
+    #[Test]
     public function target_dependent_eav_family_remains_explicitly_incomplete_pending_real_target_expansion(): void
     {
         $manifest = $this->manifest()['items'];
