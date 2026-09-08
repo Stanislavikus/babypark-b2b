@@ -15,10 +15,11 @@ class AdobeCommerceCoverageTest extends TestCase
     {
         $metrics = (new AdobeCommerceCoverage)->validate(dirname(__DIR__, 3));
 
-        $this->assertSame(183, $metrics['master_rows']);
+        $this->assertSame(184, $metrics['master_rows']);
         $this->assertSame(189, $metrics['structured_rows']);
-        $this->assertSame(39, $metrics['alias_rows']);
-        $this->assertSame(411, $metrics['coverage_rows']);
+        $this->assertSame(51, $metrics['alias_rows']);
+        $this->assertSame(424, $metrics['coverage_rows']);
+        $this->assertSame(360, $metrics['concepts']);
         $this->assertEquals(1.0, $metrics['coverage_ratio']);
         $this->assertEquals(1.0, $metrics['classification_ratio']);
         $this->assertEquals(1.0, $metrics['concept_link_ratio']);
@@ -81,7 +82,7 @@ class AdobeCommerceCoverageTest extends TestCase
         $ids = array_column($rows, null, 'coverage_id');
         $aliases = array_filter($rows, fn ($row) => $row['source_file'] === AdobeCommerceCoverage::ALIASES);
 
-        $this->assertCount(39, $aliases);
+        $this->assertCount(51, $aliases);
         foreach ($aliases as $alias) {
             $this->assertSame('ALIAS_REPRESENTATION', $alias['disposition']);
             $this->assertArrayHasKey($alias['alias_of_coverage_id'], $ids);
@@ -108,6 +109,72 @@ class AdobeCommerceCoverageTest extends TestCase
         $this->assertSame('DownloadableComposition', $master['downloadable_link']['owner_candidate']);
         $this->assertSame('SharedCatalog', $master['shared_catalog_product_membership']['owner_candidate']);
         $this->assertSame('GiftCard', $master['giftcard_amounts']['owner_candidate']);
+    }
+
+    #[Test]
+    public function every_master_connector_context_is_connector_owned_channel_semantics(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $master = $this->readCsv($root.'/'.AdobeCommerceCoverage::MASTER);
+        $coverage = $this->masterRows($root);
+        $contexts = array_filter($master, fn ($row) => $row['entry_kind'] === 'connector_context');
+
+        $this->assertCount(16, $contexts);
+        foreach ($contexts as $source) {
+            $row = $coverage[$source['adobe_key_or_capability']];
+            $this->assertSame('CHANNEL_SEMANTIC', $row['disposition']);
+            $this->assertSame('Connector', $row['owner_candidate']);
+            $this->assertSame('provider_scope_context', $row['representation_candidate']);
+        }
+    }
+
+    #[Test]
+    public function media_import_slots_and_rest_role_tokens_are_explicit_non_raw_equal_representations(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $master = array_column($this->readCsv($root.'/'.AdobeCommerceCoverage::MASTER), null, 'adobe_key_or_capability');
+        $aliases = array_values(array_filter(
+            $this->readCsv($root.'/'.AdobeCommerceCoverage::ALIASES),
+            fn ($row) => str_starts_with($row['alias_group'], 'media_'),
+        ));
+
+        foreach (['base_image', 'small_image', 'thumbnail_image', 'additional_images', 'additional_image_labels', 'hide_from_product_page'] as $key) {
+            $this->assertSame('Import API', $master[$key]['source_surface']);
+        }
+        foreach (['base_image_label', 'small_image_label', 'thumbnail_image_label'] as $key) {
+            $this->assertSame('Import API', $master[$key]['source_surface']);
+        }
+
+        $this->assertCount(12, $aliases);
+        $this->assertSame(
+            ['media_base_role', 'media_small_role', 'media_thumbnail_role', 'media_additional_gallery', 'media_additional_labels', 'media_hidden_from_product_page'],
+            array_values(array_unique(array_column($aliases, 'alias_group'))),
+        );
+        foreach ($aliases as $alias) {
+            $this->assertStringContainsString('not raw-equal', $alias['identity_rule']);
+        }
+
+        $structured = $this->structuredRows($root);
+        $this->assertStringContainsString('additional_image_labels', $structured['media_gallery_entry:label']['review_note']);
+        $this->assertStringContainsString('not a role-specific Import *_image_label field', $structured['media_gallery_entry:label']['review_note']);
+        $this->assertStringContainsString('additional_images', $structured['media_gallery_entry:file']['review_note']);
+        $this->assertStringContainsString('hide_from_product_page', $structured['media_gallery_entry:disabled']['review_note']);
+        $this->assertStringContainsString('not raw-equal representations', $structured['media_gallery_entry:types']['review_note']);
+        foreach (['base_image_label', 'small_image_label', 'thumbnail_image_label'] as $roleLabel) {
+            $this->assertCount(0, array_filter($aliases, fn ($row) => $row['surface_key'] === $roleLabel));
+        }
+    }
+
+    #[Test]
+    public function classic_cost_and_catalog_pricing_cost_storage_remain_distinct_pricing_representations(): void
+    {
+        $master = $this->masterRows(dirname(__DIR__, 3));
+
+        foreach (['cost', 'cost_storage'] as $key) {
+            $this->assertSame('DOMAIN_CAPABILITY', $master[$key]['disposition']);
+            $this->assertSame('Pricing', $master[$key]['owner_candidate']);
+        }
+        $this->assertNotSame($master['cost']['concept_key'], $master['cost_storage']['concept_key']);
     }
 
     #[Test]

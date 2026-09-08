@@ -11,11 +11,11 @@ authoritative_attribute_metadata,options,schema_metadata,select/multiselect opti
 media_gallery_entry,id,external_system_metadata,legacy numeric media entry identity; GraphQL deprecates in favor of uid,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
 media_gallery_entry,uid,external_system_metadata,GraphQL media entry identity,core GraphQL 2.4.9,INITIAL_RESEARCH
 media_gallery_entry,media_type,domain_value,image or video kind,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
-media_gallery_entry,label,domain_value,alt/display label with store-scope inheritance semantics,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
+media_gallery_entry,label,domain_value,media-entry alt/display label with store-scope inheritance; REST member also represents Import additional_image_labels through list-to-member translation; not a role-specific Import *_image_label field,Admin REST + core GraphQL 2.4.9,FOURTH_PASS_RESEARCH
 media_gallery_entry,position,domain_value,ordered media position with store-scope inheritance semantics,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
-media_gallery_entry,disabled,domain_value,visibility flag with store-scope inheritance semantics,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
-media_gallery_entry,types,domain_value,media roles such as image/small_image/thumbnail,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
-media_gallery_entry,file,domain_value,server-side media path,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
+media_gallery_entry,disabled,domain_value,per-entry visibility flag with store-scope inheritance; related to Import hide_from_product_page through non-raw-equal translation,Admin REST + core GraphQL 2.4.9,FOURTH_PASS_RESEARCH
+media_gallery_entry,types,domain_value,media role tokens image/small_image/thumbnail; related to Import base_image/small_image/thumbnail_image slots but not raw-equal representations,Admin REST + core GraphQL 2.4.9,FOURTH_PASS_RESEARCH
+media_gallery_entry,file,domain_value,server-side media path; REST member also represents Import additional_images through list-to-member translation,Admin REST + core GraphQL 2.4.9,FOURTH_PASS_RESEARCH
 media_gallery_entry,content,structured_capability,binary upload content object,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
 media_gallery_entry,video_content,structured_capability,external-video metadata object,Admin REST + core GraphQL 2.4.9,INITIAL_RESEARCH
 media_content,base64_encoded_data,structured_capability,image binary content for write payload,core GraphQL type reference + Admin REST media writes,INITIAL_RESEARCH

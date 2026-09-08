@@ -251,7 +251,7 @@ final class AdobeCommerceCoverage
                 }
             }
         }
-        if (count($seen) !== 411 || count($coverage) !== 411) {
+        if (count($seen) !== 424 || count($coverage) !== 424) {
             $errors[] = 'Adobe physical coverage mismatch';
         }
         $this->validateAliasSourceContracts($aliases, $errors);
@@ -293,6 +293,9 @@ final class AdobeCommerceCoverage
         $cluster = $row['cluster'];
         if ($cluster === 'dynamic_attributes' && in_array($row['adobe_key_or_capability'], ['manufacturer', 'material', 'color', 'size', 'instructions', 'gtin', 'mpn', 'brand'], true)) {
             return ['REUSABLE_SEMANTIC', 'ProductData', 'eav_bound_semantic_candidate'];
+        }
+        if ($row['entry_kind'] === 'connector_context') {
+            return ['CHANNEL_SEMANTIC', 'Connector', 'provider_scope_context'];
         }
         $owners = [
             'pricing' => 'Pricing', 'b2b_pricing' => 'Pricing', 'tax_configuration' => 'PricingTax',
@@ -460,7 +463,7 @@ final class AdobeCommerceCoverage
         if (in_array($row['alias_group'], ['bundle_price_type', 'bundle_sku_type', 'bundle_price_view', 'bundle_weight_type', 'bundle_shipment_type', 'status'], true) && $row['surface_key'] !== 'status') {
             return 'translated_value';
         }
-        if (in_array($row['alias_group'], ['bundle_composition', 'configurable_composition', 'grouped_composition', 'category_assignment', 'giftcard_amount'], true)) {
+        if (in_array($row['alias_group'], ['bundle_composition', 'configurable_composition', 'grouped_composition', 'category_assignment', 'giftcard_amount', 'media_base_role', 'media_small_role', 'media_thumbnail_role', 'media_additional_gallery', 'media_additional_labels', 'media_hidden_from_product_page'], true)) {
             return 'structured_equivalence';
         }
         $rule = strtolower($row['identity_rule']);
@@ -532,6 +535,12 @@ final class AdobeCommerceCoverage
             'category_assignment' => ['owner' => 'Category', 'representation' => 'id_list_object_resolution', 'value_type' => 'category_relation', 'status' => 'domain', 'explanation' => 'Import category forms, REST category links, and GraphQL categories preserve different read/write shapes.'],
             'tier_price_customer_group' => ['owner' => 'Pricing', 'representation' => 'id_code_resolution', 'value_type' => 'customer_group_reference', 'status' => 'domain', 'explanation' => 'Customer group code and Catalog Pricing representation require group identity resolution.'],
             'giftcard_amount' => ['owner' => 'GiftCard', 'representation' => 'import_graphql_amount_translation', 'value_type' => 'money_amount', 'status' => 'domain', 'explanation' => 'Import preset amounts and GraphQL read amount objects share Gift Card semantics through explicit shape translation.'],
+            'media_base_role' => ['owner' => 'Media', 'representation' => 'media_role_surface_equivalence', 'value_type' => 'media_role_assignment', 'status' => 'domain', 'explanation' => 'Import base_image is a filename/path slot while Admin REST uses the image role token inside media_gallery_entries.types; the representations are related but not raw equal.'],
+            'media_small_role' => ['owner' => 'Media', 'representation' => 'media_role_surface_equivalence', 'value_type' => 'media_role_assignment', 'status' => 'domain', 'explanation' => 'Import small_image is a filename/path slot while Admin REST uses the small_image role token inside media_gallery_entries.types; equal spelling does not make the representation raw-equal.'],
+            'media_thumbnail_role' => ['owner' => 'Media', 'representation' => 'media_role_surface_equivalence', 'value_type' => 'media_role_assignment', 'status' => 'domain', 'explanation' => 'Import thumbnail_image is a filename/path slot while Admin REST uses the thumbnail role token inside media_gallery_entries.types; the representations are related but not raw equal.'],
+            'media_additional_gallery' => ['owner' => 'Media', 'representation' => 'media_gallery_surface_equivalence', 'value_type' => 'media_entry_collection', 'status' => 'domain', 'explanation' => 'Import additional_images is a flat filename list while Admin REST represents additional images as media_gallery_entries whose role types may be empty; collection and entry shapes are not raw equal.'],
+            'media_additional_labels' => ['owner' => 'Media', 'representation' => 'media_gallery_surface_equivalence', 'value_type' => 'media_entry_label_collection', 'status' => 'domain', 'explanation' => 'Import additional_image_labels is a flat label list aligned to additional images while Admin REST stores label on each media gallery entry; list and member shapes are not raw equal.'],
+            'media_hidden_from_product_page' => ['owner' => 'Media', 'representation' => 'media_visibility_surface_equivalence', 'value_type' => 'media_entry_visibility', 'status' => 'domain', 'explanation' => 'Import hide_from_product_page is import media visibility service data while Admin REST stores disabled on each media gallery entry; the representations are not raw equal.'],
         ];
     }
 
@@ -550,6 +559,12 @@ final class AdobeCommerceCoverage
             'category_assignment' => ['categories', 'categories', 'category_link'],
             'tier_price_customer_group' => ['customer_group', 'tier_price_customer_group'],
             'giftcard_amount' => ['giftcard_amount', 'giftcard_amounts'],
+            'media_base_role' => ['base_image', 'image'],
+            'media_small_role' => ['small_image', 'small_image'],
+            'media_thumbnail_role' => ['thumbnail', 'thumbnail_image'],
+            'media_additional_gallery' => ['additional_images', 'media_gallery_entries.file'],
+            'media_additional_labels' => ['additional_image_labels', 'media_gallery_entries.label'],
+            'media_hidden_from_product_page' => ['hide_from_product_page', 'media_gallery_entries.disabled'],
         ];
     }
 
@@ -600,7 +615,7 @@ final class AdobeCommerceCoverage
     private function disagreementDefinitions(): array
     {
         return [
-            'adobe_status_lifecycle' => ['status_lifecycle', 'Does Adobe enabled/disabled status map to platform lifecycle?', 'adobe:alias:status', 'unresolved-status-lifecycle'],
+            'adobe_status_lifecycle' => ['status_lifecycle', 'Does Adobe enabled/disabled status map to any future richer platform lifecycle beyond the current boolean active contract?', 'adobe:alias:status', 'DEC-010'],
             'adobe_tax_portability' => ['tax', 'What portable tax semantic and owner represent Adobe tax ID/name?', 'adobe:alias:tax_class', 'unresolved-tax-owner'],
             'adobe_map_policy' => ['map', 'How should Adobe MAP policy be persisted?', 'adobe:pricing:map_price|adobe:pricing:map_enabled', 'unresolved-map-persistence'],
             'adobe_msrp_equivalence' => ['reference_price', 'What is equivalent between Adobe MSRP and portable RRP/list price?', 'adobe:pricing:msrp_price|adobe:pricing:msrp_display_actual_price_type', 'unresolved-reference-price-equivalence'],
@@ -792,10 +807,10 @@ final class AdobeCommerceCoverage
         return [
             'master_rows' => $byFile[self::MASTER] ?? 0, 'structured_rows' => $byFile[self::STRUCTURED] ?? 0,
             'alias_rows' => $byFile[self::ALIASES] ?? 0, 'coverage_rows' => count($coverage), 'concepts' => $conceptCount,
-            'coverage_ratio' => (float) (count($coverage) / 411), 'classification_ratio' => (float) (count(array_filter($coverage, fn ($row) => $row['disposition'] !== '')) / count($coverage)),
+            'coverage_ratio' => (float) (count($coverage) / 424), 'classification_ratio' => (float) (count(array_filter($coverage, fn ($row) => $row['disposition'] !== '')) / count($coverage)),
             'concept_link_ratio' => (float) (count(array_filter($coverage, fn ($row) => $row['concept_key'] !== '')) / count($coverage)),
             'terminal_rationale_ratio' => 1.0,
-            'silent_drop_count' => 411 - count($coverage), 'dispositions' => array_count_values(array_column($coverage, 'disposition')),
+            'silent_drop_count' => 424 - count($coverage), 'dispositions' => array_count_values(array_column($coverage, 'disposition')),
         ];
     }
 
@@ -835,7 +850,7 @@ final class AdobeCommerceCoverage
 
     private function assertDenominator(array $master, array $structured, array $aliases): void
     {
-        if (count($master) !== 183 || count($structured) !== 189 || count($aliases) !== 39) {
+        if (count($master) !== 184 || count($structured) !== 189 || count($aliases) !== 51) {
             throw new RuntimeException('Adobe frozen source drift');
         }
     }

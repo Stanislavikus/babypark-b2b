@@ -38,3 +38,15 @@ tier_price_customer_group,tier price customer-group scope,tier_price_customer_gr
 tier_price_customer_group,tier price customer-group scope,customer_group,Catalog Pricing REST,current TierPriceStorageInterface string field,THIRD_PASS_RESEARCH
 giftcard_amount,gift-card preset amount,giftcard_amount,Import API,flat preset amount array for bulk import,THIRD_PASS_RESEARCH
 giftcard_amount,gift-card preset amount,giftcard_amounts,core GraphQL READ,scoped amount objects; read representation only,THIRD_PASS_RESEARCH
+media_base_role,base/primary image role assignment,base_image,Import API,filename/path slot assigned to Base role; related to REST media role image; not raw-equal,FOURTH_PASS_RESEARCH
+media_base_role,base/primary image role assignment,image,Admin REST media_gallery_entries.types,role token inside media entry; related to Import base_image filename slot; not raw-equal,FOURTH_PASS_RESEARCH
+media_small_role,small image role assignment,small_image,Import API,filename/path slot assigned to Small role; related to REST small_image role token; not raw-equal,FOURTH_PASS_RESEARCH
+media_small_role,small image role assignment,small_image,Admin REST media_gallery_entries.types,role token inside media entry; equal spelling is still a different surface representation; not raw-equal to Import filename slot,FOURTH_PASS_RESEARCH
+media_thumbnail_role,thumbnail image role assignment,thumbnail_image,Import API,filename/path slot assigned to Thumbnail role; related to REST thumbnail role token; not raw-equal,FOURTH_PASS_RESEARCH
+media_thumbnail_role,thumbnail image role assignment,thumbnail,Admin REST media_gallery_entries.types,role token inside media entry; related to Import thumbnail_image filename slot; not raw-equal,FOURTH_PASS_RESEARCH
+media_additional_gallery,additional media gallery entries,additional_images,Import API,flat filename list for additional media entries; related to REST media_gallery_entries.file members; not raw-equal,FOURTH_PASS_RESEARCH
+media_additional_gallery,additional media gallery entries,media_gallery_entries.file,Admin REST,per-entry file member; additional entries may have empty role types; related to Import additional_images list; not raw-equal,FOURTH_PASS_RESEARCH
+media_additional_labels,additional media gallery labels,additional_image_labels,Import API,flat label list aligned to additional_images; related to REST media_gallery_entries.label members; not raw-equal,FOURTH_PASS_RESEARCH
+media_additional_labels,additional media gallery labels,media_gallery_entries.label,Admin REST,per-entry label member; related to Import additional_image_labels list; not raw-equal,FOURTH_PASS_RESEARCH
+media_hidden_from_product_page,additional media storefront visibility,hide_from_product_page,Import API,flat import media visibility service-data field; related to REST media_gallery_entries.disabled members; not raw-equal,FOURTH_PASS_RESEARCH
+media_hidden_from_product_page,additional media storefront visibility,media_gallery_entries.disabled,Admin REST,per-entry disabled flag; related to Import hide_from_product_page representation; not raw-equal,FOURTH_PASS_RESEARCH

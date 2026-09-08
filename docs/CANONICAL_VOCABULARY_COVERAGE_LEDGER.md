@@ -73,7 +73,7 @@ After all five provider passes, blind reviewers receive the content-addressed ma
 
 ## Adobe Commerce provider pass
 
-The Adobe pass adds three denominator files to the common manifest: 183 top-level inventory rows, 189 structured members, and 39 explicit alias representations. Capability clusters and the source/edition matrix remain supporting consistency evidence rather than duplicate coverage rows. The resulting shard contains 411 physical coverage rows and 359 provisional Adobe-local concepts.
+The Adobe pass now contains three denominator files in the common manifest: 184 top-level inventory rows, 189 structured members, and 51 explicit alias representations. Capability clusters and the source/edition matrix remain supporting consistency evidence rather than duplicate coverage rows. After the provider semantic-audit correction, the shard contains 424 physical coverage rows and 360 provisional Adobe-local concepts.
 
 All structured families use an explicit mapping to a real top-level capability row. Nested IDs, UIDs, codes, and SKUs remain structure/reference members. All alias rows point to a valid top-level representation and retain the frozen `identity_rule`; ID/code/name translation is not treated as raw equality.
 
@@ -87,7 +87,15 @@ The corrected normalization keeps `additional_attributes` and `custom_attributes
 
 Gift Card parentage is surface-specific: Import `giftcard_amount_list.amount` belongs to the Import `giftcard_amount` representation, while GraphQL `giftcard_amount` members belong to `giftcard_amounts`. The shared dynamic EAV member shape uses `custom_attributes` as its technical parent and records `additional_attributes|custom_attributes` as the complete envelope scope; validation requires both parents to exist.
 
-All 17 alias groups have explicit compatibility contracts defining neutral owner, representation, value type, status, expected keys, and transformation rationale. Concept metadata is independent of physical row ordering. The composition disagreement now enumerates all matching configurable, bundle, and grouped top-level, alias, and structured concepts rather than only three alias nodes.
+All 23 alias groups have explicit compatibility contracts defining neutral owner, representation, value type, status, expected keys, and transformation rationale. Concept metadata is independent of physical row ordering. The composition disagreement now enumerates all matching configurable, bundle, and grouped top-level, alias, and structured concepts rather than only three alias nodes.
+
+### Adobe provider semantic-audit correction
+
+A later independent Sonnet High semantic/clustering challenge and GPT-5.4 evidence/coverage audit were run against the frozen five-provider base, then independently arbitrated against repository decisions and current Adobe primary evidence. The durable finding-by-finding record is `docs/reviews/ADOBE_PROVIDER_SEMANTIC_AUDIT_ARBITRATION_2026-09-08.md`. This was a correction pass over already-frozen evidence, not a restart of broad Adobe discovery.
+
+The correction establishes a general invariant that any top-level Adobe `connector_context` row is Connector-owned `CHANNEL_SEMANTIC`, preventing presentation-layout and URL-rewrite controls from falling through to reusable ProductData merely because their cluster lacks a special case. It also separates Import image filename/label columns from Admin REST media-entry structure. Explicit non-raw-equal representation groups connect Base/Small/Thumbnail filename slots to REST role tokens and connect `additional_images`, `additional_image_labels`, and `hide_from_product_page` to REST media-entry `file`, `label`, and `disabled` members. REST media-entry `label` remains distinct from role-specific Import `*_image_label` columns.
+
+Classic EAV `cost` is now inventoried explicitly as a Pricing-owned Adobe representation alongside, but not merged with, Catalog Pricing `cost_storage`. Cross-platform synthesis wording is tightened so Adobe `weight` is not evidence of `net_weight` or `gross_weight` equivalence, and `country_of_manufacture` is related evidence rather than proof of identity with `country_of_origin`. The current boolean Adobe status transform remains intact under DEC-010; only the OPEN disagreement wording is narrowed to any future richer lifecycle. No new platform canonical field is created by this Adobe correction.
 
 ## Google Merchant provider pass
 

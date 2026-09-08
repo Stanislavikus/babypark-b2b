@@ -1,5 +1,5 @@
 question_key,concept_family,question,evidence_concept_keys,affected_coverage_count,existing_decision_reference,review_status,notes
-adobe_status_lifecycle,status_lifecycle,"Does Adobe enabled/disabled status map to platform lifecycle?",adobe:alias:status,4,unresolved-status-lifecycle,OPEN,"Adobe provider fate is retained; final portable decision is deferred."
+adobe_status_lifecycle,status_lifecycle,"Does Adobe enabled/disabled status map to any future richer platform lifecycle beyond the current boolean active contract?",adobe:alias:status,4,DEC-010,OPEN,"Adobe provider fate is retained; final portable decision is deferred."
 adobe_tax_portability,tax,"What portable tax semantic and owner represent Adobe tax ID/name?",adobe:alias:tax_class,4,unresolved-tax-owner,OPEN,"Adobe provider fate is retained; final portable decision is deferred."
 adobe_map_policy,map,"How should Adobe MAP policy be persisted?",adobe:pricing:map_enabled|adobe:pricing:map_price,2,unresolved-map-persistence,OPEN,"Adobe provider fate is retained; final portable decision is deferred."
 adobe_msrp_equivalence,reference_price,"What is equivalent between Adobe MSRP and portable RRP/list price?",adobe:pricing:msrp_display_actual_price_type|adobe:pricing:msrp_price,2,unresolved-reference-price-equivalence,OPEN,"Adobe provider fate is retained; final portable decision is deferred."

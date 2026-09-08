@@ -1,6 +1,6 @@
 # Adobe Commerce / Magento V1 Product & Capability Inventory
 
-Status: **FROZEN RESEARCH BASELINE — MERGE GATE PENDING**
+Status: **FROZEN RESEARCH BASELINE — PROVIDER REVIEW CORRECTION GATE**
 
 This document is a review artifact for building the platform-wide Adobe Commerce / Magento product connector inventory. It deliberately does **not** use the current smoke store as the definition of Magento scope. A connected store is only live evidence for later validation.
 
@@ -94,7 +94,7 @@ See:
 - `docs/data/adobe_commerce_v1_capability_clusters.csv` — cluster summary;
 - `docs/data/adobe_commerce_v1_inventory_source_matrix.csv` — edition/API source and freshness matrix.
 
-The corrected baseline contains **183 top-level field/capability entries grouped into 28 clusters/families**, plus **189 structured-object subfields**, **14 edition/API/source surfaces**, and **39 explicit cross-surface alias/representation rows**. These are research coverage counts, not a claim that Adobe has exactly 183 Product attributes.
+The current corrected baseline contains **184 top-level field/capability entries grouped into 28 clusters/families**, plus **189 structured-object subfields**, **14 edition/API/source surfaces**, and **51 explicit cross-surface alias/representation rows**. The generated provider shard contains **424 physical coverage rows** and **360 Adobe-local concepts**. These are research coverage counts, not a claim that Adobe has exactly 184 Product attributes.
 
 Primary clusters currently include:
 
@@ -155,6 +155,23 @@ Key final corrections:
 - SaaS file/image attribute representations are READ-only derived projections unless a separate write surface is proven;
 - Import composition/category/group/tier/gift-card keys remain inventoried and are related to REST/GraphQL representations through explicit non-raw-equal alias groups;
 - current Catalog Pricing REST uses `customer_group`, not `customer_group_id`.
+
+## Provider semantic audit correction pass
+
+After the five-provider freeze, Adobe was deliberately challenged again one provider at a time before automatic-mapping implementation. Sonnet High attacked semantic clustering/ownership while GPT-5.4 independently audited evidence coverage and traceability. Lead arbitration retained only findings supported by the exact frozen repository base and Adobe primary evidence; the durable arbitration ledger is `docs/reviews/ADOBE_PROVIDER_SEMANTIC_AUDIT_ARBITRATION_2026-09-08.md`.
+
+Accepted corrections are intentionally narrow:
+
+- all top-level `connector_context` rows now classify fail-closed as Connector-owned `CHANNEL_SEMANTIC`; this fixes the five Magento presentation/layout controls and `save_rewrites_history` without six ad-hoc exceptions;
+- Import `base_image` / `small_image` / `thumbnail_image` are preserved as filename/path slots, while Admin REST `image` / `small_image` / `thumbnail` remain media-role tokens inside `media_gallery_entries.types`; explicit non-raw-equal representation groups connect these surfaces;
+- Import `*_image_label` fields remain Import-only role-slot labels; Admin REST has a media-entry `label`, not separate Base/Small/Thumbnail label fields, so no fictional REST role-label aliases are created;
+- Import `additional_images`, `additional_image_labels`, and `hide_from_product_page` are explicitly related to Admin REST media-entry `file`, `label`, and `disabled` through non-raw-equal list/member translations rather than being treated as literal REST field names;
+- classic EAV `cost` is added as a Pricing-owned Adobe representation and remains distinct from dedicated Catalog Pricing `cost_storage`;
+- the current boolean Adobe status mapping remains resolved by DEC-010, while the OPEN disagreement is clarified to concern only any future richer lifecycle;
+- Adobe `weight` remains semantically ambiguous and must not be read as direct `net_weight`/`gross_weight` evidence; Adobe mappings stay deferred;
+- `country_of_manufacture` remains its exact Adobe provider meaning and is not asserted identity-equivalent to canonical `country_of_origin`.
+
+Current corrected denominator: **184 top-level + 189 structured + 51 aliases = 424 physical rows**, producing **360 concepts**, with zero silent drops and full classification/concept-link coverage. This pass changes provider evidence and synthesis precision only; it does not add a platform canonical field or alter Magento runtime behavior.
 
 ## Current platform Field Dictionary — comparison input, not authority
 
@@ -235,6 +252,6 @@ The detailed technical inventory can remain internal/advanced by default.
 
 ## Next gate
 
-No further frontier review is required unless the final consistency/CI gate reveals a new contradiction. GPT-5.4, Sonnet and Gemini 3.1 have already independently challenged the inventory.
+No further broad Adobe frontier review is required unless the exact correction CI or a later real connector certification exposes a new contradiction. The provider inventory has now been challenged by the original GPT-5.4/Sonnet/Gemini passes and by the later independent Sonnet High + GPT-5.4 provider semantic audit.
 
-Next: final Lead review of the corrected matrices, CI on the exact correction HEAD, then either freeze the Adobe inventory for platform-representation mapping or record a concrete remaining blocker.
+Next: deterministic generation/validation and CI on the exact semantic-correction HEAD. If green with no new substantive review finding, record **ADOBE PROVIDER REVIEW FREEZE** and move the same independent provider-review process to Google Merchant. Runtime Magento cluster certification remains a later implementation gate.
