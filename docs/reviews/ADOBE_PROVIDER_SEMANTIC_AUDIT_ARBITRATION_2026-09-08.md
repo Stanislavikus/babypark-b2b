@@ -1,6 +1,6 @@
 # Adobe Provider Semantic Audit — Arbitration Ledger
 
-Status: **CORRECTION PASS IMPLEMENTED — LOCAL VALIDATION GREEN — CI PENDING**
+Status: **CORRECTION PASS IMPLEMENTED — VALIDATION GREEN; MERGE GATE EXTERNAL**
 
 Authoritative review base: `develop @ abd65e5988f6b115f835a92c3cc3a430957e988f`
 
@@ -217,19 +217,24 @@ Explicitly **not accepted**:
 
 No Opus/Gemini arbitration is required at this point. The apparent Sonnet/GPT disagreements are resolvable from the authoritative repository decisions and current Adobe primary evidence.
 
-Implementation/local-validation state:
+Implementation/validation state:
 
 - correction branch: `fix/adobe-provider-semantic-corrections` from exact base `abd65e5988f6b115f835a92c3cc3a430957e988f`;
+- semantic correction commit: `e24d00f3db05a7eee4e0ee9022d2e52f974752c1`;
 - corrected denominator: 184 master + 189 structured + 51 aliases = **424 physical rows**, 360 concepts;
 - all top-level `connector_context` rows now fail closed to Connector-owned `CHANNEL_SEMANTIC`;
 - deterministic regenerate is byte-identical after regeneration/validation;
 - targeted Adobe semantic tests: **26 tests / 824 assertions PASS**;
 - full `tests/Unit/CanonicalCoverage`: **81 tests / 29,212 assertions PASS**;
-- Pint PASS; `git diff --check` PASS.
+- local Pint PASS; local `git diff --check` PASS;
+- authoritative MySQL workflow **#418**, run `34250138573`, completed **SUCCESS** on exact semantic correction head `e24d00f3db05a7eee4e0ee9022d2e52f974752c1`; its Full MySQL suite, Pint, and Git diff check all passed.
+
+This ledger/status update is provenance-only. It does not change Adobe semantic artifacts or runtime behavior. The final PR head must still satisfy repository-required CI before merge; the durable semantic evidence above does not depend on a self-referential final-commit CI number.
 
 Next gate:
 
-1. Final diff/provenance audit and commit/push the correction branch.
-2. Open PR and require authoritative MySQL CI on the exact correction HEAD.
-3. Lead-verify final artifacts/review threads; declare `ADOBE PROVIDER REVIEW FREEZE` only after green CI.
-4. Then move to Google Merchant with a fresh independent Sonnet/GPT pair.
+1. Require repository CI to be green on the final PR head.
+2. Recheck review threads and mergeability.
+3. Squash-merge PR #203 with exact-head SHA gating.
+4. Verify authoritative `develop` points to the squash commit and declare `ADOBE PROVIDER REVIEW FREEZE`.
+5. Then move to Google Merchant with a fresh independent Sonnet/GPT pair.
