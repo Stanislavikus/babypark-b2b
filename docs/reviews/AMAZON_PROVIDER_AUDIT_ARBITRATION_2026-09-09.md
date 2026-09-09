@@ -1,6 +1,6 @@
 # Amazon Provider Audit Arbitration — 2026-09-09
 
-Status: LEAD ARBITRATION IN PROGRESS — GPT-5.4 OVERLAY RECORDED, SONNET HIGH PENDING
+Status: CORRECTION CONTRACT FROZEN — IMPLEMENTATION LOCAL GATES GREEN, PR PENDING
 
 Authoritative review base: `develop @ b4458f2293f16b15894f6edbaa3653f777a53685`.
 
@@ -191,3 +191,29 @@ Accepted implementation scope:
 7. Preserve 0 Amazon option mappings; condition/age/gender value vocabularies remain unproven for automatic value mapping.
 
 No Gemini/Opus arbitration is required: all model disagreements are resolved by Amazon primary evidence plus frozen repository contracts. Next step is a clean correction branch from `develop @ b4458f2293f16b15894f6edbaa3653f777a53685`, deterministic regenerate, targeted regressions, full CanonicalCoverage/mapping suites, then PR/CI.
+
+## FINAL SUPERSEDING LEAD ARBITRATION — 2026-09-09
+
+This section supersedes any earlier provisional weight verdict in this file.
+
+After the Sonnet overlay and a final primary-evidence pass, the frozen correction contract is:
+
+1. `condition_type` remains a reusable condition semantic but its provider owner becomes `ProductVariantData`; `condition_note` remains separate listing/offer context.
+2. `net_weight -> item_weight` and `gross_weight -> item_package_weight` are both downgraded to `partially_verified`. Amazon distinguishes item/package measurements, but the frozen PTD evidence does not explicitly prove DEC-009's exact no-packaging vs immediate-consumer-packaging boundary. Fail closed until that boundary is directly evidenced.
+3. `purchasable_offer` remains deferred and unmapped, but its representation is made explicit as a structured multi-facet pricing envelope. `list_price -> recommended_retail_price` remains verified and leaves the OPEN pricing question.
+4. Automatic suggestions fail closed for registry applicability contexts more specific than `global` or `channel` until runtime has authoritative context to prove them. This blocks future Amazon `product_type` mappings from auto-suggesting solely on literal-key coincidence and does not alter existing global/channel provider automation.
+5. `package_quantity -> number_of_items` is downgraded to `partially_verified` and no longer treated as a rename. Amazon `number_of_items` is preserved as related branded-container/package-count evidence, not proven generic units-per-consumer-package equivalence.
+6. `product_highlights -> bullet_point` remains verified; the OPEN highlights question is narrowed to `special_feature`.
+7. `age_group -> age_range_description`, `gender -> target_gender`, and `condition -> condition_type` remain field-level mappings; Amazon option mappings remain zero until exact value vocabularies are frozen.
+
+No Gemini/Opus arbitration is required. The remaining work is implementation/regeneration/testing only.
+
+## Local correction verification
+
+- Amazon deterministic regenerate/check: 101 physical rows, 90 concepts, 14 OPEN disagreements, coverage/classification/concept-link = 1.0, silent drops = 0.
+- Canonical Registry validator: Errors 0; existing legacy warnings only.
+- `tests/Unit/CanonicalCoverage`: 98 tests / 35,241 assertions PASS.
+- `FieldMappingSuggestionReadModelTest`: 30 tests / 90 assertions PASS, including the Amazon product-type applicability fail-closed regression.
+- Pint: 1,319 files PASS.
+- `git diff --check`: PASS.
+- Amazon physical source inventories and `canonical_vocabulary_source_manifest.csv`: unchanged from authoritative base.

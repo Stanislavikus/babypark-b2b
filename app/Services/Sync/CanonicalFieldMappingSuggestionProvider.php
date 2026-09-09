@@ -106,10 +106,26 @@ final class CanonicalFieldMappingSuggestionProvider
      */
     private function verifiedMappingsForChannel(string $connectorDefinitionCode): array
     {
+        $applicabilityById = [];
+        foreach ($this->registryReader->applicability() as $row) {
+            $applicabilityById[$row['applicability_id']] = $row;
+        }
+
         return array_values(array_filter(
             $this->registryReader->mappings(),
-            fn (array $row): bool => $row['channel'] === $connectorDefinitionCode
-                && $row['verification_status'] === 'verified',
+            function (array $row) use ($connectorDefinitionCode, $applicabilityById): bool {
+                if ($row['channel'] !== $connectorDefinitionCode
+                    || $row['verification_status'] !== 'verified') {
+                    return false;
+                }
+
+                $applicability = $applicabilityById[$row['applicability_id']] ?? null;
+                if ($applicability === null) {
+                    return false;
+                }
+
+                return in_array($applicability['context_type'], ['global', 'channel'], true);
+            },
         ));
     }
 

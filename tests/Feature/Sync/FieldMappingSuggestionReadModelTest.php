@@ -132,6 +132,24 @@ class FieldMappingSuggestionReadModelTest extends TestCase
     }
 
     #[Test]
+    public function product_type_scoped_amazon_mapping_fails_closed_without_context_authority(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $nameBinding = $this->productBinding('name');
+        $provider = app(CanonicalFieldMappingSuggestionProvider::class);
+
+        $suggestions = $provider->suggest(
+            $workspace->id,
+            'amazon',
+            ['item_name' => true],
+            [],
+            [],
+        );
+
+        $this->assertArrayNotHasKey($nameBinding->id, $suggestions);
+    }
+
+    #[Test]
     public function bigcommerce_product_dimension_mapping_uses_product_surface_and_old_variant_surface_is_not_suggested(): void
     {
         $workspace = $this->defaultWorkspace();
@@ -1011,6 +1029,27 @@ class FieldMappingSuggestionReadModelTest extends TestCase
         return [
             'canonical_product_fields.csv' => $fields,
             'canonical_product_field_mappings.csv' => $mappings,
+            'canonical_product_field_applicability.csv' => [[
+                'applicability_id' => 'a001',
+                'internal_code' => $mappings[0]['internal_code'] ?? 'name',
+                'context_type' => 'channel',
+                'context_key' => ($mappings[0]['channel'] ?? 'adobe_commerce').':test',
+                'channel_or_state' => $mappings[0]['channel'] ?? 'adobe_commerce',
+                'market_or_state' => 'not_applicable',
+                'country_or_state' => 'not_applicable',
+                'product_type_or_state' => 'not_applicable',
+                'category_taxonomy_or_state' => 'not_applicable',
+                'category_code_or_state' => 'not_applicable',
+                'entity_level' => 'product',
+                'parentage_level' => 'not_applicable',
+                'operation' => 'sync',
+                'requirement_level' => 'required',
+                'effective_from' => 'undecided',
+                'effective_to' => 'open_ended',
+                'schema_version' => $mappings[0]['channel_schema_version'] ?? 'unversioned',
+                'verification_status' => 'verified',
+                'evidence_subject_key' => 'applicability:a001',
+            ]],
         ];
     }
 
