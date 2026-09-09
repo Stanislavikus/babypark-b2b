@@ -153,7 +153,8 @@ class BigCommerceCoverageTest extends TestCase
         $coverage = $this->coverageByObjectAndKey($root);
 
         $this->assertSame('DEFERRED_REVIEW', $coverage['product:tax_class_id']['review_status']);
-        $this->assertSame('UnresolvedTaxOwner', $coverage['product:tax_class_id']['owner_candidate']);
+        $this->assertSame('Connector', $coverage['product:tax_class_id']['owner_candidate']);
+        $this->assertSame('account_tax_class_reference', $coverage['product:tax_class_id']['representation_candidate']);
         $this->assertStringContainsString('queue:bigcommerce_tax_owner', $coverage['product:tax_class_id']['decision_reference']);
 
         $questions = $this->readCsv("$root/".BigCommerceCoverage::DISAGREEMENTS);
@@ -193,6 +194,26 @@ class BigCommerceCoverageTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('invalid disagreement concept');
         (new BigCommerceCoverage)->validate($root);
+    }
+
+    #[Test]
+    public function semantic_review_corrections_are_preserved(): void
+    {
+        $root = dirname(__DIR__, 3);
+        $coverage = $this->coverageByObjectAndKey($root);
+        $concepts = array_column($this->readCsv("$root/".BigCommerceCoverage::CONCEPTS), null, 'concept_key');
+        $questions = array_column($this->readCsv("$root/".BigCommerceCoverage::DISAGREEMENTS), null, 'question_key');
+
+        $this->assertSame(['Connector', 'account_tax_class_reference'], $this->ownerPair($coverage['product:tax_class_id']));
+        $this->assertSame(['Connector', 'third_party_tax_code_passthrough'], $this->ownerPair($coverage['product:product_tax_code']));
+        $this->assertSame(['ProductData', 'relative_storefront_path_object'], $this->ownerPair($coverage['product:custom_url']));
+        $this->assertSame('PROVIDER_VERIFIED', $concepts['bigcommerce:retail_price']['review_status']);
+        $this->assertArrayNotHasKey('bigcommerce_reference_price', $questions);
+        $this->assertCount(7, $questions);
+        $this->assertStringContainsString('not affected by Price Lists', $coverage['product_variant:cost_price']['review_note']);
+        $this->assertStringContainsString('no Product fallback', $coverage['product_variant:inventory_level']['review_note']);
+        $this->assertStringContainsString('Product-level', $questions['bigcommerce_order_constraints']['question']);
+        $this->assertStringContainsString('base-URL', $questions['bigcommerce_url_family']['notes']);
     }
 
     #[Test]

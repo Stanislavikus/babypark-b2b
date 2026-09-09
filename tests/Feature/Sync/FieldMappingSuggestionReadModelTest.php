@@ -132,6 +132,57 @@ class FieldMappingSuggestionReadModelTest extends TestCase
     }
 
     #[Test]
+    public function bigcommerce_product_dimension_mapping_uses_product_surface_and_old_variant_surface_is_not_suggested(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $definition = FieldDefinition::withoutWorkspaceScope()->create([
+            'workspace_id' => null,
+            'code' => 'depth_mm',
+            'data_type' => AttributeDataType::Number,
+            'scope' => AttributeScope::System,
+            'localized_labels' => ['uk' => 'Глибина'],
+            'description' => null,
+            'validation_rules' => null,
+            'is_localizable' => false,
+            'is_multi_value' => false,
+            'status' => AttributeStatus::Active,
+        ]);
+        $depthBinding = FieldBinding::withoutWorkspaceScope()->create([
+            'workspace_id' => null,
+            'field_definition_id' => $definition->id,
+            'object_type' => FieldObjectType::Product,
+            'storage_type' => AttributeStorageType::Column,
+            'storage_path' => 'products.depth_mm',
+            'field_group' => 'logistics',
+            'is_required' => false,
+            'is_filterable' => false,
+            'is_sortable' => false,
+            'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+            'sort_order' => 999,
+            'status' => AttributeStatus::Active,
+        ]);
+        $provider = app(CanonicalFieldMappingSuggestionProvider::class);
+
+        $productSurface = $provider->suggest(
+            $workspace->id,
+            'bigcommerce',
+            ['Product.depth' => true],
+            [],
+            [],
+        );
+        $this->assertSame('Product.depth', $productSurface[$depthBinding->id] ?? null);
+
+        $oldVariantSurface = $provider->suggest(
+            $workspace->id,
+            'bigcommerce',
+            ['ProductVariant.depth' => true],
+            [],
+            [],
+        );
+        $this->assertArrayNotHasKey($depthBinding->id, $oldVariantSurface);
+    }
+
+    #[Test]
     public function projection_tolerates_discovered_field_without_external_label(): void
     {
         $account = $this->createSyncSupportAccount();
