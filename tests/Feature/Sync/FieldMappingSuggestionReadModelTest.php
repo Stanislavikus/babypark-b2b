@@ -150,6 +150,53 @@ class FieldMappingSuggestionReadModelTest extends TestCase
     }
 
     #[Test]
+    public function shopify_mapping_with_google_channel_applicability_cannot_produce_a_suggestion(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $nameBinding = $this->productBinding('name');
+        $mapping = $this->mappingRow('name', 'shopify', 'title');
+        $registry = $this->minimalRegistryWithMapping(
+            [$this->fieldRow('name', 'yes', 'product', 'system')],
+            [$mapping],
+        );
+        $registry['canonical_product_field_applicability.csv'][0]['context_key'] = 'google:all_products';
+        $registry['canonical_product_field_applicability.csv'][0]['channel_or_state'] = 'google_merchant';
+        $this->bindCustomRegistry($registry);
+
+        $suggestions = app(CanonicalFieldMappingSuggestionProvider::class)->suggest(
+            $workspace->id,
+            'shopify',
+            ['title' => true],
+            [],
+            [],
+        );
+
+        $this->assertArrayNotHasKey($nameBinding->id, $suggestions);
+    }
+
+    #[Test]
+    public function unsafe_shopify_semantic_rows_cannot_produce_high_confidence_suggestions(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $suggestions = app(CanonicalFieldMappingSuggestionProvider::class)->suggest(
+            $workspace->id,
+            'shopify',
+            [
+                'vendor' => true,
+                'Product.status' => true,
+                'variants.barcode' => true,
+                'ProductVariant.barcode' => true,
+                'InventoryItem.measurement.weight' => true,
+                'InventoryItem.countryCodeOfOrigin' => true,
+            ],
+            [],
+            [],
+        );
+
+        $this->assertSame([], $suggestions);
+    }
+
+    #[Test]
     public function bigcommerce_product_dimension_mapping_uses_product_surface_and_old_variant_surface_is_not_suggested(): void
     {
         $workspace = $this->defaultWorkspace();

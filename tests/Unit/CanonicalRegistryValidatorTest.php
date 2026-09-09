@@ -132,6 +132,30 @@ class CanonicalRegistryValidatorTest extends TestCase
     }
 
     #[Test]
+    public function shopify_mapping_cannot_reference_google_channel_applicability(): void
+    {
+        $this->writeValidFixture(
+            extraApplicabilityRows: [
+                $this->applicabilityRow('a099', 'gtin', [
+                    'context_type' => 'channel',
+                    'context_key' => 'google:all_products',
+                    'channel_or_state' => 'google_merchant',
+                ]),
+            ],
+            extraMappingRows: [
+                $this->mappingRow('gtin', 'shopify', 'variants.barcode', 'a099'),
+            ],
+        );
+
+        $result = $this->validateFixture();
+
+        $this->assertTrue(collect($result['errors'])->contains(
+            fn (string $error): bool => str_contains($error, 'mappings: channel applicability mismatch')
+                && str_contains($error, "mapping channel 'shopify' != applicability channel 'google_merchant'"),
+        ));
+    }
+
+    #[Test]
     public function option_mapping_on_nonexistent_option_fails(): void
     {
         $this->writeValidFixture(extraOptionMappingRows: [
@@ -591,9 +615,10 @@ class CanonicalRegistryValidatorTest extends TestCase
         ];
     }
 
-    private function applicabilityRow(string $id, string $code): array
+    /** @param array<string, string> $overrides */
+    private function applicabilityRow(string $id, string $code, array $overrides = []): array
     {
-        return [
+        return array_merge([
             'applicability_id' => $id,
             'internal_code' => $code,
             'context_type' => 'global',
@@ -613,7 +638,7 @@ class CanonicalRegistryValidatorTest extends TestCase
             'schema_version' => 'not_applicable',
             'verification_status' => 'verified',
             'evidence_subject_key' => 'applicability:'.$id,
-        ];
+        ], $overrides);
     }
 
     /** @return list<string> */

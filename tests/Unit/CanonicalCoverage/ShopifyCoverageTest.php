@@ -148,6 +148,17 @@ class ShopifyCoverageTest extends TestCase
         $this->assertSame('DEFER_DECISION', $subtitle['disposition']);
         $this->assertSame('FieldDefinitionOrContent', $subtitle['owner_candidate']);
         $this->assertStringContainsString('queue:shopify_short_title_ownership', $subtitle['decision_reference']);
+
+        $structured = array_filter(
+            $this->coverage(),
+            fn (array $row): bool => $row['source_file'] === ShopifyCoverage::STRUCTURED
+                && str_contains($row['decision_reference'], 'queue:shopify_unit_pricing_ownership'),
+        );
+        $this->assertNotEmpty($structured);
+        foreach ($structured as $row) {
+            $this->assertSame('STRUCTURE_MEMBER', $row['disposition']);
+            $this->assertSame('PricingOrCompliance', $row['owner_candidate']);
+        }
     }
 
     #[Test]

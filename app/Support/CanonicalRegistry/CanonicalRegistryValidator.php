@@ -374,6 +374,13 @@ class CanonicalRegistryValidator
 
             $this->checkApplicabilityFk('mappings', $row['applicability_id'], $row['internal_code'], $applicabilityById);
 
+            $applicability = $applicabilityById[$row['applicability_id']] ?? null;
+            if ($applicability !== null
+                && $applicability['context_type'] === 'channel'
+                && $applicability['channel_or_state'] !== $row['channel']) {
+                $this->errors[] = "mappings: channel applicability mismatch for '{$row['evidence_subject_key']}' — mapping channel '{$row['channel']}' != applicability channel '{$applicability['channel_or_state']}'";
+            }
+
             $expectedKey = sprintf(
                 'mapping:%s:%s:%s:%s:%s',
                 $row['channel'],
