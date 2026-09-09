@@ -62,7 +62,9 @@ class GoogleMerchantCoverageTest extends TestCase
         foreach (['customLabel0', 'customLabel1', 'customLabel2', 'customLabel3', 'customLabel4', 'includedDestinations', 'excludedDestinations'] as $key) {
             $this->assertSame('CHANNEL_SEMANTIC', $r[$key]['disposition']);
         }
-        $this->assertSame('google_taxonomy_context', $r['googleProductCategory']['representation_candidate']);
+        $this->assertSame('google_controlled_taxonomy_context', $r['googleProductCategory']['representation_candidate']);
+        $this->assertSame('merchant_defined_category_path_text', $r['productTypes']['representation_candidate']);
+        $this->assertNotSame($r['googleProductCategory']['representation_candidate'], $r['productTypes']['representation_candidate']);
         $this->assertSame('Pricing', $r['price']['owner_candidate']);
         $this->assertNotSame($r['price']['concept_key'], $r['salePrice']['concept_key']);
         $this->assertSame('Media', $r['imageLink']['owner_candidate']);
@@ -83,6 +85,8 @@ class GoogleMerchantCoverageTest extends TestCase
         }
         $this->assertSame('Pricing', $r['productFee']['owner_candidate']);
         $this->assertStringContainsString('vertical=property', $r['productFee']['source_context_key']);
+        $this->assertSame('vertical_scoped_availability_quantity', $r['numberOfUnits']['representation_candidate']);
+        $this->assertStringContainsString('semantic_nature=property_availability_quantity', $r['numberOfUnits']['source_context_key']);
         foreach (['co2Emissions', 'emissionsStandard', 'energyConsumption', 'vehicleMandatoryInspectionIncluded', 'warranty'] as $key) {
             $this->assertSame('DEFER_DECISION', $r[$key]['disposition']);
             $this->assertSame('Compliance', $r[$key]['owner_candidate']);
@@ -122,6 +126,19 @@ class GoogleMerchantCoverageTest extends TestCase
         $this->assertSame('FieldDefinitionOrContent', $r['shortTitle']['owner_candidate']);
         $this->assertSame('DEFERRED_REVIEW', $r['shortTitle']['review_status']);
         $this->assertStringContainsString('queue:google_short_title_ownership', $r['shortTitle']['decision_reference']);
+        foreach (['structuredTitle', 'structuredDescription'] as $key) {
+            $this->assertSame('DEFER_DECISION', $r[$key]['disposition']);
+            $this->assertSame('FieldDefinitionOrContent', $r[$key]['owner_candidate']);
+            $this->assertSame('structured_content_with_digital_source_provenance', $r[$key]['representation_candidate']);
+            $this->assertSame('DEFERRED_REVIEW', $r[$key]['review_status']);
+            $this->assertStringContainsString('queue:google_structured_content_provenance', $r[$key]['decision_reference']);
+        }
+        $this->assertSame('PROVIDER_VERIFIED', $r['link']['review_status']);
+        $this->assertSame('not_applicable', $r['link']['decision_reference']);
+        foreach (['canonicalLink', 'mobileLink'] as $key) {
+            $this->assertSame('DEFERRED_REVIEW', $r[$key]['review_status']);
+            $this->assertStringContainsString('queue:google_landing_url', $r[$key]['decision_reference']);
+        }
         $this->assertSame('google_publication_quantity_control', $r['sellOnGoogleQuantity']['representation_candidate']);
         $this->assertSame('sustainability_incentive_program_candidate', $r['sustainabilityIncentives']['representation_candidate']);
     }

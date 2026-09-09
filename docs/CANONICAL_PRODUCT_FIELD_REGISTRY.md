@@ -214,7 +214,7 @@ Confirmed by Google Merchant Center and schema.org `Product.mpn` as a real manuf
 
 ## identifier_exists — full formulation
 
-Google: `identifier_exists = false` only when identifiers **truly do not exist** (not assigned by manufacturer) — **not** for empty unfilled fields.
+Google `identifier_exists` is a positive-polarity existence flag: `true` means appropriate unique identifiers exist; `false` is allowed only when identifiers **truly do not exist** (not assigned by manufacturer) — **not** for empty unfilled fields.
 
 - `implementation_kind: connector_only`
 - `field_definition_eligibility: no`
@@ -529,6 +529,12 @@ or `shipping_weight`. Connector mappings remain deferred until the target
 channel semantics, packaging level and measurement unit contract are
 verified.
 
+Google Merchant `productWeight` and `shippingWeight` are therefore retained as
+related, partially verified channel representations only. Google documents
+product weight and shipping-calculation weight, but does not prove the strict
+packaging exclusion/inclusion boundaries required by canonical `net_weight`
+and `gross_weight`.
+
 The old codes `weight_netto` and `weight_brutto` remain only as verified
 `legacy_code` import aliases.
 
@@ -652,7 +658,7 @@ connector-account-specific external references, not global Registry data.
 - **canonical code selected:** `identifier_exists` as `connector_only`
 - **why selected:** prevents polluting FieldDefinition; avoids dangerous empty-field inference
 - **rejected alternatives:** system boolean field; auto-false on blank GTIN/MPN
-- **mapping/transformation consequence:** mapping `google_merchant:identifier_exists` with transformation `true_only_when_identifiers_genuinely_absent`
+- **mapping/transformation consequence:** mapping `google_merchant:identifier_exists` with transformation `false_only_when_identifiers_genuinely_absent`
 - `evidence_subject_key: decision:DEC-002`
 
 ### DEC-003 — pricing domain boundary

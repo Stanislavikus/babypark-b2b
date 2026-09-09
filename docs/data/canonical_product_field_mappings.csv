@@ -15,7 +15,7 @@ price,google_merchant,price,transformed,price_with_currency_from_pricing_domain,
 price,schema_org,offers.price,transformed,nested_offer_price,a007,recommended,unversioned,verified,mapping:schema_org:price:offers.price:a007:unversioned
 availability,google_merchant,availability,transformed,stock_status_to_google_enum,a008,required,unversioned,verified,mapping:google_merchant:availability:availability:a008:unversioned
 condition,google_merchant,condition,direct,not_applicable,a006,required,unversioned,verified,mapping:google_merchant:condition:condition:a006:unversioned
-identifier_exists,google_merchant,identifier_exists,connector_only,true_only_when_identifiers_genuinely_absent,a009,conditionally_required,unversioned,partially_verified,mapping:google_merchant:identifier_exists:identifier_exists:a009:unversioned
+identifier_exists,google_merchant,identifier_exists,connector_only,false_only_when_identifiers_genuinely_absent,a009,conditionally_required,unversioned,partially_verified,mapping:google_merchant:identifier_exists:identifier_exists:a009:unversioned
 image,google_merchant,image_link,transformed,primary_image_url,a010,recommended,unversioned,verified,mapping:google_merchant:image:image_link:a010:unversioned
 image,schema_org,image,direct,not_applicable,a017,recommended,unversioned,verified,mapping:schema_org:image:image:a017:unversioned
 url,schema_org,url,transformed,absolute_storefront_url,a018,recommended,unversioned,verified,mapping:schema_org:url:url:a018:unversioned
@@ -53,13 +53,13 @@ size,google_merchant,size,direct,not_applicable,a052,conditionally_required,prod
 material,google_merchant,material,direct,not_applicable,a053,conditionally_required,products_v1-2026-09-07,verified,mapping:google_merchant:material:material:a053:products_v1-2026-09-07
 pattern,google_merchant,pattern,direct,not_applicable,a054,conditionally_required,products_v1-2026-09-07,verified,mapping:google_merchant:pattern:pattern:a054:products_v1-2026-09-07
 product_highlights,google_merchant,productHighlights,direct,not_applicable,a055,optional,products_v1-2026-09-07,verified,mapping:google_merchant:product_highlights:productHighlights:a055:products_v1-2026-09-07
-net_weight,google_merchant,productWeight,transformed,canonical_weight_to_google_product_weight,a056,optional,products_v1-2026-09-07,verified,mapping:google_merchant:net_weight:productWeight:a056:products_v1-2026-09-07
-gross_weight,google_merchant,shippingWeight,transformed,canonical_weight_to_google_shipping_weight,a057,optional,products_v1-2026-09-07,verified,mapping:google_merchant:gross_weight:shippingWeight:a057:products_v1-2026-09-07
+net_weight,google_merchant,productWeight,transformed,canonical_weight_to_google_product_weight,a056,optional,products_v1-2026-09-07,partially_verified,mapping:google_merchant:net_weight:productWeight:a056:products_v1-2026-09-07
+gross_weight,google_merchant,shippingWeight,transformed,canonical_weight_to_google_shipping_weight,a057,optional,products_v1-2026-09-07,partially_verified,mapping:google_merchant:gross_weight:shippingWeight:a057:products_v1-2026-09-07
 depth_mm,google_merchant,productLength,transformed,millimeters_to_google_product_dimension,a058,optional,products_v1-2026-09-07,verified,mapping:google_merchant:depth_mm:productLength:a058:products_v1-2026-09-07
 width_mm,google_merchant,productWidth,transformed,millimeters_to_google_product_dimension,a059,optional,products_v1-2026-09-07,verified,mapping:google_merchant:width_mm:productWidth:a059:products_v1-2026-09-07
 height_mm,google_merchant,productHeight,transformed,millimeters_to_google_product_dimension,a060,optional,products_v1-2026-09-07,verified,mapping:google_merchant:height_mm:productHeight:a060:products_v1-2026-09-07
 url,google_merchant,link,transformed,absolute_product_landing_page_url,a061,required,products_v1-2026-09-07,verified,mapping:google_merchant:url:link:a061:products_v1-2026-09-07
-sku,google_merchant,ProductInput.offerId,renamed,variant_sku_as_offer_id,a062,required,products_v1-2026-09-07,verified,mapping:google_merchant:sku:ProductInput.offerId:a062:products_v1-2026-09-07
+sku,google_merchant,offerId,renamed,variant_sku_as_offer_id,a062,required,products_v1-2026-09-07,verified,mapping:google_merchant:sku:offerId:a062:products_v1-2026-09-07
 name,shopify,Product.title,direct,not_applicable,a063,required,2026-07-admin-graphql,verified,mapping:shopify:name:Product.title:a063:2026-07-admin-graphql
 description,shopify,Product.descriptionHtml,transformed,html_content,a064,optional,2026-07-admin-graphql,verified,mapping:shopify:description:Product.descriptionHtml:a064:2026-07-admin-graphql
 status,shopify,Product.status,transformed,platform_lifecycle_to_shopify_status,a065,optional,2026-07-admin-graphql,verified,mapping:shopify:status:Product.status:a065:2026-07-admin-graphql
