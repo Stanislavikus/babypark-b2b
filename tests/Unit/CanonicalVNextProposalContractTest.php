@@ -24,8 +24,8 @@ class CanonicalVNextProposalContractTest extends TestCase
         ));
 
         $this->assertCount(65, $currentRows);
-        $this->assertCount(31, $missingRows);
-        $this->assertCount(96, $proposal);
+        $this->assertCount(34, $missingRows);
+        $this->assertCount(99, $proposal);
 
         $currentCodes = array_column($current, 'internal_code');
         $proposalCurrentCodes = array_column($currentRows, 'concept_key');
@@ -53,6 +53,9 @@ class CanonicalVNextProposalContractTest extends TestCase
 
         $this->assertSame('ADD_PLATFORM_LIBRARY', $rows['slug']['lead_decision']);
         $this->assertSame('ADD_PLATFORM_LIBRARY_BINDING_REVIEW', $rows['size_system']['lead_decision']);
+        $this->assertSame('ADD_PLATFORM_LIBRARY_BINDING_REVIEW', $rows['shape']['lead_decision']);
+        $this->assertSame('ADD_PLATFORM_LIBRARY_MODEL_REVIEW', $rows['ingredients']['lead_decision']);
+        $this->assertSame('ADD_DOMAIN_CANONICAL_MODEL_REVIEW', $rows['dangerous_goods_classification']['lead_decision']);
 
         foreach (['shipping_weight', 'shipping_dimensions', 'harmonized_system_code', 'unit_pricing_measure'] as $concept) {
             $this->assertSame('ADD_DOMAIN_CANONICAL', $rows[$concept]['lead_decision'], $concept);
@@ -70,6 +73,23 @@ class CanonicalVNextProposalContractTest extends TestCase
         $this->assertSame('BINDING_ARBITRATION_BEFORE_SEED', $rows['material']['materialization_gate']);
         $this->assertSame('ACCEPT_CONCEPT_DEFER_OWNER', $rows['max_order_quantity']['lead_decision']);
         $this->assertSame('OWNER_AND_SCOPE_DECISION', $rows['max_order_quantity']['materialization_gate']);
+    }
+
+    #[Test]
+    public function adversarial_review_corrections_remain_explicit(): void
+    {
+        $rows = $this->proposalByConcept();
+
+        foreach (['shipping_weight', 'shipping_dimensions'] as $concept) {
+            $this->assertStringContainsString('BigCommerce', $rows[$concept]['evidence_summary']);
+            $this->assertStringContainsString('not', $rows[$concept]['evidence_summary']);
+        }
+
+        $this->assertStringContainsString('DEC-010', $rows['manufacturer']['evidence_summary']);
+        $this->assertStringContainsString('InventoryItem', $rows['country_of_origin']['evidence_summary']);
+        $this->assertSame('DEFER_SHAPE_FORM_BOUNDARY', $rows['product_form']['lead_decision']);
+        $this->assertSame('DEFER_STRUCTURED_LIFETIME_MODEL', $rows['shelf_life']['lead_decision']);
+        $this->assertSame('SECOND_EXACT_SOURCE_AND_LIFETIME_MODEL', $rows['shelf_life']['materialization_gate']);
     }
 
     #[Test]
