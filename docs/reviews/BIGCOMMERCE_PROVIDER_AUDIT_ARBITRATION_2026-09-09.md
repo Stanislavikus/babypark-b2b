@@ -103,23 +103,22 @@ Lead verdict: **REJECT AS A NEW DEFECT; PRESERVE THE EXISTING DEFERRED CANDIDATE
 
 `cross_platform_product_field_synthesis.csv` already contains `max_order_quantity` as `missing_or_candidate` with `DEFER_NEW_DOMAIN_DECISION`. The rationale explicitly says BigCommerce + Amazon prove a strong candidate but adding it would introduce a new unresolved business constraint; it must be decided together with `min_order_quantity` / `order_step`. This is intentional deferral, not a silent omission.
 
-## Lead neighbor-pattern finding — missing BigCommerce condition mapping/value evidence
+## Lead neighbor-pattern check — BigCommerce `condition` mapping/value opportunity
 
-Lead verdict: **ACCEPT — MATERIAL SAFE-AUTOMATION GAP**.
+Lead verdict after deeper binding check: **DO NOT ADD MAPPING IN THIS CORRECTION PASS**.
 
-BigCommerce `Product.condition` is a writable provider-controlled field with exact allowed values `New`, `Used`, `Refurbished`. The canonical registry already has `condition` plus universal options `new`, `used`, `refurbished`, and cross-platform synthesis explicitly lists BigCommerce `condition` evidence. Yet there is no BigCommerce canonical field mapping and zero BigCommerce option mappings.
+BigCommerce `Product.condition` is a writable provider-controlled field with exact allowed values `New`, `Used`, `Refurbished`, and the canonical registry already has matching condition options. However canonical `condition` is `binding_strategy=product_variant` and currently `status=proposed`, while BigCommerce exposes condition at Product level. A direct field/option mapping would therefore assert a Product-to-Variant binding that is not proven safe for products whose variants could require distinct condition semantics.
 
-This is a high-confidence missing mapping opportunity rather than an ambiguous provider semantic. Correction candidate: add a versioned BigCommerce `condition -> Product.condition` mapping and explicit BigCommerce option mappings for `New`, `Used`, `Refurbished`, with provider evidence and deterministic tests. Runtime activation remains governed by the canonical field's own lifecycle/status.
+The absence of BigCommerce option mappings is conservative, not a current defect. Preserve the provider evidence and revisit only with an explicit Product-vs-Variant condition binding decision.
 
 ## Current Lead routing before GPT-5.4 overlay
 
 Accepted correction classes so far:
-1. Product/ProductVariant representation and binding evidence must be corrected; do not implement Sonnet's operation-specific fix verbatim.
+1. Product/ProductVariant representation and binding evidence must be corrected, but only where canonical binding and provider entity level actually conflict; do not implement Sonnet's operation-specific fix verbatim.
 2. BigCommerce weight mapping must be downgraded/deferred under DEC-009.
 3. Shared compatibility rules must distinguish documented fallback from independent co-existing values.
 4. Fix the `inheritanceContract()` negation heuristic.
 5. Refine tax and `custom_url` disagreement representations.
-6. Add the missing, directly evidenced BigCommerce `condition` field/value mapping family.
 Rejected / narrowed Sonnet claims:
 - no global rule that every mapping over a `DEFERRED_REVIEW` provider concept must be downgraded;
 - `recommended_retail_price -> retail_price` remains strongly evidenced by BigCommerce's current MSRP definition;
@@ -128,3 +127,69 @@ Rejected / narrowed Sonnet claims:
 - `max_order_quantity` is already an explicit deferred cross-platform candidate, not a newly discovered omission.
 
 No external arbitration model is required yet. Wait for the independent GPT-5.4 evidence/mapping audit, then overlay it here. Escalate only a surviving concrete dispute that primary evidence and frozen project decisions cannot resolve.
+
+## GPT-5.4 independent evidence/mapping audit
+
+GPT-5.4 reported `BIGCOMMERCE COVERAGE/CANONICALIZATION HAS MATERIAL GAPS` after checking 136/136 physical rows, 119/119 concepts, all 18 mappings, and the major shared Product/Variant families. Its final report proves the BigCommerce provider slice is complete and internally reproducible, but it contains one internal inconsistency: the intermediate issue-validation JSON rejects `recommended_retail_price -> retail_price` as a false positive, while the final prose later re-promotes the same family to a Major verified-vs-OPEN contradiction. Lead resolves that inconsistency from primary BigCommerce evidence rather than report ordering.
+
+### G1 — `net_weight -> ProductVariant.weight`
+
+Lead verdict: **ACCEPT — MATERIAL**.
+
+GPT independently confirms Sonnet S4: BigCommerce weight is shipping/store weight, not proven DEC-009 net weight. The mapping must not remain `verified` as canonical `net_weight`.
+
+### G2 — `recommended_retail_price -> ProductVariant.retail_price`
+
+Lead verdict: **REJECT DOWNGRADE; RESOLVE/NARROW THE OPEN PROVIDER QUESTION**.
+
+Current BigCommerce migration documentation defines `retail_price` as the manufacturer suggested retail price, and current storefront pricing documentation describes MSRP/RRP as list/manufacturer suggested retail price. That is direct evidence for canonical `recommended_retail_price`. The mapping can remain verified. The stale/open `bigcommerce_reference_price` question should be closed or narrowed so the provider concept no longer appears simultaneously semantically unresolved and directly evidenced as MSRP.
+### G3 — `min_order_quantity -> Product.order_quantity_minimum`
+
+Lead verdict: **REJECT DEFECT**.
+
+GPT agrees with Lead: the exact provider field is Product-level and its meaning directly matches the canonical minimum purchasable quantity. Keep the verified mapping. Reframe `bigcommerce_order_constraints` as the still-open broader family/domain decision rather than evidence against this mapping.
+
+### G4/G5 — `price` and `sku` variant mappings
+
+Lead verdict: **REJECT AS MAPPING DEFECTS IN THEIR CURRENT NARROW SCOPE**.
+
+Canonical `price` and `sku` are variant-bound (pricing-domain / ProductVariant respectively), and the BigCommerce mappings target the matching Variant surface. Product-level BigCommerce defaults/co-existing values are real provider representations, but their existence does not invalidate the narrower variant correspondence. Product-level create requirements belong to connector execution/planning, not to a direction-neutral FieldMapping row.
+
+### G6 — fallback/null semantics missing from transform names
+
+Lead verdict: **REJECT AS STATED; ACCEPT PROVIDER-METADATA HARDENING**.
+
+GPT correctly notes that transformations do not encode inheritance/null/Price List precedence, but the registry does not define mapping transformations as a complete execution planner. Keep row-local fallback evidence in provider metadata and harden compatibility classification; do not require transformation names to encode every execution rule.
+
+## Lead deeper cross-file binding audit
+
+Comparing every BigCommerce mapping to canonical `binding_strategy`, applicability `entity_level`, and external object prefix found exactly four structural mismatches:
+- `net_weight` (`binding_strategy=product`) -> `ProductVariant.weight`;
+- `depth_mm` (`product`) -> `ProductVariant.depth`;
+- `width_mm` (`product`) -> `ProductVariant.width`;
+- `height_mm` (`product`) -> `ProductVariant.height`.
+BigCommerce current docs explicitly state ProductVariant width/height/depth/weight can inherit Product defaults. For the three dimensions, canonical ownership is Product-level and provider Product fields exist directly, so the current verified Variant mappings overstate entity binding and can misdirect the exact-key suggestion layer. Correction candidate: retarget `depth_mm/width_mm/height_mm` to `Product.depth/width/height`, preserving Variant overrides only as provider-local representation/fallback evidence.
+
+For weight, entity binding should likewise not remain a verified Variant mapping, but DEC-009 is the stronger blocker: preserve BigCommerce Product/Variant weight evidence and downgrade canonical correspondence until packaging semantics are proven. If a partially-verified mapping is retained, Product-level `Product.weight` is the canonical-binding-aligned representation.
+
+This finding narrows Sonnet S1 to the subset where canonical binding and external entity level actually conflict. The other shared mappings (`sku`, `gtin`, `mpn`, pricing fields) align with their canonical variant-level binding strategies.
+
+## Final Lead arbitration after Sonnet + GPT-5.4
+
+**BIGCOMMERCE CORRECTION PASS REQUIRED.** No Gemini/Opus arbitration is currently needed: the surviving disagreements are resolved by current BigCommerce documentation plus frozen project binding contracts.
+
+Accepted correction set:
+1. Downgrade/remove verified `net_weight -> ProductVariant.weight` under DEC-009; preserve Product/Variant weight as provider representations.
+2. Retarget product-bound canonical dimensions from `ProductVariant.depth/width/height` to `Product.depth/width/height`; keep Variant null/inheritance evidence provider-local.
+3. Refine shared compatibility metadata into documented nullable fallback vs co-existing independent values vs independent flags.
+4. Fix `inheritanceContract()` so negated `not affected by Price List prices` is not classified as positive fallback evidence.
+5. Resolve/narrow `bigcommerce_reference_price`: `retail_price` is directly evidenced as MSRP/RRP, so keep `recommended_retail_price` mapping verified.
+6. Reframe `bigcommerce_order_constraints` so it does not imply the proven `min_order_quantity` mapping is unresolved; keep `max_order_quantity` as the existing deferred family candidate.
+7. Refine tax owner and `custom_url` representation notes without adding premature canonical mappings.
+
+Explicit non-corrections:
+- keep `price`, `sale_price`, `cost_price`, `recommended_retail_price`, `sku`, `gtin`, `mpn` Variant mappings where canonical binding is variant-level;
+- do not add Product-level pricing mappings merely to satisfy Create Product execution requirements; that belongs to future BigCommerce connector planner/runtime certification;
+- do not add BigCommerce `condition` field/option mappings in this pass because canonical condition is variant-bound/proposed while BigCommerce condition is Product-level;
+- do not invent same-field retail/sale fallback when current provider docs literally reference Product `price`;
+- no global validator rule `DEFERRED_REVIEW provider concept => no verified canonical mapping`.
