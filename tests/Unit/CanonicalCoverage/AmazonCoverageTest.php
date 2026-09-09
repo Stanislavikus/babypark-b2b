@@ -67,7 +67,7 @@ class AmazonCoverageTest extends TestCase
         $note = $rows['condition_note'];
 
         $this->assertSame('REUSABLE_SEMANTIC', $type['disposition']);
-        $this->assertSame('ProductData', $type['owner_candidate']);
+        $this->assertSame('ProductVariantData', $type['owner_candidate']);
         $this->assertSame('product_condition_enum', $type['representation_candidate']);
         $this->assertSame('CHANNEL_SEMANTIC', $note['disposition']);
         $this->assertSame('ListingCondition', $note['owner_candidate']);

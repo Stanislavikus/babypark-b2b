@@ -958,6 +958,30 @@ class ManageSyncFieldMappingsPageTest extends TestCase
             ],
         ]);
 
+        $this->writeRegistryCsv($tempRegistryPath, 'canonical_product_field_applicability.csv', [
+            [
+                'applicability_id' => 'a001',
+                'internal_code' => 'name',
+                'context_type' => 'channel',
+                'context_key' => 'adobe_commerce:all_products',
+                'channel_or_state' => 'adobe_commerce',
+                'market_or_state' => 'not_applicable',
+                'country_or_state' => 'not_applicable',
+                'product_type_or_state' => 'not_applicable',
+                'category_taxonomy_or_state' => 'not_applicable',
+                'category_code_or_state' => 'not_applicable',
+                'entity_level' => 'product',
+                'parentage_level' => 'not_applicable',
+                'operation' => 'sync',
+                'requirement_level' => 'required',
+                'effective_from' => 'undecided',
+                'effective_to' => 'open_ended',
+                'schema_version' => '2.4.9-admin-rest',
+                'verification_status' => 'verified',
+                'evidence_subject_key' => 'applicability:a001',
+            ],
+        ]);
+
         $reader = new CanonicalRegistryReader($tempRegistryPath);
         $this->app->instance(CanonicalRegistryReader::class, $reader);
         $this->app->instance(

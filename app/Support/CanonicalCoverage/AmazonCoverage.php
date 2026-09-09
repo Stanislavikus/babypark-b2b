@@ -195,9 +195,9 @@ final class AmazonCoverage
 
         return match ($k) {
             'fulfillment_channel_availability' => ['DOMAIN_CAPABILITY', 'Availability', 'amazon_fulfillment_availability', $k],
-            'purchasable_offer' => ['DOMAIN_CAPABILITY', 'Pricing', 'amazon_purchasable_offer', $k],
+            'purchasable_offer' => ['DOMAIN_CAPABILITY', 'Pricing', 'amazon_purchasable_offer_structured_envelope', $k],
             'list_price' => ['DOMAIN_CAPABILITY', 'Pricing', 'recommended_retail_price_evidence', $k],
-            'condition_type' => ['REUSABLE_SEMANTIC', 'ProductData', 'product_condition_enum', $k],
+            'condition_type' => ['REUSABLE_SEMANTIC', 'ProductVariantData', 'product_condition_enum', $k],
             'condition_note' => ['CHANNEL_SEMANTIC', 'ListingCondition', 'amazon_listing_condition_note', $k],
             'product_tax_code' => ['DEFER_DECISION', 'PricingOrCompliance', 'tax_classification_candidate', $k],
             'merchant_release_date' => ['DOMAIN_CAPABILITY', 'Availability', 'merchant_release_availability_date', $k],
@@ -230,14 +230,15 @@ final class AmazonCoverage
             'amazon_taxonomy_category' => ['taxonomy', 'How does Amazon taxonomy map without becoming platform Category authority?', ['item_type_keyword', 'item_type_name']],
             'amazon_suggested_asin_identity' => ['identity', 'How should seller-suggested ASIN remain distinct from established connector identity?', ['merchant_suggested_asin']],
             'amazon_identifier_exemption' => ['identifier_governance', 'How should identifier exemption remain Amazon governance?', ['supplier_declared_has_product_identifier_exemption']],
-            'amazon_offer_pricing' => ['pricing', 'How do purchasable offer and list price map while preserving their distinct pricing roles?', ['purchasable_offer', 'list_price']],
+            'amazon_offer_pricing' => ['pricing', 'How should the structured purchasable_offer envelope map while keeping independently verified list_price/RRP semantics distinct?', ['purchasable_offer']],
             'amazon_tax_classification' => ['tax', 'Which domain owns Amazon product tax classification?', ['product_tax_code']],
             'amazon_max_order_quantity' => ['commercial', 'Which Product/B2B/commercial domain owns maximum order quantity?', ['max_order_quantity']],
             'amazon_gift_options' => ['commercial', 'Which channel or commercial domain owns gift options?', ['gift_options']],
             'amazon_offer_product_media' => ['media_scope', 'How should offer-scoped media remain distinct from product media?', []],
             'amazon_variant_parentage' => ['variants', 'How should Amazon parentage schema map to VariantComposition?', ['parentage_level', 'child_parent_sku_relationship', 'variation_theme']],
-            'amazon_item_package_dimensions' => ['dimensions', 'How should item dimensions remain distinct from package dimensions/weight?', ['item_dimensions', 'item_package_dimensions', 'item_package_weight']],
-            'amazon_product_highlights' => ['content', 'How do bullet points and special features contribute distinct highlight representations?', ['bullet_point', 'special_feature']],
+            'amazon_item_package_dimensions' => ['dimensions', 'How should item/item-package dimensions and weights map without overclaiming DEC-009 packaging boundaries?', ['item_weight', 'item_dimensions', 'item_package_dimensions', 'item_package_weight']],
+            'amazon_product_highlights' => ['content', 'How should special_feature remain distinct from the independently verified bullet_point/product-highlights representation?', ['special_feature']],
+            'amazon_package_quantity_semantics' => ['packaging_count', 'How does Amazon number_of_items relate to package/container counts without becoming generic units-per-consumer-package?', ['number_of_items']],
             'amazon_compliance_portability' => ['compliance', 'Which regulated Amazon PTD facts are portable Compliance evidence?', []],
         ];
     }
@@ -347,7 +348,7 @@ final class AmazonCoverage
             'invented_applicability_key_count' => count(array_filter($coverage, fn ($r) => $r['applicability_key'] !== 'not_applicable')),
             'invalid_condition_semantics_count' => count(array_filter([
                 $rows['condition_type']['disposition'] !== 'REUSABLE_SEMANTIC',
-                $rows['condition_type']['owner_candidate'] !== 'ProductData',
+                $rows['condition_type']['owner_candidate'] !== 'ProductVariantData',
                 $rows['condition_type']['representation_candidate'] !== 'product_condition_enum',
                 $rows['condition_note']['disposition'] !== 'CHANNEL_SEMANTIC',
                 $rows['condition_note']['owner_candidate'] !== 'ListingCondition',
