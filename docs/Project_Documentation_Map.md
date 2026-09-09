@@ -651,6 +651,15 @@ These artifacts are research evidence, not account discovery state and not merch
 `FieldMapping` rows. `CANONICAL_PRODUCT_FIELD_REGISTRY.md` v8 remains the governance contract
 for what is promoted into canonical platform/domain/channel knowledge.
 
+### proposals/FIVE_PROVIDER_CANONICAL_VNEXT_2026-09-09.md
+
+Lead five-provider synthesis proposal over Adobe Commerce, Google Merchant, BigCommerce,
+Amazon and Shopify. Read it with `docs/data/five_provider_canonical_vnext_decisions.csv`
+when reviewing the proposed vNext canonical vocabulary, Missing Concept Union, promotion,
+owner/binding gates, or merchant-completeness coverage. It is explicitly **non-authoritative**
+until adversarial review and documentation approval; it does not supersede the current
+Canonical Product Field Registry or authorize runtime/seed changes.
+
 ### CANONICAL_VOCABULARY_COVERAGE_LEDGER.md
 
 Gate 1 research contract for the machine-verifiable external-vocabulary coverage ledger.
