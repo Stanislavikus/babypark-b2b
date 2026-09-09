@@ -133,3 +133,61 @@ Carry forward to Sonnet comparison:
 4. Does Sonnet find any sibling problem in other product-type-scoped mappings that survives exact evidence review?
 
 After the independent Sonnet report, Lead will freeze the correction set. Escalate only a surviving semantic dispute that primary Amazon evidence and existing canonical decisions cannot resolve.
+
+## Sonnet High semantic/domain overlay
+
+Sonnet independently reviewed the same authoritative base and returned `AMAZON SEMANTIC CORRECTIONS REQUIRED` with four material findings: condition ownership, DEC-009 weight mappings, `purchasable_offer` structure, and LUGGAGE-scoped applicability.
+
+### S1 — `condition_type` owner
+
+Lead verdict: **ACCEPT — MATERIAL PROVIDER SEMANTIC CORRECTION**.
+
+Canonical `condition` is `product_variant`-bound, Amazon applicability `a097` already records `entity_level=product_variant`, and Amazon PTD requirements explicitly distinguish product facts from sales terms. `condition_type` and `condition_note` both belong to the physical `offer` property group. Keeping reusable `condition_type` under generic `ProductData` is internally inconsistent.
+
+Minimal correction: retain the reusable `product_condition_enum` concept but change owner candidate to `ProductVariantData`; keep `condition_note` as Amazon listing-context semantics. Update the paired invariant.
+### S2 — `item_weight` / `item_package_weight` under DEC-009
+
+Lead verdict: **REJECT THE BLANKET DOWNGRADE; KEEP BOTH MAPPINGS VERIFIED AND STRENGTHEN THE EVIDENCE NOTE**.
+
+Sonnet relies heavily on PTD property-group placement (`safety_and_compliance` / `shipping`) as negative semantic evidence. Amazon's PTD meta-model itself defines property groups as logical groupings for display/informational purposes, so those group names are not semantic packaging contracts.
+
+Primary Amazon evidence distinguishes an item from a package containing the item. Amazon also describes item-package weight/dimensions as the individual listed unit including its own box/polybag, while item, item package, and case can have distinct measurements. This matches DEC-009's sellable-unit/immediate-packaging boundary far more closely than Google or BigCommerce shipping-weight surfaces. Amazon listing guidance for Item Weight states the value excludes packaging.
+
+Therefore keep `net_weight -> item_weight` and `gross_weight -> item_package_weight` verified; add explicit evidence text so later reviewers do not infer from property-group names alone.
+### S3 — `purchasable_offer` representation
+
+Lead verdict: **ACCEPT — MATERIAL PROVIDER REPRESENTATION HARDENING, NO CANONICAL FIELD MAPPING**.
+
+Amazon documents `purchasable_offer` as a structured offer envelope containing audience/currency/marketplace context and multiple pricing sub-facets (regular price, discounted schedules, seller min/max bounds and quantity-pricing structures). Current top-level Pricing ownership and deferred status are correct, but the generic representation name understates the shape.
+
+Minimal correction: make the provider representation explicitly a structured offer/pricing envelope and record the sub-facets in the disagreement note. Do not create a scalar canonical `price` mapping.
+
+### S4 — LUGGAGE applicability vs evidence scope
+
+Lead verdict: **ACCEPT — MATERIAL SYSTEMIC RUNTIME HARDENING / BLOCKER BEFORE AMAZON ACTIVATION**.
+
+Both independent reviewers found the same root problem: mappings preserve exact LUGGAGE/US/PTD applicability, but the common suggestion runtime consumes only channel + verified status + exact external key. The registry context is therefore preserved but not enforced.
+Current runtime status matters: `ConnectorFoundationSeeder` does not seed an `amazon` connector definition or Amazon schema source, so this is not an active merchant-facing production defect today. It is a dormant activation hazard that must be closed before Amazon connector enablement.
+
+A generic fix is preferable to an Amazon hard-code. `CanonicalRegistryReader` already exposes applicability rows. Current verified mappings by context type are: Adobe/BigCommerce/Google=`channel`, Shopify=`channel/global`, Amazon=`product_type` for all 20 rows. Therefore automatic suggestions can safely fail closed for any mapping whose applicability context is more specific than `global` or `channel` until the runtime has authoritative context to prove it.
+
+This disables only future Amazon LUGGAGE suggestions today and preserves all frozen provider automation.
+
+### Cross-review resolution of remaining GPT findings
+
+- `package_quantity -> number_of_items`: **ACCEPT MATERIAL**. Amazon `number_of_items` counts lowest-level branded package containers; project `package_quantity` means units per consumer package. Current synthesis already treats them as separate evidence, so the verified mapping is contradictory. Downgrade/remove operational verification while retaining provider evidence.
+- `product_highlights -> bullet_point`: **KEEP VERIFIED**. Sonnet independently confirmed the family match; keep `special_feature` separate and record Amazon slot/length constraints in the transform/evidence note.
+- `recommended_retail_price -> list_price`: **KEEP VERIFIED**. Sonnet independently confirmed Amazon's List Price is MSRP/RRP semantics. Narrow the OPEN pricing question to `purchasable_offer` structure versus settled list-price semantics.
+- `age_group -> age_range_description`: **KEEP FIELD-LEVEL MAPPING**; no Amazon option mappings until value vocabulary is enumerated.
+## Final Lead correction contract after GPT-5.4 + Sonnet
+
+Accepted implementation scope:
+1. Change `condition_type` owner candidate to `ProductVariantData` and update invariants/generated Amazon artifacts.
+2. Keep Amazon `item_weight`/`item_package_weight` canonical mappings verified, but strengthen explicit DEC-009/Amazon evidence in registry/synthesis/review regressions.
+3. Model `purchasable_offer` explicitly as a structured multi-facet offer/pricing envelope while keeping it deferred and unmapped.
+4. Add generic fail-closed suggestion gating for applicability contexts more specific than `global`/`channel`; current Amazon product-type mappings therefore cannot auto-suggest until context-aware snapshot authority exists.
+5. Downgrade/remove operational verification of `package_quantity -> number_of_items`; retain the Amazon field as separate provider evidence.
+6. Keep `product_highlights -> bullet_point`, `recommended_retail_price -> list_price`, `age_group -> age_range_description`, `gender -> target_gender`, and the two weight mappings unless a future primary-source contradiction appears.
+7. Preserve 0 Amazon option mappings; condition/age/gender value vocabularies remain unproven for automatic value mapping.
+
+No Gemini/Opus arbitration is required: all model disagreements are resolved by Amazon primary evidence plus frozen repository contracts. Next step is a clean correction branch from `develop @ b4458f2293f16b15894f6edbaa3653f777a53685`, deterministic regenerate, targeted regressions, full CanonicalCoverage/mapping suites, then PR/CI.
