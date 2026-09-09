@@ -302,6 +302,7 @@ FK/semantic-FK integrity, but not enum membership.
 - Unique key: `(internal_code, channel, external_field, channel_schema_version, applicability_id)` — the narrower 3-column combination may legitimately repeat across schema versions or applicability contexts.
 - FK: `internal_code` → fields.csv; `applicability_id` → applicability.csv
 - Semantic FK: `internal_code` of this row MUST equal `internal_code` of the referenced `applicability_id` row.
+- **Hard structural rule — mapping/applicability channel consistency:** when a mapping references an applicability row with `context_type=channel`, that applicability row's `channel_or_state` MUST equal the mapping row's `channel`; a mismatch is a hard registry error. `context_type=global` does not require channel equality. This rule does not infer operations or runtime/schema versions and does not require an applicability verification status.
 - `channel` (declared, "Stable channel codes"): `google_merchant | shopify | adobe_commerce | bigcommerce | amazon | rozetka | schema_org`
 - `mapping_type` (observed, extend via DEC): `direct | renamed | transformed | connector_only`
 - `requirement_level` (observed, extend via DEC): `required | conditionally_required | recommended | optional | undecided`
