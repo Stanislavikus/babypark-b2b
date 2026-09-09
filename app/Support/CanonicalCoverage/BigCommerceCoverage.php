@@ -252,13 +252,28 @@ final class BigCommerceCoverage
         if ($row['object_family'] === 'product_modifier' && $row['external_field'] !== 'option_values') {
             [$owner, $representation] = ['OrderCustomization', 'provider_schema_field'];
         }
-        if ($row['object_family'] === 'product' && in_array($row['external_field'], ['tax_class_id', 'product_tax_code'], true)) {
-            $owner = 'UnresolvedTaxOwner';
-            $representation = 'provider_tax_classification';
+        if ($row['object_family'] === 'product' && $row['external_field'] === 'tax_class_id') {
+            $owner = 'Connector';
+            $representation = 'account_tax_class_reference';
+        }
+        if ($row['object_family'] === 'product' && $row['external_field'] === 'product_tax_code') {
+            $owner = 'Connector';
+            $representation = 'third_party_tax_code_passthrough';
+        }
+        if ($row['object_family'] === 'product' && $row['external_field'] === 'custom_url') {
+            $owner = 'ProductData';
+            $representation = 'relative_storefront_path_object';
         }
         $note = 'Provider-local classification from typed inventory evidence; no cross-platform equivalence asserted.';
-        if (in_array($row['external_field'], ['price', 'retail_price', 'cost_price', 'sale_price', 'weight', 'depth', 'height', 'width'], true) && $row['object_family'] === 'product_variant') {
-            $note = 'Same provider semantic as Product field; Variant binding is nullable and inherits/falls back according to source description.';
+        if ($row['object_family'] === 'product_variant' && isset($this->compatibilityRules()['bigcommerce:'.$row['external_field']])) {
+            $contract = $this->inheritanceContract($row);
+            $note = match ($contract) {
+                'documented_product_fallback_and_price_list_precedence' => 'Same provider semantic as Product field; Variant value is nullable with documented Product fallback and Price List precedence.',
+                'documented_product_fallback' => 'Same provider semantic as Product field; Variant value is nullable with documented Product fallback.',
+                'documented_price_list_precedence' => 'Same provider semantic as Product field; Price List precedence is documented, but Product fallback is not inferred.',
+                'explicit_no_price_list_precedence' => 'Product and Variant values coexist; provider explicitly states this Variant value is not affected by Price Lists and no Product fallback is inferred.',
+                default => 'Product and Variant values coexist; no Product fallback or precedence relation is inferred without explicit provider evidence.',
+            };
         }
         if ($row['object_family'] === 'product_modifier') {
             $note = 'Order-time customization capability; intentionally distinct from variant dimension/product option.';
@@ -328,10 +343,16 @@ final class BigCommerceCoverage
     private function compatibilityRules(): array
     {
         $rules = [];
-        foreach (['cost_price', 'depth', 'fixed_cost_shipping_price', 'height', 'price', 'retail_price', 'sale_price', 'weight', 'width'] as $field) {
+        foreach (['depth', 'height', 'price', 'retail_price', 'sale_price', 'weight', 'width'] as $field) {
             $rules["bigcommerce:$field"] = [
                 'semantic_type' => 'decimal',
-                'explanation' => 'Product string-encoded decimal and nullable Variant numeric override normalize to decimal; entity binding, operation context, nullability, and documented Product/Price List fallback remain row-local.',
+                'explanation' => 'Product string-encoded decimal and nullable Variant numeric value share provider meaning; documented Product fallback and any Price List precedence remain row-local.',
+            ];
+        }
+        foreach (['cost_price', 'fixed_cost_shipping_price'] as $field) {
+            $rules["bigcommerce:$field"] = [
+                'semantic_type' => 'decimal',
+                'explanation' => 'Product string-encoded decimal and nullable Variant numeric value share provider meaning; no Product fallback is inferred without explicit positive provider evidence.',
             ];
         }
         foreach (['inventory_level', 'inventory_warning_level'] as $field) {
@@ -363,14 +384,13 @@ final class BigCommerceCoverage
     private function disagreementDefinitions(): array
     {
         return [
-            'bigcommerce_tax_owner' => ['family' => 'tax_classification', 'question' => 'What portable semantic and owner, if any, can represent BigCommerce tax_class_id and product_tax_code?', 'concepts' => 'bigcommerce:product:tax_class_id|bigcommerce:product:product_tax_code', 'reference' => 'unresolved-tax-owner', 'notes' => 'Do not decide storage or promote provider tax identities.'],
+            'bigcommerce_tax_owner' => ['family' => 'tax_classification', 'question' => 'How should store-specific BigCommerce tax_class_id references and third-party product_tax_code passthrough values remain separately represented without promoting either to a universal tax identity?', 'concepts' => 'bigcommerce:product:tax_class_id|bigcommerce:product:product_tax_code', 'reference' => 'unresolved-tax-owner', 'notes' => 'tax_class_id is an account/store reference; product_tax_code is a third-party tax-provider passthrough. Do not merge them.'],
             'bigcommerce_map_persistence' => ['family' => 'map', 'question' => 'Should BigCommerce MAP be persisted and how is its policy scope represented?', 'concepts' => 'bigcommerce:product:map_price', 'reference' => 'unresolved-map-persistence', 'notes' => 'MAP is explicitly not retail or transactional price.'],
-            'bigcommerce_reference_price' => ['family' => 'reference_price', 'question' => 'What portion of BigCommerce retail_price is equivalent to a portable RRP/list/MSRP semantic?', 'concepts' => 'bigcommerce:retail_price', 'reference' => 'unresolved-reference-price-equivalence', 'notes' => 'Product and Variant bindings share provider semantics but retain fallback contracts.'],
-            'bigcommerce_order_constraints' => ['family' => 'order_constraints', 'question' => 'Are minimum and maximum order quantities Product defaults or offer/variant constraints?', 'concepts' => 'bigcommerce:product:order_quantity_minimum|bigcommerce:product:order_quantity_maximum', 'reference' => 'unresolved-order-constraint-binding', 'notes' => 'No final Product/Variant binding in this pass.'],
+            'bigcommerce_order_constraints' => ['family' => 'order_constraints', 'question' => 'What platform domain should BigCommerce Product-level minimum/maximum purchase-quantity constraints belong to, and how should the still-deferred maximum/order-step family be introduced?', 'concepts' => 'bigcommerce:product:order_quantity_minimum|bigcommerce:product:order_quantity_maximum', 'reference' => 'unresolved-order-constraint-binding', 'notes' => 'Provider entity binding is Product-level; the remaining question is platform-domain/family governance, not Product-versus-Variant location.'],
             'bigcommerce_customization' => ['family' => 'customization', 'question' => 'Where is the domain boundary between Product Option variant composition and Product Modifier order-time input?', 'concepts' => 'bigcommerce:product_option:option_values|bigcommerce:product_modifier:option_values|bigcommerce:product_variant:option_values', 'reference' => 'unresolved-customization-architecture', 'notes' => 'Provider non-equivalence is preserved.'],
             'bigcommerce_product_variant_binding' => ['family' => 'product_variant_binding', 'question' => 'Which shared provider semantics become Product defaults, Variant overrides, or independently bound values?', 'concepts' => 'bigcommerce:price|bigcommerce:weight|bigcommerce:sku|bigcommerce:inventory_level', 'reference' => 'unresolved-product-variant-binding', 'notes' => 'Representative high-risk concepts; explicit compatibility rules cover every shared concept.'],
-            'bigcommerce_weight_semantics' => ['family' => 'weight', 'question' => 'Does BigCommerce shipping-calculation weight map to item net, package gross, or shipping weight?', 'concepts' => 'bigcommerce:weight', 'reference' => 'DEC-009', 'notes' => 'Do not equate it to gross_weight.'],
-            'bigcommerce_url_family' => ['family' => 'url', 'question' => 'How should custom_url differ from canonical Product URL, slug, and external storefront URL?', 'concepts' => 'bigcommerce:product:custom_url', 'reference' => 'DEC-008', 'notes' => 'No unrelated Open Graph title conflict is asserted.'],
+            'bigcommerce_weight_semantics' => ['family' => 'weight', 'question' => 'Does BigCommerce shipping-calculation weight map to item net, package gross, or shipping weight?', 'concepts' => 'bigcommerce:weight', 'reference' => 'DEC-009', 'notes' => 'Do not equate it to canonical net_weight or gross_weight without explicit packaging-level evidence.'],
+            'bigcommerce_url_family' => ['family' => 'url', 'question' => 'How should BigCommerce custom_url relative storefront path/object be transformed to or kept distinct from canonical absolute Product URL?', 'concepts' => 'bigcommerce:product:custom_url', 'reference' => 'DEC-008', 'notes' => 'custom_url is a provider structured relative path representation and needs store/base-URL context before any absolute URL mapping.'],
         ];
     }
 
@@ -467,8 +487,27 @@ final class BigCommerceCoverage
     private function inheritanceContract(array $source): string
     {
         $description = strtolower($source['description']);
-        if (str_contains($description, 'if this value is null') || str_contains($description, 'default') || str_contains($description, 'price list')) {
-            return 'documented_fallback_or_precedence';
+
+        if (str_contains($description, 'not affected by price list')) {
+            return 'explicit_no_price_list_precedence';
+        }
+
+        $hasProductFallback = str_contains($description, 'if this value is null')
+            || str_contains($description, 'and this value is null')
+            || str_contains($description, 'product’s default')
+            || str_contains($description, "product's default")
+            || str_contains($description, 'productʼs default');
+        $hasPriceListPrecedence = str_contains($description, 'price list value will be used')
+            || str_contains($description, 'if a price list id is used');
+
+        if ($hasProductFallback && $hasPriceListPrecedence) {
+            return 'documented_product_fallback_and_price_list_precedence';
+        }
+        if ($hasProductFallback) {
+            return 'documented_product_fallback';
+        }
+        if ($hasPriceListPrecedence) {
+            return 'documented_price_list_precedence';
         }
 
         return 'no_fallback_stated';

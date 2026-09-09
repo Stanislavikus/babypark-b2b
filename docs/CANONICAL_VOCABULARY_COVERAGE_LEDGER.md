@@ -32,7 +32,7 @@ Provider concept keys are research identities only. They do not assert Platform 
 
 Product and ProductVariant rows share a provider concept only for explicitly reviewed fields: bin picking number, cost/base/retail/sale/fixed-shipping prices, dimensions, weight, GTIN, MPN, UPC, SKU, inventory level/warning level, and free-shipping status. Each physical row retains its own entity level, type, read/write contract, and source description. Variant nullability, inheritance, Price List precedence, and fallback are therefore not erased by concept sharing.
 
-Every shared concept has an explicit compatibility rule. Numeric Product values encoded as strings and nullable numeric Variant overrides normalize to the neutral semantic type `decimal`; identifiers normalize to `string`, quantities to `integer`, and free-shipping status to `boolean`. The validator compares entity, wire type, cardinality, READ/WRITE contract, required/operation context, and documented inheritance/fallback for every member. An unruled shared concept fails validation.
+Every shared concept has an explicit compatibility rule. Numeric Product values encoded as strings and nullable numeric Variant values normalize to the neutral semantic type `decimal`; identifiers normalize to `string`, quantities to `integer`, and free-shipping status to `boolean`. The semantic-audit correction distinguishes three binding shapes instead of inferring one generic override rule: documented nullable Product fallback/Price-List precedence, co-existing Product/Variant values with no proven fallback, and independent non-nullable flags. The validator compares entity, wire type, cardinality, READ/WRITE contract, required/operation context, and only explicit positive fallback/precedence evidence for every member. An unruled shared concept fails validation.
 
 Product Options, ProductVariant option values, and Product Modifiers remain distinct concepts. A modifier is order-time customization; it does not create a variant dimension. Their option values and presentation/control types have explicit do-not-merge edges. Modifier/option adjustments remain in their structured capability rather than becoming base Product price.
 
@@ -61,7 +61,7 @@ dangling_applicability_keys=0
 manifest_provider_rows_preserved=PASS
 ```
 
-The pass yields 119 provider concepts from 136 physical rows. It makes no Adobe, Google, Amazon, Shopify, or cross-platform equivalence claim. The source inventories top-level fields/capabilities rather than nested members, so `STRUCTURE_MEMBER` is not used here. Ambiguities such as tax ownership, MAP persistence, reference-price equivalence, Product/Variant final binding, and customization architecture remain for blind semantic review; retaining a provider concept does not resolve them.
+The pass yields 119 provider concepts from 136 physical rows. It makes no Adobe, Google, Amazon, Shopify, or cross-platform equivalence claim. The source inventories top-level fields/capabilities rather than nested members, so `STRUCTURE_MEMBER` is not used here. After semantic-audit correction, BigCommerce `retail_price` is directly evidenced as manufacturer suggested retail price and is no longer an OPEN reference-price question. Tax representation, MAP persistence, selected Product/Variant binding, DEC-009 weight semantics, order-constraint family governance, URL transformation, and customization architecture remain explicitly deferred where evidence is still insufficient.
 
 ## Review sampling
 
@@ -70,6 +70,18 @@ All 136 coverage rows were mechanically reconciled. High-risk row-level review c
 ## Gate 2 handoff
 
 After all five provider passes, blind reviewers receive the content-addressed manifest, provider shards, provider concept graphs, validator output, resolved-decision extracts, and a cross-platform disagreement queue. They may inspect source rows through file/ordinal/hash provenance. Cross-platform merge begins only then; this BigCommerce pass must not be treated as evidence that similarly named fields from another ecosystem are equivalent.
+
+### BigCommerce provider semantic-audit correction — 2026-09-09
+
+Independent Sonnet High semantic/domain review and GPT-5.4 evidence/mapping audit were run against `develop @ 8bc70b809732ed83292b78272ca39de3c2bf0360`, then independently arbitrated against the frozen registry contract and current BigCommerce primary documentation. The durable finding-by-finding record is `docs/reviews/BIGCOMMERCE_PROVIDER_AUDIT_ARBITRATION_2026-09-09.md`. This is a correction over the frozen 136-row inventory, not a new BigCommerce discovery pass.
+
+The correction narrows the Product/ProductVariant issue to actual canonical-binding mismatches. Canonical `sku`, `gtin`, `mpn`, `price`, `sale_price`, `cost_price`, and `recommended_retail_price` remain Variant-level mappings. Canonical Product-level `depth_mm`, `width_mm`, and `height_mm` now map to BigCommerce `Product.depth`, `Product.width`, and `Product.height`; nullable `ProductVariant.*` dimensions remain provider-local override representations with documented Product fallback. `net_weight` is aligned to `Product.weight` but downgraded to `partially_verified`, because BigCommerce documents shipping/store weight and does not prove DEC-009's strict packaging exclusion.
+
+The shared-compatibility classifier no longer treats bare words such as `default` or `price list` as fallback evidence. `product_variant.cost_price` therefore preserves its explicit “not affected by Price Lists” meaning, and inventory rows mentioning the default location no longer look like inheritance contracts. Positive fallback/precedence is recognized only from explicit provider wording.
+
+BigCommerce `retail_price` is now provider-verified as manufacturer suggested retail price, so the old `bigcommerce_reference_price` disagreement is removed while the verified `recommended_retail_price` mapping remains. `min_order_quantity -> Product.order_quantity_minimum` also remains verified; its disagreement is reframed around broader max-order/order-step platform-domain governance rather than a false Product-vs-Variant location question. The OPEN queue moves from 8 to 7 families.
+
+Tax evidence is kept split: `tax_class_id` is a Connector-owned account/store tax-class reference, while `product_tax_code` is a third-party tax-provider passthrough. `custom_url` is explicitly a relative storefront-path object requiring store/base-URL context before any canonical absolute-URL transform. No BigCommerce `condition` field/option mapping is added: canonical condition is still proposed and Variant-bound while BigCommerce condition is Product-level, so fail-closed deferral is safer than a name/value-only merge.
 
 ## Adobe Commerce provider pass
 
