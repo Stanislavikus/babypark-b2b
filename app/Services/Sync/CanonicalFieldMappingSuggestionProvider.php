@@ -124,6 +124,11 @@ final class CanonicalFieldMappingSuggestionProvider
                     return false;
                 }
 
+                if ($applicability['context_type'] === 'channel'
+                    && $applicability['channel_or_state'] !== $row['channel']) {
+                    return false;
+                }
+
                 return in_array($applicability['context_type'], ['global', 'channel'], true);
             },
         ));

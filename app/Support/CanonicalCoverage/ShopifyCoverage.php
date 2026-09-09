@@ -497,7 +497,9 @@ final class ShopifyCoverage
     private function classifyStructured(array $row): array
     {
         $surface = $row['source_surface'];
+        $key = $row['object_family'].'.'.$row['subfield'];
         $owner = match (true) {
+            $this->isUnitPricingKey($key) => 'PricingOrCompliance',
             str_contains($surface, 'pricelist'), str_contains($surface, 'catalogs_markets') => 'Pricing',
             str_contains($surface, 'inventory') => 'Inventory',
             str_contains($surface, 'media'), str_contains($surface, 'files') => 'Media',
