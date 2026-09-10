@@ -127,7 +127,12 @@ class CanonicalActiveFieldFoundationCompletionTest extends TestCase
         $this->assertSame($type, $definition->data_type);
         $this->assertSame($scope, $definition->scope);
         $this->assertSame(AttributeStatus::Active, $definition->status);
-        $this->assertSame($labels, $definition->localized_labels);
+
+        $actualLabels = $definition->localized_labels;
+        ksort($labels);
+        ksort($actualLabels);
+        $this->assertSame($labels, $actualLabels);
+
         $this->assertSame($localizable, $definition->is_localizable);
         $this->assertFalse($definition->is_multi_value);
     }
