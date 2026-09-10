@@ -290,7 +290,7 @@ FK/semantic-FK integrity, but not enum membership.
 - `scope` (observed, extend via DEC): `system | platform_library | not_applicable`
 - `mvp_tier` (observed, extend via DEC): `A | B | C | not_applicable`; invariant: `mvp_tier=A → default_enabled=true`
 - `implementation_kind` (observed, extend via DEC): `compliance_entity | computed_projection | connector_only | core_model_property | dynamic_field | external_identity | inventory_domain | media_domain | pricing_domain | product_association_domain | relation`
-- `storage_owner` (observed, extend via DEC): `Category | ConnectorMapping | ExternalRecordLink | FieldDefinition | MediaAsset | PriceListItem | Product | ProductAssociation | ProductVariant | calculated | not_implemented`
+- `storage_owner` (observed, extend via DEC): `Category | ConnectorMapping | ExternalRecordLink | FieldDefinition | MediaAsset | PriceListItem | Product | ProductAssociation | ProductVariant | Tag | calculated | not_implemented`
 - `field_definition_eligibility` (observed): `yes | no`
 - `verification_status` (observed, extend via DEC): `verified | partially_verified | needs_legal_review`
 - `recommended_action` (observed, extend via DEC): `add_to_platform_library | add_to_product_model | computed_not_editable | connector_mapping_only | covered_by_existing_domain | external_identity_only | keep_as_is | needs_legal_review | relation_not_field`
@@ -642,13 +642,14 @@ connector-account-specific external references, not global Registry data.
 - **mapping consequence:** Amazon PTD-derived applicability rows may use `context_type=product_type`; raw Amazon parentage vocabulary remains connector evidence while canonical state tokens follow this registry.
 - `evidence_subject_key: decision:DEC-012`
 
-### DEC-013 — Product-owned capability may use add_to_product_model
+### DEC-013 — Tags remain a relation-backed Product classification capability
 
-- **decision:** extend `recommended_action` with `add_to_product_model` for an already-approved Product-owned semantic that is not a dynamic `FieldDefinition`, not connector-only, and not yet physically implemented.
-- **first use:** `tags`, whose Product-level role is already `[Resolved]` in the Domain Model Product classification decision.
-- **why not `keep_as_is`:** the semantic is approved but physical implementation is not present, so `keep_as_is` would incorrectly imply current runtime/storage completion.
-- **why not `add_to_platform_library`:** Tags are a Product-owned classification capability, not an EAV/dynamic reusable characteristic.
-- **platform consequence:** documentation/governance only; this decision does not add a migration, column, table, UI, or runtime behavior.
+- **historical decision:** `add_to_product_model` was introduced while the already-approved Tags semantic had no physical implementation.
+- **current runtime:** GAP-011 has since implemented workspace-owned `tags` plus the `product_tag` many-to-many relation and Product/Tag Eloquent relations. Canonical documentation must no longer describe Tags as physically absent.
+- **canonical representation:** `implementation_kind: relation`, `storage_owner: Tag`, `field_definition_eligibility: no`, `recommended_action: relation_not_field`. Tags are multi-valued Product classification data, but not a scalar Product column and not dynamic EAV.
+- **enum consequence:** this decision adds `Tag` to the observed `storage_owner` vocabulary. It does not create a new runtime owner; it names the already-implemented relation owner.
+- **mapping consequence:** this docs alignment does not invent a new FieldDefinition/FieldBinding or Receive relation-mutation route. Any future connector execution over Tags must use the approved relation-owning boundary rather than generic dynamic/column writers.
+- **why not `add_to_platform_library`:** Tags are a Product classification relation, not an EAV/dynamic reusable characteristic.
 - `evidence_subject_key: decision:DEC-013`
 
 ### DEC-002 — identifier_exists connector-only
@@ -726,7 +727,9 @@ alias:price:ru:цена:import_header:global
 
 ## Current seed → Proposed registry diff
 
-Based on `database/seeders/FieldDefinitionSeeder.php` (develop@3c3f926) and `docs/02-ATTRIBUTE_DICTIONARY.md`.
+Based on `database/seeders/FieldDefinitionSeeder.php` (develop@76ec9dbe035fe6ce60087e900d73fca76cf7ab14), plus the current implementation gap ledger and contract tests (notably `FieldDefinitionSeederFoundationSeedV5Test`).
+
+Runtime materialization (`FieldDefinition`/`FieldBinding` exists and is seeded as `status = active`) is **not** the same as canonical semantic promotion in this registry and the vNext proposal. Some fields are already materialized in runtime while remaining governance-proposed or binding-gated at the documentation level.
 
 ### Already correct
 
@@ -738,29 +741,45 @@ Based on `database/seeders/FieldDefinitionSeeder.php` (develop@3c3f926) and `doc
 | `name` | Seeded; shared FieldDefinition with Customer binding; only strict required field for product creation |
 | `description` | Seeded |
 | `category` | Correctly modeled as `relation`, not flat text |
+| `status` | Seeded; canonical status is the boolean `products.is_active` active-state contract |
 | `color`, `size` | Platform library seeded with option codes |
 | `net_weight`, `gross_weight`, `volume_m3` | System logistics fields seeded |
 | `shipping_required`, `backorder_policy` | Platform library seeded |
 | `technical_characteristics`, `instructions` | Localizable platform library seeded |
+| `condition` | Seeded (Foundation seed v5); Variant binding; semantic promotion gate is documentation-level only |
+| `short_description` | Seeded (Foundation seed v5); Product binding; may remain governance-proposed even though runtime is materialized |
+| `material` | Seeded (Foundation seed v5); Product binding; binding arbitration (Product vs Product+Variant) remains a documentation gate |
+| `country_of_origin` | Seeded (Foundation seed v5); Product binding; owner/binding definition clarity remains a documentation gate |
+| `manufacturer` | Seeded (Foundation seed v5); Product binding; distinct from `brand` and provider `vendor` labels |
+| `model` | Seeded (Foundation seed v5); Product binding; neutral model concept distinct from MPN |
+| `compatibility` | Seeded (Foundation seed v5); Product binding; may remain governance-proposed even though runtime is materialized |
+| `battery_type` | Seeded (Foundation seed v5); Product binding; may remain governance-proposed even though runtime is materialized |
 
-### Missing confirmed candidates
+### Active canonical concepts without FieldDefinition/FieldBinding seed (yet)
 
-| internal_code | recommended_action | Blocker |
-|---|---|---|
-| `mpn` | `add_to_platform_library` | Seeded (DEC-001 binding + DEC-005 scope) |
-| `condition` | `add_to_platform_library` | Not in seeder; Google required for ads |
-| `price`, `sale_price`, `cost_price` | `covered_by_existing_domain` | Documented in Attribute Dictionary but not in FieldDefinitionSeeder |
-| `availability` | `covered_by_existing_domain` | Inventory domain; not FieldDefinition |
-| `image` | `covered_by_existing_domain` | Media domain |
-| `short_description` | `add_to_platform_library` | Documented as localizable; not seeded |
-| `material`, `age_group`, `gender`, `country_of_origin`, `manufacturer`, `model`, `compatibility`, `battery_type` | `add_to_platform_library` | Attribute Dictionary seed list; not in FieldDefinitionSeeder |
+These concepts are active and `field_definition_eligibility = yes` in the canonical registry CSV, but are not currently seeded in `FieldDefinitionSeeder` (no `FieldDefinition`/`FieldBinding` rows exist in runtime). This is documentation truth only; this PR does not seed anything.
+
+At minimum, this includes:
+
+- `barcode_box`
+- `unit`
+- `min_order_quantity`
+- `order_step`
+- `package_quantity`
+- `package_type`
+- `units_per_box`
+- `boxes_per_pallet`
+- `lead_time_days`
+- `depth_mm`, `width_mm`, `height_mm`
+- `meta_title`, `meta_description` (columns exist on `products`, but not governed through Field Foundation yet)
+- `pattern`, `style`, `warranty`, `product_highlights`
+
+`age_group` and `gender` remain intentionally gated.
 
 ### Incorrectly modeled
 
 | Issue | Current state | Registry correction |
 |---|---|---|
-| `name.is_localizable` | Seeded `false`; docs say localizable for product-level content | Registry marks `false` matching **current seeder**; docs/02 conflict flagged for future DEC |
-| `status` data_type | Seeded as `boolean` mapping `is_active` | Registry keeps `boolean`; enum lifecycle (draft/active/archived) deferred |
 | Legacy `products.sku` column | DB has product-level SKU; seeder binds SKU to variant | Registry follows seeder (variant); legacy column noted as migration debt |
 | `onec_guid` classified as Product/System then as ConnectorMapping | Was `core_model_property` / `keep_as_is`, then `connector_only` / `ConnectorMapping` / `connector_mapping_only` | DEC-011: `external_identity` / `ExternalRecordLink` / `external_identity_only`; not a System Field and not a FieldMapping; physical columns are legacy identity debt |
 

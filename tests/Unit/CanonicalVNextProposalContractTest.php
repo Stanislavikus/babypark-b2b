@@ -66,11 +66,16 @@ class CanonicalVNextProposalContractTest extends TestCase
             $this->assertSame('PROMOTE_ACTIVE_VERIFIED', $rows[$concept]['lead_decision'], $concept);
         }
 
+        $this->assertSame('DOC_APPROVAL_EXISTING_VARIANT_SEED_RETAINED', $rows['condition']['materialization_gate']);
+        foreach (['manufacturer', 'model'] as $concept) {
+            $this->assertSame('DOC_APPROVAL_EXISTING_PRODUCT_SEED_RETAINED', $rows[$concept]['materialization_gate'], $concept);
+        }
+
         $this->assertSame(
             'PROMOTE_SEMANTIC_CONFIDENCE_BINDING_REVIEW',
             $rows['material']['lead_decision'],
         );
-        $this->assertSame('BINDING_ARBITRATION_BEFORE_SEED', $rows['material']['materialization_gate']);
+        $this->assertSame('BINDING_ARBITRATION_EXISTING_PRODUCT_SEED_RETAINED', $rows['material']['materialization_gate']);
         $this->assertSame('ACCEPT_CONCEPT_DEFER_OWNER', $rows['max_order_quantity']['lead_decision']);
         $this->assertSame('OWNER_AND_SCOPE_DECISION', $rows['max_order_quantity']['materialization_gate']);
     }

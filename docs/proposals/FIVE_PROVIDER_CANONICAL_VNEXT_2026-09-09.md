@@ -80,23 +80,25 @@ Missing Concept Union contains **34 explicitly classified candidates/representat
 | short_description | KEEP_PROPOSED | MEDIUM | SECOND_EXACT_SOURCE_OR_ARBITRATION | Do not promote by treating short title/subtitle as short description. |
 | status | KEEP_CLARIFY_SEMANTICS | HIGH | EXISTING_CONTRACT | Keep internal lifecycle/active-state concept; explicitly exclude channel publication/visibility from the definition. |
 | gtin | KEEP_CLARIFY_SEMANTICS | HIGH | EXISTING_CONTRACT | GTIN is not arbitrary barcode text. Valid UPC/EAN representations may normalize to GTIN; generic barcode requires validation. |
-| condition | PROMOTE_ACTIVE_VERIFIED | HIGH | DOC_APPROVAL_THEN_LIBRARY_SEED | Semantic promotion is now justified; keep current Variant binding unless later offer-domain work proves a need to split offer condition. |
+| condition | PROMOTE_ACTIVE_VERIFIED | HIGH | DOC_APPROVAL_EXISTING_VARIANT_SEED_RETAINED | Semantic promotion is now justified; retain the existing Variant seed/binding unless later offer-domain work proves a need to split offer condition. |
 | net_weight | KEEP_STRICT_SEMANTICS | HIGH | EXISTING_CONTRACT | Keep strict net/gross definitions. Introduce a separate shipping-weight domain concept rather than weakening these fields. |
 | gross_weight | KEEP_STRICT_SEMANTICS | HIGH | EXISTING_CONTRACT | Keep strict net/gross definitions. Introduce a separate shipping-weight domain concept rather than weakening these fields. |
 | depth_mm | KEEP_CONCEPT_VARIANT_BINDING_REVIEW | HIGH_CONCEPT_MEDIUM_BINDING | TARGETED_BINDING_REVIEW_BEFORE_VARIANT_MAPPING | Keep current Product column semantics. Before Variant mapping, decide how the core_model_property concept is registered through FieldDefinition/FieldBinding so Product can retain a column binding and Variant can use a dynamic binding on the same concept. |
 | width_mm | KEEP_CONCEPT_VARIANT_BINDING_REVIEW | HIGH_CONCEPT_MEDIUM_BINDING | TARGETED_BINDING_REVIEW_BEFORE_VARIANT_MAPPING | Keep current Product column semantics. Before Variant mapping, decide how the core_model_property concept is registered through FieldDefinition/FieldBinding so Product can retain a column binding and Variant can use a dynamic binding on the same concept. |
 | height_mm | KEEP_CONCEPT_VARIANT_BINDING_REVIEW | HIGH_CONCEPT_MEDIUM_BINDING | TARGETED_BINDING_REVIEW_BEFORE_VARIANT_MAPPING | Keep current Product column semantics. Before Variant mapping, decide how the core_model_property concept is registered through FieldDefinition/FieldBinding so Product can retain a column binding and Variant can use a dynamic binding on the same concept. |
-| meta_title | KEEP_CONCEPT_DOC_ALIGNMENT | HIGH | ALIGN_02_NAMING_LOCALIZATION_BEFORE_NEW_SEED | Keep current canonical code/owner. Align 02 wording (seo_title/seo_description) with registry meta_title/meta_description and preserve localization decision gate. |
-| meta_description | KEEP_CONCEPT_DOC_ALIGNMENT | HIGH | ALIGN_02_NAMING_LOCALIZATION_BEFORE_NEW_SEED | Keep current canonical code/owner. Align 02 wording (seo_title/seo_description) with registry meta_title/meta_description and preserve localization decision gate. |
-| material | PROMOTE_SEMANTIC_CONFIDENCE_BINDING_REVIEW | HIGH | BINDING_ARBITRATION_BEFORE_SEED | Concept is strong enough for active/verified. Product-only vs Product+Variant binding still merits targeted review. |
+| meta_title | KEEP_CONCEPT_DOC_ALIGNMENT | HIGH | ALIGN_02_NAMING_LOCALIZATION_BEFORE_NEW_SEED | Keep current canonical code/owner. 02 naming is aligned to registry meta_title/meta_description; localization/storage semantics remain a gate before any new governed seed. |
+| meta_description | KEEP_CONCEPT_DOC_ALIGNMENT | HIGH | ALIGN_02_NAMING_LOCALIZATION_BEFORE_NEW_SEED | Keep current canonical code/owner. 02 naming is aligned to registry meta_title/meta_description; localization/storage semantics remain a gate before any new governed seed. |
+| material | PROMOTE_SEMANTIC_CONFIDENCE_BINDING_REVIEW | HIGH | BINDING_ARBITRATION_EXISTING_PRODUCT_SEED_RETAINED | Concept is strong enough for active/verified; retain the existing Product seed while Product-only vs Product+Variant binding remains under targeted review. |
 | age_group | KEEP_PROPOSED_BINDING_GAP | HIGH_CONCEPT_MEDIUM_BINDING | GAP_022_BINDING_DECISION | Concept is strong; do not seed until Product-vs-Variant applicability is resolved. |
 | gender | KEEP_PROPOSED_BINDING_GAP | HIGH_CONCEPT_MEDIUM_BINDING | GAP_022_BINDING_DECISION | Concept is strong; do not seed until Product-vs-Variant applicability is resolved. |
 | country_of_origin | KEEP_PROPOSED_OWNER_BINDING_REVIEW | HIGH_CONCEPT_MEDIUM_OWNER | OWNER_AND_BINDING_ARBITRATION | Clarify definition and Product-vs-Variant/domain owner before promotion; do not conflate with country_of_manufacture. |
-| manufacturer | PROMOTE_ACTIVE_VERIFIED | HIGH | DOC_APPROVAL_THEN_LIBRARY_SEED | Promote concept; keep separate from brand/vendor. |
-| model | PROMOTE_ACTIVE_VERIFIED | HIGH | DOC_APPROVAL_THEN_LIBRARY_SEED | Promote neutral Product model concept; do not merge with MPN. |
+| manufacturer | PROMOTE_ACTIVE_VERIFIED | HIGH | DOC_APPROVAL_EXISTING_PRODUCT_SEED_RETAINED | Promote concept; retain the existing Product seed/binding and keep separate from brand/vendor. |
+| model | PROMOTE_ACTIVE_VERIFIED | HIGH | DOC_APPROVAL_EXISTING_PRODUCT_SEED_RETAINED | Promote neutral Product model concept; retain the existing Product seed/binding and do not merge with MPN. |
 | compatibility | KEEP_PROPOSED | MEDIUM | MORE_EVIDENCE | Keep candidate, not active global library yet. |
 | battery_type | KEEP_PROPOSED | MEDIUM | MORE_EVIDENCE | Keep candidate; do not flatten structured battery compliance into one field. |
 | has_energy_consumption_details | KEEP_LEGAL_REVIEW | MEDIUM | NORMATIVE_LEGAL_EVIDENCE | No promotion without the legal/compliance evidence required by registry governance. |
+
+Runtime note: on `develop` as of `76ec9dbe035fe6ce60087e900d73fca76cf7ab14`, `FieldDefinitionSeeder` already materializes `condition`, `short_description`, `material`, `country_of_origin`, `manufacturer`, `model`, `compatibility`, and `battery_type` (each with a matching `FieldBinding`). The gates above must be read as semantic promotion / owner/binding arbitration gates, not as “first seed exists only in the future”.
 
 ### Important preservation decisions
 
@@ -111,10 +113,10 @@ The evidence is now strong enough to treat these as mature neutral concepts, sub
 
 | concept_key | concept_name | lead_decision | confidence | evidence_summary | materialization_gate |
 | --- | --- | --- | --- | --- | --- |
-| condition | Condition | PROMOTE_ACTIVE_VERIFIED | HIGH | Google condition + BigCommerce condition + Amazon condition_type independently confirm the commerce concept; current registry already marks verification=verified. | DOC_APPROVAL_THEN_LIBRARY_SEED |
-| material | Material | PROMOTE_SEMANTIC_CONFIDENCE_BINDING_REVIEW | HIGH | Adobe material + Google material + Amazon material + Shopify taxonomy independently confirm the concept; Schema.org material also supports it. | BINDING_ARBITRATION_BEFORE_SEED |
-| manufacturer | Manufacturer | PROMOTE_ACTIVE_VERIFIED | HIGH | Amazon manufacturer + Schema.org manufacturer independently confirm the neutral concept. Adobe manufacturer is supplementary only because DEC-010 does not establish guaranteed availability across all installations; Shopify vendor and BigCommerce brand_name are not equivalents. | DOC_APPROVAL_THEN_LIBRARY_SEED |
-| model | Model | PROMOTE_ACTIVE_VERIFIED | HIGH | Amazon model_number/model_name + Schema.org Product.model confirm neutral model semantics; provider-specific vehicle model remains separate applicability. | DOC_APPROVAL_THEN_LIBRARY_SEED |
+| condition | Condition | PROMOTE_ACTIVE_VERIFIED | HIGH | Google condition + BigCommerce condition + Amazon condition_type independently confirm the commerce concept; current registry already marks verification=verified. | DOC_APPROVAL_EXISTING_VARIANT_SEED_RETAINED |
+| material | Material | PROMOTE_SEMANTIC_CONFIDENCE_BINDING_REVIEW | HIGH | Adobe material + Google material + Amazon material + Shopify taxonomy independently confirm the concept; Schema.org material also supports it. | BINDING_ARBITRATION_EXISTING_PRODUCT_SEED_RETAINED |
+| manufacturer | Manufacturer | PROMOTE_ACTIVE_VERIFIED | HIGH | Amazon manufacturer + Schema.org manufacturer independently confirm the neutral concept. Adobe manufacturer is supplementary only because DEC-010 does not establish guaranteed availability across all installations; Shopify vendor and BigCommerce brand_name are not equivalents. | DOC_APPROVAL_EXISTING_PRODUCT_SEED_RETAINED |
+| model | Model | PROMOTE_ACTIVE_VERIFIED | HIGH | Amazon model_number/model_name + Schema.org Product.model confirm neutral model semantics; provider-specific vehicle model remains separate applicability. | DOC_APPROVAL_EXISTING_PRODUCT_SEED_RETAINED |
 
 `material` is the important special case: the concept itself is strongly confirmed by Adobe, Google, Amazon and Shopify evidence, but Product-only binding is too narrow to freeze without reviewing a Product+Variant two-binding model.
 
@@ -214,7 +216,7 @@ These sources support only the bounded arbitration changes above. They do not au
 
 ## Documentation conflicts that must be corrected before materialization
 
-1. **Brand vs manufacturer vs vendor.** `02-ATTRIBUTE_DICTIONARY.md` and the current registry describe `brand` as "Brand or manufacturer name". Five-provider evidence requires a strict split: Brand is the commercial brand; Manufacturer is the manufacturer concept; Shopify `vendor` is a provider-party label and is not automatically either one.
+1. **Brand vs manufacturer vs vendor.** Earlier drafts of `02-ATTRIBUTE_DICTIONARY.md` and the registry described `brand` as "Brand or manufacturer name". Five-provider evidence requires a strict split: Brand is the commercial brand; Manufacturer is the manufacturer concept; Shopify `vendor` is a provider-party label and is not automatically either one.
 2. **GTIN vs barcode.** Current documentation uses "GTIN / EAN / Barcode" loosely. GTIN is a standardized trade item identifier; an arbitrary barcode string is not automatically GTIN. Provider `barcode` mappings require validation/type evidence.
 3. **Status vs publication.** Internal lifecycle/active state must be defined separately from Shopify publication, BigCommerce visibility, Google publication controls and Amazon listing state.
 4. **SEO naming alignment.** The registry/Domain Model use `meta_title` / `meta_description`, while Attribute Dictionary localization text still refers to `seo_title` / `seo_description`. Keep one canonical naming contract and resolve localization/storage semantics before mapping expansion.

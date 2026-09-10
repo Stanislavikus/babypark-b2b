@@ -9951,22 +9951,23 @@ replacement of what already exists, but an addition alongside it:
   Merchant/Catalogue Category, not replace it, and will most naturally live in the
   connector/channel-mapping layer already anticipated for marketplace taxonomy mapping (GAP-006),
   not as a change to the core `categories` table.
-- **Merchant Type** (new, free-form, optional — inspired by Shopify's custom "product type"
+- **Merchant Type** (free-form, optional — inspired by Shopify's custom "product type"
   field, distinct from this document's existing `ProductType` template concept as explained
   above): an unstructured internal label a merchant can set for their own organization, with no
-  taxonomy backing and no attribute-unlocking behavior. Suggested future storage name:
-  `products.merchant_type` or `products.custom_type` — deliberately not a generic `type` column,
-  to keep it unambiguous in code as well as in docs.
-- **Tags** (new, free-form, optional, multiple per product): the loosest layer, for filtering/
-  collections on top of Merchant/Catalogue Category — never a substitute for it.
+  taxonomy backing and no attribute-unlocking behavior. Implemented as `products.merchant_type`
+  (nullable string column), deliberately not a generic `type` column to keep it unambiguous in
+  code as well as in docs.
+- **Tags** (free-form, optional, multiple per product): the loosest layer, for filtering/
+  collections on top of Merchant/Catalogue Category — never a substitute for it. Implemented as
+  a workspace-owned `tags` table + `product_tag` pivot with `workspace_id` isolation enforcement.
 
 **When Standard Category is eventually built** (not now), it becomes mandatory for product
 readiness/channel-export/publishing flows specifically — not for draft-product existence, and
 not a replacement for Merchant/Catalogue Category's storefront-navigation role.
 
-This is a planning decision, not yet implemented — see **GAP-011** for the `Merchant Type`/`Tags`
-schema task (ready to implement now) and the Standard Category concept (tracked, deferred,
-connects to GAP-006's connector/channel-mapping layer when built).
+`Merchant Type` and `Tags` are implemented on `develop` (see **GAP-011** for runtime notes and
+scope boundaries). Standard Category remains a tracked future concept and is not implemented
+today; it connects to GAP-006's connector/channel-mapping layer when built.
 
 This decision is closed and must not be reopened without a documentation-level decision. It
 does not reopen, override, or contradict the existing "Categories are workspace-owned" / "no
