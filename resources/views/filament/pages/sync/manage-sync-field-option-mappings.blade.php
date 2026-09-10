@@ -83,7 +83,12 @@
                 {{ $row['internal_label'] }}
               </td>
               <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-200">
-                {{ $row['external_label'] }}
+                <span>{{ $row['external_label'] }}</span>
+                @if ($row['is_suggested'])
+                  <span class="ml-2 text-xs text-gray-500 dark:text-gray-400" data-testid="sync-option-mapping-suggestion">
+                    {{ __('sync_option_mappings.suggestion') }}
+                  </span>
+                @endif
               </td>
               <td class="px-4 py-3 text-sm">
                 <span class="inline-flex items-center gap-1 text-gray-700 dark:text-gray-200">

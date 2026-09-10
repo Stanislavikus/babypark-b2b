@@ -5348,8 +5348,60 @@ have no meaning independently of the parent mapping.
 
 Persisted `FieldOptionMapping` = explicit authoritative correspondence.
 
-Label equality may later generate a **suggestion**. Label equality must **never**
-become persisted authority automatically.
+Canonical option evidence may generate a transient **suggestion** under the
+resolved contract below. Label equality, fuzzy matching, AI inference, and any
+other heuristic remain deferred and must **never** become persisted authority
+automatically.
+
+##### Canonical FieldOptionMapping suggestion contract
+[Resolved — Automatic Mapping Completion, 2026-09-10]
+
+This is a read-model/prefill capability over the existing Stage 2B Option Mapping
+surface. It introduces **no** migration, new persistence state, confidence column,
+or automatic mutation.
+
+A canonical option suggestion is eligible only when all of the following hold:
+
+1. the parent `FieldMapping` already exists as merchant-confirmed effective state;
+2. the current `FieldBinding` / `FieldDefinition` exposes the internal option code
+   through `FieldDefinitionOptionCatalog`;
+3. the connector definition code exactly equals the canonical registry `channel`;
+4. a verified canonical field-mapping row exists for the same `internal_code` and
+   its `external_field` exactly equals the confirmed `external_field_key`;
+5. the field-mapping row, canonical option row, and option-mapping row each
+   reference an existing **verified** applicability row;
+6. first-slice applicability is only `global` or the same `channel`; category- or
+   product-type-specific option evidence fails closed until the runtime projects
+   that context explicitly;
+7. applicability `entity_level` matches the confirmed FieldMapping binding's
+   `product` / `product_variant` object type;
+8. the canonical option row is `status = active` and
+   `verification_status = verified`;
+9. the canonical option mapping has `verification_status = verified`;
+10. the candidate `external_option_value` exactly exists in the authoritative
+    persisted account snapshot choices for the confirmed external field.
+
+The first slice treats external option values as opaque identities. It does not
+parse connector transport syntax, normalize IDs, guess labels, call remote HTTP,
+or manufacture account-specific Magento option IDs.
+
+Suggestion-set safety is fail-closed:
+
+```text
+one internal_option_key   -> at most one suggested external_option_value
+one external_option_value -> at most one suggested internal_option_key
+```
+
+Existing persisted `FieldOptionMapping` rows reserve their external values first
+and always win. A collision among remaining canonical candidates removes every
+colliding suggestion; no lexical/first-row priority is allowed. This stricter
+1:1 rule applies only to **automatic high-confidence suggestions**. It does not
+add a database uniqueness constraint to the legitimate persistence model.
+
+Suggestions are transient read-model state only. The UI may display/prefill one,
+but persistence occurs only after the merchant explicitly confirms through the
+existing `FieldOptionMappingMutationService`. A read, refresh, or action mount
+must never persist the suggestion.
 
 No Stage-1 merchant `FieldOptionMapping` UI.
 
@@ -5444,7 +5496,10 @@ suggestions.
 Do **not** hardcode `2.4.9-admin-rest` as “the account's runtime version.”
 
 For the first provider, version/applicability rows are **knowledge evidence
-only**.
+only**; they are not persisted account-runtime state and must not be used to
+guess a connected store version. The one bounded exception is the referenced
+verified applicability row's `entity_level`, which participates only in the
+§G.1 deterministic Product/ProductVariant target resolution described below.
 
 If multiple eligible verified canonical rows could imply different suggestions
 for the same internal target, the result is **ambiguous** → **no**
@@ -5520,7 +5575,8 @@ suggestion-set 1:1 invariant (§G.2) are satisfied.
 5. parent `FieldDefinition` is `active`;
 6. binding `object_type` is `product` or `product_variant`;
 7. registry `channel` exactly matches this connector definition `code`;
-8. canonical **mapping** evidence has `verification_status = verified`;
+8. canonical **mapping** evidence and its referenced applicability evidence both
+   have `verification_status = verified`;
 9. candidate `external_field` exactly exists as `external_field_key` in the
    authoritative snapshot resolved for this projection (§H);
 10. for this internal `field_binding_id`, there is **exactly one** resulting
@@ -5558,11 +5614,16 @@ For a canonical mapping row with `internal_code = X`, high-confidence
    merely reuse the same `code` are **not** canonical suggestion targets in this
    first slice.
 7. **Resolve `FieldBinding`** — active binding on that definition whose
-   `object_type` matches canonical `binding_strategy`:
+   `object_type` matches canonical `binding_strategy`, with the referenced
+   **verified** applicability row allowed to narrow only a genuine two-binding field:
    - `product` → `product` binding;
    - `product_variant` → `product_variant` binding;
-   - `product_and_variant_two_bindings` → each matching `product` / `product_variant`
-     binding may be evaluated separately as its own internal target.
+   - `product_and_variant_two_bindings` → `entity_level = product` selects only
+     the `product` binding; `entity_level = product_variant` selects only the
+     `product_variant` binding; missing / `not_applicable` / unsupported entity
+     level is ambiguous for this high-confidence slice → no suggestion.
+   This narrowing happens **before** §G.2 collision analysis; collision removal
+   must not be used as a substitute for known entity-level semantics.
 8. **Uniqueness** — fail closed if the canonical-field → definition → binding
    chain is not unique for the internal target under evaluation.
 
@@ -5597,7 +5658,12 @@ Do **not** choose first row, lexical sort winner, global-over-workspace winner,
 or any other arbitrary priority.
 
 This projection-level check is required even when each internal binding
-individually has exactly one candidate.
+individually has exactly one candidate. Applicability-driven entity-level
+narrowing from §G.1 is completed before a candidate reaches this collision set.
+There is no same-`internal_code` exemption: if separate verified applicability
+rows narrow one canonical two-binding field to Product and ProductVariant but
+both candidates would consume the same `external_field_key`, §G.2 still treats
+that as a collision and returns no high-confidence suggestion for either binding.
 
 ##### H. One authoritative discovery view per projection
 

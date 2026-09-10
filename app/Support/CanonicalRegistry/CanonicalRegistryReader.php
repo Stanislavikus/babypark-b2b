@@ -33,6 +33,22 @@ class CanonicalRegistryReader
     /**
      * @return list<array<string, string>>
      */
+    public function options(): array
+    {
+        return $this->load('canonical_product_field_options.csv');
+    }
+
+    /**
+     * @return list<array<string, string>>
+     */
+    public function optionMappings(): array
+    {
+        return $this->load('canonical_product_field_option_mappings.csv');
+    }
+
+    /**
+     * @return list<array<string, string>>
+     */
     public function channelDecisions(): array
     {
         return $this->load('canonical_product_field_channel_decisions.csv');
