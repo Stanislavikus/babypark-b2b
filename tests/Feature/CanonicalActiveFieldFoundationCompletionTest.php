@@ -27,19 +27,19 @@ class CanonicalActiveFieldFoundationCompletionTest extends TestCase
 {
     use RefreshDatabase;
 
-    /** @var array<string, array{AttributeDataType, string, string, array<string, string>}> */
+    /** @var array<string, array{AttributeDataType, string, string, bool, array<string, string>}> */
     private array $columnFields = [
-        'barcode_box' => [AttributeDataType::Text, 'products.barcode_box', 'identifiers', ['en' => 'Box Barcode', 'uk' => 'Штрихкод коробки', 'ru' => 'Штрихкод коробки']],
-        'min_order_quantity' => [AttributeDataType::Number, 'products.min_order_quantity', 'b2b', ['en' => 'Minimum Order Quantity', 'uk' => 'Мін. кількість замовлення', 'ru' => 'Мин. количество заказа']],
-        'order_step' => [AttributeDataType::Number, 'products.order_step', 'b2b', ['en' => 'Order Step', 'uk' => 'Крок замовлення', 'ru' => 'Шаг заказа']],
-        'package_quantity' => [AttributeDataType::Number, 'products.package_quantity', 'logistics', ['en' => 'Package Quantity', 'uk' => 'Кількість в упаковці', 'ru' => 'Количество в упаковке']],
-        'package_type' => [AttributeDataType::Text, 'products.package_type', 'logistics', ['en' => 'Package Type', 'uk' => 'Тип упаковки', 'ru' => 'Тип упаковки']],
-        'units_per_box' => [AttributeDataType::Number, 'products.units_per_box', 'logistics', ['en' => 'Units Per Box', 'uk' => 'Одиниць у коробці', 'ru' => 'Единиц в коробке']],
-        'boxes_per_pallet' => [AttributeDataType::Number, 'products.boxes_per_pallet', 'logistics', ['en' => 'Boxes Per Pallet', 'uk' => 'Коробок на палеті', 'ru' => 'Коробок на паллете']],
-        'lead_time_days' => [AttributeDataType::Number, 'products.lead_time_days', 'logistics', ['en' => 'Lead Time Days', 'uk' => 'Термін поставки (дні)', 'ru' => 'Срок поставки (дни)']],
-        'depth_mm' => [AttributeDataType::Number, 'products.depth_mm', 'logistics', ['en' => 'Depth', 'uk' => 'Глибина', 'ru' => 'Глубина']],
-        'width_mm' => [AttributeDataType::Number, 'products.width_mm', 'logistics', ['en' => 'Width', 'uk' => 'Ширина', 'ru' => 'Ширина']],
-        'height_mm' => [AttributeDataType::Number, 'products.height_mm', 'logistics', ['en' => 'Height', 'uk' => 'Висота', 'ru' => 'Высота']],
+        'barcode_box' => [AttributeDataType::Text, 'products.barcode_box', 'identifiers', false, ['en' => 'Box Barcode', 'uk' => 'Штрихкод коробки', 'ru' => 'Штрихкод коробки']],
+        'min_order_quantity' => [AttributeDataType::Number, 'products.min_order_quantity', 'b2b', true, ['en' => 'Minimum Order Quantity', 'uk' => 'Мін. кількість замовлення', 'ru' => 'Мин. количество заказа']],
+        'order_step' => [AttributeDataType::Number, 'products.order_step', 'b2b', true, ['en' => 'Order Step', 'uk' => 'Крок замовлення', 'ru' => 'Шаг заказа']],
+        'package_quantity' => [AttributeDataType::Number, 'products.package_quantity', 'logistics', false, ['en' => 'Package Quantity', 'uk' => 'Кількість в упаковці', 'ru' => 'Количество в упаковке']],
+        'package_type' => [AttributeDataType::Text, 'products.package_type', 'logistics', false, ['en' => 'Package Type', 'uk' => 'Тип упаковки', 'ru' => 'Тип упаковки']],
+        'units_per_box' => [AttributeDataType::Number, 'products.units_per_box', 'logistics', false, ['en' => 'Units Per Box', 'uk' => 'Одиниць у коробці', 'ru' => 'Единиц в коробке']],
+        'boxes_per_pallet' => [AttributeDataType::Number, 'products.boxes_per_pallet', 'logistics', false, ['en' => 'Boxes Per Pallet', 'uk' => 'Коробок на палеті', 'ru' => 'Коробок на паллете']],
+        'lead_time_days' => [AttributeDataType::Number, 'products.lead_time_days', 'logistics', false, ['en' => 'Lead Time Days', 'uk' => 'Термін поставки (дні)', 'ru' => 'Срок поставки (дни)']],
+        'depth_mm' => [AttributeDataType::Number, 'products.depth_mm', 'logistics', false, ['en' => 'Depth', 'uk' => 'Глибина', 'ru' => 'Глубина']],
+        'width_mm' => [AttributeDataType::Number, 'products.width_mm', 'logistics', false, ['en' => 'Width', 'uk' => 'Ширина', 'ru' => 'Ширина']],
+        'height_mm' => [AttributeDataType::Number, 'products.height_mm', 'logistics', false, ['en' => 'Height', 'uk' => 'Висота', 'ru' => 'Высота']],
     ];
 
     protected function setUp(): void
@@ -51,24 +51,24 @@ class CanonicalActiveFieldFoundationCompletionTest extends TestCase
 
     public function test_safe_materialization_set_has_exact_canonical_metadata_and_bindings(): void
     {
-        foreach ($this->columnFields as $code => [$dataType, $storagePath, $group, $labels]) {
+        foreach ($this->columnFields as $code => [$dataType, $storagePath, $group, $b2bVisible, $labels]) {
             $definition = $this->definition($code);
             $this->assertDefinition($definition, $dataType, AttributeScope::System, $labels, false);
-            $this->assertExactBindings($definition, [[FieldObjectType::Product, AttributeStorageType::Column, $storagePath, $group]]);
+            $this->assertExactBindings($definition, [[FieldObjectType::Product, AttributeStorageType::Column, $storagePath, $group, false, ['admin' => true, 'b2b' => $b2bVisible, 'channels' => []]]]);
         }
 
         foreach (['pattern' => ['Pattern', 'Візерунок', 'Узор'], 'style' => ['Style', 'Стиль', 'Стиль']] as $code => $labels) {
             $definition = $this->definition($code);
             $this->assertDefinition($definition, AttributeDataType::Text, AttributeScope::PlatformLibrary, array_combine(['en', 'uk', 'ru'], $labels), false);
             $this->assertExactBindings($definition, [
-                [FieldObjectType::Product, AttributeStorageType::Dynamic, null, 'characteristics'],
-                [FieldObjectType::ProductVariant, AttributeStorageType::Dynamic, null, 'characteristics'],
+                [FieldObjectType::Product, AttributeStorageType::Dynamic, null, 'characteristics', true, ['admin' => true, 'b2b' => true, 'channels' => []]],
+                [FieldObjectType::ProductVariant, AttributeStorageType::Dynamic, null, 'characteristics', true, ['admin' => true, 'b2b' => true, 'channels' => []]],
             ]);
         }
 
         $warranty = $this->definition('warranty');
         $this->assertDefinition($warranty, AttributeDataType::LongText, AttributeScope::PlatformLibrary, ['en' => 'Warranty Description', 'uk' => 'Гарантія', 'ru' => 'Гарантия'], true);
-        $this->assertExactBindings($warranty, [[FieldObjectType::Product, AttributeStorageType::Dynamic, null, 'descriptions']]);
+        $this->assertExactBindings($warranty, [[FieldObjectType::Product, AttributeStorageType::Dynamic, null, 'descriptions', false, ['admin' => true, 'b2b' => true, 'channels' => []]]]);
     }
 
     public function test_seeder_is_idempotent_and_exclusions_remain_unseeded(): void
@@ -136,12 +136,15 @@ class CanonicalActiveFieldFoundationCompletionTest extends TestCase
     {
         $actual = FieldBinding::withoutWorkspaceScope()->whereBelongsTo($definition)->orderBy('object_type')->get();
         $this->assertCount(count($expected), $actual);
-        foreach ($expected as [$objectType, $storageType, $storagePath, $group]) {
+        foreach ($expected as [$objectType, $storageType, $storagePath, $group, $isFilterable, $visibility]) {
             $binding = $actual->firstWhere('object_type', $objectType);
             $this->assertNotNull($binding);
             $this->assertSame($storageType, $binding->storage_type);
             $this->assertSame($storagePath, $binding->storage_path);
             $this->assertSame($group, $binding->field_group);
+            $this->assertSame($isFilterable, $binding->is_filterable);
+            $this->assertFalse($binding->is_sortable);
+            $this->assertSame($visibility, $binding->visibility_settings);
             $this->assertSame(AttributeStatus::Active, $binding->status);
         }
     }
