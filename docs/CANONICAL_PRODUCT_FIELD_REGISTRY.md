@@ -726,7 +726,9 @@ alias:price:ru:цена:import_header:global
 
 ## Current seed → Proposed registry diff
 
-Based on `database/seeders/FieldDefinitionSeeder.php` (develop@3c3f926) and `docs/02-ATTRIBUTE_DICTIONARY.md`.
+Based on `database/seeders/FieldDefinitionSeeder.php` (develop@76ec9dbe035fe6ce60087e900d73fca76cf7ab14), plus the current implementation gap ledger and contract tests (notably `FieldDefinitionSeederFoundationSeedV5Test`).
+
+Runtime materialization (`FieldDefinition`/`FieldBinding` exists and is seeded as `status = active`) is **not** the same as canonical semantic promotion in this registry and the vNext proposal. Some fields are already materialized in runtime while remaining governance-proposed or binding-gated at the documentation level.
 
 ### Already correct
 
@@ -738,29 +740,45 @@ Based on `database/seeders/FieldDefinitionSeeder.php` (develop@3c3f926) and `doc
 | `name` | Seeded; shared FieldDefinition with Customer binding; only strict required field for product creation |
 | `description` | Seeded |
 | `category` | Correctly modeled as `relation`, not flat text |
+| `status` | Seeded; canonical status is the boolean `products.is_active` active-state contract |
 | `color`, `size` | Platform library seeded with option codes |
 | `net_weight`, `gross_weight`, `volume_m3` | System logistics fields seeded |
 | `shipping_required`, `backorder_policy` | Platform library seeded |
 | `technical_characteristics`, `instructions` | Localizable platform library seeded |
+| `condition` | Seeded (Foundation seed v5); Variant binding; semantic promotion gate is documentation-level only |
+| `short_description` | Seeded (Foundation seed v5); Product binding; may remain governance-proposed even though runtime is materialized |
+| `material` | Seeded (Foundation seed v5); Product binding; binding arbitration (Product vs Product+Variant) remains a documentation gate |
+| `country_of_origin` | Seeded (Foundation seed v5); Product binding; owner/binding definition clarity remains a documentation gate |
+| `manufacturer` | Seeded (Foundation seed v5); Product binding; distinct from `brand` and provider `vendor` labels |
+| `model` | Seeded (Foundation seed v5); Product binding; neutral model concept distinct from MPN |
+| `compatibility` | Seeded (Foundation seed v5); Product binding; may remain governance-proposed even though runtime is materialized |
+| `battery_type` | Seeded (Foundation seed v5); Product binding; may remain governance-proposed even though runtime is materialized |
 
-### Missing confirmed candidates
+### Active canonical concepts without FieldDefinition/FieldBinding seed (yet)
 
-| internal_code | recommended_action | Blocker |
-|---|---|---|
-| `mpn` | `add_to_platform_library` | Seeded (DEC-001 binding + DEC-005 scope) |
-| `condition` | `add_to_platform_library` | Not in seeder; Google required for ads |
-| `price`, `sale_price`, `cost_price` | `covered_by_existing_domain` | Documented in Attribute Dictionary but not in FieldDefinitionSeeder |
-| `availability` | `covered_by_existing_domain` | Inventory domain; not FieldDefinition |
-| `image` | `covered_by_existing_domain` | Media domain |
-| `short_description` | `add_to_platform_library` | Documented as localizable; not seeded |
-| `material`, `age_group`, `gender`, `country_of_origin`, `manufacturer`, `model`, `compatibility`, `battery_type` | `add_to_platform_library` | Attribute Dictionary seed list; not in FieldDefinitionSeeder |
+These concepts are active and `field_definition_eligibility = yes` in the canonical registry CSV, but are not currently seeded in `FieldDefinitionSeeder` (no `FieldDefinition`/`FieldBinding` rows exist in runtime). This is documentation truth only; this PR does not seed anything.
+
+At minimum, this includes:
+
+- `barcode_box`
+- `unit`
+- `min_order_quantity`
+- `order_step`
+- `package_quantity`
+- `package_type`
+- `units_per_box`
+- `boxes_per_pallet`
+- `lead_time_days`
+- `depth_mm`, `width_mm`, `height_mm`
+- `meta_title`, `meta_description` (columns exist on `products`, but not governed through Field Foundation yet)
+- `pattern`, `style`, `warranty`, `product_highlights`
+
+`age_group` and `gender` remain intentionally gated.
 
 ### Incorrectly modeled
 
 | Issue | Current state | Registry correction |
 |---|---|---|
-| `name.is_localizable` | Seeded `false`; docs say localizable for product-level content | Registry marks `false` matching **current seeder**; docs/02 conflict flagged for future DEC |
-| `status` data_type | Seeded as `boolean` mapping `is_active` | Registry keeps `boolean`; enum lifecycle (draft/active/archived) deferred |
 | Legacy `products.sku` column | DB has product-level SKU; seeder binds SKU to variant | Registry follows seeder (variant); legacy column noted as migration debt |
 | `onec_guid` classified as Product/System then as ConnectorMapping | Was `core_model_property` / `keep_as_is`, then `connector_only` / `ConnectorMapping` / `connector_mapping_only` | DEC-011: `external_identity` / `ExternalRecordLink` / `external_identity_only`; not a System Field and not a FieldMapping; physical columns are legacy identity debt |
 

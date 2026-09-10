@@ -86,8 +86,8 @@ Missing Concept Union contains **34 explicitly classified candidates/representat
 | depth_mm | KEEP_CONCEPT_VARIANT_BINDING_REVIEW | HIGH_CONCEPT_MEDIUM_BINDING | TARGETED_BINDING_REVIEW_BEFORE_VARIANT_MAPPING | Keep current Product column semantics. Before Variant mapping, decide how the core_model_property concept is registered through FieldDefinition/FieldBinding so Product can retain a column binding and Variant can use a dynamic binding on the same concept. |
 | width_mm | KEEP_CONCEPT_VARIANT_BINDING_REVIEW | HIGH_CONCEPT_MEDIUM_BINDING | TARGETED_BINDING_REVIEW_BEFORE_VARIANT_MAPPING | Keep current Product column semantics. Before Variant mapping, decide how the core_model_property concept is registered through FieldDefinition/FieldBinding so Product can retain a column binding and Variant can use a dynamic binding on the same concept. |
 | height_mm | KEEP_CONCEPT_VARIANT_BINDING_REVIEW | HIGH_CONCEPT_MEDIUM_BINDING | TARGETED_BINDING_REVIEW_BEFORE_VARIANT_MAPPING | Keep current Product column semantics. Before Variant mapping, decide how the core_model_property concept is registered through FieldDefinition/FieldBinding so Product can retain a column binding and Variant can use a dynamic binding on the same concept. |
-| meta_title | KEEP_CONCEPT_DOC_ALIGNMENT | HIGH | ALIGN_02_NAMING_LOCALIZATION_BEFORE_NEW_SEED | Keep current canonical code/owner. Align 02 wording (seo_title/seo_description) with registry meta_title/meta_description and preserve localization decision gate. |
-| meta_description | KEEP_CONCEPT_DOC_ALIGNMENT | HIGH | ALIGN_02_NAMING_LOCALIZATION_BEFORE_NEW_SEED | Keep current canonical code/owner. Align 02 wording (seo_title/seo_description) with registry meta_title/meta_description and preserve localization decision gate. |
+| meta_title | KEEP_CONCEPT_DOC_ALIGNMENT | HIGH | ALIGN_02_NAMING_LOCALIZATION_BEFORE_NEW_SEED | Keep current canonical code/owner. 02 naming is aligned to registry meta_title/meta_description; localization/storage semantics remain a gate before any new governed seed. |
+| meta_description | KEEP_CONCEPT_DOC_ALIGNMENT | HIGH | ALIGN_02_NAMING_LOCALIZATION_BEFORE_NEW_SEED | Keep current canonical code/owner. 02 naming is aligned to registry meta_title/meta_description; localization/storage semantics remain a gate before any new governed seed. |
 | material | PROMOTE_SEMANTIC_CONFIDENCE_BINDING_REVIEW | HIGH | BINDING_ARBITRATION_BEFORE_SEED | Concept is strong enough for active/verified. Product-only vs Product+Variant binding still merits targeted review. |
 | age_group | KEEP_PROPOSED_BINDING_GAP | HIGH_CONCEPT_MEDIUM_BINDING | GAP_022_BINDING_DECISION | Concept is strong; do not seed until Product-vs-Variant applicability is resolved. |
 | gender | KEEP_PROPOSED_BINDING_GAP | HIGH_CONCEPT_MEDIUM_BINDING | GAP_022_BINDING_DECISION | Concept is strong; do not seed until Product-vs-Variant applicability is resolved. |
@@ -97,6 +97,8 @@ Missing Concept Union contains **34 explicitly classified candidates/representat
 | compatibility | KEEP_PROPOSED | MEDIUM | MORE_EVIDENCE | Keep candidate, not active global library yet. |
 | battery_type | KEEP_PROPOSED | MEDIUM | MORE_EVIDENCE | Keep candidate; do not flatten structured battery compliance into one field. |
 | has_energy_consumption_details | KEEP_LEGAL_REVIEW | MEDIUM | NORMATIVE_LEGAL_EVIDENCE | No promotion without the legal/compliance evidence required by registry governance. |
+
+Runtime note: on `develop` as of `76ec9dbe035fe6ce60087e900d73fca76cf7ab14`, `FieldDefinitionSeeder` already materializes `condition`, `short_description`, `material`, `country_of_origin`, `manufacturer`, `model`, `compatibility`, and `battery_type` (each with a matching `FieldBinding`). The gates above must be read as semantic promotion / owner/binding arbitration gates, not as “first seed exists only in the future”.
 
 ### Important preservation decisions
 
@@ -214,7 +216,7 @@ These sources support only the bounded arbitration changes above. They do not au
 
 ## Documentation conflicts that must be corrected before materialization
 
-1. **Brand vs manufacturer vs vendor.** `02-ATTRIBUTE_DICTIONARY.md` and the current registry describe `brand` as "Brand or manufacturer name". Five-provider evidence requires a strict split: Brand is the commercial brand; Manufacturer is the manufacturer concept; Shopify `vendor` is a provider-party label and is not automatically either one.
+1. **Brand vs manufacturer vs vendor.** Earlier drafts of `02-ATTRIBUTE_DICTIONARY.md` and the registry described `brand` as "Brand or manufacturer name". Five-provider evidence requires a strict split: Brand is the commercial brand; Manufacturer is the manufacturer concept; Shopify `vendor` is a provider-party label and is not automatically either one.
 2. **GTIN vs barcode.** Current documentation uses "GTIN / EAN / Barcode" loosely. GTIN is a standardized trade item identifier; an arbitrary barcode string is not automatically GTIN. Provider `barcode` mappings require validation/type evidence.
 3. **Status vs publication.** Internal lifecycle/active state must be defined separately from Shopify publication, BigCommerce visibility, Google publication controls and Amazon listing state.
 4. **SEO naming alignment.** The registry/Domain Model use `meta_title` / `meta_description`, while Attribute Dictionary localization text still refers to `seo_title` / `seo_description`. Keep one canonical naming contract and resolve localization/storage semantics before mapping expansion.

@@ -96,13 +96,13 @@ The system must explicitly split system attributes by their architectural assign
 
 - name — Base product name. 
 
-- brand — Brand or manufacturer name. 
+- brand — Commercial brand name. Not automatically equivalent to the manufacturer. `manufacturer` is a separate Platform Library concept, and provider-side labels (e.g. Shopify `vendor`) are not automatically either one.
 
 - category — Category reference. **Crucial Rule**: This is not a flat text field. It is a system relation mapping the product to the Workspace Category Tree entity. During import, if a category path doesn't exist, the platform automatically creates the corresponding nodes in the tree structure. 
 
 - description — Detailed product description. 
 
-- status — Product lifecycle status (e.g., draft, active, archived). **Crucial Rule**: This field belongs strictly to the product lifecycle and channel visibility. It has absolutely no operational relation to order_status or payment_status. 
+- status — Product active state (boolean), backed by `products.is_active`. Provider publication/visibility/listing state is a distinct concept and must not be treated as canonical equality. Future richer lifecycle enums remain deferred unless explicitly resolved elsewhere. This has absolutely no operational relation to order_status or payment_status.
 
 - url — Primary absolute customer-facing product page URL. 
 
@@ -110,7 +110,7 @@ The system must explicitly split system attributes by their architectural assign
 
 - sku — SKU / article number. 
 
-- gtin — GTIN / EAN / Barcode. 
+- gtin — GTIN (currently stored as `product_variants.barcode_ean`). No validated GTIN normalization boundary exists yet; generic provider barcodes must not be assumed validated GTINs.
 
 - price — Public / base price in workspace currency. 
 
@@ -311,7 +311,7 @@ separate documentation-level decision.
 - `name` — `is_localizable = false`. Stored as a scalar database column (`products.name`, `string`), not as a translation object. `storage_type: Column`, `storage_path: products.name`.
 - `description` — `is_localizable = false`. Stored as a scalar database column (`products.description`, `text`), not as a translation object. `storage_type: Column`, `storage_path: products.description`.
 - `short_description` — `is_localizable = true`. Stored via dynamic value storage (`storage_type: Dynamic`), not as a scalar column. User-facing localized content fields that use dynamic storage must be marked `is_localizable = true`.
-- `seo_title` / `seo_description` — no `FieldDefinition` is seeded yet; there is no current runtime contract for `is_localizable` or storage model. When these fields are added, their localizable/storage model must be decided explicitly before seed — not assumed here.
+- `meta_title` / `meta_description` — `products.meta_title` and `products.meta_description` columns exist, but no `FieldDefinition`/`FieldBinding` is seeded yet; there is no current runtime contract for `is_localizable` or storage model. When these fields are added to the governed Field Foundation surface, their localizable/storage model must be decided explicitly before seed — not assumed here.
 
 **Reason (`name` / `description`):** Both fields are scalar database columns, not translation objects. Localized field labels (`localized_labels`) describe the attribute name in the UI; they do not mean the field value itself is localized.
 
