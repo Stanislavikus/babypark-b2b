@@ -447,6 +447,7 @@
     "sync_option_mappings.status.unmapped": "Needs mapping",
     "sync_option_mappings.status.external_value_unavailable": "Value no longer available",
     "sync_option_mappings.status.stale_correspondence": "Stale correspondence",
+    "sync_option_mappings.suggestion": "Suggested",
     "sync_option_mappings.actions.confirm": "Map",
     "sync_option_mappings.actions.change": "Change",
     "sync_option_mappings.actions.remove": "Remove mapping",

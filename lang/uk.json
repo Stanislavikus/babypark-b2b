@@ -447,6 +447,7 @@
     "sync_option_mappings.status.unmapped": "Потрібно зіставити",
     "sync_option_mappings.status.external_value_unavailable": "Значення більше недоступне",
     "sync_option_mappings.status.stale_correspondence": "Застаріла відповідність",
+    "sync_option_mappings.suggestion": "Запропоновано",
     "sync_option_mappings.actions.confirm": "Зіставити",
     "sync_option_mappings.actions.change": "Змінити",
     "sync_option_mappings.actions.remove": "Видалити зіставлення",

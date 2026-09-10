@@ -21,6 +21,7 @@ final class FieldOptionMappingReadModelProjector
         private readonly FieldDefinitionOptionCatalog $optionCatalog,
         private readonly AuthoritativeExternalOptionChoiceResolver $externalOptionChoiceResolver,
         private readonly AuthoritativeConnectorSchemaSnapshotResolver $snapshotResolver,
+        private readonly CanonicalFieldOptionMappingSuggestionProvider $suggestionProvider,
     ) {}
 
     public function project(
@@ -70,12 +71,29 @@ final class FieldOptionMappingReadModelProjector
             ? $this->optionCatalog->currentOptionCodes($definition)
             : [];
         $currentOptionCodeSet = array_fill_keys($currentOptionCodes, true);
-
         $persistedByInternalKey = [];
+        $reservedExternalValues = [];
 
         foreach ($mapping->optionMappings as $optionMapping) {
             $persistedByInternalKey[$optionMapping->internal_option_key] = $optionMapping;
+            $reservedExternalValues[] = $optionMapping->external_option_value;
         }
+
+        $unmappedInternalOptionKeys = array_values(array_filter(
+            $currentOptionCodes,
+            static fn (string $optionCode): bool => ! isset($persistedByInternalKey[$optionCode]),
+        ));
+        $suggestions = ($eligible && $binding !== null && $definition !== null && $externalChoicesResolvable)
+            ? $this->suggestionProvider->suggest(
+                connectorDefinitionCode: $account->connectorDefinition->code,
+                internalFieldCode: $definition->code,
+                objectType: $binding->object_type,
+                externalFieldKey: $externalFieldKey,
+                internalOptionKeys: $unmappedInternalOptionKeys,
+                authoritativeExternalValues: array_keys($externalLabelsByValue),
+                reservedExternalValues: $reservedExternalValues,
+            )
+            : [];
 
         $normalRows = [];
 
@@ -86,11 +104,15 @@ final class FieldOptionMappingReadModelProjector
                 : $internalOptionKey;
 
             if ($persisted === null) {
+                $suggestedExternalValue = $suggestions[$internalOptionKey] ?? null;
+
                 $normalRows[] = new FieldOptionMappingNormalRow(
                     internalOptionKey: $internalOptionKey,
                     internalLabel: $internalLabel,
-                    externalOptionValue: null,
-                    externalLabel: null,
+                    externalOptionValue: $suggestedExternalValue,
+                    externalLabel: $suggestedExternalValue !== null
+                        ? ($externalLabelsByValue[$suggestedExternalValue] ?? null)
+                        : null,
                     semanticState: FieldOptionMappingRowState::UNMAPPED,
                     existingExternalOptionValue: null,
                 );

@@ -430,6 +430,7 @@
     "sync_option_mappings.status.unmapped": "Нужно сопоставить",
     "sync_option_mappings.status.external_value_unavailable": "Значение больше недоступно",
     "sync_option_mappings.status.stale_correspondence": "Устаревшее соответствие",
+    "sync_option_mappings.suggestion": "Предложено",
     "sync_option_mappings.actions.confirm": "Сопоставить",
     "sync_option_mappings.actions.change": "Изменить",
     "sync_option_mappings.actions.remove": "Удалить сопоставление",

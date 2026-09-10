@@ -5348,8 +5348,60 @@ have no meaning independently of the parent mapping.
 
 Persisted `FieldOptionMapping` = explicit authoritative correspondence.
 
-Label equality may later generate a **suggestion**. Label equality must **never**
-become persisted authority automatically.
+Canonical option evidence may generate a transient **suggestion** under the
+resolved contract below. Label equality, fuzzy matching, AI inference, and any
+other heuristic remain deferred and must **never** become persisted authority
+automatically.
+
+##### Canonical FieldOptionMapping suggestion contract
+[Resolved — Automatic Mapping Completion, 2026-09-10]
+
+This is a read-model/prefill capability over the existing Stage 2B Option Mapping
+surface. It introduces **no** migration, new persistence state, confidence column,
+or automatic mutation.
+
+A canonical option suggestion is eligible only when all of the following hold:
+
+1. the parent `FieldMapping` already exists as merchant-confirmed effective state;
+2. the current `FieldBinding` / `FieldDefinition` exposes the internal option code
+   through `FieldDefinitionOptionCatalog`;
+3. the connector definition code exactly equals the canonical registry `channel`;
+4. a verified canonical field-mapping row exists for the same `internal_code` and
+   its `external_field` exactly equals the confirmed `external_field_key`;
+5. the field-mapping row, canonical option row, and option-mapping row each
+   reference an existing **verified** applicability row;
+6. first-slice applicability is only `global` or the same `channel`; category- or
+   product-type-specific option evidence fails closed until the runtime projects
+   that context explicitly;
+7. applicability `entity_level` matches the confirmed FieldMapping binding's
+   `product` / `product_variant` object type;
+8. the canonical option row is `status = active` and
+   `verification_status = verified`;
+9. the canonical option mapping has `verification_status = verified`;
+10. the candidate `external_option_value` exactly exists in the authoritative
+    persisted account snapshot choices for the confirmed external field.
+
+The first slice treats external option values as opaque identities. It does not
+parse connector transport syntax, normalize IDs, guess labels, call remote HTTP,
+or manufacture account-specific Magento option IDs.
+
+Suggestion-set safety is fail-closed:
+
+```text
+one internal_option_key   -> at most one suggested external_option_value
+one external_option_value -> at most one suggested internal_option_key
+```
+
+Existing persisted `FieldOptionMapping` rows reserve their external values first
+and always win. A collision among remaining canonical candidates removes every
+colliding suggestion; no lexical/first-row priority is allowed. This stricter
+1:1 rule applies only to **automatic high-confidence suggestions**. It does not
+add a database uniqueness constraint to the legitimate persistence model.
+
+Suggestions are transient read-model state only. The UI may display/prefill one,
+but persistence occurs only after the merchant explicitly confirms through the
+existing `FieldOptionMappingMutationService`. A read, refresh, or action mount
+must never persist the suggestion.
 
 No Stage-1 merchant `FieldOptionMapping` UI.
 

@@ -31,12 +31,14 @@ use App\Models\User;
 use App\Models\VariantFieldValue;
 use App\Models\Workspace;
 use App\Models\WorkspaceUser;
+use App\Services\Sync\CanonicalFieldOptionMappingSuggestionProvider;
 use App\Services\Sync\CreateSyncConfigurationInput;
 use App\Services\Sync\FieldDefinitionInternalOptionValidator;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\FieldOptionMappingAuthorizationService;
 use App\Services\Sync\FieldOptionMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
+use App\Support\CanonicalRegistry\CanonicalRegistryReader;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Sync\ConnectorExecutionConfiguration;
 use App\Support\Sync\Exceptions\FieldMappingValidationException;
@@ -664,6 +666,77 @@ class Stage2BOptionMappingTest extends TestCase
     }
 
     #[Test]
+    public function existing_mapping_keeps_current_value_prefilled_when_canonical_suggestions_are_enabled(): void
+    {
+        [$account, $configuration, $mapping] = $this->colorMappingFixture();
+        $this->bindCanonicalColorOptionSuggestionProvider();
+        $actor = $this->actorWithPermissions([WorkspacePermissions::MANAGE_SYNC_MAPPINGS]);
+
+        FieldOptionMapping::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'field_mapping_id' => $mapping->id,
+            'internal_option_key' => 'blue',
+            'external_option_value' => '93',
+        ]);
+
+        Livewire::actingAs($actor)
+            ->test(ManageSyncFieldOptionMappings::class, $this->optionPageParameters($account, $configuration, $mapping))
+            ->mountAction('changeMapping', [
+                'internalOptionKey' => 'blue',
+                'externalOptionValue' => '93',
+            ])
+            ->assertActionDataSet(['external_option_value' => '93']);
+    }
+
+    #[Test]
+    public function verified_canonical_option_suggestion_is_transient_and_prefills_confirmation_action(): void
+    {
+        [$account, $configuration, $mapping] = $this->colorMappingFixture();
+        $this->bindCanonicalColorOptionSuggestionProvider();
+        $actor = $this->actorWithPermissions([WorkspacePermissions::MANAGE_SYNC_MAPPINGS]);
+
+        $component = Livewire::actingAs($actor)
+            ->test(ManageSyncFieldOptionMappings::class, $this->optionPageParameters($account, $configuration, $mapping))
+            ->assertSeeHtml('data-testid="sync-option-mapping-suggestion"')
+            ->assertSee(__('sync_option_mappings.suggestion'));
+
+        $rowsByKey = collect($component->instance()->displayRows)->keyBy('internal_option_key');
+
+        $this->assertSame('unmapped', $rowsByKey['blue']['semantic_state']);
+        $this->assertSame('93', $rowsByKey['blue']['suggested_external_option_value']);
+        $this->assertSame('Blue', $rowsByKey['blue']['external_label']);
+        $this->assertTrue($rowsByKey['blue']['is_suggested']);
+        $this->assertNull($rowsByKey['blue']['existing_external_option_value']);
+        $this->assertDatabaseMissing('field_option_mappings', [
+            'field_mapping_id' => $mapping->id,
+            'internal_option_key' => 'blue',
+        ]);
+
+        $component
+            ->mountAction('changeMapping', [
+                'internalOptionKey' => 'blue',
+                'externalOptionValue' => '',
+            ])
+            ->assertActionDataSet(['external_option_value' => '93']);
+
+        $this->assertDatabaseMissing('field_option_mappings', [
+            'field_mapping_id' => $mapping->id,
+            'internal_option_key' => 'blue',
+        ]);
+
+        $component
+            ->callMountedAction()
+            ->assertNotified(__('sync_option_mappings.notifications.changed'));
+
+        $this->assertDatabaseHas('field_option_mappings', [
+            'field_mapping_id' => $mapping->id,
+            'internal_option_key' => 'blue',
+            'external_option_value' => '93',
+        ]);
+    }
+
+    #[Test]
     public function missing_snapshot_keeps_read_model_safe_without_external_choices(): void
     {
         $account = $this->createSyncSupportAccount();
@@ -743,8 +816,9 @@ class Stage2BOptionMappingTest extends TestCase
 
         Livewire::actingAs($actor)
             ->test(ManageSyncFieldOptionMappings::class, $this->optionPageParameters($account, $configuration, $mapping))
-            ->assertDontSee(__('sync_option_mappings.actions.confirm'))
-            ->assertDontSee(__('sync_option_mappings.actions.remove'));
+            ->assertDontSeeHtml('data-testid="sync-option-mapping-confirm"')
+            ->assertDontSeeHtml('data-testid="sync-option-mapping-change"')
+            ->assertDontSeeHtml('data-testid="sync-option-mapping-remove"');
     }
 
     #[Test]
@@ -1368,6 +1442,34 @@ class Stage2BOptionMappingTest extends TestCase
         $this->grantExactWorkspacePermissions($workspace, $actor, $permissions);
 
         return $actor;
+    }
+
+    private function bindCanonicalColorOptionSuggestionProvider(): void
+    {
+        $path = sys_get_temp_dir().'/canonical-option-suggestions-'.Str::uuid();
+        mkdir($path, 0777, true);
+
+        file_put_contents(
+            $path.'/canonical_product_field_mappings.csv',
+            "internal_code,channel,external_field,applicability_id,verification_status\ncolor,adobe_commerce,color,a-color-adobe,verified\n",
+        );
+        file_put_contents(
+            $path.'/canonical_product_field_options.csv',
+            "option_id,internal_code,option_code,applicability_id,verification_status,status\no-blue,color,blue,a-color-adobe,verified,active\no-pink,color,pink,a-color-adobe,verified,active\n",
+        );
+        file_put_contents(
+            $path.'/canonical_product_field_option_mappings.csv',
+            "option_id,channel,external_option_value,applicability_id,verification_status\no-blue,adobe_commerce,93,a-color-adobe,verified\no-pink,adobe_commerce,94,a-color-adobe,verified\n",
+        );
+        file_put_contents(
+            $path.'/canonical_product_field_applicability.csv',
+            "applicability_id,internal_code,context_type,channel_or_state,entity_level,verification_status\na-color-adobe,color,channel,adobe_commerce,product_variant,verified\n",
+        );
+
+        app()->instance(
+            CanonicalFieldOptionMappingSuggestionProvider::class,
+            new CanonicalFieldOptionMappingSuggestionProvider(new CanonicalRegistryReader($path)),
+        );
     }
 
     /**

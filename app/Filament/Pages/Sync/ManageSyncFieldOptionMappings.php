@@ -231,6 +231,17 @@ class ManageSyncFieldOptionMappings extends Page implements HasActions, HasSchem
     {
         return Action::make('changeMapping')
             ->modalHeading(__('sync_option_mappings.actions.change_heading'))
+            ->fillForm(function (array $arguments): array {
+                $currentExternalOptionValue = (string) ($arguments['externalOptionValue'] ?? '');
+                $suggestedExternalOptionValue = $this->suggestedExternalOptionValue(
+                    (string) ($arguments['internalOptionKey'] ?? ''),
+                );
+
+                return [
+                    'external_option_value' => $suggestedExternalOptionValue
+                        ?? ($currentExternalOptionValue !== '' ? $currentExternalOptionValue : null),
+                ];
+            })
             ->schema([
                 Select::make('external_option_value')
                     ->label($this->platformName)
@@ -289,6 +300,38 @@ class ManageSyncFieldOptionMappings extends Page implements HasActions, HasSchem
 
                 $this->refreshReadModel();
             });
+    }
+
+    private function suggestedExternalOptionValue(string $internalOptionKey): ?string
+    {
+        if ($internalOptionKey === '') {
+            return null;
+        }
+
+        $user = Auth::user();
+        abort_unless($user instanceof User, 403);
+
+        try {
+            $readModel = app(FieldOptionMappingAuthorizationService::class)->projectReadModel(
+                $user,
+                $this->resolveMappingWorkspace()->id,
+                $this->accountId,
+                $this->configurationId,
+                $this->fieldMappingId,
+            );
+        } catch (SyncConfigurationNotFoundException) {
+            abort(404);
+        }
+
+        foreach ($readModel->normalRows as $row) {
+            if ($row->internalOptionKey === $internalOptionKey
+                && $row->semanticState === FieldOptionMappingRowState::UNMAPPED
+                && $row->existingExternalOptionValue === null) {
+                return $row->externalOptionValue;
+            }
+        }
+
+        return null;
     }
 
     protected function refreshReadModel(): void
@@ -429,6 +472,11 @@ class ManageSyncFieldOptionMappings extends Page implements HasActions, HasSchem
             'external_label' => $row->externalLabel ?? __('sync_option_mappings.external_field_empty'),
             'semantic_state' => $row->semanticState,
             'existing_external_option_value' => $row->existingExternalOptionValue,
+            'suggested_external_option_value' => $row->semanticState === FieldOptionMappingRowState::UNMAPPED
+                ? $row->externalOptionValue
+                : null,
+            'is_suggested' => $row->semanticState === FieldOptionMappingRowState::UNMAPPED
+                && $row->externalOptionValue !== null,
             'status_label' => __("sync_option_mappings.status.{$row->semanticState}"),
             'status_icon' => match ($row->semanticState) {
                 FieldOptionMappingRowState::MAPPED => 'check',
