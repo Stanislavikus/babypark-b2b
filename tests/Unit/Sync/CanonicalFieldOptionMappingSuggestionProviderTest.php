@@ -89,6 +89,30 @@ class CanonicalFieldOptionMappingSuggestionProviderTest extends TestCase
     }
 
     #[Test]
+    public function numeric_looking_external_values_remain_opaque_string_identities(): void
+    {
+        $provider = $this->providerFromCsv([
+            'canonical_product_field_mappings.csv' => "internal_code,channel,external_field,applicability_id,verification_status\ncolor,adobe_commerce,color,a-color,verified\n",
+            'canonical_product_field_options.csv' => "option_id,internal_code,option_code,applicability_id,verification_status,status\no-blue,color,blue,a-color,verified,active\no-pink,color,pink,a-color,verified,active\no-zero,color,zero,a-color,verified,active\n",
+            'canonical_product_field_option_mappings.csv' => "option_id,channel,external_option_value,applicability_id,verification_status\no-blue,adobe_commerce,93,a-color,verified\no-pink,adobe_commerce,093,a-color,verified\no-zero,adobe_commerce,0,a-color,verified\n",
+            'canonical_product_field_applicability.csv' => "applicability_id,internal_code,context_type,channel_or_state,entity_level,verification_status\na-color,color,channel,adobe_commerce,product_variant,verified\n",
+        ]);
+
+        $this->assertSame([
+            'blue' => '93',
+            'pink' => '093',
+            'zero' => '0',
+        ], $provider->suggest(
+            connectorDefinitionCode: 'adobe_commerce',
+            internalFieldCode: 'color',
+            objectType: FieldObjectType::ProductVariant,
+            externalFieldKey: 'color',
+            internalOptionKeys: ['blue', 'pink', 'zero'],
+            authoritativeExternalValues: ['93', '093', '0'],
+        ));
+    }
+
+    #[Test]
     public function external_value_collision_between_internal_options_fails_closed_for_both(): void
     {
         $provider = $this->providerFromCsv([
@@ -119,6 +143,28 @@ class CanonicalFieldOptionMappingSuggestionProviderTest extends TestCase
             internalOptionKeys: ['new'],
             authoritativeExternalValues: ['new'],
         ));
+    }
+
+    #[Test]
+    public function category_and_product_type_applicability_fail_closed_without_runtime_context(): void
+    {
+        foreach (['category', 'product_type'] as $contextType) {
+            $provider = $this->providerFromCsv([
+                'canonical_product_field_mappings.csv' => "internal_code,channel,external_field,applicability_id,verification_status\ncondition,adobe_commerce,condition,a-condition,verified\n",
+                'canonical_product_field_options.csv' => "option_id,internal_code,option_code,applicability_id,verification_status,status\no-new,condition,new,a-condition,verified,active\n",
+                'canonical_product_field_option_mappings.csv' => "option_id,channel,external_option_value,applicability_id,verification_status\no-new,adobe_commerce,new,a-condition,verified\n",
+                'canonical_product_field_applicability.csv' => "applicability_id,internal_code,context_type,channel_or_state,entity_level,verification_status\na-condition,condition,{$contextType},adobe_commerce,product_variant,verified\n",
+            ]);
+
+            $this->assertSame([], $provider->suggest(
+                connectorDefinitionCode: 'adobe_commerce',
+                internalFieldCode: 'condition',
+                objectType: FieldObjectType::ProductVariant,
+                externalFieldKey: 'condition',
+                internalOptionKeys: ['new'],
+                authoritativeExternalValues: ['new'],
+            ), $contextType);
+        }
     }
 
     #[Test]

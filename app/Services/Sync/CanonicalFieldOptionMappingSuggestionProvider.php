@@ -43,8 +43,14 @@ final class CanonicalFieldOptionMappingSuggestionProvider
         }
 
         $internalOptionKeySet = array_fill_keys($internalOptionKeys, true);
-        $externalValueSet = array_fill_keys($authoritativeExternalValues, true);
-        $reservedExternalValueSet = array_fill_keys($reservedExternalValues, true);
+        $externalValueSet = array_fill_keys(array_map(
+            fn (string $value): string => $this->externalIdentityKey($value),
+            $authoritativeExternalValues,
+        ), true);
+        $reservedExternalValueSet = array_fill_keys(array_map(
+            fn (string $value): string => $this->externalIdentityKey($value),
+            $reservedExternalValues,
+        ), true);
         $optionCodeById = [];
 
         foreach ($this->registryReader->options() as $row) {
@@ -93,30 +99,32 @@ final class CanonicalFieldOptionMappingSuggestionProvider
 
             $optionCode = $optionCodeById[$row['option_id'] ?? ''] ?? null;
             $externalValue = $row['external_option_value'] ?? '';
+            $externalIdentityKey = $this->externalIdentityKey($externalValue);
 
             if ($optionCode === null
                 || $externalValue === ''
-                || ! isset($externalValueSet[$externalValue])
-                || isset($reservedExternalValueSet[$externalValue])) {
+                || ! isset($externalValueSet[$externalIdentityKey])
+                || isset($reservedExternalValueSet[$externalIdentityKey])) {
                 continue;
             }
 
-            $candidatesByInternalOption[$optionCode][$externalValue] = true;
-            $internalOptionsByExternalValue[$externalValue][$optionCode] = true;
+            $candidatesByInternalOption[$optionCode][$externalIdentityKey] = $externalValue;
+            $internalOptionsByExternalValue[$externalIdentityKey][$optionCode] = true;
         }
 
         $suggestions = [];
 
         foreach ($internalOptionKeys as $internalOptionKey) {
-            $candidates = array_keys($candidatesByInternalOption[$internalOptionKey] ?? []);
+            $candidates = array_values($candidatesByInternalOption[$internalOptionKey] ?? []);
 
             if (count($candidates) !== 1) {
                 continue;
             }
 
             $externalValue = $candidates[0];
+            $externalIdentityKey = $this->externalIdentityKey($externalValue);
 
-            if (count($internalOptionsByExternalValue[$externalValue] ?? []) !== 1) {
+            if (count($internalOptionsByExternalValue[$externalIdentityKey] ?? []) !== 1) {
                 continue;
             }
 
@@ -124,6 +132,11 @@ final class CanonicalFieldOptionMappingSuggestionProvider
         }
 
         return $suggestions;
+    }
+
+    private function externalIdentityKey(string $externalValue): string
+    {
+        return strlen($externalValue).':'.$externalValue;
     }
 
     /**

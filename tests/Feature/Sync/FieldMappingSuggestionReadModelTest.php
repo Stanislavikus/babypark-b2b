@@ -499,6 +499,48 @@ class FieldMappingSuggestionReadModelTest extends TestCase
     }
 
     #[Test]
+    public function two_binding_field_product_and_variant_candidates_for_same_external_key_still_collide(): void
+    {
+        $registry = $this->minimalRegistryWithMapping(
+            fields: [
+                $this->fieldRow('pattern', 'yes', 'product_and_variant_two_bindings', 'platform_library'),
+            ],
+            mappings: [
+                $this->mappingRow('pattern', 'google_merchant', 'pattern'),
+            ],
+        );
+        $registry['canonical_product_field_applicability.csv'][0]['entity_level'] = 'product';
+
+        $variantMapping = $this->mappingRow('pattern', 'google_merchant', 'pattern');
+        $variantMapping['applicability_id'] = 'a002';
+        $variantMapping['evidence_subject_key'] = 'mapping:google_merchant:pattern:pattern:a002:2.4.9-admin-rest';
+        $registry['canonical_product_field_mappings.csv'][] = $variantMapping;
+
+        $variantApplicability = $registry['canonical_product_field_applicability.csv'][0];
+        $variantApplicability['applicability_id'] = 'a002';
+        $variantApplicability['entity_level'] = 'product_variant';
+        $variantApplicability['evidence_subject_key'] = 'applicability:a002';
+        $registry['canonical_product_field_applicability.csv'][] = $variantApplicability;
+        $this->bindCustomRegistry($registry);
+
+        $workspace = $this->defaultWorkspace();
+        $productBinding = $this->productBinding('pattern');
+        $variantBinding = $this->productVariantBinding('pattern');
+
+        $suggestions = app(CanonicalFieldMappingSuggestionProvider::class)->suggest(
+            $workspace->id,
+            'google_merchant',
+            ['pattern' => true],
+            [],
+            [],
+        );
+
+        $this->assertArrayNotHasKey($productBinding->id, $suggestions);
+        $this->assertArrayNotHasKey($variantBinding->id, $suggestions);
+        $this->assertSame([], $suggestions);
+    }
+
+    #[Test]
     public function two_binding_field_without_supported_entity_level_fails_closed(): void
     {
         $registry = $this->minimalRegistryWithMapping(

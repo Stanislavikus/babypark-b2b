@@ -5660,6 +5660,10 @@ or any other arbitrary priority.
 This projection-level check is required even when each internal binding
 individually has exactly one candidate. Applicability-driven entity-level
 narrowing from §G.1 is completed before a candidate reaches this collision set.
+There is no same-`internal_code` exemption: if separate verified applicability
+rows narrow one canonical two-binding field to Product and ProductVariant but
+both candidates would consume the same `external_field_key`, §G.2 still treats
+that as a collision and returns no high-confidence suggestion for either binding.
 
 ##### H. One authoritative discovery view per projection
 
