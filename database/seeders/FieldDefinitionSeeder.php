@@ -21,6 +21,14 @@ class FieldDefinitionSeeder extends Seeder
             $this->platformLibraryAttributes(),
         );
 
+        $this->seedDefinitions($definitions);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $definitions
+     */
+    protected function seedDefinitions(array $definitions): void
+    {
         foreach ($definitions as $seed) {
             $definition = $this->upsertDefinition($seed);
 
@@ -506,7 +514,7 @@ class FieldDefinitionSeeder extends Seeder
      * @param  \Closure(bool, bool): array<string, mixed>  $visibility
      * @return array<int, array<string, mixed>>
      */
-    private function canonicalProductColumnAttributes(\Closure $visibility): array
+    protected function canonicalProductColumnAttributes(\Closure $visibility): array
     {
         $fields = [
             ['barcode_box', AttributeDataType::Text, 'products.barcode_box', 'identifiers', 200, false, ['en' => 'Box Barcode', 'uk' => 'Штрихкод коробки', 'ru' => 'Штрихкод коробки']],
@@ -881,7 +889,7 @@ class FieldDefinitionSeeder extends Seeder
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function canonicalPlatformLibraryAttributes(): array
+    protected function canonicalPlatformLibraryAttributes(): array
     {
         return [
             $this->canonicalDynamicAttribute(

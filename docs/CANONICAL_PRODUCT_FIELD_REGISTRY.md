@@ -768,6 +768,11 @@ The Platform Library concepts `pattern` and `style` now each have one definition
 Product and ProductVariant dynamic bindings. `warranty` now has one localizable
 long-text Product dynamic binding.
 
+Existing installations receive this same fourteen-concept subset through
+`CanonicalActiveFieldSeeder` in the authorized `deploy.sh` upgrade path. The seed is
+transactional and idempotent; existing binding IDs and administrator-editable settings
+are preserved. A metadata conflict fails deployment without partial field registration.
+
 The remaining explicit gates are unchanged: `unit` requires a Product-vs-Variant owner
 decision; `meta_title` and `meta_description` require localization/storage alignment;
 `product_highlights` requires an approved localized multi-value textual contract; and

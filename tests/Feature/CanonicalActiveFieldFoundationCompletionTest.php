@@ -17,10 +17,12 @@ use App\Models\VariantFieldValue;
 use App\Models\Workspace;
 use App\Services\Catalog\GovernedProductVariantColumnMutationService;
 use App\Services\Fields\GovernedDynamicFieldValueWriter;
+use Database\Seeders\CanonicalActiveFieldSeeder;
 use Database\Seeders\FieldDefinitionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Tests\TestCase;
 
 class CanonicalActiveFieldFoundationCompletionTest extends TestCase
@@ -50,6 +52,11 @@ class CanonicalActiveFieldFoundationCompletionTest extends TestCase
     }
 
     public function test_safe_materialization_set_has_exact_canonical_metadata_and_bindings(): void
+    {
+        $this->assertCanonicalMetadata();
+    }
+
+    private function assertCanonicalMetadata(): void
     {
         foreach ($this->columnFields as $code => [$dataType, $storagePath, $group, $b2bVisible, $labels]) {
             $definition = $this->definition($code);
@@ -96,6 +103,73 @@ class CanonicalActiveFieldFoundationCompletionTest extends TestCase
         $this->assertSame('Крапка', VariantFieldValue::withoutWorkspaceScope()->where('field_binding_id', $variantBinding->id)->sole()->value_text);
     }
 
+    public function test_deployment_seed_upgrades_existing_installation_and_preserves_existing_settings(): void
+    {
+        $codes = [...array_keys($this->columnFields), 'pattern', 'style', 'warranty'];
+        $ids = FieldDefinition::withoutWorkspaceScope()->whereIn('code', $codes)->pluck('id');
+        FieldBinding::withoutWorkspaceScope()->whereIn('field_definition_id', $ids)->delete();
+        FieldDefinition::withoutWorkspaceScope()->whereIn('id', $ids)->delete();
+
+        // An unrelated edited definition must not make the narrow upgrade fail.
+        $brand = $this->definition('brand');
+        $brand->update(['localized_labels' => ['uk' => 'Мій бренд']]);
+        $brandBefore = $brand->fresh()->getAttributes();
+        $custom = $brand->replicate();
+        $custom->fill([
+            'workspace_id' => Workspace::query()->where('is_default', true)->sole()->id,
+            'scope' => AttributeScope::WorkspaceCustom,
+            'code' => 'pattern',
+        ])->save();
+        $customBefore = $custom->fresh()->getAttributes();
+        $definitionCount = FieldDefinition::withoutWorkspaceScope()->count();
+        $bindingCount = FieldBinding::withoutWorkspaceScope()->count();
+
+        $this->artisan('db:seed', ['--class' => CanonicalActiveFieldSeeder::class, '--force' => true])->assertSuccessful();
+        $this->assertSame($definitionCount + 14, FieldDefinition::withoutWorkspaceScope()->count());
+        $this->assertSame($bindingCount + 16, FieldBinding::withoutWorkspaceScope()->count());
+        $this->assertCanonicalMetadata();
+
+        $pattern = $this->binding('pattern', FieldObjectType::Product);
+        $pattern->update([
+            'visibility_settings' => ['admin' => true, 'b2b' => false, 'channels' => []],
+            'is_filterable' => false,
+            'is_sortable' => true,
+            'is_required' => true,
+            'sort_order' => 987,
+        ]);
+        $patternBefore = $pattern->fresh()->getAttributes();
+        $definitionIds = FieldDefinition::withoutWorkspaceScope()->orderBy('id')->pluck('id')->all();
+        $bindingIds = FieldBinding::withoutWorkspaceScope()->orderBy('id')->pluck('id')->all();
+
+        $this->artisan('db:seed', ['--class' => CanonicalActiveFieldSeeder::class, '--force' => true])->assertSuccessful();
+        $this->assertSame($definitionIds, FieldDefinition::withoutWorkspaceScope()->orderBy('id')->pluck('id')->all());
+        $this->assertSame($bindingIds, FieldBinding::withoutWorkspaceScope()->orderBy('id')->pluck('id')->all());
+        $this->assertSame($patternBefore, $pattern->fresh()->getAttributes());
+        $this->assertSame($brandBefore, $brand->fresh()->getAttributes());
+        $this->assertSame($customBefore, $custom->fresh()->getAttributes());
+    }
+
+    public function test_deployment_seed_rolls_back_new_fields_when_a_later_definition_conflicts(): void
+    {
+        $barcode = $this->definition('barcode_box');
+        FieldBinding::withoutWorkspaceScope()->whereBelongsTo($barcode)->delete();
+        $barcode->delete();
+        $warranty = $this->definition('warranty');
+        $warranty->update(['is_localizable' => false]);
+        $definitionsBefore = FieldDefinition::withoutWorkspaceScope()->orderBy('id')->get()->map->getAttributes()->all();
+        $bindingsBefore = FieldBinding::withoutWorkspaceScope()->orderBy('id')->get()->map->getAttributes()->all();
+
+        try {
+            $this->seed(CanonicalActiveFieldSeeder::class);
+            $this->fail('The conflicting warranty definition must reject materialization.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString("Field definition conflict for code 'warranty'", $exception->getMessage());
+        }
+
+        $this->assertSame($definitionsBefore, FieldDefinition::withoutWorkspaceScope()->orderBy('id')->get()->map->getAttributes()->all());
+        $this->assertSame($bindingsBefore, FieldBinding::withoutWorkspaceScope()->orderBy('id')->get()->map->getAttributes()->all());
+    }
+
     public function test_warranty_uses_localized_set_clear_and_new_column_binding_stays_fail_closed(): void
     {
         [$workspace, $product] = $this->targets();
@@ -114,7 +188,7 @@ class CanonicalActiveFieldFoundationCompletionTest extends TestCase
 
     private function definition(string $code): FieldDefinition
     {
-        return FieldDefinition::withoutWorkspaceScope()->where('code', $code)->sole();
+        return FieldDefinition::withoutWorkspaceScope()->whereNull('workspace_id')->where('code', $code)->sole();
     }
 
     private function binding(string $code, FieldObjectType $type): FieldBinding

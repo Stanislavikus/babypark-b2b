@@ -213,7 +213,13 @@ GAP-026B workspace RBAC authority cutover and must **not** be used to expose GAP
 authority-switching code to merchant traffic before cutover completion.
 
 Current `deploy.sh` runs migrations and additively synchronizes the canonical
-`workspace_permissions` catalogue with `WorkspaceRbacPermissionSeeder`. It does
+`workspace_permissions` catalogue with `WorkspaceRbacPermissionSeeder`. It also runs
+`CanonicalActiveFieldSeeder` to register the fourteen approved active Product concepts
+from PR #210 on existing installations before queue restart and maintenance exit.
+That narrow field seed reuses Field Foundation metadata and conflict checks in one
+transaction, preserves existing binding IDs and administrator-editable settings, and
+does not run the full application seeder. A conflict rolls back the field seed and
+fails deployment under the existing maintenance-mode error contract. It does
 **not** run legacy backfill, alter role/user assignments, perform anti-lockout
 validation, or run cutover smoke checks. Do **not** silently turn every future deploy
 into a backfill attempt.
