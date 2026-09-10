@@ -290,7 +290,7 @@ FK/semantic-FK integrity, but not enum membership.
 - `scope` (observed, extend via DEC): `system | platform_library | not_applicable`
 - `mvp_tier` (observed, extend via DEC): `A | B | C | not_applicable`; invariant: `mvp_tier=A → default_enabled=true`
 - `implementation_kind` (observed, extend via DEC): `compliance_entity | computed_projection | connector_only | core_model_property | dynamic_field | external_identity | inventory_domain | media_domain | pricing_domain | product_association_domain | relation`
-- `storage_owner` (observed, extend via DEC): `Category | ConnectorMapping | ExternalRecordLink | FieldDefinition | MediaAsset | PriceListItem | Product | ProductAssociation | ProductVariant | calculated | not_implemented`
+- `storage_owner` (observed, extend via DEC): `Category | ConnectorMapping | ExternalRecordLink | FieldDefinition | MediaAsset | PriceListItem | Product | ProductAssociation | ProductVariant | Tag | calculated | not_implemented`
 - `field_definition_eligibility` (observed): `yes | no`
 - `verification_status` (observed, extend via DEC): `verified | partially_verified | needs_legal_review`
 - `recommended_action` (observed, extend via DEC): `add_to_platform_library | add_to_product_model | computed_not_editable | connector_mapping_only | covered_by_existing_domain | external_identity_only | keep_as_is | needs_legal_review | relation_not_field`
@@ -642,13 +642,14 @@ connector-account-specific external references, not global Registry data.
 - **mapping consequence:** Amazon PTD-derived applicability rows may use `context_type=product_type`; raw Amazon parentage vocabulary remains connector evidence while canonical state tokens follow this registry.
 - `evidence_subject_key: decision:DEC-012`
 
-### DEC-013 — Product-owned capability may use add_to_product_model
+### DEC-013 — Tags remain a relation-backed Product classification capability
 
-- **decision:** extend `recommended_action` with `add_to_product_model` for an already-approved Product-owned semantic that is not a dynamic `FieldDefinition`, not connector-only, and not yet physically implemented.
-- **first use:** `tags`, whose Product-level role is already `[Resolved]` in the Domain Model Product classification decision.
-- **why not `keep_as_is`:** the semantic is approved but physical implementation is not present, so `keep_as_is` would incorrectly imply current runtime/storage completion.
-- **why not `add_to_platform_library`:** Tags are a Product-owned classification capability, not an EAV/dynamic reusable characteristic.
-- **platform consequence:** documentation/governance only; this decision does not add a migration, column, table, UI, or runtime behavior.
+- **historical decision:** `add_to_product_model` was introduced while the already-approved Tags semantic had no physical implementation.
+- **current runtime:** GAP-011 has since implemented workspace-owned `tags` plus the `product_tag` many-to-many relation and Product/Tag Eloquent relations. Canonical documentation must no longer describe Tags as physically absent.
+- **canonical representation:** `implementation_kind: relation`, `storage_owner: Tag`, `field_definition_eligibility: no`, `recommended_action: relation_not_field`. Tags are multi-valued Product classification data, but not a scalar Product column and not dynamic EAV.
+- **enum consequence:** this decision adds `Tag` to the observed `storage_owner` vocabulary. It does not create a new runtime owner; it names the already-implemented relation owner.
+- **mapping consequence:** this docs alignment does not invent a new FieldDefinition/FieldBinding or Receive relation-mutation route. Any future connector execution over Tags must use the approved relation-owning boundary rather than generic dynamic/column writers.
+- **why not `add_to_platform_library`:** Tags are a Product classification relation, not an EAV/dynamic reusable characteristic.
 - `evidence_subject_key: decision:DEC-013`
 
 ### DEC-002 — identifier_exists connector-only

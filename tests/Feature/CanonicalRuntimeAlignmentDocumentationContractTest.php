@@ -70,6 +70,32 @@ class CanonicalRuntimeAlignmentDocumentationContractTest extends TestCase
     }
 
     #[Test]
+    public function implementation_gap_no_longer_schedules_merchant_type_tags_schema_work(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $content = file_get_contents($root.'/docs/IMPLEMENTATION_GAPS.md');
+        $this->assertIsString($content);
+
+        $this->assertStringNotContainsString('`Merchant Type` and `Tags` do not exist as', $content);
+        $this->assertStringNotContainsString('**Next task:** Product classification structure implementation', $content);
+        $this->assertStringContainsString('No Merchant Type/Tags schema task remains', $content);
+        $this->assertStringContainsString('Standard Category stays deferred', $content);
+    }
+
+    #[Test]
+    public function tags_registry_decision_names_existing_relation_owner_without_field_definition(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $registry = file_get_contents($root.'/docs/CANONICAL_PRODUCT_FIELD_REGISTRY.md');
+        $this->assertIsString($registry);
+
+        $this->assertStringContainsString('`storage_owner: Tag`', $registry);
+        $this->assertStringContainsString('`field_definition_eligibility: no`', $registry);
+        $this->assertStringContainsString('`recommended_action: relation_not_field`', $registry);
+        $this->assertStringContainsString('adds `Tag` to the observed `storage_owner` vocabulary', $registry);
+    }
+
+    #[Test]
     public function canonical_csv_brand_and_tags_rows_match_runtime_truth_boundaries(): void
     {
         $root = dirname(__DIR__, 2);

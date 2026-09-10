@@ -791,8 +791,8 @@ by itself decide the business threshold, which remains open per this gap.
   Merchant Type / Tags" (Patch 1 above, Resolved): four distinct concepts. Merchant/Catalogue
   `Category` (existing `categories` table) is unchanged. This document's existing `ProductType`
   template concept (internal field/variant structure control, hidden in MVP) is also unchanged
-  and unrelated to the new `Merchant Type` concept. `Merchant Type` and `Tags` do not exist as
-  schema yet and are ready to implement. Standard Category (standardized public taxonomy) is a
+  and unrelated to the new `Merchant Type` concept. `Merchant Type` and `Tags` are now implemented
+  in schema/runtime as described below. Standard Category (standardized public taxonomy) remains a
   tracked future concept, deliberately not built now, consistent with the existing "no global
   taxonomy in MVP" decision.
 
@@ -824,19 +824,17 @@ by itself decide the business threshold, which remains open per this gap.
   — it becomes relevant once channel/marketplace export (GAP-006) is actually built.
 
 **Decision:**
-- Implement `Merchant Type` (nullable string, e.g. `products.merchant_type` — not a generic
-  `type` column, to stay unambiguous relative to the existing `ProductType` concept) and `Tags`
-  (separate table, many-to-many with `Product`) as their own small schema task now — this does
-  not require re-touching `Category` (stays workspace-owned) or `ProductType` (stays hidden,
-  unrelated).
-- Standard Category is explicitly **not** part of this task's scope — revisit only alongside
-  GAP-006 (connector/channel-mapping infrastructure), not as a core catalog change.
+- `Merchant Type` is implemented as nullable `products.merchant_type`; `Tags` are implemented as
+  a separate workspace-owned `tags` table with a many-to-many `product_tag` relation. These remain
+  distinct from Merchant/Catalogue `Category` and the internal `ProductType` template.
+- Standard Category is explicitly **not** part of the implemented Merchant Type/Tags slice — revisit
+  only alongside GAP-006 (connector/channel-mapping infrastructure), not as a core catalog change.
 
-**Next task:** Product classification structure implementation (schema task, separate from the
-Phase 2 field backlog in GAP-013).
+**Next task:** No Merchant Type/Tags schema task remains. Standard Category stays deferred until
+GAP-006/channel-mapping work creates the concrete product need.
 
 **Status:** Partially closed in code. Implemented: `products.merchant_type` (nullable string column),
-its column-backed `AttributeDefinition`, `tags` table, `product_tag` pivot with `workspace_id`
+its column-backed `FieldDefinition`/`FieldBinding`, `tags` table, `product_tag` pivot with `workspace_id`
 consistency enforcement (Eloquent `ProductTag` pivot guard + MySQL composite foreign keys),
 `Tag` model, and `Product`/`Tag` `belongsToMany` relations; admin UI for assigning
 `Merchant Type` and `Tags` to products (`ProductResource` `"Класифікація"` section, table columns,
