@@ -755,26 +755,24 @@ Runtime materialization (`FieldDefinition`/`FieldBinding` exists and is seeded a
 | `compatibility` | Seeded (Foundation seed v5); Product binding; may remain governance-proposed even though runtime is materialized |
 | `battery_type` | Seeded (Foundation seed v5); Product binding; may remain governance-proposed even though runtime is materialized |
 
-### Active canonical concepts without FieldDefinition/FieldBinding seed (yet)
+### Active canonical concepts materialized in Field Foundation
 
-These concepts are active and `field_definition_eligibility = yes` in the canonical registry CSV, but are not currently seeded in `FieldDefinitionSeeder` (no `FieldDefinition`/`FieldBinding` rows exist in runtime). This is documentation truth only; this PR does not seed anything.
+The Product column-backed concepts `barcode_box`, `min_order_quantity`, `order_step`,
+`package_quantity`, `package_type`, `units_per_box`, `boxes_per_pallet`,
+`lead_time_days`, `depth_mm`, `width_mm`, and `height_mm` now have active System
+`FieldDefinition` rows and Product column `FieldBinding` rows. Registration makes them
+valid semantic `FieldMapping` targets; it does not grant Receive WRITE authority. The
+GAP-029 allowlist remains limited to Product `name` and `description`.
 
-At minimum, this includes:
+The Platform Library concepts `pattern` and `style` now each have one definition with
+Product and ProductVariant dynamic bindings. `warranty` now has one localizable
+long-text Product dynamic binding.
 
-- `barcode_box`
-- `unit`
-- `min_order_quantity`
-- `order_step`
-- `package_quantity`
-- `package_type`
-- `units_per_box`
-- `boxes_per_pallet`
-- `lead_time_days`
-- `depth_mm`, `width_mm`, `height_mm`
-- `meta_title`, `meta_description` (columns exist on `products`, but not governed through Field Foundation yet)
-- `pattern`, `style`, `warranty`, `product_highlights`
-
-`age_group` and `gender` remain intentionally gated.
+The remaining explicit gates are unchanged: `unit` requires a Product-vs-Variant owner
+decision; `meta_title` and `meta_description` require localization/storage alignment;
+`product_highlights` requires an approved localized multi-value textual contract; and
+`age_group` / `gender` remain blocked by GAP-022. Product bindings for `depth_mm`,
+`width_mm`, and `height_mm` do not settle the open Variant-binding review.
 
 ### Incorrectly modeled
 

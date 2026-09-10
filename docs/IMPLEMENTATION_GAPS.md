@@ -936,6 +936,22 @@ Foundation Seed Sync v5 (Branch A) added eight Platform Library fields via
 `country_of_origin`, `manufacturer`, `model`, `compatibility`, `battery_type`
 (each with a matching `FieldBinding`). See `FieldDefinitionSeederFoundationSeedV5Test`.
 
+Canonical Active Field Foundation Completion registered eleven existing Product
+columns (`barcode_box`, `min_order_quantity`, `order_step`, `package_quantity`,
+`package_type`, `units_per_box`, `boxes_per_pallet`, `lead_time_days`, `depth_mm`,
+`width_mm`, `height_mm`) as active System definitions with Product column bindings.
+It also registered Platform Library dynamic fields `pattern` and `style` for both
+Product and ProductVariant, plus localizable Product long-text `warranty`. These
+bindings are semantic mapping targets, but the GAP-029 Receive WRITE allowlist remains
+Product `name` and `description` only.
+
+Remaining canonical registration gates are explicit: `unit` still has contradictory
+Product/Variant ownership; `meta_title` and `meta_description` still require SEO
+localization/storage alignment; `product_highlights` still lacks an approved localized
+multi-value text representation/write contract; and `age_group` / `gender` remain
+blocked by GAP-022. Product column bindings for `depth_mm`, `width_mm`, and `height_mm`
+do not resolve or add the separately gated Variant bindings.
+
 ---
 
 ## GAP-020 — Canonical registry fields blocked by missing verified select options
