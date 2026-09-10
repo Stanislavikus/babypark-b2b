@@ -79,6 +79,28 @@ class FieldMappingPersistenceTest extends TestCase
     }
 
     #[Test]
+    public function newly_registered_product_column_binding_is_a_valid_semantic_mapping_target(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->createProductsSyncConfiguration($account);
+        $binding = $this->productBinding('barcode_box');
+        $this->publishAuthoritativeSnapshot($account, ['case_barcode']);
+
+        app(FieldMappingMutationService::class)->confirm(
+            $account,
+            $configuration->id,
+            $binding->id,
+            'case_barcode',
+        );
+
+        $this->assertDatabaseHas('field_mappings', [
+            'sync_configuration_id' => $configuration->id,
+            'field_binding_id' => $binding->id,
+            'external_field_key' => 'case_barcode',
+        ]);
+    }
+
+    #[Test]
     public function migration_rolls_back_and_remigrates_cleanly(): void
     {
         $this->rollbackThrough('2026_08_12_110000_field_mappings');

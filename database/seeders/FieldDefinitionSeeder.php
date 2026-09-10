@@ -21,6 +21,14 @@ class FieldDefinitionSeeder extends Seeder
             $this->platformLibraryAttributes(),
         );
 
+        $this->seedDefinitions($definitions);
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $definitions
+     */
+    protected function seedDefinitions(array $definitions): void
+    {
         foreach ($definitions as $seed) {
             $definition = $this->upsertDefinition($seed);
 
@@ -498,7 +506,50 @@ class FieldDefinitionSeeder extends Seeder
                 'localized_labels' => ['uk' => "Об'єм, м³"],
                 'validation_rules' => null,
             ],
+            ...$this->canonicalProductColumnAttributes($visibility),
         ];
+    }
+
+    /**
+     * @param  \Closure(bool, bool): array<string, mixed>  $visibility
+     * @return array<int, array<string, mixed>>
+     */
+    protected function canonicalProductColumnAttributes(\Closure $visibility): array
+    {
+        $fields = [
+            ['barcode_box', AttributeDataType::Text, 'products.barcode_box', 'identifiers', 200, false, ['en' => 'Box Barcode', 'uk' => 'Штрихкод коробки', 'ru' => 'Штрихкод коробки']],
+            ['min_order_quantity', AttributeDataType::Number, 'products.min_order_quantity', 'b2b', 210, true, ['en' => 'Minimum Order Quantity', 'uk' => 'Мін. кількість замовлення', 'ru' => 'Мин. количество заказа']],
+            ['order_step', AttributeDataType::Number, 'products.order_step', 'b2b', 220, true, ['en' => 'Order Step', 'uk' => 'Крок замовлення', 'ru' => 'Шаг заказа']],
+            ['package_quantity', AttributeDataType::Number, 'products.package_quantity', 'logistics', 230, false, ['en' => 'Package Quantity', 'uk' => 'Кількість в упаковці', 'ru' => 'Количество в упаковке']],
+            ['package_type', AttributeDataType::Text, 'products.package_type', 'logistics', 240, false, ['en' => 'Package Type', 'uk' => 'Тип упаковки', 'ru' => 'Тип упаковки']],
+            ['units_per_box', AttributeDataType::Number, 'products.units_per_box', 'logistics', 250, false, ['en' => 'Units Per Box', 'uk' => 'Одиниць у коробці', 'ru' => 'Единиц в коробке']],
+            ['boxes_per_pallet', AttributeDataType::Number, 'products.boxes_per_pallet', 'logistics', 260, false, ['en' => 'Boxes Per Pallet', 'uk' => 'Коробок на палеті', 'ru' => 'Коробок на паллете']],
+            ['lead_time_days', AttributeDataType::Number, 'products.lead_time_days', 'logistics', 270, false, ['en' => 'Lead Time Days', 'uk' => 'Термін поставки (дні)', 'ru' => 'Срок поставки (дни)']],
+            ['depth_mm', AttributeDataType::Number, 'products.depth_mm', 'logistics', 280, false, ['en' => 'Depth', 'uk' => 'Глибина', 'ru' => 'Глубина']],
+            ['width_mm', AttributeDataType::Number, 'products.width_mm', 'logistics', 290, false, ['en' => 'Width', 'uk' => 'Ширина', 'ru' => 'Ширина']],
+            ['height_mm', AttributeDataType::Number, 'products.height_mm', 'logistics', 300, false, ['en' => 'Height', 'uk' => 'Висота', 'ru' => 'Высота']],
+        ];
+
+        return array_map(fn (array $field): array => [
+            'code' => $field[0],
+            'workspace_id' => null,
+            'scope' => AttributeScope::System,
+            'value_level' => 'product',
+            'data_type' => $field[1],
+            'storage_type' => AttributeStorageType::Column,
+            'storage_path' => $field[2],
+            'attribute_group' => $field[3],
+            'is_localizable' => false,
+            'is_multi_value' => false,
+            'is_required' => false,
+            'is_filterable' => false,
+            'is_sortable' => false,
+            'status' => AttributeStatus::Active,
+            'sort_order' => $field[4],
+            'visibility_settings' => $visibility(true, $field[5]),
+            'localized_labels' => $field[6],
+            'validation_rules' => null,
+        ], $fields);
     }
 
     /**
@@ -831,6 +882,79 @@ class FieldDefinitionSeeder extends Seeder
                 'localized_labels' => ['uk' => 'Інструкція'],
                 'validation_rules' => null,
             ],
+            ...$this->canonicalPlatformLibraryAttributes(),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function canonicalPlatformLibraryAttributes(): array
+    {
+        return [
+            $this->canonicalDynamicAttribute(
+                code: 'pattern',
+                valueLevel: 'both',
+                dataType: AttributeDataType::Text,
+                group: 'characteristics',
+                sortOrder: 200,
+                labels: ['en' => 'Pattern', 'uk' => 'Візерунок', 'ru' => 'Узор'],
+                isFilterable: true,
+            ),
+            $this->canonicalDynamicAttribute(
+                code: 'style',
+                valueLevel: 'both',
+                dataType: AttributeDataType::Text,
+                group: 'characteristics',
+                sortOrder: 210,
+                labels: ['en' => 'Style', 'uk' => 'Стиль', 'ru' => 'Стиль'],
+                isFilterable: true,
+            ),
+            $this->canonicalDynamicAttribute(
+                code: 'warranty',
+                valueLevel: 'product',
+                dataType: AttributeDataType::LongText,
+                group: 'descriptions',
+                sortOrder: 220,
+                labels: ['en' => 'Warranty Description', 'uk' => 'Гарантія', 'ru' => 'Гарантия'],
+                isLocalizable: true,
+            ),
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $labels
+     * @return array<string, mixed>
+     */
+    private function canonicalDynamicAttribute(
+        string $code,
+        string $valueLevel,
+        AttributeDataType $dataType,
+        string $group,
+        int $sortOrder,
+        array $labels,
+        bool $isLocalizable = false,
+        bool $isFilterable = false,
+    ): array {
+        return [
+            'code' => $code,
+            'workspace_id' => null,
+            'scope' => AttributeScope::PlatformLibrary,
+            'value_level' => $valueLevel,
+            'data_type' => $dataType,
+            'storage_type' => AttributeStorageType::Dynamic,
+            'storage_path' => null,
+            'attribute_group' => $group,
+            'is_localizable' => $isLocalizable,
+            'is_multi_value' => false,
+            'is_required' => false,
+            'is_filterable' => $isFilterable,
+            'is_sortable' => false,
+            'status' => AttributeStatus::Active,
+            'sort_order' => $sortOrder,
+            'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+            'localized_labels' => $labels,
+            'validation_rules' => null,
         ];
     }
 }
