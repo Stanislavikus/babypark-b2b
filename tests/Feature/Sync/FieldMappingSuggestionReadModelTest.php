@@ -200,32 +200,13 @@ class FieldMappingSuggestionReadModelTest extends TestCase
     public function bigcommerce_product_dimension_mapping_uses_product_surface_and_old_variant_surface_is_not_suggested(): void
     {
         $workspace = $this->defaultWorkspace();
-        $definition = FieldDefinition::withoutWorkspaceScope()->create([
-            'workspace_id' => null,
-            'code' => 'depth_mm',
-            'data_type' => AttributeDataType::Number,
-            'scope' => AttributeScope::System,
-            'localized_labels' => ['uk' => 'Глибина'],
-            'description' => null,
-            'validation_rules' => null,
-            'is_localizable' => false,
-            'is_multi_value' => false,
-            'status' => AttributeStatus::Active,
-        ]);
-        $depthBinding = FieldBinding::withoutWorkspaceScope()->create([
-            'workspace_id' => null,
-            'field_definition_id' => $definition->id,
-            'object_type' => FieldObjectType::Product,
-            'storage_type' => AttributeStorageType::Column,
-            'storage_path' => 'products.depth_mm',
-            'field_group' => 'logistics',
-            'is_required' => false,
-            'is_filterable' => false,
-            'is_sortable' => false,
-            'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
-            'sort_order' => 999,
-            'status' => AttributeStatus::Active,
-        ]);
+        $definition = FieldDefinition::withoutWorkspaceScope()
+            ->where('code', 'depth_mm')
+            ->sole();
+        $depthBinding = FieldBinding::withoutWorkspaceScope()
+            ->where('field_definition_id', $definition->id)
+            ->where('object_type', FieldObjectType::Product)
+            ->sole();
         $provider = app(CanonicalFieldMappingSuggestionProvider::class);
 
         $productSurface = $provider->suggest(
