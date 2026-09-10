@@ -74,7 +74,10 @@ final class CanonicalFieldMappingSuggestionProvider
                 continue;
             }
 
-            $objectTypes = $this->objectTypesForBindingStrategy($fieldRow['binding_strategy']);
+            $objectTypes = $this->objectTypesForBindingStrategy(
+                $fieldRow['binding_strategy'],
+                $mappingRow['applicability_entity_level'] ?? '',
+            );
 
             foreach ($objectTypes as $objectType) {
                 $binding = $this->findBindingForDefinition(
@@ -111,27 +114,33 @@ final class CanonicalFieldMappingSuggestionProvider
             $applicabilityById[$row['applicability_id']] = $row;
         }
 
-        return array_values(array_filter(
-            $this->registryReader->mappings(),
-            function (array $row) use ($connectorDefinitionCode, $applicabilityById): bool {
-                if ($row['channel'] !== $connectorDefinitionCode
-                    || $row['verification_status'] !== 'verified') {
-                    return false;
-                }
+        $mappings = [];
 
-                $applicability = $applicabilityById[$row['applicability_id']] ?? null;
-                if ($applicability === null) {
-                    return false;
-                }
+        foreach ($this->registryReader->mappings() as $row) {
+            if ($row['channel'] !== $connectorDefinitionCode
+                || $row['verification_status'] !== 'verified') {
+                continue;
+            }
 
-                if ($applicability['context_type'] === 'channel'
-                    && $applicability['channel_or_state'] !== $row['channel']) {
-                    return false;
-                }
+            $applicability = $applicabilityById[$row['applicability_id']] ?? null;
+            if ($applicability === null || ($applicability['verification_status'] ?? '') !== 'verified') {
+                continue;
+            }
 
-                return in_array($applicability['context_type'], ['global', 'channel'], true);
-            },
-        ));
+            if ($applicability['context_type'] === 'channel'
+                && $applicability['channel_or_state'] !== $row['channel']) {
+                continue;
+            }
+
+            if (! in_array($applicability['context_type'], ['global', 'channel'], true)) {
+                continue;
+            }
+
+            $row['applicability_entity_level'] = $applicability['entity_level'] ?? '';
+            $mappings[] = $row;
+        }
+
+        return $mappings;
     }
 
     /**
@@ -245,12 +254,16 @@ final class CanonicalFieldMappingSuggestionProvider
     /**
      * @return list<FieldObjectType>
      */
-    private function objectTypesForBindingStrategy(string $bindingStrategy): array
+    private function objectTypesForBindingStrategy(string $bindingStrategy, string $entityLevel): array
     {
         return match ($bindingStrategy) {
             'product' => [FieldObjectType::Product],
             'product_variant' => [FieldObjectType::ProductVariant],
-            'product_and_variant_two_bindings' => [FieldObjectType::Product, FieldObjectType::ProductVariant],
+            'product_and_variant_two_bindings' => match ($entityLevel) {
+                'product' => [FieldObjectType::Product],
+                'product_variant' => [FieldObjectType::ProductVariant],
+                default => [],
+            },
             default => [],
         };
     }

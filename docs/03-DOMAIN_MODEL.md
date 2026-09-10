@@ -5444,7 +5444,10 @@ suggestions.
 Do **not** hardcode `2.4.9-admin-rest` as “the account's runtime version.”
 
 For the first provider, version/applicability rows are **knowledge evidence
-only**.
+only**; they are not persisted account-runtime state and must not be used to
+guess a connected store version. The one bounded exception is the referenced
+verified applicability row's `entity_level`, which participates only in the
+§G.1 deterministic Product/ProductVariant target resolution described below.
 
 If multiple eligible verified canonical rows could imply different suggestions
 for the same internal target, the result is **ambiguous** → **no**
@@ -5520,7 +5523,8 @@ suggestion-set 1:1 invariant (§G.2) are satisfied.
 5. parent `FieldDefinition` is `active`;
 6. binding `object_type` is `product` or `product_variant`;
 7. registry `channel` exactly matches this connector definition `code`;
-8. canonical **mapping** evidence has `verification_status = verified`;
+8. canonical **mapping** evidence and its referenced applicability evidence both
+   have `verification_status = verified`;
 9. candidate `external_field` exactly exists as `external_field_key` in the
    authoritative snapshot resolved for this projection (§H);
 10. for this internal `field_binding_id`, there is **exactly one** resulting
@@ -5558,11 +5562,16 @@ For a canonical mapping row with `internal_code = X`, high-confidence
    merely reuse the same `code` are **not** canonical suggestion targets in this
    first slice.
 7. **Resolve `FieldBinding`** — active binding on that definition whose
-   `object_type` matches canonical `binding_strategy`:
+   `object_type` matches canonical `binding_strategy`, with the referenced
+   **verified** applicability row allowed to narrow only a genuine two-binding field:
    - `product` → `product` binding;
    - `product_variant` → `product_variant` binding;
-   - `product_and_variant_two_bindings` → each matching `product` / `product_variant`
-     binding may be evaluated separately as its own internal target.
+   - `product_and_variant_two_bindings` → `entity_level = product` selects only
+     the `product` binding; `entity_level = product_variant` selects only the
+     `product_variant` binding; missing / `not_applicable` / unsupported entity
+     level is ambiguous for this high-confidence slice → no suggestion.
+   This narrowing happens **before** §G.2 collision analysis; collision removal
+   must not be used as a substitute for known entity-level semantics.
 8. **Uniqueness** — fail closed if the canonical-field → definition → binding
    chain is not unique for the internal target under evaluation.
 
@@ -5597,7 +5606,8 @@ Do **not** choose first row, lexical sort winner, global-over-workspace winner,
 or any other arbitrary priority.
 
 This projection-level check is required even when each internal binding
-individually has exactly one candidate.
+individually has exactly one candidate. Applicability-driven entity-level
+narrowing from §G.1 is completed before a candidate reaches this collision set.
 
 ##### H. One authoritative discovery view per projection
 
