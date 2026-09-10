@@ -149,7 +149,12 @@ class CanonicalActiveFieldFoundationCompletionTest extends TestCase
             $this->assertSame($group, $binding->field_group);
             $this->assertSame($isFilterable, $binding->is_filterable);
             $this->assertFalse($binding->is_sortable);
-            $this->assertSame($visibility, $binding->visibility_settings);
+
+            $actualVisibility = $binding->visibility_settings;
+            ksort($visibility);
+            ksort($actualVisibility);
+            $this->assertSame($visibility, $actualVisibility);
+
             $this->assertSame(AttributeStatus::Active, $binding->status);
         }
     }
