@@ -114,7 +114,7 @@ class CanonicalActiveFieldFoundationCompletionTest extends TestCase
         $brand = $this->definition('brand');
         $brand->update(['localized_labels' => ['uk' => 'Мій бренд']]);
         $brandBefore = $brand->fresh()->getAttributes();
-        $custom = $brand->replicate();
+        $custom = new FieldDefinition($brand->only($brand->getFillable()));
         $custom->fill([
             'workspace_id' => Workspace::query()->where('is_default', true)->sole()->id,
             'scope' => AttributeScope::WorkspaceCustom,
