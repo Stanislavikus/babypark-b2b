@@ -21,7 +21,7 @@
     {{-- Page title --}}
     <div>
         <h1 class="text-2xl font-bold text-gray-900">Кабінет</h1>
-        <p class="mt-1 text-sm text-gray-500">Ласкаво просимо, {{ $contractor->short_name ?? $contractor->name }}</p>
+        <p class="mt-1 text-sm text-gray-500">Ласкаво просимо, {{ $customer->short_name ?? $customer->name }}</p>
     </div>
 
     {{-- C.1 Contact cards --}}
@@ -33,26 +33,26 @@
             <dl class="space-y-2">
                 <div class="flex justify-between text-sm">
                     <dt class="text-gray-500">Назва</dt>
-                    <dd class="font-medium text-gray-900 text-right">{{ $contractor->name }}</dd>
+                    <dd class="font-medium text-gray-900 text-right">{{ $customer->name }}</dd>
                 </div>
-                @if($contractor->email)
+                @if($customer->email)
                     <div class="flex justify-between text-sm">
                         <dt class="text-gray-500">Email</dt>
                         <dd class="font-medium text-gray-900">
-                            <a href="mailto:{{ $contractor->email }}" class="hover:text-primary-600">{{ $contractor->email }}</a>
+                            <a href="mailto:{{ $customer->email }}" class="hover:text-primary-600">{{ $customer->email }}</a>
                         </dd>
                     </div>
                 @endif
-                @if($contractor->edrpou)
+                @if($customer->edrpou)
                     <div class="flex justify-between text-sm">
                         <dt class="text-gray-500">ЄДРПОУ</dt>
-                        <dd class="font-mono font-medium text-gray-900">{{ $contractor->edrpou }}</dd>
+                        <dd class="font-mono font-medium text-gray-900">{{ $customer->edrpou }}</dd>
                     </div>
                 @endif
-                @if($contractor->ipn)
+                @if($customer->ipn)
                     <div class="flex justify-between text-sm">
                         <dt class="text-gray-500">ІПН</dt>
-                        <dd class="font-mono font-medium text-gray-900">{{ $contractor->ipn }}</dd>
+                        <dd class="font-mono font-medium text-gray-900">{{ $customer->ipn }}</dd>
                     </div>
                 @endif
             </dl>
@@ -92,19 +92,19 @@
             <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <p class="text-xs text-gray-500 uppercase tracking-wide">Кредитний ліміт</p>
                 <p class="mt-1 text-2xl font-bold text-gray-900">
-                    {{ number_format((float) $contractor->credit_limit, 2, ',', ' ') }} ₴
+                    {{ number_format((float) $customer->credit_limit, 2, ',', ' ') }} ₴
                 </p>
             </div>
 
             <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <p class="text-xs text-gray-500 uppercase tracking-wide">Поточний борг</p>
-                <p class="mt-1 text-2xl font-bold {{ (float)$contractor->current_debt > 0 ? 'text-red-600' : 'text-gray-900' }}">
-                    {{ number_format((float) $contractor->current_debt, 2, ',', ' ') }} ₴
+                <p class="mt-1 text-2xl font-bold {{ (float)$customer->current_debt > 0 ? 'text-red-600' : 'text-gray-900' }}">
+                    {{ number_format((float) $customer->current_debt, 2, ',', ' ') }} ₴
                 </p>
             </div>
 
             @php
-                $available = max(0, (float) $contractor->credit_limit - (float) $contractor->current_debt);
+                $available = max(0, (float) $customer->credit_limit - (float) $customer->current_debt);
             @endphp
             <div class="rounded-xl border border-green-200 bg-green-50 p-4 shadow-sm">
                 <p class="text-xs text-green-700 uppercase tracking-wide">Доступно для закупівлі</p>
@@ -116,7 +116,7 @@
             <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                 <p class="text-xs text-gray-500 uppercase tracking-wide">Термін відстрочки</p>
                 <p class="mt-1 text-2xl font-bold text-gray-900">
-                    {{ $contractor->payment_delay_days ?? 0 }} дн.
+                    {{ $customer->payment_delay_days ?? 0 }} дн.
                 </p>
             </div>
         </div>

@@ -1,0 +1,1078 @@
+<?php
+
+namespace Tests\Feature\Sync;
+
+use App\Enums\PriceListItemStatus;
+use App\Enums\PriceListStatus;
+use App\Enums\SyncLiveOutcome;
+use App\Models\ConnectorAccount;
+use App\Models\ExternalRecordLink;
+use App\Models\PriceList;
+use App\Models\PriceListItem;
+use App\Models\Product;
+use App\Models\ProductVariant;
+use App\Models\VariantFieldValue;
+use App\Models\Workspace;
+use App\Support\Connectors\AdobePaaS\AdobeAttributeMetadata;
+use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
+use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionMetadata;
+use App\Support\Connectors\AdobePaaS\AdobeProductExportLiveCapability;
+use App\Support\Connectors\AdobePaaS\AdobeProductExportLiveRunContext;
+use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableAppliedStateAggregator;
+use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableChildLinkCommandExecutor;
+use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableCommandEvidence;
+use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableCommandInput;
+use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableDesiredStateCompiler;
+use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableInactiveLinkedVariantLifecycleExecutor;
+use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableOptionCommandExecutor;
+use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableParentCommandExecutor;
+use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableParentSkuGenerator;
+use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableProductCommandCoordinator;
+use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableRemoteOptionStateReader;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductAppliedStateKnowledge;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductCommandCompilationException;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductCommandRequestFactory;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductDesiredStateCompiler;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkGuard;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersister;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductOwnershipTrustPolicy;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductParentDesiredState;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteGetClassifier;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateClient;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateComparator;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateNormalizer;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandExecutor;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandInput;
+use App\Support\Connectors\AdobePaaS\Command\ConservativeAdobeProductOwnershipTrustPolicy;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClient;
+use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncRequestFactory;
+use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
+use App\Support\Connectors\Transport\ConnectorHttpResult;
+use App\Support\Connectors\Transport\ConnectorHttpTransport;
+use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
+use Database\Seeders\ConnectorFoundationSeeder;
+use Database\Seeders\WorkspaceSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\CreatesConnectorAccountFixtures;
+use Tests\Concerns\CreatesMerchantConfirmedExternalRecordLinks;
+use Tests\Concerns\InteractsWithFieldMappingFixtures;
+use Tests\Support\Connectors\AdobePaaS\Command\AdobeConfigurableCommandTestFixtures;
+use Tests\Support\Connectors\RecordingConnectorHttpTransport;
+use Tests\Support\Sync\SyncLiveConsequentialWriteGateStub;
+use Tests\TestCase;
+
+class Stage3CAdobeConfigurableLiveTest extends TestCase
+{
+    use CreatesConnectorAccountFixtures;
+    use CreatesMerchantConfirmedExternalRecordLinks;
+    use InteractsWithFieldMappingFixtures;
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(WorkspaceSeeder::class);
+        $this->seed(ConnectorFoundationSeeder::class);
+        $this->seedFieldDefinitions();
+    }
+
+    #[Test]
+    public function aggregator_maps_all_applied_to_synchronized(): void
+    {
+        $aggregator = new AdobeConfigurableAppliedStateAggregator;
+
+        $outcome = $aggregator->aggregate([
+            new AdobeConfigurableCommandEvidence('simple_child', AdobeProductAppliedStateKnowledge::KnownApplied, 'ok'),
+            new AdobeConfigurableCommandEvidence('configurable_parent', AdobeProductAppliedStateKnowledge::KnownApplied, 'ok'),
+        ]);
+
+        $this->assertSame(SyncLiveOutcome::Synchronized, $outcome);
+    }
+
+    #[Test]
+    public function aggregator_maps_mixed_applied_and_not_applied_to_partial(): void
+    {
+        $aggregator = new AdobeConfigurableAppliedStateAggregator;
+
+        $outcome = $aggregator->aggregate([
+            new AdobeConfigurableCommandEvidence('simple_child', AdobeProductAppliedStateKnowledge::KnownApplied, 'ok'),
+            new AdobeConfigurableCommandEvidence('configurable_parent', AdobeProductAppliedStateKnowledge::KnownNotApplied, 'rejected'),
+        ]);
+
+        $this->assertSame(SyncLiveOutcome::Partial, $outcome);
+    }
+
+    #[Test]
+    public function aggregator_maps_any_unknown_to_ambiguous_outranking_partial(): void
+    {
+        $aggregator = new AdobeConfigurableAppliedStateAggregator;
+
+        $outcome = $aggregator->aggregate([
+            new AdobeConfigurableCommandEvidence('simple_child', AdobeProductAppliedStateKnowledge::KnownApplied, 'ok'),
+            new AdobeConfigurableCommandEvidence('child_link', AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous, 'uncertain'),
+            new AdobeConfigurableCommandEvidence('configurable_parent', AdobeProductAppliedStateKnowledge::KnownNotApplied, 'rejected'),
+        ]);
+
+        $this->assertSame(SyncLiveOutcome::Ambiguous, $outcome);
+    }
+
+    #[Test]
+    public function child_compiler_includes_resolved_configurable_values_as_custom_attributes(): void
+    {
+        $compiler = new AdobeProductDesiredStateCompiler;
+        $semantic = AdobeConfigurableCommandTestFixtures::configurableSemanticResult();
+
+        $desired = $compiler->compileSimpleChildFromSemanticResult($semantic, '10');
+
+        $this->assertArrayHasKey('color', $desired->customAttributes);
+        $this->assertSame(93, $desired->customAttributes['color']);
+    }
+
+    #[Test]
+    public function invalid_child_configurable_value_index_fails_closed_before_http(): void
+    {
+        $semantic = AdobeConfigurableCommandTestFixtures::configurableSemanticResult(
+            children: [[
+                'variant_id' => '10',
+                'sku' => 'CHILD-BLUE',
+                'color' => 'blue',
+                'color_index' => '1e3',
+            ]],
+        );
+
+        $compiler = new AdobeProductDesiredStateCompiler;
+
+        try {
+            $compiler->compileSimpleChildFromSemanticResult($semantic, '10');
+            $this->fail('Expected AdobeProductCommandCompilationException for invalid value_index.');
+        } catch (AdobeProductCommandCompilationException $exception) {
+            $this->assertStringContainsString('value_index', $exception->getMessage());
+        }
+
+        $transport = new RecordingConnectorHttpTransport(fn (): ConnectorHttpResult => new ConnectorHttpResult(500, [], '{}'));
+
+        $executor = new AdobeProductSimpleCommandExecutor(
+            new AdobeProductDesiredStateCompiler,
+            new AdobeProductExternalRecordLinkGuard,
+            new AdobeSafeSyncClient(
+                app(AdobePaaSRequestContextFactory::class),
+                new AdobeSafeSyncRequestFactory(new OAuth1RequestSigner),
+                $transport,
+            ),
+        );
+
+        $result = $executor->executeSimpleChild(
+            new AdobeProductSimpleCommandInput(
+                workspaceId: (string) Str::uuid(),
+                connectorAccountId: (string) Str::uuid(),
+                semanticResult: $semantic,
+                adobeBaseCurrency: 'UAH',
+            ),
+            '10',
+        );
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
+        $this->assertSame('semantic_compilation_failed', $result->evidence->reasonCode);
+        $this->assertSame(0, $transport->sendCount);
+    }
+
+    #[Test]
+    public function parent_payload_builder_omits_price(): void
+    {
+        $factory = new AdobeProductCommandRequestFactory(new OAuth1RequestSigner);
+        $parent = new AdobeProductParentDesiredState(
+            productId: 1,
+            sku: 'cfg-test',
+            name: 'Parent',
+            attributeSetId: 4,
+            typeId: 'configurable',
+            status: 1,
+            visibility: 4,
+            customAttributes: [],
+        );
+
+        $method = new \ReflectionMethod($factory, 'encodeParentProductEnvelope');
+        $method->setAccessible(true);
+        $encoded = $method->invoke($factory, $parent);
+        $payload = json_decode($encoded, true);
+
+        $this->assertArrayNotHasKey('price', $payload['product']);
+    }
+
+    #[Test]
+    public function generated_parent_collision_with_product_erl_is_zero_post(): void
+    {
+        [$parentExecutor, $transport] = $this->parentExecutorStack();
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$otherProduct] = $this->createConfigurableProduct($workspace, 'CFG-OTHER');
+        [$product] = $this->createConfigurableProduct($workspace, 'CFG-TARGET');
+
+        $parentSku = (new AdobeConfigurableParentSkuGenerator)->generate($workspace->id, $product->id);
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $otherProduct->id,
+            'external_identifier' => $parentSku,
+        ]);
+
+        $input = $this->configurableInput($workspace, $account, $product);
+
+        $result = $parentExecutor->execute($input);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
+        $this->assertSame('external_record_link_collision', $result->reasonCode);
+        $this->assertSame(0, $transport->sendCount);
+    }
+
+    #[Test]
+    public function legacy_parent_link_without_provenance_is_not_trusted_with_zero_write(): void
+    {
+        [$parentExecutor, $transport] = $this->parentExecutorStack();
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product] = $this->createConfigurableProduct($workspace, 'CFG-TARGET');
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_identifier' => 'stale-parent-sku',
+        ]);
+
+        $result = $parentExecutor->execute($this->configurableInput($workspace, $account, $product));
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
+        $this->assertSame('link_required', $result->reasonCode);
+        $this->assertSame(0, $transport->sendCount);
+    }
+
+    #[Test]
+    public function parent_create_without_trusted_link_is_fail_closed_with_zero_write(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product] = $this->createConfigurableProduct($workspace, 'CFG-CONSERVATIVE');
+
+        [$parentExecutor, $transport] = $this->parentExecutorStack();
+
+        $result = $parentExecutor->execute($this->configurableInput($workspace, $account, $product));
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
+        $this->assertSame('link_required', $result->reasonCode);
+        $this->assertSame(0, ExternalRecordLink::query()->where('product_id', $product->id)->count());
+        $this->assertSame(0, $transport->sendCount);
+    }
+
+    #[Test]
+    public function coordinator_stops_all_writes_when_child_has_no_trusted_link(): void
+    {
+        [$coordinator, $transport] = $this->coordinatorStack();
+
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product] = $this->createConfigurableProduct($workspace, 'CFG-TARGET');
+
+        $result = $coordinator->execute(
+            $workspace->id,
+            $account->id,
+            AdobeConfigurableCommandTestFixtures::configurableSemanticResult($product->id),
+            'UAH',
+            $this->metadataFixture(),
+            null,
+        );
+
+        $this->assertSame(SyncLiveOutcome::NotApplied, $result->outcome);
+        $this->assertTrue(collect($result->commandEvidence)->contains(
+            fn ($entry) => $entry->commandKind === 'simple_child'
+                && $entry->reasonCode === 'link_required',
+        ));
+        $this->assertSame(0, $transport->sendCount);
+    }
+
+    #[Test]
+    public function classification_transition_simple_semantic_with_trusted_parent_is_not_applied(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product, $variant] = $this->createSimpleProductWithVariant($workspace);
+
+        $parentSku = (new AdobeConfigurableParentSkuGenerator)->generate($workspace->id, $product->id);
+        ExternalRecordLink::query()->create(
+            $this->merchantConfirmedParentLinkAttributes(
+                $workspace,
+                $account->id,
+                $product,
+                $parentSku,
+                'disc-'.$parentSku,
+            ),
+        );
+
+        $capability = app(AdobeProductExportLiveCapability::class);
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            $this->simpleSnapshot(),
+        )[0];
+
+        $runContext = (new AdobeProductExportLiveRunContext(
+            workspaceId: $workspace->id,
+            connectorAccountId: $account->id,
+            metadata: $this->metadataFixture(),
+            adobeBaseCurrency: 'UAH',
+        ));
+
+        $result = $capability->executeProduct(
+            $aggregate,
+            $this->simpleSnapshot(),
+            $runContext,
+            new SyncLiveConsequentialWriteGateStub(true),
+        );
+
+        $this->assertSame(SyncLiveOutcome::NotApplied, $result->outcome);
+        $this->assertTrue(collect($result->findings)->contains(
+            fn ($finding) => $finding->code === 'configurable_classification_transition_requires_adobe_validation',
+        ));
+    }
+
+    #[Test]
+    public function merchant_confirmed_configurable_links_fail_closed_until_write_bridge(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product, $variants] = $this->createConfigurableProduct($workspace, 'CFG-HAPPY');
+        $parentSku = (new AdobeConfigurableParentSkuGenerator)->generate($workspace->id, $product->id);
+
+        ExternalRecordLink::query()->create(
+            $this->merchantConfirmedParentLinkAttributes(
+                $workspace,
+                $account->id,
+                $product,
+                $parentSku,
+                'disc-'.$parentSku,
+            ),
+        );
+
+        foreach ($variants as $variant) {
+            ExternalRecordLink::query()->create(
+                $this->merchantConfirmedVariantLinkAttributes(
+                    $workspace,
+                    $account->id,
+                    $variant,
+                    $variant->sku,
+                    'disc-'.$variant->sku,
+                ),
+            );
+        }
+
+        [$coordinator, $transport] = $this->coordinatorStack();
+
+        $result = $coordinator->execute(
+            $workspace->id,
+            $account->id,
+            AdobeConfigurableCommandTestFixtures::configurableSemanticResult(
+                $product->id,
+                [
+                    ['variant_id' => (string) $variants[0]->id, 'sku' => $variants[0]->sku, 'color' => 'blue', 'color_index' => '93'],
+                    ['variant_id' => (string) $variants[1]->id, 'sku' => $variants[1]->sku, 'color' => 'red', 'color_index' => '94'],
+                ],
+            ),
+            'UAH',
+            $this->metadataFixture(),
+            new SyncLiveConsequentialWriteGateStub(true),
+        );
+
+        $this->assertSame(SyncLiveOutcome::NotApplied, $result->outcome);
+        $this->assertTrue(collect($result->commandEvidence)->contains(
+            fn ($entry) => $entry->commandKind === 'simple_child'
+                && $entry->reasonCode === 'entity_bound_mutation_bridge_required',
+        ));
+        $this->assertSame(0, $transport->sendCount);
+    }
+
+    #[Test]
+    public function option_request_payload_contains_no_per_value_label(): void
+    {
+        $factory = new AdobeProductCommandRequestFactory(new OAuth1RequestSigner);
+        $compiler = new AdobeConfigurableDesiredStateCompiler(new AdobeConfigurableParentSkuGenerator);
+        $desiredState = $compiler->compile(
+            AdobeConfigurableCommandTestFixtures::configurableSemanticResult(),
+            (string) Str::uuid(),
+            $this->metadataFixture(),
+        );
+
+        $method = new \ReflectionMethod($factory, 'encodeConfigurableOptionPayload');
+        $method->setAccessible(true);
+        $encoded = $method->invoke($factory, $desiredState->options[0]);
+        $payload = json_decode($encoded, true);
+
+        $this->assertArrayHasKey('value_index', $payload['option']['values'][0]);
+        $this->assertArrayNotHasKey('label', $payload['option']['values'][0]);
+    }
+
+    #[Test]
+    public function official_magento_option_response_is_exact_no_op_with_zero_option_put(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product] = $this->createConfigurableProduct($workspace, 'CFG-OPTION-NOOP');
+        $parentSku = (new AdobeConfigurableParentSkuGenerator)->generate($workspace->id, $product->id);
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_identifier' => $parentSku,
+        ]);
+
+        $optionExecutor = new AdobeConfigurableOptionCommandExecutor(
+            app(AdobePaaSRequestContextFactory::class),
+            new AdobeProductRemoteStateClient(
+                app(AdobePaaSRequestContextFactory::class),
+                new AdobeProductCommandRequestFactory(new OAuth1RequestSigner),
+                new RecordingConnectorHttpTransport(fn (): ConnectorHttpResult => new ConnectorHttpResult(
+                    200,
+                    [],
+                    json_encode(AdobeConfigurableCommandTestFixtures::remoteOptionsPayload(), JSON_THROW_ON_ERROR),
+                )),
+                new AdobeProductRemoteGetClassifier(new AdobeProductRemoteStateNormalizer),
+            ),
+            new AdobeConfigurableRemoteOptionStateReader,
+        );
+
+        $input = $this->configurableInput($workspace, $account, $product);
+        $result = $optionExecutor->execute($input, $input->desiredState->options[0]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
+        $this->assertSame('configurable_option_no_op', $result->reasonCode);
+        $this->assertSame(0, $result->consequentialWriteAttempts);
+    }
+
+    #[Test]
+    public function malformed_option_response_is_fail_closed_with_zero_write(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product] = $this->createConfigurableProduct($workspace, 'CFG-MALFORMED-OPTION');
+
+        $optionExecutor = new AdobeConfigurableOptionCommandExecutor(
+            app(AdobePaaSRequestContextFactory::class),
+            new AdobeProductRemoteStateClient(
+                app(AdobePaaSRequestContextFactory::class),
+                new AdobeProductCommandRequestFactory(new OAuth1RequestSigner),
+                new RecordingConnectorHttpTransport(fn (): ConnectorHttpResult => new ConnectorHttpResult(
+                    200,
+                    [],
+                    json_encode([[
+                        'id' => 201,
+                        'attribute_id' => '100',
+                        'label' => 'color',
+                        'position' => 0,
+                        'values' => [
+                            ['value_index' => 'not-a-number'],
+                        ],
+                    ]], JSON_THROW_ON_ERROR),
+                )),
+                new AdobeProductRemoteGetClassifier(new AdobeProductRemoteStateNormalizer),
+            ),
+            new AdobeConfigurableRemoteOptionStateReader,
+        );
+
+        $input = $this->configurableInput($workspace, $account, $product);
+        $result = $optionExecutor->execute($input, $input->desiredState->options[0]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous, $result->appliedStateKnowledge);
+        $this->assertSame('configurable_options_get_untrusted', $result->reasonCode);
+        $this->assertSame(0, $result->consequentialWriteAttempts);
+    }
+
+    #[Test]
+    public function malformed_children_response_is_fail_closed_with_zero_child_link_post(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product, $variants] = $this->createConfigurableProduct($workspace, 'CFG-MALFORMED-CHILDREN');
+        $parentSku = (new AdobeConfigurableParentSkuGenerator)->generate($workspace->id, $product->id);
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_identifier' => $parentSku,
+        ]);
+
+        foreach ($variants as $variant) {
+            ExternalRecordLink::query()->create([
+                'workspace_id' => $workspace->id,
+                'connector_account_id' => $account->id,
+                'product_variant_id' => $variant->id,
+                'external_identifier' => $variant->sku,
+            ]);
+        }
+
+        $transport = new RecordingConnectorHttpTransport(fn (): ConnectorHttpResult => new ConnectorHttpResult(
+            200,
+            [],
+            json_encode([['not_sku' => $variants[0]->sku]], JSON_THROW_ON_ERROR),
+        ));
+
+        $childLinkExecutor = new AdobeConfigurableChildLinkCommandExecutor(
+            app(AdobePaaSRequestContextFactory::class),
+            new AdobeProductRemoteStateClient(
+                app(AdobePaaSRequestContextFactory::class),
+                new AdobeProductCommandRequestFactory(new OAuth1RequestSigner),
+                $transport,
+                new AdobeProductRemoteGetClassifier(new AdobeProductRemoteStateNormalizer),
+            ),
+            new AdobeConfigurableRemoteOptionStateReader,
+        );
+
+        $input = $this->configurableInput($workspace, $account, $product);
+        $result = $childLinkExecutor->execute($input, $input->desiredState->childLinks[0]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous, $result->appliedStateKnowledge);
+        $this->assertSame('configurable_children_get_untrusted', $result->reasonCode);
+        $this->assertFalse(collect($transport->recordedRequests)->contains(
+            fn ($request) => str_contains((string) $request->request->getUri(), '/child')
+                && $request->request->getMethod() === 'POST',
+        ));
+    }
+
+    #[Test]
+    public function option_write_transport_failure_reconciles_to_known_applied(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product] = $this->createConfigurableProduct($workspace, 'CFG-OPTION-RECON');
+
+        $transport = new RecordingConnectorHttpTransport(function (): ConnectorHttpResult {
+            static $count = 0;
+            $count++;
+
+            return match ($count) {
+                1 => new ConnectorHttpResult(200, [], '[]'),
+                2 => new ConnectorHttpResult(500, [], '{}'),
+                3 => new ConnectorHttpResult(200, [], json_encode(AdobeConfigurableCommandTestFixtures::remoteOptionsPayload(), JSON_THROW_ON_ERROR)),
+                default => new ConnectorHttpResult(500, [], '{}'),
+            };
+        });
+
+        $optionExecutor = new AdobeConfigurableOptionCommandExecutor(
+            app(AdobePaaSRequestContextFactory::class),
+            new AdobeProductRemoteStateClient(
+                app(AdobePaaSRequestContextFactory::class),
+                new AdobeProductCommandRequestFactory(new OAuth1RequestSigner),
+                $transport,
+                new AdobeProductRemoteGetClassifier(new AdobeProductRemoteStateNormalizer),
+            ),
+            new AdobeConfigurableRemoteOptionStateReader,
+        );
+
+        $input = $this->configurableInput($workspace, $account, $product);
+        $result = $optionExecutor->execute($input, $input->desiredState->options[0]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
+        $this->assertSame(1, $result->reconciliationGetAttempts);
+        $this->assertSame(1, $result->consequentialWriteAttempts);
+        $this->assertSame(3, $transport->sendCount);
+    }
+
+    #[Test]
+    public function child_link_write_transport_failure_reconciles_to_known_applied(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product, $variants] = $this->createConfigurableProduct($workspace, 'CFG-LINK-RECON');
+        $childSku = $variants[0]->sku;
+
+        $transport = new RecordingConnectorHttpTransport(function () use ($childSku): ConnectorHttpResult {
+            static $count = 0;
+            $count++;
+
+            return match ($count) {
+                1 => new ConnectorHttpResult(200, [], '[]'),
+                2 => new ConnectorHttpResult(500, [], '{}'),
+                3 => new ConnectorHttpResult(200, [], json_encode([['sku' => $childSku]], JSON_THROW_ON_ERROR)),
+                default => new ConnectorHttpResult(500, [], '{}'),
+            };
+        });
+
+        $childLinkExecutor = new AdobeConfigurableChildLinkCommandExecutor(
+            app(AdobePaaSRequestContextFactory::class),
+            new AdobeProductRemoteStateClient(
+                app(AdobePaaSRequestContextFactory::class),
+                new AdobeProductCommandRequestFactory(new OAuth1RequestSigner),
+                $transport,
+                new AdobeProductRemoteGetClassifier(new AdobeProductRemoteStateNormalizer),
+            ),
+            new AdobeConfigurableRemoteOptionStateReader,
+        );
+
+        $semantic = AdobeConfigurableCommandTestFixtures::configurableSemanticResult(
+            $product->id,
+            [
+                ['variant_id' => (string) $variants[0]->id, 'sku' => $variants[0]->sku, 'color' => 'blue', 'color_index' => '93'],
+                ['variant_id' => (string) $variants[1]->id, 'sku' => $variants[1]->sku, 'color' => 'red', 'color_index' => '94'],
+            ],
+        );
+        $compiler = new AdobeConfigurableDesiredStateCompiler(new AdobeConfigurableParentSkuGenerator);
+        $desired = $compiler->compile($semantic, $workspace->id, $this->metadataFixture());
+        $input = new AdobeConfigurableCommandInput(
+            workspaceId: $workspace->id,
+            connectorAccountId: $account->id,
+            semanticResult: $semantic,
+            desiredState: $desired,
+            adobeBaseCurrency: 'UAH',
+            metadata: $this->metadataFixture(),
+        );
+
+        $result = $childLinkExecutor->execute($input, $input->desiredState->childLinks[0]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
+        $this->assertSame(1, $result->reconciliationGetAttempts);
+        $this->assertSame(1, $result->consequentialWriteAttempts);
+        $this->assertSame(3, $transport->sendCount);
+    }
+
+    #[Test]
+    public function legacy_child_links_fail_closed_before_inactive_lifecycle(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product, $variants] = $this->createConfigurableProduct($workspace, 'CFG-LINK-PARTIAL');
+        $parentSku = (new AdobeConfigurableParentSkuGenerator)->generate($workspace->id, $product->id);
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_identifier' => $parentSku,
+        ]);
+
+        foreach ($variants as $variant) {
+            ExternalRecordLink::query()->create([
+                'workspace_id' => $workspace->id,
+                'connector_account_id' => $account->id,
+                'product_variant_id' => $variant->id,
+                'external_identifier' => $variant->sku,
+            ]);
+        }
+
+        $inactiveVariant = ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => $product->sku.'-INACTIVE',
+            'is_active' => false,
+        ]);
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_variant_id' => $inactiveVariant->id,
+            'external_identifier' => $inactiveVariant->sku,
+        ]);
+
+        [$coordinator, $transport] = $this->coordinatorStack();
+
+        $result = $coordinator->execute(
+            $workspace->id,
+            $account->id,
+            AdobeConfigurableCommandTestFixtures::configurableSemanticResult(
+                $product->id,
+                [
+                    ['variant_id' => (string) $variants[0]->id, 'sku' => $variants[0]->sku, 'color' => 'blue', 'color_index' => '93'],
+                    ['variant_id' => (string) $variants[1]->id, 'sku' => $variants[1]->sku, 'color' => 'red', 'color_index' => '94'],
+                ],
+            ),
+            'UAH',
+            $this->metadataFixture(),
+            new SyncLiveConsequentialWriteGateStub(false),
+        );
+
+        $this->assertSame(SyncLiveOutcome::NotApplied, $result->outcome);
+        $this->assertFalse(collect($result->commandEvidence)->contains(
+            fn ($entry) => $entry->commandKind === 'inactive_child_lifecycle',
+        ));
+        $this->assertSame(0, $transport->sendCount);
+    }
+
+    #[Test]
+    public function ambiguous_parent_links_with_simple_semantic_are_ambiguous_with_zero_http(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product, $variant] = $this->createSimpleProductWithVariant($workspace);
+        $parentSku = (new AdobeConfigurableParentSkuGenerator)->generate($workspace->id, $product->id);
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_identifier' => $parentSku,
+        ]);
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_identifier' => 'second-parent-sku',
+        ]);
+
+        $transport = new RecordingConnectorHttpTransport(fn (): ConnectorHttpResult => new ConnectorHttpResult(500, [], '{}'));
+        $this->app->instance(ConnectorHttpTransport::class, $transport);
+
+        $capability = app(AdobeProductExportLiveCapability::class);
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            $this->simpleSnapshot(),
+        )[0];
+
+        $result = $capability->executeProduct(
+            $aggregate,
+            $this->simpleSnapshot(),
+            new AdobeProductExportLiveRunContext(
+                workspaceId: $workspace->id,
+                connectorAccountId: $account->id,
+                metadata: $this->metadataFixture(),
+                adobeBaseCurrency: 'UAH',
+            ),
+            new SyncLiveConsequentialWriteGateStub(true),
+        );
+
+        $this->assertSame(SyncLiveOutcome::Ambiguous, $result->outcome);
+        $this->assertTrue(collect($result->findings)->contains(
+            fn ($finding) => $finding->code === 'ambiguous_configurable_parent_identity_links',
+        ));
+        $this->assertSame(0, $transport->sendCount);
+    }
+
+    #[Test]
+    public function ambiguous_parent_links_with_configurable_semantic_are_ambiguous_with_zero_http(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product] = $this->createConfigurableProduct($workspace, 'CFG-AMBIG-PARENT');
+        $parentSku = (new AdobeConfigurableParentSkuGenerator)->generate($workspace->id, $product->id);
+
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_identifier' => $parentSku,
+        ]);
+        ExternalRecordLink::query()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_identifier' => 'second-parent-sku',
+        ]);
+
+        $transport = new RecordingConnectorHttpTransport(fn (): ConnectorHttpResult => new ConnectorHttpResult(500, [], '{}'));
+        $this->app->instance(ConnectorHttpTransport::class, $transport);
+
+        $capability = app(AdobeProductExportLiveCapability::class);
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            $this->configurableSnapshot(),
+        )[0];
+
+        $result = $capability->executeProduct(
+            $aggregate,
+            $this->configurableSnapshot(),
+            new AdobeProductExportLiveRunContext(
+                workspaceId: $workspace->id,
+                connectorAccountId: $account->id,
+                metadata: $this->metadataFixture(),
+                adobeBaseCurrency: 'UAH',
+            ),
+            new SyncLiveConsequentialWriteGateStub(true),
+        );
+
+        $this->assertSame(SyncLiveOutcome::Ambiguous, $result->outcome);
+        $this->assertTrue(collect($result->findings)->contains(
+            fn ($finding) => $finding->code === 'ambiguous_configurable_parent_identity_links',
+        ));
+        $this->assertSame(0, $transport->sendCount);
+    }
+
+    #[Test]
+    public function configurable_option_label_prefers_current_adobe_default_frontend_label(): void
+    {
+        $compiler = new AdobeConfigurableDesiredStateCompiler(new AdobeConfigurableParentSkuGenerator);
+        $metadata = new AdobeProductExportExecutionMetadata(
+            selectedAttributeSetId: 4,
+            attributeSets: [['attribute_set_id' => 4, 'attribute_set_name' => 'Default']],
+            attributes: [
+                'color' => new AdobeAttributeMetadata(
+                    attributeId: 100,
+                    code: 'color',
+                    frontendInput: 'select',
+                    scope: 'global',
+                    options: ['93' => 'Blue', '94' => 'Red'],
+                    defaultFrontendLabel: 'Color',
+                ),
+            ],
+        );
+
+        $desired = $compiler->compile(
+            AdobeConfigurableCommandTestFixtures::configurableSemanticResult(),
+            (string) Str::uuid(),
+            $metadata,
+        );
+
+        $this->assertSame('Color', $desired->options[0]->label);
+    }
+
+    #[Test]
+    public function configurable_option_label_falls_back_to_external_field_key_when_adobe_label_missing(): void
+    {
+        $compiler = new AdobeConfigurableDesiredStateCompiler(new AdobeConfigurableParentSkuGenerator);
+        $desired = $compiler->compile(
+            AdobeConfigurableCommandTestFixtures::configurableSemanticResult(),
+            (string) Str::uuid(),
+            $this->metadataFixture(),
+        );
+
+        $this->assertSame('color', $desired->options[0]->label);
+    }
+
+    /**
+     * @return array{0: AdobeConfigurableProductCommandCoordinator, 1: RecordingConnectorHttpTransport}
+     */
+    private function coordinatorStack(
+        ?\Closure $responder = null,
+        ?AdobeProductOwnershipTrustPolicy $ownershipPolicy = null,
+    ): array {
+        $transport = new RecordingConnectorHttpTransport(
+            $responder ?? fn (): ConnectorHttpResult => new ConnectorHttpResult(500, [], '{}'),
+        );
+
+        $normalizer = new AdobeProductRemoteStateNormalizer;
+        $classifier = new AdobeProductRemoteGetClassifier($normalizer);
+        $client = new AdobeProductRemoteStateClient(
+            app(AdobePaaSRequestContextFactory::class),
+            new AdobeProductCommandRequestFactory(new OAuth1RequestSigner),
+            $transport,
+            $classifier,
+        );
+        $linkGuard = new AdobeProductExternalRecordLinkGuard;
+        $ownershipPolicy ??= new ConservativeAdobeProductOwnershipTrustPolicy;
+        $persister = new AdobeProductExternalRecordLinkPersister($linkGuard);
+        $comparator = new AdobeProductRemoteStateComparator;
+        $optionReader = new AdobeConfigurableRemoteOptionStateReader;
+
+        $coordinator = new AdobeConfigurableProductCommandCoordinator(
+            new AdobeConfigurableDesiredStateCompiler(new AdobeConfigurableParentSkuGenerator),
+            new AdobeProductSimpleCommandExecutor(
+                new AdobeProductDesiredStateCompiler,
+                $linkGuard,
+                new AdobeSafeSyncClient(
+                    app(AdobePaaSRequestContextFactory::class),
+                    new AdobeSafeSyncRequestFactory(new OAuth1RequestSigner),
+                    $transport,
+                ),
+            ),
+            new AdobeConfigurableParentCommandExecutor($linkGuard),
+            new AdobeConfigurableOptionCommandExecutor(
+                app(AdobePaaSRequestContextFactory::class),
+                $client,
+                $optionReader,
+            ),
+            new AdobeConfigurableChildLinkCommandExecutor(
+                app(AdobePaaSRequestContextFactory::class),
+                $client,
+                $optionReader,
+            ),
+            new AdobeConfigurableInactiveLinkedVariantLifecycleExecutor(
+                app(AdobePaaSRequestContextFactory::class),
+                $client,
+                $normalizer,
+                $comparator,
+                $linkGuard,
+            ),
+            new AdobeConfigurableAppliedStateAggregator,
+            $linkGuard,
+        );
+
+        return [$coordinator, $transport];
+    }
+
+    /**
+     * @return array{0: AdobeConfigurableParentCommandExecutor, 1: RecordingConnectorHttpTransport}
+     */
+    private function parentExecutorStack(?\Closure $responder = null): array
+    {
+        [$coordinator, $transport] = $this->coordinatorStack($responder);
+
+        return [new AdobeConfigurableParentCommandExecutor(new AdobeProductExternalRecordLinkGuard), $transport];
+    }
+
+    private function configurableInput(Workspace $workspace, ConnectorAccount $account, Product $product): AdobeConfigurableCommandInput
+    {
+        $semantic = AdobeConfigurableCommandTestFixtures::configurableSemanticResult($product->id);
+        $compiler = new AdobeConfigurableDesiredStateCompiler(new AdobeConfigurableParentSkuGenerator);
+        $desired = $compiler->compile($semantic, $workspace->id, $this->metadataFixture());
+
+        return new AdobeConfigurableCommandInput(
+            workspaceId: $workspace->id,
+            connectorAccountId: $account->id,
+            semanticResult: $semantic,
+            desiredState: $desired,
+            adobeBaseCurrency: 'UAH',
+            metadata: $this->metadataFixture(),
+        );
+    }
+
+    /**
+     * @return array{0: Product, 1: list<ProductVariant>}
+     */
+    private function createConfigurableProduct(Workspace $workspace, string $productSku = 'CFG-PRODUCT'): array
+    {
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => $productSku,
+            'name' => 'Configurable Product',
+            'is_active' => true,
+        ]);
+
+        $variants = [];
+
+        foreach ([['VAR-BLUE', 'blue'], ['VAR-RED', 'red']] as [$suffix, $color]) {
+            $variantSku = $productSku.'-'.$suffix;
+            $variant = ProductVariant::withoutWorkspaceScope()->create([
+                'workspace_id' => $workspace->id,
+                'product_id' => $product->id,
+                'onec_guid' => (string) Str::uuid(),
+                'sku' => $variantSku,
+                'is_active' => true,
+                'base_price_cache' => 100,
+            ]);
+
+            VariantFieldValue::withoutWorkspaceScope()->create([
+                'workspace_id' => $workspace->id,
+                'variant_id' => $variant->id,
+                'field_binding_id' => $this->productVariantBinding('color')->id,
+                'value_text' => $color,
+            ]);
+
+            $this->attachVariantPrice($workspace, $variant, 100);
+            $variants[] = $variant;
+        }
+
+        return [$product, $variants];
+    }
+
+    /**
+     * @return array{0: Product, 1: ProductVariant}
+     */
+    private function createSimpleProductWithVariant(Workspace $workspace): array
+    {
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'SIMPLE-PRODUCT',
+            'name' => 'Simple Product',
+            'is_active' => true,
+        ]);
+
+        $variant = ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'SIMPLE-SKU',
+            'is_active' => true,
+            'base_price_cache' => 100,
+        ]);
+
+        $this->attachVariantPrice($workspace, $variant, 100);
+
+        return [$product, $variant];
+    }
+
+    private function attachVariantPrice(Workspace $workspace, ProductVariant $variant, float $price): void
+    {
+        $priceList = PriceList::withoutWorkspaceScope()->firstOrCreate(
+            ['workspace_id' => $workspace->id, 'is_default' => true],
+            ['name' => 'Workspace Default', 'currency' => 'UAH', 'priority' => 0, 'status' => PriceListStatus::Active],
+        );
+
+        PriceListItem::withoutWorkspaceScope()->updateOrCreate(
+            [
+                'workspace_id' => $workspace->id,
+                'price_list_id' => $priceList->id,
+                'product_variant_id' => $variant->id,
+                'quantity_min' => 1,
+            ],
+            ['price' => $price, 'status' => PriceListItemStatus::Active],
+        );
+    }
+
+    private function metadataFixture(): AdobeProductExportExecutionMetadata
+    {
+        return new AdobeProductExportExecutionMetadata(
+            selectedAttributeSetId: 4,
+            attributeSets: [['attribute_set_id' => 4, 'attribute_set_name' => 'Default']],
+            attributes: [
+                'name' => new AdobeAttributeMetadata(71, 'name', 'text', 'global', []),
+                'sku' => new AdobeAttributeMetadata(74, 'sku', 'text', 'global', []),
+                'status' => new AdobeAttributeMetadata(97, 'status', 'select', 'global', ['1' => 'Enabled']),
+                'color' => new AdobeAttributeMetadata(100, 'color', 'select', 'global', ['93' => 'Blue', '94' => 'Red']),
+            ],
+        );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function configurableSnapshot(): array
+    {
+        return [
+            'version' => 'platform.sync-run-input.v1',
+            'data_domain' => 'products',
+            'semantic_operation' => 'export',
+            'external_context' => [],
+            'selection' => ['mode' => 'all_products'],
+            'field_mappings' => [
+                ['field_binding_id' => $this->productBinding('name')->id, 'external_field_key' => 'name'],
+                ['field_binding_id' => $this->productVariantBinding('sku')->id, 'external_field_key' => 'sku'],
+                ['field_binding_id' => $this->productBinding('status')->id, 'external_field_key' => 'status'],
+                [
+                    'field_binding_id' => $this->productVariantBinding('color')->id,
+                    'external_field_key' => 'color',
+                    'option_mappings' => [
+                        ['internal_option_key' => 'blue', 'external_option_value' => '93'],
+                        ['internal_option_key' => 'red', 'external_option_value' => '94'],
+                    ],
+                ],
+            ],
+            'connector_execution_configuration' => ['attribute_set_id' => 4],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function simpleSnapshot(): array
+    {
+        return [
+            'version' => 'platform.sync-run-input.v1',
+            'data_domain' => 'products',
+            'semantic_operation' => 'export',
+            'external_context' => [],
+            'selection' => ['mode' => 'all_products'],
+            'field_mappings' => [
+                ['field_binding_id' => $this->productBinding('name')->id, 'external_field_key' => 'name'],
+                ['field_binding_id' => $this->productVariantBinding('sku')->id, 'external_field_key' => 'sku'],
+                ['field_binding_id' => $this->productBinding('status')->id, 'external_field_key' => 'status'],
+            ],
+            'connector_execution_configuration' => ['attribute_set_id' => 4],
+        ];
+    }
+}

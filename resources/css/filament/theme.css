@@ -1,0 +1,21 @@
+@import '../../../vendor/filament/filament/resources/css/theme.css';
+@import '../design-tokens.css' layer(base);
+
+@source '../../../app/Filament/**/*';
+@source '../../../resources/views/filament/**/*';
+@source '../../../resources/views/vendor/filament*/**/*';
+@source '../../../resources/views/components/filament/**/*';
+@source '../../../resources/views/livewire/**/*';
+
+@theme {
+    --font-sans:
+        Figtree, ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+        'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --color-primary-50: #fffbeb;
+    --color-primary-100: #fef3c7;
+    --color-primary-400: #fbbf24;
+    --color-primary-500: #f59e0b;
+    --color-primary-600: #d97706;
+    --color-primary-700: #b45309;
+}

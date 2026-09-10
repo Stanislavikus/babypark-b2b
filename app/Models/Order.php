@@ -13,7 +13,7 @@ class Order extends Model
     use HasFactory;
 
     protected $fillable = [
-        'contractor_id',
+        'customer_id',
         'user_id',
         'onec_guid',
         'onec_number',
@@ -38,9 +38,9 @@ class Order extends Model
         ];
     }
 
-    public function contractor(): BelongsTo
+    public function customer(): BelongsTo
     {
-        return $this->belongsTo(Contractor::class);
+        return $this->belongsTo(Customer::class);
     }
 
     public function user(): BelongsTo

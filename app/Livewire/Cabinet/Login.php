@@ -22,7 +22,7 @@ class Login extends Component
     {
         $this->validate();
 
-        if (! Auth::guard('contractor')->attempt(
+        if (! Auth::guard('customer')->attempt(
             ['login' => $this->login, 'password' => $this->password],
             $this->remember
         )) {
@@ -31,10 +31,10 @@ class Login extends Component
             return;
         }
 
-        $contractor = Auth::guard('contractor')->user();
+        $customer = Auth::guard('customer')->user();
 
-        if (! $contractor->is_active) {
-            Auth::guard('contractor')->logout();
+        if (! $customer->is_active) {
+            Auth::guard('customer')->logout();
             $this->addError('login', 'Ваш акаунт деактивовано.');
 
             return;

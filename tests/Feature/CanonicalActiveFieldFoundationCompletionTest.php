@@ -1,0 +1,245 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Enums\AttributeDataType;
+use App\Enums\AttributeScope;
+use App\Enums\AttributeStatus;
+use App\Enums\AttributeStorageType;
+use App\Enums\FieldObjectType;
+use App\Exceptions\Catalog\ColumnFieldNotAllowlistedException;
+use App\Models\FieldBinding;
+use App\Models\FieldDefinition;
+use App\Models\Product;
+use App\Models\ProductFieldValue;
+use App\Models\ProductVariant;
+use App\Models\VariantFieldValue;
+use App\Models\Workspace;
+use App\Services\Catalog\GovernedProductVariantColumnMutationService;
+use App\Services\Fields\GovernedDynamicFieldValueWriter;
+use Database\Seeders\CanonicalActiveFieldSeeder;
+use Database\Seeders\FieldDefinitionSeeder;
+use Database\Seeders\WorkspaceSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+use RuntimeException;
+use Tests\TestCase;
+
+class CanonicalActiveFieldFoundationCompletionTest extends TestCase
+{
+    use RefreshDatabase;
+
+    /** @var array<string, array{AttributeDataType, string, string, bool, array<string, string>}> */
+    private array $columnFields = [
+        'barcode_box' => [AttributeDataType::Text, 'products.barcode_box', 'identifiers', false, ['en' => 'Box Barcode', 'uk' => 'Штрихкод коробки', 'ru' => 'Штрихкод коробки']],
+        'min_order_quantity' => [AttributeDataType::Number, 'products.min_order_quantity', 'b2b', true, ['en' => 'Minimum Order Quantity', 'uk' => 'Мін. кількість замовлення', 'ru' => 'Мин. количество заказа']],
+        'order_step' => [AttributeDataType::Number, 'products.order_step', 'b2b', true, ['en' => 'Order Step', 'uk' => 'Крок замовлення', 'ru' => 'Шаг заказа']],
+        'package_quantity' => [AttributeDataType::Number, 'products.package_quantity', 'logistics', false, ['en' => 'Package Quantity', 'uk' => 'Кількість в упаковці', 'ru' => 'Количество в упаковке']],
+        'package_type' => [AttributeDataType::Text, 'products.package_type', 'logistics', false, ['en' => 'Package Type', 'uk' => 'Тип упаковки', 'ru' => 'Тип упаковки']],
+        'units_per_box' => [AttributeDataType::Number, 'products.units_per_box', 'logistics', false, ['en' => 'Units Per Box', 'uk' => 'Одиниць у коробці', 'ru' => 'Единиц в коробке']],
+        'boxes_per_pallet' => [AttributeDataType::Number, 'products.boxes_per_pallet', 'logistics', false, ['en' => 'Boxes Per Pallet', 'uk' => 'Коробок на палеті', 'ru' => 'Коробок на паллете']],
+        'lead_time_days' => [AttributeDataType::Number, 'products.lead_time_days', 'logistics', false, ['en' => 'Lead Time Days', 'uk' => 'Термін поставки (дні)', 'ru' => 'Срок поставки (дни)']],
+        'depth_mm' => [AttributeDataType::Number, 'products.depth_mm', 'logistics', false, ['en' => 'Depth', 'uk' => 'Глибина', 'ru' => 'Глубина']],
+        'width_mm' => [AttributeDataType::Number, 'products.width_mm', 'logistics', false, ['en' => 'Width', 'uk' => 'Ширина', 'ru' => 'Ширина']],
+        'height_mm' => [AttributeDataType::Number, 'products.height_mm', 'logistics', false, ['en' => 'Height', 'uk' => 'Висота', 'ru' => 'Высота']],
+    ];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(WorkspaceSeeder::class);
+        $this->seed(FieldDefinitionSeeder::class);
+    }
+
+    public function test_safe_materialization_set_has_exact_canonical_metadata_and_bindings(): void
+    {
+        $this->assertCanonicalMetadata();
+    }
+
+    private function assertCanonicalMetadata(): void
+    {
+        foreach ($this->columnFields as $code => [$dataType, $storagePath, $group, $b2bVisible, $labels]) {
+            $definition = $this->definition($code);
+            $this->assertDefinition($definition, $dataType, AttributeScope::System, $labels, false);
+            $this->assertExactBindings($definition, [[FieldObjectType::Product, AttributeStorageType::Column, $storagePath, $group, false, ['admin' => true, 'b2b' => $b2bVisible, 'channels' => []]]]);
+        }
+
+        foreach (['pattern' => ['Pattern', 'Візерунок', 'Узор'], 'style' => ['Style', 'Стиль', 'Стиль']] as $code => $labels) {
+            $definition = $this->definition($code);
+            $this->assertDefinition($definition, AttributeDataType::Text, AttributeScope::PlatformLibrary, array_combine(['en', 'uk', 'ru'], $labels), false);
+            $this->assertExactBindings($definition, [
+                [FieldObjectType::Product, AttributeStorageType::Dynamic, null, 'characteristics', true, ['admin' => true, 'b2b' => true, 'channels' => []]],
+                [FieldObjectType::ProductVariant, AttributeStorageType::Dynamic, null, 'characteristics', true, ['admin' => true, 'b2b' => true, 'channels' => []]],
+            ]);
+        }
+
+        $warranty = $this->definition('warranty');
+        $this->assertDefinition($warranty, AttributeDataType::LongText, AttributeScope::PlatformLibrary, ['en' => 'Warranty Description', 'uk' => 'Гарантія', 'ru' => 'Гарантия'], true);
+        $this->assertExactBindings($warranty, [[FieldObjectType::Product, AttributeStorageType::Dynamic, null, 'descriptions', false, ['admin' => true, 'b2b' => true, 'channels' => []]]]);
+    }
+
+    public function test_seeder_is_idempotent_and_exclusions_remain_unseeded(): void
+    {
+        $counts = [FieldDefinition::withoutWorkspaceScope()->count(), FieldBinding::withoutWorkspaceScope()->count()];
+        $this->seed(FieldDefinitionSeeder::class);
+        $this->assertSame($counts, [FieldDefinition::withoutWorkspaceScope()->count(), FieldBinding::withoutWorkspaceScope()->count()]);
+
+        $this->assertSame(0, FieldDefinition::withoutWorkspaceScope()->whereIn('code', [
+            'unit', 'meta_title', 'meta_description', 'product_highlights', 'age_group', 'gender',
+        ])->count());
+    }
+
+    public function test_new_dynamic_bindings_use_existing_product_and_variant_write_paths(): void
+    {
+        [$workspace, $product, $variant] = $this->targets();
+        $writer = app(GovernedDynamicFieldValueWriter::class);
+        $productBinding = $this->binding('pattern', FieldObjectType::Product);
+        $variantBinding = $this->binding('pattern', FieldObjectType::ProductVariant);
+
+        $writer->set($workspace->id, FieldObjectType::Product, $product->id, $productBinding->id, 'Смугастий');
+        $writer->set($workspace->id, FieldObjectType::ProductVariant, $variant->id, $variantBinding->id, 'Крапка');
+
+        $this->assertSame('Смугастий', ProductFieldValue::withoutWorkspaceScope()->where('field_binding_id', $productBinding->id)->sole()->value_text);
+        $this->assertSame('Крапка', VariantFieldValue::withoutWorkspaceScope()->where('field_binding_id', $variantBinding->id)->sole()->value_text);
+    }
+
+    public function test_deployment_seed_upgrades_existing_installation_and_preserves_existing_settings(): void
+    {
+        $codes = [...array_keys($this->columnFields), 'pattern', 'style', 'warranty'];
+        $ids = FieldDefinition::withoutWorkspaceScope()->whereIn('code', $codes)->pluck('id');
+        FieldBinding::withoutWorkspaceScope()->whereIn('field_definition_id', $ids)->delete();
+        FieldDefinition::withoutWorkspaceScope()->whereIn('id', $ids)->delete();
+
+        // An unrelated edited definition must not make the narrow upgrade fail.
+        $brand = $this->definition('brand');
+        $brand->update(['localized_labels' => ['uk' => 'Мій бренд']]);
+        $brandBefore = $brand->fresh()->getAttributes();
+        $custom = new FieldDefinition($brand->only($brand->getFillable()));
+        $custom->fill([
+            'workspace_id' => Workspace::query()->where('is_default', true)->sole()->id,
+            'scope' => AttributeScope::WorkspaceCustom,
+            'code' => 'pattern',
+        ])->save();
+        $customBefore = $custom->fresh()->getAttributes();
+        $definitionCount = FieldDefinition::withoutWorkspaceScope()->count();
+        $bindingCount = FieldBinding::withoutWorkspaceScope()->count();
+
+        $this->artisan('db:seed', ['--class' => CanonicalActiveFieldSeeder::class, '--force' => true])->assertSuccessful();
+        $this->assertSame($definitionCount + 14, FieldDefinition::withoutWorkspaceScope()->count());
+        $this->assertSame($bindingCount + 16, FieldBinding::withoutWorkspaceScope()->count());
+        $this->assertCanonicalMetadata();
+
+        $pattern = $this->binding('pattern', FieldObjectType::Product);
+        $pattern->update([
+            'visibility_settings' => ['admin' => true, 'b2b' => false, 'channels' => []],
+            'is_filterable' => false,
+            'is_sortable' => true,
+            'is_required' => true,
+            'sort_order' => 987,
+        ]);
+        $patternBefore = $pattern->fresh()->getAttributes();
+        $definitionIds = FieldDefinition::withoutWorkspaceScope()->orderBy('id')->pluck('id')->all();
+        $bindingIds = FieldBinding::withoutWorkspaceScope()->orderBy('id')->pluck('id')->all();
+
+        $this->artisan('db:seed', ['--class' => CanonicalActiveFieldSeeder::class, '--force' => true])->assertSuccessful();
+        $this->assertSame($definitionIds, FieldDefinition::withoutWorkspaceScope()->orderBy('id')->pluck('id')->all());
+        $this->assertSame($bindingIds, FieldBinding::withoutWorkspaceScope()->orderBy('id')->pluck('id')->all());
+        $this->assertSame($patternBefore, $pattern->fresh()->getAttributes());
+        $this->assertSame($brandBefore, $brand->fresh()->getAttributes());
+        $this->assertSame($customBefore, $custom->fresh()->getAttributes());
+    }
+
+    public function test_deployment_seed_rolls_back_new_fields_when_a_later_definition_conflicts(): void
+    {
+        $barcode = $this->definition('barcode_box');
+        FieldBinding::withoutWorkspaceScope()->whereBelongsTo($barcode)->delete();
+        $barcode->delete();
+        $warranty = $this->definition('warranty');
+        $warranty->update(['is_localizable' => false]);
+        $definitionsBefore = FieldDefinition::withoutWorkspaceScope()->orderBy('id')->get()->map->getAttributes()->all();
+        $bindingsBefore = FieldBinding::withoutWorkspaceScope()->orderBy('id')->get()->map->getAttributes()->all();
+
+        try {
+            $this->seed(CanonicalActiveFieldSeeder::class);
+            $this->fail('The conflicting warranty definition must reject materialization.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString("Field definition conflict for code 'warranty'", $exception->getMessage());
+        }
+
+        $this->assertSame($definitionsBefore, FieldDefinition::withoutWorkspaceScope()->orderBy('id')->get()->map->getAttributes()->all());
+        $this->assertSame($bindingsBefore, FieldBinding::withoutWorkspaceScope()->orderBy('id')->get()->map->getAttributes()->all());
+    }
+
+    public function test_warranty_uses_localized_set_clear_and_new_column_binding_stays_fail_closed(): void
+    {
+        [$workspace, $product] = $this->targets();
+        $writer = app(GovernedDynamicFieldValueWriter::class);
+        $warranty = $this->binding('warranty', FieldObjectType::Product);
+        $writer->set($workspace->id, FieldObjectType::Product, $product->id, $warranty->id, 'Два роки', 'uk');
+        $writer->set($workspace->id, FieldObjectType::Product, $product->id, $warranty->id, 'Two years', 'en');
+        $writer->clear($workspace->id, FieldObjectType::Product, $product->id, $warranty->id, 'en');
+
+        $this->assertSame(['uk' => 'Два роки'], ProductFieldValue::withoutWorkspaceScope()->where('field_binding_id', $warranty->id)->sole()->value_jsonb);
+
+        $barcode = $this->binding('barcode_box', FieldObjectType::Product);
+        $this->expectException(ColumnFieldNotAllowlistedException::class);
+        app(GovernedProductVariantColumnMutationService::class)->set($workspace->id, FieldObjectType::Product, $product->id, $barcode->id, '4820000000000');
+    }
+
+    private function definition(string $code): FieldDefinition
+    {
+        return FieldDefinition::withoutWorkspaceScope()->whereNull('workspace_id')->where('code', $code)->sole();
+    }
+
+    private function binding(string $code, FieldObjectType $type): FieldBinding
+    {
+        return FieldBinding::withoutWorkspaceScope()->whereBelongsTo($this->definition($code))->where('object_type', $type)->sole();
+    }
+
+    private function assertDefinition(FieldDefinition $definition, AttributeDataType $type, AttributeScope $scope, array $labels, bool $localizable): void
+    {
+        $this->assertSame($type, $definition->data_type);
+        $this->assertSame($scope, $definition->scope);
+        $this->assertSame(AttributeStatus::Active, $definition->status);
+
+        $actualLabels = $definition->localized_labels;
+        ksort($labels);
+        ksort($actualLabels);
+        $this->assertSame($labels, $actualLabels);
+
+        $this->assertSame($localizable, $definition->is_localizable);
+        $this->assertFalse($definition->is_multi_value);
+    }
+
+    private function assertExactBindings(FieldDefinition $definition, array $expected): void
+    {
+        $actual = FieldBinding::withoutWorkspaceScope()->whereBelongsTo($definition)->orderBy('object_type')->get();
+        $this->assertCount(count($expected), $actual);
+        foreach ($expected as [$objectType, $storageType, $storagePath, $group, $isFilterable, $visibility]) {
+            $binding = $actual->firstWhere('object_type', $objectType);
+            $this->assertNotNull($binding);
+            $this->assertSame($storageType, $binding->storage_type);
+            $this->assertSame($storagePath, $binding->storage_path);
+            $this->assertSame($group, $binding->field_group);
+            $this->assertSame($isFilterable, $binding->is_filterable);
+            $this->assertFalse($binding->is_sortable);
+
+            $actualVisibility = $binding->visibility_settings;
+            ksort($visibility);
+            ksort($actualVisibility);
+            $this->assertSame($visibility, $actualVisibility);
+
+            $this->assertSame(AttributeStatus::Active, $binding->status);
+        }
+    }
+
+    /** @return array{Workspace, Product, ProductVariant} */
+    private function targets(): array
+    {
+        $workspace = Workspace::query()->where('is_default', true)->firstOrFail();
+        $product = Product::query()->create(['workspace_id' => $workspace->id, 'onec_guid' => (string) Str::uuid(), 'sku' => Str::uuid(), 'name' => 'Test', 'unit' => 'шт', 'is_active' => true]);
+        $variant = ProductVariant::query()->create(['workspace_id' => $workspace->id, 'product_id' => $product->id, 'onec_guid' => (string) Str::uuid(), 'sku' => Str::uuid(), 'is_active' => true]);
+
+        return [$workspace, $product, $variant];
+    }
+}

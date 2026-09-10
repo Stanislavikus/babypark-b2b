@@ -7,7 +7,7 @@ enum SyncLogType: string
     case Products = 'products';
     case Prices = 'prices';
     case Stocks = 'stocks';
-    case Contractors = 'contractors';
+    case Customers = 'customers';
     case Statuses = 'statuses';
 
     public function label(): string
@@ -16,7 +16,7 @@ enum SyncLogType: string
             self::Products => 'Товари',
             self::Prices => 'Ціни',
             self::Stocks => 'Залишки',
-            self::Contractors => 'Контрагенти',
+            self::Customers => 'Клієнти',
             self::Statuses => 'Статуси замовлень',
         };
     }

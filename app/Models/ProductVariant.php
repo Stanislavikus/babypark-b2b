@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Enums\AvailabilityStatus;
+use App\Services\Availability\AvailabilityResolver;
+use App\Support\Workspace\BelongsToWorkspace;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,15 +13,22 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProductVariant extends Model
 {
+    use BelongsToWorkspace;
     use HasFactory;
 
     protected $fillable = [
+        'workspace_id',
         'product_id',
         'onec_guid',
         'sku',
         'barcode_ean',
         'attributes',
         'is_active',
+        'available_quantity_cache',
+        'availability_status',
+        'cost_price',
+        'recommended_retail_price_cache',
+        'base_price_cache',
         'synced_at',
     ];
 
@@ -27,6 +37,11 @@ class ProductVariant extends Model
         return [
             'attributes' => 'array',
             'is_active' => 'boolean',
+            'available_quantity_cache' => 'integer',
+            'availability_status' => AvailabilityStatus::class,
+            'cost_price' => 'decimal:2',
+            'recommended_retail_price_cache' => 'decimal:2',
+            'base_price_cache' => 'decimal:2',
             'synced_at' => 'datetime',
         ];
     }
@@ -34,6 +49,11 @@ class ProductVariant extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function workspace(): BelongsTo
+    {
+        return $this->belongsTo(Workspace::class);
     }
 
     public function stocks(): HasMany
@@ -46,6 +66,11 @@ class ProductVariant extends Model
         return $this->hasMany(Price::class, 'variant_id');
     }
 
+    public function priceListItems(): HasMany
+    {
+        return $this->hasMany(PriceListItem::class);
+    }
+
     /**
      * Shared badge computation from raw availability data.
      *
@@ -53,7 +78,7 @@ class ProductVariant extends Model
      *   label, color (success/warning/info/danger),
      *   and optionally available_quantity, expected_quantity, expected_date.
      *
-     * The threshold only affects whether we show exact count or "В наявності";
+     * The threshold controls the ">N / =N / bare N" suffix after "У наявності:";
      * it does NOT limit the quantity counter max.
      *
      * @return array{label: string, color: string, available_quantity?: int, expected_quantity?: int, expected_date?: Carbon|null}
@@ -66,15 +91,23 @@ class ProductVariant extends Model
     ): array {
         if ($availQty > $threshold) {
             return [
-                'label' => 'В наявності',
+                'label' => "У наявності: >{$threshold} шт.",
                 'color' => 'success',
+                'available_quantity' => $availQty,
+            ];
+        }
+
+        if ($availQty === $threshold) {
+            return [
+                'label' => "У наявності: ={$threshold} шт.",
+                'color' => 'warning',
                 'available_quantity' => $availQty,
             ];
         }
 
         if ($availQty > 0) {
             return [
-                'label' => "Залишилось {$availQty} шт",
+                'label' => "У наявності: {$availQty} шт.",
                 'color' => 'warning',
                 'available_quantity' => $availQty,
             ];
@@ -95,16 +128,21 @@ class ProductVariant extends Model
         ];
     }
 
+    public function reservations(): HasMany
+    {
+        return $this->hasMany(Reservation::class, 'variant_id');
+    }
+
     /**
-     * Compute availability badge for this variant (aggregate across all its warehouses).
+     * Compute availability badge for this variant (aggregate across all locations).
      *
-     * Requires $this->stocks to be loaded.
+     * Requires $this->stocks to be loaded for expected-date display.
      *
      * @return array{label: string, color: string, available_quantity?: int, expected_quantity?: int, expected_date?: Carbon|null}
      */
     public function availabilityBadge(int $threshold): array
     {
-        $availQty = $this->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0));
+        $availQty = app(AvailabilityResolver::class)->netAvailable($this);
         $expectedQty = $this->stocks->sum('expected_quantity') ?? 0;
         $expectedDate = $this->stocks
             ->whereNotNull('expected_date')
