@@ -15,7 +15,7 @@ final class AdobePaaSConnectionCheckResponseMapper
             return $this->mapSuccessResponse($result->body);
         }
 
-        return $this->mapHttpStatus($result->statusCode, $result->headers);
+        return $this->mapHttpStatus($result->statusCode, $result->headers, $result->body);
     }
 
     private function mapSuccessResponse(#[\SensitiveParameter] string $body): ConnectorConnectionCheckResult
@@ -60,14 +60,13 @@ final class AdobePaaSConnectionCheckResponseMapper
     /**
      * @param  array<string, list<string>>  $headers
      */
-    private function mapHttpStatus(int $status, array $headers): ConnectorConnectionCheckResult
+    private function mapHttpStatus(int $status, array $headers, #[\SensitiveParameter] string $body): ConnectorConnectionCheckResult
     {
         $errorCode = match (true) {
             $status >= 201 && $status <= 299 => ConnectorConnectionCheckErrorCode::AdobeUnexpectedSuccessStatus,
             $status >= 300 && $status <= 399 => ConnectorConnectionCheckErrorCode::AdobeRedirectResponse,
             $status === 400 => ConnectorConnectionCheckErrorCode::AdobeUnrecognizedBadRequest,
-            $status === 401 => ConnectorConnectionCheckErrorCode::AdobeInvalidCredentials,
-            $status === 403 => ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions,
+            $status === 401, $status === 403 => $this->mapAccessRejected($body),
             $status === 404, $status === 405 => ConnectorConnectionCheckErrorCode::AdobeInvalidOrUnsupportedEndpoint,
             $status === 408 => ConnectorConnectionCheckErrorCode::AdobeRequestTimeout,
             $status === 429 => ConnectorConnectionCheckErrorCode::AdobeRateLimited,
@@ -81,5 +80,31 @@ final class AdobePaaSConnectionCheckResponseMapper
             : null;
 
         return ConnectorConnectionCheckResult::httpFailure($errorCode, $status, $retryAfterSeconds);
+    }
+
+    private function mapAccessRejected(#[\SensitiveParameter] string $body): ConnectorConnectionCheckErrorCode
+    {
+        if ($this->hasStructuredResourceDenialEvidence($body)) {
+            return ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions;
+        }
+
+        return ConnectorConnectionCheckErrorCode::AdobeAccessRejectedUndetermined;
+    }
+
+    private function hasStructuredResourceDenialEvidence(#[\SensitiveParameter] string $body): bool
+    {
+        try {
+            $decoded = json_decode($body, associative: false, depth: 32, flags: JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return false;
+        }
+
+        if (! $decoded instanceof \stdClass || ! ($decoded->parameters ?? null) instanceof \stdClass) {
+            return false;
+        }
+
+        $resources = $decoded->parameters->resources ?? null;
+
+        return is_string($resources) && trim($resources) !== '';
     }
 }

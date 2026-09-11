@@ -277,8 +277,18 @@ class ConnectorConnectionCheckErrorCodeTest extends TestCase
             ConnectorErrorActionability::UserActionRequired,
             'connectors.errors.insufficient_permissions',
             true,
-            403,
             401,
+            400,
+        ];
+
+        yield 'adobe_access_rejected_undetermined' => [
+            ConnectorConnectionCheckErrorCode::AdobeAccessRejectedUndetermined,
+            ConnectorErrorCause::Unknown,
+            ConnectorErrorActionability::UserActionRequired,
+            'connectors.errors.connection_access_unconfirmed',
+            true,
+            401,
+            400,
         ];
 
         yield 'adobe_invalid_or_unsupported_endpoint' => [
@@ -430,6 +440,18 @@ class ConnectorConnectionCheckErrorCodeTest extends TestCase
             null,
             null,
         ];
+    }
+
+    #[Test]
+    public function permission_and_ambiguous_access_codes_accept_both_401_and_403(): void
+    {
+        foreach ([
+            ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions,
+            ConnectorConnectionCheckErrorCode::AdobeAccessRejectedUndetermined,
+        ] as $case) {
+            $this->assertTrue($case->acceptsHttpStatus(401));
+            $this->assertTrue($case->acceptsHttpStatus(403));
+        }
     }
 
     #[Test]

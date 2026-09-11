@@ -28,6 +28,7 @@ enum ConnectorConnectionCheckErrorCode: string
     case AdobeUnrecognizedBadRequest = 'adobe_unrecognized_bad_request';
     case AdobeInvalidCredentials = 'adobe_invalid_credentials';
     case AdobeInsufficientPermissions = 'adobe_insufficient_permissions';
+    case AdobeAccessRejectedUndetermined = 'adobe_access_rejected_undetermined';
     case AdobeInvalidOrUnsupportedEndpoint = 'adobe_invalid_or_unsupported_endpoint';
     case AdobeRequestTimeout = 'adobe_request_timeout';
     case AdobeRateLimited = 'adobe_rate_limited';
@@ -87,6 +88,7 @@ enum ConnectorConnectionCheckErrorCode: string
             self::AdobeOAuthVersionRejected,
             self::AdobeOAuthParameterAbsent,
             self::AdobeOAuthParameterRejected,
+            self::AdobeAccessRejectedUndetermined,
             self::AdobeUnexpectedSuccessStatus,
             self::AdobeUnrecognizedBadRequest,
             self::AdobeUnrecognizedClientError,
@@ -116,6 +118,7 @@ enum ConnectorConnectionCheckErrorCode: string
             self::AdobeRedirectResponse,
             self::AdobeInvalidCredentials,
             self::AdobeInsufficientPermissions,
+            self::AdobeAccessRejectedUndetermined,
             self::AdobeInvalidOrUnsupportedEndpoint,
             self::TransportInvalidDestination,
             self::TransportUnsafeDestination => ConnectorErrorActionability::UserActionRequired,
@@ -162,6 +165,8 @@ enum ConnectorConnectionCheckErrorCode: string
             self::AdobeOAuthPermissionUnknown,
             self::AdobeOAuthPermissionDenied,
             self::AdobeInsufficientPermissions => 'connectors.errors.insufficient_permissions',
+
+            self::AdobeAccessRejectedUndetermined => 'connectors.errors.connection_access_unconfirmed',
 
             self::AdobeOAuthMethodNotAllowed,
             self::AdobeRedirectResponse,
@@ -242,7 +247,8 @@ enum ConnectorConnectionCheckErrorCode: string
             self::AdobeRedirectResponse => $status >= 300 && $status <= 399,
             self::AdobeUnrecognizedBadRequest => $status === 400,
             self::AdobeInvalidCredentials => $status === 401,
-            self::AdobeInsufficientPermissions => $status === 403,
+            self::AdobeInsufficientPermissions,
+            self::AdobeAccessRejectedUndetermined => in_array($status, [401, 403], true),
             self::AdobeInvalidOrUnsupportedEndpoint => $status === 404 || $status === 405,
             self::AdobeRequestTimeout => $status === 408,
             self::AdobeRateLimited => $status === 429,

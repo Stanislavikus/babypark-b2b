@@ -130,6 +130,65 @@ class ConnectorConnectionCheckJobTest extends TestCase
     }
 
     #[Test]
+    public function proven_permission_failure_at_401_persists_authorization_projection(): void
+    {
+        $account = $this->createConnectorAccount();
+        $row = $this->createQueuedRow($account);
+        $retryUntil = $row->retry_until_at->getTimestamp();
+
+        $result = ConnectorConnectionCheckResult::httpFailure(
+            ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions,
+            401,
+        );
+
+        $capability = Mockery::mock(AdobePaaSConnectionCheckCapability::class);
+        $capability->shouldReceive('checkConnection')->once()->andReturn($result);
+        $this->app->instance(AdobePaaSConnectionCheckCapability::class, $capability);
+
+        (new ConnectorConnectionCheckJob($account->workspace_id, $account->id, $row->id, $retryUntil))
+            ->handle(app(AdobePaaSConnectionCheckService::class), app(ConnectorConnectionCheckPersistence::class));
+
+        $row->refresh();
+        $account->refresh();
+
+        $this->assertSame(ConnectorConnectionCheckStatus::Failed, $row->status);
+        $this->assertSame(ConnectorErrorCause::Authorization, $row->cause_category);
+        $this->assertSame(ConnectorAccountConnectionStatus::AttentionRequired, $account->connection_status);
+        $this->assertSame(ConnectorErrorCause::Authorization, $account->last_error_cause);
+        $this->assertSame('connectors.errors.insufficient_permissions', $account->last_error_message_key);
+    }
+
+    #[Test]
+    public function ambiguous_401_persists_conservative_user_action_projection(): void
+    {
+        $account = $this->createConnectorAccount();
+        $row = $this->createQueuedRow($account);
+        $retryUntil = $row->retry_until_at->getTimestamp();
+
+        $result = ConnectorConnectionCheckResult::httpFailure(
+            ConnectorConnectionCheckErrorCode::AdobeAccessRejectedUndetermined,
+            401,
+        );
+
+        $capability = Mockery::mock(AdobePaaSConnectionCheckCapability::class);
+        $capability->shouldReceive('checkConnection')->once()->andReturn($result);
+        $this->app->instance(AdobePaaSConnectionCheckCapability::class, $capability);
+
+        (new ConnectorConnectionCheckJob($account->workspace_id, $account->id, $row->id, $retryUntil))
+            ->handle(app(AdobePaaSConnectionCheckService::class), app(ConnectorConnectionCheckPersistence::class));
+
+        $row->refresh();
+        $account->refresh();
+
+        $this->assertSame(ConnectorConnectionCheckStatus::Failed, $row->status);
+        $this->assertSame(ConnectorErrorCause::Unknown, $row->cause_category);
+        $this->assertSame(ConnectorErrorActionability::UserActionRequired, $row->actionability);
+        $this->assertSame(ConnectorAccountConnectionStatus::AttentionRequired, $account->connection_status);
+        $this->assertSame(ConnectorErrorCause::Unknown, $account->last_error_cause);
+        $this->assertSame('connectors.errors.connection_access_unconfirmed', $account->last_error_message_key);
+    }
+
+    #[Test]
     public function intermediate_retry_persists_classification_without_terminalizing(): void
     {
         $account = $this->createConnectorAccount();
