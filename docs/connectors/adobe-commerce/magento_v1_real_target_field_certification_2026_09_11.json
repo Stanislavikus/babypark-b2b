@@ -549,32 +549,32 @@
       "data_type": "image",
       "scope": "store",
       "observed_value": "/s/m/small-joolz_-_campaigns_-_comfort_segment_-_day5_vs_geo3_carousel_-_int_-_1080x1080_-_06.jpg",
-      "reason": "media_role_surface_not_generic_eav",
-      "status": "not_generic_scalar_certified"
+      "reason": "media_role_surface_not_generic_eav; real-target metadata PUT/GET/restore preserved this managed role and content hash",
+      "status": "media_surface_role_preservation_verified_2026_09_11"
     },
     {
       "external_field_key": "small_image",
       "data_type": "image",
       "scope": "store",
       "observed_value": "/s/m/small-joolz_-_campaigns_-_comfort_segment_-_day5_vs_geo3_carousel_-_int_-_1080x1080_-_06.jpg",
-      "reason": "media_role_surface_not_generic_eav",
-      "status": "not_generic_scalar_certified"
+      "reason": "media_role_surface_not_generic_eav; real-target metadata PUT/GET/restore preserved this managed role and content hash",
+      "status": "media_surface_role_preservation_verified_2026_09_11"
     },
     {
       "external_field_key": "thumbnail",
       "data_type": "image",
       "scope": "store",
       "observed_value": "/s/m/small-joolz_-_campaigns_-_comfort_segment_-_day5_vs_geo3_carousel_-_int_-_1080x1080_-_06.jpg",
-      "reason": "media_role_surface_not_generic_eav",
-      "status": "not_generic_scalar_certified"
+      "reason": "media_role_surface_not_generic_eav; real-target metadata PUT/GET/restore preserved this managed role and content hash",
+      "status": "media_surface_role_preservation_verified_2026_09_11"
     },
     {
       "external_field_key": "swatch_image",
       "data_type": "image",
       "scope": "store",
       "observed_value": "/s/m/small-joolz_-_campaigns_-_comfort_segment_-_day5_vs_geo3_carousel_-_int_-_1080x1080_-_06.jpg",
-      "reason": "media_role_surface_not_generic_eav",
-      "status": "not_generic_scalar_certified"
+      "reason": "swatch role is not owned by current Primary media contract; real-target metadata PUT/GET/restore proved it is preserved rather than cleared",
+      "status": "media_surface_unmanaged_role_preservation_verified_2026_09_11"
     },
     {
       "external_field_key": "url_key",
@@ -585,5 +585,25 @@
       "status": "not_generic_scalar_certified"
     }
   ],
-  "public_live_support_flipped": false
+  "public_live_support_flipped": false,
+  "special_surface_proofs": [
+    {
+      "surface": "media_gallery_entry_metadata",
+      "sku": "1234567890",
+      "entry_id": 1,
+      "baseline_label": null,
+      "mutation_label": "[B2B Media Cert]",
+      "restore_label": null,
+      "content_sha256_prefix": "337699db3f3e",
+      "roles": [
+        "image",
+        "small_image",
+        "swatch_image",
+        "thumbnail"
+      ],
+      "mutation_result": "known_applied/media_put_reconciled/1_put/1_get",
+      "restore_result": "known_applied/media_put_reconciled/1_put/1_get",
+      "notes": "Real target also exposed label=null. Runtime now preserves nullable label semantics and preserves unmanaged swatch_image during managed metadata PUT."
+    }
+  ]
 }

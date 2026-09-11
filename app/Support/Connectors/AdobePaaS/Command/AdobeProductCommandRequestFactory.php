@@ -6,6 +6,7 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSBaseUrl;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 use App\Support\Connectors\AdobePaaS\Exceptions\InvalidAdobePaaSRequestContextException;
 use App\Support\Connectors\AdobePaaS\Media\AdobeProductMediaDesiredEntry;
+use App\Support\Connectors\AdobePaaS\Media\AdobeProductMediaRole;
 use App\Support\Connectors\AdobePaaS\Media\AdobeProductRemoteMediaMetadataEntry;
 use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
 use App\Support\Connectors\OAuth1\OAuth1SigningContext;
@@ -241,12 +242,25 @@ final class AdobeProductCommandRequestFactory
         bool $includeContent,
         ?AdobeProductRemoteMediaMetadataEntry $remoteMetadata = null,
     ): string {
+        $types = $desired->magentoTypes();
+
+        if (! $includeContent && $remoteMetadata !== null) {
+            foreach ($remoteMetadata->types as $remoteType) {
+                if (! in_array($remoteType, AdobeProductMediaRole::controlledMagentoTypes(), true)) {
+                    $types[] = $remoteType;
+                }
+            }
+        }
+
+        $types = array_values(array_unique($types));
+        sort($types);
+
         $entry = [
             'id' => $entryId,
             'media_type' => 'image',
             'label' => $desired->label,
             'position' => $desired->position,
-            'types' => $desired->magentoTypes(),
+            'types' => $types,
             'disabled' => false,
         ];
 

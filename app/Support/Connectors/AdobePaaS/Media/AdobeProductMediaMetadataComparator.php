@@ -27,6 +27,12 @@ final class AdobeProductMediaMetadataComparator
         $desiredTypes = $desired->magentoTypes();
         sort($desiredTypes);
 
-        return $remote->types === $desiredTypes;
+        $remoteControlledTypes = array_values(array_filter(
+            $remote->types,
+            static fn (string $type): bool => in_array($type, AdobeProductMediaRole::controlledMagentoTypes(), true),
+        ));
+        sort($remoteControlledTypes);
+
+        return $remoteControlledTypes === $desiredTypes;
     }
 }

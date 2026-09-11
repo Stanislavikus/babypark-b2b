@@ -397,6 +397,14 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
         self::assertSame('real_target_command_write_read_restore_verified_2026_09_11', $rows['rest-tax-class-id']['real_validation_state']);
         self::assertSame('TARGET_DEPENDENT', $rows['dynamic-eav-family']['write_capability_state']);
         self::assertStringContainsString('24_dynamic_children', $rows['dynamic-eav-family']['real_validation_state']);
+        self::assertSame('real_target_metadata_write_read_restore_verified_2026_09_11', $rows['media-gallery-structure']['real_validation_state']);
+        self::assertSame('real_target_media_role_preservation_verified_2026_09_11', $rows['eav-media-system-attributes']['real_validation_state']);
+        self::assertCount(1, $ledger['special_surface_proofs']);
+        $mediaProof = $ledger['special_surface_proofs'][0];
+        self::assertSame('media_gallery_entry_metadata', $mediaProof['surface']);
+        self::assertNull($mediaProof['baseline_label']);
+        self::assertNull($mediaProof['restore_label']);
+        self::assertSame(['image', 'small_image', 'swatch_image', 'thumbnail'], $mediaProof['roles']);
         self::assertSame(
             'docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json',
             $this->matrix()['real_target_field_certification_evidence'],

@@ -17,4 +17,15 @@ enum AdobeProductMediaRole: string
             self::Gallery => [],
         };
     }
+
+    /**
+     * Magento media roles owned by this connector runtime. Remote roles outside
+     * this list must be preserved rather than implicitly cleared.
+     *
+     * @return list<string>
+     */
+    public static function controlledMagentoTypes(): array
+    {
+        return ['image', 'small_image', 'thumbnail'];
+    }
 }

@@ -88,7 +88,7 @@ final class AdobeProductRemoteMediaMetadataReader
             return null;
         }
 
-        if (! is_string($label)) {
+        if ($label !== null && ! is_string($label)) {
             return null;
         }
 

@@ -135,9 +135,9 @@ There is still no universal installation-independent Magento custom EAV list.
 Repository contract:
 
 - inventories one explicit target-dependent family row
-- keeps it incomplete on purpose
-- requires real target discovery to expand that family into one row per actually
-  discovered external field before field-by-field certification
+- keeps the family incomplete on purpose
+- records that this certification target has already been expanded and 24 dynamic child attributes were write/read/restore verified
+- still requires each future Magento installation to expand and certify its own discovered child set rather than inheriting this target's list
 
 ## Surface highlights kept explicit
 
@@ -185,7 +185,9 @@ At implementation commit `10d05db59b857ba51a4851338cd6186c969c19c9`, the standar
 - the same production runtime restored `151 -> 150`;
 - result: `KnownApplied`, `stock_write_verified`; independent GET confirmed the original state restored.
 
-The subsequent field-by-field campaign certifies **all four current core Simple fields plus 34 present scalar/select custom attributes on this target** through the same production stock writer, `AdobeProductDocumentReader` observation, and exact restore. The target ledger is `docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json`. After the EAV campaign the full 42-custom-attribute baseline and final snapshot were identical (`42 -> 42`, diff count `0`) and the core Product state was also restored exactly. This does not flip public Live support and does not certify configurable, media, relation, URL-rewrite side effects, system-owned flags, or custom-attribute clear semantics.
+The subsequent field-by-field campaign certifies **all four current core Simple fields plus 34 present scalar/select custom attributes on this target** through the same production stock writer, `AdobeProductDocumentReader` observation, and exact restore. The target ledger is `docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json`. After the EAV campaign the full 42-custom-attribute baseline and final snapshot were identical (`42 -> 42`, diff count `0`) and the core Product state was also restored exactly. This does not flip public Live support and does not certify configurable, relation, URL-rewrite side effects, system-owned flags, or custom-attribute clear semantics.
+
+Media was then certified separately through the stock media surface. Real target gallery entry `id=1` accepted a metadata-only PUT changing `label: null -> [B2B Media Cert]`, reconciliation returned `KnownApplied / media_put_reconciled`, and a second metadata-only PUT restored `label` exactly to `null`. The content SHA-256 prefix remained `337699db3f3e` and roles `image`, `small_image`, `thumbnail`, and existing unmanaged `swatch_image` were unchanged. This proves metadata mutation/reconciliation and exact restore for the existing entry; it does not certify media create/delete or connector ownership of `swatch_image`.
 
 A read-only real-target probe for a deliberately absent SKU returned HTTP 404 with a `message` key only and no structured `parameters`; the current classifier therefore conservatively returns `untrusted_or_failed`. The synthetic structured trusted-missing fixture is not treated as real-target evidence.
 

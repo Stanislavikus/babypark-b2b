@@ -635,15 +635,15 @@
       "platform_domain_owner": "Media",
       "platform_representation": "products.images and media runtime owner.",
       "connector_read_seam": "AdobeProductDocumentReader evidence and media metadata readers.",
-      "connector_write_seam": "Internal stock media runtime exists; entity-bound Safe Sync media path is absent.",
+      "connector_write_seam": "AdobeProductMediaLiveExecutor -> AdobeProductMediaEntryExecutor -> stock /V1/products/{sku}/media/{entryId} metadata PUT with reconciliation; create path remains separate.",
       "read_capability_state": "SUPPORTED",
       "write_capability_state": "PARTIAL",
       "safe_sync_read_state": "UNSUPPORTED",
       "safe_sync_write_state": "UNSUPPORTED",
-      "real_validation_state": "real_target_pending",
-      "field_certification_status": "internal_runtime_present_not_real_target_certified",
+      "real_validation_state": "real_target_metadata_write_read_restore_verified_2026_09_11",
+      "field_certification_status": "media_metadata_put_reconciled_nullable_label_and_role_preservation_verified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Tracked as a structured media capability, not as a scalar field."
+      "result_or_blocker": "Real target entry id=1 verified label null -> [B2B Media Cert] -> null with stable content hash and roles image/small_image/thumbnail/swatch_image. Public support remains false; media create/delete and swatch ownership remain separately uncertified."
     },
     {
       "id": "eav-media-system-attributes",
@@ -672,10 +672,10 @@
       "write_capability_state": "UNSUPPORTED",
       "safe_sync_read_state": "UNSUPPORTED",
       "safe_sync_write_state": "UNSUPPORTED",
-      "real_validation_state": "repository_contract_only",
-      "field_certification_status": "system_media_attributes_inventoried_transport_not_certified",
+      "real_validation_state": "real_target_media_role_preservation_verified_2026_09_11",
+      "field_certification_status": "generic_eav_transport_unsupported_media_surface_preservation_verified",
       "installation_condition": "stable_system_attributes",
-      "result_or_blocker": "Preserves CSV ↔ EAV ↔ gallery structure boundaries without inventing raw-equal aliases."
+      "result_or_blocker": "image/small_image/thumbnail are handled by media surface, not generic EAV; real-target metadata mutation preserved those roles. swatch_image is currently unmanaged and was proven preserved, not owned. Other media/system bindings remain separately uncertified."
     },
     {
       "id": "bulk-media-role-bindings",
