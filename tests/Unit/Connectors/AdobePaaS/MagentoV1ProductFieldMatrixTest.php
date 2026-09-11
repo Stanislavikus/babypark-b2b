@@ -405,6 +405,11 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
         self::assertNull($mediaProof['baseline_label']);
         self::assertNull($mediaProof['restore_label']);
         self::assertSame(['image', 'small_image', 'swatch_image', 'thumbnail'], $mediaProof['roles']);
+        self::assertSame(['image_label', 'small_image_label', 'thumbnail_label'], $mediaProof['materialized_role_label_attributes']);
+        self::assertSame('', $mediaProof['default_store_projection_reset_payload_label']);
+        self::assertFalse($mediaProof['final_role_label_attributes_present']);
+        self::assertSame(42, $mediaProof['final_custom_attribute_count']);
+        self::assertTrue($mediaProof['final_product_state_restored']);
         self::assertSame(
             'docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json',
             $this->matrix()['real_target_field_certification_evidence'],

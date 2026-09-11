@@ -603,7 +603,19 @@
       ],
       "mutation_result": "known_applied/media_put_reconciled/1_put/1_get",
       "restore_result": "known_applied/media_put_reconciled/1_put/1_get",
-      "notes": "Real target also exposed label=null. Runtime now preserves nullable label semantics and preserves unmanaged swatch_image during managed metadata PUT."
+      "notes": "Real target exposed label=null. Runtime preserves nullable label semantics and unmanaged swatch_image. Initial label=null restore returned gallery metadata to null but Magento materialized image_label/small_image_label/thumbnail_label with the certification text. A default-store media PUT with label=\"\" removed those role-label EAV projections while Magento normalized gallery label back to null; content hash and roles remained unchanged. Non-default store-view clear/inheritance semantics remain pending.",
+      "initial_gallery_restore_result": "known_applied/media_put_reconciled_but_role_label_eav_materialized",
+      "materialized_role_label_attributes": [
+        "image_label",
+        "small_image_label",
+        "thumbnail_label"
+      ],
+      "default_store_projection_reset_payload_label": "",
+      "default_store_projection_reset_http_status": 200,
+      "final_gallery_label": null,
+      "final_role_label_attributes_present": false,
+      "final_custom_attribute_count": 42,
+      "final_product_state_restored": true
     }
   ]
 }

@@ -693,6 +693,7 @@ cross-platform vocabulary or define runtime/storage behavior.
   current-base Magento V1 Product field/capability inventory; cluster summaries are
   classification only, not field certification
 - `docs/connectors/adobe-commerce/MAGENTO_V1_CONNECTION_UX_CONTRACT.md` — frozen Magento V1 onboarding / connection truth / credential rotation / permission-remediation / recovery contract; mandatory for Magento connection UI and connection-health runtime work
+- `docs/connectors/adobe-commerce/MAGENTO_V1_PENDING_CERTIFICATION_ITEMS.md` — durable queue of Magento V1 surfaces deliberately deferred during certification; mandatory pre-read before resuming Magento field/surface work so pending blockers are not lost or silently reclassified
 - `ADOBE_COMMERCE_V1_INVENTORY_RESEARCH.md` + review synthesis + related Adobe CSVs —
   frozen cross-platform Adobe research baseline
 - `SHOPIFY_V1_INVENTORY_RESEARCH.md` + related Shopify CSVs — frozen Shopify 2026-07 Product/capability research baseline; obey its frozen/not-frozen status marker
