@@ -3,6 +3,7 @@
 namespace Tests\Feature\Connectors;
 
 use App\Enums\ConnectorAccountConnectionStatus;
+use App\Enums\ConnectorConnectionCheckErrorCode;
 use App\Enums\ConnectorConnectionCheckLifecycleErrorCode;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Enums\ConnectorConnectionCheckTrigger;
@@ -25,7 +26,10 @@ use App\Models\Workspace;
 use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
 use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
 use App\Services\Sync\AdobeProductsExportPreviewAuthorizationService;
+use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapability;
 use App\Support\Connectors\AdobePaaS\AdobePaaSCredentialMapper;
+use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
+use App\Support\Connectors\ConnectorConnectionCheckResult;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
@@ -33,6 +37,7 @@ use Database\Seeders\WorkspacePermissionSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\App;
@@ -431,6 +436,139 @@ class ConnectorAccountResourceTest extends TestCase
         $this->assertStringNotContainsString(self::CREDENTIAL_CANARY, $snapshot);
         $this->assertStringNotContainsString(self::CREDENTIAL_CANARY, $effects);
         $this->assertStringNotContainsString('cs_'.self::CREDENTIAL_CANARY, $html);
+    }
+
+    #[Test]
+    public function adobe_manager_can_replace_connection_details_without_exposing_existing_secrets(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount(overrides: [
+            'credentials' => AdobePaaSCredentialMapper::toStorageArray(new OAuth1Credentials(
+                'ck_'.self::CREDENTIAL_CANARY,
+                'cs_'.self::CREDENTIAL_CANARY,
+                'at_'.self::CREDENTIAL_CANARY,
+                'ts_'.self::CREDENTIAL_CANARY,
+            )),
+        ]);
+
+        $capability = new class implements AdobePaaSConnectionCheckCapability
+        {
+            public ?AdobePaaSRequestContext $captured = null;
+
+            public function checkConnection(AdobePaaSRequestContext $context): ConnectorConnectionCheckResult
+            {
+                $this->captured = $context;
+
+                return ConnectorConnectionCheckResult::success();
+            }
+        };
+        $this->app->instance(AdobePaaSConnectionCheckCapability::class, $capability);
+
+        $component = Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertActionExists('updateConnectionDetails')
+            ->mountAction('updateConnectionDetails');
+
+        $this->assertStringNotContainsString(self::CREDENTIAL_CANARY, $component->html());
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('updateConnectionDetails', data: [
+                'consumer_key' => 'ck_new',
+                'consumer_secret' => 'cs_new',
+                'access_token' => 'at_new',
+                'access_token_secret' => 'ts_new',
+            ])
+            ->assertNotified(__('connectors.ui.credentials.notifications.updated'));
+
+        $account->refresh();
+        $this->assertSame('ck_new', $account->credentials['consumer_key'] ?? null);
+        $this->assertSame('cs_new', $account->credentials['consumer_secret'] ?? null);
+        $this->assertSame('at_new', $account->credentials['access_token'] ?? null);
+        $this->assertSame('ts_new', $account->credentials['access_token_secret'] ?? null);
+        $this->assertSame('ck_new', $capability->captured?->credentials->consumerKey);
+
+        $this->assertDatabaseHas('connector_connection_checks', [
+            'connector_account_id' => $account->id,
+            'trigger' => ConnectorConnectionCheckTrigger::CredentialsReplacement->value,
+            'status' => ConnectorConnectionCheckStatus::Succeeded->value,
+            'initiated_by_user_id' => $admin->id,
+        ]);
+    }
+
+    #[Test]
+    public function failed_replacement_keeps_current_credentials_and_shows_safe_reason(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount(overrides: [
+            'credentials' => AdobePaaSCredentialMapper::toStorageArray(new OAuth1Credentials(
+                'ck_old',
+                'cs_old',
+                'at_old',
+                'ts_old',
+            )),
+        ]);
+        $originalCredentials = $account->credentials;
+
+        $this->app->instance(AdobePaaSConnectionCheckCapability::class, new class implements AdobePaaSConnectionCheckCapability
+        {
+            public function checkConnection(AdobePaaSRequestContext $context): ConnectorConnectionCheckResult
+            {
+                return ConnectorConnectionCheckResult::httpFailure(
+                    ConnectorConnectionCheckErrorCode::AdobeAccessRejectedUndetermined,
+                    401,
+                );
+            }
+        });
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->callAction('updateConnectionDetails', data: [
+                'consumer_key' => 'ck_bad',
+                'consumer_secret' => 'cs_bad',
+                'access_token' => 'at_bad',
+                'access_token_secret' => 'ts_bad',
+            ])
+            ->assertNotified(
+                Notification::make()
+                    ->danger()
+                    ->title(__('connectors.ui.credentials.notifications.not_updated'))
+                    ->body(__('connectors.errors.connection_access_unconfirmed')),
+            );
+
+        $account->refresh();
+        $this->assertSame($originalCredentials, $account->credentials);
+        $this->assertDatabaseMissing('connector_connection_checks', [
+            'connector_account_id' => $account->id,
+            'trigger' => ConnectorConnectionCheckTrigger::CredentialsReplacement->value,
+        ]);
+    }
+
+    #[Test]
+    public function credential_update_action_is_limited_to_manageable_adobe_oauth1_accounts(): void
+    {
+        $account = $this->createConnectorAccount();
+        $manager = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+
+        Livewire::actingAs($manager)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertActionExists('updateConnectionDetails');
+
+        $viewer = $this->createStaffUser(UserRole::Manager);
+        $this->grantConnectorView($this->defaultWorkspace(), $viewer);
+
+        Livewire::actingAs($viewer)
+            ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
+            ->assertActionDoesNotExist('updateConnectionDetails');
+
+        $shopify = ConnectorDefinition::query()->where('code', 'shopify')->firstOrFail();
+        $nonAdobe = $this->createConnectorAccount(overrides: [
+            'connector_definition_id' => $shopify->id,
+        ]);
+
+        Livewire::actingAs($manager)
+            ->test(ViewConnectorAccount::class, ['record' => $nonAdobe->getKey()])
+            ->assertActionDoesNotExist('updateConnectionDetails');
     }
 
     #[Test]
