@@ -692,6 +692,7 @@ cross-platform vocabulary or define runtime/storage behavior.
 - `docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md` — authoritative
   current-base Magento V1 Product field/capability inventory; cluster summaries are
   classification only, not field certification
+- `docs/connectors/adobe-commerce/MAGENTO_V1_CONNECTION_UX_CONTRACT.md` — frozen Magento V1 onboarding / connection truth / credential rotation / permission-remediation / recovery contract; mandatory for Magento connection UI and connection-health runtime work
 - `ADOBE_COMMERCE_V1_INVENTORY_RESEARCH.md` + review synthesis + related Adobe CSVs —
   frozen cross-platform Adobe research baseline
 - `SHOPIFY_V1_INVENTORY_RESEARCH.md` + related Shopify CSVs — frozen Shopify 2026-07 Product/capability research baseline; obey its frozen/not-frozen status marker
@@ -723,6 +724,8 @@ cross-platform vocabulary or define runtime/storage behavior.
 - `docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md` when the task
   touches Magento Product inventory, certification, stock Product reads, or entity-bound
   Safe Sync Product writes
+- `docs/connectors/adobe-commerce/MAGENTO_V1_CONNECTION_UX_CONTRACT.md` when the task
+  touches Magento onboarding, connection checks, credentials, store scope, permission remediation, connection recovery, or WRITE-readiness presentation
 - `ADOBE_COMMERCE_V1_INVENTORY_RESEARCH.md` and `SHOPIFY_V1_INVENTORY_RESEARCH.md`
   when the task touches cross-platform Product field/capability research or either
   connector inventory baseline
@@ -733,6 +736,7 @@ cross-platform vocabulary or define runtime/storage behavior.
 - 06-UI_DESIGN_SYSTEM.md
 - 07-TECH_STACK.md
 - relevant sections of 03-DOMAIN_MODEL.md where domain data is displayed
+- `docs/connectors/adobe-commerce/MAGENTO_V1_CONNECTION_UX_CONTRACT.md` for Magento onboarding / connection / credential / permission / recovery surfaces
 
 ---
 
