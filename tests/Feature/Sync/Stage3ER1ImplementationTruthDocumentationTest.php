@@ -18,7 +18,7 @@ class Stage3ER1ImplementationTruthDocumentationTest extends TestCase
         $this->assertStringContainsString('**Safe Sync simple WRITE remains implemented as an optional Enhanced Safety primitive and is no longer the standard-path dependency**', $content);
         $this->assertStringContainsString('**Stage 3E-R2b-1 merchant-confirmed ENTITY TRUST review/confirm backend is implemented**', $content);
         $this->assertStringContainsString('**disposable validation harness is implemented internally as a validation-only Laravel control plane**', $content);
-        $this->assertStringContainsString('real-target certification step 4, decisions 5–9, configurable/media/live-support completion, and support flip remain **pending**', $content);
+        $this->assertStringContainsString('real-target core Simple price WRITE/restore step is verified; remaining field-by-field validation', $content);
         $this->assertStringContainsString('support remains **false**', $content);
     }
 
@@ -30,7 +30,7 @@ class Stage3ER1ImplementationTruthDocumentationTest extends TestCase
         $this->assertStringContainsString('Stage 3E Magento Safe Sync enhanced-safety runtime', $content);
         $this->assertStringContainsString('IMPLEMENTED (internal optional primitive; support false; not standard-path prerequisite)', $content);
         $this->assertStringContainsString('Magento V1 moduleless stock simple trusted WRITE', $content);
-        $this->assertStringContainsString('IMPLEMENTED (internal; support false; pending real-target certification)', $content);
+        $this->assertStringContainsString('IMPLEMENTED + CORE REAL-TARGET VERIFIED (support false; field-by-field certification pending)', $content);
         $this->assertStringContainsString('Stage 3E disposable validation harness', $content);
         $this->assertStringContainsString('IMPLEMENTED (internal; validation-only; support false; no real-target certification executed)', $content);
         $this->assertStringContainsString('integrations/magento-safe-sync/', $content);

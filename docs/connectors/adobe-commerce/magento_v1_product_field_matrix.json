@@ -69,7 +69,9 @@
   "rows": [
     {
       "id": "rest-product-id",
-      "source_inventory_ids": ["rest-product-id"],
+      "source_inventory_ids": [
+        "rest-product-id"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "product.id",
       "external_field_or_capability": "id",
@@ -99,7 +101,9 @@
     },
     {
       "id": "rest-product-sku",
-      "source_inventory_ids": ["rest-product-sku"],
+      "source_inventory_ids": [
+        "rest-product-sku"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "product.sku",
       "external_field_or_capability": "sku",
@@ -117,7 +121,7 @@
       "platform_domain_owner": "ProductVariant identity + ExternalRecordLink",
       "platform_representation": "ProductVariant sku and trusted external identity link.",
       "connector_read_seam": "AdobeProductDocumentReader (stock GET /V1/products/{sku}); Safe Sync read remains internal optional primitive.",
-      "connector_write_seam": "AdobeSafeSyncClient::writeSimpleProduct() uses expected_sku as a precondition only.",
+      "connector_write_seam": "Standard trusted Simple WRITE uses SKU only as the stock endpoint address after merchant-confirmed entity-id proof; SKU itself remains non-writable identity authority.",
       "read_capability_state": "SUPPORTED",
       "write_capability_state": "UNSUPPORTED",
       "safe_sync_read_state": "SUPPORTED",
@@ -125,11 +129,13 @@
       "real_validation_state": "repository_contract_only",
       "field_certification_status": "internal_runtime_present_not_real_target_certified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Trusted simple execution preserves exact SKU equality and never uses a stock trusted SKU-addressed consequential writer."
+      "result_or_blocker": "Trusted simple execution proves Magento entity id + exact SKU before the single stock PUT; SKU mutation remains unsupported."
     },
     {
       "id": "rest-product-name",
-      "source_inventory_ids": ["rest-product-name"],
+      "source_inventory_ids": [
+        "rest-product-name"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "product.name",
       "external_field_or_capability": "name",
@@ -147,7 +153,7 @@
       "platform_domain_owner": "Product",
       "platform_representation": "Governed Product.name.",
       "connector_read_seam": "AdobeProductDocumentReader (stock GET /V1/products/{sku}); Safe Sync read remains internal optional primitive.",
-      "connector_write_seam": "AdobeProductSimpleCommandExecutor -> AdobeSafeSyncClient::writeSimpleProduct().",
+      "connector_write_seam": "AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor -> stock PUT /V1/products/{sku} with trusted entity-id pre-read and GET verification.",
       "read_capability_state": "SUPPORTED",
       "write_capability_state": "SUPPORTED",
       "safe_sync_read_state": "SUPPORTED",
@@ -155,11 +161,13 @@
       "real_validation_state": "repository_contract_only",
       "field_certification_status": "internal_runtime_present_not_real_target_certified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Trusted simple Product WRITE consumption exists internally; real-target certification and public Live support remain pending."
+      "result_or_blocker": "Standard trusted Simple stock WRITE is implemented; public Live support remains false pending field-by-field certification."
     },
     {
       "id": "rest-product-attribute-set-id",
-      "source_inventory_ids": ["rest-product-attribute-set-id"],
+      "source_inventory_ids": [
+        "rest-product-attribute-set-id"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "product.attribute_set_id",
       "external_field_or_capability": "attribute_set_id",
@@ -189,7 +197,9 @@
     },
     {
       "id": "bulk-attribute-set-code",
-      "source_inventory_ids": ["bulk-attribute-set-code"],
+      "source_inventory_ids": [
+        "bulk-attribute-set-code"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "attribute_set_code",
       "external_field_or_capability": "attribute_set_code",
@@ -219,7 +229,9 @@
     },
     {
       "id": "rest-product-price",
-      "source_inventory_ids": ["rest-product-price"],
+      "source_inventory_ids": [
+        "rest-product-price"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "product.price",
       "external_field_or_capability": "price",
@@ -237,19 +249,21 @@
       "platform_domain_owner": "Pricing",
       "platform_representation": "Platform base price binding.",
       "connector_read_seam": "AdobeProductDocumentReader.",
-      "connector_write_seam": "AdobeProductSimpleCommandExecutor -> AdobeSafeSyncClient::writeSimpleProduct().",
+      "connector_write_seam": "AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor -> stock PUT /V1/products/{sku} with trusted entity-id pre-read and GET verification.",
       "read_capability_state": "SUPPORTED",
       "write_capability_state": "SUPPORTED",
       "safe_sync_read_state": "UNSUPPORTED",
       "safe_sync_write_state": "SUPPORTED",
-      "real_validation_state": "repository_contract_only",
-      "field_certification_status": "internal_runtime_present_not_real_target_certified",
+      "real_validation_state": "real_target_write_restore_verified_2026_09_11",
+      "field_certification_status": "real_target_write_restore_verified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Trusted simple base-price WRITE consumption exists internally; advanced pricing remains separate."
+      "result_or_blocker": "Real target verified controlled base-price cycle 150 -> 151 -> 150 through production Simple executor with identity-preserving GET verification; public Live support remains false."
     },
     {
       "id": "rest-product-status",
-      "source_inventory_ids": ["rest-product-status"],
+      "source_inventory_ids": [
+        "rest-product-status"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "product.status",
       "external_field_or_capability": "status",
@@ -267,7 +281,7 @@
       "platform_domain_owner": "Connector-owned external lifecycle projection",
       "platform_representation": "Semantic planner and desired-state compiler output.",
       "connector_read_seam": "AdobeProductDocumentReader.",
-      "connector_write_seam": "AdobeProductSimpleCommandExecutor -> AdobeSafeSyncClient::writeSimpleProduct().",
+      "connector_write_seam": "AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor -> stock PUT /V1/products/{sku} with trusted entity-id pre-read and GET verification.",
       "read_capability_state": "SUPPORTED",
       "write_capability_state": "SUPPORTED",
       "safe_sync_read_state": "UNSUPPORTED",
@@ -275,11 +289,13 @@
       "real_validation_state": "repository_contract_only",
       "field_certification_status": "internal_runtime_present_not_real_target_certified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Trusted simple Safe Sync WRITE consumption exists internally; public support remains false."
+      "result_or_blocker": "Standard trusted Simple stock WRITE is implemented; public Live support remains false pending field-by-field certification."
     },
     {
       "id": "bulk-product-online",
-      "source_inventory_ids": ["bulk-product-online"],
+      "source_inventory_ids": [
+        "bulk-product-online"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "product_online",
       "external_field_or_capability": "product_online",
@@ -309,7 +325,9 @@
     },
     {
       "id": "rest-product-visibility",
-      "source_inventory_ids": ["rest-product-visibility"],
+      "source_inventory_ids": [
+        "rest-product-visibility"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "product.visibility",
       "external_field_or_capability": "visibility",
@@ -327,7 +345,7 @@
       "platform_domain_owner": "Connector-owned external display projection",
       "platform_representation": "Semantic planner and desired-state compiler output.",
       "connector_read_seam": "AdobeProductDocumentReader.",
-      "connector_write_seam": "AdobeProductSimpleCommandExecutor -> AdobeSafeSyncClient::writeSimpleProduct().",
+      "connector_write_seam": "AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor -> stock PUT /V1/products/{sku} with trusted entity-id pre-read and GET verification.",
       "read_capability_state": "SUPPORTED",
       "write_capability_state": "SUPPORTED",
       "safe_sync_read_state": "UNSUPPORTED",
@@ -335,11 +353,13 @@
       "real_validation_state": "repository_contract_only",
       "field_certification_status": "internal_runtime_present_not_real_target_certified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Trusted simple Safe Sync WRITE consumption exists internally; the runtime no longer truthfully reads as universally blocked before every consequential write."
+      "result_or_blocker": "Standard trusted Simple stock WRITE is implemented; public Live support remains false pending field-by-field certification."
     },
     {
       "id": "rest-product-type-id",
-      "source_inventory_ids": ["rest-product-type-id"],
+      "source_inventory_ids": [
+        "rest-product-type-id"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "product.type_id",
       "external_field_or_capability": "type_id",
@@ -369,7 +389,9 @@
     },
     {
       "id": "bulk-product-type",
-      "source_inventory_ids": ["bulk-product-type"],
+      "source_inventory_ids": [
+        "bulk-product-type"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "product_type",
       "external_field_or_capability": "product_type",
@@ -399,7 +421,9 @@
     },
     {
       "id": "rest-product-created-at",
-      "source_inventory_ids": ["rest-product-created-at"],
+      "source_inventory_ids": [
+        "rest-product-created-at"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "product.created_at",
       "external_field_or_capability": "created_at",
@@ -429,7 +453,9 @@
     },
     {
       "id": "rest-product-updated-at",
-      "source_inventory_ids": ["rest-product-updated-at"],
+      "source_inventory_ids": [
+        "rest-product-updated-at"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "product.updated_at",
       "external_field_or_capability": "updated_at",
@@ -459,7 +485,9 @@
     },
     {
       "id": "rest-product-weight",
-      "source_inventory_ids": ["rest-product-weight"],
+      "source_inventory_ids": [
+        "rest-product-weight"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "product.weight",
       "external_field_or_capability": "weight",
@@ -489,7 +517,9 @@
     },
     {
       "id": "rest-product-extension-attributes",
-      "source_inventory_ids": ["rest-product-extension-attributes"],
+      "source_inventory_ids": [
+        "rest-product-extension-attributes"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "product.extension_attributes",
       "external_field_or_capability": "extension_attributes",
@@ -519,7 +549,10 @@
     },
     {
       "id": "rest-product-links-structure",
-      "source_inventory_ids": ["rest-product-product-links", "bulk-relation-columns"],
+      "source_inventory_ids": [
+        "rest-product-product-links",
+        "bulk-relation-columns"
+      ],
       "external_entity_object": "catalog_product_relation",
       "external_field_key_path": "product.product_links[].{link_type,linked_product_sku,position} / CSV related_skus|related_position|crosssell_skus|crosssell_position|upsell_skus|upsell_position",
       "external_field_or_capability": "product links, relation types, linked SKU, position",
@@ -549,7 +582,10 @@
     },
     {
       "id": "custom-options-structures",
-      "source_inventory_ids": ["rest-product-options", "bulk-custom-options"],
+      "source_inventory_ids": [
+        "rest-product-options",
+        "bulk-custom-options"
+      ],
       "external_entity_object": "catalog_product_custom_option",
       "external_field_key_path": "product.options / custom_options",
       "external_field_or_capability": "custom options and stable child semantics",
@@ -579,7 +615,9 @@
     },
     {
       "id": "media-gallery-structure",
-      "source_inventory_ids": ["rest-product-media-gallery-entries"],
+      "source_inventory_ids": [
+        "rest-product-media-gallery-entries"
+      ],
       "external_entity_object": "catalog_product_media_gallery",
       "external_field_key_path": "product.media_gallery_entries[].{file,label,disabled,types,extension_attributes.video_content}",
       "external_field_or_capability": "structured media gallery entries, role tokens, generic entry labels, visibility and video extension data",
@@ -609,7 +647,9 @@
     },
     {
       "id": "eav-media-system-attributes",
-      "source_inventory_ids": ["eav-media-system-attributes"],
+      "source_inventory_ids": [
+        "eav-media-system-attributes"
+      ],
       "external_entity_object": "catalog_product_attribute",
       "external_field_key_path": "image|small_image|thumbnail|swatch_image|image_label|small_image_label|thumbnail_label|media_gallery|gallery",
       "external_field_or_capability": "stable system EAV media attributes discovered by stock attribute discovery",
@@ -639,7 +679,9 @@
     },
     {
       "id": "bulk-media-role-bindings",
-      "source_inventory_ids": ["bulk-media-role-bindings"],
+      "source_inventory_ids": [
+        "bulk-media-role-bindings"
+      ],
       "external_entity_object": "catalog_product_media_role_binding",
       "external_field_key_path": "base_image|small_image|thumbnail_image|additional_images",
       "external_field_or_capability": "bulk media-role bindings and labels",
@@ -669,7 +711,10 @@
     },
     {
       "id": "pricing-tier-prices-rest",
-      "source_inventory_ids": ["rest-product-tier-prices", "pricing-advanced-tier-import"],
+      "source_inventory_ids": [
+        "rest-product-tier-prices",
+        "pricing-advanced-tier-import"
+      ],
       "external_entity_object": "catalog_product_tier_price",
       "external_field_key_path": "product.tier_prices / Advanced Pricing CSV",
       "external_field_or_capability": "tier pricing and stable tier-price dimensions",
@@ -699,7 +744,9 @@
     },
     {
       "id": "custom-attributes-container",
-      "source_inventory_ids": ["rest-product-custom-attributes"],
+      "source_inventory_ids": [
+        "rest-product-custom-attributes"
+      ],
       "external_entity_object": "catalog_product_attribute_container",
       "external_field_key_path": "product.custom_attributes[]",
       "external_field_or_capability": "custom_attributes container",
@@ -729,7 +776,17 @@
     },
     {
       "id": "eav-content-fields",
-      "source_inventory_ids": ["eav-description", "eav-short-description", "eav-country-of-manufacture", "eav-new-from-date", "eav-new-to-date", "bulk-new-product-window", "eav-url-key", "eav-meta-title", "eav-meta-description"],
+      "source_inventory_ids": [
+        "eav-description",
+        "eav-short-description",
+        "eav-country-of-manufacture",
+        "eav-new-from-date",
+        "eav-new-to-date",
+        "bulk-new-product-window",
+        "eav-url-key",
+        "eav-meta-title",
+        "eav-meta-description"
+      ],
       "external_entity_object": "catalog_product_attribute",
       "external_field_key_path": "description|short_description|country_of_manufacture|news_from_date|news_to_date|url_key|meta_title|meta_description / CSV new_from_date|new_to_date",
       "external_field_or_capability": "stable system EAV content and presentation attributes",
@@ -759,7 +816,13 @@
     },
     {
       "id": "special-pricing-fields",
-      "source_inventory_ids": ["eav-special-price", "eav-special-from-date", "eav-special-to-date", "bulk-special-price-window", "pricing-special-price-object"],
+      "source_inventory_ids": [
+        "eav-special-price",
+        "eav-special-from-date",
+        "eav-special-to-date",
+        "bulk-special-price-window",
+        "pricing-special-price-object"
+      ],
       "external_entity_object": "catalog_product_pricing_attribute",
       "external_field_key_path": "special_price|special_from_date|special_to_date / CSV special_price_from_date|special_price_to_date / SpecialPriceInterface.{price,price_from,price_to}",
       "external_field_or_capability": "special pricing amount and effective-window representations",
@@ -789,7 +852,9 @@
     },
     {
       "id": "rest-meta-keyword",
-      "source_inventory_ids": ["eav-meta-keyword"],
+      "source_inventory_ids": [
+        "eav-meta-keyword"
+      ],
       "external_entity_object": "catalog_product_attribute",
       "external_field_key_path": "product.custom_attributes.meta_keyword",
       "external_field_or_capability": "meta_keyword",
@@ -819,7 +884,9 @@
     },
     {
       "id": "bulk-meta-keywords",
-      "source_inventory_ids": ["bulk-meta-keywords"],
+      "source_inventory_ids": [
+        "bulk-meta-keywords"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "meta_keywords",
       "external_field_or_capability": "meta_keywords",
@@ -849,7 +916,9 @@
     },
     {
       "id": "rest-tax-class-id",
-      "source_inventory_ids": ["eav-tax-class-id"],
+      "source_inventory_ids": [
+        "eav-tax-class-id"
+      ],
       "external_entity_object": "catalog_product_attribute",
       "external_field_key_path": "product.custom_attributes.tax_class_id",
       "external_field_or_capability": "tax_class_id",
@@ -879,7 +948,9 @@
     },
     {
       "id": "bulk-tax-class-name",
-      "source_inventory_ids": ["bulk-tax-class-name"],
+      "source_inventory_ids": [
+        "bulk-tax-class-name"
+      ],
       "external_entity_object": "catalog_product",
       "external_field_key_path": "tax_class_name",
       "external_field_or_capability": "tax_class_name",
@@ -909,7 +980,9 @@
     },
     {
       "id": "eav-cost",
-      "source_inventory_ids": ["eav-cost"],
+      "source_inventory_ids": [
+        "eav-cost"
+      ],
       "external_entity_object": "catalog_product_attribute",
       "external_field_key_path": "product.custom_attributes.cost",
       "external_field_or_capability": "cost",
@@ -939,7 +1012,11 @@
     },
     {
       "id": "website-store-scope-fields",
-      "source_inventory_ids": ["bulk-store-view-code", "bulk-product-websites", "bulk-website-id"],
+      "source_inventory_ids": [
+        "bulk-store-view-code",
+        "bulk-product-websites",
+        "bulk-website-id"
+      ],
       "external_entity_object": "catalog_product_scope_binding",
       "external_field_key_path": "store_view_code|product_websites|website_id",
       "external_field_or_capability": "website and store scope bindings",
@@ -969,7 +1046,10 @@
     },
     {
       "id": "category-bindings",
-      "source_inventory_ids": ["bulk-categories", "bulk-save-rewrites-history"],
+      "source_inventory_ids": [
+        "bulk-categories",
+        "bulk-save-rewrites-history"
+      ],
       "external_entity_object": "catalog_product_category_relation",
       "external_field_key_path": "categories|save_rewrites_history",
       "external_field_or_capability": "category assignment and rewrite-side-effect bindings",
@@ -999,7 +1079,10 @@
     },
     {
       "id": "presentation-conditional-fields",
-      "source_inventory_ids": ["presentation-conditional-fields", "eav-options-container"],
+      "source_inventory_ids": [
+        "presentation-conditional-fields",
+        "eav-options-container"
+      ],
       "external_entity_object": "catalog_product_presentation_binding",
       "external_field_key_path": "display_product_options_in / options_container | product_options_container|gift_message_available|custom_design|custom_design_from|custom_design_to|custom_layout_update|page_layout",
       "external_field_or_capability": "presentation and module/theme dependent bindings",
@@ -1029,7 +1112,10 @@
     },
     {
       "id": "pricing-map-msrp-fields",
-      "source_inventory_ids": ["pricing-map-msrp-fields", "eav-map-msrp-attributes"],
+      "source_inventory_ids": [
+        "pricing-map-msrp-fields",
+        "eav-map-msrp-attributes"
+      ],
       "external_entity_object": "catalog_product_pricing_binding",
       "external_field_key_path": "CSV map_price ↔ system minimal_price | CSV msrp_price ↔ system msrp | CSV map_enabled | msrp_display_actual_price_type",
       "external_field_or_capability": "MAP and MSRP pricing bindings",
@@ -1059,7 +1145,9 @@
     },
     {
       "id": "configurable-rest-options",
-      "source_inventory_ids": ["configurable-rest-options"],
+      "source_inventory_ids": [
+        "configurable-rest-options"
+      ],
       "external_entity_object": "configurable_product",
       "external_field_key_path": "V1/configurable-products/{sku}/options",
       "external_field_or_capability": "configurable options",
@@ -1089,7 +1177,9 @@
     },
     {
       "id": "configurable-rest-children",
-      "source_inventory_ids": ["configurable-rest-children"],
+      "source_inventory_ids": [
+        "configurable-rest-children"
+      ],
       "external_entity_object": "configurable_product",
       "external_field_key_path": "V1/configurable-products/{sku}/children",
       "external_field_or_capability": "configurable children",
@@ -1119,7 +1209,9 @@
     },
     {
       "id": "configurable-bulk-bindings",
-      "source_inventory_ids": ["bulk-configurable-bindings"],
+      "source_inventory_ids": [
+        "bulk-configurable-bindings"
+      ],
       "external_entity_object": "configurable_product",
       "external_field_key_path": "configurable_variations|configurable_variation_labels|_super_*",
       "external_field_or_capability": "bulk configurable bindings",
@@ -1149,7 +1241,9 @@
     },
     {
       "id": "inventory-source-item-structure",
-      "source_inventory_ids": ["inventory-source-item-structure"],
+      "source_inventory_ids": [
+        "inventory-source-item-structure"
+      ],
       "external_entity_object": "inventory_source_item",
       "external_field_key_path": "source item {source_code,qty,status}",
       "external_field_or_capability": "source item structure",
@@ -1179,7 +1273,10 @@
     },
     {
       "id": "inventory-bulk-stock-inputs",
-      "source_inventory_ids": ["bulk-inventory-stock-inputs", "legacy-stockitem-compatibility"],
+      "source_inventory_ids": [
+        "bulk-inventory-stock-inputs",
+        "legacy-stockitem-compatibility"
+      ],
       "external_entity_object": "inventory_stock_configuration",
       "external_field_key_path": "CSV stock fields; renamed compatibility pairs out_of_stock_qty↔min_qty, allow_backorders↔backorders, min_cart_qty↔min_sale_qty, max_cart_qty↔max_sale_qty, notify_on_stock_below↔notify_stock_qty",
       "external_field_or_capability": "bulk stock configuration inputs",
@@ -1209,7 +1306,10 @@
     },
     {
       "id": "other-product-types",
-      "source_inventory_ids": ["other-grouped-product-type", "other-bundle-product-type"],
+      "source_inventory_ids": [
+        "other-grouped-product-type",
+        "other-bundle-product-type"
+      ],
       "external_entity_object": "catalog_product_type",
       "external_field_key_path": "product_type=grouped|bundle",
       "external_field_or_capability": "grouped and bundle product types",
@@ -1239,7 +1339,9 @@
     },
     {
       "id": "dynamic-eav-family",
-      "source_inventory_ids": ["target-dependent-eav-family"],
+      "source_inventory_ids": [
+        "target-dependent-eav-family"
+      ],
       "external_entity_object": "catalog_product_attribute_metadata",
       "external_field_key_path": "installation-dependent discovered custom attributes",
       "external_field_or_capability": "target-dependent discovered EAV family",

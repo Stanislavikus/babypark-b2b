@@ -345,7 +345,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('Stage 3E Magento Safe Sync enhanced-safety runtime', $atlas);
         $this->assertStringContainsString('IMPLEMENTED (internal optional primitive; support false; not standard-path prerequisite)', $atlas);
         $this->assertStringContainsString('Magento V1 moduleless stock simple trusted WRITE', $atlas);
-        $this->assertStringContainsString('IMPLEMENTED (internal; support false; pending real-target certification)', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED + CORE REAL-TARGET VERIFIED (support false; field-by-field certification pending)', $atlas);
         $this->assertStringContainsString('Stage3EEntityBoundSafeSyncDocumentationContractTest.php', $atlas);
     }
 
@@ -625,7 +625,7 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('Stage 3E Magento Safe Sync enhanced-safety runtime', $atlas);
         $this->assertStringContainsString('IMPLEMENTED (internal optional primitive; support false; not standard-path prerequisite)', $atlas);
         $this->assertStringContainsString('Magento V1 moduleless stock simple trusted WRITE', $atlas);
-        $this->assertStringContainsString('IMPLEMENTED (internal; support false; pending real-target certification)', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED + CORE REAL-TARGET VERIFIED (support false; field-by-field certification pending)', $atlas);
         $this->assertStringContainsString('Stage 3E disposable validation harness', $atlas);
         $this->assertStringContainsString('IMPLEMENTED (internal; validation-only; support false; no real-target certification executed)', $atlas);
         $this->assertStringContainsString('the standard Magento V1 Simple writer no longer depends on this path', $atlas);

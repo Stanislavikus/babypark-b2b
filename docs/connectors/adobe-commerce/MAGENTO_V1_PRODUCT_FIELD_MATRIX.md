@@ -22,11 +22,11 @@ manifest.
   - `AdobeProductDocumentReader` reuses
     `AdobeProductRemoteStateClient::sendReadOnlyGetWithContext()`
   - trusted simple Product execution consumes
-    `AdobeSafeSyncClient::writeSimpleProduct()`
+    `AdobeProductStockSimpleWriteExecutor` over stock `PUT /V1/products/{sku}`; Safe Sync remains optional Enhanced Safety
 - trusted Receive uses `AdobeProductDocumentReader` (stock `GET /V1/products/{sku}`)
   - configurable child remains fail-closed
   - no duplicate Product GET transport, OAuth signer, or request factory exists
-  - no trusted stock `PUT /V1/products/{sku}` consequential writer exists
+  - trusted stock `PUT /V1/products/{sku}` consequential writer exists for merchant-confirmed simple Product updates; public support remains false
 
 ## Source-derived coverage
 
@@ -79,11 +79,10 @@ outcomes. Completeness is no longer proven by a magic stable-field count.
 
 The matrix/manifest pair now records the final Slice 2 / Slice 3 runtime truth:
 
-- `rest-product-name` reflects internal trusted simple Safe Sync WRITE consumption.
-- `rest-product-price` reflects internal trusted simple Safe Sync WRITE consumption.
-- `rest-product-status` reflects internal trusted simple Safe Sync WRITE consumption.
-- `rest-product-visibility` reflects internal trusted simple Safe Sync WRITE
-  consumption and no longer claims universal pre-write blocking.
+- `rest-product-name` reflects the moduleless trusted simple stock WRITE runtime; field mutation remains pending real-target certification.
+- `rest-product-price` is real-target WRITE+restore verified through the moduleless stock runtime on 2026-09-11.
+- `rest-product-status` reflects the moduleless trusted simple stock WRITE runtime; field mutation remains pending real-target certification.
+- `rest-product-visibility` reflects the moduleless trusted simple stock WRITE runtime; field mutation remains pending real-target certification.
 - `rest-product-type-id` reflects the existing reusable full Product document READ
   through `AdobeProductDocumentReader`.
 
@@ -155,9 +154,9 @@ Repository contract:
 - inventory/availability stays owned by Availability rather than Product-column
   semantics
 
-## Current trusted simple Safe Sync request-field allowlist
+## Optional Enhanced Safety — Safe Sync request-field allowlist
 
-The current trusted simple Product Safe Sync request contract remains exactly:
+The optional Safe Sync simple Product request contract remains exactly:
 
 - `expected_sku`
 - `name`
@@ -174,6 +173,21 @@ Current row-level matrix truth remains aligned with that contract:
   `safe_sync_write_state` is `SUPPORTED`
 - `mapped_attributes` remains a bounded envelope and does **not** imply universal
   WRITE certification for every attribute row
+
+## Real-target certification evidence — 2026-09-11
+
+At implementation commit `10d05db59b857ba51a4851338cd6186c969c19c9`, the standard moduleless trusted Simple runtime was exercised against the certification Magento target using the merchant-confirmed `Test Product` (`SKU 1234567890`, trusted logical `entity_id = 1`).
+
+- baseline stock GET: `price=150`, exact SKU, `type_id=simple`, `attribute_set_id=9`, status `1`, visibility `4`;
+- production `AdobeProductSimpleCommandExecutor` changed price `150 -> 151`;
+- result: `KnownApplied`, `stock_write_verified`, one consequential PUT and one reconciliation GET;
+- independent stock GET confirmed `price=151` with the same entity id/SKU/type;
+- the same production runtime restored `151 -> 150`;
+- result: `KnownApplied`, `stock_write_verified`; independent GET confirmed the original state restored.
+
+This certifies the **moduleless trusted Simple stock WRITE/verify/restore core and the base-price field on this target**. It does not flip public Live support and does not certify every field, dynamic EAV, configurable, media, or custom-attribute clear semantics.
+
+A read-only real-target probe for a deliberately absent SKU returned HTTP 404 with a `message` key only and no structured `parameters`; the current classifier therefore conservatively returns `untrusted_or_failed`. The synthetic structured trusted-missing fixture is not treated as real-target evidence.
 
 ## Current discovery inputs currently normalized in repository code
 
@@ -195,84 +209,61 @@ Any other `frontend_input` remains fail-closed until explicitly verified and map
 
 ---
 
-## Current runtime owner vs newly approved target architecture
-[Recorded — 2026-09-03]
+## Moduleless runtime migration and real-target certification record
+[Direction recorded — 2026-09-03; runtime migrated and core verified — 2026-09-11]
 
-This matrix is a **current runtime / audit truth** snapshot. It must
-continue to be read that way until a separate runtime task actually
-changes the seams below.
+This matrix is a **current runtime / audit truth** snapshot. The historical 2026-09-03
+moduleless-by-default rebaseline is now implemented for trusted Simple Product WRITE.
 
-### Current runtime owner (unchanged by this record)
+### Current runtime owner
 
-- **`AdobeProductDocumentReader` reuses
-  `AdobeProductRemoteStateClient::sendReadOnlyGetWithContext()`** for
-  trusted full Product document READ.
-- **Trusted simple Product execution** consumes
-  `AdobeSafeSyncClient::writeSimpleProduct(...)`.
-- **Trusted Receive** uses `AdobeProductDocumentReader` (stock
-  `GET /V1/products/{sku}`).
-- The configurable child path remains fail-closed.
-- No duplicate Product GET transport, OAuth signer, or request factory
-  exists in the standard seam.
-- No trusted stock `PUT /V1/products/{sku}` consequential writer
-  exists.
+- `AdobeProductDocumentReader` reuses
+  `AdobeProductRemoteStateClient::sendReadOnlyGetWithContext()` for trusted full Product READ.
+- Trusted Simple Product execution uses
+  `AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor` over stock
+  `GET /V1/products/{sku}` + at most one `PUT /V1/products/{sku}` + read-only verification.
+- Merchant-confirmed ERL identity is mandatory; the fresh pre-read must prove exact SKU,
+  `type_id = simple`, and Magento entity `id` equal to the trusted discriminator before PUT.
+- POST/create and blind consequential PUT retry are absent from the standard Simple path.
+- Trusted Receive continues to use `AdobeProductDocumentReader` over stock Product GET.
+- The configurable child path remains fail-closed for this standard Simple migration.
+- Safe Sync remains implemented only as an optional Enhanced Safety primitive and is not the
+  standard-path prerequisite.
+- Mapping remains a **platform-owned workflow** over persisted and normalised discovered metadata;
+  Mapping does **not** itself consume vendor stock REST as a runtime.
+- Preview remains a **platform-owned orchestration** under the existing Preview contracts; bounded
+  remote reads are allowed only where those contracts require them, and Preview performs no
+  consequential mutation.
 
-These runtime seams are not rewritten by this record. The matrix still
-correctly names them as the **current** owner of the relevant
-operations.
+### Real-target evidence
 
-### Newly approved target architecture (direction only — not runtime)
+On 2026-09-11 the certification target verified the core trusted Simple path with
+`Test Product` / SKU `1234567890` / Magento entity `id = 1`:
 
-After the Post-#168 / Post-D6 rebaseline recorded in
-`docs/03-DOMAIN_MODEL.md` → **Magento V1 Moduleless-by-default
-Stop-and-Amend**, the **approved product direction** for the standard
-merchant path is:
+- baseline price `150`;
+- controlled stock WRITE `150 -> 151`;
+- result `KnownApplied / stock_write_verified`;
+- one consequential PUT and one read-only verification/reconciliation GET;
+- independent GET confirmed price `151` with unchanged identity/type/status/visibility/attribute set;
+- controlled restore `151 -> 150`;
+- restore again returned `KnownApplied / stock_write_verified`;
+- final independent GET confirmed the original price `150` and unchanged identity.
 
-- **Moduleless by default**: standard Magento V1 connector MUST NOT
-  require the first-party `B2BPlatform_MagentoSafeSync` Composer
-  component for connection, READ, field discovery, mapping, Preview,
-  or normal Magento V1 operation once the stock public REST path is
-  separately certified for the relevant operation.
-- **Target seam separation** (this record does **not** redesign any
-  of these seams):
-  - **Magento stock API** is the **connector remote transport** for
-    account connection, standard Product READ, field discovery, and
-    the candidate future consequential WRITE. It is the only
-    connector-side seam that talks to the merchant's Magento over
-    the network on the standard path.
-  - **Mapping** is a **platform-owned workflow** that operates over
-    the **persisted and normalised discovered metadata** that field
-    discovery has already produced. Mapping does **not** itself
-    consume vendor stock REST as a runtime.
-  - **Preview** is a **platform-owned orchestration** that follows
-    the existing Preview contracts. It may perform **bounded
-    remote reads** only where those existing contracts already
-    require such reads, and it does **not** redesign those contracts.
-- **Safe Sync reclassified as optional Enhanced Safety candidate**:
-  the first-party component remains a legitimate, implementation-true
-  primitive, but it is no longer a basic connector prerequisite.
+A separate read-only missing-SKU probe returned HTTP 404 with a message-only body and no
+structured `parameters`. The classifier therefore remained conservative `untrusted_or_failed`;
+this target did not prove the synthetic `TrustedKnownMissing` fixture shape.
 
-### Narrow distinction this record preserves
+### Scope that remains pending
 
-This record does **not** claim that:
+This certification does **not** introduce public Live support and does not certify every matrix
+row. `Adobe Products / Export / Live = false` remains authoritative. The following still require
+separate evidence where applicable:
 
-- a stock public REST writer is already in production;
-- stock public READ has been Tier-1 certified;
-- the standard path is already running moduleless in production;
-- any row's `safe_sync_write_state` is anything other than what
-  the matrix already records;
-- the first-party Composer envelope is widened.
+- field-by-field Simple Product WRITE validation beyond the verified base-price cycle;
+- installation-dependent mapped EAV values and explicit clear semantics;
+- configurable Product mutation;
+- media mutation;
+- remaining product-type and connector-owned surfaces.
 
-This record also does **not** introduce new support rows. The matrix
-itself remains the audit truth for what the **current** runtime
-actually does. The Post-#168 rebaseline only rebaselines the
-**product direction** for the future standard path; it does not
-forbid the matrix from continuing to describe the **current** runtime
-truth it audits.
-
-Future field-matrix revisions that move a row from
-"current runtime = Safe Sync consumption" to "current runtime = stock
-public REST" must be backed by the separately-designed runtime
-migration that actually changes the seam. Until that migration ships,
-the matrix must continue to record the current runtime owner for that
-row.
+The matrix's `safe_sync_write_state` continues to describe the optional Safe Sync primitive where
+it exists; it is not the owner of the standard Simple runtime anymore.

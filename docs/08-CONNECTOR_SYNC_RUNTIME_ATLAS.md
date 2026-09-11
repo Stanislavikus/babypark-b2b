@@ -112,7 +112,7 @@ A reuse-intent marker does **not** mean implementation exists.
 | Adobe Product simple command executor + ERL safety (Stage 3B-2) | IMPLEMENTED (superseded no-link contract) | Connector | `AdobeProductSimpleCommandExecutor.php`; `AdobeProductExternalRecordLinkGuard.php`; `AdobeProductExternalRecordLinkPersister.php`; `ConservativeAdobeProductOwnershipTrustPolicy.php` — **Stage 3E Stop-and-Amend:** stock no-link POST/create path must not be used; link-first + ENTITY TRUST contract in `03-DOMAIN_MODEL.md` | `external_record_links` | `tests/Feature/Sync/Stage3B2AdobeSimpleCommandSafetyTest.php`; etc. | Stage 3E Stop-and-Amend | connector-owned |
 | Stage 3E entity-bound Safe Sync contract (docs) | DOCS CONTRACT DONE — runtime pending | Connector | Normative contract in `docs/03-DOMAIN_MODEL.md` → Stage 3E Stop-and-Amend — entity-bound Safe Sync runtime contract; first-party `magento2-module`; Part 1 harness runtime **reverted**; Stage 3E Post-#168 Real-Target Certification Amendment (9 decisions + dormant discrepancies table) layered on top | none (follow-on: provenance fields, link UI, Magento Safe Sync component, `ConnectorLiveRuntimeReadiness`) | `tests/Feature/Sync/Stage3EEntityBoundSafeSyncDocumentationContractTest.php` | Stage 3E; Stage 3E Post-#168 amendment | docs-only contract frozen |
 | Stage 3E Magento Safe Sync enhanced-safety runtime | IMPLEMENTED (internal optional primitive; support false; not standard-path prerequisite) | Connector | `integrations/magento-safe-sync/` first-party `magento2-module` plus `app/Support/Connectors/AdobePaaS/SafeSync/AdobeSafeSyncClient.php` and `AdobeSafeSyncRequestFactory.php` — authenticated handshake, entity-bound Product read, isolated entity-bound simple Product write and rollback/commit safety remain available as optional Enhanced Safety; the standard Magento V1 Simple writer no longer depends on this path | none | `tests/Unit/Connectors/AdobePaaS/SafeSync/AdobeSafeSyncClientTest.php`; `tests/Unit/Connectors/AdobePaaS/SafeSync/AdobeSafeSyncRequestFactoryTest.php`; `tests/Unit/MagentoSafeSync/MagentoSafeSyncModuleLogicTest.php`; `tests/Feature/Sync/MagentoSafeSyncModuleContractTest.php` | Stage 3E Stop-and-Amend; Magento V1 Moduleless-by-default rebaseline | connector-owned optional enhanced-safety runtime |
-| Magento V1 moduleless stock simple trusted WRITE | IMPLEMENTED (internal; support false; pending real-target certification) | Connector | `app/Support/Connectors/AdobePaaS/Command/AdobeProductSimpleCommandExecutor.php`; `app/Support/Connectors/AdobePaaS/Command/AdobeProductStockSimpleWriteExecutor.php`; `app/Support/Connectors/AdobePaaS/Command/AdobeProductRemoteStateClient.php` — merchant-confirmed ERL required; fresh stock Product GET proves exact SKU + simple type + Magento entity `id` equals trusted discriminator; at most one stock PUT; no POST/create; no blind retry; read-only reconciliation/post-write verification; controlled custom scalar values use bounded canonical comparison for Magento scalar round-trips; mapped custom-attribute clear intent is preserved and fails closed before PUT when the remote still carries a stale value because stock clear semantics are not yet real-target certified; structured WRITE permission evidence retained separately from connection truth | none | `tests/Feature/Sync/MagentoV1ModulelessSimpleWriteTest.php`; `tests/Feature/Sync/Stage3B2AdobeSimpleCommandSafetyTest.php`; `tests/Feature/Sync/Stage3B3AdobeSimpleLiveIntegrationTest.php` | `docs/connectors/adobe-commerce/MAGENTO_V1_CONNECTION_UX_CONTRACT.md`; Magento V1 Moduleless-by-default rebaseline | connector-owned stock REST runtime |
+| Magento V1 moduleless stock simple trusted WRITE | IMPLEMENTED + CORE REAL-TARGET VERIFIED (support false; field-by-field certification pending) | Connector | `app/Support/Connectors/AdobePaaS/Command/AdobeProductSimpleCommandExecutor.php`; `app/Support/Connectors/AdobePaaS/Command/AdobeProductStockSimpleWriteExecutor.php`; `app/Support/Connectors/AdobePaaS/Command/AdobeProductRemoteStateClient.php` — merchant-confirmed ERL required; fresh stock Product GET proves exact SKU + simple type + Magento entity `id` equals trusted discriminator; at most one stock PUT; no POST/create; no blind retry; read-only reconciliation/post-write verification; controlled custom scalar values use bounded canonical comparison for Magento scalar round-trips; mapped custom-attribute clear intent is preserved and fails closed before PUT when the remote still carries a stale value because stock clear semantics are not yet real-target certified; structured WRITE permission evidence retained separately from connection truth; real target 2026-09-11 verified price `150 -> 151 -> 150` with `KnownApplied / stock_write_verified` and stable `entity_id=1`; missing-SKU 404 on this target had no structured `parameters` and therefore remains conservative `untrusted_or_failed` | none | `tests/Feature/Sync/MagentoV1ModulelessSimpleWriteTest.php`; `tests/Feature/Sync/Stage3B2AdobeSimpleCommandSafetyTest.php`; `tests/Feature/Sync/Stage3B3AdobeSimpleLiveIntegrationTest.php` | `docs/connectors/adobe-commerce/MAGENTO_V1_CONNECTION_UX_CONTRACT.md`; Magento V1 Moduleless-by-default rebaseline | connector-owned stock REST runtime |
 | Safe Sync component readiness + certification package | IMPLEMENTED (stateless; support false) | Connector | `AdobeSafeSyncComponentReadinessResolver`; `AdobeSafeSyncHandshakeProbe`; compatibility-epoch/capability-subset parser; transient Connector Account action; `scripts/package-magento-safe-sync.sh` | none | `tests/Feature/Connectors/AdobeSafeSyncComponentReadinessResolverTest.php`; `tests/Unit/Connectors/AdobePaaS/SafeSync/AdobeSafeSyncHandshakeProbeTest.php`; `tests/Feature/Sync/MagentoSafeSyncCertificationPackageTest.php` | `03-DOMAIN_MODEL.md` → Account readiness freeze / Safe Sync component readiness (baseline success remains distinguishable from readiness probe failure) | connector-owned; certification distribution only |
 | Stage 3E disposable validation harness | IMPLEMENTED (internal; validation-only; support false; no real-target certification executed) | Connector | `app/Support/Connectors/AdobePaaS/Validation/`; `config/adobe_stage3e_validation.php`; `routes/console.php` — validation-only Laravel control plane over existing Safe Sync primitives; env-gated `adobe:stage3e-validate`; trusted `ProductVariant -> ExternalRecordLink -> logical entity_id` resolution; local transport-loss decorator/evidence writer; no global transport rebinding; no Live consumer | local JSON artifact under `storage/app/stage3e-validation` only | `tests/Feature/Sync/Stage3ES3DisposableValidationHarnessCommandAvailabilityTest.php`; `tests/Feature/Sync/Stage3ES3DisposableValidationHarnessTest.php`; `tests/Unit/Connectors/AdobePaaS/Validation/AdobeStage3EValidationTransportDecoratorTest.php` | Decision 9 step 3 — disposable validation harness | connector-owned validation seam |
 | Stage 3E post-#168 dormant code-vs-docs discrepancies | DOCUMENTED (dormant; not fixed) | Connector | Production-unreachable code paths that still use stock SKU-addressed consequential logic for: media (`GalleryManagement`); configurable options / child link; lifecycle status / visibility. They must be replaced before their respective Live path becomes reachable | none | `tests/Feature/Sync/Stage3EEntityBoundSafeSyncDocumentationContractTest.php` | Stage 3E Post-#168 amendment | dormant |
@@ -187,63 +187,37 @@ Mechanical coverage: documentation-contract tests verify that declared `app/`, `
 
 ---
 
-## Current runtime vs new contract — intentional gap (Post-#168 / Post-D6 rebaseline)
-[Recorded — 2026-09-03]
+## Moduleless standard-path migration record (Post-#168 / Post-D6 rebaseline)
+[Recorded — 2026-09-03; resolved in runtime and core real-target verified — 2026-09-11]
 
-After the Post-#168 / Post-D6 rebaseline recorded in
-`docs/03-DOMAIN_MODEL.md` → **Magento V1 Moduleless-by-default
-Stop-and-Amend**, an intentional gap exists between this Atlas's
-**current runtime truth** and the **approved target architecture** for
-the standard merchant path.
+The Post-#168 / Post-D6 rebaseline in `docs/03-DOMAIN_MODEL.md` approved Magento V1 as
+**moduleless by default** and made first-party Safe Sync an optional Enhanced Safety primitive,
+not a standard connector prerequisite.
 
-The Atlas continues to record current runtime truth. It is **not**
-silently rewritten to match the new contract. The relevant rows above
-already say, in their own words, that:
+The historical runtime gap recorded on 2026-09-03 is now resolved for trusted Simple Product
+WRITE:
 
-- trusted simple Product execution currently consumes
-  `AdobeSafeSyncClient::writeSimpleProduct(...)` for the simple
-  Live path;
-- the first-party `B2BPlatform_MagentoSafeSync` component is
-  currently used internally in some seams;
-- Adobe Products/Export/Live public support remains `false`;
-- the dormant code-vs-docs discrepancies table from Stage 3E
-  Post-#168 still stands.
+- standard trusted Simple Product execution no longer calls `AdobeSafeSyncClient::writeSimpleProduct(...)`;
+- `AdobeProductSimpleCommandExecutor` delegates to the stock REST writer;
+- the standard path proves merchant-confirmed ERL identity with a fresh Product GET, exact SKU,
+  `type_id = simple`, and Magento entity `id` equal to the trusted discriminator;
+- it performs at most one stock `PUT /V1/products/{sku}`, never POST/create, never blind-retries
+  a consequential PUT, and uses read-only GET verification/reconciliation;
+- Safe Sync remains implemented only as an optional Enhanced Safety primitive;
+- Adobe Products/Export/Live public support remains `false`; broad field-by-field, configurable,
+  media, and merchant readiness certification remains separate work.
 
-The new contract changes **the product direction** — standard
-Magento V1 is **moduleless by default**, and the first-party Safe
-Sync component is an **optional "Enhanced Safety" candidate**, not a
-baseline connector prerequisite. It does **not** claim that the
-underlying runtime migration is already complete. The migration that
-would actually decouple the standard connector path from the
-first-party component is a separate, separately-designed task and is
-**not** authorised by the new contract.
+Real-target evidence on 2026-09-11 verified the core trusted Simple path against the certification
+Magento target using `Test Product` / SKU `1234567890`: baseline price `150`, controlled stock
+WRITE to `151`, verified `KnownApplied / stock_write_verified`, then controlled restore to `150`
+with the same verified outcome. Independent GETs before, after WRITE, and after restore kept
+`entity_id = 1`, exact SKU, `type_id = simple`, `attribute_set_id = 9`, `status = 1`, and
+`visibility = 4`.
 
-Therefore, while the new contract is in force, the following
-intentional current-runtime-vs-new-contract facts remain visible and
-are **not** silently hidden:
+A read-only missing-SKU probe on the same target returned HTTP 404 with a message-only JSON body
+and no structured `parameters`; the current classifier therefore correctly remained conservative
+`untrusted_or_failed` rather than inventing `TrustedKnownMissing`.
 
-- Current code still consumes the entity-bound Safe Sync primitive
-  for trusted simple Product WRITE in some internal seams.
-- The Connector Account Overview is rendered through the
-  `store-setup.blade.php` Layer-A surface as connection confidence plus one
-  next step. The normal healthy Overview no longer projects catalogue, field, or media
-  certification evidence; the underlying Connection Check/Discovery collection and
-  persistence remain unchanged for runtime/support use. It does **not** reintroduce
-  developer-facing Safe Sync readiness diagnostics.
-- The standard connector path is now wired through stock public REST
-  READ seams (connection check uses one bounded `/V1/products?pageSize=1` Product
-  baseline, followed by at most one `/V1/products/{sku}/media` readability probe,
-  plus document read) for merchant/runtime evidence. The Product response itself
-  supplies safe catalogue-count evidence. The optional media probe records only a
-  merchant-safe confirmation boolean and cannot overturn successful Product baseline evidence.
-  Consequential WRITE remains internal and
-  not publicly supported or real-target certified.
-- The Composer compatibility envelope of the first-party component
-  is **not** widened by the new contract; the current envelope
-  stands until a separate, narrowly-scoped decision changes it.
-
-A future Atlas entry may move a row from "current code still
-consumes Safe Sync" to "current code consumes only stock public REST
-on the standard path" once that future runtime migration is designed,
-approved, and shipped in its own PR(s). Until then, the Atlas must
-not lie.
+The Connector Account Overview remains a Layer-A connection-confidence surface. Product WRITE
+readiness/failures stay operation-specific and must not redefine healthy Product READ connection
+truth.
