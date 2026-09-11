@@ -25,11 +25,11 @@ class ReceiveProposalFoundationDocumentationContractTest extends TestCase
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
         $this->assertStringContainsString('| Receive proposal/planner foundation | IMPLEMENTED |', $atlas);
-        $this->assertStringContainsString('| Adobe Products Receive name proposal orchestration | IMPLEMENTED (internal; zero-mutation; no merchant entrypoint; no Apply) |', $atlas);
+        $this->assertStringContainsString('| Adobe Products Receive name proposal orchestration | IMPLEMENTED (internal; proposal is zero-mutation; name-only Apply exists; no merchant entrypoint; public Import support false) |', $atlas);
         $this->assertStringContainsString('| Receive connector read/orchestration | PARTIAL |', $atlas);
-        $this->assertStringContainsString('Normal `ConnectorSyncOperationSupport` / `SyncConfigurationService` admission still does **not** advertise or admit Adobe Products/Import from this internal primitive.', $atlas);
+        $this->assertStringContainsString('Consequential Apply is a separate internal R3 runtime and normal Adobe Products/Import support remains disabled.', $atlas);
         $this->assertStringContainsString('Import support must **not** be inferred from the existence of this internal Adobe service because normal Adobe Products/Import admission remains disabled.', $atlas);
-        $this->assertStringContainsString('| Receive Apply runtime | CONFIRMED ABSENT |', $atlas);
+        $this->assertStringContainsString('| Receive Apply runtime | IMPLEMENTED (internal; R3 Product `name` only; public Adobe Import/Live support false; real-target certified 2026-09-11) |', $atlas);
         $this->assertStringNotContainsString('| Receive / Import runtime | CONFIRMED ABSENT |', $atlas);
     }
 

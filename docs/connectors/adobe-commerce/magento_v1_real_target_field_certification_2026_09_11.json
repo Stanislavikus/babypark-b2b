@@ -617,5 +617,45 @@
       "final_custom_attribute_count": 42,
       "final_product_state_restored": true
     }
+  ],
+  "receive_apply_proofs": [
+    {
+      "surface": "canonical_product_name",
+      "runtime": "AdobeProductReceiveProposalService -> ReceiveLiveImportAdmissionService -> AdobeProductReceiveApplyService -> GovernedProductVariantColumnMutationService::setIfCurrentValue",
+      "target_sku": "1234567890",
+      "logical_entity_id": 1,
+      "local_product_id": 51,
+      "correlation_variant_id": 56,
+      "baseline_name": "Test Product",
+      "probe_name": "Test Product [Receive Cert]",
+      "remote_change_result": "known_applied",
+      "first_receive_run": {
+        "run_id": "a2b946f1-fce0-4a78-9825-dbc1447d4d9d",
+        "status": "completed",
+        "outcome": "synchronized",
+        "mutation_status": "updated",
+        "local_name_after_apply": "Test Product [Receive Cert]"
+      },
+      "remote_restore_result": "known_applied",
+      "second_receive_run": {
+        "run_id": "a2b946f5-4db6-4cac-a559-5f633a0f188e",
+        "status": "completed",
+        "outcome": "synchronized",
+        "mutation_status": "updated",
+        "local_name_after_apply": "Test Product"
+      },
+      "baseline_configuration_operations": [
+        "export"
+      ],
+      "baseline_configuration_revision": "4aa944468d2d2897adcba23214fc5f6fc5d2f0736b8a47864d66533590e3d4fe",
+      "temporary_import_enabled_revision": "61fdc928ded15514da8f621f5bcde82da6059be1c18110e8c96f33eb185fbf3d",
+      "final_configuration_operations": [
+        "export"
+      ],
+      "final_configuration_revision": "4aa944468d2d2897adcba23214fc5f6fc5d2f0736b8a47864d66533590e3d4fe",
+      "normal_receive_restore_completed": true,
+      "emergency_cleanup_used": false,
+      "public_import_live_support_flipped": false
+    }
   ]
 }

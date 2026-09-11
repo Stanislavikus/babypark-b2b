@@ -525,7 +525,11 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             $this->domainModelContent,
         );
         $this->assertStringContainsString(
-            'does **not** claim that `setIfCurrentValue(...)` is already',
+            'Implementation truth (2026-09-11): `setIfCurrentValue(...)` is implemented',
+            $this->domainModelContent,
+        );
+        $this->assertStringContainsString(
+            'rejects stale participating local',
             $this->domainModelContent,
         );
         $this->assertStringContainsString(
@@ -750,7 +754,7 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             $atlasContent,
         );
         $this->assertStringContainsString(
-            'Adobe Products Receive name proposal orchestration | IMPLEMENTED (internal; zero-mutation; no merchant entrypoint; no Apply)',
+            'Adobe Products Receive name proposal orchestration | IMPLEMENTED (internal; proposal is zero-mutation; name-only Apply exists; no merchant entrypoint; public Import support false)',
             $atlasContent,
         );
         $this->assertStringContainsString(
@@ -758,7 +762,7 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             $atlasContent,
         );
         $this->assertStringContainsString(
-            'Normal `ConnectorSyncOperationSupport` / `SyncConfigurationService` admission still does **not** advertise or admit Adobe Products/Import from this internal primitive.',
+            'Consequential Apply is a separate internal R3 runtime and normal Adobe Products/Import support remains disabled.',
             $atlasContent,
         );
         $this->assertStringContainsString(
@@ -766,7 +770,7 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             $atlasContent,
         );
         $this->assertStringContainsString(
-            'Receive Apply runtime | CONFIRMED ABSENT',
+            'Receive Apply runtime | IMPLEMENTED (internal; R3 Product `name` only; public Adobe Import/Live support false; real-target certified 2026-09-11)',
             $atlasContent,
         );
         $this->assertStringContainsString(

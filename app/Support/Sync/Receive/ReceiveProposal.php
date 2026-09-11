@@ -19,6 +19,8 @@ final readonly class ReceiveProposal
         public FieldObjectType $targetType,
         public string $targetId,
         public string $trustedExternalLinkEvidenceId,
+        public string $trustedExternalIdentifier,
+        public string $trustedExternalRecordDiscriminator,
         public array $entries,
         public DateTimeImmutable $issuedAt,
     ) {
@@ -33,6 +35,8 @@ final readonly class ReceiveProposal
             || $this->configurationRevision === ''
             || $this->targetId === ''
             || $this->trustedExternalLinkEvidenceId === ''
+            || $this->trustedExternalIdentifier === ''
+            || $this->trustedExternalRecordDiscriminator === ''
         ) {
             throw new InvalidArgumentException('ReceiveProposal correlation identifiers must not be empty.');
         }

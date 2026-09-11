@@ -57,9 +57,10 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 ### P-07 — Magento Receive Apply breadth
 
 - Surface: Magento → platform mutation, distinct from `AdobeProductDocumentReader` observation.
-- Current truth: outbound WRITE + inbound read observation is certified for many fields; actual Receive Apply remains narrower and must not be overstated.
-- Needed proof: enumerate current Apply allowlist, implement/certify additional fields deliberately, and verify trust/conflict semantics per field family.
-- Reviewer candidate: yes when Apply scope is expanded.
+- Current truth: R3 consequential Receive Apply is now implemented and real-target certified for canonical Product `name` only. On 2026-09-11, real Magento SKU `1234567890` was changed `Test Product → Test Product [Receive Cert]`; a server-authoritative proposal plus `AdobeProductReceiveApplyService` changed certification-clone Product 51 to the remote name with a completed/synchronized Live Import run. Magento was then restored to `Test Product`; a second proposal/Apply restored Product 51 through the same path. Final remote/local names, configuration operations (`export` only), and configuration revision returned exactly to baseline. Public Adobe Products/Import/Live support remains false and there is no merchant Apply UI.
+- Why still open: breadth beyond Product `name` is intentionally not inferred from outbound field certification or `AdobeProductDocumentReader` observation.
+- Needed proof: expand the Apply allowlist one field/domain family at a time through its owning writer, with operation-specific stale-state/conflict semantics and real-target certification before advertising broader Import support.
+- Reviewer candidate: yes when Apply scope is expanded beyond the frozen R3 Product-name slice.
 
 ### P-08 — Product WRITE paused/remediation presentation
 

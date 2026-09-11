@@ -4545,14 +4545,14 @@ Boundary: `app/Services/Catalog/GovernedProductVariantColumnMutationService.php`
 - Product `description` is admitted only for the canonical global/global System `FieldDefinition` / `FieldBinding` tuple bound to `products.description`; Set requires a PHP string, rejects `null`, preserves the exact string including `''`, rejects physically oversized payloads, and `clear()` sets `NULL`.
 - The first consequential column-backed Receive Apply MUST NOT call GAP-029
   `set()` blindly.
-- Future Apply runtime requires an additive expected-current-value mutation path
-  conceptually equivalent to `setIfCurrentValue(...)`.
-- This expected-current-value precondition must be checked only **after**
-  locking the target Product row inside the authoritative GAP-029 mutation
-  transaction.
-- Existing GAP-029 `set()` / `clear()` semantics remain unchanged. This
-  contract does **not** claim that `setIfCurrentValue(...)` is already
-  implemented.
+- Receive Apply uses the additive GAP-029 expected-current-value mutation path
+  `setIfCurrentValue(...)`.
+- This expected-current-value precondition is checked only **after** locking
+  the target Product row inside the authoritative GAP-029 mutation transaction.
+- Existing GAP-029 `set()` / `clear()` semantics remain unchanged.
+- Implementation truth (2026-09-11): `setIfCurrentValue(...)` is implemented
+  for the frozen first Product-name slice and rejects stale participating local
+  values before either mutation or no-op classification.
 - Immediately before local consequential mutation, the same locked section must
   also verify the Receive `SyncRun` is still executable: the run exists, its
   `status = Running`, `writer_deadline_at` is present, and current time is
@@ -4749,8 +4749,23 @@ The first manual Receive Apply contract remains:
 - Import support flip;
 - merchant UI.
 
-Adobe Products/Import support remains **false** until separate truthful runtime
-and real-target validation work is completed.
+Adobe Products/Import support remains **false** until a separate public-support
+flip is justified; the existence of the internal name-only runtime does not
+advertise merchant Import capability.
+
+**Implementation/certification record — 2026-09-11.** The frozen R3 Product-name
+slice is now implemented internally by `ReceiveLiveImportAdmissionService` and
+`AdobeProductReceiveApplyService`, with GAP-029 `setIfCurrentValue(...)` as the
+final Product mutation boundary. A real-target certification against Magento SKU
+`1234567890` proved `Test Product → Test Product [Receive Cert]` on Magento,
+server-authoritative proposal construction, consequential Live/Import Apply into
+the isolated certification clone, then Magento restore to `Test Product` and a
+second Receive Apply restoring the clone through the same runtime. Both runs
+completed with `SyncRunItem.outcome = synchronized`; final remote/local names,
+configuration operation set, and configuration revision matched the exact
+baseline. This certifies only canonical Product `name`; broader Receive Apply,
+merchant UI, automated sync, and public Adobe Products/Import support remain out
+of scope.
 
 
 ## Sync Domain Rebaseline (Resolved — normative)

@@ -158,6 +158,8 @@ final class AdobeProductReceiveProposalService
             targetType: $targetType,
             targetId: $targetId,
             trustedExternalLinkEvidenceId: (string) $revalidatedLink->id,
+            trustedExternalIdentifier: (string) $revalidatedLink->external_identifier,
+            trustedExternalRecordDiscriminator: (string) $revalidatedLink->external_record_discriminator,
             entries: $entries,
             issuedAt: $this->issuedAt(),
         );

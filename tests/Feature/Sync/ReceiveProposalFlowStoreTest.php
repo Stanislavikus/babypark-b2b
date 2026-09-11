@@ -171,6 +171,8 @@ class ReceiveProposalFlowStoreTest extends TestCase
             targetType: FieldObjectType::Product,
             targetId: $targetId,
             trustedExternalLinkEvidenceId: 'erl-evidence-1',
+            trustedExternalIdentifier: 'SKU-1',
+            trustedExternalRecordDiscriminator: '77',
             entries: [
                 new ReceiveProposalEntry(
                     fieldBindingId: 'binding-1',

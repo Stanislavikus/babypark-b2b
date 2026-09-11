@@ -26,6 +26,11 @@ final class SyncLiveAdmissionException extends RuntimeException
         return new self('Live execution is not supported for this configuration.');
     }
 
+    public static function configurationRevisionChanged(): self
+    {
+        return new self('Sync configuration changed after the receive proposal was issued.');
+    }
+
     public static function activeRunExists(string $configurationId): self
     {
         return new self("An active sync run already exists for configuration '{$configurationId}'.");

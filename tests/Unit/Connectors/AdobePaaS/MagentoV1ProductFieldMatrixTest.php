@@ -376,6 +376,23 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
         self::assertSame(0, $ledger['post_campaign_drift_proof']['custom_attribute_diff_count']);
         self::assertTrue($ledger['post_campaign_drift_proof']['core_state_restored']);
         self::assertFalse($ledger['public_live_support_flipped']);
+        self::assertCount(1, $ledger['receive_apply_proofs']);
+        $receiveProof = $ledger['receive_apply_proofs'][0];
+        self::assertSame('canonical_product_name', $receiveProof['surface']);
+        self::assertSame('1234567890', $receiveProof['target_sku']);
+        self::assertSame(1, $receiveProof['logical_entity_id']);
+        self::assertSame('Test Product', $receiveProof['baseline_name']);
+        self::assertSame('Test Product [Receive Cert]', $receiveProof['probe_name']);
+        self::assertSame('completed', $receiveProof['first_receive_run']['status']);
+        self::assertSame('synchronized', $receiveProof['first_receive_run']['outcome']);
+        self::assertSame('updated', $receiveProof['first_receive_run']['mutation_status']);
+        self::assertSame('completed', $receiveProof['second_receive_run']['status']);
+        self::assertSame('synchronized', $receiveProof['second_receive_run']['outcome']);
+        self::assertSame('updated', $receiveProof['second_receive_run']['mutation_status']);
+        self::assertSame($receiveProof['baseline_configuration_revision'], $receiveProof['final_configuration_revision']);
+        self::assertTrue($receiveProof['normal_receive_restore_completed']);
+        self::assertFalse($receiveProof['emergency_cleanup_used']);
+        self::assertFalse($receiveProof['public_import_live_support_flipped']);
 
         $verifiedKeys = [];
         foreach ($ledger['verified_fields'] as $field) {
