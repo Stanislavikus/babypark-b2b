@@ -58,6 +58,14 @@ final class AdobeProductStockSimpleWriteExecutor
             );
         }
 
+        if ($this->hasUncertifiedCustomAttributeClearDrift($desiredState, $observed)) {
+            return $this->knownNotApplied(
+                'stock_custom_attribute_clear_not_certified',
+                $desiredState->sku,
+                $preRead->classification,
+            );
+        }
+
         if ($this->comparator->controlledStateMatches($desiredState, $observed)) {
             return $this->knownApplied(
                 'stock_state_already_matches',
@@ -153,6 +161,19 @@ final class AdobeProductStockSimpleWriteExecutor
             reconciliationGetAttempts: 1,
             writeAccessClassification: $writeAccessClassification,
         );
+    }
+
+    private function hasUncertifiedCustomAttributeClearDrift(
+        AdobeProductDesiredState $desiredState,
+        AdobeProductObservedState $observedState,
+    ): bool {
+        foreach ($desiredState->clearedCustomAttributeKeys as $attributeCode) {
+            if (array_key_exists($attributeCode, $observedState->customAttributes)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function writeAccessClassification(ConnectorHttpResult $httpResult): ?AdobeProductWriteAccessClassification

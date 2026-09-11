@@ -110,6 +110,8 @@ final class AdobeProductDesiredStateCompiler
             throw AdobeProductCommandCompilationException::invalidResolvedPrice('currency');
         }
 
+        [$customAttributes, $clearedCustomAttributeKeys] = $this->compileCustomAttributeIntent($context);
+
         return new AdobeProductDesiredState(
             productVariantId: $variantId,
             sku: $sku,
@@ -120,7 +122,8 @@ final class AdobeProductDesiredStateCompiler
             visibility: $visibilityNumeric,
             price: (float) $effectiveNetPrice,
             priceCurrency: $currency,
-            customAttributes: $this->compileCustomAttributes($context),
+            customAttributes: $customAttributes,
+            clearedCustomAttributeKeys: $clearedCustomAttributeKeys,
         );
     }
 
@@ -185,11 +188,16 @@ final class AdobeProductDesiredStateCompiler
             throw AdobeProductCommandCompilationException::invalidResolvedPrice('currency');
         }
 
-        $customAttributes = $this->compileCustomAttributes($context);
+        [$customAttributes, $clearedCustomAttributeKeys] = $this->compileCustomAttributeIntent($context);
         $customAttributes = $this->mergeResolvedConfigurableValues(
             $customAttributes,
             $context['resolved_configurable_values'] ?? [],
         );
+        $clearedCustomAttributeKeys = array_values(array_diff(
+            $clearedCustomAttributeKeys,
+            array_keys($customAttributes),
+        ));
+        sort($clearedCustomAttributeKeys);
 
         return new AdobeProductDesiredState(
             productVariantId: $variantId,
@@ -202,6 +210,7 @@ final class AdobeProductDesiredStateCompiler
             price: (float) $effectiveNetPrice,
             priceCurrency: $currency,
             customAttributes: $customAttributes,
+            clearedCustomAttributeKeys: $clearedCustomAttributeKeys,
         );
     }
 
@@ -288,11 +297,12 @@ final class AdobeProductDesiredStateCompiler
 
     /**
      * @param  array<string, mixed>  $context
-     * @return array<string, mixed>
+     * @return array{0: array<string, mixed>, 1: list<string>}
      */
-    private function compileCustomAttributes(array $context): array
+    private function compileCustomAttributeIntent(array $context): array
     {
         $customAttributes = [];
+        $clearedCustomAttributeKeys = [];
 
         foreach (['mapped_product_values', 'mapped_variant_values'] as $mappedKey) {
             $mappedValues = $context[$mappedKey] ?? [];
@@ -322,15 +332,21 @@ final class AdobeProductDesiredStateCompiler
                 }
 
                 if ($externalValue === null || $externalValue === '') {
+                    unset($customAttributes[$externalFieldKey]);
+                    $clearedCustomAttributeKeys[$externalFieldKey] = true;
+
                     continue;
                 }
 
                 $customAttributes[$externalFieldKey] = $externalValue;
+                unset($clearedCustomAttributeKeys[$externalFieldKey]);
             }
         }
 
         ksort($customAttributes);
+        $clearedKeys = array_keys($clearedCustomAttributeKeys);
+        sort($clearedKeys);
 
-        return $customAttributes;
+        return [$customAttributes, $clearedKeys];
     }
 }

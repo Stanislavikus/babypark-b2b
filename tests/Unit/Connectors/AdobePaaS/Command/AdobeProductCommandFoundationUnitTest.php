@@ -261,6 +261,86 @@ class AdobeProductCommandFoundationUnitTest extends TestCase
     }
 
     #[Test]
+    public function comparator_accepts_safe_scalar_round_trips_without_collapsing_noncanonical_strings(): void
+    {
+        $desired = new AdobeProductDesiredState(
+            productVariantId: 'variant-1',
+            sku: 'SKU-1',
+            name: 'Name',
+            attributeSetId: 4,
+            typeId: 'simple',
+            status: 1,
+            visibility: 4,
+            price: 100.0,
+            priceCurrency: 'UAH',
+            customAttributes: [
+                'int_value' => 93,
+                'bool_value' => true,
+            ],
+        );
+
+        $canonicalRoundTrip = new AdobeProductObservedState(
+            entityId: 77,
+            sku: 'SKU-1',
+            name: 'Name',
+            attributeSetId: 4,
+            typeId: 'simple',
+            status: 1,
+            visibility: 4,
+            price: 100.0,
+            customAttributes: [
+                'int_value' => '93',
+                'bool_value' => '1',
+            ],
+        );
+
+        $nonCanonicalDesired = new AdobeProductDesiredState(
+            productVariantId: 'variant-1',
+            sku: 'SKU-1',
+            name: 'Name',
+            attributeSetId: 4,
+            typeId: 'simple',
+            status: 1,
+            visibility: 4,
+            price: 100.0,
+            priceCurrency: 'UAH',
+            customAttributes: ['textual_code' => '093'],
+        );
+        $numericObserved = new AdobeProductObservedState(
+            entityId: 77,
+            sku: 'SKU-1',
+            name: 'Name',
+            attributeSetId: 4,
+            typeId: 'simple',
+            status: 1,
+            visibility: 4,
+            price: 100.0,
+            customAttributes: ['textual_code' => 93],
+        );
+
+        $this->assertTrue($this->comparator->controlledStateMatches($desired, $canonicalRoundTrip));
+        $this->assertFalse($this->comparator->controlledStateMatches($nonCanonicalDesired, $numericObserved));
+    }
+
+    #[Test]
+    public function compiler_preserves_controlled_custom_attribute_clear_intent(): void
+    {
+        $desired = (new AdobeProductDesiredStateCompiler)->compileFromSemanticResult(
+            AdobeProductCommandTestFixtures::semanticResult([
+                'mapped_product_values' => [
+                    'binding-custom-text' => [
+                        'external_field_key' => 'custom_text',
+                        'external_value' => '',
+                    ],
+                ],
+            ]),
+        );
+
+        $this->assertSame([], $desired->customAttributes);
+        $this->assertSame(['custom_text'], $desired->clearedCustomAttributeKeys);
+    }
+
+    #[Test]
     public function compiler_has_no_public_operation_compilation_boundary(): void
     {
         $reflection = new \ReflectionClass(AdobeProductDesiredStateCompiler::class);

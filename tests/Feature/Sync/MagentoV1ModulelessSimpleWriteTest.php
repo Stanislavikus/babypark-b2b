@@ -223,6 +223,97 @@ class MagentoV1ModulelessSimpleWriteTest extends TestCase
     }
 
     #[Test]
+    public function canonical_integer_custom_attribute_round_trip_is_verified_after_put(): void
+    {
+        $remoteValue = '92';
+        $transport = $this->bindTransport(function (ConnectorOutboundRequest $request) use (&$remoteValue): ConnectorHttpResult {
+            if ($request->request->getMethod() === 'GET') {
+                return $this->productResult(77, 100.0, [[
+                    'attribute_code' => 'custom_int',
+                    'value' => $remoteValue,
+                ]]);
+            }
+
+            $payload = json_decode((string) $request->request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+            $this->assertSame(93, $payload['product']['custom_attributes'][0]['value']);
+            $remoteValue = '93';
+
+            return new ConnectorHttpResult(200, [], '{}');
+        });
+        [$workspace, $account, $variant] = $this->trustedVariant('77');
+
+        $result = $this->execute($workspace, $account->id, $variant->id, contextOverrides: [
+            'mapped_product_values' => [
+                'binding-custom-int' => [
+                    'external_field_key' => 'custom_int',
+                    'external_value' => 93,
+                ],
+            ],
+        ]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
+        $this->assertSame('stock_write_verified', $result->evidence->reasonCode);
+        $this->assertSame(['GET', 'PUT', 'GET'], $this->methods($transport));
+    }
+
+    #[Test]
+    public function uncertified_custom_attribute_clear_with_remote_stale_value_fails_before_put(): void
+    {
+        $transport = $this->bindTransport(fn () => $this->productResult(77, 100.0, [[
+            'attribute_code' => 'custom_text',
+            'value' => 'stale',
+        ]]));
+        [$workspace, $account, $variant] = $this->trustedVariant('77');
+
+        $result = $this->execute($workspace, $account->id, $variant->id, contextOverrides: [
+            'mapped_product_values' => [
+                'binding-custom-text' => [
+                    'external_field_key' => 'custom_text',
+                    'external_value' => '',
+                ],
+            ],
+        ]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
+        $this->assertSame('stock_custom_attribute_clear_not_certified', $result->evidence->reasonCode);
+        $this->assertSame(0, $result->evidence->consequentialWriteAttempts);
+        $this->assertSame(['GET'], $this->methods($transport));
+    }
+
+    #[Test]
+    public function custom_attribute_clear_intent_is_satisfied_when_remote_attribute_is_already_empty(): void
+    {
+        $transport = $this->bindTransport(fn () => $this->productResult(77, 100.0));
+        [$workspace, $account, $variant] = $this->trustedVariant('77');
+
+        $result = $this->execute($workspace, $account->id, $variant->id, contextOverrides: [
+            'mapped_product_values' => [
+                'binding-custom-text' => [
+                    'external_field_key' => 'custom_text',
+                    'external_value' => '',
+                ],
+            ],
+        ]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
+        $this->assertSame('stock_state_already_matches', $result->evidence->reasonCode);
+        $this->assertSame(['GET'], $this->methods($transport));
+    }
+
+    #[Test]
+    public function trusted_link_sku_mismatch_fails_closed_with_zero_http(): void
+    {
+        $transport = $this->bindTransport(fn () => throw new \RuntimeException('HTTP must not be called'));
+        [$workspace, $account, $variant] = $this->trustedVariant('77', 'REMOTE-OLD-SKU');
+
+        $result = $this->execute($workspace, $account->id, $variant->id);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
+        $this->assertSame('trusted_link_sku_mismatch', $result->evidence->reasonCode);
+        $this->assertSame(0, $transport->sendCount);
+    }
+
+    #[Test]
     public function closed_consequential_gate_performs_zero_http(): void
     {
         $transport = $this->bindTransport(fn () => throw new \RuntimeException('HTTP must not be called'));
@@ -267,12 +358,16 @@ class MagentoV1ModulelessSimpleWriteTest extends TestCase
         return $transport;
     }
 
-    private function productResult(int $entityId, float $price): ConnectorHttpResult
-    {
+    private function productResult(
+        int $entityId,
+        float $price,
+        array $customAttributes = [],
+    ): ConnectorHttpResult {
         return new ConnectorHttpResult(200, [], json_encode(
             AdobeProductCommandTestFixtures::remoteProductPayload([
                 'id' => $entityId,
                 'price' => $price,
+                'custom_attributes' => $customAttributes,
             ]),
             JSON_THROW_ON_ERROR,
         ));
@@ -283,14 +378,15 @@ class MagentoV1ModulelessSimpleWriteTest extends TestCase
         string $accountId,
         string $variantId,
         bool $gateAllowed = true,
+        array $contextOverrides = [],
     ) {
         return app(AdobeProductSimpleCommandExecutor::class)->execute(
             new AdobeProductSimpleCommandInput(
                 workspaceId: $workspace->id,
                 connectorAccountId: $accountId,
-                semanticResult: AdobeProductCommandTestFixtures::semanticResult([
+                semanticResult: AdobeProductCommandTestFixtures::semanticResult(array_merge([
                     'variant_id' => $variantId,
-                ]),
+                ], $contextOverrides)),
                 adobeBaseCurrency: 'UAH',
                 consequentialWriteGate: $this->gate($gateAllowed),
             ),
@@ -300,7 +396,7 @@ class MagentoV1ModulelessSimpleWriteTest extends TestCase
     /**
      * @return array{0: Workspace, 1: ConnectorAccount, 2: ProductVariant}
      */
-    private function trustedVariant(string $discriminator): array
+    private function trustedVariant(string $discriminator, string $externalSku = 'SKU-TEST-1'): array
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
@@ -310,7 +406,7 @@ class MagentoV1ModulelessSimpleWriteTest extends TestCase
                 $workspace,
                 $account->id,
                 $variant,
-                'SKU-TEST-1',
+                $externalSku,
                 $discriminator,
                 $this->createWorkspaceActor($workspace),
             ),
