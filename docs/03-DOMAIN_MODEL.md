@@ -4238,7 +4238,7 @@ of that authority switch completed on the reference environment on 2026-08-14 vi
 verified maintenance-window **EXECUTE** cutover. Merging B-2 code was not itself
 the production cutover; the separate production activation has now also completed.
 
-### Connection-check capability and error mapping (Resolved — historical baseline; superseded for Magento V1 standard connection truth on 2026-09-11)
+### Connection-check capability and error mapping (Resolved)
 
 **Superseding rule:** for the standard Magento V1 OAuth1 Integration profile, `docs/connectors/adobe-commerce/MAGENTO_V1_CONNECTION_UX_CONTRACT.md` is authoritative for connection truth. A successful authenticated bounded Product READ is the only healthy baseline. Product Attributes/media are downstream evidence and may neither create false green nor false red connection state. Structured machine-reliable response fields may refine remediation, but localized free-form vendor message text is never the semantic authority and raw bodies are never merchant-facing. The attribute-first/status-only paragraphs below remain historical implementation context only.
 

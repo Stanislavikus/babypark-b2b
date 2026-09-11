@@ -48,7 +48,7 @@ final class AdobePaaSConnectionCheckCapabilityImpl implements AdobePaaSConnectio
             return $mapped;
         }
 
-        $catalogEvidence = $this->probeCatalog($context);
+        $catalogEvidence = $this->extractCatalogEvidence($result->body);
 
         if ($catalogEvidence === null) {
             return $mapped;
@@ -64,40 +64,10 @@ final class AdobePaaSConnectionCheckCapabilityImpl implements AdobePaaSConnectio
     }
 
     /** @return array{total_count: int, sku: ?string}|null */
-    private function probeCatalog(#[\SensitiveParameter] AdobePaaSRequestContext $context): ?array
+    private function extractCatalogEvidence(#[\SensitiveParameter] string $body): ?array
     {
-        $signingContext = new OAuth1SigningContext(
-            bin2hex(random_bytes(16)),
-            time(),
-        );
-
-        $request = $this->requestFactory->buildProductsSearch(
-            $context,
-            $signingContext,
-            ['pageSize' => 1],
-        );
-
-        $outboundRequest = new ConnectorOutboundRequest(
-            $request,
-            new ConnectorTransportLimits(
-                connectTimeoutSeconds: 5.0,
-                totalTimeoutSeconds: 30.0,
-                maxResponseBodyBytes: 256 * 1024,
-            ),
-        );
-
         try {
-            $result = $this->transport->send($outboundRequest);
-        } catch (ConnectorTransportException) {
-            return null;
-        }
-
-        if ($result->statusCode !== 200) {
-            return null;
-        }
-
-        try {
-            $decoded = json_decode($result->body, associative: false, depth: 512, flags: JSON_THROW_ON_ERROR);
+            $decoded = json_decode($body, associative: false, depth: 512, flags: JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
             return null;
         }

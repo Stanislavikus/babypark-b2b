@@ -49,7 +49,7 @@ A successful authenticated bounded Product READ is the **only** baseline that es
 
 Product Attributes, media, discovery, mapping, Preview, WRITE prerequisites, and real WRITE are downstream evidence. None may make a successful Product baseline red, and none may make a failed Product baseline green.
 
-The current attribute-first runtime and best-effort `probeCatalog()` success fallback are implementation gaps to remove. A Product READ failure must be classified and persisted; it must never fall back to an earlier successful attributes result.
+**Implementation status (certification branch, 2026-09-11):** the historical attribute-first runtime and best-effort `probeCatalog()` success fallback are removed. Connection Check now performs one bounded Product READ baseline and derives safe catalogue evidence from that same response. Product Attributes are no longer connection-health authority. A Product READ failure remains authoritative and must be classified/persisted by the existing lifecycle.
 
 Healthy merchant presentation is dated:
 

@@ -229,10 +229,11 @@ are **not** silently hidden:
   persistence remain unchanged for runtime/support use. It does **not** reintroduce
   developer-facing Safe Sync readiness diagnostics.
 - The standard connector path is now wired through stock public REST
-  READ seams (connection check, a one-product catalogue probe followed by at most
-  one `/V1/products/{sku}/media` readability probe, and document read) for the
-  merchant overview evidence. The optional media probe records only a merchant-safe
-  confirmation boolean and cannot overturn successful baseline/catalogue evidence.
+  READ seams (connection check uses one bounded `/V1/products?pageSize=1` Product
+  baseline, followed by at most one `/V1/products/{sku}/media` readability probe,
+  plus document read) for merchant/runtime evidence. The Product response itself
+  supplies safe catalogue-count evidence. The optional media probe records only a
+  merchant-safe confirmation boolean and cannot overturn successful Product baseline evidence.
   Consequential WRITE remains internal and
   not publicly supported or real-target certified.
 - The Composer compatibility envelope of the first-party component

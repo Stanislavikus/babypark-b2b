@@ -18,30 +18,7 @@ final class AdobePaaSConnectionCheckRequestFactory
         AdobePaaSRequestContext $context,
         OAuth1SigningContext $signingContext,
     ): RequestInterface {
-        $absoluteUrl = $this->buildAbsoluteUrl($context, '/V1/products/attributes', ['pageSize' => 1]);
-        $request = new Request('GET', $absoluteUrl);
-
-        $authorizationHeader = $this->signer->sign(
-            $request->getMethod(),
-            (string) $request->getUri(),
-            null,
-            null,
-            $context->credentials,
-            $signingContext,
-        );
-
-        return $request->withHeader('Authorization', $authorizationHeader);
-    }
-
-    /**
-     * @param  array<string, mixed>  $searchCriteria
-     */
-    public function buildProductsSearch(
-        AdobePaaSRequestContext $context,
-        OAuth1SigningContext $signingContext,
-        array $searchCriteria,
-    ): RequestInterface {
-        $absoluteUrl = $this->buildAbsoluteUrl($context, '/V1/products', $searchCriteria);
+        $absoluteUrl = $this->buildAbsoluteUrl($context, '/V1/products', ['pageSize' => 1]);
         $request = new Request('GET', $absoluteUrl);
 
         $authorizationHeader = $this->signer->sign(
