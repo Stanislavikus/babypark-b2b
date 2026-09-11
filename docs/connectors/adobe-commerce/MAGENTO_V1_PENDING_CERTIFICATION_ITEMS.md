@@ -26,9 +26,9 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 ### P-03 — Custom-attribute clear semantics
 
 - Surface: mapped scalar EAV attributes transitioning from value to empty/null.
-- Current truth: false `KnownApplied` was removed; stale remote values now fail closed with `stock_custom_attribute_clear_not_certified` and zero PUT.
-- Why deferred: exact field-type/store-scope clearing payload has not been certified against real Magento.
-- Needed proof: representative text/select/decimal clear behavior, store-scope inheritance semantics, post-write verification, restore.
+- Current truth: false `KnownApplied` was removed; stale remote values now fail closed with `stock_custom_attribute_clear_not_certified` and zero PUT. Real target probes on 2026-09-11 show type/scope-specific behavior: optional store-scoped text `meta_title` with `value=""` becomes absent; required global select `manufacturer` rejects `""` with HTTP 400 but `null` removes the attribute; optional website-scoped price/decimal `c_carseats_adac_rating` maps `""` to `0.000000`, while `null` returns HTTP 200 but the effective GET remains `2.000000` (consistent with inherited/use-default behavior on a non-admin store view). Every probe was immediately restored and final custom-attribute diff was zero.
+- Why deferred: clearing cannot be represented by one universal `null`/empty-string rule. Required attributes must not be cleared merely because REST accepts it, and website/store inheritance must be distinguished from an unchanged value.
+- Needed proof: freeze V1 clear intent semantics (`explicit empty` vs `use inherited/default`), determine per frontend/backend type payloads, and define scope-aware post-write verification that can prove override removal without relying only on effective Product GET.
 - Reviewer candidate: yes after representative target evidence.
 ### P-04 — Real WRITE permission-denial evidence
 
