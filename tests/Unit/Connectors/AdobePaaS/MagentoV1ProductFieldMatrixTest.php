@@ -434,6 +434,31 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
     }
 
     #[Test]
+    public function p10_store_scope_probe_records_authoritative_blocker_before_mutation(): void
+    {
+        $probe = $this->storeScopeInheritanceProbe();
+
+        self::assertSame('2026-09-12', $probe['probe_date']);
+        self::assertSame('P-10', $probe['pending_item']);
+        self::assertSame('blocked_before_mutation', $probe['status']);
+        self::assertSame('default', $probe['target_scope']['configured_store_code']);
+        self::assertSame(1, $probe['target_scope']['configured_store_view_id']);
+        self::assertSame(8, $probe['store_topology']['active_storefront_view_count']);
+        self::assertSame(0, $probe['store_topology']['admin_store']['id']);
+        self::assertSame(200, $probe['read_only_observations']['product_get']['default']['http_status']);
+        self::assertSame(200, $probe['read_only_observations']['product_get']['all']['http_status']);
+        self::assertSame(400, $probe['read_only_observations']['product_get']['admin']['http_status']);
+        self::assertSame('store', $probe['read_only_observations']['attribute_metadata']['name']['scope']);
+        self::assertSame('store', $probe['read_only_observations']['attribute_metadata']['meta_title']['scope']);
+        self::assertSame(404, $probe['read_only_observations']['safe_sync_handshake']['http_status']);
+        self::assertFalse($probe['authoritative_evidence_assessment']['ordinary_product_get_is_sufficient']);
+        self::assertFalse($probe['authoritative_evidence_assessment']['all_scope_write_usable_as_global_only_probe']);
+        self::assertFalse($probe['mutation_probe']['stock_product_put_executed']);
+        self::assertFalse($probe['conclusion']['p10_cleared']);
+        self::assertFalse($probe['conclusion']['public_live_support_flipped']);
+    }
+
+    #[Test]
     public function current_discovery_frontend_inputs_are_documented(): void
     {
         $source = file_get_contents($this->repoPath('app/Support/Connectors/AdobePaaS/AdobePaaSAttributeNormalizer.php'));
@@ -480,6 +505,17 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
     private function certificationLedger(): array
     {
         $contents = file_get_contents($this->repoPath('docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json'));
+        $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($decoded);
+
+        return $decoded;
+    }
+
+    /** @return array<string, mixed> */
+    private function storeScopeInheritanceProbe(): array
+    {
+        $contents = file_get_contents($this->repoPath('docs/connectors/adobe-commerce/magento_v1_store_scope_inheritance_probe_2026_09_12.json'));
         $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
 
         self::assertIsArray($decoded);
