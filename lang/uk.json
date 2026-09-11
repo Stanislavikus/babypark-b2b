@@ -57,6 +57,7 @@
     "connectors.enums.connection_check_status.failed": "Невдало",
     "connectors.enums.connection_check_trigger.manual": "Вручну",
     "connectors.enums.connection_check_trigger.first_connect": "Перше підключення",
+    "connectors.enums.connection_check_trigger.credentials_replacement": "Заміна даних доступу",
     "connectors.enums.connection_check_trigger.scheduled": "За розкладом",
     "connectors.enums.connection_check_trigger.before_discovery": "Перед отриманням полів",
     "connectors.enums.discovery_run_status.queued": "Очікує отримання полів",

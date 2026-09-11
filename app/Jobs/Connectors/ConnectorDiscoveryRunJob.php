@@ -5,6 +5,7 @@ namespace App\Jobs\Connectors;
 use App\Enums\ConnectorDiscoveryRunLifecycleErrorCode;
 use App\Services\Connectors\AdobePaaSDiscoveryService;
 use App\Services\Connectors\ConnectorDiscoveryRunPersistence;
+use App\Support\Connectors\ConnectorAccountOperationLock;
 use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceInvalidAfterReservationException;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
@@ -49,7 +50,7 @@ class ConnectorDiscoveryRunJob implements ShouldQueue
     public function middleware(): array
     {
         return [
-            (new WithoutOverlapping("connector-account:{$this->connectorAccountId}"))
+            (new WithoutOverlapping(ConnectorAccountOperationLock::sharedKey($this->connectorAccountId)))
                 ->shared()
                 ->releaseAfter(30)
                 ->expireAfter(1100),

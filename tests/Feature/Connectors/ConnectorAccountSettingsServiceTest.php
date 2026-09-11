@@ -808,42 +808,31 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     }
 
     #[Test]
-    public function credential_rotation_is_allowed_with_trusted_merchant_confirmed_links(): void
+    public function direct_update_cannot_bypass_verified_credential_rotation_flow(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
-        $this->prepareEntityTrustConfiguration($account);
-        [$product, $variant] = $this->createSimpleEntityTrustProduct($this->workspace, 'ROTATE-SKU');
+        $originalCredentials = $account->credentials;
 
-        $link = ExternalRecordLink::withoutWorkspaceScope()->create(
-            $this->merchantConfirmedVariantLinkAttributes(
+        try {
+            $this->service->update(
+                $admin,
                 $this->workspace,
                 $account->id,
-                $variant,
-                'ROTATE-SKU',
-                '5101',
-                $this->createWorkspaceActor($this->workspace),
-            ),
-        );
-
-        $result = $this->service->update(
-            $admin,
-            $this->workspace,
-            $account->id,
-            UpdateConnectorAccountInput::adobePaas(
-                baseUrl: (string) $account->base_url,
-                storeCode: (string) $account->store_code,
-                tenantContext: null,
-                credentialMutation: CredentialMutation::replace(
-                    new OAuth1Credentials('ck_rot', 'cs_rot', 'at_rot', 'ts_rot'),
+                UpdateConnectorAccountInput::adobePaas(
+                    baseUrl: (string) $account->base_url,
+                    storeCode: (string) $account->store_code,
+                    tenantContext: $account->tenant_context,
+                    credentialMutation: CredentialMutation::replace(
+                        new OAuth1Credentials('ck_bypass', 'cs_bypass', 'at_bypass', 'ts_bypass'),
+                    ),
                 ),
-            ),
-        );
-
-        $this->assertTrue($result->hasCredentials);
-        $link->refresh();
-        $this->assertTrue($link->hasMerchantConfirmedTrust());
-        $this->assertSame('5101', $link->external_record_discriminator);
+            );
+            $this->fail('Expected direct credential replacement to be rejected.');
+        } catch (InvalidCredentialMutationException) {
+            $account->refresh();
+            $this->assertSame($originalCredentials, $account->credentials);
+        }
     }
 
     #[Test]

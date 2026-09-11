@@ -16,7 +16,7 @@ final class AdobePaaSDiscoveryResponseMapper
         }
 
         return AdobePaaSDiscoveryPageResult::failure(
-            $this->mapHttpStatus($result->statusCode, $result->headers),
+            $this->mapHttpStatus($result->statusCode, $result->headers, $result->body),
         );
     }
 
@@ -68,14 +68,16 @@ final class AdobePaaSDiscoveryResponseMapper
     /**
      * @param  array<string, list<string>>  $headers
      */
-    private function mapHttpStatus(int $status, #[\SensitiveParameter] array $headers): ConnectorDiscoveryAttemptResult
-    {
+    private function mapHttpStatus(
+        int $status,
+        #[\SensitiveParameter] array $headers,
+        #[\SensitiveParameter] string $body,
+    ): ConnectorDiscoveryAttemptResult {
         $errorCode = match (true) {
             $status >= 201 && $status <= 299 => ConnectorDiscoveryRunErrorCode::AdobeUnexpectedSuccessStatus,
             $status >= 300 && $status <= 399 => ConnectorDiscoveryRunErrorCode::AdobeRedirectResponse,
             $status === 400 => ConnectorDiscoveryRunErrorCode::AdobeUnrecognizedBadRequest,
-            $status === 401 => ConnectorDiscoveryRunErrorCode::AdobeInvalidCredentials,
-            $status === 403 => ConnectorDiscoveryRunErrorCode::AdobeInsufficientPermissions,
+            $status === 401, $status === 403 => $this->mapAccessRejected($body),
             $status === 404, $status === 405 => ConnectorDiscoveryRunErrorCode::AdobeInvalidOrUnsupportedEndpoint,
             $status === 408 => ConnectorDiscoveryRunErrorCode::AdobeRequestTimeout,
             $status === 429 => ConnectorDiscoveryRunErrorCode::AdobeRateLimited,
@@ -89,5 +91,12 @@ final class AdobePaaSDiscoveryResponseMapper
             : null;
 
         return ConnectorDiscoveryAttemptResult::httpFailure($errorCode, $status, $retryAfterSeconds);
+    }
+
+    private function mapAccessRejected(#[\SensitiveParameter] string $body): ConnectorDiscoveryRunErrorCode
+    {
+        return AdobePaaSAccessRejectionEvidence::hasStructuredResourceDenial($body)
+            ? ConnectorDiscoveryRunErrorCode::AdobeInsufficientPermissions
+            : ConnectorDiscoveryRunErrorCode::AdobeAccessRejectedUndetermined;
     }
 }

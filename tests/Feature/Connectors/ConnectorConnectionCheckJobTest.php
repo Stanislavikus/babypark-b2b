@@ -15,6 +15,7 @@ use App\Models\ConnectorConnectionCheck;
 use App\Services\Connectors\AdobePaaSConnectionCheckService;
 use App\Services\Connectors\ConnectorConnectionCheckPersistence;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapability;
+use App\Support\Connectors\ConnectorAccountOperationLock;
 use App\Support\Connectors\ConnectorConnectionCheckResult;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
@@ -61,6 +62,10 @@ class ConnectorConnectionCheckJobTest extends TestCase
         $this->assertSame(120, $middleware[0]->expiresAfter);
         $this->assertSame(30, $middleware[0]->releaseAfter);
         $this->assertTrue($middleware[0]->shareKey);
+        $this->assertSame(
+            ConnectorAccountOperationLock::cacheKey('acct'),
+            $middleware[0]->getLockKey($job),
+        );
     }
 
     #[Test]

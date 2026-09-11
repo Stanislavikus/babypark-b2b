@@ -19,6 +19,7 @@ use App\Support\Connectors\Exceptions\ConnectorAccountNotFoundException;
 use App\Support\Connectors\Exceptions\ConnectorAccountSettingsValidationException;
 use App\Support\Connectors\Exceptions\ConnectorAccountTargetFrozenException;
 use App\Support\Connectors\Exceptions\ConnectorDefinitionNotFoundException;
+use App\Support\Connectors\Exceptions\InvalidCredentialMutationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -133,6 +134,12 @@ final class ConnectorAccountSettingsService implements ConnectorAccountPersisten
                     ->firstOrFail();
 
                 $this->authorizeUpdate($actor, $lockedAccount, $input->credentialMutation);
+
+                if ($input->credentialMutation->isReplace()) {
+                    throw new InvalidCredentialMutationException(
+                        'Credential replacement must use the verified credential-rotation flow.',
+                    );
+                }
 
                 if ($this->targetSnapshotResolver->wouldChangeTarget(
                     $lockedAccount,

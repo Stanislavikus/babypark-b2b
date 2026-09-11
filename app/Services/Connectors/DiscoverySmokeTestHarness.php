@@ -47,6 +47,7 @@ final class DiscoverySmokeTestHarness
     public function __construct(
         private readonly ConnectorProfileRegistry $profileRegistry,
         private readonly ConnectorAccountPersistencePort $settingsService,
+        private readonly AdobePaaSCredentialRotationService $credentialRotationService,
         private readonly ConnectorDiscoveryDispatchPort $dispatchService,
         private readonly WorkspaceAuthorization $workspaceAuthorization,
         private readonly ConnectorSchemaSourceEndpointPathValidator $endpointPathValidator,
@@ -374,16 +375,11 @@ final class DiscoverySmokeTestHarness
 
         $credentials = $prefilledCredentials ?? $prompts->askOAuth1Credentials();
 
-        $this->settingsService->update(
+        $this->credentialRotationService->replace(
             $actor,
             $workspace,
             $existingAccount->id,
-            UpdateConnectorAccountInput::adobePaas(
-                $validated->baseUrl,
-                $validated->storeCode,
-                $validated->tenantContext,
-                CredentialMutation::replace($credentials),
-            ),
+            $credentials,
         );
 
         $existingAccount->refresh();

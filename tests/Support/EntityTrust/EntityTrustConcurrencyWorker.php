@@ -14,6 +14,7 @@
 use App\Models\ConnectorAccount;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Connectors\AdobePaaSCredentialRotationService;
 use App\Services\Connectors\ConnectorAccountSettingsService;
 use App\Services\Connectors\UpdateConnectorAccountInput;
 use App\Services\Sync\EntityTrust\AdobeProductEntityTrustConfirmationService;
@@ -208,19 +209,11 @@ function runCredentialRotate(
     file_put_contents($ipcDir.'/credential_entered', '1');
 
     try {
-        $settings = app(ConnectorAccountSettingsService::class);
-        $settings->update(
+        app(AdobePaaSCredentialRotationService::class)->replace(
             $actor,
             $workspace,
             $accountId,
-            UpdateConnectorAccountInput::adobePaas(
-                baseUrl: (string) $account->base_url,
-                storeCode: (string) $account->store_code,
-                tenantContext: $account->tenant_context,
-                credentialMutation: CredentialMutation::replace(
-                    new OAuth1Credentials('ck_race', 'cs_race', 'at_race', 'ts_race'),
-                ),
-            ),
+            new OAuth1Credentials('ck_race', 'cs_race', 'at_race', 'ts_race'),
         );
         file_put_contents($ipcDir.'/credential_result', 'success');
     } catch (Throwable $exception) {

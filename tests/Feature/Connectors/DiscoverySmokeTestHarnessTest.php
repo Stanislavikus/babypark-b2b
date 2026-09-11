@@ -19,6 +19,7 @@ use App\Models\ConnectorSchemaSnapshotField;
 use App\Models\ConnectorSchemaSource;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Connectors\AdobePaaSCredentialRotationService;
 use App\Services\Connectors\ConnectorAccountPersistencePort;
 use App\Services\Connectors\ConnectorAccountSettingsResult;
 use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
@@ -26,8 +27,10 @@ use App\Services\Connectors\DiscoverySmokeTestAbortedException;
 use App\Services\Connectors\DiscoverySmokeTestHarness;
 use App\Services\Connectors\DiscoverySmokeTestPromptGateway;
 use App\Services\Workspace\WorkspaceAuthorization;
+use App\Support\Connectors\AdobePaaS\AdobePaaSConnectionCheckCapability;
 use App\Support\Connectors\ConnectorAccountMutationMode;
 use App\Support\Connectors\ConnectorAccountSchema;
+use App\Support\Connectors\ConnectorConnectionCheckResult;
 use App\Support\Connectors\ConnectorDiscoveryDispatchDecision;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\ConnectorSchemaSourceEndpointPathValidator;
@@ -297,6 +300,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
         $harness = new DiscoverySmokeTestHarness(
             $registry,
             app(ConnectorAccountPersistencePort::class),
+            app(AdobePaaSCredentialRotationService::class),
             app(ConnectorDiscoveryDispatchPort::class),
             app(WorkspaceAuthorization::class),
             app(ConnectorSchemaSourceEndpointPathValidator::class),
@@ -368,7 +372,7 @@ class DiscoverySmokeTestHarnessTest extends TestCase
     }
 
     #[Test]
-    public function replace_path_delegates_persistence_to_settings_service(): void
+    public function replace_path_uses_verified_credential_rotation_instead_of_generic_settings_update(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
         $account = $this->createConnectorAccount($this->workspace);
@@ -381,20 +385,18 @@ class DiscoverySmokeTestHarnessTest extends TestCase
         );
 
         $settingsService = Mockery::mock(ConnectorAccountPersistencePort::class);
-        $settingsService->shouldReceive('update')
-            ->once()
-            ->andReturn(new ConnectorAccountSettingsResult(
-                id: $account->id,
-                connectorDefinitionId: $definition->id,
-                authProfile: DiscoverySmokeTestHarness::AUTH_PROFILE,
-                baseUrl: (string) $account->base_url,
-                storeCode: (string) $account->store_code,
-                tenantContext: $account->tenant_context,
-                settings: [],
-                isEnabled: true,
-                hasCredentials: true,
-            ));
+        $settingsService->shouldNotReceive('update');
         $this->app->instance(ConnectorAccountPersistencePort::class, $settingsService);
+
+        $capability = Mockery::mock(AdobePaaSConnectionCheckCapability::class);
+        $capability->shouldReceive('checkConnection')
+            ->once()
+            ->andReturn(ConnectorConnectionCheckResult::success());
+        $this->app->instance(AdobePaaSConnectionCheckCapability::class, $capability);
+        $this->app->instance(
+            AdobePaaSCredentialRotationService::class,
+            new AdobePaaSCredentialRotationService($capability),
+        );
 
         $harness = app(DiscoverySmokeTestHarness::class);
 

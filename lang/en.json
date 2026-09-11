@@ -57,6 +57,7 @@
     "connectors.enums.connection_check_status.failed": "Failed",
     "connectors.enums.connection_check_trigger.manual": "Manual",
     "connectors.enums.connection_check_trigger.first_connect": "First connection",
+    "connectors.enums.connection_check_trigger.credentials_replacement": "Credentials replacement",
     "connectors.enums.connection_check_trigger.scheduled": "Scheduled",
     "connectors.enums.connection_check_trigger.before_discovery": "Before field discovery",
     "connectors.enums.discovery_run_status.queued": "Waiting for field discovery",

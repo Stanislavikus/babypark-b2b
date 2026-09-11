@@ -4,6 +4,7 @@ namespace App\Jobs\Connectors;
 
 use App\Services\Connectors\AdobePaaSConnectionCheckService;
 use App\Services\Connectors\ConnectorConnectionCheckPersistence;
+use App\Support\Connectors\ConnectorAccountOperationLock;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
@@ -44,7 +45,7 @@ class ConnectorConnectionCheckJob implements ShouldQueue
     public function middleware(): array
     {
         return [
-            (new WithoutOverlapping("connector-account:{$this->connectorAccountId}"))
+            (new WithoutOverlapping(ConnectorAccountOperationLock::sharedKey($this->connectorAccountId)))
                 ->shared()
                 ->releaseAfter(30)
                 ->expireAfter(120),

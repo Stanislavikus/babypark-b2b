@@ -26,6 +26,7 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSServiceOnlyAttributeEligibility;
 use App\Support\Connectors\CanonicalSchemaFieldHash;
 use App\Support\Connectors\CanonicalSchemaFieldHasher;
 use App\Support\Connectors\CanonicalSchemaSnapshotHasher;
+use App\Support\Connectors\ConnectorAccountOperationLock;
 use App\Support\Connectors\ConnectorDiscoveryAttemptResult;
 use App\Support\Connectors\ConnectorDiscoveryNormalizedField;
 use App\Support\Connectors\ConnectorDiscoverySnapshotCandidate;
@@ -81,6 +82,10 @@ class ConnectorDiscoveryRunJobTest extends TestCase
         $this->assertSame(1100, $middleware[0]->expiresAfter);
         $this->assertSame(30, $middleware[0]->releaseAfter);
         $this->assertTrue($middleware[0]->shareKey);
+        $this->assertSame(
+            ConnectorAccountOperationLock::cacheKey('acct'),
+            $middleware[0]->getLockKey($job),
+        );
         $this->assertSame('connector-account:acct', $middleware[0]->key);
     }
 
