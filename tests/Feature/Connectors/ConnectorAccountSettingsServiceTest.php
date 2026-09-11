@@ -113,6 +113,58 @@ class ConnectorAccountSettingsServiceTest extends TestCase
     }
 
     #[Test]
+    public function create_rejects_reserved_all_store_scope_before_persistence(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+
+        try {
+            $this->service->create(
+                $admin,
+                $this->workspace,
+                CreateConnectorAccountInput::adobePaas(
+                    connectorDefinitionId: $this->adobeConnectorDefinition()->id,
+                    name: 'Forbidden Global Scope',
+                    baseUrl: 'https://shop.example.com',
+                    storeCode: 'all',
+                    tenantContext: null,
+                    credentialMutation: CredentialMutation::keep(),
+                ),
+            );
+            $this->fail('Reserved all store scope should be rejected.');
+        } catch (ConnectorAccountSettingsValidationException) {
+            $this->assertDatabaseMissing('connector_accounts', [
+                'workspace_id' => $this->workspace->id,
+                'name' => 'Forbidden Global Scope',
+            ]);
+        }
+    }
+
+    #[Test]
+    public function update_rejects_reserved_all_store_scope_without_mutating_account(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount($this->workspace, ['store_code' => 'default']);
+
+        try {
+            $this->service->update(
+                $admin,
+                $this->workspace,
+                $account->id,
+                UpdateConnectorAccountInput::adobePaas(
+                    baseUrl: (string) $account->base_url,
+                    storeCode: 'ALL',
+                    tenantContext: null,
+                    credentialMutation: CredentialMutation::keep(),
+                ),
+            );
+            $this->fail('Reserved all store scope should be rejected.');
+        } catch (ConnectorAccountSettingsValidationException) {
+            $account->refresh();
+            $this->assertSame('default', $account->store_code);
+        }
+    }
+
+    #[Test]
     public function create_rejects_remove_credential_mutation(): void
     {
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);

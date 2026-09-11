@@ -18,6 +18,12 @@ final readonly class AdobePaaSStoreCode
             );
         }
 
+        if (strtolower($raw) === 'all') {
+            throw new ConnectorAccountSettingsValidationException(
+                'Adobe PaaS store code [all] is reserved and is not supported by the Magento V1 connector profile.',
+            );
+        }
+
         return new self($raw);
     }
 }
