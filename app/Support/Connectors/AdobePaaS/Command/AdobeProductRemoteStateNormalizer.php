@@ -20,7 +20,12 @@ final class AdobeProductRemoteStateNormalizer
      */
     public function normalize(array $productPayload, string $expectedSku): ?AdobeProductObservedState
     {
+        $entityId = $productPayload['id'] ?? null;
         $sku = $productPayload['sku'] ?? null;
+
+        if (! is_int($entityId) || $entityId <= 0) {
+            return null;
+        }
 
         if (! is_string($sku) || $sku !== $expectedSku) {
             return null;
@@ -58,6 +63,7 @@ final class AdobeProductRemoteStateNormalizer
         }
 
         return new AdobeProductObservedState(
+            entityId: $entityId,
             sku: $sku,
             name: $name,
             attributeSetId: (int) $attributeSetId,
@@ -74,7 +80,12 @@ final class AdobeProductRemoteStateNormalizer
      */
     public function normalizeParent(array $productPayload, string $expectedSku): ?AdobeProductParentObservedState
     {
+        $entityId = $productPayload['id'] ?? null;
         $sku = $productPayload['sku'] ?? null;
+
+        if (! is_int($entityId) || $entityId <= 0) {
+            return null;
+        }
 
         if (! is_string($sku) || $sku !== $expectedSku) {
             return null;

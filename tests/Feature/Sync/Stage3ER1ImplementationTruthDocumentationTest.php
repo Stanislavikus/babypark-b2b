@@ -9,12 +9,13 @@ use Tests\TestCase;
 class Stage3ER1ImplementationTruthDocumentationTest extends TestCase
 {
     #[Test]
-    public function implementation_gaps_documents_internal_read_and_trusted_simple_write_consumption_without_live_truth_flip(): void
+    public function implementation_gaps_documents_moduleless_simple_write_consumption_without_live_truth_flip(): void
     {
         $content = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString('**Stage 3E-R1 internal read foundation is implemented**', $content);
-        $this->assertStringContainsString('**simple trusted entity-bound Product WRITE consumption is implemented internally**', $content);
+        $this->assertStringContainsString('**standard moduleless trusted simple Product WRITE consumption is implemented internally**', $content);
+        $this->assertStringContainsString('**Safe Sync simple WRITE remains implemented as an optional Enhanced Safety primitive and is no longer the standard-path dependency**', $content);
         $this->assertStringContainsString('**Stage 3E-R2b-1 merchant-confirmed ENTITY TRUST review/confirm backend is implemented**', $content);
         $this->assertStringContainsString('**disposable validation harness is implemented internally as a validation-only Laravel control plane**', $content);
         $this->assertStringContainsString('real-target certification step 4, decisions 5–9, configurable/media/live-support completion, and support flip remain **pending**', $content);
@@ -22,12 +23,14 @@ class Stage3ER1ImplementationTruthDocumentationTest extends TestCase
     }
 
     #[Test]
-    public function atlas_tracks_internal_safe_sync_read_and_simple_trusted_write_consumption_while_live_support_stays_false(): void
+    public function atlas_tracks_optional_safe_sync_and_moduleless_stock_simple_write_while_live_support_stays_false(): void
     {
         $content = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
-        $this->assertStringContainsString('Stage 3E Magento Safe Sync read + simple trusted write consumption', $content);
-        $this->assertStringContainsString('IMPLEMENTED (internal; support false; simple path consumed; not real-target certified)', $content);
+        $this->assertStringContainsString('Stage 3E Magento Safe Sync enhanced-safety runtime', $content);
+        $this->assertStringContainsString('IMPLEMENTED (internal optional primitive; support false; not standard-path prerequisite)', $content);
+        $this->assertStringContainsString('Magento V1 moduleless stock simple trusted WRITE', $content);
+        $this->assertStringContainsString('IMPLEMENTED (internal; support false; pending real-target certification)', $content);
         $this->assertStringContainsString('Stage 3E disposable validation harness', $content);
         $this->assertStringContainsString('IMPLEMENTED (internal; validation-only; support false; no real-target certification executed)', $content);
         $this->assertStringContainsString('integrations/magento-safe-sync/', $content);

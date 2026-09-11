@@ -168,6 +168,7 @@ class AdobeProductCommandFoundationUnitTest extends TestCase
         );
 
         $matching = new AdobeProductObservedState(
+            entityId: 77,
             sku: 'SKU-1',
             name: 'Name',
             attributeSetId: 4,
@@ -179,6 +180,7 @@ class AdobeProductCommandFoundationUnitTest extends TestCase
         );
 
         $different = new AdobeProductObservedState(
+            entityId: 77,
             sku: 'SKU-1',
             name: 'Different',
             attributeSetId: 4,
@@ -210,6 +212,7 @@ class AdobeProductCommandFoundationUnitTest extends TestCase
         );
 
         $observedWithExtra = new AdobeProductObservedState(
+            entityId: 77,
             sku: 'SKU-1',
             name: 'Name',
             attributeSetId: 4,
@@ -243,6 +246,7 @@ class AdobeProductCommandFoundationUnitTest extends TestCase
         );
 
         $observedMismatch = new AdobeProductObservedState(
+            entityId: 77,
             sku: 'SKU-1',
             name: 'Name',
             attributeSetId: 4,

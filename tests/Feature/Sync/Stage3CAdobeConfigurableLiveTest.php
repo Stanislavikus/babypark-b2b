@@ -43,9 +43,8 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateComparator;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductRemoteStateNormalizer;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandExecutor;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandInput;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductStockSimpleWriteExecutor;
 use App\Support\Connectors\AdobePaaS\Command\ConservativeAdobeProductOwnershipTrustPolicy;
-use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClient;
-use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncRequestFactory;
 use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorHttpTransport;
@@ -154,15 +153,8 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
 
         $transport = new RecordingConnectorHttpTransport(fn (): ConnectorHttpResult => new ConnectorHttpResult(500, [], '{}'));
 
-        $executor = new AdobeProductSimpleCommandExecutor(
-            new AdobeProductDesiredStateCompiler,
-            new AdobeProductExternalRecordLinkGuard,
-            new AdobeSafeSyncClient(
-                app(AdobePaaSRequestContextFactory::class),
-                new AdobeSafeSyncRequestFactory(new OAuth1RequestSigner),
-                $transport,
-            ),
-        );
+        $this->app->instance(ConnectorHttpTransport::class, $transport);
+        $executor = $this->app->make(AdobeProductSimpleCommandExecutor::class);
 
         $result = $executor->executeSimpleChild(
             new AdobeProductSimpleCommandInput(
@@ -872,10 +864,10 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
             new AdobeProductSimpleCommandExecutor(
                 new AdobeProductDesiredStateCompiler,
                 $linkGuard,
-                new AdobeSafeSyncClient(
+                new AdobeProductStockSimpleWriteExecutor(
                     app(AdobePaaSRequestContextFactory::class),
-                    new AdobeSafeSyncRequestFactory(new OAuth1RequestSigner),
-                    $transport,
+                    $client,
+                    $comparator,
                 ),
             ),
             new AdobeConfigurableParentCommandExecutor($linkGuard),

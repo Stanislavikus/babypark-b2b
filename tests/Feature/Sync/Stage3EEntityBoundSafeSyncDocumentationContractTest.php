@@ -330,7 +330,8 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('**Stage 3E — Real Adobe Validation + Truth Flip**', $gaps);
         $this->assertStringContainsString('**Done (docs contract)**', $gaps);
         $this->assertStringContainsString('entity-bound Safe Sync runtime contract frozen', $gaps);
-        $this->assertStringContainsString('**simple trusted entity-bound Product WRITE consumption is implemented internally**', $gaps);
+        $this->assertStringContainsString('**standard moduleless trusted simple Product WRITE consumption is implemented internally**', $gaps);
+        $this->assertStringContainsString('**Safe Sync simple WRITE remains implemented as an optional Enhanced Safety primitive and is no longer the standard-path dependency**', $gaps);
         $this->assertStringContainsString('support remains **false**', $gaps);
     }
 
@@ -341,8 +342,10 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('Stage 3E entity-bound Safe Sync contract (docs)', $atlas);
         $this->assertStringContainsString('DOCS CONTRACT DONE — runtime pending', $atlas);
-        $this->assertStringContainsString('Stage 3E Magento Safe Sync read + simple trusted write consumption', $atlas);
-        $this->assertStringContainsString('IMPLEMENTED (internal; support false; simple path consumed; not real-target certified)', $atlas);
+        $this->assertStringContainsString('Stage 3E Magento Safe Sync enhanced-safety runtime', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED (internal optional primitive; support false; not standard-path prerequisite)', $atlas);
+        $this->assertStringContainsString('Magento V1 moduleless stock simple trusted WRITE', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED (internal; support false; pending real-target certification)', $atlas);
         $this->assertStringContainsString('Stage3EEntityBoundSafeSyncDocumentationContractTest.php', $atlas);
     }
 
@@ -619,11 +622,14 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
     {
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
-        $this->assertStringContainsString('Stage 3E Magento Safe Sync read + simple trusted write consumption', $atlas);
-        $this->assertStringContainsString('IMPLEMENTED (internal; support false; simple path consumed; not real-target certified)', $atlas);
+        $this->assertStringContainsString('Stage 3E Magento Safe Sync enhanced-safety runtime', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED (internal optional primitive; support false; not standard-path prerequisite)', $atlas);
+        $this->assertStringContainsString('Magento V1 moduleless stock simple trusted WRITE', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED (internal; support false; pending real-target certification)', $atlas);
         $this->assertStringContainsString('Stage 3E disposable validation harness', $atlas);
         $this->assertStringContainsString('IMPLEMENTED (internal; validation-only; support false; no real-target certification executed)', $atlas);
-        $this->assertStringContainsString('trusted simple Product execution now consumes', $atlas);
+        $this->assertStringContainsString('the standard Magento V1 Simple writer no longer depends on this path', $atlas);
+        $this->assertStringContainsString('at most one stock PUT', $atlas);
         $this->assertStringContainsString('Stage 3E post-#168 dormant code-vs-docs discrepancies', $atlas);
         $this->assertStringContainsString('DOCUMENTED (dormant; not fixed)', $atlas);
         $this->assertStringContainsString('Production-unreachable code paths that still use stock SKU-addressed', $atlas);
@@ -640,7 +646,8 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
         $this->assertStringContainsString('9 decisions (current state, media-neutral Product save, connection quarantine,', $gaps);
         $this->assertStringContainsString('a `Code-vs-docs dormant discrepancies` table', $gaps);
         $this->assertStringContainsString('no change to the first-party `integrations/magento-safe-sync` module in this campaign', $gaps);
-        $this->assertStringContainsString('Laravel trusted simple execution now consumes the previously existing Safe Sync write primitive', $gaps);
+        $this->assertStringContainsString('Laravel trusted simple execution now consumes the moduleless stock REST writer', $gaps);
+        $this->assertStringContainsString('Safe Sync remains optional Enhanced Safety', $gaps);
         $this->assertStringContainsString('no `composer.json` change', $gaps);
         $this->assertStringContainsString('validation-only Laravel control plane', $gaps);
         $this->assertStringContainsString('no real-target validation harness execution/certification in this PR', $gaps);

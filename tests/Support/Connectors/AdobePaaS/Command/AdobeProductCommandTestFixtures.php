@@ -72,6 +72,7 @@ final class AdobeProductCommandTestFixtures
     public static function remoteProductPayload(array $overrides = []): array
     {
         return array_merge([
+            'id' => 77,
             'sku' => 'SKU-TEST-1',
             'name' => 'Test Product',
             'attribute_set_id' => 4,
