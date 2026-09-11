@@ -220,4 +220,12 @@ and no structured `parameters`; the current classifier therefore correctly remai
 
 The Connector Account Overview remains a Layer-A connection-confidence surface. Product WRITE
 readiness/failures stay operation-specific and must not redefine healthy Product READ connection
-truth.
+truth. The P-08 presentation slice now reads immutable Live Export `SyncRunItem.findings` through
+`AdobeProductWritePauseProjector`: only structured `stock_write_permission_denied` evidence with an
+actual WRITE attempt plus `write_access_classification=permission_denied` can surface the merchant
+warning `Передача змін товарів призупинена` while the account stays Connected. Ambiguous/message-only
+evidence is ignored for this projection; a newer verified stock WRITE supersedes an older denial,
+while unrelated no-write runs do not. Successful credential replacement is a freshness boundary for
+older denial evidence but is not itself promoted to WRITE success. The operation-remediation
+projection is evaluated only for connector-management actors so read-only Overview presentation
+keeps its restricted query/safe-data boundary.

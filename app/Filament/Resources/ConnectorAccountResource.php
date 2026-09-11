@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\ConnectorAccountConnectionStatus;
 use App\Enums\ConnectorConnectionCheckStatus;
 use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ListConnectorAccounts;
@@ -14,6 +15,7 @@ use App\Models\Workspace;
 use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
 use App\Services\Sync\AdobeProductsExportPreviewAuthorizationService;
 use App\Services\Sync\SyncConfigurationLookupService;
+use App\Support\Connectors\AdobePaaS\Presentation\AdobeProductWritePauseProjector;
 use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAccountUiState;
 use App\Support\Connectors\ConnectorUiFormatter;
@@ -404,7 +406,7 @@ class ConnectorAccountResource extends Resource
         return true;
     }
 
-    /** @return array{syncConfigurationId: ?string, canConfigureSync: bool, canCreatePreview: bool, canManageSyncConfiguration: bool, canRunPreview: bool} */
+    /** @return array{syncConfigurationId: ?string, canConfigureSync: bool, canCreatePreview: bool, canManageSyncConfiguration: bool, canRunPreview: bool, productWritePaused: bool} */
     private static function overviewViewData(ConnectorAccount $record): array
     {
         $configuration = app(SyncConfigurationLookupService::class)->findProductsDefaultContext($record);
@@ -432,12 +434,19 @@ class ConnectorAccountResource extends Resource
             $canPreview = false;
         }
 
+        $canManageConnectorAccount = $user instanceof User
+            && static::capabilityPresentation()->canManage($user, $workspace);
+        $productWritePaused = $canManageConnectorAccount
+            && $record->connection_status === ConnectorAccountConnectionStatus::Connected
+            && app(AdobeProductWritePauseProjector::class)->isPausedByProvenPermissionDenial($record);
+
         return [
             'syncConfigurationId' => $configuration?->getKey(),
             'canConfigureSync' => $canConfigure,
             'canCreatePreview' => $canPreview,
             'canManageSyncConfiguration' => $canManageSyncConfiguration,
             'canRunPreview' => $canRunPreview,
+            'productWritePaused' => $productWritePaused,
         ];
     }
 }

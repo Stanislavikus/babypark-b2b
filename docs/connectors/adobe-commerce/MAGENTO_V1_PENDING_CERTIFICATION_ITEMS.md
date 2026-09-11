@@ -1,7 +1,7 @@
 # Magento V1 Pending Certification Items
 
 **Status:** active campaign ledger  
-**Updated:** 2026-09-11  
+**Updated:** 2026-09-12
 **Branch:** `campaign/magento-v1-real-certification`
 
 This file is the durable queue for Magento V1 issues deliberately deferred during field-by-field certification. An item stays here until it is implemented/certified or explicitly closed with evidence. Public Adobe Products / Export / Live support remains false while required items are open.
@@ -65,9 +65,10 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 ### P-08 — Product WRITE paused/remediation presentation
 
 - Surface: merchant Overview operation-specific readiness.
-- Current truth: structured WRITE evidence now exists; healthy Product READ connection must remain Connected when WRITE is blocked.
-- Needed proof: projector/UI that surfaces `Передача змін товарів призупинена` only from proven operation evidence, with safe remediation, without changing `ConnectorAccount.connection_status`.
-- Reviewer candidate: yes after UI implementation.
+- Current truth: the implementation slice now projects immutable Live Export `SyncRunItem.findings` through `AdobeProductWritePauseProjector` instead of changing account connection truth. A Connected Magento account shows `Передача змін товарів призупинена` only when a terminal Live Export contains `command_evidence` with `stock_write_permission_denied`, an actual consequential WRITE attempt, `write_access_classification=permission_denied`, and `not_applied`. Ambiguous/message-only evidence does not create the state. A newer verified `stock_write_verified` WRITE clears an older denial; unrelated no-write/mapping runs do not. Successful credential replacement invalidates older WRITE-denial evidence without pretending that the replacement itself proves WRITE readiness. The projection is limited to actors allowed to manage the connector account so read-only Overview paths retain their existing zero connection-check-query/safe-presentation boundary. `ConnectorAccount.connection_status` remains `Connected`, and no raw Magento response/finding detail is rendered.
+- Why still open: implementation and regression coverage are green, but the frozen contract calls for an adversarial review of temporal ordering, stale evidence invalidation, RBAC/query boundaries, and merchant-safe remediation before treating this presentation slice as closed.
+- Needed proof: narrow implementation review only; no new Magento mutation is required unless the review identifies a contradiction in runtime evidence semantics.
+- Reviewer candidate: yes — next action is the narrow post-implementation review.
 ### P-09 — Store-view media label clear/inheritance semantics
 
 - Surface: gallery `label` plus `image_label` / `small_image_label` / `thumbnail_label` projections.

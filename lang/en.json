@@ -720,5 +720,8 @@
     "connectors.ui.layer_a.next_step.setup_admin_required": "Synchronization setup requires an authorized workspace administrator.",
     "connectors.ui.layer_a.next_step.unavailable": "The next step is temporarily unavailable because of the connection setup. Contact support.",
     "connectors.ui.layer_a.status.connected": "Connected",
+    "connectors.ui.layer_a.product_write_paused.title": "Product change transfer is paused",
+    "connectors.ui.layer_a.product_write_paused.body": "The Magento connection works, but during a product transfer Magento confirmed that this integration does not have permission to change products.",
+    "connectors.ui.layer_a.product_write_paused.remediation": "Review the integration permissions in Magento, then run the transfer again.",
     "connectors.ui.layer_a.next_step.preview_permission_required": "Creating a test synchronization requires the appropriate access. Contact an authorized workspace administrator."
 }
