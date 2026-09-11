@@ -146,7 +146,7 @@
       "null_semantics": "nullable_before_persistence",
       "clear_semantics": "clear_semantics_not_reverified_for_current_contract",
       "external_read_contract": "REST Product payload and trusted Safe Sync read expose name.",
-      "external_write_contract": "Stock Magento and the entity-bound simple Safe Sync primitive can mutate name.",
+      "external_write_contract": "Stock Magento REST can mutate name on the trusted moduleless Simple path; Safe Sync remains an optional Enhanced Safety primitive.",
       "external_restrictions_or_system_owner": "Governed Product owner; all trusted-link and gate checks still apply.",
       "version_edition_scope": "Magento 2.4-develop ProductInterface; Adobe/Magento 2.4.x",
       "cluster": "core_product",
@@ -158,10 +158,10 @@
       "write_capability_state": "SUPPORTED",
       "safe_sync_read_state": "SUPPORTED",
       "safe_sync_write_state": "SUPPORTED",
-      "real_validation_state": "repository_contract_only",
-      "field_certification_status": "internal_runtime_present_not_real_target_certified",
+      "real_validation_state": "real_target_write_read_restore_verified_2026_09_11",
+      "field_certification_status": "real_target_write_read_restore_verified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Standard trusted Simple stock WRITE is implemented; public Live support remains false pending field-by-field certification."
+      "result_or_blocker": "Real target verified controlled name cycle Test Product -> Test Product [B2B Cert] -> Test Product through the production stock writer; AdobeProductDocumentReader observed the mutated value before restore; identity remained entity_id=1 and public Live support remains false."
     },
     {
       "id": "rest-product-attribute-set-id",
@@ -242,7 +242,7 @@
       "null_semantics": "nullable_before_persistence",
       "clear_semantics": "surface_specific_and_not_reverified_here",
       "external_read_contract": "REST Product payload exposes base price.",
-      "external_write_contract": "Stock Magento and the entity-bound simple Safe Sync primitive can mutate base price.",
+      "external_write_contract": "Stock Magento REST can mutate price on the trusted moduleless Simple path; Safe Sync remains an optional Enhanced Safety primitive.",
       "external_restrictions_or_system_owner": "Pricing domain owns value; advanced pricing remains a separate surface.",
       "version_edition_scope": "Magento 2.4-develop ProductInterface; Adobe/Magento 2.4.x",
       "cluster": "pricing",
@@ -254,10 +254,10 @@
       "write_capability_state": "SUPPORTED",
       "safe_sync_read_state": "UNSUPPORTED",
       "safe_sync_write_state": "SUPPORTED",
-      "real_validation_state": "real_target_write_restore_verified_2026_09_11",
-      "field_certification_status": "real_target_write_restore_verified",
+      "real_validation_state": "real_target_write_read_restore_verified_2026_09_11",
+      "field_certification_status": "real_target_write_read_restore_verified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Real target verified controlled base-price cycle 150 -> 151 -> 150 through production Simple executor with identity-preserving GET verification; public Live support remains false."
+      "result_or_blocker": "Real target verified controlled price cycle 150 -> 151 -> 150 through the production stock writer; AdobeProductDocumentReader observed the mutated value before restore; identity remained entity_id=1 and public Live support remains false."
     },
     {
       "id": "rest-product-status",
@@ -274,7 +274,7 @@
       "null_semantics": "nullable_before_persistence",
       "clear_semantics": "surface_specific_and_not_reverified_here",
       "external_read_contract": "REST Product payload exposes status.",
-      "external_write_contract": "Stock Magento and the entity-bound simple Safe Sync primitive can mutate status.",
+      "external_write_contract": "Stock Magento REST can mutate status on the trusted moduleless Simple path; Safe Sync remains an optional Enhanced Safety primitive.",
       "external_restrictions_or_system_owner": "Connector-owned external lifecycle projection.",
       "version_edition_scope": "Magento 2.4-develop ProductInterface; Adobe/Magento 2.4.x",
       "cluster": "lifecycle",
@@ -286,10 +286,10 @@
       "write_capability_state": "SUPPORTED",
       "safe_sync_read_state": "UNSUPPORTED",
       "safe_sync_write_state": "SUPPORTED",
-      "real_validation_state": "repository_contract_only",
-      "field_certification_status": "internal_runtime_present_not_real_target_certified",
+      "real_validation_state": "real_target_write_read_restore_verified_2026_09_11",
+      "field_certification_status": "real_target_write_read_restore_verified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Standard trusted Simple stock WRITE is implemented; public Live support remains false pending field-by-field certification."
+      "result_or_blocker": "Real target verified controlled status cycle 1 -> 2 -> 1 through the production stock writer; AdobeProductDocumentReader observed the mutated value before restore; identity remained entity_id=1 and public Live support remains false."
     },
     {
       "id": "bulk-product-online",
@@ -338,7 +338,7 @@
       "null_semantics": "nullable_before_persistence",
       "clear_semantics": "surface_specific_and_not_reverified_here",
       "external_read_contract": "REST Product payload exposes visibility.",
-      "external_write_contract": "Stock Magento and the entity-bound simple Safe Sync primitive can mutate visibility.",
+      "external_write_contract": "Stock Magento REST can mutate visibility on the trusted moduleless Simple path; Safe Sync remains an optional Enhanced Safety primitive.",
       "external_restrictions_or_system_owner": "Connector-owned external display projection.",
       "version_edition_scope": "Magento 2.4-develop ProductInterface; Adobe/Magento 2.4.x",
       "cluster": "lifecycle",
@@ -350,10 +350,10 @@
       "write_capability_state": "SUPPORTED",
       "safe_sync_read_state": "UNSUPPORTED",
       "safe_sync_write_state": "SUPPORTED",
-      "real_validation_state": "repository_contract_only",
-      "field_certification_status": "internal_runtime_present_not_real_target_certified",
+      "real_validation_state": "real_target_write_read_restore_verified_2026_09_11",
+      "field_certification_status": "real_target_write_read_restore_verified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Standard trusted Simple stock WRITE is implemented; public Live support remains false pending field-by-field certification."
+      "result_or_blocker": "Real target verified controlled visibility cycle 4 -> 2 -> 4 through the production stock writer; AdobeProductDocumentReader observed the mutated value before restore; identity remained entity_id=1 and public Live support remains false."
     },
     {
       "id": "rest-product-type-id",
@@ -764,7 +764,7 @@
       "platform_domain_owner": "Attribute Dictionary",
       "platform_representation": "FieldDefinition and FieldBinding after per-field classification.",
       "connector_read_seam": "AdobeProductDocumentReader custom attribute extraction.",
-      "connector_write_seam": "Trusted simple Safe Sync path can carry mapped_attributes scalar strings only.",
+      "connector_write_seam": "AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor carries mapped scalar child attributes in product.custom_attributes; explicit clear intent remains fail-closed when stale remote data exists pending field-specific clear certification.",
       "read_capability_state": "SUPPORTED",
       "write_capability_state": "PARTIAL",
       "safe_sync_read_state": "UNSUPPORTED",

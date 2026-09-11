@@ -79,10 +79,9 @@ outcomes. Completeness is no longer proven by a magic stable-field count.
 
 The matrix/manifest pair now records the final Slice 2 / Slice 3 runtime truth:
 
-- `rest-product-name` reflects the moduleless trusted simple stock WRITE runtime; field mutation remains pending real-target certification.
-- `rest-product-price` is real-target WRITE+restore verified through the moduleless stock runtime on 2026-09-11.
-- `rest-product-status` reflects the moduleless trusted simple stock WRITE runtime; field mutation remains pending real-target certification.
-- `rest-product-visibility` reflects the moduleless trusted simple stock WRITE runtime; field mutation remains pending real-target certification.
+- `rest-product-name`, `rest-product-price`, `rest-product-status`, and `rest-product-visibility` are real-target WRITE + `AdobeProductDocumentReader` READ + restore verified through the moduleless stock runtime on 2026-09-11.
+- Certified cycles: `name` = `Test Product -> Test Product [B2B Cert] -> Test Product`; `price` = `150 -> 151 -> 150`; `status` = `1 -> 2 -> 1`; `visibility` = `4 -> 2 -> 4`.
+- Every cycle preserved Magento logical identity `entity_id=1`, exact SKU `1234567890`, simple type, attribute set, and all non-target core fields.
 - `rest-product-type-id` reflects the existing reusable full Product document READ
   through `AdobeProductDocumentReader`.
 

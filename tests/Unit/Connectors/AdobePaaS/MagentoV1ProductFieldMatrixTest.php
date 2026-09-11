@@ -341,6 +341,29 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
     }
 
     #[Test]
+    public function core_simple_fields_are_real_target_write_read_restore_certified(): void
+    {
+        $rows = array_column($this->matrix()['rows'], null, 'id');
+
+        foreach ([
+            'rest-product-name',
+            'rest-product-price',
+            'rest-product-status',
+            'rest-product-visibility',
+        ] as $rowId) {
+            self::assertSame('SUPPORTED', $rows[$rowId]['read_capability_state'], $rowId);
+            self::assertSame('SUPPORTED', $rows[$rowId]['write_capability_state'], $rowId);
+            self::assertSame('real_target_write_read_restore_verified_2026_09_11', $rows[$rowId]['real_validation_state'], $rowId);
+            self::assertSame('real_target_write_read_restore_verified', $rows[$rowId]['field_certification_status'], $rowId);
+            self::assertStringContainsString('AdobeProductStockSimpleWriteExecutor', $rows[$rowId]['connector_write_seam'], $rowId);
+            self::assertStringContainsString('AdobeProductDocumentReader', $rows[$rowId]['result_or_blocker'], $rowId);
+        }
+
+        self::assertStringContainsString('mapped scalar child attributes', $rows['custom-attributes-container']['connector_write_seam']);
+        self::assertStringNotContainsString('Trusted simple Safe Sync path', $rows['custom-attributes-container']['connector_write_seam']);
+    }
+
+    #[Test]
     public function current_discovery_frontend_inputs_are_documented(): void
     {
         $source = file_get_contents($this->repoPath('app/Support/Connectors/AdobePaaS/AdobePaaSAttributeNormalizer.php'));
