@@ -30,6 +30,33 @@ final class ConnectorConnectionCheckDispatchService
         string $workspaceId,
         string $connectorAccountId,
     ): string {
+        return $this->execute(
+            $actor,
+            $workspaceId,
+            $connectorAccountId,
+            ConnectorConnectionCheckTrigger::Manual,
+        );
+    }
+
+    public function executeFirstConnect(
+        User $actor,
+        string $workspaceId,
+        string $connectorAccountId,
+    ): string {
+        return $this->execute(
+            $actor,
+            $workspaceId,
+            $connectorAccountId,
+            ConnectorConnectionCheckTrigger::FirstConnect,
+        );
+    }
+
+    private function execute(
+        User $actor,
+        string $workspaceId,
+        string $connectorAccountId,
+        ConnectorConnectionCheckTrigger $trigger,
+    ): string {
         $account = ConnectorAccount::withoutWorkspaceScope()
             ->where('workspace_id', $workspaceId)
             ->where('id', $connectorAccountId)
@@ -51,7 +78,7 @@ final class ConnectorConnectionCheckDispatchService
         );
 
         if (DB::transactionLevel() > 0 && ! app()->environment('testing')) {
-            throw new \RuntimeException('executeManual must not run inside a nested transaction.');
+            throw new \RuntimeException('Connection-check dispatch must not run inside a nested transaction.');
         }
 
         $lockKey = "connector-op:{$workspaceId}:{$connectorAccountId}:connection_check";
@@ -60,11 +87,13 @@ final class ConnectorConnectionCheckDispatchService
             $actor,
             $workspaceId,
             $connectorAccountId,
+            $trigger,
         ): ConnectionCheckDispatchDecision {
             return DB::transaction(function () use (
                 $actor,
                 $workspaceId,
                 $connectorAccountId,
+                $trigger,
             ): ConnectionCheckDispatchDecision {
                 $lockedAccount = ConnectorAccount::withoutWorkspaceScope()
                     ->where('workspace_id', $workspaceId)
@@ -114,7 +143,7 @@ final class ConnectorConnectionCheckDispatchService
                 $newRow = ConnectorConnectionCheck::withoutWorkspaceScope()->create([
                     'workspace_id' => $workspaceId,
                     'connector_account_id' => $connectorAccountId,
-                    'trigger' => ConnectorConnectionCheckTrigger::Manual,
+                    'trigger' => $trigger,
                     'initiated_by_user_id' => $actor->getKey(),
                     'status' => ConnectorConnectionCheckStatus::Queued,
                     'execution_attempts' => 0,

@@ -5,6 +5,7 @@ namespace App\Enums;
 enum ConnectorConnectionCheckTrigger: string
 {
     case Manual = 'manual';
+    case FirstConnect = 'first_connect';
     case Scheduled = 'scheduled';
     case BeforeDiscovery = 'before_discovery';
 

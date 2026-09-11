@@ -8,6 +8,7 @@ use App\Models\ConnectorAccount;
 use App\Models\ConnectorDefinition;
 use App\Models\User;
 use App\Services\Connectors\ConnectorAccountSettingsService;
+use App\Services\Connectors\ConnectorConnectionCheckDispatchService;
 use App\Services\Connectors\CreateConnectorAccountInput;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\CredentialMutation;
@@ -168,6 +169,7 @@ class ConnectPlatformIntegration extends Page implements HasForms
         ConnectorAccountSettingsService $settingsService,
         WorkspaceContext $workspaceContext,
         ConnectorProfileRegistry $profileRegistry,
+        ConnectorConnectionCheckDispatchService $connectionCheckDispatchService,
     ): void {
         $user = Auth::user();
         abort_unless($user instanceof User, 403);
@@ -230,10 +232,25 @@ class ConnectPlatformIntegration extends Page implements HasForms
             return;
         }
 
-        Notification::make()
-            ->title(__('connectors.ui.integrations.connect.success'))
-            ->success()
-            ->send();
+        try {
+            $connectionCheckDispatchService->executeFirstConnect(
+                $user,
+                $workspace->id,
+                $result->id,
+            );
+
+            Notification::make()
+                ->title(__('connectors.ui.integrations.connect.success'))
+                ->body(__('connectors.ui.integrations.connect.check_started'))
+                ->success()
+                ->send();
+        } catch (Throwable) {
+            Notification::make()
+                ->title(__('connectors.ui.integrations.connect.success'))
+                ->body(__('connectors.ui.integrations.connect.check_start_failed'))
+                ->warning()
+                ->send();
+        }
 
         $this->redirect(ConnectorAccountResource::getUrl('view', ['record' => $result->id]));
     }

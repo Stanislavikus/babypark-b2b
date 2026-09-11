@@ -824,6 +824,8 @@ class ConnectorAccountResourceTest extends TestCase
             'connectors.ui.notifications.check_started',
             'connectors.ui.notifications.check_completed',
             'connectors.ui.notifications.action_failed',
+            'connectors.ui.integrations.connect.check_started',
+            'connectors.ui.integrations.connect.check_start_failed',
         ];
 
         foreach ($locales as $locale) {
