@@ -27,9 +27,10 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 
 - Surface: mapped scalar EAV attributes transitioning from value to empty/null.
 - Current truth: false `KnownApplied` was removed; stale remote values now fail closed with `stock_custom_attribute_clear_not_certified` and zero PUT. Real target probes on 2026-09-11 show type/scope-specific behavior: optional store-scoped text `meta_title` with `value=""` becomes absent; required global select `manufacturer` rejects `""` with HTTP 400 but `null` removes the attribute; optional website-scoped price/decimal `c_carseats_adac_rating` maps `""` to `0.000000`, while `null` returns HTTP 200 but the effective GET remains `2.000000` (consistent with inherited/use-default behavior on a non-admin store view). Every probe was immediately restored and final custom-attribute diff was zero.
-- Why deferred: clearing cannot be represented by one universal `null`/empty-string rule. Required attributes must not be cleared merely because REST accepts it, and website/store inheritance must be distinguished from an unchanged value.
-- Needed proof: freeze V1 clear intent semantics (`explicit empty` vs `use inherited/default`), determine per frontend/backend type payloads, and define scope-aware post-write verification that can prove override removal without relying only on effective Product GET.
-- Reviewer candidate: yes after representative target evidence.
+- Frozen V1 decision after independent GPT-5.4 + Sonnet review: there is no universal clear payload. Required attributes are never clearable. Scoped `inherit/use default` is not claimed through stock Product REST because effective GET cannot prove raw override removal. `price`/non-global decimal and `multiselect` remain fail-closed. Optional text-like clear is admitted only per separately certified target/type evidence; optional select/date/boolean/plain-decimal require their own proof before admission.
+- Why still open: only representative target cases are certified; cross-type and cross-store semantics remain incomplete.
+- Needed proof: add only narrowly proven type/scope clear rules, with fail-closed default and scope-aware postconditions; never infer override removal from effective-value equality alone.
+- Reviewer candidate: no broad re-review needed; reopen only for a new type/scope rule or contradictory real-target evidence.
 ### P-04 — Real WRITE permission-denial evidence
 
 - Surface: stock Product/media WRITE authorization failure.
@@ -73,3 +74,11 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Why deferred: non-default store views distinguish `null` (use default/inherit) from `""` (explicit empty), so only the default-store reset is certified.
 - Needed proof: a real non-default store-view inheritance/explicit-empty cycle before claiming cross-store media-label clear support.
 - Reviewer candidate: yes if V1 ownership expands beyond default-store media labels.
+
+### P-10 — Store-view Product PUT may materialize untouched scoped overrides
+
+- Surface: any stock `PUT /V1/products/{sku}` executed through an explicit non-admin store-view code such as `default`.
+- Current truth: independent review surfaced Magento issue class #8897/#26484: saving through `ProductRepository` in a store-view context has historically copied untouched inherited EAV values into store-specific rows, disabling `Use Default Value`. Upstream issue #8897 is Closed/Done but still labeled confirmed/reproduced on 2.4.x/latest 2.4-develop and exposes no linked fix PR. Our stock REST path ultimately saves through ProductRepository, so this cannot be dismissed from code inspection alone.
+- Why deferred: ordinary Product GET returns effective values and therefore cannot prove whether equal-valued store-specific override rows were newly materialized. Our previous write/read/restore certification proves controlled values and no observable payload drift, but not absence of hidden scope-row side effects.
+- Needed proof before public Live support: on the exact supported Magento version, establish a baseline for one or more inherited store/website-scoped attributes using DB/admin `Use Default Value` evidence or an equally authoritative mechanism; perform one ordinary stock Product PUT through the configured store code; prove untouched attributes did not gain overrides. If stock REST cannot preserve inheritance reliably, standard V1 must fail closed for affected store-view writes or narrow support to a scope/path with proven safety.
+- Reviewer candidate: yes after target-side proof or if a bounded mitigation is proposed.
