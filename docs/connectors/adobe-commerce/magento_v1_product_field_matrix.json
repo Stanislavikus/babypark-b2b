@@ -769,10 +769,10 @@
       "write_capability_state": "PARTIAL",
       "safe_sync_read_state": "UNSUPPORTED",
       "safe_sync_write_state": "PARTIAL",
-      "real_validation_state": "repository_contract_only",
-      "field_certification_status": "container_inventoried_child_rows_required",
+      "real_validation_state": "real_target_34_present_scalar_children_command_write_read_restore_verified_2026_09_11",
+      "field_certification_status": "partial_child_certification_34_present_scalar_children_verified",
       "installation_condition": "stable_container_with_mixed_child_semantics",
-      "result_or_blocker": "Container stability does not replace row-by-row child certification."
+      "result_or_blocker": "Target ledger verifies 34 present scalar/select custom attributes through stock command WRITE, AdobeProductDocumentReader observation, and restore with zero final drift; array/media/system-owned/URL-rewrite children remain separate surfaces or dedicated certification."
     },
     {
       "id": "eav-content-fields",
@@ -804,15 +804,15 @@
       "platform_domain_owner": "Product / Attribute Dictionary / SEO bindings",
       "platform_representation": "Existing domain owner or field binding only; no new Product core expansion.",
       "connector_read_seam": "AdobeProductDocumentReader custom attribute extraction.",
-      "connector_write_seam": "Candidate mapped_attributes path only where field-by-field certification later proves it.",
+      "connector_write_seam": "Mapped scalar children use AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor; child-specific scope/side effects still govern certification.",
       "read_capability_state": "SUPPORTED",
       "write_capability_state": "PARTIAL",
       "safe_sync_read_state": "UNSUPPORTED",
       "safe_sync_write_state": "PARTIAL",
-      "real_validation_state": "repository_contract_only",
-      "field_certification_status": "stable_fields_inventoried_write_certification_pending",
+      "real_validation_state": "real_target_partial_child_command_write_read_restore_verified_2026_09_11",
+      "field_certification_status": "partial_children_country_meta_title_meta_description_verified_url_key_pending_dedicated",
       "installation_condition": "stable_system_attributes",
-      "result_or_blocker": "Inventoried as stable EAV/system fields without inventing new SaaS Product columns."
+      "result_or_blocker": "Real target command cycle verified country_of_manufacture, meta_title and meta_description; url_key remains excluded from generic probes because URL-rewrite side effects require dedicated certification; other grouped children remain individually pending."
     },
     {
       "id": "special-pricing-fields",
@@ -872,15 +872,15 @@
       "platform_domain_owner": "Attribute Dictionary / SEO binding",
       "platform_representation": "Field binding only; no Product core expansion.",
       "connector_read_seam": "AdobeProductDocumentReader custom attribute extraction by exact attribute code.",
-      "connector_write_seam": "Candidate mapped_attributes path only after field-level certification.",
+      "connector_write_seam": "Mapped scalar child through AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor.",
       "read_capability_state": "SUPPORTED",
       "write_capability_state": "PARTIAL",
       "safe_sync_read_state": "UNSUPPORTED",
       "safe_sync_write_state": "PARTIAL",
-      "real_validation_state": "real_target_pending",
-      "field_certification_status": "alias_separated_exact_binding_recorded",
+      "real_validation_state": "real_target_command_write_read_restore_verified_2026_09_11",
+      "field_certification_status": "real_target_command_write_read_restore_verified",
       "installation_condition": "stable_system_attribute",
-      "result_or_blocker": "Exact REST/EAV binding remains meta_keyword; it is not collapsed into bulk meta_keywords."
+      "result_or_blocker": "Real target verified meta_keyword mutation, AdobeProductDocumentReader observation, and exact restore; full merchant mapping/Live support remains gated separately."
     },
     {
       "id": "bulk-meta-keywords",
@@ -934,17 +934,17 @@
       "version_edition_scope": "Adobe configurable product docs; product system attribute semantics",
       "cluster": "stable_system_eav",
       "platform_domain_owner": "Pricing / tax configuration boundary",
-      "platform_representation": "No current certified Product V1 tax-class binding.",
+      "platform_representation": "Attribute Dictionary field binding; external option identity remains Magento-owned and mapping-governed.",
       "connector_read_seam": "AdobeProductDocumentReader exact custom attribute extraction when target exposes tax_class_id.",
-      "connector_write_seam": "UNSUPPORTED",
+      "connector_write_seam": "Mapped scalar/select child through AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor.",
       "read_capability_state": "PARTIAL",
-      "write_capability_state": "UNSUPPORTED",
+      "write_capability_state": "PARTIAL",
       "safe_sync_read_state": "UNSUPPORTED",
       "safe_sync_write_state": "UNSUPPORTED",
-      "real_validation_state": "real_target_pending",
-      "field_certification_status": "alias_separated_exact_binding_recorded",
+      "real_validation_state": "real_target_command_write_read_restore_verified_2026_09_11",
+      "field_certification_status": "real_target_command_write_read_restore_verified_mapping_e2e_pending",
       "installation_condition": "target_tax_catalog_specific",
-      "result_or_blocker": "Exact binding is tax_class_id, not generic tax_class; target tax catalog binding remains uncertified."
+      "result_or_blocker": "Real target command cycle verified tax_class_id 2 -> 0 -> 2 and read-back; full mapping/option end-to-end certification remains pending, so capability is PARTIAL rather than advertised support."
     },
     {
       "id": "bulk-tax-class-name",
@@ -1100,15 +1100,15 @@
       "platform_domain_owner": "Presentation / theme / module configuration",
       "platform_representation": "Explicit unsupported-or-conditional outcome only.",
       "connector_read_seam": "UNSUPPORTED",
-      "connector_write_seam": "UNSUPPORTED",
+      "connector_write_seam": "On this target, present scalar children gift_message_available, options_container and page_layout traverse the mapped stock Simple writer; other grouped theme/design children remain conditional/unverified.",
       "read_capability_state": "MODULE_DEPENDENT",
       "write_capability_state": "MODULE_DEPENDENT",
       "safe_sync_read_state": "NOT_APPLICABLE",
       "safe_sync_write_state": "NOT_APPLICABLE",
-      "real_validation_state": "real_target_pending",
-      "field_certification_status": "conditional_surface_inventoried_runtime_absent",
+      "real_validation_state": "real_target_partial_present_children_command_write_read_restore_verified_2026_09_11",
+      "field_certification_status": "conditional_group_partial_children_verified",
       "installation_condition": "module_theme_and_feature_dependent",
-      "result_or_blocker": "Inventoried explicitly as conditional presentation bindings, not as Product core."
+      "result_or_blocker": "Target verified gift_message_available, options_container and page_layout command mutation/read/restore; grouped custom design/layout children remain unverified and module/theme dependent."
     },
     {
       "id": "pricing-map-msrp-fields",
@@ -1133,15 +1133,15 @@
       "platform_domain_owner": "Pricing",
       "platform_representation": "Explicit conditional pricing outcome only.",
       "connector_read_seam": "UNSUPPORTED",
-      "connector_write_seam": "UNSUPPORTED",
+      "connector_write_seam": "On this target, present msrp_display_actual_price_type traverses the mapped stock Simple writer; remaining MAP/MSRP bindings retain their own pricing-surface rules.",
       "read_capability_state": "MODULE_DEPENDENT",
       "write_capability_state": "MODULE_DEPENDENT",
       "safe_sync_read_state": "NOT_APPLICABLE",
       "safe_sync_write_state": "NOT_APPLICABLE",
-      "real_validation_state": "real_target_pending",
-      "field_certification_status": "conditional_surface_inventoried_runtime_absent",
+      "real_validation_state": "real_target_partial_present_child_command_write_read_restore_verified_2026_09_11",
+      "field_certification_status": "conditional_group_msrp_display_child_verified",
       "installation_condition": "feature_configuration_dependent",
-      "result_or_blocker": "MAP/MSRP fields remain inventoried explicitly instead of being omitted."
+      "result_or_blocker": "Target verified msrp_display_actual_price_type command mutation/read/restore; map/minimal_price/msrp translation semantics remain separately pending."
     },
     {
       "id": "configurable-rest-options",
@@ -1359,15 +1359,16 @@
       "platform_domain_owner": "Attribute Dictionary",
       "platform_representation": "FieldDefinition + FieldBinding after target expansion.",
       "connector_read_seam": "Discovery capability plus AdobeProductDocumentReader field extraction.",
-      "connector_write_seam": "Field specific after target expansion and certification.",
+      "connector_write_seam": "Target-discovered scalar/select children can traverse the mapped stock Simple writer after field-specific classification; non-scalar/system/media children remain separate.",
       "read_capability_state": "TARGET_DEPENDENT",
       "write_capability_state": "TARGET_DEPENDENT",
       "safe_sync_read_state": "UNSUPPORTED",
       "safe_sync_write_state": "TARGET_DEPENDENT",
-      "real_validation_state": "real_target_pending",
-      "field_certification_status": "pending_real_target_expansion",
+      "real_validation_state": "real_target_partial_target_expansion_24_dynamic_children_command_verified_2026_09_11",
+      "field_certification_status": "target_expanded_24_dynamic_children_verified_family_incomplete",
       "installation_condition": "must_expand_from_actual_connected_target",
-      "result_or_blocker": "Static official inventory does not replace real target discovery; the family remains explicitly incomplete until target expansion."
+      "result_or_blocker": "Real target discovery exposed installation-dependent EAV; 24 dynamic c_carseats_*/x_* children in the certification product were mutation/read/restore verified. The family remains TARGET_DEPENDENT because other installations and undiscovered/absent fields are not implied by this target."
     }
-  ]
+  ],
+  "real_target_field_certification_evidence": "docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json"
 }

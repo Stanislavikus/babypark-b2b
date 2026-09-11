@@ -84,6 +84,7 @@ The matrix/manifest pair now records the final Slice 2 / Slice 3 runtime truth:
 - Every cycle preserved Magento logical identity `entity_id=1`, exact SKU `1234567890`, simple type, attribute set, and all non-target core fields.
 - `rest-product-type-id` reflects the existing reusable full Product document READ
   through `AdobeProductDocumentReader`.
+- Target-specific field evidence is recorded in `magento_v1_real_target_field_certification_2026_09_11.json`: 38 fields are verified (4 core + 34 present scalar/select custom attributes), each through mutation, `AdobeProductDocumentReader` observation, and restore. Eight present custom attributes are intentionally excluded from generic scalar certification because they belong to relation, media, system-owned, or URL-rewrite semantics.
 
 ## Exact semantic corrections
 
@@ -184,7 +185,7 @@ At implementation commit `10d05db59b857ba51a4851338cd6186c969c19c9`, the standar
 - the same production runtime restored `151 -> 150`;
 - result: `KnownApplied`, `stock_write_verified`; independent GET confirmed the original state restored.
 
-This certifies the **moduleless trusted Simple stock WRITE/verify/restore core and the base-price field on this target**. It does not flip public Live support and does not certify every field, dynamic EAV, configurable, media, or custom-attribute clear semantics.
+The subsequent field-by-field campaign certifies **all four current core Simple fields plus 34 present scalar/select custom attributes on this target** through the same production stock writer, `AdobeProductDocumentReader` observation, and exact restore. The target ledger is `docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json`. After the EAV campaign the full 42-custom-attribute baseline and final snapshot were identical (`42 -> 42`, diff count `0`) and the core Product state was also restored exactly. This does not flip public Live support and does not certify configurable, media, relation, URL-rewrite side effects, system-owned flags, or custom-attribute clear semantics.
 
 A read-only real-target probe for a deliberately absent SKU returned HTTP 404 with a `message` key only and no structured `parameters`; the current classifier therefore conservatively returns `untrusted_or_failed`. The synthetic structured trusted-missing fixture is not treated as real-target evidence.
 
@@ -203,7 +204,7 @@ Any other `frontend_input` remains fail-closed until explicitly verified and map
 - no Product core expansion merely because Magento exposes a field
 - no support flip
 - no Safe Sync module rewrite
-- no real Magento write
+- no public support flip or deployment as a side effect of certification
 - no deploy
 
 ---

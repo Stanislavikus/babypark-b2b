@@ -274,7 +274,7 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
     }
 
     #[Test]
-    public function target_dependent_eav_family_remains_explicitly_incomplete_pending_real_target_expansion(): void
+    public function target_dependent_eav_family_records_partial_real_target_expansion_without_claiming_completeness(): void
     {
         $manifest = $this->manifest()['items'];
         $targetFamily = current(array_filter(
@@ -291,7 +291,8 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
         ));
 
         self::assertIsArray($matrixRow);
-        self::assertSame('pending_real_target_expansion', $matrixRow['field_certification_status']);
+        self::assertSame('target_expanded_24_dynamic_children_verified_family_incomplete', $matrixRow['field_certification_status']);
+        self::assertStringContainsString('real_target_partial_target_expansion_24_dynamic_children', $matrixRow['real_validation_state']);
         self::assertSame('TARGET_DEPENDENT', $matrixRow['read_capability_state']);
         self::assertSame('TARGET_DEPENDENT', $matrixRow['write_capability_state']);
     }
@@ -364,6 +365,45 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
     }
 
     #[Test]
+    public function real_target_field_certification_ledger_records_verified_and_excluded_children(): void
+    {
+        $ledger = $this->certificationLedger();
+        $rows = array_column($this->matrix()['rows'], null, 'id');
+
+        self::assertSame('2026-09-11', $ledger['certification_date']);
+        self::assertCount(38, $ledger['verified_fields']);
+        self::assertCount(8, $ledger['present_but_not_generic_scalar_certified']);
+        self::assertSame(0, $ledger['post_campaign_drift_proof']['custom_attribute_diff_count']);
+        self::assertTrue($ledger['post_campaign_drift_proof']['core_state_restored']);
+        self::assertFalse($ledger['public_live_support_flipped']);
+
+        $verifiedKeys = [];
+        foreach ($ledger['verified_fields'] as $field) {
+            $key = $field['external_field_key'];
+            self::assertNotContains($key, $verifiedKeys, $key);
+            $verifiedKeys[] = $key;
+            self::assertSame('known_applied', $field['send_write_result'], $key);
+            self::assertSame('stock_write_verified', $field['reason_code'], $key);
+            self::assertTrue($field['document_reader_observed_probe'], $key);
+            self::assertSame('known_applied', $field['restore_result'], $key);
+            self::assertTrue($field['final_state_restored'], $key);
+        }
+
+        foreach (['category_ids', 'has_options', 'required_options', 'image', 'small_image', 'thumbnail', 'swatch_image', 'url_key'] as $key) {
+            self::assertContains($key, array_column($ledger['present_but_not_generic_scalar_certified'], 'external_field_key'));
+        }
+
+        self::assertSame('PARTIAL', $rows['rest-tax-class-id']['write_capability_state']);
+        self::assertSame('real_target_command_write_read_restore_verified_2026_09_11', $rows['rest-tax-class-id']['real_validation_state']);
+        self::assertSame('TARGET_DEPENDENT', $rows['dynamic-eav-family']['write_capability_state']);
+        self::assertStringContainsString('24_dynamic_children', $rows['dynamic-eav-family']['real_validation_state']);
+        self::assertSame(
+            'docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json',
+            $this->matrix()['real_target_field_certification_evidence'],
+        );
+    }
+
+    #[Test]
     public function current_discovery_frontend_inputs_are_documented(): void
     {
         $source = file_get_contents($this->repoPath('app/Support/Connectors/AdobePaaS/AdobePaaSAttributeNormalizer.php'));
@@ -399,6 +439,17 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
     private function matrix(): array
     {
         $contents = file_get_contents($this->repoPath('docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json'));
+        $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($decoded);
+
+        return $decoded;
+    }
+
+    /** @return array<string, mixed> */
+    private function certificationLedger(): array
+    {
+        $contents = file_get_contents($this->repoPath('docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json'));
         $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
 
         self::assertIsArray($decoded);
