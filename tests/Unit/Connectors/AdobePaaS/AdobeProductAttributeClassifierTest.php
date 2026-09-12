@@ -37,6 +37,19 @@ class AdobeProductAttributeClassifierTest extends TestCase
         $this->assertSame('pricing', $decision->runtimeOwnerHint);
     }
 
+    public function test_verified_mapping_with_unready_canonical_target_stays_provider_standard(): void
+    {
+        $decision = app(AdobeProductAttributeClassifier::class)->classify($this->field(
+            'short_description', frontendInput: 'textarea', normalizedType: 'long_text',
+            isUserDefined: false, backendType: 'text',
+        ));
+
+        $this->assertSame(ConnectorSchemaFieldDisposition::ProviderStandard, $decision->disposition);
+        $this->assertSame('short_description', $decision->canonicalCode);
+        $this->assertSame('canonical_target_not_ready', $decision->mappingStrategy);
+        $this->assertSame('canonical_field_not_active_verified_or_eligible', $decision->reasonCode);
+    }
+
     public function test_known_provider_standard_is_visible_but_not_claimed_as_verified_mapping(): void
     {
         $decision = app(AdobeProductAttributeClassifier::class)->classify($this->field(

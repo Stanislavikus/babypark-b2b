@@ -23,6 +23,7 @@ final class SyncConfigurationService
         private readonly SyncConfigurationRevisionHasher $revisionHasher,
         private readonly SyncConfigurationMutationCoordinator $mutationCoordinator,
         private readonly SyncConfigurationConstraintViolationClassifier $constraintViolationClassifier,
+        private readonly VerifiedCanonicalFieldMappingMaterializer $verifiedMappingMaterializer,
     ) {}
 
     public function create(
@@ -34,7 +35,7 @@ final class SyncConfigurationService
         $this->assertOperationsSupported($account, $input->dataDomain, $operationSet);
 
         try {
-            return DB::transaction(function () use ($account, $input, $operationSet): SyncConfiguration {
+            $configuration = DB::transaction(function () use ($account, $input, $operationSet): SyncConfiguration {
                 return SyncConfiguration::withoutWorkspaceScope()->create([
                     'id' => (string) Str::uuid(),
                     'workspace_id' => $account->workspace_id,
@@ -51,6 +52,16 @@ final class SyncConfigurationService
                     ),
                 ]);
             });
+
+            if ($input->dataDomain === SyncDataDomain::Products) {
+                try {
+                    $this->verifiedMappingMaterializer->materialize($account->workspace_id, $account->id);
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
+            }
+
+            return $configuration->refresh();
         } catch (QueryException $exception) {
             if ($this->constraintViolationClassifier->isIdentityUniquenessConflict($exception)) {
                 throw SyncConfigurationConflictException::duplicateIdentity(previous: $exception);

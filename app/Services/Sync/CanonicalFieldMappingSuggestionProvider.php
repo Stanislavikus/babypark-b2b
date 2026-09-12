@@ -7,12 +7,14 @@ use App\Enums\AttributeStatus;
 use App\Enums\FieldObjectType;
 use App\Models\FieldBinding;
 use App\Models\FieldDefinition;
+use App\Support\CanonicalRegistry\CanonicalMappingSnapshotKeyResolver;
 use App\Support\CanonicalRegistry\CanonicalRegistryReader;
 
 final class CanonicalFieldMappingSuggestionProvider
 {
     public function __construct(
         private readonly CanonicalRegistryReader $registryReader,
+        private readonly CanonicalMappingSnapshotKeyResolver $snapshotKeyResolver,
     ) {}
 
     /**
@@ -68,9 +70,9 @@ final class CanonicalFieldMappingSuggestionProvider
                 continue;
             }
 
-            $externalField = $mappingRow['external_field'];
+            $externalField = $this->snapshotKeyResolver->resolve($connectorDefinitionCode, $mappingRow);
 
-            if (! isset($snapshotExternalFieldKeys[$externalField])) {
+            if ($externalField === null || ! isset($snapshotExternalFieldKeys[$externalField])) {
                 continue;
             }
 

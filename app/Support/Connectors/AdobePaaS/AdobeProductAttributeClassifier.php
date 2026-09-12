@@ -5,6 +5,7 @@ namespace App\Support\Connectors\AdobePaaS;
 use App\Enums\ConnectorSchemaFieldDisposition;
 use App\Enums\ConnectorSchemaFieldNormalizationStatus;
 use App\Models\ConnectorSchemaSnapshotField;
+use App\Support\CanonicalRegistry\CanonicalMappingSnapshotKeyResolver;
 use App\Support\CanonicalRegistry\CanonicalRegistryReader;
 use App\Support\Connectors\ConnectorSchemaFieldClassificationDecision;
 
@@ -14,6 +15,7 @@ final class AdobeProductAttributeClassifier
 
     public function __construct(
         private readonly CanonicalRegistryReader $registryReader,
+        private readonly CanonicalMappingSnapshotKeyResolver $snapshotKeyResolver,
         private readonly AdobeProductAttributeProviderRegistry $providerRegistry,
     ) {}
 
@@ -67,6 +69,20 @@ final class AdobeProductAttributeClassifier
         if ($canonicalCode !== null) {
             if (($channelDecision['decision_state'] ?? null) === 'account_specific') {
                 return $this->review($behaviorClass, $behaviorSignature, 'verified_mapping_conflicts_with_account_specific_decision');
+            }
+
+            $canonicalField = $this->canonicalFieldForCode($canonicalCode);
+            if (! $this->isActiveVerifiedMappableCanonicalField($canonicalField)) {
+                return new ConnectorSchemaFieldClassificationDecision(
+                    ConnectorSchemaFieldDisposition::ProviderStandard,
+                    $behaviorClass,
+                    $behaviorSignature,
+                    null,
+                    $canonicalCode,
+                    'canonical_target_not_ready',
+                    self::CLASSIFIER_VERSION,
+                    'canonical_field_not_active_verified_or_eligible',
+                );
             }
 
             return new ConnectorSchemaFieldClassificationDecision(
@@ -237,7 +253,7 @@ final class AdobeProductAttributeClassifier
     {
         $codes = [];
         foreach ($this->registryReader->verifiedMappingsForChannel('adobe_commerce') as $row) {
-            $mappedKey = $this->snapshotKeyFromVerifiedMapping($row);
+            $mappedKey = $this->snapshotKeyResolver->resolve('adobe_commerce', $row);
             if ($mappedKey === $externalFieldKey) {
                 $codes[$row['internal_code']] = true;
             }
@@ -284,21 +300,12 @@ final class AdobeProductAttributeClassifier
             && ($field['verification_status'] ?? '') === 'verified';
     }
 
-    /** @param array<string, string> $row */
-    private function snapshotKeyFromVerifiedMapping(array $row): ?string
+    /** @param array<string, string>|null $field */
+    private function isActiveVerifiedMappableCanonicalField(?array $field): bool
     {
-        $external = $row['external_field'];
-        if (preg_match('/^custom_attributes\\[attribute_code=([^\\]]+)\\]\\.value$/', $external, $matches) === 1) {
-            return $matches[1];
-        }
-        if (($row['transformation'] ?? '') === 'category_relation_to_adobe_category_ids') {
-            return 'category_ids';
-        }
-        if (preg_match('/^[A-Za-z0-9_]+$/', $external) === 1) {
-            return $external;
-        }
-
-        return null;
+        return $this->isActiveVerifiedCanonicalField($field)
+            && ($field['field_definition_eligibility'] ?? '') === 'yes'
+            && in_array(($field['scope'] ?? ''), ['system', 'platform_library'], true);
     }
 
     private function review(

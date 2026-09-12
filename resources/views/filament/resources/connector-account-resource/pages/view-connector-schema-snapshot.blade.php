@@ -29,6 +29,18 @@
                     {{ $fieldCount }}
                 </dd>
             </div>
+            @if ($classificationSummary !== [])
+                <div class="sm:col-span-2">
+                    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                        @foreach ($classificationSummary as $item)
+                            <div class="rounded-lg border border-gray-200 px-3 py-2 dark:border-white/10">
+                                <div class="text-xs text-gray-500 dark:text-gray-400">{{ $item['label'] }}</div>
+                                <div class="mt-1 text-lg font-semibold text-gray-950 dark:text-white">{{ $item['count'] }}</div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
             @if (! $layerBPresentation && $snapshotStateLabel !== null)
                 <div>
                     <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">

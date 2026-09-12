@@ -23,6 +23,8 @@ use App\Services\Connectors\ConnectorDiscoveryDispatchPort;
 use App\Services\Sync\CanonicalFieldMappingSuggestionProvider;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\FieldMappingReadModelProjector;
+use App\Services\Sync\VerifiedCanonicalMappingEligibilityResolver;
+use App\Support\CanonicalRegistry\CanonicalMappingSnapshotKeyResolver;
 use App\Support\CanonicalRegistry\CanonicalRegistryReader;
 use App\Support\Connectors\ConnectorDiscoveryDispatchDecision;
 use App\Support\Connectors\ConnectorProfileRegistry;
@@ -986,13 +988,17 @@ class ManageSyncFieldMappingsPageTest extends TestCase
         $this->app->instance(CanonicalRegistryReader::class, $reader);
         $this->app->instance(
             CanonicalFieldMappingSuggestionProvider::class,
-            new CanonicalFieldMappingSuggestionProvider($reader),
+            new CanonicalFieldMappingSuggestionProvider(
+                $reader,
+                app(CanonicalMappingSnapshotKeyResolver::class),
+            ),
         );
         $this->app->instance(
             FieldMappingReadModelProjector::class,
             new FieldMappingReadModelProjector(
                 app(AuthoritativeConnectorSchemaSnapshotResolver::class),
                 app(CanonicalFieldMappingSuggestionProvider::class),
+                app(VerifiedCanonicalMappingEligibilityResolver::class),
             ),
         );
 

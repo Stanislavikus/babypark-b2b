@@ -28,6 +28,8 @@ use App\Services\Connectors\AuthoritativeConnectorSchemaSnapshotResolver;
 use App\Services\Sync\CanonicalFieldMappingSuggestionProvider;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\FieldMappingReadModelProjector;
+use App\Services\Sync\VerifiedCanonicalMappingEligibilityResolver;
+use App\Support\CanonicalRegistry\CanonicalMappingSnapshotKeyResolver;
 use App\Support\CanonicalRegistry\CanonicalRegistryReader;
 use App\Support\Sync\Exceptions\FieldMappingProjectionInvariantException;
 use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
@@ -249,7 +251,7 @@ class FieldMappingSuggestionReadModelTest extends TestCase
     }
 
     #[Test]
-    public function adobe_description_does_not_suggest_description_due_to_transport_path_mismatch(): void
+    public function adobe_description_suggests_description_through_verified_transport_path_resolution(): void
     {
         $account = $this->createSyncSupportAccount();
         $configuration = $this->createProductsSyncConfiguration($account);
@@ -259,7 +261,7 @@ class FieldMappingSuggestionReadModelTest extends TestCase
 
         $descriptionRow = $this->rowForCode($model, 'description', FieldObjectType::Product);
 
-        $this->assertNull($descriptionRow->suggestedExternalFieldKey);
+        $this->assertSame('description', $descriptionRow->suggestedExternalFieldKey);
     }
 
     #[Test]
@@ -1158,13 +1160,17 @@ class FieldMappingSuggestionReadModelTest extends TestCase
         $this->app->instance(CanonicalRegistryReader::class, $reader);
         $this->app->instance(
             CanonicalFieldMappingSuggestionProvider::class,
-            new CanonicalFieldMappingSuggestionProvider($reader),
+            new CanonicalFieldMappingSuggestionProvider(
+                $reader,
+                app(CanonicalMappingSnapshotKeyResolver::class),
+            ),
         );
         $this->app->instance(
             FieldMappingReadModelProjector::class,
             new FieldMappingReadModelProjector(
                 app(AuthoritativeConnectorSchemaSnapshotResolver::class),
                 app(CanonicalFieldMappingSuggestionProvider::class),
+                app(VerifiedCanonicalMappingEligibilityResolver::class),
             ),
         );
     }

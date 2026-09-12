@@ -47,7 +47,8 @@ class ConnectorSchemaFieldClassificationProjectorTest extends TestCase
             ->where('connector_schema_source_id', $source->id);
 
         $this->assertSame(1000, (clone $query)->count());
-        $this->assertSame(5, (clone $query)->where('disposition', ConnectorSchemaFieldDisposition::CanonicalPlatform->value)->count());
+        $this->assertSame(4, (clone $query)->where('disposition', ConnectorSchemaFieldDisposition::CanonicalPlatform->value)->count());
+        $this->assertSame(1, (clone $query)->where('disposition', ConnectorSchemaFieldDisposition::ProviderStandard->value)->count());
         $this->assertSame(995, (clone $query)->where('disposition', ConnectorSchemaFieldDisposition::WorkspaceCustom->value)->count());
         $this->assertSame(0, (clone $query)->where('disposition', ConnectorSchemaFieldDisposition::ReviewNeeded->value)->count());
         $this->assertSame(1, (clone $query)->where('disposition', ConnectorSchemaFieldDisposition::WorkspaceCustom->value)->distinct()->count('behavior_class'));

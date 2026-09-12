@@ -2,15 +2,21 @@
 
 namespace App\Filament\Resources\ConnectorAccountResource\Pages;
 
+use App\Enums\ConnectorSchemaFieldDisposition;
+use App\Enums\SyncDataDomain;
 use App\Filament\Resources\ConnectorAccountResource;
 use App\Models\ConnectorAccount;
+use App\Models\ConnectorSchemaFieldClassification;
 use App\Models\ConnectorSchemaSnapshot;
 use App\Models\ConnectorSchemaSnapshotField;
+use App\Models\FieldMapping;
+use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Connectors\ConnectorAccountCapabilityPresentation;
 use App\Support\Connectors\ConnectorAuthorization;
 use App\Support\Connectors\ConnectorSchemaFieldPresenter;
+use App\Support\Connectors\ConnectorSchemaFieldReadinessPresenter;
 use App\Support\Connectors\ConnectorUiFormatter;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
@@ -53,6 +59,9 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
 
     public ?string $snapshotStateLabel;
 
+    /** @var list<array{code: string, label: string, count: int}> */
+    public array $classificationSummary = [];
+
     public bool $layerBPresentation = false;
 
     #[Locked]
@@ -75,6 +84,13 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
 
     #[Url(as: 'sort')]
     public ?string $tableSort = null;
+
+    #[Url(as: 'configuration')]
+    public ?string $configurationId = null;
+
+    protected bool $configurationContextResolved = false;
+
+    protected ?string $resolvedConfigurationId = null;
 
     public function getTitle(): string|Htmlable
     {
@@ -104,6 +120,12 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
     {
         $this->account = $this->resolveAccountRecord($record);
         $this->accountId = (string) $this->account->getKey();
+
+        $queryConfiguration = request()->query('configuration');
+        if ($this->configurationId === null && is_string($queryConfiguration) && $queryConfiguration !== '') {
+            $this->configurationId = $queryConfiguration;
+        }
+
         $snapshotRecord = $this->resolveSnapshotRecord($snapshot);
         $this->snapshotId = (string) $snapshotRecord->getKey();
 
@@ -114,6 +136,7 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
         $this->capturedAt = ConnectorUiFormatter::formatDateTime($snapshotRecord->captured_at);
         $this->fieldCount = $snapshotRecord->field_count;
         $this->snapshotStateLabel = null;
+        $this->loadClassificationSummary();
     }
 
     public function table(Table $table): Table
@@ -145,6 +168,16 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
                     ->label(__('connectors.ui.snapshot.fields.columns.type'))
                     ->formatStateUsing(fn (?string $state): string => ConnectorSchemaFieldPresenter::normalizedDataTypeLabel($state))
                     ->sortable(),
+                TextColumn::make('classification_disposition')
+                    ->label(__('connectors.ui.snapshot.fields.columns.disposition'))
+                    ->getStateUsing(fn (ConnectorSchemaSnapshotField $record): string => ConnectorSchemaFieldReadinessPresenter::dispositionLabel(
+                        $record->getAttribute('classification_disposition'),
+                    )),
+                TextColumn::make('mapping_readiness')
+                    ->label(__('connectors.ui.snapshot.fields.columns.readiness'))
+                    ->getStateUsing(fn (ConnectorSchemaSnapshotField $record): string => ConnectorSchemaFieldReadinessPresenter::readinessLabel(
+                        $this->readinessCodeForRecord($record),
+                    )),
                 TextColumn::make('is_required')
                     ->label(__('connectors.ui.snapshot.fields.columns.required'))
                     ->getStateUsing(fn (ConnectorSchemaSnapshotField $record): string => ConnectorSchemaFieldPresenter::booleanLabel($record->is_required)),
@@ -223,6 +256,22 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
                 TextEntry::make('normalized_data_type')
                     ->label(__('connectors.ui.snapshot.fields.detail.type'))
                     ->formatStateUsing(fn (?string $state): string => ConnectorSchemaFieldPresenter::normalizedDataTypeLabel($state)),
+                TextEntry::make('classification_disposition')
+                    ->label(__('connectors.ui.snapshot.fields.columns.disposition'))
+                    ->getStateUsing(fn (ConnectorSchemaSnapshotField $record): string => ConnectorSchemaFieldReadinessPresenter::dispositionLabel(
+                        $record->getAttribute('classification_disposition'),
+                    )),
+                TextEntry::make('mapping_readiness')
+                    ->label(__('connectors.ui.snapshot.fields.columns.readiness'))
+                    ->getStateUsing(fn (ConnectorSchemaSnapshotField $record): string => ConnectorSchemaFieldReadinessPresenter::readinessLabel(
+                        $this->readinessCodeForRecord($record),
+                    )),
+                TextEntry::make('classification_behavior_class')
+                    ->label(__('connectors.ui.snapshot.fields.columns.behavior_class'))
+                    ->placeholder(__('connectors.ui.common.dash')),
+                TextEntry::make('classification_reason_code')
+                    ->label(__('connectors.ui.snapshot.fields.columns.reason'))
+                    ->placeholder(__('connectors.ui.common.dash')),
                 TextEntry::make('is_required')
                     ->label(__('connectors.ui.snapshot.fields.detail.required'))
                     ->getStateUsing(fn (ConnectorSchemaSnapshotField $record): string => ConnectorSchemaFieldPresenter::booleanLabel($record->is_required)),
@@ -246,17 +295,36 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
 
     protected function getFieldTableQuery(): Builder
     {
-        return ConnectorSchemaSnapshotField::query()
+        $query = ConnectorSchemaSnapshotField::query()
             ->select([
-                'id',
-                'external_field_key',
-                'external_label',
-                'normalized_data_type',
-                'is_required',
-                'is_multi_value',
-                'is_localizable',
-                'external_scope',
-                'sort_order',
+                'connector_schema_snapshot_fields.id',
+                'connector_schema_snapshot_fields.external_field_key',
+                'connector_schema_snapshot_fields.external_label',
+                'connector_schema_snapshot_fields.normalization_status',
+                'connector_schema_snapshot_fields.normalized_data_type',
+                'connector_schema_snapshot_fields.is_required',
+                'connector_schema_snapshot_fields.is_multi_value',
+                'connector_schema_snapshot_fields.is_localizable',
+                'connector_schema_snapshot_fields.external_scope',
+                'connector_schema_snapshot_fields.sort_order',
+            ])
+            ->addSelect([
+                'classification_disposition' => ConnectorSchemaFieldClassification::withoutWorkspaceScope()
+                    ->select('disposition')
+                    ->whereColumn('latest_snapshot_field_id', 'connector_schema_snapshot_fields.id')
+                    ->limit(1),
+                'classification_mapping_strategy' => ConnectorSchemaFieldClassification::withoutWorkspaceScope()
+                    ->select('mapping_strategy')
+                    ->whereColumn('latest_snapshot_field_id', 'connector_schema_snapshot_fields.id')
+                    ->limit(1),
+                'classification_behavior_class' => ConnectorSchemaFieldClassification::withoutWorkspaceScope()
+                    ->select('behavior_class')
+                    ->whereColumn('latest_snapshot_field_id', 'connector_schema_snapshot_fields.id')
+                    ->limit(1),
+                'classification_reason_code' => ConnectorSchemaFieldClassification::withoutWorkspaceScope()
+                    ->select('reason_code')
+                    ->whereColumn('latest_snapshot_field_id', 'connector_schema_snapshot_fields.id')
+                    ->limit(1),
             ])
             ->where('snapshot_id', $this->snapshotId)
             ->whereHas(
@@ -265,6 +333,103 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
                     ->whereKey($this->snapshotId)
                     ->where('connector_account_id', $this->accountId),
             );
+
+        $configurationId = $this->effectiveMappingConfigurationId();
+
+        if ($configurationId !== null) {
+            $query->addSelect([
+                'active_mapping_id' => FieldMapping::withoutWorkspaceScope()
+                    ->select('id')
+                    ->where('sync_configuration_id', $configurationId)
+                    ->whereColumn('external_field_key', 'connector_schema_snapshot_fields.external_field_key')
+                    ->limit(1),
+            ]);
+        } else {
+            $query->selectRaw('NULL AS active_mapping_id');
+        }
+
+        return $query;
+    }
+
+    private function readinessCodeForRecord(ConnectorSchemaSnapshotField $record): string
+    {
+        return ConnectorSchemaFieldReadinessPresenter::readinessCode(
+            $record->getAttribute('classification_disposition'),
+            $record->getAttribute('classification_mapping_strategy'),
+            $record->getAttribute('active_mapping_id') !== null,
+            $this->effectiveMappingConfigurationId() !== null,
+        );
+    }
+
+    private function effectiveMappingConfigurationId(): ?string
+    {
+        if ($this->configurationContextResolved) {
+            return $this->resolvedConfigurationId;
+        }
+
+        $this->configurationContextResolved = true;
+        if ($this->configurationId === null || $this->configurationId === '') {
+            return null;
+        }
+
+        $this->resolvedConfigurationId = SyncConfiguration::withoutWorkspaceScope()
+            ->where('workspace_id', $this->account->workspace_id)
+            ->where('connector_account_id', $this->accountId)
+            ->where('data_domain', SyncDataDomain::Products->value)
+            ->whereKey($this->configurationId)
+            ->value('id');
+
+        return $this->resolvedConfigurationId;
+    }
+
+    private function loadClassificationSummary(): void
+    {
+        $fieldIds = ConnectorSchemaSnapshotField::withoutWorkspaceScope()
+            ->where('workspace_id', $this->account->workspace_id)
+            ->where('snapshot_id', $this->snapshotId)
+            ->pluck('id');
+
+        if ($fieldIds->isEmpty()) {
+            $this->classificationSummary = [];
+
+            return;
+        }
+
+        $counts = ConnectorSchemaFieldClassification::withoutWorkspaceScope()
+            ->where('workspace_id', $this->account->workspace_id)
+            ->where('connector_account_id', $this->accountId)
+            ->whereIn('latest_snapshot_field_id', $fieldIds->all())
+            ->selectRaw('disposition, COUNT(*) AS total')
+            ->groupBy('disposition')
+            ->pluck('total', 'disposition');
+
+        $summary = [];
+        $configurationId = $this->effectiveMappingConfigurationId();
+        if ($configurationId !== null) {
+            $externalKeys = ConnectorSchemaSnapshotField::withoutWorkspaceScope()
+                ->where('workspace_id', $this->account->workspace_id)
+                ->where('snapshot_id', $this->snapshotId)
+                ->pluck('external_field_key');
+            $mapped = FieldMapping::withoutWorkspaceScope()
+                ->where('sync_configuration_id', $configurationId)
+                ->whereIn('external_field_key', $externalKeys->all())
+                ->count();
+            $summary[] = [
+                'code' => 'mapped',
+                'label' => ConnectorSchemaFieldReadinessPresenter::readinessLabel('mapped'),
+                'count' => $mapped,
+            ];
+        }
+
+        foreach (ConnectorSchemaFieldDisposition::cases() as $disposition) {
+            $summary[] = [
+                'code' => $disposition->value,
+                'label' => ConnectorSchemaFieldReadinessPresenter::dispositionLabel($disposition->value),
+                'count' => (int) ($counts[$disposition->value] ?? 0),
+            ];
+        }
+
+        $this->classificationSummary = $summary;
     }
 
     protected function resolveAccountRecord(int|string $key): ConnectorAccount

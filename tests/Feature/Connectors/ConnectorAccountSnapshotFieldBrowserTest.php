@@ -4,15 +4,18 @@ namespace Tests\Feature\Connectors;
 
 use App\Enums\ConnectorDiscoveryRunStatus;
 use App\Enums\ConnectorDiscoveryRunTrigger;
+use App\Enums\ConnectorSchemaFieldDisposition;
 use App\Enums\UserRole;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorSchemaSnapshot;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorDiscoveryRun;
+use App\Models\ConnectorSchemaFieldClassification;
 use App\Models\ConnectorSchemaSnapshot;
 use App\Models\ConnectorSchemaSnapshotField;
 use App\Models\ConnectorSchemaSource;
 use App\Models\User;
 use App\Support\Connectors\ConnectorSchemaFieldPresenter;
+use App\Support\Connectors\ConnectorSchemaFieldReadinessPresenter;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspacePermissionSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -89,6 +92,55 @@ class ConnectorAccountSnapshotFieldBrowserTest extends TestCase
             ->assertSee(ConnectorSchemaFieldPresenter::booleanLabel(true))
             ->assertSee(ConnectorSchemaFieldPresenter::booleanLabel(null))
             ->assertSee(__('connectors.ui.snapshot.fields.section_title'));
+    }
+
+    #[Test]
+    public function unclassified_v2_field_renders_review_state_without_type_failure(): void
+    {
+        $admin = $this->createMappingAuthorizedAdmin();
+        [$account, $snapshot] = $this->createSnapshotWithFields([[
+            'external_field_key' => 'future_widget_field',
+            'external_label' => 'Future Widget',
+            'normalization_status' => 'unclassified',
+            'normalization_failure_reason' => 'unmapped_value',
+            'normalized_data_type' => null,
+            'is_required' => null,
+            'is_multi_value' => null,
+            'is_localizable' => null,
+            'external_scope' => null,
+        ]]);
+        $snapshot->forceFill(['canonical_hash_version' => 'v2'])->save();
+        $field = ConnectorSchemaSnapshotField::withoutWorkspaceScope()
+            ->where('snapshot_id', $snapshot->id)
+            ->where('external_field_key', 'future_widget_field')
+            ->firstOrFail();
+
+        ConnectorSchemaFieldClassification::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'connector_schema_source_id' => $snapshot->connector_schema_source_id,
+            'external_field_key' => $field->external_field_key,
+            'latest_snapshot_field_id' => $field->id,
+            'disposition' => ConnectorSchemaFieldDisposition::ReviewNeeded,
+            'behavior_class' => 'adobe.product_attribute.v1.test',
+            'behavior_signature' => ['provider' => 'adobe_commerce'],
+            'mapping_strategy' => 'none_review_required',
+            'classifier_version' => 'test.v1',
+            'reason_code' => 'semantic_normalization_failed',
+            'classified_canonical_hash' => $field->canonical_hash,
+            'computed_at' => now(),
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(ViewConnectorSchemaSnapshot::class, [
+                'record' => $account->getKey(),
+                'snapshot' => $snapshot->getKey(),
+            ])
+            ->assertSee('future_widget_field')
+            ->assertSee(ConnectorSchemaFieldPresenter::normalizedDataTypeLabel(null))
+            ->assertSee(ConnectorSchemaFieldReadinessPresenter::dispositionLabel('review_needed'))
+            ->assertSee(ConnectorSchemaFieldReadinessPresenter::readinessLabel('review_required'));
     }
 
     #[Test]

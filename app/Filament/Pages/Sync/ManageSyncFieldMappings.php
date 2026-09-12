@@ -567,6 +567,7 @@ class ManageSyncFieldMappings extends Page implements HasActions, HasSchemas
         return ConnectorAccountResource::getUrl('view-snapshot', [
             'record' => $this->accountId,
             'snapshot' => $snapshot->id,
+            'configuration' => $this->configurationId,
         ]);
     }
 

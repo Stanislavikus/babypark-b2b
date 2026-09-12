@@ -25,6 +25,7 @@ final class FieldMappingReadModelProjector
     public function __construct(
         private readonly AuthoritativeConnectorSchemaSnapshotResolver $snapshotResolver,
         private readonly CanonicalFieldMappingSuggestionProvider $suggestionProvider,
+        private readonly VerifiedCanonicalMappingEligibilityResolver $mappingEligibilityResolver,
     ) {}
 
     public function project(
@@ -63,6 +64,9 @@ final class FieldMappingReadModelProjector
         }
 
         $snapshotExternalFieldKeys = array_fill_keys(array_keys($snapshotFieldsByKey), true);
+        $suggestionEligibleExternalFieldKeys = $snapshot === null
+            ? []
+            : $this->mappingEligibilityResolver->eligibleExternalKeys($account, $snapshot, $snapshotFieldsByKey);
 
         if ($configuration->data_domain !== SyncDataDomain::Products) {
             return new FieldMappingReadModel(
@@ -100,7 +104,7 @@ final class FieldMappingReadModelProjector
             ? $this->suggestionProvider->suggest(
                 $configuration->workspace_id,
                 $account->connectorDefinition->code,
-                $snapshotExternalFieldKeys,
+                $suggestionEligibleExternalFieldKeys,
                 $reservedBindingIds,
                 $reservedExternalKeys,
             )

@@ -5,6 +5,7 @@ namespace App\Jobs\Connectors;
 use App\Enums\ConnectorDiscoveryRunLifecycleErrorCode;
 use App\Services\Connectors\AdobePaaSDiscoveryService;
 use App\Services\Connectors\ConnectorDiscoveryRunPersistence;
+use App\Services\Sync\VerifiedCanonicalFieldMappingMaterializer;
 use App\Support\Connectors\ConnectorAccountOperationLock;
 use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceInvalidAfterReservationException;
 use Carbon\CarbonImmutable;
@@ -60,9 +61,12 @@ class ConnectorDiscoveryRunJob implements ShouldQueue
     public function handle(
         AdobePaaSDiscoveryService $service,
         ConnectorDiscoveryRunPersistence $persistence,
+        ?VerifiedCanonicalFieldMappingMaterializer $mappingMaterializer = null,
     ): void {
+        $mappingMaterializer ??= app(VerifiedCanonicalFieldMappingMaterializer::class);
+
         try {
-            $this->handleSafely($service, $persistence);
+            $this->handleSafely($service, $persistence, $mappingMaterializer);
         } catch (ConnectorDiscoveryRunJobExecutionException $exception) {
             throw $exception;
         } catch (\Throwable) {
@@ -73,6 +77,7 @@ class ConnectorDiscoveryRunJob implements ShouldQueue
     private function handleSafely(
         AdobePaaSDiscoveryService $service,
         ConnectorDiscoveryRunPersistence $persistence,
+        VerifiedCanonicalFieldMappingMaterializer $mappingMaterializer,
     ): void {
         $slot = $persistence->reserveExecutionSlot(
             $this->workspaceId,
@@ -135,6 +140,16 @@ class ConnectorDiscoveryRunJob implements ShouldQueue
 
         if ($releaseDelaySeconds !== null) {
             $this->release($releaseDelaySeconds);
+
+            return;
+        }
+
+        if ($result->succeeded) {
+            try {
+                $mappingMaterializer->materialize($this->workspaceId, $this->connectorAccountId);
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
         }
     }
 
