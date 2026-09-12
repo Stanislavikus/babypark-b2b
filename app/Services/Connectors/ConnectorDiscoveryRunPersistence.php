@@ -23,6 +23,7 @@ final class ConnectorDiscoveryRunPersistence
 
     public function __construct(
         private readonly ConnectorDiscoverySourceResolver $sourceResolver,
+        private readonly ConnectorSchemaFieldClassificationProjector $classificationProjector,
     ) {}
 
     public function persistAttemptDurationOnly(
@@ -502,6 +503,8 @@ final class ConnectorDiscoveryRunPersistence
         foreach ($candidate->fields as $index => $normalizedField) {
             $this->createSnapshotField($row, $snapshot, $normalizedField, $index);
         }
+
+        $this->classificationProjector->project($account, $source, $snapshot);
 
         $row->update([
             'status' => ConnectorDiscoveryRunStatus::Succeeded,

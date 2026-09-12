@@ -1,0 +1,341 @@
+{
+  "schema_version": "adobe.product_attribute_registry.v1",
+  "provider": "adobe_commerce",
+  "surface": "product_attribute",
+  "attributes": {
+    "price": {
+      "owner": "pricing",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "special_price": {
+      "owner": "pricing",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "special_from_date": {
+      "owner": "pricing",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "special_to_date": {
+      "owner": "pricing",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "cost": {
+      "owner": "pricing",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "minimal_price": {
+      "owner": "pricing",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "msrp": {
+      "owner": "pricing",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "msrp_display_actual_price_type": {
+      "owner": "pricing",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "tax_class_id": {
+      "owner": "pricing",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "image": {
+      "owner": "media",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "small_image": {
+      "owner": "media",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "thumbnail": {
+      "owner": "media",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "swatch_image": {
+      "owner": "media",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "image_label": {
+      "owner": "media",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "small_image_label": {
+      "owner": "media",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "thumbnail_label": {
+      "owner": "media",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "media_gallery": {
+      "owner": "media",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "gallery": {
+      "owner": "media",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "category_ids": {
+      "owner": "relations",
+      "evidence_refs": [
+        "docs/data/canonical_product_field_mappings.csv"
+      ]
+    },
+    "created_at": {
+      "owner": "system",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "updated_at": {
+      "owner": "system",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "has_options": {
+      "owner": "system",
+      "evidence_refs": [
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "required_options": {
+      "owner": "system",
+      "evidence_refs": [
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "visibility": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "weight": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "country_of_manufacture": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "news_from_date": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "news_to_date": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "url_key": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "url_path": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "meta_keyword": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "options_container": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "gift_message_available": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "custom_design": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "custom_design_from": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "custom_design_to": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "custom_layout_update": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "page_layout": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/adobe_commerce_v1_inventory_master.csv"
+      ]
+    },
+    "price_type": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "price_view": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "shipment_type": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "sku_type": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "weight_type": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/data/adobe_commerce_v1_alias_groups.csv"
+      ]
+    },
+    "color": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/data/adobe_commerce_v1_inventory_master.csv",
+        "docs/data/canonical_product_field_channel_decisions.csv"
+      ]
+    },
+    "manufacturer": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/data/adobe_commerce_v1_inventory_master.csv",
+        "docs/data/canonical_product_field_channel_decisions.csv"
+      ]
+    },
+    "meta_title": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/data/adobe_commerce_v1_inventory_master.csv",
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/canonical_product_field_channel_decisions.csv"
+      ]
+    },
+    "meta_description": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/data/adobe_commerce_v1_inventory_master.csv",
+        "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+        "docs/data/canonical_product_field_channel_decisions.csv"
+      ]
+    }
+  },
+  "source_contracts": [
+    "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
+    "docs/data/adobe_commerce_v1_inventory_master.csv",
+    "docs/data/adobe_commerce_v1_alias_groups.csv",
+    "docs/data/canonical_product_field_mappings.csv",
+    "docs/data/canonical_product_field_channel_decisions.csv"
+  ]
+}

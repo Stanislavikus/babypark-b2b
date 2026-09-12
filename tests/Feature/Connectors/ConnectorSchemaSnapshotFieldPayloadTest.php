@@ -3,8 +3,10 @@
 namespace Tests\Feature\Connectors;
 
 use App\Enums\ConnectorDiscoveryRunStatus;
+use App\Enums\ConnectorSchemaFieldDisposition;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorDiscoveryRun;
+use App\Models\ConnectorSchemaFieldClassification;
 use App\Models\ConnectorSchemaSnapshot;
 use App\Models\ConnectorSchemaSnapshotField;
 use App\Services\Connectors\ConnectorDiscoveryRunPersistence;
@@ -115,6 +117,47 @@ class ConnectorSchemaSnapshotFieldPayloadTest extends TestCase
         $this->assertSame(5, $persisted->sort_order);
         $this->assertSame('{"options":[]}', json_encode($persisted->normalized_payload, JSON_THROW_ON_ERROR));
         $this->assertDatabaseJsonTypes($persisted->id, expectsOptionsArray: true);
+    }
+
+    #[Test]
+    public function finalize_after_vendor_attempt_projects_current_field_classification(): void
+    {
+        $account = $this->createConnectorAccount();
+        $row = $this->createQueuedRow($account);
+        $metadata = (object) [
+            'frontend_input' => 'text',
+            'scope' => 'global',
+            'backend_type' => 'varchar',
+            'source_model' => null,
+            'backend_model' => null,
+            'is_user_defined' => true,
+            'apply_to' => [],
+        ];
+        $field = $this->buildNormalizedField(
+            externalFieldKey: 'merchant_runtime_attribute',
+            payload: CanonicalSchemaPayload::withProviderMetadata(
+                'adobe.product_attribute.v1',
+                $metadata,
+            ),
+            sortOrder: 7,
+        );
+
+        $this->publishThroughFinalizeAfterVendorAttempt($account, $row, [$field]);
+
+        $persistedField = ConnectorSchemaSnapshotField::withoutWorkspaceScope()
+            ->where('snapshot_id', $row->fresh()->snapshot_id)
+            ->where('external_field_key', 'merchant_runtime_attribute')
+            ->firstOrFail();
+        $classification = ConnectorSchemaFieldClassification::withoutWorkspaceScope()
+            ->where('connector_account_id', $account->id)
+            ->where('connector_schema_source_id', $row->connector_schema_source_id)
+            ->where('external_field_key', 'merchant_runtime_attribute')
+            ->firstOrFail();
+
+        $this->assertSame(ConnectorSchemaFieldDisposition::WorkspaceCustom, $classification->disposition);
+        $this->assertSame($persistedField->id, $classification->latest_snapshot_field_id);
+        $this->assertNotNull($classification->behavior_class);
+        $this->assertSame('stage2_workspace_materialization', $classification->mapping_strategy);
     }
 
     #[Test]

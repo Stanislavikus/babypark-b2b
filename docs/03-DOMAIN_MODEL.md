@@ -3887,6 +3887,29 @@ On successful Adobe v2 discovery, `fields_identified = fields_normalized + field
 
 Historical rows are preserved: migration backfills existing snapshot rows with `canonical_hash_version = v1` and existing snapshot-field rows with `normalization_status = normalized`; it does not recalculate historical hashes or invent rows for service-only fields that v1 deliberately omitted.
 
+### ConnectorSchemaFieldClassification (Resolved — Magento universal schema Stage 1, 2026-09-12)
+
+`connector_schema_field_classifications` is a **derived, recomputable current projection**, not discovery source truth. Immutable `ConnectorSchemaSnapshotField` rows remain authoritative evidence. One current projection row is keyed by `(workspace_id, connector_account_id, connector_schema_source_id, external_field_key)` and points only to `latest_snapshot_field_id`; a duplicate `latest_snapshot_id` is intentionally forbidden because the snapshot is reachable through that field row.
+
+Persisted facts are: `disposition`, deterministic `behavior_class` + `behavior_signature`, optional `runtime_owner_hint`, optional `canonical_code`, `mapping_strategy`, `classifier_version`, machine-readable `reason_code`, `classified_canonical_hash`, and `computed_at`. Generic readiness/support flags are **not persisted**. Merchant-facing readiness such as usable/deferred/review/blocked must be derived later from classification + effective mapping + runtime owner + operation-specific blockers.
+
+The runtime disposition vocabulary is exactly:
+
+- `canonical_platform`;
+- `provider_standard`;
+- `workspace_custom`;
+- `system_or_dedicated_owner`;
+- `review_needed`;
+- `unsupported`.
+
+**Field identity is not behavior identity.** `external_field_key` never participates in the behavior-class hash. Behavior identity is derived from provider/surface, normalized/raw type facts, scope, cardinality, option semantics, `source_model`, `backend_model`, `apply_to`, required/localizable facts, clear-semantics state, and dedicated runtime owner when proven. `is_user_defined` is classification/disposition evidence, not a behavior dimension; two keys with identical mechanics may therefore reuse one behavior class.
+
+Adobe classification evidence precedence is fail-closed: third-party special models → verified canonical mapping rules / dedicated-owner evidence → verified Canonical Registry channel decisions → provider registry evidence → user-defined custom evidence → review. A verified Adobe channel decision of `account_specific` prevents literal-name promotion to canonical; `deferred` may recognize an active+verified canonical concept only when provider identity is independently proven, but it does not manufacture a verified mapping. Current verified examples: `color` and `manufacturer` are `account_specific`; `meta_title` and `meta_description` are `deferred`.
+
+Provider-standard/dedicated-owner claims must carry durable frozen evidence in `resources/connector-registry/adobe_commerce_product_attribute_registry.json`. Appearance on one real target, label similarity, or `is_user_defined` alone is insufficient. Any unresolved provider object/field/ownership rule is recorded in `docs/connectors/adobe-commerce/MAGENTO_V1_RESEARCH_QUEUE.md` and remains `review_needed` until authoritative evidence closes the item.
+
+Classification is recomputed when a new authoritative snapshot is published. The current row records the latest field hash it classified (`classified_canonical_hash`) and classifier version. An incompatible semantic change such as `select → multiselect` changes the behavior class without silently rewriting persisted FieldMapping state.
+
 ### ConnectorSchemaDiff / ConnectorSchemaDiffItem (Resolved schema; dormant runtime)
 
 `connector_schema_diffs` compares `from_snapshot_id` → `to_snapshot_id` with
