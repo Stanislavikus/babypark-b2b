@@ -329,6 +329,36 @@
         "docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json",
         "docs/data/canonical_product_field_channel_decisions.csv"
       ]
+    },
+    "quantity_and_stock_status": {
+      "owner": "inventory",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/MAGENTO_V1_PROVIDER_IDENTITY_EVIDENCE_2026_09_13.md"
+      ]
+    },
+    "tier_price": {
+      "owner": "pricing",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/MAGENTO_V1_PROVIDER_IDENTITY_EVIDENCE_2026_09_13.md"
+      ]
+    },
+    "custom_layout": {
+      "owner": null,
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/MAGENTO_V1_PROVIDER_IDENTITY_EVIDENCE_2026_09_13.md"
+      ]
+    },
+    "links_purchased_separately": {
+      "owner": "downloadable",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/MAGENTO_V1_PROVIDER_IDENTITY_EVIDENCE_2026_09_13.md"
+      ]
+    },
+    "links_title": {
+      "owner": "downloadable",
+      "evidence_refs": [
+        "docs/connectors/adobe-commerce/MAGENTO_V1_PROVIDER_IDENTITY_EVIDENCE_2026_09_13.md"
+      ]
     }
   },
   "source_contracts": [
@@ -336,6 +366,7 @@
     "docs/data/adobe_commerce_v1_inventory_master.csv",
     "docs/data/adobe_commerce_v1_alias_groups.csv",
     "docs/data/canonical_product_field_mappings.csv",
-    "docs/data/canonical_product_field_channel_decisions.csv"
+    "docs/data/canonical_product_field_channel_decisions.csv",
+    "docs/connectors/adobe-commerce/MAGENTO_V1_PROVIDER_IDENTITY_EVIDENCE_2026_09_13.md"
   ]
 }

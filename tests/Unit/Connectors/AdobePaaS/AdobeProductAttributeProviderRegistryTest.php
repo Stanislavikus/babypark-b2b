@@ -40,11 +40,10 @@ class AdobeProductAttributeProviderRegistryTest extends TestCase
         $registry = app(AdobeProductAttributeProviderRegistry::class);
 
         foreach ([
-            'quantity_and_stock_status',
             'old_id',
             'custom_layout_update_file',
-            'tier_price',
-            'custom_layout',
+            'links_exist',
+            'samples_title',
         ] as $key) {
             $this->assertNull($registry->find($key), $key);
         }

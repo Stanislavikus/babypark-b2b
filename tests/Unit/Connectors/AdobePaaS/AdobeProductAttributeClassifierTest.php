@@ -182,11 +182,48 @@ class AdobeProductAttributeClassifierTest extends TestCase
         $this->assertSame('semantic_normalization_failed', $decision->reasonCode);
     }
 
+    public function test_real_target_provider_evidence_closes_inventory_pricing_layout_and_downloadable_cases(): void
+    {
+        $classifier = app(AdobeProductAttributeClassifier::class);
+
+        $inventory = $classifier->classify($this->field(
+            'quantity_and_stock_status', frontendInput: 'select', normalizedType: 'select',
+            isUserDefined: false, sourceModel: 'Magento\\CatalogInventory\\Model\\Source\\Stock',
+            backendModel: 'Magento\\Catalog\\Model\\Product\\Attribute\\Backend\\Stock',
+        ));
+        $this->assertSame(ConnectorSchemaFieldDisposition::SystemOrDedicatedOwner, $inventory->disposition);
+        $this->assertSame('inventory', $inventory->runtimeOwnerHint);
+
+        $tierPrice = $classifier->classify($this->field(
+            'tier_price', frontendInput: 'text', normalizedType: 'text', isUserDefined: false,
+            backendModel: 'Magento\\Catalog\\Model\\Product\\Attribute\\Backend\\Tierprice',
+            backendType: 'decimal',
+        ));
+        $this->assertSame(ConnectorSchemaFieldDisposition::SystemOrDedicatedOwner, $tierPrice->disposition);
+        $this->assertSame('pricing', $tierPrice->runtimeOwnerHint);
+
+        $layout = $classifier->classify($this->field(
+            'custom_layout', frontendInput: 'select', normalizedType: 'select', isUserDefined: false,
+            sourceModel: 'Magento\\Catalog\\Model\\Product\\Attribute\\Source\\Layout',
+            backendType: 'varchar',
+        ));
+        $this->assertSame(ConnectorSchemaFieldDisposition::ProviderStandard, $layout->disposition);
+
+        foreach (['links_purchased_separately', 'links_title'] as $key) {
+            $downloadable = $classifier->classify($this->field(
+                $key, frontendInput: null, normalizedType: null, isUserDefined: false,
+                normalizationStatus: 'unclassified',
+            ));
+            $this->assertSame(ConnectorSchemaFieldDisposition::SystemOrDedicatedOwner, $downloadable->disposition, $key);
+            $this->assertSame('downloadable', $downloadable->runtimeOwnerHint, $key);
+        }
+    }
+
     public function test_target_only_keys_without_provider_evidence_fail_closed_to_review(): void
     {
         $classifier = app(AdobeProductAttributeClassifier::class);
 
-        foreach (['quantity_and_stock_status', 'old_id', 'custom_layout_update_file', 'tier_price', 'custom_layout'] as $key) {
+        foreach (['old_id', 'custom_layout_update_file', 'links_exist', 'samples_title'] as $key) {
             $decision = $classifier->classify($this->field($key, isUserDefined: false));
 
             $this->assertSame(ConnectorSchemaFieldDisposition::ReviewNeeded, $decision->disposition, $key);
