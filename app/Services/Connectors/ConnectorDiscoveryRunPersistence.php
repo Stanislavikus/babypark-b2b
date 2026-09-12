@@ -13,7 +13,7 @@ use App\Models\ConnectorSchemaSnapshot;
 use App\Models\ConnectorSchemaSnapshotField;
 use App\Models\ConnectorSchemaSource;
 use App\Support\Connectors\ConnectorDiscoveryAttemptResult;
-use App\Support\Connectors\ConnectorDiscoveryNormalizedField;
+use App\Support\Connectors\ConnectorDiscoveryField;
 use App\Support\Connectors\ConnectorDiscoverySnapshotCandidate;
 use Illuminate\Support\Facades\DB;
 
@@ -493,8 +493,9 @@ final class ConnectorDiscoveryRunPersistence
             'discovery_run_id' => $row->id,
             'previous_snapshot_id' => $previousSnapshot?->id,
             'schema_version' => $source->schema_version,
-            'field_count' => $candidate->fieldsNormalized(),
+            'field_count' => $candidate->fieldsIdentified(),
             'canonical_hash' => $candidate->canonicalHash,
+            'canonical_hash_version' => $candidate->canonicalHashVersion(),
             'captured_at' => $candidate->capturedAt,
         ]);
 
@@ -507,7 +508,9 @@ final class ConnectorDiscoveryRunPersistence
             'snapshot_id' => $snapshot->id,
             'previous_snapshot_id' => $previousSnapshot?->id,
             'fields_received' => $candidate->fieldsReceived(),
+            'fields_identified' => $candidate->fieldsIdentified(),
             'fields_normalized' => $candidate->fieldsNormalized(),
+            'fields_unclassified' => $candidate->fieldsUnclassified(),
             'duration_ms' => $durationMs,
             'finished_at' => now(),
             'next_attempt_at' => null,
@@ -524,23 +527,25 @@ final class ConnectorDiscoveryRunPersistence
     private function createSnapshotField(
         ConnectorDiscoveryRun $row,
         ConnectorSchemaSnapshot $snapshot,
-        #[\SensitiveParameter] ConnectorDiscoveryNormalizedField $normalizedField,
+        #[\SensitiveParameter] ConnectorDiscoveryField $discoveredField,
         int $index,
     ): void {
-        $field = $normalizedField->field;
+        $field = $discoveredField->field;
 
         ConnectorSchemaSnapshotField::withoutWorkspaceScope()->create([
             'workspace_id' => $row->workspace_id,
             'snapshot_id' => $snapshot->id,
             'external_field_key' => $field->externalFieldKey(),
             'external_label' => $field->externalLabel(),
+            'normalization_status' => $field->normalizationStatus()->value,
+            'normalization_failure_reason' => $field->normalizationFailureReason()?->value,
             'normalized_data_type' => $field->normalizedDataType(),
             'is_required' => $field->isRequired(),
             'is_multi_value' => $field->isMultiValue(),
             'is_localizable' => $field->isLocalizable(),
             'external_scope' => $field->externalScope(),
             'normalized_payload' => $field->normalizedPayload()->toCanonicalObject(),
-            'canonical_hash' => $normalizedField->canonicalHash,
+            'canonical_hash' => $discoveredField->canonicalHash,
             'sort_order' => $field->sortOrder(),
         ]);
     }

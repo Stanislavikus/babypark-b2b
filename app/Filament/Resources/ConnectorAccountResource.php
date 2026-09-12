@@ -121,7 +121,7 @@ class ConnectorAccountResource extends Resource
                             'canonical_hash',
                         ]),
                         'snapshot.schemaSource:id,label',
-                        'snapshot.previousSnapshot:id,canonical_hash',
+                        'snapshot.previousSnapshot:id,canonical_hash,canonical_hash_version',
                     ])
                     ->latest('created_at')
                     ->first();

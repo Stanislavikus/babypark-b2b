@@ -312,7 +312,7 @@ class ViewConnectorSchemaSnapshot extends Page implements HasTable
             ->whereKey($snapshotId)
             ->with([
                 'schemaSource:id,label',
-                'previousSnapshot:id,canonical_hash',
+                'previousSnapshot:id,canonical_hash,canonical_hash_version',
             ])
             ->first();
 

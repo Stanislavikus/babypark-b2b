@@ -12,8 +12,12 @@ final class CanonicalSchemaPayload
 
     private readonly bool $hasOptions;
 
-    private function __construct(bool $hasOptions, #[\SensitiveParameter] array $options = [])
-    {
+    private function __construct(
+        bool $hasOptions,
+        #[\SensitiveParameter] array $options = [],
+        private readonly ?string $providerMetadataVersion = null,
+        #[\SensitiveParameter] private readonly ?object $providerMetadata = null,
+    ) {
         $this->hasOptions = $hasOptions;
         $this->options = $options;
     }
@@ -68,12 +72,30 @@ final class CanonicalSchemaPayload
         return new self(true, $options);
     }
 
-    public function toCanonicalObject(): object
-    {
-        if (! $this->hasOptions) {
-            return (object) [];
+    /** @param list<CanonicalSchemaOption>|null $options */
+    public static function withProviderMetadata(
+        string $version,
+        #[\SensitiveParameter] object $metadata,
+        #[\SensitiveParameter] ?array $options = null,
+    ): self {
+        if ($version === '' || ! mb_check_encoding($version, 'UTF-8')) {
+            throw ConnectorDiscoverySchemaValidationException::at(
+                ConnectorDiscoverySchemaValidationReason::InvalidType,
+                'normalized_payload',
+            );
         }
 
+        if ($options !== null) {
+            $withOptions = self::withOptions($options);
+
+            return new self(true, $withOptions->options, $version, $metadata);
+        }
+
+        return new self(false, [], $version, $metadata);
+    }
+
+    public function toCanonicalObject(): object
+    {
         $payload = new \stdClass;
         $optionObjects = [];
 
@@ -88,7 +110,14 @@ final class CanonicalSchemaPayload
             $optionObjects[] = $optionObject;
         }
 
-        $payload->options = $optionObjects;
+        if ($this->hasOptions) {
+            $payload->options = $optionObjects;
+        }
+
+        if ($this->providerMetadataVersion !== null && $this->providerMetadata !== null) {
+            $payload->provider_metadata = $this->providerMetadata;
+            $payload->provider_metadata_version = $this->providerMetadataVersion;
+        }
 
         return $payload;
     }

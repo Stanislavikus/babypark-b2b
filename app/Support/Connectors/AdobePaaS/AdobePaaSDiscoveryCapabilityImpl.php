@@ -3,13 +3,13 @@
 namespace App\Support\Connectors\AdobePaaS;
 
 use App\Enums\ConnectorDiscoveryRunErrorCode;
-use App\Enums\ConnectorDiscoverySchemaValidationReason;
 use App\Support\Connectors\CanonicalSchemaFieldHash;
-use App\Support\Connectors\CanonicalSchemaFieldHasher;
-use App\Support\Connectors\CanonicalSchemaSnapshotHasher;
 use App\Support\Connectors\ConnectorDiscoveryAttemptResult;
-use App\Support\Connectors\ConnectorDiscoveryNormalizedField;
+use App\Support\Connectors\ConnectorDiscoveryField;
+use App\Support\Connectors\ConnectorDiscoveryIdentifiedField;
 use App\Support\Connectors\ConnectorDiscoverySnapshotCandidate;
+use App\Support\Connectors\ConnectorSchemaFieldV2Hasher;
+use App\Support\Connectors\ConnectorSchemaSnapshotV2Hasher;
 use App\Support\Connectors\Exceptions\ConnectorDiscoverySchemaValidationException;
 use App\Support\Connectors\OAuth1\OAuth1SigningContext;
 use App\Support\Connectors\Transport\ConnectorHttpTransport;
@@ -17,7 +17,6 @@ use App\Support\Connectors\Transport\ConnectorOutboundRequest;
 use App\Support\Connectors\Transport\ConnectorTransportException;
 use App\Support\Connectors\Transport\ConnectorTransportLimits;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\Log;
 
 final class AdobePaaSDiscoveryCapabilityImpl implements AdobePaaSDiscoveryCapability
 {
@@ -34,32 +33,27 @@ final class AdobePaaSDiscoveryCapabilityImpl implements AdobePaaSDiscoveryCapabi
         private readonly AdobePaaSDiscoveryTransportMapper $transportMapper,
         private readonly AdobePaaSAttributeNormalizer $normalizer,
         private readonly AdobePaaSServiceOnlyAttributeEligibility $serviceOnlyAttributeEligibility,
-        private readonly CanonicalSchemaFieldHasher $fieldHasher,
-        private readonly CanonicalSchemaSnapshotHasher $snapshotHasher,
+        private readonly AdobePaaSAttributeIdentityExtractor $identityExtractor = new AdobePaaSAttributeIdentityExtractor,
+        private readonly AdobePaaSAttributePayloadProjector $payloadProjector = new AdobePaaSAttributePayloadProjector,
+        private readonly ConnectorSchemaFieldV2Hasher $fieldHasher = new ConnectorSchemaFieldV2Hasher,
+        private readonly ConnectorSchemaSnapshotV2Hasher $snapshotHasher = new ConnectorSchemaSnapshotV2Hasher,
     ) {}
 
     public function discover(
         #[\SensitiveParameter] AdobePaaSRequestContext $context,
         string $endpointPath,
     ): ConnectorDiscoveryAttemptResult {
-        /** @var list<ConnectorDiscoveryNormalizedField> $accumulatedFields */
+        /** @var list<ConnectorDiscoveryField> $accumulatedFields */
         $accumulatedFields = [];
         /** @var array<string, true> $seenFieldKeys */
         $seenFieldKeys = [];
-        /** @var list<string> $skippedAttributeCodes */
-        $skippedAttributeCodes = [];
         $receivedItemsCount = 0;
         $stableTotalCount = null;
         $currentPage = 1;
 
         while ($currentPage <= self::MAX_PAGES) {
-            $signingContext = new OAuth1SigningContext(
-                bin2hex(random_bytes(16)),
-                time(),
-            );
-
+            $signingContext = new OAuth1SigningContext(bin2hex(random_bytes(16)), time());
             $request = $this->requestFactory->build($context, $endpointPath, $currentPage, $signingContext);
-
             $outboundRequest = new ConnectorOutboundRequest(
                 $request,
                 new ConnectorTransportLimits(
@@ -76,113 +70,109 @@ final class AdobePaaSDiscoveryCapabilityImpl implements AdobePaaSDiscoveryCapabi
             }
 
             $pageResult = $this->responseMapper->map($httpResult);
-
             if ($pageResult->failure !== null) {
                 return $pageResult->failure;
             }
-
             $page = $pageResult->page;
 
             if ($page->totalCount > self::MAX_FIELDS) {
-                return ConnectorDiscoveryAttemptResult::paginationFailure(
-                    ConnectorDiscoveryRunErrorCode::DiscoveryPaginationLimitExceeded,
-                );
+                return ConnectorDiscoveryAttemptResult::paginationFailure(ConnectorDiscoveryRunErrorCode::DiscoveryPaginationLimitExceeded);
             }
-
             if ($stableTotalCount === null) {
                 $stableTotalCount = $page->totalCount;
             } elseif ($page->totalCount !== $stableTotalCount) {
-                return ConnectorDiscoveryAttemptResult::paginationFailure(
-                    ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination,
-                );
+                return ConnectorDiscoveryAttemptResult::paginationFailure(ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination);
             }
 
             foreach ($page->items as $itemIndex => $rawItem) {
                 $receivedItemsCount++;
 
-                if ($this->serviceOnlyAttributeEligibility->shouldSkip($rawItem)) {
-                    $skippedAttributeCodes[] = $rawItem->attribute_code;
-
-                    continue;
-                }
-
                 try {
-                    $canonicalField = $this->normalizer->normalize($rawItem);
-                    $fieldKey = $canonicalField->externalFieldKey();
-
-                    if (isset($seenFieldKeys[$fieldKey])) {
-                        throw ConnectorDiscoverySchemaValidationException::at(
-                            ConnectorDiscoverySchemaValidationReason::DuplicateExternalFieldKey,
-                            "items[{$itemIndex}]",
-                        );
-                    }
-
-                    $seenFieldKeys[$fieldKey] = true;
-
-                    $accumulatedFields[] = new ConnectorDiscoveryNormalizedField(
-                        $canonicalField,
-                        $this->fieldHasher->hash($canonicalField),
-                    );
+                    $fieldKey = $this->identityExtractor->extract($rawItem);
                 } catch (ConnectorDiscoverySchemaValidationException) {
                     return ConnectorDiscoveryAttemptResult::schemaValidationFailure();
                 }
+
+                if (isset($seenFieldKeys[$fieldKey])) {
+                    return ConnectorDiscoveryAttemptResult::schemaValidationFailure();
+                }
+                $seenFieldKeys[$fieldKey] = true;
+
+                /** @var \stdClass $rawItem */
+                if ($this->serviceOnlyAttributeEligibility->shouldSkip($rawItem)) {
+                    $identified = ConnectorDiscoveryIdentifiedField::unclassified(
+                        $fieldKey,
+                        $this->bestEffortLabel($rawItem),
+                        $this->payloadProjector->projectBestEffort($rawItem),
+                        null,
+                    );
+                } else {
+                    try {
+                        $identified = ConnectorDiscoveryIdentifiedField::normalized(
+                            $this->normalizer->normalizeIdentifiedV2($rawItem, $fieldKey),
+                        );
+                    } catch (ConnectorDiscoverySchemaValidationException $exception) {
+                        $identified = ConnectorDiscoveryIdentifiedField::unclassified(
+                            $fieldKey,
+                            $this->bestEffortLabel($rawItem),
+                            $this->payloadProjector->projectBestEffort($rawItem),
+                            $exception->reason,
+                        );
+                    }
+                }
+
+                $accumulatedFields[] = new ConnectorDiscoveryField(
+                    $identified,
+                    $this->fieldHasher->hash($identified),
+                );
             }
 
             if ($receivedItemsCount === $stableTotalCount) {
                 break;
             }
-
             if ($currentPage === self::MAX_PAGES && $receivedItemsCount < $stableTotalCount) {
-                return ConnectorDiscoveryAttemptResult::paginationFailure(
-                    ConnectorDiscoveryRunErrorCode::DiscoveryPaginationLimitExceeded,
-                );
+                return ConnectorDiscoveryAttemptResult::paginationFailure(ConnectorDiscoveryRunErrorCode::DiscoveryPaginationLimitExceeded);
             }
-
             if ($page->items === [] && $receivedItemsCount < $stableTotalCount) {
-                return ConnectorDiscoveryAttemptResult::paginationFailure(
-                    ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination,
-                );
+                return ConnectorDiscoveryAttemptResult::paginationFailure(ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination);
             }
-
             if ($receivedItemsCount > $stableTotalCount) {
-                return ConnectorDiscoveryAttemptResult::paginationFailure(
-                    ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination,
-                );
+                return ConnectorDiscoveryAttemptResult::paginationFailure(ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination);
             }
-
             $currentPage++;
         }
 
         if ($stableTotalCount === null || $receivedItemsCount !== $stableTotalCount) {
-            return ConnectorDiscoveryAttemptResult::paginationFailure(
-                ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination,
-            );
+            return ConnectorDiscoveryAttemptResult::paginationFailure(ConnectorDiscoveryRunErrorCode::DiscoveryIncompletePagination);
         }
 
         $fieldHashes = array_map(
-            fn (ConnectorDiscoveryNormalizedField $field): CanonicalSchemaFieldHash => CanonicalSchemaFieldHash::create(
+            fn (ConnectorDiscoveryField $field): CanonicalSchemaFieldHash => CanonicalSchemaFieldHash::create(
                 $field->field->externalFieldKey(),
                 $field->canonicalHash,
             ),
             $accumulatedFields,
         );
 
-        $snapshotHash = $this->snapshotHasher->hash($fieldHashes);
-
         $candidate = ConnectorDiscoverySnapshotCandidate::create(
             $accumulatedFields,
-            $snapshotHash,
+            $this->snapshotHasher->hash($fieldHashes),
             CarbonImmutable::now(),
             $receivedItemsCount,
         );
 
-        if ($skippedAttributeCodes !== []) {
-            Log::info('Adobe Commerce discovery skipped service-only attributes.', [
-                'skipped_count' => count($skippedAttributeCodes),
-                'attribute_codes' => $skippedAttributeCodes,
-            ]);
+        return ConnectorDiscoveryAttemptResult::success($candidate);
+    }
+
+    private function bestEffortLabel(#[\SensitiveParameter] \stdClass $raw): ?string
+    {
+        if (! property_exists($raw, 'default_frontend_label') || $raw->default_frontend_label === null) {
+            return null;
+        }
+        if (! is_string($raw->default_frontend_label) || ! mb_check_encoding($raw->default_frontend_label, 'UTF-8')) {
+            return null;
         }
 
-        return ConnectorDiscoveryAttemptResult::success($candidate);
+        return $raw->default_frontend_label;
     }
 }

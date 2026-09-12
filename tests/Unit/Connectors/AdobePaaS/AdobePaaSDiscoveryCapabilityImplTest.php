@@ -11,8 +11,6 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryResponseMapper;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryTransportMapper;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 use App\Support\Connectors\AdobePaaS\AdobePaaSServiceOnlyAttributeEligibility;
-use App\Support\Connectors\CanonicalSchemaFieldHasher;
-use App\Support\Connectors\CanonicalSchemaSnapshotHasher;
 use App\Support\Connectors\ConnectorSchemaSourceEndpointPathValidator;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
 use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
@@ -449,7 +447,7 @@ class AdobePaaSDiscoveryCapabilityImplTest extends TestCase
     }
 
     #[Test]
-    public function service_only_null_frontend_input_attributes_are_counted_as_received_but_not_normalized(): void
+    public function service_only_null_frontend_input_attributes_are_identified_and_quarantined(): void
     {
         $transport = new class implements ConnectorHttpTransport
         {
@@ -470,8 +468,13 @@ class AdobePaaSDiscoveryCapabilityImplTest extends TestCase
 
         $this->assertTrue($result->succeeded);
         $this->assertSame(2, $result->snapshotCandidate?->fieldsReceived());
+        $this->assertSame(2, $result->snapshotCandidate?->fieldsIdentified());
         $this->assertSame(1, $result->snapshotCandidate?->fieldsNormalized());
+        $this->assertSame(1, $result->snapshotCandidate?->fieldsUnclassified());
         $this->assertSame('color', $result->snapshotCandidate?->fields[0]->field->externalFieldKey());
+        $this->assertSame('links_title', $result->snapshotCandidate?->fields[1]->field->externalFieldKey());
+        $this->assertSame('unclassified', $result->snapshotCandidate?->fields[1]->field->normalizationStatus()->value);
+        $this->assertNull($result->snapshotCandidate?->fields[1]->field->normalizationFailureReason());
     }
 
     #[Test]
@@ -511,8 +514,6 @@ class AdobePaaSDiscoveryCapabilityImplTest extends TestCase
             new AdobePaaSDiscoveryTransportMapper,
             new AdobePaaSAttributeNormalizer,
             new AdobePaaSServiceOnlyAttributeEligibility,
-            new CanonicalSchemaFieldHasher,
-            new CanonicalSchemaSnapshotHasher,
         );
     }
 

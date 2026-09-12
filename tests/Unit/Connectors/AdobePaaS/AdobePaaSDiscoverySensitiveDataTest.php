@@ -12,8 +12,6 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryResponseMapper;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryTransportMapper;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 use App\Support\Connectors\AdobePaaS\AdobePaaSServiceOnlyAttributeEligibility;
-use App\Support\Connectors\CanonicalSchemaFieldHasher;
-use App\Support\Connectors\CanonicalSchemaSnapshotHasher;
 use App\Support\Connectors\ConnectorDiscoveryAttemptResult;
 use App\Support\Connectors\ConnectorDiscoveryNormalizedField;
 use App\Support\Connectors\ConnectorDiscoverySnapshotCandidate;
@@ -205,8 +203,6 @@ class AdobePaaSDiscoverySensitiveDataTest extends TestCase
             new AdobePaaSDiscoveryTransportMapper,
             new AdobePaaSAttributeNormalizer,
             new AdobePaaSServiceOnlyAttributeEligibility,
-            new CanonicalSchemaFieldHasher,
-            new CanonicalSchemaSnapshotHasher,
         );
     }
 

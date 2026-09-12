@@ -27,6 +27,7 @@ class ConnectorSchemaSnapshot extends Model
         'schema_version',
         'field_count',
         'canonical_hash',
+        'canonical_hash_version',
         'captured_at',
     ];
 

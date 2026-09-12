@@ -23,6 +23,8 @@ class ConnectorSchemaSnapshotFieldFactory extends Factory
             'snapshot_id' => $snapshot->id,
             'external_field_key' => fake()->unique()->slug(2),
             'external_label' => fake()->words(2, true),
+            'normalization_status' => 'normalized',
+            'normalization_failure_reason' => null,
             'normalized_data_type' => 'string',
             'is_required' => false,
             'is_multi_value' => false,

@@ -11,12 +11,13 @@ use App\Services\Connectors\ConnectorDiscoveryRunPersistence;
 use App\Services\Connectors\ConnectorDiscoverySourceResolver;
 use App\Support\Connectors\CanonicalSchemaField;
 use App\Support\Connectors\CanonicalSchemaFieldHash;
-use App\Support\Connectors\CanonicalSchemaFieldHasher;
 use App\Support\Connectors\CanonicalSchemaPayload;
-use App\Support\Connectors\CanonicalSchemaSnapshotHasher;
 use App\Support\Connectors\ConnectorDiscoveryAttemptResult;
-use App\Support\Connectors\ConnectorDiscoveryNormalizedField;
+use App\Support\Connectors\ConnectorDiscoveryField;
+use App\Support\Connectors\ConnectorDiscoveryIdentifiedField;
 use App\Support\Connectors\ConnectorDiscoverySnapshotCandidate;
+use App\Support\Connectors\ConnectorSchemaFieldV2Hasher;
+use App\Support\Connectors\ConnectorSchemaSnapshotV2Hasher;
 use Carbon\CarbonImmutable;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
@@ -184,17 +185,16 @@ class ConnectorSchemaSnapshotFieldPayloadTest extends TestCase
     }
 
     /**
-     * @param  list<ConnectorDiscoveryNormalizedField>  $fields
+     * @param  list<ConnectorDiscoveryField>  $fields
      */
     private function publishThroughFinalizeAfterVendorAttempt(
         ConnectorAccount $account,
         ConnectorDiscoveryRun $row,
         array $fields,
     ): void {
-        $fieldHasher = new CanonicalSchemaFieldHasher;
-        $snapshotHasher = new CanonicalSchemaSnapshotHasher;
+        $snapshotHasher = new ConnectorSchemaSnapshotV2Hasher;
         $fieldHashes = array_map(
-            fn (ConnectorDiscoveryNormalizedField $field): CanonicalSchemaFieldHash => CanonicalSchemaFieldHash::create(
+            fn (ConnectorDiscoveryField $field): CanonicalSchemaFieldHash => CanonicalSchemaFieldHash::create(
                 $field->field->externalFieldKey(),
                 $field->canonicalHash,
             ),
@@ -224,8 +224,8 @@ class ConnectorSchemaSnapshotFieldPayloadTest extends TestCase
         string $externalFieldKey,
         CanonicalSchemaPayload $payload,
         ?int $sortOrder,
-    ): ConnectorDiscoveryNormalizedField {
-        $fieldHasher = new CanonicalSchemaFieldHasher;
+    ): ConnectorDiscoveryField {
+        $fieldHasher = new ConnectorSchemaFieldV2Hasher;
         $canonicalField = CanonicalSchemaField::create(
             $externalFieldKey,
             ucfirst($externalFieldKey),
@@ -238,9 +238,11 @@ class ConnectorSchemaSnapshotFieldPayloadTest extends TestCase
             $sortOrder,
         );
 
-        return new ConnectorDiscoveryNormalizedField(
-            $canonicalField,
-            $fieldHasher->hash($canonicalField),
+        $identifiedField = ConnectorDiscoveryIdentifiedField::normalized($canonicalField);
+
+        return new ConnectorDiscoveryField(
+            $identifiedField,
+            $fieldHasher->hash($identifiedField),
         );
     }
 

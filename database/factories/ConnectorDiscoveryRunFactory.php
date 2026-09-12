@@ -33,7 +33,9 @@ class ConnectorDiscoveryRunFactory extends Factory
             'finished_at' => null,
             'duration_ms' => null,
             'fields_received' => null,
+            'fields_identified' => null,
             'fields_normalized' => null,
+            'fields_unclassified' => null,
             'added_count' => null,
             'changed_count' => null,
             'removed_count' => null,
@@ -58,7 +60,9 @@ class ConnectorDiscoveryRunFactory extends Factory
             'finished_at' => now(),
             'duration_ms' => 60000,
             'fields_received' => 10,
+            'fields_identified' => 10,
             'fields_normalized' => 10,
+            'fields_unclassified' => 0,
         ]);
     }
 }

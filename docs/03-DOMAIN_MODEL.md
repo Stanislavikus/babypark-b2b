@@ -3423,8 +3423,9 @@ Immutable successful normalized schema capture.
 | `discovery_run_id` | UUID FK | Producing run |
 | `previous_snapshot_id` | UUID FK nullable | Chain |
 | `schema_version` | string nullable | From source/account context |
-| `field_count` | unsigned int | Count of normalized snapshot fields only (`fields_normalized`), never the raw received total. |
-| `canonical_hash` | char(64) | Hash of ordered normalized field hashes |
+| `field_count` | unsigned int | **v2 current meaning:** count of persisted identified snapshot fields (`fields_identified`). Historical v1 snapshots counted normalized merchant-facing fields only. |
+| `canonical_hash` | char(64) | Versioned deterministic schema hash; interpret with `canonical_hash_version`. |
+| `canonical_hash_version` | string | `v1` for historical snapshots; `v2` for the universal identified-field discovery contract. Never reinterpret a historical hash under another version. |
 | `captured_at` | timestamp | Vendor-normalized capture instant |
 | `created_at` | timestamp | Append-only |
 
@@ -3445,7 +3446,9 @@ columns — diffs are separate entities.
 | `snapshot_id` | UUID FK | |
 | `external_field_key` | string | Adobe: `attribute_code` |
 | `external_label` | string nullable | |
-| `normalized_data_type` | string | Connector-neutral type code |
+| `normalized_data_type` | string nullable | Connector-neutral type code when semantic normalization succeeds; `null` for an identified-but-unclassified field. Never use sentinel type strings such as `opaque`/`unknown`. |
+| `normalization_status` | string | `normalized` or `unclassified`. |
+| `normalization_failure_reason` | string nullable | Existing `ConnectorDiscoverySchemaValidationReason` value when semantic normalization failed; may be null for intentionally non-normalized system/service fields. |
 | `is_required` | boolean nullable | |
 | `is_multi_value` | boolean nullable | |
 | `is_localizable` | boolean nullable | |
@@ -3457,7 +3460,10 @@ columns — diffs are separate entities.
 
 Unique: `(snapshot_id, external_field_key)`.
 
-### Adobe attribute normalization (Resolved)
+### Adobe attribute normalization v1 (Historical contract; superseded for new Adobe discoveries)
+
+This v1 contract remains authoritative for historical snapshots whose `canonical_hash_version = v1`. It must not be recomputed or silently reinterpreted. New Adobe account discovery publishes under the v2 contract defined after the historical v1 hashing section below.
+
 
 This section defines how Adobe Commerce PaaS/on-prem `GET /V1/products/attributes`
 **list** responses are converted into the canonical
@@ -3669,7 +3675,7 @@ Raw Adobe response bodies are never persisted, only the mapped canonical shape
 (already stated for the hash contract — restated here for the mapping step
 specifically, since that's where raw data first enters the system).
 
-### Connector schema canonical hashing (Resolved)
+### Connector schema canonical hashing v1 (Historical contract)
 
 Canonical hashes provide deterministic no-change detection for normalized
 external schemas. They never hash raw vendor responses.
@@ -3849,6 +3855,37 @@ This is canonicalization contract `v1`. It uses the existing `char(64)` columns
 and requires no migration. Any future change to the preimage or normalization
 rules requires an explicit documentation-level decision and a rebaseline plan;
 the algorithm must never change silently.
+
+### Adobe Product attribute discovery + canonical hashing v2 (Resolved — 2026-09-12)
+
+New Adobe Commerce account discovery for the declared `GET /V1/products/attributes` schema source uses **v2**. V1 above is historical evidence only.
+
+**Identity precedes semantics.** Every raw list item first passes structural identity extraction. A missing, non-string, empty, or invalid-UTF-8 `attribute_code`, a duplicate identified key, transport/envelope failure, or pagination inconsistency invalidates the complete attempt because the returned field set cannot be trusted. Once a trustworthy `attribute_code` exists, semantic normalization failure is field-local: the identified field is persisted with `normalization_status = unclassified` and an explicit failure reason instead of destroying unrelated fields.
+
+`CanonicalSchemaField` remains the normalized-only DTO. V2 discovery uses a separate identified-field state so nullable persistence does not weaken canonical normalized-field invariants.
+
+**Service/internal attributes are inventory, not silent skips.** A trustworthy Magento internal attribute matching the existing strict service-only evidence (`frontend_input = null`, `is_user_defined = false`, `is_visible = false`) is persisted as an identified unclassified field. It is later classified `system_or_dedicated_owner`; it is not a merchant mapping problem. The old pre-normalization skip is superseded for v2.
+
+**Provider metadata whitelist.** V2 retains only explicitly approved metadata from the list response, under versioned `normalized_payload.provider_metadata`: `frontend_input`, `scope`, `backend_type`, `is_user_defined`, `is_visible`, `source_model`, `backend_model`, `apply_to`, `validation_rules`, `is_unique`, and `default_value`, when present. The exact JSON types returned by Magento are preserved after canonical safety validation; for example the current real fixture returns `is_unique` as string `"0"`/`"1"`, not as a boolean. Unknown top-level vendor properties remain ignored. Raw response bodies are never persisted. `apply_to` is retained now because it can alter behavior/applicability even though attribute-set/group workflow remains a later stage.
+
+V2 successful discovery counters have distinct meanings:
+
+- `fields_received` — raw list items received across all pages;
+- `fields_identified` — items with trustworthy unique `external_field_key` that are persisted;
+- `fields_normalized` — identified fields whose connector-neutral semantic normalization succeeded;
+- `fields_unclassified` — identified fields persisted without connector-neutral semantic normalization.
+
+On successful Adobe v2 discovery, `fields_identified = fields_normalized + fields_unclassified` and `ConnectorSchemaSnapshot.field_count = fields_identified`.
+
+#### V2 field canonical hash
+
+`ConnectorSchemaSnapshotField.canonical_hash` for a v2 snapshot is SHA-256 of `babypark.connector-schema-field.v2`, one LF byte, and canonical JSON containing exactly the persisted schema facts: `external_field_key`, `external_label`, `normalization_status`, `normalization_failure_reason`, `normalized_data_type`, `is_required`, `is_multi_value`, `is_localizable`, `external_scope`, `normalized_payload`, and `sort_order`. Nullable semantic columns are `null` for unclassified fields. Provider metadata is part of `normalized_payload`, therefore behavior-relevant metadata changes change the field hash. The same canonical JSON/container/UTF-8 rules as v1 apply.
+
+#### V2 snapshot canonical hash
+
+`ConnectorSchemaSnapshot.canonical_hash` for `canonical_hash_version = v2` is SHA-256 of `babypark.connector-schema-snapshot.v2`, one LF byte, and the canonical JSON list of **all identified persisted fields**, represented by `external_field_key` + v2 field `canonical_hash`, sorted bytewise by external key. Service/internal and other unclassified fields therefore affect v2 schema identity.
+
+Historical rows are preserved: migration backfills existing snapshot rows with `canonical_hash_version = v1` and existing snapshot-field rows with `normalization_status = normalized`; it does not recalculate historical hashes or invent rows for service-only fields that v1 deliberately omitted.
 
 ### ConnectorSchemaDiff / ConnectorSchemaDiffItem (Resolved schema; dormant runtime)
 
