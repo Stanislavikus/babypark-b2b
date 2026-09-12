@@ -93,6 +93,39 @@ Connector-specific payload structures must not become new core domain fields mer
 
 When the external field has no valid platform representation, treat that as a concrete blocker to resolve through the normal documentation/domain process. Do not silently skip the field.
 
+### 3.1 Mandatory per-field progress ledger
+
+The connector master matrix may group fields when documenting shared transport/domain mechanics, but an active certification campaign must also maintain a **machine-readable per-field progress ledger with exactly one row per discovered external field**. Aggregated cluster rows never replace this ledger.
+
+Minimum progress columns are:
+
+`external_field_key → progress_bucket → bucket_detail → canonical_code (if any) → mapping_status → certification_status → evidence_ref → next_action`
+
+The top-level `progress_bucket` must make merchant/runtime intent obvious:
+
+- `canonical_platform` — a neutral platform concept exists; automatic mapping is either verified or has an explicit mapping gap;
+- `provider_standard` / connector-specific equivalent — a stable provider field or provider/domain mechanic that must not be forced into global canonical vocabulary;
+- `workspace_custom` — a merchant/workspace-specific discovered attribute whose definition is retained for that workspace/account without global semantic promotion.
+
+Provider/system-owned fields may use a `bucket_detail` such as `system_platform_owned`; they still receive an explicit row and terminal certification/classification result.
+
+**Write-through rule:** discovery/classification/certification work is not considered complete until the same campaign change records the resulting row status and evidence reference. “We checked it in chat” is not project state.
+
+**Resume rule:** when a campaign resumes after a chat/session boundary, read the authoritative inventory, this per-field ledger, the pending-blocker queue, and the runtime Atlas. Continue from the first unresolved `next_action`. Do not repeat provider research or re-inventory already-accounted fields unless the external version/snapshot changed or the ledger contains a concrete inconsistency.
+
+### 3.2 Connector certification is not customer onboarding
+
+Field-by-field connector certification is an engineering activity performed once per connector/version/behavior class. It must not become a manual onboarding requirement for every merchant catalogue.
+
+At workspace discovery time:
+
+1. exact/high-confidence canonical mappings reuse the already-approved canonical/provider mapping rules;
+2. known provider-standard fields reuse the connector's existing owner/transport classification;
+3. workspace custom fields are persisted as discovered fields and matched to an already-certified behavior class (for example data type + scope + requiredness + option/clear semantics);
+4. a new engineering investigation is opened only for an unrecognized behavior class, ambiguous semantic promotion, or a concrete runtime failure.
+
+A catalogue with hundreds or thousands of custom attributes must therefore scale primarily as data classification, not as hundreds or thousands of fresh manual vendor-manual studies. Individual rows still receive explicit progress/results, but proven cluster/behavior mechanics are reused automatically.
+
 ---
 
 ## 4. Implement Missing Seams as Blocker Removal, Not as New End Goals
@@ -221,6 +254,7 @@ Every connector campaign handoff must state:
 - inventory completion status;
 - clusters and representative fields;
 - master matrix location;
+- machine-readable per-field progress ledger location and bucket counts (`canonical_platform` / provider-standard / `workspace_custom`);
 - which representative READ probes passed/failed;
 - which representative WRITE probes passed/failed;
 - literal current blockers/errors;

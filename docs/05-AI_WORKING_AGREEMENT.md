@@ -65,6 +65,8 @@ The AI must not:
 
 - generate code from memory when current project files are available;
 - assume that previous chat memory is the source of truth;
+- restart connector inventory/research from zero when an authoritative inventory and per-field progress ledger already exist;
+- keep completed field checks only in chat or scratch notes instead of writing their status/evidence into the campaign ledger;
 - create new database fields casually;
 - bypass the Attribute Dictionary;
 - bypass workspace isolation;

@@ -10,6 +10,8 @@ This markdown is the human-readable audit for the authoritative machine contract
 `magento_v1_product_field_matrix.json` and the adjacent source-derived inventory
 manifest.
 
+**Per-field real-target progress is tracked separately and must not be reconstructed from these aggregated rows.** Read `MAGENTO_V1_FIELD_PROGRESS.md` and `magento_v1_real_target_field_progress_2026_09_12.csv` for the current 102-field discovery snapshot, canonical/Magento-standard/workspace-custom bucket counts, certification status, evidence, and exact resume action.
+
 ## Non-negotiable interpretation rules
 
 - Repository external inventory is source-complete for the official Magento/Adobe
