@@ -1,58 +1,64 @@
-# Magento V1 Real-Target Per-Field Progress
+# Magento V1 Field Progress
 
-**Status:** mandatory campaign resume ledger/index
-**Updated:** 2026-09-12
-**Real-target discovery snapshot:** `a2a3edfa-025f-49cd-ab5b-4e6af71b79e6`
-**Machine-readable rows:** `magento_v1_real_target_field_progress_2026_09_12.csv`
+**Status:** Stage 1 runtime-derived resume index
+**Updated:** 2026-09-13
+**Authoritative real-target evidence:** `magento_v1_stage1_real_target_evidence_2026_09_13.json`
+**Historical engineering ledger:** `magento_v1_real_target_field_progress_2026_09_12.csv` (historical only; not runtime classification truth)
 
-This file exists so Magento field work never has to be reconstructed from chat memory or from aggregated cluster prose.
+Runtime classification is now authoritative. The historical CSV remains evidence of earlier exact WRITE→READ→RESTORE and behavior-class work, but it must not be edited as a competing field-classification source.
 
-The CSV is the current real-target per-field progress ledger: exactly one row per discovered field. `MAGENTO_V1_PRODUCT_FIELD_MATRIX.md` remains the connector mechanics/capability matrix; `MAGENTO_V1_PENDING_CERTIFICATION_ITEMS.md` remains the blocker queue. These files have different jobs and must not replace one another.
+## Current Stage 1 snapshot
 
-## Current snapshot
+The latest successful real-target v2 discovery accounts for **106 / 106** trustworthy Magento Product attribute identities with **0 silent drops**.
 
-| Progress bucket | Discovered | Exact WRITE→READ→RESTORE | Behavior-class covered | Other explicit checked result | Unresolved engineering rows | Onboarding-ready custom |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `canonical_platform` | 12 | 6 | 0 | 3 | 3 | n/a |
-| `magento_standard` | 45 | 8 | 0 | 6 | 31 | n/a |
-| `workspace_custom` | 45 | 24 | 21 | 0 | **0** | **45 / 45** |
-| **Total** | **102** | **38** | **21** | **9** | **34** | **45 / 45 custom** |
+| Runtime fact | Count |
+| --- | ---: |
+| Received / persisted identities | 106 / 106 |
+| Normalized | 102 |
+| Identified but unclassified | 4 |
+| `canonical_platform` | 6 |
+| `provider_standard` | 22 |
+| `workspace_custom` | 47 |
+| `system_or_dedicated_owner` | 27 |
+| `review_needed` | 4 |
+| `unsupported` | 0 |
+| Distinct non-null behavior classes | 49 |
+| Actual verified generic `FieldMapping` rows | 4 |
 
-`Behavior-class covered` is deliberately not counted as exact per-code bidirectional certification. It means the discovered custom field matches a transport behavior already proven on the same real target and can use the reusable onboarding path. `Other explicit checked result` covers terminal classifications such as identity read-only, system-owned, relation pending, URL side-effect pending, or media preservation.
+The four open review fields are `custom_layout_update_file`, `links_exist`, `old_id`, and `samples_title`. They remain fail-closed in `MAGENTO_V1_RESEARCH_QUEUE.md`; their presence does not invalidate the otherwise trustworthy snapshot.
 
-## Canonical mapping state
+## Canonical-relevant real-target audit
 
-The 12 `canonical_platform` rows have a neutral platform representation today. Six already have a verified Adobe automatic mapping rule in the canonical mapping registry: `category_ids → category`, `description`, `name`, `short_description`, `sku`, and transformed `status`.
+| Magento key | Platform concept | Runtime outcome | Generic mapping | Why |
+| --- | --- | --- | --- | --- |
+| `category_ids` | `category` | dedicated relation owner | no | Category relation is not a generic field |
+| `color` | `color` | workspace custom | no | verified Adobe channel decision is account-specific |
+| `description` | `description` | canonical | **yes** | verified Adobe rule + active/verified internal field |
+| `image` | `image` | dedicated media owner | no | media domain owns the value |
+| `manufacturer` | `manufacturer` | workspace custom | no | account-specific; internal concept is still proposed/partially verified |
+| `meta_description` | `meta_description` | canonical, deferred | no | verified Adobe channel decision is deferred |
+| `meta_title` | `meta_title` | canonical, deferred | no | verified Adobe channel decision is deferred |
+| `name` | `name` | canonical | **yes** | verified Adobe rule + active/verified internal field |
+| `price` | `price` | dedicated pricing owner | no | pricing domain owns the value |
+| `short_description` | `short_description` | provider standard | no | internal canonical target is proposed/partially verified |
+| `sku` | `sku` | canonical | **yes** | verified Adobe rule + active/verified internal field |
+| `status` | `status` | canonical | **yes** | verified Adobe transformed rule + active/verified internal field |
 
-The remaining canonical rows are explicit mapping work, not hidden knowledge: `color`, `image`, `manufacturer`, `meta_description`, `meta_title`, and `price`. Some already passed real-target transport, but their Adobe canonical mapping rule still has to be materialized/verified where applicable.
+Therefore the current Products configuration has exactly four automatic generic mappings: `description`, `name`, `sku`, and `status`. Missing mappings are explicit architecture decisions, not silent gaps.
 
 ## Workspace-custom scale state
 
-The current target exposes 45 workspace-custom `c_*` / `x_*` fields. Twenty-four already passed reversible real-target WRITE→READ→RESTORE certification. The other 21 collapse into only two behavior signatures already exact-field certified on this same target:
-
-- 16 × `select / global`;
-- 5 × `money / website`.
-
-A 2026-09-12 read-only scan of all 19 products on the certification Magento target found live values for 18 of those 21 rows; three (`c_carseats_child_gender`, `c_furniture_color`, `c_strollers_color_joolz_day_5`) are present in discovered schema but unused by the current catalogue. Evidence is `magento_v1_custom_behavior_coverage_2026_09_12.json`.
-
-All 21 are now `BEHAVIOR_CLASS_COVERED_NO_EXACT_WRITE`, so **all 45/45 BabyPark custom attributes are onboarding-ready**. This does not claim 45 exact remote mutations: exact WRITE→READ→RESTORE remains 24/45. A new destructive PUT is required only if an attribute introduces a new behavior class, special/clear semantics, or an actual runtime failure. This avoids multiplying P-10 store-scope side-effect risk merely to retest an already-proven transport mechanism.
+The real target now classifies **47** Product attributes as `workspace_custom`. Stage 1 deliberately preserves and behavior-classifies them without creating workspace `FieldDefinition` rows. Literal customer keys are not engineering units: different keys that share provider behavior reuse the same behavior-class mechanism. Full custom materialization, options, grouping and custom Receive belong to Stage 2.
 
 ## Mandatory resume algorithm
 
-When resuming Magento field work:
+1. read this file and the runtime evidence JSON;
+2. read `MAGENTO_V1_RESEARCH_QUEUE.md` and `MAGENTO_V1_PENDING_CERTIFICATION_ITEMS.md`;
+3. treat DB classification as source of truth and generated evidence as a snapshot/export only;
+4. never revive the historical CSV as a manually maintained classification source;
+5. group unresolved work by behavior/owner, not literal external key;
+6. do not re-inventory Magento merely because a chat/session ended.
 
-1. read this file and the CSV;
-2. read `MAGENTO_V1_PENDING_CERTIFICATION_ITEMS.md`;
-3. verify the current runtime owner in `08-CONNECTOR_SYNC_RUNTIME_ATLAS.md` and code only for the seam being touched;
-4. select rows whose `next_action` is unresolved, grouping rows by shared behavior/owner;
-5. run the smallest representative or batch certification that can advance those rows;
-6. write every resulting status and `evidence_ref` back to the ledger in the same campaign change;
-7. never re-run the complete external inventory/research merely because a chat/session ended.
+## Stage boundary
 
-Re-inventory is justified only when the external connector/API version or discovery snapshot materially changes, or when an explicit ledger inconsistency is found.
-
-## Customer onboarding rule
-
-This real-target engineering certification is not a merchant onboarding workflow. A new Magento merchant with hundreds or thousands of custom attributes must not wait for manual per-field research.
-
-Discovery records the fields immediately. Known canonical mappings are reused; known Magento-standard semantics are reused; custom attributes are attached to known behavior classes and proposed as workspace fields/mappings. Only unknown behavior classes, ambiguous semantic promotion, or actual runtime failures enter engineering review.
+Stage 1 is complete when the runtime and tests remain green with the evidence above. Stage 2 starts from these persisted classifications and covers workspace custom-field materialization plus Magento attribute sets/groups. It must not rediscover or reclassify the Product attribute surface from zero.

@@ -93,25 +93,26 @@ Connector-specific payload structures must not become new core domain fields mer
 
 When the external field has no valid platform representation, treat that as a concrete blocker to resolve through the normal documentation/domain process. Do not silently skip the field.
 
-### 3.1 Mandatory per-field progress ledger
+### 3.1 Mandatory per-field runtime progress state
 
-The connector master matrix may group fields when documenting shared transport/domain mechanics, but an active certification campaign must also maintain a **machine-readable per-field progress ledger with exactly one row per discovered external field**. Aggregated cluster rows never replace this ledger.
+The connector master matrix may group fields when documenting shared transport/domain mechanics, but every active certification campaign must maintain a **machine-readable per-field progress source with exactly one explicit outcome per discovered external field**. Aggregated cluster rows never replace per-field state.
 
-Minimum progress columns are:
+When a persisted runtime classification/projection exists, **runtime state is authoritative** and JSON/CSV ledgers are generated evidence/exports only. When a connector has not yet implemented such a runtime projection, a machine-readable per-field ledger remains the fallback authoritative source until the runtime projection replaces it. Never maintain two independently editable classification truths.
 
-`external_field_key → type/scope behavior_class → progress_bucket → bucket_detail → canonical_code (if any) → mapping_status → certification_status → onboarding_readiness → evidence_ref → next_action`
+Minimum per-field facts are:
 
-The top-level `progress_bucket` must make merchant/runtime intent obvious:
+`external_field_key → normalization/type/scope → behavior_class → disposition/progress_bucket → owner or canonical_code (if any) → mapping strategy/state → certification evidence → next action/reason`
+
+The top-level runtime disposition or fallback `progress_bucket` must make merchant/runtime intent obvious:
 
 - `canonical_platform` — a neutral platform concept exists; automatic mapping is either verified or has an explicit mapping gap;
 - `provider_standard` / connector-specific equivalent — a stable provider field or provider/domain mechanic that must not be forced into global canonical vocabulary;
-- `workspace_custom` — a merchant/workspace-specific discovered attribute whose definition is retained for that workspace/account without global semantic promotion.
+- `workspace_custom` — a merchant/workspace-specific discovered attribute retained without global semantic promotion;
+- `system_or_dedicated_owner`, `review_needed`, or `unsupported` — explicit non-generic terminal/attention states where the connector runtime supports them.
 
-Provider/system-owned fields may use a `bucket_detail` such as `system_platform_owned`; they still receive an explicit row and terminal certification/classification result.
+**Write-through rule:** discovery/classification/certification work is not complete until the authoritative runtime projection (or fallback ledger) records the resulting state and durable evidence/reason. “We checked it in chat” is not project state.
 
-**Write-through rule:** discovery/classification/certification work is not considered complete until the same campaign change records the resulting row status and evidence reference. “We checked it in chat” is not project state.
-
-**Resume rule:** when a campaign resumes after a chat/session boundary, read the authoritative inventory, this per-field ledger, the pending-blocker queue, and the runtime Atlas. Continue from the first unresolved `next_action`. Do not repeat provider research or re-inventory already-accounted fields unless the external version/snapshot changed or the ledger contains a concrete inconsistency.
+**Resume rule:** after a chat/session boundary, read the authoritative inventory, persisted runtime classification plus its latest generated evidence export (or the fallback ledger where no runtime projection exists), the pending-blocker queue, and the runtime Atlas. Continue from unresolved runtime/research/blocker state. Do not repeat provider research or re-inventory already-accounted fields unless the external version/snapshot materially changed or a concrete inconsistency is found.
 
 ### 3.2 Connector certification is not customer onboarding
 
@@ -259,7 +260,7 @@ Every connector campaign handoff must state:
 - inventory completion status;
 - clusters and representative fields;
 - master matrix location;
-- machine-readable per-field progress ledger location and bucket counts (`canonical_platform` / provider-standard / `workspace_custom`);
+- authoritative per-field runtime progress source (or fallback ledger) plus latest generated evidence location and disposition/bucket counts;
 - which representative READ probes passed/failed;
 - which representative WRITE probes passed/failed;
 - literal current blockers/errors;
