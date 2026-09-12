@@ -171,6 +171,89 @@ class AdobeProductWritePausePresentationTest extends TestCase
     }
 
     #[Test]
+    public function same_second_contradictory_runs_fail_safe_instead_of_using_uuid_order(): void
+    {
+        foreach ([['verified', 'denied'], ['denied', 'verified']] as $order) {
+            $account = $this->connectedAdobeAccount();
+
+            foreach ($order as $signal) {
+                $this->createLiveEvidence(
+                    $account,
+                    reasonCode: $signal === 'denied' ? 'stock_write_permission_denied' : 'stock_write_verified',
+                    outcome: $signal === 'denied' ? SyncLiveOutcome::NotApplied : SyncLiveOutcome::Synchronized,
+                    context: $signal === 'denied'
+                        ? [
+                            'consequential_write_attempts' => 1,
+                            'reconciliation_get_attempts' => 0,
+                            'write_access_classification' => AdobeProductWriteAccessClassification::PermissionDenied->value,
+                        ]
+                        : [
+                            'consequential_write_attempts' => 1,
+                            'reconciliation_get_attempts' => 1,
+                        ],
+                    at: '2026-09-12 01:03:00',
+                );
+            }
+
+            $this->assertTrue(
+                app(AdobeProductWritePauseProjector::class)->isPausedByProvenPermissionDenial($account),
+                'Same-second contradictory evidence must fail safe regardless of UUID/insertion order.',
+            );
+        }
+    }
+
+    #[Test]
+    public function later_verified_item_in_same_run_clears_earlier_denial_when_item_time_orders_them(): void
+    {
+        $account = $this->connectedAdobeAccount();
+        $run = $this->createLiveEvidence(
+            $account,
+            reasonCode: 'stock_write_permission_denied',
+            outcome: SyncLiveOutcome::NotApplied,
+            context: [
+                'consequential_write_attempts' => 1,
+                'reconciliation_get_attempts' => 0,
+                'write_access_classification' => AdobeProductWriteAccessClassification::PermissionDenied->value,
+            ],
+            at: '2026-09-12 01:04:00',
+        );
+
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $account->workspace_id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'P08-SKU-SECOND',
+            'name' => 'P08 Product Second',
+            'is_active' => true,
+        ]);
+
+        $this->travelTo('2026-09-12 01:05:00');
+        SyncRunItem::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'sync_run_id' => $run->getKey(),
+            'product_id' => $product->getKey(),
+            'outcome' => SyncLiveOutcome::Synchronized->value,
+            'findings' => [[
+                'code' => 'command_evidence',
+                'subject' => $product->sku,
+                'context' => [
+                    'reason_code' => 'stock_write_verified',
+                    'consequential_write_attempts' => 1,
+                    'reconciliation_get_attempts' => 1,
+                ],
+            ]],
+        ]);
+        SyncRun::withoutWorkspaceScope()->whereKey($run->getKey())->update([
+            'completed_at' => now()->addMinute(),
+        ]);
+        $this->travelBack();
+
+        $this->assertFalse(
+            app(AdobeProductWritePauseProjector::class)->isPausedByProvenPermissionDenial($account),
+        );
+    }
+
+    #[Test]
     public function successful_credential_replacement_invalidates_older_write_denial_without_claiming_new_write(): void
     {
         $account = $this->connectedAdobeAccount();
@@ -206,6 +289,42 @@ class AdobeProductWritePausePresentationTest extends TestCase
         );
     }
 
+    #[Test]
+    public function same_second_credential_replacement_does_not_hide_indistinguishable_denial(): void
+    {
+        $account = $this->connectedAdobeAccount();
+
+        $this->createLiveEvidence(
+            $account,
+            reasonCode: 'stock_write_permission_denied',
+            outcome: SyncLiveOutcome::NotApplied,
+            context: [
+                'consequential_write_attempts' => 1,
+                'reconciliation_get_attempts' => 0,
+                'write_access_classification' => AdobeProductWriteAccessClassification::PermissionDenied->value,
+            ],
+            at: '2026-09-12 01:06:00',
+        );
+
+        $this->travelTo('2026-09-12 01:06:00');
+        ConnectorConnectionCheck::withoutWorkspaceScope()->create([
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->getKey(),
+            'trigger' => ConnectorConnectionCheckTrigger::CredentialsReplacement,
+            'status' => ConnectorConnectionCheckStatus::Succeeded,
+            'execution_attempts' => 1,
+            'safe_message_parameters' => [],
+            'started_at' => now(),
+            'finished_at' => now(),
+            'duration_ms' => 0,
+        ]);
+        $this->travelBack();
+
+        $this->assertTrue(
+            app(AdobeProductWritePauseProjector::class)->isPausedByProvenPermissionDenial($account),
+        );
+    }
+
     private function connectedAdobeAccount(): ConnectorAccount
     {
         return $this->createConnectorAccount(overrides: [
@@ -224,7 +343,7 @@ class AdobeProductWritePausePresentationTest extends TestCase
         array $context,
         string $at,
         string $findingCode = 'command_evidence',
-    ): void {
+    ): SyncRun {
         $configuration = SyncConfiguration::withoutWorkspaceScope()
             ->where('workspace_id', $account->workspace_id)
             ->where('connector_account_id', $account->getKey())
@@ -285,5 +404,7 @@ class AdobeProductWritePausePresentationTest extends TestCase
         ]);
 
         $this->travelBack();
+
+        return $run;
     }
 }

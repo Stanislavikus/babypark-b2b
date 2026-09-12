@@ -62,13 +62,13 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Needed proof: expand the Apply allowlist one field/domain family at a time through its owning writer, with operation-specific stale-state/conflict semantics and real-target certification before advertising broader Import support.
 - Reviewer candidate: yes when Apply scope is expanded beyond the frozen R3 Product-name slice.
 
-### P-08 — Product WRITE paused/remediation presentation
+### P-08 — Product WRITE paused/remediation presentation — CLOSED 2026-09-12
 
 - Surface: merchant Overview operation-specific readiness.
 - Current truth: the implementation slice now projects immutable Live Export `SyncRunItem.findings` through `AdobeProductWritePauseProjector` instead of changing account connection truth. A Connected Magento account shows `Передача змін товарів призупинена` only when a terminal Live Export contains `command_evidence` with `stock_write_permission_denied`, an actual consequential WRITE attempt, `write_access_classification=permission_denied`, and `not_applied`. Ambiguous/message-only evidence does not create the state. A newer verified `stock_write_verified` WRITE clears an older denial; unrelated no-write/mapping runs do not. Successful credential replacement invalidates older WRITE-denial evidence without pretending that the replacement itself proves WRITE readiness. The projection is limited to actors allowed to manage the connector account so read-only Overview paths retain their existing zero connection-check-query/safe-presentation boundary. `ConnectorAccount.connection_status` remains `Connected`, and no raw Magento response/finding detail is rendered.
-- Why still open: implementation and regression coverage are green, but the frozen contract calls for an adversarial review of temporal ordering, stale evidence invalidation, RBAC/query boundaries, and merchant-safe remediation before treating this presentation slice as closed.
-- Needed proof: narrow implementation review only; no new Magento mutation is required unless the review identifies a contradiction in runtime evidence semantics.
-- Reviewer candidate: yes — next action is the narrow post-implementation review.
+- Closure evidence: Sonnet 5 High narrow adversarial review found one production-significant temporal-ordering defect: second-precision run timestamps plus UUID ordering could hide a newer proven denial. The projector now orders by persisted run/item chronology, groups indistinguishable timestamp buckets, and fails safe to permission denial when contradictory evidence cannot be ordered. The successful-credential boundary now includes equal-second evidence (`>=`) so a same-second denial cannot be silently discarded. A later item in the same run can supersede an earlier denial when item timestamps actually order them. Focused P-08 coverage is 7/7 and includes both UUID/insertion orders, same-run later success, and same-second credential replacement. No schema widening is required for correctness because ties are handled conservatively rather than guessed.
+- Remaining non-blocking note: historical scan volume may eventually warrant a derived/indexed decisive-evidence projection if measured Overview latency requires it; do not trade correctness for an arbitrary time/row cutoff.
+- Reviewer candidate: no — review finding accepted and corrected; presentation slice closed.
 ### P-09 — Store-view media label clear/inheritance semantics
 
 - Surface: gallery `label` plus `image_label` / `small_image_label` / `thumbnail_label` projections.

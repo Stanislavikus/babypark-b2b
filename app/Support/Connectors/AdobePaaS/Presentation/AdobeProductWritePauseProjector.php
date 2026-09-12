@@ -32,7 +32,11 @@ final class AdobeProductWritePauseProjector
             ->max('finished_at');
 
         $items = SyncRunItem::withoutWorkspaceScope()
-            ->select('sync_run_items.*')
+            ->select([
+                'sync_run_items.*',
+                'sync_runs.completed_at as run_completed_at',
+                'sync_runs.created_at as run_created_at',
+            ])
             ->join('sync_runs', 'sync_runs.id', '=', 'sync_run_items.sync_run_id')
             ->join('sync_configurations', 'sync_configurations.id', '=', 'sync_runs.sync_configuration_id')
             ->where('sync_run_items.workspace_id', $account->workspace_id)
@@ -46,39 +50,49 @@ final class AdobeProductWritePauseProjector
             ])
             ->when(
                 $credentialBoundary !== null,
-                fn ($query) => $query->where('sync_run_items.created_at', '>', $credentialBoundary),
+                // Current schema timestamps are second-precision. Equality is kept
+                // deliberately: discarding same-second evidence could hide a real
+                // post-rotation permission denial. A stale same-second warning is
+                // safer than a false all-clear when chronology is unknowable.
+                fn ($query) => $query->where('sync_run_items.created_at', '>=', $credentialBoundary),
             )
             ->orderByDesc('sync_runs.completed_at')
             ->orderByDesc('sync_runs.created_at')
-            ->orderByDesc('sync_runs.id')
             ->orderByDesc('sync_run_items.created_at')
+            ->orderByDesc('sync_run_items.id')
             ->cursor();
 
-        $currentRunId = null;
-        $runHasPermissionDenial = false;
-        $runHasVerifiedWrite = false;
+        $currentRecencyKey = null;
+        $bucketHasPermissionDenial = false;
+        $bucketHasVerifiedWrite = false;
 
         foreach ($items as $item) {
-            $runId = (string) $item->sync_run_id;
+            $recencyKey = $this->recencyKey($item);
 
-            if ($currentRunId !== null && $runId !== $currentRunId) {
-                $decision = $this->decisionForRun($runHasPermissionDenial, $runHasVerifiedWrite);
+            if ($currentRecencyKey !== null && $recencyKey !== $currentRecencyKey) {
+                $decision = $this->decisionForRecencyBucket(
+                    $bucketHasPermissionDenial,
+                    $bucketHasVerifiedWrite,
+                );
 
                 if ($decision !== null) {
                     return $decision;
                 }
 
-                $runHasPermissionDenial = false;
-                $runHasVerifiedWrite = false;
+                $bucketHasPermissionDenial = false;
+                $bucketHasVerifiedWrite = false;
             }
 
-            $currentRunId = $runId;
+            $currentRecencyKey = $recencyKey;
             [$permissionDenied, $verifiedWrite] = $this->evidenceFlags($item);
-            $runHasPermissionDenial = $runHasPermissionDenial || $permissionDenied;
-            $runHasVerifiedWrite = $runHasVerifiedWrite || $verifiedWrite;
+            $bucketHasPermissionDenial = $bucketHasPermissionDenial || $permissionDenied;
+            $bucketHasVerifiedWrite = $bucketHasVerifiedWrite || $verifiedWrite;
         }
 
-        return $this->decisionForRun($runHasPermissionDenial, $runHasVerifiedWrite) ?? false;
+        return $this->decisionForRecencyBucket(
+            $bucketHasPermissionDenial,
+            $bucketHasVerifiedWrite,
+        ) ?? false;
     }
 
     /** @return array{bool, bool} */
@@ -119,8 +133,20 @@ final class AdobeProductWritePauseProjector
         return [$permissionDenied, $verifiedWrite];
     }
 
-    private function decisionForRun(bool $permissionDenied, bool $verifiedWrite): ?bool
+    private function recencyKey(SyncRunItem $item): string
     {
+        return implode('|', [
+            (string) $item->getAttribute('run_completed_at'),
+            (string) $item->getAttribute('run_created_at'),
+            (string) $item->created_at,
+        ]);
+    }
+
+    private function decisionForRecencyBucket(bool $permissionDenied, bool $verifiedWrite): ?bool
+    {
+        // If contradictory evidence is indistinguishable at the persisted timestamp
+        // precision, fail safe. A later independently timestamped verified WRITE
+        // will clear the pause; an arbitrary UUID ordering must never do so.
         if ($permissionDenied) {
             return true;
         }
