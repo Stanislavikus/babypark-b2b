@@ -10,9 +10,9 @@ return new class extends Migration
     {
         Schema::create('connector_schema_field_classifications', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('workspace_id')->constrained('workspaces');
+            $table->uuid('workspace_id');
             $table->uuid('connector_account_id');
-            $table->foreignUuid('connector_schema_source_id')->constrained('connector_schema_sources')->restrictOnDelete();
+            $table->uuid('connector_schema_source_id');
             $table->string('external_field_key');
             $table->uuid('latest_snapshot_field_id');
             $table->string('disposition', 64);
@@ -33,6 +33,10 @@ return new class extends Migration
         });
 
         Schema::table('connector_schema_field_classifications', function (Blueprint $table) {
+            $table->foreign('workspace_id', 'csfc_workspace_fk')
+                ->references('id')->on('workspaces')->restrictOnDelete();
+            $table->foreign('connector_schema_source_id', 'csfc_source_fk')
+                ->references('id')->on('connector_schema_sources')->restrictOnDelete();
             $table->foreign(['workspace_id', 'connector_account_id'], 'csfc_ws_account_fk')
                 ->references(['workspace_id', 'id'])->on('connector_accounts')->restrictOnDelete();
             $table->foreign(['workspace_id', 'latest_snapshot_field_id'], 'csfc_ws_field_fk')
