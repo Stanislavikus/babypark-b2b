@@ -16,7 +16,7 @@ final class MagentoV1FieldProgressLedgerTest extends TestCase
         self::assertCount(102, array_unique(array_column($rows, 'external_field_key')));
 
         foreach ($rows as $row) {
-            foreach (['progress_bucket', 'mapping_status', 'certification_status', 'evidence_ref', 'next_action'] as $key) {
+            foreach (['behavior_class', 'progress_bucket', 'mapping_status', 'certification_status', 'onboarding_readiness', 'evidence_ref', 'next_action'] as $key) {
                 self::assertNotSame('', trim($row[$key]), $row['external_field_key'].'.'.$key);
             }
         }
@@ -34,32 +34,71 @@ final class MagentoV1FieldProgressLedgerTest extends TestCase
     }
 
     #[Test]
-    public function remaining_workspace_custom_work_is_two_bounded_known_behavior_batches(): void
+    public function workspace_custom_rows_are_all_onboarding_ready_without_faking_exact_write_proof(): void
     {
         $custom = array_values(array_filter(
             $this->rows(),
             static fn (array $row): bool => $row['progress_bucket'] === 'workspace_custom',
         ));
-        $passed = array_values(array_filter(
+        $exact = array_values(array_filter(
             $custom,
             static fn (array $row): bool => $row['certification_status'] === 'WRITE_READ_RESTORE_PASS',
         ));
-        $pending = array_values(array_filter(
+        $covered = array_values(array_filter(
             $custom,
-            static fn (array $row): bool => $row['certification_status'] === 'NOT_YET_CERTIFIED',
+            static fn (array $row): bool => $row['certification_status'] === 'BEHAVIOR_CLASS_COVERED_NO_EXACT_WRITE',
         ));
 
         self::assertCount(45, $custom);
-        self::assertCount(24, $passed);
-        self::assertCount(21, $pending);
+        self::assertCount(24, $exact);
+        self::assertCount(21, $covered);
         self::assertCount(16, array_filter(
-            $pending,
-            static fn (array $row): bool => $row['normalized_data_type'] === 'select' && $row['external_scope'] === 'global',
+            $covered,
+            static fn (array $row): bool => $row['behavior_class'] === 'select/global',
         ));
         self::assertCount(5, array_filter(
-            $pending,
-            static fn (array $row): bool => $row['normalized_data_type'] === 'money' && $row['external_scope'] === 'website',
+            $covered,
+            static fn (array $row): bool => $row['behavior_class'] === 'money/website',
         ));
+        self::assertCount(45, array_filter(
+            $custom,
+            static fn (array $row): bool => str_starts_with($row['onboarding_readiness'], 'ready_'),
+        ));
+        self::assertCount(0, array_filter(
+            $custom,
+            static fn (array $row): bool => $row['certification_status'] === 'NOT_YET_CERTIFIED',
+        ));
+    }
+
+    #[Test]
+    public function custom_behavior_coverage_records_live_catalog_evidence_without_claiming_exact_writes(): void
+    {
+        $coverage = json_decode(
+            file_get_contents($this->root('docs/connectors/adobe-commerce/magento_v1_custom_behavior_coverage_2026_09_12.json')),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        self::assertSame(19, $coverage['catalog_total_count']);
+        self::assertTrue($coverage['exact_field_write_read_restore_not_claimed_by_this_artifact']);
+        self::assertCount(21, $coverage['fields']);
+        self::assertCount(18, array_filter(
+            $coverage['fields'],
+            static fn (array $row): bool => $row['live_value_observed'] === true,
+        ));
+        $schemaOnly = array_values(array_map(
+            static fn (array $row): string => $row['external_field_key'],
+            array_filter(
+                $coverage['fields'],
+                static fn (array $row): bool => $row['live_value_observed'] === false,
+            ),
+        ));
+        sort($schemaOnly);
+        self::assertSame([
+            'c_carseats_child_gender',
+            'c_furniture_color',
+            'c_strollers_color_joolz_day_5',
+        ], $schemaOnly);
     }
 
     #[Test]
@@ -95,9 +134,12 @@ final class MagentoV1FieldProgressLedgerTest extends TestCase
 
         self::assertStringContainsString('Mandatory per-field progress ledger', $protocol);
         self::assertStringContainsString('Connector certification is not customer onboarding', $protocol);
+        self::assertStringContainsString('exact per-code WRITE certification is not an onboarding gate', $protocol);
         self::assertStringContainsString('Continue from the first unresolved `next_action`', $protocol);
         self::assertStringContainsString('restart connector inventory/research from zero', $agreement);
+        self::assertStringContainsString('merchant custom attributes into one-by-one vendor research', $agreement);
         self::assertStringContainsString('MAGENTO_V1_FIELD_PROGRESS.md', $map);
+        self::assertStringContainsString('magento_v1_custom_behavior_coverage_2026_09_12.json', $map);
         self::assertStringContainsString('Per-field real-target progress is tracked separately', $matrix);
     }
 

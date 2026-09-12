@@ -11,14 +11,14 @@ The CSV is the current real-target per-field progress ledger: exactly one row pe
 
 ## Current snapshot
 
-| Progress bucket | Discovered | Full WRITE→READ→RESTORE pass | Other explicit checked result | Not yet certified |
-| --- | ---: | ---: | ---: | ---: |
-| `canonical_platform` | 12 | 6 | 3 | 3 |
-| `magento_standard` | 45 | 8 | 6 | 31 |
-| `workspace_custom` | 45 | 24 | 0 | 21 |
-| **Total** | **102** | **38** | **9** | **55** |
+| Progress bucket | Discovered | Exact WRITE→READ→RESTORE | Behavior-class covered | Other explicit checked result | Unresolved engineering rows | Onboarding-ready custom |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `canonical_platform` | 12 | 6 | 0 | 3 | 3 | n/a |
+| `magento_standard` | 45 | 8 | 0 | 6 | 31 | n/a |
+| `workspace_custom` | 45 | 24 | 21 | 0 | **0** | **45 / 45** |
+| **Total** | **102** | **38** | **21** | **9** | **34** | **45 / 45 custom** |
 
-`Other explicit checked result` means a real terminal classification/proof such as identity read-only, system-owned, relation pending, URL side-effect pending, or media preservation. It must not be counted as bidirectional field certification.
+`Behavior-class covered` is deliberately not counted as exact per-code bidirectional certification. It means the discovered custom field matches a transport behavior already proven on the same real target and can use the reusable onboarding path. `Other explicit checked result` covers terminal classifications such as identity read-only, system-owned, relation pending, URL side-effect pending, or media preservation.
 
 ## Canonical mapping state
 
@@ -28,14 +28,14 @@ The remaining canonical rows are explicit mapping work, not hidden knowledge: `c
 
 ## Workspace-custom scale state
 
-The current target exposes 45 workspace-custom `c_*` / `x_*` fields. Twenty-four already passed reversible real-target WRITE→READ→RESTORE certification.
-
-The remaining 21 are not 21 new transport designs. They collapse into two behavior signatures already exercised by certified fields:
+The current target exposes 45 workspace-custom `c_*` / `x_*` fields. Twenty-four already passed reversible real-target WRITE→READ→RESTORE certification. The other 21 collapse into only two behavior signatures already exact-field certified on this same target:
 
 - 16 × `select / global`;
 - 5 × `money / website`.
 
-They should therefore be batch-certified through the existing proven mechanism. New vendor research is required only if a concrete field exposes a new behavior, semantics conflict, or runtime failure.
+A 2026-09-12 read-only scan of all 19 products on the certification Magento target found live values for 18 of those 21 rows; three (`c_carseats_child_gender`, `c_furniture_color`, `c_strollers_color_joolz_day_5`) are present in discovered schema but unused by the current catalogue. Evidence is `magento_v1_custom_behavior_coverage_2026_09_12.json`.
+
+All 21 are now `BEHAVIOR_CLASS_COVERED_NO_EXACT_WRITE`, so **all 45/45 BabyPark custom attributes are onboarding-ready**. This does not claim 45 exact remote mutations: exact WRITE→READ→RESTORE remains 24/45. A new destructive PUT is required only if an attribute introduces a new behavior class, special/clear semantics, or an actual runtime failure. This avoids multiplying P-10 store-scope side-effect risk merely to retest an already-proven transport mechanism.
 
 ## Mandatory resume algorithm
 

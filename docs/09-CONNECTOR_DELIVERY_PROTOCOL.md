@@ -99,7 +99,7 @@ The connector master matrix may group fields when documenting shared transport/d
 
 Minimum progress columns are:
 
-`external_field_key → progress_bucket → bucket_detail → canonical_code (if any) → mapping_status → certification_status → evidence_ref → next_action`
+`external_field_key → type/scope behavior_class → progress_bucket → bucket_detail → canonical_code (if any) → mapping_status → certification_status → onboarding_readiness → evidence_ref → next_action`
 
 The top-level `progress_bucket` must make merchant/runtime intent obvious:
 
@@ -125,6 +125,8 @@ At workspace discovery time:
 4. a new engineering investigation is opened only for an unrecognized behavior class, ambiguous semantic promotion, or a concrete runtime failure.
 
 A catalogue with hundreds or thousands of custom attributes must therefore scale primarily as data classification, not as hundreds or thousands of fresh manual vendor-manual studies. Individual rows still receive explicit progress/results, but proven cluster/behavior mechanics are reused automatically.
+
+For installation-dependent `workspace_custom` attributes, **exact per-code WRITE certification is not an onboarding gate** when the discovered metadata fits an already real-target-certified behavior class and there is no field-specific restriction or runtime failure. The ledger must distinguish `exact field certified` from `behavior-class covered`; both may be onboarding-ready, but only the first may be counted as an exact field WRITE→READ→RESTORE proof. A field that introduces a new type/scope/option/clear/requiredness behavior, or fails at runtime, leaves the reusable fast path and becomes engineering work.
 
 ---
 
@@ -187,17 +189,20 @@ A failure may expose a genuine new architecture or domain ambiguity. In that cas
 
 ## 7. Field-by-Field Certification After Cluster Proof
 
-Once a cluster's representative path works, run every field in that cluster through the proven mechanism.
+Once a cluster's representative path works, run every provider-standard/canonical field in that cluster through the proven mechanism.
 
-Do not assume that all fields pass because one representative field passed.
+Do not assume that standard provider fields pass because one representative field passed.
 
-Every field receives an explicit certification result for each relevant direction.
+Installation-dependent `workspace_custom` codes are different: their connector contract is the discovered behavior class, not the merchant's arbitrary attribute code. Each custom row still receives an explicit result, but it may terminate as `BEHAVIOR CLASS COVERED` without a dedicated destructive WRITE when its metadata matches a real-target-certified class and no field-specific blocker exists. Exact per-code certification remains required for new behavior classes, special semantics, and concrete failures.
+
+Every row receives an explicit certification/classification result for each relevant direction.
 
 Allowed final classifications are:
 
 - `READ PASS`;
 - `WRITE PASS`;
 - `READ + WRITE PASS`;
+- `BEHAVIOR CLASS COVERED` — workspace-custom only; exact representative real-target proof for the matching transport behavior exists and this row introduces no new behavior/failure;
 - `INTENTIONALLY ONE-WAY` — only with a concrete external-platform or product-domain reason and evidence;
 - `SYSTEM / PLATFORM OWNED` — mutation is not semantically valid, with owner/reason recorded;
 - `BLOCKED` — concrete unresolved blocker recorded;
@@ -218,7 +223,7 @@ A connector V1 is not production-ready until all of the following are true:
 3. every field has a platform representation or an explicit documented blocker/classification;
 4. at least one representative field from every cluster has been proven end-to-end on a real target in every supported direction;
 5. errors found during representative probes have been root-caused and the required blockers fixed;
-6. every field has been individually certified through the working cluster mechanism;
+6. every canonical/provider-standard field has been individually certified through the working cluster mechanism, and every workspace-custom row is either exact-field certified or explicitly covered by a certified behavior class with no unresolved exception;
 7. the master matrix contains no unexplained gaps or unknowns;
 8. connector capability/support flags match actual runtime truth;
 9. automated tests and CI pass for the production-intended paths;

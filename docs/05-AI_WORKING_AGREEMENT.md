@@ -67,6 +67,7 @@ The AI must not:
 - assume that previous chat memory is the source of truth;
 - restart connector inventory/research from zero when an authoritative inventory and per-field progress ledger already exist;
 - keep completed field checks only in chat or scratch notes instead of writing their status/evidence into the campaign ledger;
+- turn merchant custom attributes into one-by-one vendor research when their discovered behavior class is already certified; use the ledger/class evidence and investigate only new behavior or actual failures;
 - create new database fields casually;
 - bypass the Attribute Dictionary;
 - bypass workspace isolation;
