@@ -526,9 +526,9 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function workspace_permission_catalogue_contains_tenth_permission_including_run_sync_live(): void
+    public function workspace_permission_catalogue_contains_run_sync_live(): void
     {
-        $this->assertCount(10, WorkspacePermissions::catalogue());
+        $this->assertCount(11, WorkspacePermissions::catalogue());
         $this->assertContains(WorkspacePermissions::RUN_SYNC_PREVIEW, WorkspacePermissions::catalogue());
         $this->assertContains(WorkspacePermissions::RUN_SYNC_LIVE, WorkspacePermissions::catalogue());
     }

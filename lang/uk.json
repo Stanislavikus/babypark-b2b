@@ -744,5 +744,6 @@
     "connectors.ui.layer_a.product_write_paused.title": "Передача змін товарів призупинена",
     "connectors.ui.layer_a.product_write_paused.body": "Підключення до Magento працює, але під час передачі змін Magento підтвердив, що цій інтеграції бракує дозволу на зміну товарів.",
     "connectors.ui.layer_a.product_write_paused.remediation": "Перевірте дозволи інтеграції в Magento, а потім повторіть передачу.",
-    "connectors.ui.layer_a.next_step.preview_permission_required": "Для створення пробної синхронізації потрібен відповідний доступ. Зверніться до уповноваженого адміністратора робочого простору."
+    "connectors.ui.layer_a.next_step.preview_permission_required": "Для створення пробної синхронізації потрібен відповідний доступ. Зверніться до уповноваженого адміністратора робочого простору.",
+    "workspace_access.permissions.manage_product_structure": "Керування структурою товарів"
 }

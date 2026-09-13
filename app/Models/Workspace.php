@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\PriceDisplayMode;
+use App\Services\ProductStructure\BasicProductStructureReconciler;
 use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -32,6 +33,23 @@ class Workspace extends Model
         static::creating(function (Workspace $workspace): void {
             $workspace->default_vat_rate ??= (string) config('pricing.default_vat_rate', 20);
         });
+
+        static::created(function (Workspace $workspace): void {
+            $reconciler = app(BasicProductStructureReconciler::class);
+            if ($reconciler->available()) {
+                $reconciler->reconcileWorkspace((string) $workspace->id);
+            }
+        });
+    }
+
+    public function productTypes(): HasMany
+    {
+        return $this->hasMany(ProductType::class);
+    }
+
+    public function attributeGroups(): HasMany
+    {
+        return $this->hasMany(AttributeGroup::class);
     }
 
     public function products(): HasMany

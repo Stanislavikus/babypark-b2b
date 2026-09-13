@@ -24,6 +24,8 @@ final class WorkspacePermissions
 
     public const MANAGE_SYNC_CONFIGURATIONS = 'manage_sync_configurations';
 
+    public const MANAGE_PRODUCT_STRUCTURE = 'manage_product_structure';
+
     /**
      * @return list<string>
      */
@@ -40,6 +42,7 @@ final class WorkspacePermissions
             self::RUN_SYNC_PREVIEW,
             self::RUN_SYNC_LIVE,
             self::MANAGE_SYNC_CONFIGURATIONS,
+            self::MANAGE_PRODUCT_STRUCTURE,
         ];
     }
 }

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AttributeStatus;
 use App\Enums\AttributeStorageType;
 use App\Enums\FieldObjectType;
+use App\Services\ProductStructure\BasicProductStructureReconciler;
 use App\Support\Sync\Exceptions\FieldBindingReferencedByFieldMappingException;
 use App\Support\Workspace\BelongsToWorkspaceOrGlobal;
 use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids;
@@ -37,6 +38,13 @@ class FieldBinding extends Model
         static::deleting(function (FieldBinding $binding): void {
             if (FieldMapping::withoutWorkspaceScope()->where('field_binding_id', $binding->id)->exists()) {
                 throw FieldBindingReferencedByFieldMappingException::forBinding($binding->id);
+            }
+        });
+
+        static::saved(function (FieldBinding $binding): void {
+            $reconciler = app(BasicProductStructureReconciler::class);
+            if ($reconciler->available()) {
+                $reconciler->reconcileBinding($binding);
             }
         });
     }
