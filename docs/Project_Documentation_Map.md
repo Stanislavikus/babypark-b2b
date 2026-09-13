@@ -722,6 +722,7 @@ cross-platform vocabulary or define runtime/storage behavior.
 - `docs/reviews/PRODUCT_STRUCTURE_UX_AI_GPT54_ARBITRATION_2026_09_13.md` — pre-implementation arbitration of GPT-5.4 ProductType/AttributeGroup/Category/AI-enrichment research; records accepted baseline, concrete corrections, and architecture questions that must remain open for Sonnet before final contract freeze.
 - `docs/reviews/PRODUCT_STRUCTURE_UX_AI_FINAL_SYNTHESIS_2026_09_13.md` — final pre-implementation synthesis across repo contracts, GPT-5.4, Sonnet 5 High, primary vendor docs, and Amazon/BigCommerce connector-shape checks; authoritative research conclusion for ProductType/AttributeGroup/Completeness/AI proposal design before adversarial implementation review.
 - `docs/reviews/PRODUCT_STRUCTURE_UX_AI_IMPLEMENTATION_CONTRACT_2026_09_13.md` — concrete phased implementation contract prepared for Gemini 3.1 adversarial review; coding must begin with Slice A only after review/arbitration.
+- `docs/reviews/PRODUCT_STRUCTURE_UX_AI_SONNET_CONTRACT_REVIEW_2026_09_13.md` — post-contract Sonnet adversarial review resolution; freezes physical PK/FK type, Customer bootstrap exclusion, `manage_product_structure`, out-of-type sync boundary, Basic Product post-create reconciliation, structure revision semantics, and mandatory MySQL gate without changing the ProductType/AttributeGroup architecture.
 
 **For AI-assisted implementation (architecture and domain tasks):**
 

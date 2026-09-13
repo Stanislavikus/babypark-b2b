@@ -2,6 +2,8 @@
 
 # Architecture Principles
 
+> **Field Foundation terminology note (current runtime):** historical sections of this document use `AttributeDefinition`, `ProductAttributeValue`, `VariantAttributeValue`, `product_attribute_values`, and `variant_attribute_values`. After GAP-016, read those as `FieldDefinition` + `FieldBinding`, `ProductFieldValue`, `VariantFieldValue`, `product_field_values`, and `variant_field_values` respectively. The architectural rules remain normative; the old names are historical terminology, not current schema names.
+
 ## Purpose
 
 This document establishes the architectural laws, decision-making protocols and implementation constraints for all developers and Artificial Intelligence code generation systems working on the platform.

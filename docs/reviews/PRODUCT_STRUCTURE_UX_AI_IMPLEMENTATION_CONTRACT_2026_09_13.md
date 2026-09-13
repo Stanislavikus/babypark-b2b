@@ -50,6 +50,8 @@ Rules:
 - exactly one default Basic Product per workspace;
 - active ProductType code unique inside workspace;
 - merchant rename changes label, not stable code/identity;
+- `structure_revision` is one authoritative monotonic CAS/fingerprint anchor for the ProductType structure; every governed structural mutation that changes Group placement/order/optional/default-active state or FieldBinding placement/order/`required_for_completeness` must bump it transactionally;
+- presentation-only label/help-text changes need not bump structural revision unless they alter AI target identity or applicability;
 - archive/delete must be rejected while Products reference the type unless they are first reassigned through the governed mutation flow.
 
 #### `attribute_groups`
@@ -96,7 +98,8 @@ Important physical-schema note: `FieldBinding` may be global (`workspace_id NULL
 #### `product_active_optional_groups`
 
 Minimum columns:
-- UUID/appropriate PK, `workspace_id`, `product_id`, `product_type_group_placement_id`;
+- UUID PK, `workspace_id`, `product_type_group_placement_id`;
+- `product_id` is **unsigned BIGINT** and FK to `products.id` (matching the existing Product/value-table key convention);
 - explicit `is_active` override;
 - timestamps.
 
@@ -121,14 +124,23 @@ Migration strategy:
 Use existing `FieldBinding.field_group`, `sort_order`, object type, status, workspace/global ownership, and admin visibility only as bootstrap evidence.
 
 For each workspace:
-- inspect active Product/ProductVariant bindings currently eligible for admin product editing;
+- inspect only active bindings with `object_type IN (Product, ProductVariant)` currently eligible for admin product editing; **Customer bindings are explicitly excluded even when they share the same `field_group` string**;
 - create/reuse AttributeGroups from distinct legacy `field_group` codes using stable deterministic codes/known platform labels;
+- dedupe bootstrap group identity by `(workspace_id, legacy_field_group_code)`; provenance/provider does not create duplicate internal groups for the same legacy grouping code;
 - create ProductTypeGroupPlacement rows for Basic Product;
 - create one ProductTypeFieldPlacement per binding;
 - preserve current sort order as initial order;
 - do not infer groups from Magento Attribute Groups or any provider labels.
 
-Do not drop or rewrite `field_bindings.field_group` in Slice A. New ProductType UX reads new placements; legacy field_group remains fallback/compatibility state until a later cleanup proves no consumer remains.
+Introduce one idempotent **Basic Product structure reconciler** as the compatibility seam after initial bootstrap. From Slice A onward:
+- every newly created admin-visible Product/ProductVariant `FieldBinding` must become placed in that workspace's Basic Product through this reconciler;
+- the binding's legacy `field_group` is only the default AttributeGroup hint for Basic Product placement;
+- a new workspace-scoped binding reconciles only its own workspace;
+- a newly introduced global Product/ProductVariant binding must be reconciled into every existing workspace Basic Product by the controlled seed/deploy/reconciliation path;
+- Customer bindings never enter ProductType structure;
+- non-Basic ProductTypes never receive new fields implicitly; their structure changes only through governed ProductType editing/mutation.
+
+Do not drop or rewrite `field_bindings.field_group` in Slice A. New ProductType UX reads new placements; legacy `field_group` remains fallback/Basic-bootstrap compatibility metadata until a later cleanup proves no consumer remains. It is not an ongoing structural source of truth outside Basic Product reconciliation.
 
 ### ProductType change services
 
@@ -151,6 +163,7 @@ Mutation must:
 - update Product type;
 - delete/retire only invalid optional-group override rows, never field values;
 - leave out-of-type values physically intact;
+- **Slice A does not change Send/Receive eligibility:** an out-of-type value that remains covered by an active `FieldMapping` continues to be eligible for connector sync exactly as before; ProductType/placement state is not a Send/Receive filter in Slice A. Whether target Readiness or a later explicit sync policy should suppress out-of-type mapped values is deferred to the Readiness/sync-policy slice and must not be assumed now;
 - invalidate/recompute derived completeness/readiness caches only if such caches exist;
 - emit auditable result/finding according to repository conventions.
 ## Slice B — Structure admin UX + Product editor + Completeness
@@ -336,6 +349,8 @@ A target readiness evaluator may consume structural completeness but also uses a
 
 Amazon PTD is a key design check: marketplace, seller configuration, requirements mode and parentage level change the external schema. Do not encode these dimensions into ProductTypeFieldPlacement requiredness.
 
+Readiness/sync-policy design must explicitly decide whether an out-of-type but still FieldMapped stored value remains publishable to each target. Until that later decision, existing connector Send/Receive behavior remains unchanged.
+
 ## Slice F — connector structure onboarding (deferred from first build)
 
 Do not add a generic mapping table in Slice A/B.
@@ -351,7 +366,9 @@ Then reuse the existing connector pattern: discover immutable/provider-scoped ev
 
 Do not introduce role-name checks.
 
-ProductType/Group structural mutations must go through service-level authorization compatible with current workspace authorization direction. Reuse an existing product/field-management permission only if its current contract truly covers this authority. If no suitable atomic permission exists, STOP in implementation and document the smallest permission addition instead of smuggling authority through Admin/Director labels.
+ProductType/Group structural mutations must go through service-level authorization compatible with current workspace authorization direction.
+
+Current `WorkspacePermissions::catalogue()` has no product/field-structure mutation capability, so Slice A must add one explicit atomic permission: **`manage_product_structure`**. Seed it through the authoritative workspace-permission catalogue/bootstrap path and authorize ProductType, AttributeGroup, placement, optional-group, and ProductType-change mutation services by this permission. Do not infer authority from Admin/Director or any role name. Read-only Product/ProductType presentation may continue to follow existing Product access surfaces until broader Product RBAC is separately cut over; this permission is the mutation authority for the new structure domain.
 
 Every workspace-owned query/write must be explicitly workspace safe. New joins with Product, ProductType, Group, placement and optional overrides should use composite workspace guards/FKs where possible.
 
@@ -376,6 +393,7 @@ At minimum:
 
 ### Schema / tenant tests
 - exact DB uniqueness and FK constraints on MySQL, not SQLite only;
+- `product_active_optional_groups.product_id` is unsigned BIGINT and has an enforced FK to `products.id`;
 - Basic Product uniqueness per workspace;
 - Product.product_type_id backfill + non-null target state;
 - ProductType/Group cross-workspace isolation;
@@ -389,12 +407,17 @@ At minimum:
 - stored Product/Variant values survive type change bit-for-bit;
 - invalid optional-group overrides are removed while values survive;
 - stale structure revision rejects apply;
+- every structural child mutation bumps ProductType `structure_revision`; unchanged structure does not bump spuriously;
 - bulk type change reports per-product partial failure rather than all-or-nothing.
 ### Bootstrap / compatibility tests
 - distinct legacy `field_group` values bootstrap deterministic AttributeGroups;
+- bootstrap query explicitly excludes `FieldObjectType::Customer`; Customer bindings produce zero ProductType placements even when sharing a `field_group` string with Product bindings;
+- two Product/ProductVariant bindings using the same legacy `field_group` code resolve to exactly one workspace AttributeGroup regardless of provenance;
 - Stage2-C workspace custom bindings currently using `characteristics` are placed without provider-specific special cases;
 - global canonical Product/Variant bindings and workspace custom bindings can coexist in Basic Product;
-- legacy `field_group` remains unchanged after bootstrap;
+- a new workspace Product/ProductVariant binding created after Slice A is idempotently placed into that workspace Basic Product;
+- a newly introduced global Product/ProductVariant binding can be reconciled into all existing workspace Basic Products without cross-workspace leakage;
+- legacy `field_group` remains unchanged after bootstrap/reconciliation and is used only as the Basic Product fallback group hint;
 - no Magento AttributeGroup ID/name is promoted into platform AttributeGroup automatically.
 
 ### Completeness tests
@@ -452,6 +475,9 @@ Slice A is complete only when:
 - optional group activation foundation is proven;
 - bootstrap placements include current global + workspace custom Product/Variant bindings without provider-specific code;
 - broad regressions are green;
+- new schema/tenant/constraint tests have passed on real MySQL, not only SQLite;
+- `manage_product_structure` is seeded and enforced on every new structure mutation seam;
+- Basic Product reconciliation handles both initial bootstrap and post-Slice-A new bindings;
 - docs/evidence updated.
 
 Then implement Slice B and prove real merchant usability before adding AI persistence.
