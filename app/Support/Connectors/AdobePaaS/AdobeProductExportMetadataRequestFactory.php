@@ -18,8 +18,9 @@ final class AdobeProductExportMetadataRequestFactory
         AdobePaaSRequestContext $context,
         string $endpointPath,
         OAuth1SigningContext $signingContext,
+        ?int $currentPage = null,
     ): RequestInterface {
-        $absoluteUrl = $this->buildAbsoluteUrl($context, $endpointPath);
+        $absoluteUrl = $this->buildAbsoluteUrl($context, $endpointPath, $currentPage);
         $request = new Request('GET', $absoluteUrl);
 
         $authorizationHeader = $this->signer->sign(
@@ -34,8 +35,11 @@ final class AdobeProductExportMetadataRequestFactory
         return $request->withHeader('Authorization', $authorizationHeader);
     }
 
-    private function buildAbsoluteUrl(AdobePaaSRequestContext $context, string $endpointPath): string
-    {
+    private function buildAbsoluteUrl(
+        AdobePaaSRequestContext $context,
+        string $endpointPath,
+        ?int $currentPage,
+    ): string {
         if ($context->storeCode === '') {
             throw new InvalidAdobePaaSRequestContextException('Adobe PaaS store code must not be empty.');
         }
@@ -57,8 +61,18 @@ final class AdobeProductExportMetadataRequestFactory
             return $urlWithoutQuery;
         }
 
+        $criteria = ['pageSize' => 200];
+
+        if ($currentPage !== null) {
+            if ($currentPage < 1 || $currentPage > 50) {
+                throw new \InvalidArgumentException('Current page must be between 1 and 50.');
+            }
+
+            $criteria['currentPage'] = $currentPage;
+        }
+
         $query = http_build_query(
-            ['searchCriteria' => ['pageSize' => 200]],
+            ['searchCriteria' => $criteria],
             '',
             '&',
             PHP_QUERY_RFC3986,

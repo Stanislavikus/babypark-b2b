@@ -36,6 +36,7 @@
 14. Blank sentinel option values are not materialized as normal business options.
 15. Internal option codes may initially reuse the stable provider option value inside an account-local materialized FieldDefinition; cross-account semantic unification requires explicit option mapping/review.
 16. Existing `FieldOptionMapping` remains the connector correspondence owner; no second mapping framework is introduced.
+16a. Provider option lineage may be persisted for every selectable Product attribute because the global registry already returns those IDs/labels in the same paginated read; this does not materialize platform options. Workspace materialization still filters by runtime disposition and binding eligibility.
 
 ## Workspace materialization boundary
 
@@ -56,7 +57,7 @@ B. **Read-only structure reconciler**
 - fetch global Product attributes with `attribute_id`;
 - fetch Product Attribute Sets and set membership;
 - filter groups by authoritative Product set IDs;
-- fetch option labels by store view for selectable workspace-custom fields;
+- reuse inline provider option identity/labels from the global Product attribute registry for selectable attributes; call the per-attribute options endpoint only when that inline structure is absent, then let materialization consume the `workspace_custom` subset;
 - reconcile rename, disappear/reappear, membership and option changes idempotently.
 
 C. **Workspace materializer**

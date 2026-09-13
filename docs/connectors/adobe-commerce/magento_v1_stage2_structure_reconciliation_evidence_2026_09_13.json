@@ -1,0 +1,31 @@
+{
+  "schema_version": "magento_v1_stage2_structure_reconciliation_evidence.v1",
+  "generated_at": "2026-09-13T07:04:11+00:00",
+  "source": "live_adobe_commerce_read_only_reconciliation",
+  "foundation_commit": "86cb5ce0de3d20e58e4d192acd6c2acb98b0a20b",
+  "migration": "2026_09_13_040000_adobe_product_attribute_structure_foundation",
+  "product_write_mutations": false,
+  "run_1": {
+    "attributes": 106,
+    "attribute_sets": 4,
+    "attribute_groups": 42,
+    "set_memberships": 284,
+    "option_lineages": 1387,
+    "lineage_identity_sha256": "d528b081cd86fe44b6963699090e4e8d4b2862d36b91fe1409f959dcadebcacb",
+    "option_identity_sha256": "153eb81ad3adf6477bc9431ddbe6bd0a026766032d84f44e9c7edab655489d96"
+  },
+  "run_2": {
+    "attributes": 106,
+    "attribute_sets": 4,
+    "attribute_groups": 42,
+    "set_memberships": 284,
+    "option_lineages": 1387,
+    "lineage_identity_sha256": "d528b081cd86fe44b6963699090e4e8d4b2862d36b91fe1409f959dcadebcacb",
+    "option_identity_sha256": "153eb81ad3adf6477bc9431ddbe6bd0a026766032d84f44e9c7edab655489d96"
+  },
+  "conclusion": {
+    "idempotent": true,
+    "duplicate_identity_rows_created": false,
+    "all_projection_rows_active_after_run_2": true
+  }
+}
