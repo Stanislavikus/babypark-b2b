@@ -719,6 +719,7 @@ cross-platform vocabulary or define runtime/storage behavior.
 - 02-ATTRIBUTE_DICTIONARY.md
 - 03-DOMAIN_MODEL.md
 - 04-ARCHITECTURE_PRINCIPLES.md
+- `docs/reviews/PRODUCT_STRUCTURE_UX_AI_GPT54_ARBITRATION_2026_09_13.md` — pre-implementation arbitration of GPT-5.4 ProductType/AttributeGroup/Category/AI-enrichment research; records accepted baseline, concrete corrections, and architecture questions that must remain open for Sonnet before final contract freeze.
 
 **For AI-assisted implementation (architecture and domain tasks):**
 
