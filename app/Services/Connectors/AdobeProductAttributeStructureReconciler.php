@@ -90,7 +90,7 @@ final class AdobeProductAttributeStructureReconciler
             ->where($scope)
             ->get()
             ->keyBy('provider_attribute_id');
-        AdobeProductAttributeLineage::withoutWorkspaceScope()->where($scope)->update(['missing_since' => $capturedAt]);
+        AdobeProductAttributeLineage::withoutWorkspaceScope()->where($scope)->whereNull('missing_since')->update(['missing_since' => $capturedAt]);
 
         $lineageRows = [];
         $lineageIds = [];
@@ -124,7 +124,7 @@ final class AdobeProductAttributeStructureReconciler
             ->where($scope)
             ->get()
             ->keyBy('provider_attribute_set_id');
-        AdobeProductAttributeSet::withoutWorkspaceScope()->where($scope)->update(['missing_since' => $capturedAt]);
+        AdobeProductAttributeSet::withoutWorkspaceScope()->where($scope)->whereNull('missing_since')->update(['missing_since' => $capturedAt]);
 
         $setRows = [];
         $setIds = [];
@@ -169,7 +169,7 @@ final class AdobeProductAttributeStructureReconciler
             ->where($scope)
             ->get()
             ->keyBy('provider_attribute_group_id');
-        AdobeProductAttributeGroup::withoutWorkspaceScope()->where($scope)->update(['missing_since' => $capturedAt]);
+        AdobeProductAttributeGroup::withoutWorkspaceScope()->where($scope)->whereNull('missing_since')->update(['missing_since' => $capturedAt]);
         $rows = [];
 
         foreach ($snapshot->attributeGroups as $group) {
@@ -219,7 +219,7 @@ final class AdobeProductAttributeStructureReconciler
             ->where($scope)
             ->get()
             ->keyBy(fn (AdobeProductAttributeSetMembership $row): string => $row->adobe_product_attribute_lineage_id.':'.$row->adobe_product_attribute_set_id);
-        AdobeProductAttributeSetMembership::withoutWorkspaceScope()->where($scope)->update(['missing_since' => $capturedAt]);
+        AdobeProductAttributeSetMembership::withoutWorkspaceScope()->where($scope)->whereNull('missing_since')->update(['missing_since' => $capturedAt]);
         $rows = [];
 
         foreach ($snapshot->setMemberships as $membership) {
@@ -266,7 +266,7 @@ final class AdobeProductAttributeStructureReconciler
             ->where($scope)
             ->get()
             ->keyBy(fn (AdobeProductAttributeOptionLineage $row): string => $row->adobe_product_attribute_lineage_id.':'.$row->provider_option_id);
-        AdobeProductAttributeOptionLineage::withoutWorkspaceScope()->where($scope)->update(['missing_since' => $capturedAt]);
+        AdobeProductAttributeOptionLineage::withoutWorkspaceScope()->where($scope)->whereNull('missing_since')->update(['missing_since' => $capturedAt]);
         $rows = [];
 
         foreach ($snapshot->options as $option) {

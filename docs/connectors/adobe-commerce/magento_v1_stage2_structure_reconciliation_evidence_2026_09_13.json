@@ -27,5 +27,22 @@
     "idempotent": true,
     "duplicate_identity_rows_created": false,
     "all_projection_rows_active_after_run_2": true
+  },
+  "mysql_targeted_verification": {
+    "database_engine": "mysql",
+    "database": "babypark_b2b_test",
+    "test": "Tests\\Feature\\Connectors\\AdobeProductAttributeStructureReconcilerTest::reconciliation_is_idempotent_and_tracks_rename_delete_readd_by_provider_id",
+    "result": "passed",
+    "assertions": 33,
+    "verified_behaviors": [
+      "generated active-code uniqueness",
+      "rename",
+      "retire/reactivate",
+      "delete-readd same code with new provider id"
+    ]
+  },
+  "review_corrections": {
+    "missing_since_semantics": "retire updates only rows where missing_since is null; already-retired first-missing timestamp is preserved",
+    "mysql_swap_safety": "targeted reconciliation scenario verified on MySQL test database before Stage2-C materialization"
   }
 }

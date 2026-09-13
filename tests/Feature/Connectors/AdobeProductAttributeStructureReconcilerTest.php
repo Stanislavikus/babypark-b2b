@@ -11,6 +11,7 @@ use App\Services\Connectors\AdobeProductAttributeStructureReconciler;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorHttpTransport;
 use App\Support\Connectors\Transport\ConnectorOutboundRequest;
+use Carbon\CarbonImmutable;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -70,6 +71,7 @@ class AdobeProductAttributeStructureReconcilerTest extends TestCase
         $this->assertSame(1, AdobeProductAttributeOptionLineage::withoutWorkspaceScope()->where('connector_account_id', $account->id)->count());
         $this->assertSame(2, $second->setMemberships);
 
+        CarbonImmutable::setTestNow('2026-09-13 07:30:00');
         $phase = 2;
         $reconciler->reconcile($account->workspace_id, $account->id);
         $renamed = $this->lineage($account->id, 100);
@@ -77,10 +79,12 @@ class AdobeProductAttributeStructureReconcilerTest extends TestCase
         $this->assertSame($lineage100->id, $renamed->id);
         $this->assertSame('merchant_new', $renamed->current_external_field_key);
         $this->assertNull($renamed->missing_since);
-        $this->assertNotNull($this->lineage($account->id, 101)->missing_since);
+        $lineage101MissingSince = $this->lineage($account->id, 101)->missing_since;
+        $this->assertNotNull($lineage101MissingSince);
         $this->assertSame('Crimson', $this->option($account->id, $renamed->id, '10')->default_label);
         $this->assertSame('Renamed Group', $this->group($account->id, 7)->name);
 
+        CarbonImmutable::setTestNow('2026-09-13 08:30:00');
         $phase = 3;
         $reconciler->reconcile($account->workspace_id, $account->id);
         $old = $this->lineage($account->id, 100);
@@ -96,10 +100,12 @@ class AdobeProductAttributeStructureReconcilerTest extends TestCase
         $this->assertSame(1, AdobeProductAttributeSet::withoutWorkspaceScope()->where('connector_account_id', $account->id)->whereNull('missing_since')->count());
         $this->assertSame(1, AdobeProductAttributeGroup::withoutWorkspaceScope()->where('connector_account_id', $account->id)->whereNull('missing_since')->count());
         $this->assertSame(1, AdobeProductAttributeSetMembership::withoutWorkspaceScope()->where('connector_account_id', $account->id)->whereNull('missing_since')->count());
+        $this->assertSame($lineage101MissingSince?->toJSON(), $this->lineage($account->id, 101)->missing_since?->toJSON());
         $this->assertSame('Ruby', $this->option($account->id, $replacement->id, '10')->default_label);
         $this->assertFalse(collect($transport->recordedRequests)->contains(
             static fn (ConnectorOutboundRequest $request): bool => str_contains((string) $request->request->getUri(), '/options'),
         ));
+        CarbonImmutable::setTestNow();
     }
 
     #[Test]
