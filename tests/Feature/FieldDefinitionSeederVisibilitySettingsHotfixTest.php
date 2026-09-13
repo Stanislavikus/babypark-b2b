@@ -7,6 +7,7 @@ use App\Models\FieldBinding;
 use App\Models\FieldDefinition;
 use Database\Seeders\FieldDefinitionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -49,6 +50,10 @@ class FieldDefinitionSeederVisibilitySettingsHotfixTest extends TestCase
             ->where('code', 'battery_type')
             ->firstOrFail();
 
+        $bindingIdsToRemove = FieldBinding::withoutWorkspaceScope()
+            ->where('field_definition_id', $definition->id)
+            ->pluck('id');
+        DB::table('product_type_field_placements')->whereIn('field_binding_id', $bindingIdsToRemove)->delete();
         FieldBinding::withoutWorkspaceScope()
             ->where('field_definition_id', $definition->id)
             ->delete();

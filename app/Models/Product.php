@@ -24,7 +24,6 @@ class Product extends Model
         'barcode_box',
         'name',
         'category_id',
-        'product_type_id',
         'brand',
         'merchant_type',
         'unit',

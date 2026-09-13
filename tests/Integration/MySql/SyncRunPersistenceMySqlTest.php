@@ -11,6 +11,7 @@ use App\Enums\SyncSemanticOperation;
 use App\Models\SyncConfiguration;
 use App\Models\SyncRun;
 use App\Models\SyncRunItem;
+use App\Services\ProductStructure\ProductStructureIdentity;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Database\QueryException;
@@ -79,6 +80,7 @@ class SyncRunPersistenceMySqlTest extends TestCase
 
         $productId = DB::table('products')->insertGetId([
             'workspace_id' => $account->workspace_id,
+            'product_type_id' => ProductStructureIdentity::basicProductTypeId((string) $account->workspace_id),
             'onec_guid' => (string) Str::uuid(),
             'sku' => 'MYSQL-'.Str::random(6),
             'name' => 'MySQL product',

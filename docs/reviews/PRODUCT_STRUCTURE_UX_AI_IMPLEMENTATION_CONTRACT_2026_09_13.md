@@ -482,6 +482,23 @@ Slice A is complete only when:
 
 Then implement Slice B and prove real merchant usability before adding AI persistence.
 
+## Slice A closure evidence — 2026-09-13
+
+Status: **CLOSED / implementation complete.**
+
+Verified evidence:
+- Product Structure foundation + lifecycle focused gate: 14 tests, 56 assertions, green.
+- Real MySQL targeted regression gate: 70 tests, 727 assertions, green.
+- Full Pint gate: 1415 files, green; `git diff --check` green.
+- A clone of the current real catalogue (54 Products / 67 Variants, including four rich smoke Products) migrated through both Slice A migrations successfully, including final `products.product_type_id NOT NULL`.
+- Post-migration clone state: zero Products without ProductType, exactly one Basic Product for the workspace, 8 AttributeGroups / group placements, 28 field placements, and all four smoke Products backfilled to Basic Product.
+- Smoke data preservation: 36 Product dynamic rows and 72 Variant dynamic rows remained intact after migration.
+- Governed end-to-end ProductType change on a rich smoke Product succeeded Basic Product → sparse custom ProductType → Basic Product. Impact reported 27 removed bindings, including 19 populated Product bindings and 24 populated Variant cells; optional-group override resolved false → true; stored dynamic values remained 9 → 9 Product rows and 18 → 18 Variant rows.
+- ProductType change returns structured `ProductTypeMutationResult`; completeness projection is explicitly `deferred_to_slice_b` until the Slice B Completeness evaluator exists.
+- `manage_product_structure`, structure revision/CAS, stale-preview rejection, optional-group lifecycle, governed field/group placement mutation, tenant/global-binding safeguards, partial-failure bulk mutation, Basic Product reconciliation, and NOT NULL cutover are covered by the implemented services/tests.
+
+Known boundary retained by design: Slice A does not make ProductType placement a Send/Receive eligibility gate; Readiness/sync-policy semantics remain deferred.
+
 ## Gemini 3.1 adversarial review targets
 
 Do not repeat broad PIM research. Attack this implementation contract against the actual repo.

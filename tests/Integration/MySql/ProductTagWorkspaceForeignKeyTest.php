@@ -2,6 +2,7 @@
 
 namespace Tests\Integration\MySql;
 
+use App\Services\ProductStructure\ProductStructureIdentity;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,10 @@ class ProductTagWorkspaceForeignKeyTest extends TestCase
     public function test_raw_mismatched_product_tag_insert_is_rejected_by_composite_foreign_key(): void
     {
         $driver = DB::connection()->getDriverName();
+
+        if ($driver !== 'mysql') {
+            $this->markTestSkipped('MySQL-specific composite foreign-key probe.');
+        }
 
         $this->assertSame('mysql', $driver);
 
@@ -42,8 +47,22 @@ class ProductTagWorkspaceForeignKeyTest extends TestCase
             ],
         ]);
 
+        $productTypeId = ProductStructureIdentity::basicProductTypeId($workspaceA);
+        DB::table('product_types')->insert([
+            'id' => $productTypeId,
+            'workspace_id' => $workspaceA,
+            'code' => 'basic_product',
+            'localized_labels' => json_encode(['en' => 'Basic Product'], JSON_THROW_ON_ERROR),
+            'status' => 'active',
+            'is_default' => true,
+            'structure_revision' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         $productId = DB::table('products')->insertGetId([
             'workspace_id' => $workspaceA,
+            'product_type_id' => $productTypeId,
             'onec_guid' => (string) Str::uuid(),
             'sku' => 'FK-PRODUCT-001',
             'name' => 'FK product',
