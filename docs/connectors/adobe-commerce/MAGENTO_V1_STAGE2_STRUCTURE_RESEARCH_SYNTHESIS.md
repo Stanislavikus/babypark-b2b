@@ -76,3 +76,12 @@ D. **Custom Receive/Export**
 - Product vs ProductVariant ownership for arbitrary merchant attributes needs a separate evidence-based resolver.
 - Store-scope localized select/multiselect remains constrained by the current governed writer contract.
 - P-10 Product PUT store-scope inheritance risk remains orthogonal; this Stage 2 foundation is read-only until write admission is separately proven.
+
+## Stage 2-C live materialization proof (2026-09-13)
+
+- Materialization remains lineage-owned: Magento `attribute_id` lineage maps to exactly one workspace `FieldDefinition`; `FieldDefinition.code` is not provider identity.
+- Automatic materialization currently admits only `workspace_custom` single-select, non-localizable fields with active membership in the configured Product Attribute Set and exactly one trusted entity-level evidence class.
+- On the real target, 18 of 35 workspace-custom select attributes had merchant-confirmed Variant evidence and active membership in configured Attribute Set `9`; all 18 materialized as Dynamic `product_variant` bindings.
+- The other 29 workspace-custom fields remain deferred (including 12 Money fields and select fields without sufficient entity/set evidence).
+- First live run created 18 definitions, 18 bindings, 18 field mappings and 924 option mappings; the second live run created zero definitions/bindings and preserved all identity checksums.
+- No Magento Product/Variant write and no local Product/Variant field-value write was performed by the materializer proof.
