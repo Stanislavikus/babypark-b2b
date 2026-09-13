@@ -2,10 +2,17 @@
 
 namespace Tests\Feature\Sync;
 
+use App\Enums\AttributeDataType;
+use App\Enums\AttributeScope;
+use App\Enums\AttributeStatus;
+use App\Enums\AttributeStorageType;
+use App\Enums\FieldObjectType;
 use App\Enums\PriceListItemStatus;
 use App\Enums\PriceListStatus;
 use App\Enums\SyncPreviewFindingCode;
 use App\Enums\SyncPreviewOutcome;
+use App\Models\FieldBinding;
+use App\Models\FieldDefinition;
 use App\Models\PriceList;
 use App\Models\PriceListItem;
 use App\Models\Product;
@@ -14,6 +21,8 @@ use App\Models\VariantFieldValue;
 use App\Support\Connectors\AdobePaaS\AdobeAttributeMetadata;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionMetadata;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportPreviewPlanner;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductDesiredStateCompiler;
+use App\Support\Connectors\AdobePaaS\Semantic\AdobeProductExportSemanticPlanner;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
@@ -679,6 +688,103 @@ class AdobeProductExportPreviewPlannerTest extends TestCase
         $this->assertNotNull($backorderEntry);
         $this->assertSame('deny', $backorderEntry['internal_value']);
         $this->assertSame('0', $backorderEntry['external_value']);
+    }
+
+    #[Test]
+    public function workspace_custom_dynamic_variant_select_projects_to_magento_custom_attribute(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'CUSTOM-SELECT-P',
+            'name' => 'Custom Select Product',
+            'is_active' => true,
+        ]);
+        $variant = $this->createVariant($product, 'CUSTOM-SELECT-1', null);
+        $this->seedDefaultPrice($variant);
+
+        $definition = FieldDefinition::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'code' => 'merchant_color',
+            'data_type' => AttributeDataType::Select,
+            'scope' => AttributeScope::WorkspaceCustom,
+            'localized_labels' => ['uk' => 'Merchant Color'],
+            'description' => null,
+            'validation_rules' => ['options' => [[
+                'code' => 'internal_red',
+                'labels' => ['uk' => 'Red'],
+            ]]],
+            'is_localizable' => false,
+            'is_multi_value' => false,
+            'status' => AttributeStatus::Active,
+        ]);
+        $binding = FieldBinding::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'field_definition_id' => $definition->id,
+            'object_type' => FieldObjectType::ProductVariant,
+            'storage_type' => AttributeStorageType::Dynamic,
+            'storage_path' => null,
+            'field_group' => 'characteristics',
+            'is_required' => false,
+            'is_filterable' => false,
+            'is_sortable' => false,
+            'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+            'sort_order' => 900,
+            'status' => AttributeStatus::Active,
+        ]);
+        VariantFieldValue::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'variant_id' => $variant->id,
+            'field_binding_id' => $binding->id,
+            'value_text' => 'internal_red',
+        ]);
+
+        $snapshot = $this->snapshotWithMappings([[
+            'field_binding_id' => $binding->id,
+            'external_field_key' => 'merchant_color',
+            'option_mappings' => [[
+                'internal_option_key' => 'internal_red',
+                'external_option_value' => '902',
+            ]],
+        ]]);
+        $metadataFixture = $this->metadataFixture();
+        $metadata = new AdobeProductExportExecutionMetadata(
+            selectedAttributeSetId: 4,
+            attributeSets: [['attribute_set_id' => 4, 'attribute_set_name' => 'Default']],
+            attributes: array_merge($metadataFixture->attributes, [
+                'merchant_color' => new AdobeAttributeMetadata(
+                    attributeId: 5001,
+                    code: 'merchant_color',
+                    frontendInput: 'select',
+                    scope: 'global',
+                    options: ['902' => 'Red'],
+                ),
+            ]),
+        );
+
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            $snapshot,
+        )[0];
+        $result = $this->planner->plan($aggregate, $snapshot, $metadata);
+
+        $this->assertSame(SyncPreviewOutcome::Ready, $result->outcome);
+        $operation = collect($result->connectorPlan->operations)->first(
+            fn ($op) => $op->operation === 'simple_product',
+        );
+        $entry = $operation?->context['mapped_variant_values'][$binding->id] ?? null;
+        $this->assertNotNull($entry);
+        $this->assertSame('internal_red', $entry['internal_value']);
+        $this->assertSame('902', $entry['external_value']);
+        $this->assertSame('merchant_color', $entry['external_field_key']);
+
+        $semanticResult = app(AdobeProductExportSemanticPlanner::class)
+            ->evaluate($aggregate, $snapshot, $metadata);
+        $desired = (new AdobeProductDesiredStateCompiler)
+            ->compileFromSemanticResult($semanticResult);
+        $this->assertSame('902', $desired->customAttributes['merchant_color'] ?? null);
     }
 
     #[Test]
