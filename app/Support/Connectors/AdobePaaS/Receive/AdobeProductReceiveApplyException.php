@@ -31,12 +31,12 @@ final class AdobeProductReceiveApplyException extends RuntimeException
 
     public static function proposalShapeNotExecutable(): self
     {
-        return new self('receive_apply_proposal_shape_not_executable', 'Receive proposal is not executable by the frozen Product name Apply slice.');
+        return new self('receive_apply_proposal_shape_not_executable', 'Receive proposal does not contain an executable supported Apply action.');
     }
 
-    public static function mappingChanged(): self
+    public static function mappingChanged(?\Throwable $previous = null): self
     {
-        return new self('receive_apply_mapping_changed', 'Receive name mapping changed after the proposal was issued.');
+        return new self('receive_apply_mapping_changed', 'Receive field mapping or option mapping changed after the proposal was issued.', $previous);
     }
 
     public static function trustedLinkChanged(): self
@@ -51,7 +51,7 @@ final class AdobeProductReceiveApplyException extends RuntimeException
 
     public static function remoteValueChanged(): self
     {
-        return new self('receive_apply_remote_value_changed', 'Remote Magento Product name changed after the proposal was issued.');
+        return new self('receive_apply_remote_value_changed', 'Participating remote Magento value changed after the proposal was issued.');
     }
 
     public static function remoteReadFailed(?\Throwable $previous = null): self
@@ -61,7 +61,7 @@ final class AdobeProductReceiveApplyException extends RuntimeException
 
     public static function localValueChanged(?\Throwable $previous = null): self
     {
-        return new self('receive_apply_local_value_changed', 'Local Product name changed after the proposal was issued.', $previous);
+        return new self('receive_apply_local_value_changed', 'Participating local value changed after the proposal was issued.', $previous);
     }
 
     public static function configurationChanged(): self

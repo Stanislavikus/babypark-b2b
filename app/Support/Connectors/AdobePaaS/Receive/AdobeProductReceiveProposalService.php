@@ -44,6 +44,7 @@ final class AdobeProductReceiveProposalService
         private readonly FieldMappingBindingValidator $fieldMappingBindingValidator,
         private readonly GovernedProductVariantColumnEligibility $columnEligibility,
         private readonly GovernedProductVariantColumnValuePolicy $columnValuePolicy,
+        private readonly AdobeProductDynamicSelectReceiveResolver $dynamicSelectResolver,
         private readonly ReceiveProposalPlanner $proposalPlanner,
         private readonly ReceiveProposalFlowStore $proposalFlowStore,
     ) {}
@@ -134,7 +135,7 @@ final class AdobeProductReceiveProposalService
             $remoteNameValue,
         );
 
-        $entries = $this->proposalPlanner->plan([
+        $candidates = [
             $this->buildNameCandidate(
                 fieldBindingId: $mappingState['field_binding_id'],
                 localName: $freshLocalProduct->name,
@@ -142,7 +143,17 @@ final class AdobeProductReceiveProposalService
                 isSupported: $mappingState['is_supported'],
                 blockedReasonCode: $mappingState['blocked_reason_code'],
             ),
-        ]);
+        ];
+        $candidates = array_merge(
+            $candidates,
+            $this->dynamicSelectResolver->candidates(
+                configuration: $revalidatedConfiguration,
+                document: $verifiedProduct,
+                targetType: $targetType,
+                targetId: $targetId,
+            ),
+        );
+        $entries = $this->proposalPlanner->plan($candidates);
 
         $finalConfiguration = $this->revalidateConfiguration(
             account: $account,

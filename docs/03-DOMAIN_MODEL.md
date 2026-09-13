@@ -4828,6 +4828,30 @@ merchant UI, automated sync, and public Adobe Products/Import support remain out
 of scope.
 
 
+### 15. Receive R4 Dynamic Single-Select Stop-and-Amend — 2026-09-13
+
+R3 above remains the historical first Product-name certification. R4 is an additive
+behavior-class widening and does **not** reopen ENTITY TRUST, transport, proposal
+flow, Live Import admission, SyncRun history, or public Import support. The frozen
+implementation contract is
+`docs/connectors/adobe-commerce/MAGENTO_V1_RECEIVE_R4_DYNAMIC_SELECT_STOP_AND_AMEND_2026_09_13.md`.
+
+R4 admits active workspace-owned `WorkspaceCustom` Dynamic single-value Select
+bindings mapped to the explicit trusted Product/ProductVariant target. External
+option values resolve only through current `FieldOptionMapping`; labels/fuzzy
+matching are forbidden. Consequential states are `Differs` and `LocalAbsent`;
+`RemoteAbsent` is observation-only and MUST NOT become an implicit Clear.
+
+Apply preserves R3 fresh authorization, one-time flow consumption, Live Import
+admission, fresh remote reread outside the final transaction, configuration/trust/
+mapping revalidation, and one Product-owned `SyncRunItem`. Dynamic mutation uses
+`GovernedDynamicFieldValueWriter::setIfCurrentValue(...)`; stale local or remote
+state produces `not_applied`. A proposal may carry Product-name plus multiple R4
+Dynamic Select entries; `Equal` entries are non-consequential and all executable
+mutations are atomic within the final transaction. Public Adobe Products/Import
+support remains false.
+
+
 ## Sync Domain Rebaseline (Resolved — normative)
 
 **Status:** Approved normative Sync UX / Domain model. Supersedes earlier

@@ -57,10 +57,10 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 ### P-07 — Magento Receive Apply breadth
 
 - Surface: Magento → platform mutation, distinct from `AdobeProductDocumentReader` observation.
-- Current truth: R3 consequential Receive Apply is now implemented and real-target certified for canonical Product `name` only. On 2026-09-11, real Magento SKU `1234567890` was changed `Test Product → Test Product [Receive Cert]`; a server-authoritative proposal plus `AdobeProductReceiveApplyService` changed certification-clone Product 51 to the remote name with a completed/synchronized Live Import run. Magento was then restored to `Test Product`; a second proposal/Apply restored Product 51 through the same path. Final remote/local names, configuration operations (`export` only), and configuration revision returned exactly to baseline. Public Adobe Products/Import/Live support remains false and there is no merchant Apply UI.
-- Why still open: breadth beyond Product `name` is intentionally not inferred from outbound field certification or `AdobeProductDocumentReader` observation.
-- Needed proof: expand the Apply allowlist one field/domain family at a time through its owning writer, with operation-specific stale-state/conflict semantics and real-target certification before advertising broader Import support.
-- Reviewer candidate: yes when Apply scope is expanded beyond the frozen R3 Product-name slice.
+- Current truth: R3 consequential Receive Apply remains real-target certified for canonical Product `name`. R4 (2026-09-13) additively implements behavior-class Receive for active workspace custom Dynamic single-select fields: exact `FieldOptionMapping` reverse resolution, `Differs` / `LocalAbsent` proposal states, fresh remote revalidation, and `GovernedDynamicFieldValueWriter::setIfCurrentValue(...)` stale-local protection. No Magento field code is individually allowlisted. `RemoteAbsent` is not Clear. Public Adobe Products/Import/Live support remains false and there is no merchant Apply UI.
+- Why still open: R4 is code/test certified but has not yet received a destructive real-target Receive mutation certification for a custom attribute; broader behavior classes (including Money/MultiSelect/etc.) remain intentionally unclaimed.
+- Needed proof: complete R4 broad regression and, before advertising public Import support, run a controlled real-target custom-select change/read/apply/restore certification. Future breadth expands by behavior class through its owning writer, never by assuming outbound certification implies Receive writability.
+- Reviewer candidate: yes for a narrow R4 implementation review or when the next behavior class is admitted.
 
 ### P-08 — Product WRITE paused/remediation presentation — CLOSED 2026-09-12
 

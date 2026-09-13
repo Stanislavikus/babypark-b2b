@@ -26,9 +26,13 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Catalog\GovernedProductVariantColumnEligibility;
 use App\Services\Catalog\GovernedProductVariantColumnMutationService;
+use App\Services\Fields\Exceptions\DynamicFieldCurrentValueMismatchException;
+use App\Services\Fields\Exceptions\FieldValueWriterException;
+use App\Services\Fields\GovernedDynamicFieldValueWriter;
 use App\Services\Sync\Receive\ReceiveLiveImportAdmissionService;
 use App\Services\Sync\Receive\ReceiveProposalFlowStore;
 use App\Services\Workspace\WorkspaceAuthorization;
+use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocument;
 use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReader;
 use App\Support\Connectors\AdobePaaS\Product\AdobeProductDocumentReadException;
 use App\Support\Sync\Receive\ReceiveProposal;
@@ -45,8 +49,10 @@ final class AdobeProductReceiveApplyService
         private readonly ReceiveProposalFlowStore $proposalFlowStore,
         private readonly ReceiveLiveImportAdmissionService $admissionService,
         private readonly AdobeProductDocumentReader $productDocumentReader,
+        private readonly AdobeProductDynamicSelectReceiveResolver $dynamicSelectResolver,
         private readonly GovernedProductVariantColumnEligibility $columnEligibility,
         private readonly GovernedProductVariantColumnMutationService $columnMutationService,
+        private readonly GovernedDynamicFieldValueWriter $dynamicFieldValueWriter,
     ) {}
 
     public function apply(
@@ -82,9 +88,9 @@ final class AdobeProductReceiveApplyService
             throw AdobeProductReceiveApplyException::proposalUnavailable();
         }
 
-        $entry = $this->assertExecutableProposalShape($proposal);
+        $entries = $this->assertExecutableProposalShape($proposal);
         $productId = $this->resolveOwningProductId($proposal);
-        $this->assertCurrentNameMapping($proposal, $entry);
+        $this->assertCurrentMappings($proposal, $entries);
 
         // Admission performs the second fresh authority check inside the locked
         // workspace/configuration transaction and creates the synchronous
@@ -119,32 +125,30 @@ final class AdobeProductReceiveApplyService
             );
         }
 
-        $remoteName = $verifiedProduct->externalValue('name');
-
-        if (
-            ! ($remoteName['present'] ?? false)
-            || ! is_string($remoteName['value'] ?? null)
-            || $remoteName['value'] !== $entry->remoteCanonicalValue
-        ) {
-            return $this->completeNotApplied(
-                $run,
-                $productId,
-                AdobeProductReceiveApplyException::remoteValueChanged()->reasonCode,
-            );
+        try {
+            $this->assertFreshRemoteValues($proposal, $entries, $verifiedProduct);
+        } catch (AdobeProductReceiveApplyException $exception) {
+            return $this->completeNotApplied($run, $productId, $exception->reasonCode);
         }
 
         try {
             return $this->mutateAndComplete(
                 run: $run,
                 proposal: $proposal,
-                entry: $entry,
+                entries: $entries,
                 productId: $productId,
             );
-        } catch (ColumnFieldCurrentValueMismatchException $exception) {
+        } catch (ColumnFieldCurrentValueMismatchException|DynamicFieldCurrentValueMismatchException $exception) {
             return $this->completeNotApplied(
                 $run,
                 $productId,
                 AdobeProductReceiveApplyException::localValueChanged($exception)->reasonCode,
+            );
+        } catch (FieldValueWriterException $exception) {
+            return $this->completeNotApplied(
+                $run,
+                $productId,
+                AdobeProductReceiveApplyException::mappingChanged($exception)->reasonCode,
             );
         } catch (AdobeProductReceiveApplyException $exception) {
             if ($exception->reasonCode === 'receive_apply_run_not_executable') {
@@ -177,30 +181,73 @@ final class AdobeProductReceiveApplyService
         return [$workspace, $account];
     }
 
-    private function assertExecutableProposalShape(ReceiveProposal $proposal): ReceiveProposalEntry
+    /** @return list<ReceiveProposalEntry> */
+    private function assertExecutableProposalShape(ReceiveProposal $proposal): array
     {
-        if (count($proposal->entries) !== 1) {
+        if ($proposal->entries === []) {
             throw AdobeProductReceiveApplyException::proposalShapeNotExecutable();
         }
 
-        $entry = $proposal->entries[0] ?? null;
+        $actions = [];
 
-        if (
-            ! $entry instanceof ReceiveProposalEntry
-            || $entry->objectType !== FieldObjectType::Product
-            || $entry->domainRoute !== ReceiveDomainRoute::ProductVariantColumn
-            || $entry->diffState !== ReceiveDiffState::Differs
-            || ! $entry->localValuePresent
-            || ! is_string($entry->localCanonicalValue)
-            || ! $entry->remoteValuePresent
-            || ! is_string($entry->remoteCanonicalValue)
-            || $entry->explicitClear
-            || $entry->blockedReasonCode !== null
-        ) {
+        foreach ($proposal->entries as $entry) {
+            if (! $entry instanceof ReceiveProposalEntry
+                || $entry->blockedReasonCode !== null
+                || $entry->explicitClear) {
+                throw AdobeProductReceiveApplyException::proposalShapeNotExecutable();
+            }
+
+            if ($entry->diffState === ReceiveDiffState::Equal) {
+                continue;
+            }
+
+            if ($entry->domainRoute === ReceiveDomainRoute::ProductVariantColumn) {
+                if ($entry->objectType !== FieldObjectType::Product
+                    || $entry->diffState !== ReceiveDiffState::Differs
+                    || ! $entry->localValuePresent
+                    || ! is_string($entry->localCanonicalValue)
+                    || ! $entry->remoteValuePresent
+                    || ! is_string($entry->remoteCanonicalValue)) {
+                    throw AdobeProductReceiveApplyException::proposalShapeNotExecutable();
+                }
+
+                $actions[] = $entry;
+
+                continue;
+            }
+
+            if ($entry->domainRoute === ReceiveDomainRoute::DynamicField) {
+                if ($entry->objectType !== $proposal->targetType
+                    || ! $entry->remoteValuePresent
+                    || ! is_string($entry->remoteCanonicalValue)) {
+                    throw AdobeProductReceiveApplyException::proposalShapeNotExecutable();
+                }
+
+                if ($entry->diffState === ReceiveDiffState::Differs) {
+                    if (! $entry->localValuePresent || ! is_string($entry->localCanonicalValue)) {
+                        throw AdobeProductReceiveApplyException::proposalShapeNotExecutable();
+                    }
+                } elseif ($entry->diffState === ReceiveDiffState::LocalAbsent) {
+                    if ($entry->localValuePresent || $entry->localCanonicalValue !== null) {
+                        throw AdobeProductReceiveApplyException::proposalShapeNotExecutable();
+                    }
+                } else {
+                    throw AdobeProductReceiveApplyException::proposalShapeNotExecutable();
+                }
+
+                $actions[] = $entry;
+
+                continue;
+            }
+
             throw AdobeProductReceiveApplyException::proposalShapeNotExecutable();
         }
 
-        return $entry;
+        if ($actions === []) {
+            throw AdobeProductReceiveApplyException::proposalShapeNotExecutable();
+        }
+
+        return $actions;
     }
 
     private function resolveOwningProductId(ReceiveProposal $proposal): string
@@ -232,6 +279,83 @@ final class AdobeProductReceiveApplyService
         }
 
         throw AdobeProductReceiveApplyException::proposalShapeNotExecutable();
+    }
+
+    /** @param list<ReceiveProposalEntry> $entries */
+    private function assertCurrentMappings(ReceiveProposal $proposal, array $entries): void
+    {
+        $configuration = SyncConfiguration::withoutWorkspaceScope()
+            ->where('workspace_id', $proposal->workspaceId)
+            ->where('connector_account_id', $proposal->connectorAccountId)
+            ->whereKey($proposal->syncConfigurationId)
+            ->first();
+
+        if (! $configuration instanceof SyncConfiguration) {
+            throw AdobeProductReceiveApplyException::mappingChanged();
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry->domainRoute === ReceiveDomainRoute::ProductVariantColumn) {
+                $this->assertCurrentNameMapping($proposal, $entry);
+
+                continue;
+            }
+
+            if (! $this->dynamicSelectResolver->hasEligibleMapping(
+                $configuration,
+                $entry->objectType,
+                $entry->fieldBindingId,
+            )) {
+                throw AdobeProductReceiveApplyException::mappingChanged();
+            }
+        }
+    }
+
+    /** @param list<ReceiveProposalEntry> $entries */
+    private function assertFreshRemoteValues(
+        ReceiveProposal $proposal,
+        array $entries,
+        AdobeProductDocument $document,
+    ): void {
+        $configuration = SyncConfiguration::withoutWorkspaceScope()
+            ->where('workspace_id', $proposal->workspaceId)
+            ->where('connector_account_id', $proposal->connectorAccountId)
+            ->whereKey($proposal->syncConfigurationId)
+            ->first();
+
+        if (! $configuration instanceof SyncConfiguration) {
+            throw AdobeProductReceiveApplyException::mappingChanged();
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry->domainRoute === ReceiveDomainRoute::ProductVariantColumn) {
+                $remoteName = $document->externalValue('name');
+
+                if (! ($remoteName['present'] ?? false)
+                    || ! is_string($remoteName['value'] ?? null)
+                    || $remoteName['value'] !== $entry->remoteCanonicalValue) {
+                    throw AdobeProductReceiveApplyException::remoteValueChanged();
+                }
+
+                continue;
+            }
+
+            $state = $this->dynamicSelectResolver->stateForBinding(
+                configuration: $configuration,
+                document: $document,
+                targetType: $entry->objectType,
+                targetId: $proposal->targetId,
+                fieldBindingId: $entry->fieldBindingId,
+            );
+
+            if ($state === null || ! $state->isSupported) {
+                throw AdobeProductReceiveApplyException::mappingChanged();
+            }
+
+            if (! $state->remoteValuePresent || $state->remoteCanonicalValue !== $entry->remoteCanonicalValue) {
+                throw AdobeProductReceiveApplyException::remoteValueChanged();
+            }
+        }
     }
 
     private function assertCurrentNameMapping(ReceiveProposal $proposal, ReceiveProposalEntry $entry): void
@@ -301,13 +425,14 @@ final class AdobeProductReceiveApplyService
         };
     }
 
+    /** @param list<ReceiveProposalEntry> $entries */
     private function mutateAndComplete(
         SyncRun $run,
         ReceiveProposal $proposal,
-        ReceiveProposalEntry $entry,
+        array $entries,
         string $productId,
     ): SyncRun {
-        DB::transaction(function () use ($run, $proposal, $entry, $productId): void {
+        DB::transaction(function () use ($run, $proposal, $entries, $productId): void {
             $lockedRun = SyncRun::withoutWorkspaceScope()
                 ->where('workspace_id', $proposal->workspaceId)
                 ->whereKey($run->id)
@@ -342,26 +467,65 @@ final class AdobeProductReceiveApplyService
             }
 
             $this->assertTrustedLinkMatchesProposal($proposal, lock: true);
+            $findings = [];
 
-            $mapping = FieldMapping::withoutWorkspaceScope()
-                ->where('workspace_id', $proposal->workspaceId)
-                ->where('sync_configuration_id', $proposal->syncConfigurationId)
-                ->where('external_field_key', 'name')
-                ->lockForUpdate()
-                ->get();
+            foreach ($entries as $entry) {
+                if ($entry->domainRoute === ReceiveDomainRoute::ProductVariantColumn) {
+                    $mapping = FieldMapping::withoutWorkspaceScope()
+                        ->where('workspace_id', $proposal->workspaceId)
+                        ->where('sync_configuration_id', $proposal->syncConfigurationId)
+                        ->where('external_field_key', 'name')
+                        ->lockForUpdate()
+                        ->get();
 
-            if ($mapping->count() !== 1 || (string) $mapping->first()->field_binding_id !== $entry->fieldBindingId) {
-                throw AdobeProductReceiveApplyException::mappingChanged();
+                    if ($mapping->count() !== 1 || (string) $mapping->first()->field_binding_id !== $entry->fieldBindingId) {
+                        throw AdobeProductReceiveApplyException::mappingChanged();
+                    }
+
+                    $mutation = $this->columnMutationService->setIfCurrentValue(
+                        workspaceId: $proposal->workspaceId,
+                        targetType: FieldObjectType::Product,
+                        targetId: $productId,
+                        fieldBindingId: $entry->fieldBindingId,
+                        expectedCurrentValue: $entry->localCanonicalValue,
+                        value: $entry->remoteCanonicalValue,
+                    );
+
+                    $findings[] = [
+                        'code' => 'receive_product_name_applied',
+                        'field_binding_id' => $mutation->fieldBindingId,
+                        'mutation_status' => $mutation->status,
+                    ];
+
+                    continue;
+                }
+
+                $mapping = FieldMapping::withoutWorkspaceScope()
+                    ->where('workspace_id', $proposal->workspaceId)
+                    ->where('sync_configuration_id', $proposal->syncConfigurationId)
+                    ->where('field_binding_id', $entry->fieldBindingId)
+                    ->lockForUpdate()
+                    ->get();
+
+                if ($mapping->count() !== 1) {
+                    throw AdobeProductReceiveApplyException::mappingChanged();
+                }
+
+                $mutation = $this->dynamicFieldValueWriter->setIfCurrentValue(
+                    workspaceId: $proposal->workspaceId,
+                    targetType: $entry->objectType,
+                    targetId: $proposal->targetId,
+                    fieldBindingId: $entry->fieldBindingId,
+                    expectedCurrentValue: $entry->localCanonicalValue,
+                    value: $entry->remoteCanonicalValue,
+                );
+
+                $findings[] = [
+                    'code' => 'receive_dynamic_field_applied',
+                    'field_binding_id' => $mutation->fieldBindingId,
+                    'mutation_status' => $mutation->status,
+                ];
             }
-
-            $mutation = $this->columnMutationService->setIfCurrentValue(
-                workspaceId: $proposal->workspaceId,
-                targetType: FieldObjectType::Product,
-                targetId: $productId,
-                fieldBindingId: $entry->fieldBindingId,
-                expectedCurrentValue: $entry->localCanonicalValue,
-                value: $entry->remoteCanonicalValue,
-            );
 
             SyncRunItem::withoutWorkspaceScope()->create([
                 'id' => (string) Str::uuid(),
@@ -369,11 +533,7 @@ final class AdobeProductReceiveApplyService
                 'sync_run_id' => $lockedRun->id,
                 'product_id' => (int) $productId,
                 'outcome' => SyncLiveOutcome::Synchronized->value,
-                'findings' => [[
-                    'code' => 'receive_product_name_applied',
-                    'field_binding_id' => $mutation->fieldBindingId,
-                    'mutation_status' => $mutation->status,
-                ]],
+                'findings' => $findings,
             ]);
 
             $lockedRun->update([
