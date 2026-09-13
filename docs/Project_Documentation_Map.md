@@ -487,7 +487,7 @@ Availability, Customers, Orders, B2B Catalogue, Payment, Import, Export.
 - Connector, Import and Export Rules;
 - Regional and Compliance Rules;
 - Documentation Update Rules;
-- Testing Requirements;
+- Testing Requirements, including the resolved risk-based Test Execution Cadence (focused/regression tests per risk-bearing mechanism; MySQL-specific proof where required; one mandatory broad/full local gate before slice/PR closure; green CI before merge);
 - Output Format for Planning Tasks;
 - Output Format for Code Tasks;
 - Small Task Exception;
