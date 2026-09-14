@@ -5,6 +5,7 @@ namespace App\Services\ProductStructure;
 use App\Enums\AttributeStorageType;
 use App\Enums\FieldObjectType;
 use App\Models\FieldBinding;
+use App\Models\FieldDefinition;
 use App\Models\Product;
 use App\Models\ProductActiveOptionalGroup;
 use App\Models\ProductFieldValue;
@@ -19,7 +20,10 @@ use Illuminate\Support\Collection;
 
 final class ProductTypeChangeImpactService
 {
-    public function __construct(private readonly ProductCompletenessService $completeness) {}
+    public function __construct(
+        private readonly ProductCompletenessService $completeness,
+        private readonly ProductStructureStoredValueReader $storedValueReader,
+    ) {}
 
     public function preview(Product $product, ProductType $targetType): ProductTypeChangeImpact
     {
@@ -116,6 +120,7 @@ final class ProductTypeChangeImpactService
         }
 
         $bindings = FieldBinding::withoutWorkspaceScope()
+            ->with(['fieldDefinition' => fn ($query) => $query->withoutGlobalScopes()])
             ->whereIn('id', $removedBindingIds)
             ->orderBy('id')
             ->get();
@@ -146,7 +151,7 @@ final class ProductTypeChangeImpactService
             if ($binding->object_type === FieldObjectType::Product) {
                 $present = $binding->storage_type === AttributeStorageType::Dynamic
                     ? $productDynamic->has((string) $binding->id)
-                    : $this->columnValuePresent($binding, $product);
+                    : $this->storedValuePresent($binding, $product);
                 if ($present) {
                     $productHits[] = (string) $binding->id;
                 }
@@ -161,7 +166,7 @@ final class ProductTypeChangeImpactService
             foreach ($variants as $variant) {
                 $present = $binding->storage_type === AttributeStorageType::Dynamic
                     ? $variantDynamic->has(((int) $variant->id).':'.$binding->id)
-                    : $this->columnValuePresent($binding, $variant);
+                    : $this->storedValuePresent($binding, $variant);
                 if ($present) {
                     $variantHits[] = ['variant_id' => (int) $variant->id, 'field_binding_id' => (string) $binding->id];
                 }
@@ -174,20 +179,12 @@ final class ProductTypeChangeImpactService
         return [$productHits, $variantHits];
     }
 
-    private function columnValuePresent(FieldBinding $binding, object $record): bool
+    private function storedValuePresent(FieldBinding $binding, Product|ProductVariant $record): bool
     {
-        if (! is_string($binding->storage_path) || $binding->storage_path === '') {
-            return false;
-        }
+        $definition = $binding->fieldDefinition;
 
-        [, $column] = array_pad(explode('.', $binding->storage_path, 2), 2, null);
-        if (! is_string($column) || $column === '') {
-            return false;
-        }
-
-        $value = $record->getAttribute($column);
-
-        return $value !== null && $value !== '' && $value !== [];
+        return $definition instanceof FieldDefinition
+            && $this->storedValueReader->isComplete($record, $binding, $definition);
     }
 
     private function sortedDiff(array $left, array $right): array

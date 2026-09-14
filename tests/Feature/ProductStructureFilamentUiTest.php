@@ -155,9 +155,26 @@ class ProductStructureFilamentUiTest extends TestCase
             ->where('workspace_id', $this->workspace->id)
             ->where('code', 'dimensions')
             ->sole();
+        $type = app(ProductStructureMutationService::class)->createProductType(
+            $this->manager,
+            $this->workspace,
+            'dimensions-usage',
+            ['uk' => 'Тип з габаритами'],
+        );
+        app(ProductStructureMutationService::class)->putGroupPlacement(
+            $this->manager,
+            $this->workspace,
+            $type,
+            $group,
+            100,
+            false,
+            true,
+            $type->structure_revision,
+        );
 
         Livewire::actingAs($this->manager)
             ->test(EditAttributeGroup::class, ['record' => $group->getRouteKey()])
+            ->assertSee('Тип з габаритами')
             ->fillForm([
                 'label_uk' => 'Габарити',
                 'label_en' => 'Dimensions',

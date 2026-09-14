@@ -17,6 +17,8 @@ class ViewProduct extends ViewRecord
     {
         return [
             EditAction::make(),
+            ProductResource::makeChangeProductTypeAction(),
+            ProductResource::makeOptionalGroupsAction(),
             ProductResource::makeEditStructureValuesAction(),
             ProductResource::makeBulkVariantValueAction(),
         ];

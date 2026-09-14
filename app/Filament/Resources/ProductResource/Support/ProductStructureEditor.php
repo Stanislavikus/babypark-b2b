@@ -17,6 +17,7 @@ use App\Services\Catalog\GovernedProductVariantColumnEligibility;
 use App\Services\Catalog\GovernedProductVariantColumnMutationService;
 use App\Services\Fields\GovernedDynamicFieldValueWriter;
 use App\Services\ProductStructure\ProductCompletenessService;
+use App\Services\ProductStructure\ProductStructureStoredValueReader;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -24,6 +25,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
@@ -34,13 +36,52 @@ final class ProductStructureEditor
         private readonly GovernedProductVariantColumnMutationService $columnWriter,
         private readonly GovernedProductVariantColumnEligibility $columnEligibility,
         private readonly ProductCompletenessService $completeness,
+        private readonly ProductStructureStoredValueReader $storedValueReader,
     ) {}
 
     public function schema(Product $product, string $locale = 'uk'): array
     {
         [$product, $groups, $variants, $projection] = $this->context($product, $locale);
         $projectionByGroup = collect($projection->groups)->keyBy('groupPlacementId');
-        $sections = [];
+        $groupOptions = ['all' => 'Усі групи'];
+        foreach ($groups as $group) {
+            $groupProjection = $projectionByGroup->get((string) $group->id);
+            if ($groupProjection === null || ! $groupProjection->isActive) {
+                continue;
+            }
+            $groupOptions[(string) $group->id] = (string) ($group->attributeGroup?->localized_labels[$locale]
+                ?? $group->attributeGroup?->localized_labels['uk']
+                ?? $group->attributeGroup?->localized_labels['en']
+                ?? $group->attributeGroup?->code
+                ?? 'Група');
+        }
+        $sections = [
+            Section::make('Навігація по полях')->schema([
+                TextInput::make('structure_search')
+                    ->label('Пошук')
+                    ->placeholder('Назва поля або групи')
+                    ->live()
+                    ->dehydrated(false),
+                Select::make('structure_group')
+                    ->label('Група')
+                    ->options($groupOptions)
+                    ->default('all')
+                    ->live()
+                    ->dehydrated(false),
+                Select::make('structure_filter')
+                    ->label('Показати')
+                    ->options([
+                        'all' => 'Усі',
+                        'empty' => 'Порожні',
+                        'required' => 'Обов’язкові',
+                        'incomplete' => 'Незаповнені обов’язкові',
+                        'additional' => 'Додаткові дані',
+                    ])
+                    ->default('all')
+                    ->live()
+                    ->dehydrated(false),
+            ])->columns(3),
+        ];
 
         foreach ($groups as $group) {
             $groupProjection = $projectionByGroup->get((string) $group->id);
@@ -48,8 +89,14 @@ final class ProductStructureEditor
                 continue;
             }
 
+            $groupLabel = (string) ($group->attributeGroup?->localized_labels[$locale]
+                ?? $group->attributeGroup?->localized_labels['uk']
+                ?? $group->attributeGroup?->localized_labels['en']
+                ?? $group->attributeGroup?->code
+                ?? 'Група');
             $productComponents = [];
             $variantSections = [];
+            $fieldMeta = [];
 
             foreach ($group->fieldPlacements as $placement) {
                 $binding = $placement->fieldBinding;
@@ -60,15 +107,16 @@ final class ProductStructureEditor
                     continue;
                 }
 
-                $label = $this->fieldLabel($definition, $locale, (bool) $placement->required_for_completeness);
+                $required = (bool) $placement->required_for_completeness;
+                $label = $this->fieldLabel($definition, $locale, $required);
                 if ($binding->object_type === FieldObjectType::Product) {
-                    $productComponents[] = $this->component(
-                        "product_values.{$binding->id}",
-                        $label,
-                        $binding,
-                        $definition,
-                        $locale,
-                    );
+                    $path = "product_values.{$binding->id}";
+                    $incomplete = in_array((string) $binding->id, $groupProjection->missingProductBindingIds, true);
+                    $productComponents[] = $this->component($path, $label, $binding, $definition, $locale)
+                        ->visible(fn (Get $get): bool => $this->fieldVisible(
+                            $get, $label, $groupLabel, $required, $incomplete, [$path],
+                        ));
+                    $fieldMeta[] = compact('label', 'required', 'incomplete') + ['paths' => [$path]];
 
                     continue;
                 }
@@ -77,20 +125,29 @@ final class ProductStructureEditor
                     continue;
                 }
 
+                $paths = [];
                 $variantComponents = [];
                 foreach ($variants as $variant) {
+                    $path = "variant_values.{$variant->id}.{$binding->id}";
+                    $paths[] = $path;
                     $variantComponents[] = $this->component(
-                        "variant_values.{$variant->id}.{$binding->id}",
-                        $variant->sku ?: 'Variant #'.$variant->id,
+                        $path,
+                        $variant->sku ?: 'Варіант #'.$variant->id,
                         $binding,
                         $definition,
                         $locale,
                     );
                 }
+                $incomplete = collect($groupProjection->missingVariantCells)
+                    ->contains(fn (array $cell): bool => (string) $cell['field_binding_id'] === (string) $binding->id);
                 $variantSections[] = Section::make($label)
-                    ->description('Значення для активних sibling variants')
+                    ->description('Значення для активних варіантів товару')
                     ->schema([Grid::make(3)->schema($variantComponents)])
+                    ->visible(fn (Get $get): bool => $this->fieldVisible(
+                        $get, $label, $groupLabel, $required, $incomplete, $paths,
+                    ))
                     ->collapsible();
+                $fieldMeta[] = compact('label', 'required', 'incomplete', 'paths');
             }
 
             $schema = [];
@@ -99,13 +156,7 @@ final class ProductStructureEditor
             }
             array_push($schema, ...$variantSections);
 
-            $groupLabel = $group->attributeGroup?->localized_labels[$locale]
-                ?? $group->attributeGroup?->localized_labels['uk']
-                ?? $group->attributeGroup?->localized_labels['en']
-                ?? $group->attributeGroup?->code
-                ?? 'Група';
-
-            $sections[] = Section::make((string) $groupLabel)
+            $sections[] = Section::make($groupLabel)
                 ->description(sprintf(
                     'Повнота: %d%% (%d/%d)',
                     $groupProjection->percentage,
@@ -113,12 +164,20 @@ final class ProductStructureEditor
                     $groupProjection->requiredCount,
                 ))
                 ->schema($schema)
+                ->visible(fn (Get $get): bool => $this->groupVisible($get, (string) $group->id, $groupLabel, $fieldMeta))
                 ->collapsible();
         }
 
-        return $sections !== []
-            ? $sections
-            : [Placeholder::make('no_structure_fields')->content('Для активної структури немає полів для редагування.')];
+        $additional = $this->additionalDataComponents($product, $groups, $locale);
+        $sections[] = Section::make('Додаткові дані')
+            ->description('Збережені значення, які не входять до поточного типу товару. Вони не впливають на повноту.')
+            ->schema($additional !== []
+                ? $additional
+                : [Placeholder::make('no_additional_data')->content('Додаткових збережених значень немає.')])
+            ->visible(fn (Get $get): bool => ($get('structure_filter') ?? 'all') === 'additional')
+            ->collapsible();
+
+        return $sections;
     }
 
     public function fill(Product $product, string $locale = 'uk'): array
@@ -231,6 +290,200 @@ final class ProductStructureEditor
                 }
             }
         });
+    }
+
+    /** @param list<array{label: string, required: bool, incomplete: bool, paths: list<string>}> $fieldMeta */
+    private function groupVisible(Get $get, string $groupId, string $groupLabel, array $fieldMeta): bool
+    {
+        if (($get('structure_filter') ?? 'all') === 'additional') {
+            return false;
+        }
+        $selectedGroup = (string) ($get('structure_group') ?? 'all');
+        if ($selectedGroup !== 'all' && $selectedGroup !== $groupId) {
+            return false;
+        }
+
+        foreach ($fieldMeta as $meta) {
+            if ($this->fieldVisible(
+                $get,
+                $meta['label'],
+                $groupLabel,
+                $meta['required'],
+                $meta['incomplete'],
+                $meta['paths'],
+            )) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param list<string> $paths */
+    private function fieldVisible(
+        Get $get,
+        string $label,
+        string $groupLabel,
+        bool $required,
+        bool $incomplete,
+        array $paths,
+    ): bool {
+        $filter = (string) ($get('structure_filter') ?? 'all');
+        if ($filter === 'additional') {
+            return false;
+        }
+
+        $search = mb_strtolower(trim((string) ($get('structure_search') ?? '')));
+        if ($search !== '') {
+            $haystack = mb_strtolower($label.' '.$groupLabel);
+            if (! str_contains($haystack, $search)) {
+                return false;
+            }
+        }
+
+        return match ($filter) {
+            'all' => true,
+            'required' => $required,
+            'incomplete' => $required && $incomplete,
+            'empty' => collect($paths)->contains(fn (string $path): bool => $this->stateIsEmpty($get($path))),
+            default => true,
+        };
+    }
+
+    private function stateIsEmpty(mixed $value): bool
+    {
+        return $value === null || $value === '' || $value === [];
+    }
+
+    /** @return array<int, Placeholder> */
+    private function additionalDataComponents(Product $product, $groups, string $locale): array
+    {
+        $currentBindingIds = $groups
+            ->flatMap(fn (ProductTypeGroupPlacement $group) => $group->fieldPlacements)
+            ->pluck('field_binding_id')
+            ->map('strval')
+            ->unique()
+            ->values()
+            ->all();
+        $components = [];
+
+        $productSlots = ProductFieldValue::withoutWorkspaceScope()
+            ->with([
+                'fieldBinding' => fn ($query) => $query->withoutGlobalScopes(),
+                'fieldBinding.fieldDefinition' => fn ($query) => $query->withoutGlobalScopes(),
+            ])
+            ->where('workspace_id', $product->workspace_id)
+            ->where('product_id', $product->id)
+            ->when($currentBindingIds !== [], fn ($query) => $query->whereNotIn('field_binding_id', $currentBindingIds))
+            ->orderBy('field_binding_id')
+            ->get();
+
+        foreach ($productSlots as $slot) {
+            $binding = $slot->fieldBinding;
+            $definition = $binding?->fieldDefinition;
+            if (! $binding instanceof FieldBinding || ! $definition instanceof FieldDefinition) {
+                continue;
+            }
+            $value = $this->dynamicAdditionalValue($definition, $slot, $locale);
+            if ($this->stateIsEmpty($value)) {
+                continue;
+            }
+            $components[] = Placeholder::make('additional_product_'.md5((string) $slot->id))
+                ->label($definition->localizedLabel($locale).' — Товар')
+                ->content($this->formatAdditionalValue($value));
+        }
+
+        $variants = ProductVariant::withoutWorkspaceScope()
+            ->where('workspace_id', $product->workspace_id)
+            ->where('product_id', $product->id)
+            ->orderBy('id')
+            ->get();
+        $variantSlots = VariantFieldValue::withoutWorkspaceScope()
+            ->with([
+                'fieldBinding' => fn ($query) => $query->withoutGlobalScopes(),
+                'fieldBinding.fieldDefinition' => fn ($query) => $query->withoutGlobalScopes(),
+            ])
+            ->where('workspace_id', $product->workspace_id)
+            ->whereIn('variant_id', $variants->pluck('id'))
+            ->when($currentBindingIds !== [], fn ($query) => $query->whereNotIn('field_binding_id', $currentBindingIds))
+            ->orderBy('variant_id')
+            ->orderBy('field_binding_id')
+            ->get();
+        $variantsById = $variants->keyBy('id');
+
+        foreach ($variantSlots as $slot) {
+            $binding = $slot->fieldBinding;
+            $definition = $binding?->fieldDefinition;
+            $variant = $variantsById->get($slot->variant_id);
+            if (! $binding instanceof FieldBinding || ! $definition instanceof FieldDefinition || ! $variant instanceof ProductVariant) {
+                continue;
+            }
+            $value = $this->dynamicAdditionalValue($definition, $slot, $locale);
+            if ($this->stateIsEmpty($value)) {
+                continue;
+            }
+            $components[] = Placeholder::make('additional_variant_'.md5((string) $slot->id))
+                ->label($definition->localizedLabel($locale).' — Варіант '.($variant->sku ?: '#'.$variant->id))
+                ->content($this->formatAdditionalValue($value));
+        }
+
+        $canonicalBindings = FieldBinding::withoutWorkspaceScope()
+            ->with(['fieldDefinition' => fn ($query) => $query->withoutGlobalScopes()])
+            ->whereIn('object_type', [FieldObjectType::Product, FieldObjectType::ProductVariant])
+            ->whereIn('storage_type', [AttributeStorageType::Column, AttributeStorageType::Relation])
+            ->where(function ($query) use ($product): void {
+                $query->whereNull('workspace_id')->orWhere('workspace_id', $product->workspace_id);
+            })
+            ->when($currentBindingIds !== [], fn ($query) => $query->whereNotIn('id', $currentBindingIds))
+            ->orderBy('sort_order')
+            ->get();
+
+        foreach ($canonicalBindings as $binding) {
+            $definition = $binding->fieldDefinition;
+            if (! $definition instanceof FieldDefinition) {
+                continue;
+            }
+            $targets = $binding->object_type === FieldObjectType::Product ? collect([$product]) : $variants;
+            foreach ($targets as $target) {
+                $read = $this->storedValueReader->read($target, $binding, $definition);
+                if (! $read['present']) {
+                    continue;
+                }
+                $owner = $target instanceof Product
+                    ? 'Товар'
+                    : 'Варіант '.($target->sku ?: '#'.$target->id);
+                $components[] = Placeholder::make('additional_canonical_'.md5($binding->id.':'.$target->id))
+                    ->label($definition->localizedLabel($locale).' — '.$owner)
+                    ->content($this->formatAdditionalValue($read['value']));
+            }
+        }
+
+        return $components;
+    }
+
+    private function dynamicAdditionalValue(FieldDefinition $definition, mixed $slot, string $locale): mixed
+    {
+        try {
+            return $this->dynamicWriter->storedSlotValue(
+                $definition,
+                $slot,
+                $definition->is_localizable ? $locale : null,
+            );
+        } catch (\Throwable) {
+            return $slot->value_jsonb ?? $slot->value_text ?? $slot->value_num;
+        }
+    }
+
+    private function formatAdditionalValue(mixed $value): string
+    {
+        if (is_bool($value)) {
+            return $value ? 'Так' : 'Ні';
+        }
+        if (is_array($value)) {
+            return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '—';
+        }
+
+        return (string) $value;
     }
 
     private function context(Product $product, string $locale): array

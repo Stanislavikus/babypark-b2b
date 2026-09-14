@@ -651,21 +651,6 @@ class ProductResource extends Resource
         return $allowed;
     }
 
-    private static function canManageCurrentWorkspaceStructure(): bool
-    {
-        $actor = auth()->user();
-        if (! $actor instanceof User) {
-            return false;
-        }
-        $workspace = app(WorkspaceContext::class)->current();
-
-        return app(WorkspaceAuthorization::class)->allows(
-            $actor,
-            $workspace,
-            WorkspacePermissions::MANAGE_PRODUCT_STRUCTURE,
-        );
-    }
-
     public static function makeEditStructureValuesAction(): Action
     {
         return Action::make('edit_structure_values')
@@ -776,7 +761,7 @@ class ProductResource extends Resource
             });
     }
 
-    private static function makeChangeProductTypeAction(): Action
+    public static function makeChangeProductTypeAction(): Action
     {
         return Action::make('change_product_type')
             ->label('Змінити тип товару')
@@ -849,7 +834,7 @@ class ProductResource extends Resource
             });
     }
 
-    private static function makeOptionalGroupsAction(): Action
+    public static function makeOptionalGroupsAction(): Action
     {
         return Action::make('optional_groups')
             ->label('Опційні групи')

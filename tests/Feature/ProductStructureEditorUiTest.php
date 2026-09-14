@@ -69,6 +69,7 @@ class ProductStructureEditorUiTest extends TestCase
 
         $productBinding = $this->binding($workspace, 'material', FieldObjectType::Product, AttributeDataType::Text);
         $preservedBinding = $this->binding($workspace, 'preserved_note', FieldObjectType::Product, AttributeDataType::Text);
+        $additionalBinding = $this->binding($workspace, 'legacy_note', FieldObjectType::Product, AttributeDataType::Text);
         $localizedDefinition = FieldDefinition::withoutWorkspaceScope()->create([
             'workspace_id' => $workspace->id,
             'code' => 'localized_short_description',
@@ -157,14 +158,29 @@ class ProductStructureEditorUiTest extends TestCase
             'field_binding_id' => $preservedBinding->id,
             'value_text' => 'KEEP-ME',
         ]);
+        ProductFieldValue::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'product_id' => $product->id,
+            'field_binding_id' => $additionalBinding->id,
+            'value_text' => 'OUT-OF-TYPE-KEEP',
+        ]);
 
         Livewire::actingAs($admin)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
             ->assertActionExists('edit_structure_values');
 
-        Livewire::actingAs($admin)
+        $editor = Livewire::actingAs($admin)
             ->test(ListProducts::class)
             ->assertTableActionExists('edit_structure_values')
+            ->mountTableAction('edit_structure_values', $product);
+        $this->assertStringContainsString('Пошук', $editor->getMountedActionModalHtml());
+        $editor->setTableActionData(['structure_search' => 'NO-SUCH-FIELD']);
+        $this->assertStringNotContainsString('Material', $editor->getMountedActionModalHtml());
+        $editor->setTableActionData(['structure_search' => '', 'structure_filter' => 'additional']);
+        $this->assertStringContainsString('OUT-OF-TYPE-KEEP', $editor->getMountedActionModalHtml());
+
+        Livewire::actingAs($admin)
+            ->test(ListProducts::class)
             ->callTableAction('edit_structure_values', $product, data: [
                 'product_values' => [
                     $productBinding->id => 'Cotton',

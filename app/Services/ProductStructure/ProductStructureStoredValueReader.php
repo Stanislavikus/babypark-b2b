@@ -44,27 +44,38 @@ final class ProductStructureStoredValueReader
 
     public function isComplete(Product|ProductVariant $target, FieldBinding $binding, FieldDefinition $definition): bool
     {
+        return $this->read($target, $binding, $definition)['present'];
+    }
+
+    /** @return array{present: bool, value: mixed} */
+    public function read(Product|ProductVariant $target, FieldBinding $binding, FieldDefinition $definition): array
+    {
         $rule = self::RULES[$definition->code] ?? null;
         if ($rule === null || ! $this->matches($binding, $definition, $rule)) {
-            return false;
+            return ['present' => false, 'value' => null];
         }
 
         [$objectType, $storageType, , $dataType, $attribute] = $rule;
         if (($target instanceof Product ? FieldObjectType::Product : FieldObjectType::ProductVariant) !== $objectType) {
-            return false;
+            return ['present' => false, 'value' => null];
         }
 
         $value = $target->getAttribute($attribute);
         if ($storageType === AttributeStorageType::Relation) {
-            return $definition->code === 'category'
-                && $value !== null
-                && Category::withoutWorkspaceScope()
-                    ->whereKey($value)
-                    ->where('workspace_id', $target->workspace_id)
-                    ->exists();
+            if ($definition->code !== 'category' || $value === null) {
+                return ['present' => false, 'value' => null];
+            }
+            $category = Category::withoutWorkspaceScope()
+                ->whereKey($value)
+                ->where('workspace_id', $target->workspace_id)
+                ->first();
+
+            return $category === null
+                ? ['present' => false, 'value' => null]
+                : ['present' => true, 'value' => $category->name];
         }
 
-        return match ($dataType) {
+        $present = match ($dataType) {
             AttributeDataType::Text,
             AttributeDataType::LongText => is_string($value) && trim($value) !== '',
             AttributeDataType::Url => is_string($value) && $value !== '' && filter_var($value, FILTER_VALIDATE_URL) !== false,
@@ -73,6 +84,8 @@ final class ProductStructureStoredValueReader
             AttributeDataType::Boolean => is_bool($value) || in_array($value, [0, 1, '0', '1'], true),
             default => false,
         };
+
+        return ['present' => $present, 'value' => $present ? $value : null];
     }
 
     /** @param array{0: FieldObjectType, 1: AttributeStorageType, 2: string, 3: AttributeDataType, 4: string} $rule */
