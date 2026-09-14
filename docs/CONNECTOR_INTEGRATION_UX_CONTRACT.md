@@ -665,6 +665,12 @@ When a Product lacks sufficient trust for consequential Live:
 
 Do **not** add a per-product case to the run-level setup barrier for linking.
 
+For configurable initial-link/relink review, when an existing parent SKU hint is
+required but absent, surface a **distinct per-item identity-input reason**. Do not
+reuse `AccountConfigurationNotCurrent` / generic configuration-stale copy: the
+connector account can be current while the merchant simply has not supplied the
+parent identity hint needed to locate the existing configurable parent.
+
 ### Link confirmation authorization
 
 Link-confirmation mutation authority requires **both**, fresh for the current

@@ -1894,6 +1894,7 @@ Summary rules for unlinked or trust-insufficient Products in the Live surface:
 - **Worklist placement** — after truthful Live enablement, actionable unlinked/trust-insufficient Products appear in the ordered merchant attention worklist with contextual link/reconfirmation action when the actor is authorized; already-confirmed/no-action Products stay out of the primary task list.
 - **No Preview mutation** — Preview remains safe/read-only; do not route linking
   through Preview remediation or existence lookup.
+- **Configurable parent hint is its own reason** — if initial-link/relink needs an existing parent SKU hint and the merchant has not supplied it, show a dedicated identity-input message/action. Never present that state as generic account/configuration staleness.
 - **Informed confirmation** — before link confirmation the merchant sees a concise
   controlled-field comparison (platform value vs current Magento value) for fields
   the connector will own/update; action label concept: *Пов’язати з цим товаром
