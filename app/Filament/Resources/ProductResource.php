@@ -11,16 +11,27 @@ use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Filament\Resources\ProductResource\Pages\ViewProduct;
 use App\Filament\Resources\ProductResource\Support\TagBulkUi;
 use App\Models\Product;
+use App\Models\ProductType;
+use App\Models\ProductTypeGroupPlacement;
 use App\Models\Tag;
+use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Catalog\TagManager;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Services\Pricing\ProductPricingSummary;
+use App\Services\ProductStructure\ProductCompletenessService;
+use App\Services\ProductStructure\ProductOptionalGroupMutationService;
+use App\Services\ProductStructure\ProductTypeChangeImpactService;
+use App\Services\ProductStructure\ProductTypeMutationService;
+use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\AdminAvailabilityPresenter;
 use App\Support\ProductFields\AdminProductMargin;
 use App\Support\ProductFields\MarginToggle;
 use App\Support\ProductFields\ProductColumnVisibility;
+use App\Support\ProductStructure\Exceptions\ProductTypeChangeStaleException;
 use App\Support\ProductTableLink;
 use App\Support\Workspace\WorkspaceContext;
+use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
@@ -92,6 +103,15 @@ class ProductResource extends Resource
                             ? (app(ProductPricingSummary::class)->formatCostPrice($record) ?? '—')
                             : '—'),
                 ])->columns(2),
+
+                Section::make('Структура товару')->schema([
+                    Placeholder::make('product_type_summary')
+                        ->label('Тип товару')
+                        ->content(fn (?Product $record): string => $record ? self::productTypeLabel($record) : '—'),
+                    Placeholder::make('completeness_summary')
+                        ->label('Повнота структури')
+                        ->content(fn (?Product $record): string => $record ? self::completenessLabel($record) : '—'),
+                ])->columns(2)->visible(fn (?Product $record): bool => $record !== null),
 
                 Section::make('Класифікація')->schema([
                     TextInput::make('merchant_type')
@@ -204,6 +224,15 @@ class ProductResource extends Resource
                         ->getStateUsing(fn (Product $record): string => $record->is_active ? 'Активний' : 'Неактивний')
                         ->badge()
                         ->color(fn (string $state): string => $state === 'Активний' ? 'success' : 'gray'),
+                ])->columns(2),
+
+                Section::make('Структура товару')->schema([
+                    TextEntry::make('product_type_summary')
+                        ->label('Тип товару')
+                        ->getStateUsing(fn (Product $record): string => self::productTypeLabel($record)),
+                    TextEntry::make('completeness_summary')
+                        ->label('Повнота структури')
+                        ->getStateUsing(fn (Product $record): string => self::completenessLabel($record)),
                 ])->columns(2),
 
                 Section::make('Класифікація')->schema([
@@ -501,6 +530,8 @@ class ProductResource extends Resource
                     ->multiple(),
             ])
             ->recordActions([
+                self::makeChangeProductTypeAction(),
+                self::makeOptionalGroupsAction(),
                 ViewAction::make()
                     ->extraAttributes(['class' => 'bp-admin-row-view-action-hidden'])
                     ->slideOver()
@@ -555,6 +586,126 @@ class ProductResource extends Resource
             'view' => ViewProduct::route('/{record}'),
             'edit' => EditProduct::route('/{record}/edit'),
         ];
+    }
+
+    private static function productTypeLabel(Product $product): string
+    {
+        $type = ProductType::withoutWorkspaceScope()->find($product->product_type_id);
+
+        return (string) ($type?->localized_labels['uk'] ?? $type?->localized_labels['en'] ?? $type?->code ?? '—');
+    }
+
+    private static function completenessLabel(Product $product): string
+    {
+        $projection = app(ProductCompletenessService::class)->project($product, 'uk');
+
+        return sprintf('%d%% (%d/%d)', $projection->percentage, $projection->filledCount, $projection->requiredCount);
+    }
+
+    private static function canManageProductStructure(Product $product): bool
+    {
+        $actor = auth()->user();
+        if (! $actor instanceof User) {
+            return false;
+        }
+        $workspace = Workspace::withoutGlobalScopes()->find($product->workspace_id);
+
+        return $workspace instanceof Workspace
+            && app(WorkspaceAuthorization::class)->allows($actor, $workspace, WorkspacePermissions::MANAGE_PRODUCT_STRUCTURE);
+    }
+
+    private static function makeChangeProductTypeAction(): Action
+    {
+        return Action::make('change_product_type')
+            ->label('Змінити тип товару')
+            ->icon('heroicon-o-squares-2x2')
+            ->visible(fn (Product $record): bool => self::canManageProductStructure($record))
+            ->schema([
+                Select::make('product_type_id')
+                    ->label('Новий тип товару')
+                    ->options(fn (Product $record): array => ProductType::withoutWorkspaceScope()
+                        ->where('workspace_id', $record->workspace_id)
+                        ->where('status', 'active')
+                        ->orderBy('is_default', 'desc')
+                        ->orderBy('code')
+                        ->get()
+                        ->mapWithKeys(fn (ProductType $type): array => [
+                            $type->id => (string) ($type->localized_labels['uk'] ?? $type->localized_labels['en'] ?? $type->code),
+                        ])->all())
+                    ->required()
+                    ->searchable(),
+                Placeholder::make('impact_notice')
+                    ->label('Що станеться')
+                    ->content('Значення полів не видаляються. Поля поза новим типом залишаться як out-of-type data.'),
+            ])
+            ->action(function (array $data, Product $record): void {
+                $actor = auth()->user();
+                abort_unless($actor instanceof User, 403);
+                $workspace = Workspace::withoutGlobalScopes()->findOrFail($record->workspace_id);
+                $target = ProductType::withoutWorkspaceScope()
+                    ->where('workspace_id', $workspace->id)
+                    ->findOrFail((string) $data['product_type_id']);
+                $impact = app(ProductTypeChangeImpactService::class)->preview($record, $target);
+
+                try {
+                    app(ProductTypeMutationService::class)->change($actor, $workspace, $record, $target, $impact);
+                    Notification::make()->success()->title('Тип товару змінено')->send();
+                } catch (ProductTypeChangeStaleException $exception) {
+                    Notification::make()->danger()->title('Структура вже змінилася')->body($exception->getMessage())->send();
+                }
+            });
+    }
+
+    private static function makeOptionalGroupsAction(): Action
+    {
+        return Action::make('optional_groups')
+            ->label('Опційні групи')
+            ->icon('heroicon-o-adjustments-horizontal')
+            ->visible(fn (Product $record): bool => self::canManageProductStructure($record)
+                && ProductTypeGroupPlacement::withoutWorkspaceScope()
+                    ->where('workspace_id', $record->workspace_id)
+                    ->where('product_type_id', $record->product_type_id)
+                    ->where('is_optional', true)
+                    ->exists())
+            ->schema([
+                Select::make('group_placement_id')
+                    ->label('Опційна група')
+                    ->options(fn (Product $record): array => ProductTypeGroupPlacement::withoutWorkspaceScope()
+                        ->with(['attributeGroup' => fn ($query) => $query->withoutGlobalScopes()])
+                        ->where('workspace_id', $record->workspace_id)
+                        ->where('product_type_id', $record->product_type_id)
+                        ->where('is_optional', true)
+                        ->orderBy('sort_order')
+                        ->get()
+                        ->mapWithKeys(fn (ProductTypeGroupPlacement $placement): array => [
+                            $placement->id => (string) ($placement->attributeGroup?->localized_labels['uk']
+                                ?? $placement->attributeGroup?->localized_labels['en']
+                                ?? $placement->attributeGroup?->code
+                                ?? $placement->id),
+                        ])->all())
+                    ->required(),
+                Select::make('active')
+                    ->label('Стан')
+                    ->options([1 => 'Активна', 0 => 'Неактивна'])
+                    ->required(),
+            ])
+            ->action(function (array $data, Product $record): void {
+                $actor = auth()->user();
+                abort_unless($actor instanceof User, 403);
+                $workspace = Workspace::withoutGlobalScopes()->findOrFail($record->workspace_id);
+                $placement = ProductTypeGroupPlacement::withoutWorkspaceScope()
+                    ->where('workspace_id', $workspace->id)
+                    ->where('product_type_id', $record->product_type_id)
+                    ->findOrFail((string) $data['group_placement_id']);
+                app(ProductOptionalGroupMutationService::class)->setActive(
+                    $actor,
+                    $workspace,
+                    $record,
+                    $placement,
+                    (bool) $data['active'],
+                );
+                Notification::make()->success()->title('Стан опційної групи змінено')->send();
+            });
     }
 
     // -------------------------------------------------------------------------
