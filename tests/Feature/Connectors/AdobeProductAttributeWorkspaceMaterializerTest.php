@@ -141,7 +141,7 @@ class AdobeProductAttributeWorkspaceMaterializerTest extends TestCase
             'last_seen_at' => now(),
             'missing_since' => null,
         ]);
-        foreach ([['10', 'Red'], ['20', 'Blue']] as [$value, $label]) {
+        foreach ([['10', 'Red', 'en_us'], ['20', 'Blue', 'wholesale']] as [$value, $label, $storeCode]) {
             AdobeProductAttributeOptionLineage::withoutWorkspaceScope()->create([
                 'id' => (string) Str::uuid(),
                 'workspace_id' => $workspace->id,
@@ -149,8 +149,8 @@ class AdobeProductAttributeWorkspaceMaterializerTest extends TestCase
                 'connector_schema_source_id' => $source->id,
                 'adobe_product_attribute_lineage_id' => $lineage->id,
                 'provider_option_id' => $value,
-                'default_label' => $label,
-                'labels_by_store' => ['default' => $label],
+                'default_label' => null,
+                'labels_by_store' => [$storeCode => $label],
                 'first_seen_at' => now(),
                 'last_seen_at' => now(),
                 'missing_since' => null,
@@ -179,11 +179,12 @@ class AdobeProductAttributeWorkspaceMaterializerTest extends TestCase
             '77',
         ));
 
-        $transport = new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request): ConnectorHttpResult {
+        $remoteEntityId = 77;
+        $transport = new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request) use (&$remoteEntityId): ConnectorHttpResult {
             $this->assertStringContainsString('/V1/products/SKU-V', (string) $request->request->getUri());
 
             return new ConnectorHttpResult(200, [], json_encode([
-                'id' => 77,
+                'id' => $remoteEntityId,
                 'sku' => 'SKU-V',
                 'name' => 'Remote Variant',
                 'attribute_set_id' => 9,
@@ -214,6 +215,10 @@ class AdobeProductAttributeWorkspaceMaterializerTest extends TestCase
         $this->assertSame(FieldObjectType::ProductVariant, $binding->object_type);
         $this->assertSame(AttributeStorageType::Dynamic, $binding->storage_type);
         $this->assertSame('merchant_color', $mapping->external_field_key);
+        $this->assertSame([
+            ['code' => '10', 'labels' => ['en' => 'Red']],
+            ['code' => '20', 'labels' => ['uk' => 'Blue']],
+        ], $definition->validation_rules['options']);
         $this->assertSame(['10', '20'], FieldOptionMapping::withoutWorkspaceScope()
             ->where('field_mapping_id', $mapping->id)->orderBy('internal_option_key')->pluck('internal_option_key')->all());
 
@@ -234,5 +239,11 @@ class AdobeProductAttributeWorkspaceMaterializerTest extends TestCase
             FieldMapping::withoutWorkspaceScope()->where('field_binding_id', $binding->id)->sole()->id,
         ]);
         $this->assertSame(2, $transport->sendCount);
+
+        $remoteEntityId = 78;
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('different logical entity');
+
+        app(AdobeProductAttributeWorkspaceMaterializer::class)->materialize($workspace->id, $account->id);
     }
 }

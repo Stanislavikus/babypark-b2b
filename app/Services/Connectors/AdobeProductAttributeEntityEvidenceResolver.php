@@ -40,6 +40,10 @@ final class AdobeProductAttributeEntityEvidenceResolver
                 throw new \RuntimeException('Trusted Adobe product evidence could not be read.');
             }
 
+            if ((string) $result->observedState->entityId !== (string) $link->external_record_discriminator) {
+                throw new \RuntimeException('Trusted Adobe product evidence resolved to a different logical entity.');
+            }
+
             $objectType = $link->product_variant_id !== null
                 ? FieldObjectType::ProductVariant
                 : FieldObjectType::Product;

@@ -344,14 +344,35 @@ final class AdobeProductAttributeWorkspaceMaterializer
     private function optionLabels(AdobeProductAttributeOptionLineage $option): array
     {
         $labels = [];
+        $fallbackLabel = null;
+
         foreach ($option->labels_by_store ?? [] as $storeCode => $label) {
-            if (is_string($storeCode) && preg_match('/^[a-z]{2}$/', $storeCode) === 1 && is_string($label) && $label !== '') {
-                $labels[$storeCode] = $label;
+            if (! is_string($storeCode) || ! is_string($label) || $label === '') {
+                continue;
+            }
+
+            $fallbackLabel ??= $label;
+            $normalizedStoreCode = strtolower($storeCode);
+
+            if (preg_match('/^[a-z]{2}$/', $normalizedStoreCode) === 1) {
+                $labels[$normalizedStoreCode] = $label;
+
+                continue;
+            }
+
+            if (preg_match('/^([a-z]{2})[_-][a-z]{2}$/', $normalizedStoreCode, $matches) === 1) {
+                $labels[$matches[1]] = $label;
             }
         }
 
-        if ($labels === [] && is_string($option->default_label) && $option->default_label !== '') {
-            $labels['uk'] = $option->default_label;
+        if ($labels === []) {
+            $defaultLabel = is_string($option->default_label) && $option->default_label !== ''
+                ? $option->default_label
+                : $fallbackLabel;
+
+            if ($defaultLabel !== null) {
+                $labels['uk'] = $defaultLabel;
+            }
         }
 
         return $labels;
