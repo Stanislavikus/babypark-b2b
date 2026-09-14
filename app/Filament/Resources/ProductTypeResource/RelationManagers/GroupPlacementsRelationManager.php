@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\ProductStructure\ProductStructureMutationService;
 use App\Support\ProductStructure\Exceptions\ProductStructureStaleException;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -51,6 +52,7 @@ class GroupPlacementsRelationManager extends RelationManager
     {
         return Action::make('addGroup')
             ->label('Додати групу')
+            ->fillForm(fn (): array => ['expected_structure_revision' => (int) $this->getOwnerRecord()->structure_revision])
             ->schema($this->groupSchema(includeGroup: true))
             ->action(function (array $data): void {
                 $this->mutateGroup($data, null);
@@ -65,6 +67,7 @@ class GroupPlacementsRelationManager extends RelationManager
                 'sort_order' => $record->sort_order,
                 'is_optional' => $record->is_optional,
                 'default_active' => $record->default_active,
+                'expected_structure_revision' => (int) $this->getOwnerRecord()->structure_revision,
             ])
             ->schema($this->groupSchema(includeGroup: false))
             ->action(function (array $data, ProductTypeGroupPlacement $record): void {
@@ -88,6 +91,7 @@ class GroupPlacementsRelationManager extends RelationManager
                 ->required()
                 ->searchable();
         }
+        $schema[] = Hidden::make('expected_structure_revision')->required();
         $schema[] = TextInput::make('sort_order')->label('Порядок')->numeric()->required()->default(100);
         $schema[] = Toggle::make('is_optional')->label('Опційна група')->live();
         $schema[] = Toggle::make('default_active')->label('Активна за замовчуванням')->default(true);
@@ -115,7 +119,7 @@ class GroupPlacementsRelationManager extends RelationManager
                 (int) $data['sort_order'],
                 (bool) ($data['is_optional'] ?? false),
                 (bool) ($data['default_active'] ?? true),
-                $type->structure_revision,
+                (int) $data['expected_structure_revision'],
             );
             Notification::make()->success()->title('Структуру групи збережено')->send();
         } catch (ProductStructureStaleException $exception) {
