@@ -265,28 +265,28 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
     }
 
     #[Test]
-    public function atlas_records_intentional_current_runtime_vs_new_contract_gap(): void
+    public function atlas_records_resolved_moduleless_runtime_migration_and_core_real_target_evidence(): void
     {
         $content = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
-        $this->assertStringContainsString('## Current runtime vs new contract — intentional gap', $content);
-        $this->assertStringContainsString('Current code still consumes the entity-bound Safe Sync primitive', $content);
-        $this->assertStringContainsString('The Composer compatibility envelope of the first-party component', $content);
-        $this->assertStringContainsString('**not** widened by the new contract', $content);
-        $this->assertStringContainsString('Until then, the Atlas must', $content);
+        $this->assertStringContainsString('## Moduleless standard-path migration record', $content);
+        $this->assertStringContainsString('resolved in runtime and core real-target verified — 2026-09-11', $content);
+        $this->assertStringContainsString('standard trusted Simple Product execution no longer calls', $content);
+        $this->assertStringContainsString('AdobeProductSimpleCommandExecutor', $content);
+        $this->assertStringContainsString('Adobe Products/Export/Live public support remains `false`', $content);
     }
 
     #[Test]
-    public function field_matrix_records_narrow_distinction_between_current_owner_and_target_arch(): void
+    public function field_matrix_records_moduleless_runtime_owner_and_real_target_scope(): void
     {
         $content = File::get(base_path('docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md'));
 
-        $this->assertStringContainsString('## Current runtime owner vs newly approved target architecture', $content);
-        $this->assertStringContainsString('[Recorded — 2026-09-03]', $content);
-        $this->assertStringContainsString('`AdobeSafeSyncClient::writeSimpleProduct(...)`', $content);
-        $this->assertStringContainsString('Newly approved target architecture (direction only — not runtime)', $content);
-        $this->assertStringContainsString('Moduleless by default', $content);
-        $this->assertStringContainsString('does **not** introduce new support rows', $content);
+        $this->assertStringContainsString('## Moduleless runtime migration and real-target certification record', $content);
+        $this->assertStringContainsString('runtime migrated and core verified — 2026-09-11', $content);
+        $this->assertStringContainsString('AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor', $content);
+        $this->assertStringContainsString('controlled stock WRITE `150 -> 151`', $content);
+        $this->assertStringContainsString('`Adobe Products / Export / Live = false` remains authoritative', $content);
+        $this->assertStringContainsString('field-by-field Simple Product WRITE validation', $content);
     }
 
     #[Test]
@@ -409,29 +409,23 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
 
         $section = $this->extractSection(
             $content,
-            '### Newly approved target architecture (direction only — not runtime)',
-            '### Narrow distinction this record preserves',
+            '### Current runtime owner',
+            '### Real-target evidence',
         );
         $normalized_section = $this->normalizeDocWhitespace($section);
 
-        // The corrected Field Matrix must keep the three seams separate:
-        // - Magento stock API is the connector remote transport.
-        // - Mapping is a platform-owned workflow over persisted metadata.
-        // - Preview is a platform-owned orchestration under existing contracts.
-        $this->assertStringContainsString('**Target seam separation**', $section);
-        $this->assertStringContainsString('**Magento stock API** is the **connector remote transport**', $section);
-        $this->assertStringContainsString('**Mapping** is a **platform-owned workflow**', $section);
+        // The current Field Matrix must keep connector transport, Mapping, and Preview separate.
+        $this->assertStringContainsString('AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor', $section);
+        $this->assertStringContainsString('stock `GET /V1/products/{sku}` + at most one `PUT /V1/products/{sku}`', $normalized_section);
+        $this->assertStringContainsString('Mapping remains a **platform-owned workflow**', $section);
         $this->assertStringContainsString('persisted and normalised discovered metadata', $section);
-        $this->assertStringContainsString('Mapping does **not** itself', $section);
-        $this->assertStringContainsString('consume vendor stock REST as a runtime', $section);
-        $this->assertStringContainsString('**Preview** is a **platform-owned orchestration**', $section);
+        $this->assertStringContainsString('Mapping does **not** itself consume vendor stock REST as a runtime', $normalized_section);
+        $this->assertStringContainsString('Preview remains a **platform-owned orchestration**', $section);
         $this->assertStringContainsString('bounded remote reads', $normalized_section);
+        $this->assertStringContainsString('Preview performs no consequential mutation', $normalized_section);
+        $this->assertStringContainsString('Safe Sync remains implemented only as an optional Enhanced Safety primitive', $normalized_section);
 
-        // The earlier lumped "Stock public REST as default runtime" bullet
-        // (which falsely implied Mapping and Preview themselves consume
-        // vendor stock REST) is removed from the new section.
         $this->assertStringNotContainsString('**Stock public REST as default runtime**', $section);
-        $this->assertStringNotContainsString('expected to consume vendor stock public REST for connection, READ,', $section);
     }
 
     /**

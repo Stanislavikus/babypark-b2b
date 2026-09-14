@@ -4,6 +4,8 @@ namespace App\Jobs\Connectors;
 
 use App\Services\Connectors\AdobePaaSConnectionCheckService;
 use App\Services\Connectors\ConnectorConnectionCheckPersistence;
+use App\Services\Connectors\ConnectorConnectionRecoveryScheduler;
+use App\Support\Connectors\ConnectorAccountOperationLock;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Bus\Queueable;
@@ -44,7 +46,7 @@ class ConnectorConnectionCheckJob implements ShouldQueue
     public function middleware(): array
     {
         return [
-            (new WithoutOverlapping("connector-account:{$this->connectorAccountId}"))
+            (new WithoutOverlapping(ConnectorAccountOperationLock::sharedKey($this->connectorAccountId)))
                 ->shared()
                 ->releaseAfter(30)
                 ->expireAfter(120),
@@ -54,9 +56,12 @@ class ConnectorConnectionCheckJob implements ShouldQueue
     public function handle(
         AdobePaaSConnectionCheckService $service,
         ConnectorConnectionCheckPersistence $persistence,
+        ?ConnectorConnectionRecoveryScheduler $recoveryScheduler = null,
     ): void {
+        $recoveryScheduler ??= app(ConnectorConnectionRecoveryScheduler::class);
+
         try {
-            $this->handleSafely($service, $persistence);
+            $this->handleSafely($service, $persistence, $recoveryScheduler);
         } catch (ConnectorConnectionCheckJobExecutionException $exception) {
             throw $exception;
         } catch (\Throwable) {
@@ -67,6 +72,7 @@ class ConnectorConnectionCheckJob implements ShouldQueue
     private function handleSafely(
         AdobePaaSConnectionCheckService $service,
         ConnectorConnectionCheckPersistence $persistence,
+        ConnectorConnectionRecoveryScheduler $recoveryScheduler,
     ): void {
         $slot = $persistence->reserveExecutionSlot(
             $this->workspaceId,
@@ -77,6 +83,12 @@ class ConnectorConnectionCheckJob implements ShouldQueue
         if (! $slot['reserved']) {
             if ($slot['releaseDelaySeconds'] !== null) {
                 $this->release($slot['releaseDelaySeconds']);
+            } else {
+                $recoveryScheduler->scheduleIfEligible(
+                    $this->workspaceId,
+                    $this->connectorAccountId,
+                    $this->connectionCheckId,
+                );
             }
 
             return;
@@ -116,12 +128,24 @@ class ConnectorConnectionCheckJob implements ShouldQueue
 
         if ($releaseDelaySeconds !== null) {
             $this->release($releaseDelaySeconds);
+        } else {
+            $recoveryScheduler->scheduleIfEligible(
+                $this->workspaceId,
+                $this->connectorAccountId,
+                $this->connectionCheckId,
+            );
         }
     }
 
     public function failed(?\Throwable $exception): void
     {
         app(ConnectorConnectionCheckPersistence::class)->terminalizeWithStoredVendorClassification(
+            $this->workspaceId,
+            $this->connectorAccountId,
+            $this->connectionCheckId,
+        );
+
+        app(ConnectorConnectionRecoveryScheduler::class)->scheduleIfEligible(
             $this->workspaceId,
             $this->connectorAccountId,
             $this->connectionCheckId,

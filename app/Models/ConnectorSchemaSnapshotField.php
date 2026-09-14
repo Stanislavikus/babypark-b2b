@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\ConnectorDiscoverySchemaValidationReason;
+use App\Enums\ConnectorSchemaFieldNormalizationStatus;
 use App\Support\Workspace\BelongsToWorkspace;
 use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,6 +24,8 @@ class ConnectorSchemaSnapshotField extends Model
         'snapshot_id',
         'external_field_key',
         'external_label',
+        'normalization_status',
+        'normalization_failure_reason',
         'normalized_data_type',
         'is_required',
         'is_multi_value',
@@ -35,6 +39,8 @@ class ConnectorSchemaSnapshotField extends Model
     protected function casts(): array
     {
         return [
+            'normalization_status' => ConnectorSchemaFieldNormalizationStatus::class,
+            'normalization_failure_reason' => ConnectorDiscoverySchemaValidationReason::class,
             'is_required' => 'boolean',
             'is_multi_value' => 'boolean',
             'is_localizable' => 'boolean',

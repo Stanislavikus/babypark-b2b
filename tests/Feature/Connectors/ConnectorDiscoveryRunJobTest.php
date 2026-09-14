@@ -24,11 +24,13 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryResponseMapper;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryTransportMapper;
 use App\Support\Connectors\AdobePaaS\AdobePaaSServiceOnlyAttributeEligibility;
 use App\Support\Connectors\CanonicalSchemaFieldHash;
-use App\Support\Connectors\CanonicalSchemaFieldHasher;
-use App\Support\Connectors\CanonicalSchemaSnapshotHasher;
+use App\Support\Connectors\ConnectorAccountOperationLock;
 use App\Support\Connectors\ConnectorDiscoveryAttemptResult;
-use App\Support\Connectors\ConnectorDiscoveryNormalizedField;
+use App\Support\Connectors\ConnectorDiscoveryField;
+use App\Support\Connectors\ConnectorDiscoveryIdentifiedField;
 use App\Support\Connectors\ConnectorDiscoverySnapshotCandidate;
+use App\Support\Connectors\ConnectorSchemaFieldV2Hasher;
+use App\Support\Connectors\ConnectorSchemaSnapshotV2Hasher;
 use App\Support\Connectors\ConnectorSchemaSourceEndpointPathValidator;
 use App\Support\Connectors\Exceptions\ConnectorDiscoverySourceInvalidAfterReservationException;
 use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
@@ -81,6 +83,10 @@ class ConnectorDiscoveryRunJobTest extends TestCase
         $this->assertSame(1100, $middleware[0]->expiresAfter);
         $this->assertSame(30, $middleware[0]->releaseAfter);
         $this->assertTrue($middleware[0]->shareKey);
+        $this->assertSame(
+            ConnectorAccountOperationLock::cacheKey('acct'),
+            $middleware[0]->getLockKey($job),
+        );
         $this->assertSame('connector-account:acct', $middleware[0]->key);
     }
 
@@ -374,8 +380,6 @@ class ConnectorDiscoveryRunJobTest extends TestCase
                 new AdobePaaSDiscoveryTransportMapper,
                 new AdobePaaSAttributeNormalizer,
                 new AdobePaaSServiceOnlyAttributeEligibility,
-                new CanonicalSchemaFieldHasher,
-                new CanonicalSchemaSnapshotHasher,
             ),
         );
 
@@ -493,8 +497,8 @@ class ConnectorDiscoveryRunJobTest extends TestCase
     private function sampleSuccessResult(): ConnectorDiscoveryAttemptResult
     {
         $normalizer = new AdobePaaSAttributeNormalizer;
-        $fieldHasher = new CanonicalSchemaFieldHasher;
-        $snapshotHasher = new CanonicalSchemaSnapshotHasher;
+        $fieldHasher = new ConnectorSchemaFieldV2Hasher;
+        $snapshotHasher = new ConnectorSchemaSnapshotV2Hasher;
 
         $raw = json_decode(
             '{"attribute_code":"color","frontend_input":"text","scope":"global"}',
@@ -502,18 +506,14 @@ class ConnectorDiscoveryRunJobTest extends TestCase
             depth: 512,
             flags: JSON_THROW_ON_ERROR,
         );
-        $canonicalField = $normalizer->normalize($raw);
-        $normalizedField = new ConnectorDiscoveryNormalizedField(
-            $canonicalField,
-            $fieldHasher->hash($canonicalField),
-        );
+        $canonicalField = $normalizer->normalizeIdentifiedV2($raw, 'color');
+        $identifiedField = ConnectorDiscoveryIdentifiedField::normalized($canonicalField);
+        $fieldHash = $fieldHasher->hash($identifiedField);
+        $discoveredField = new ConnectorDiscoveryField($identifiedField, $fieldHash);
         $candidate = ConnectorDiscoverySnapshotCandidate::create(
-            [$normalizedField],
+            [$discoveredField],
             $snapshotHasher->hash([
-                CanonicalSchemaFieldHash::create(
-                    $canonicalField->externalFieldKey(),
-                    $fieldHasher->hash($canonicalField),
-                ),
+                CanonicalSchemaFieldHash::create('color', $fieldHash),
             ]),
             CarbonImmutable::now(),
             1,

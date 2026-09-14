@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ProductStructure\BasicProductStructureReconciler;
 use App\Support\Workspace\BelongsToWorkspace;
 use App\Support\Workspace\WorkspaceContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -49,6 +50,23 @@ class Product extends Model
         'synced_at',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (Product $product): void {
+            if ($product->getAttribute('product_type_id') !== null) {
+                return;
+            }
+
+            $reconciler = app(BasicProductStructureReconciler::class);
+            if (! $reconciler->available()) {
+                return;
+            }
+
+            $workspaceId = (string) ($product->getAttribute('workspace_id') ?? app(WorkspaceContext::class)->id());
+            $product->setAttribute('product_type_id', $reconciler->ensureWorkspace($workspaceId)->id);
+        });
+    }
+
     protected function casts(): array
     {
         return [
@@ -61,6 +79,11 @@ class Product extends Model
             'gross_weight' => 'decimal:3',
             'volume_m3' => 'decimal:6',
         ];
+    }
+
+    public function productType(): BelongsTo
+    {
+        return $this->belongsTo(ProductType::class);
     }
 
     public function category(): BelongsTo

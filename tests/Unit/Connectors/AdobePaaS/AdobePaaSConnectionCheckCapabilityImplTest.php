@@ -29,7 +29,6 @@ class AdobePaaSConnectionCheckCapabilityImplTest extends TestCase
     {
         foreach (['[]', '[{"id":1,"media_type":"image"}]'] as $mediaBody) {
             $transport = $this->sequenceTransport([
-                new ConnectorHttpResult(200, [], '{"items":[],"search_criteria":{},"total_count":0}'),
                 new ConnectorHttpResult(200, [], '{"items":[{"sku":"SKU / 1"}],"search_criteria":{},"total_count":1}'),
                 new ConnectorHttpResult(200, [], $mediaBody),
             ]);
@@ -41,7 +40,7 @@ class AdobePaaSConnectionCheckCapabilityImplTest extends TestCase
                 'catalog_total_count' => 1,
                 'images_access_confirmed' => true,
             ], $result->safeMessageParameters());
-            $this->assertStringContainsString('/V1/products/SKU%20%2F%201/media', (string) $transport->captured[2]->request->getUri());
+            $this->assertStringContainsString('/V1/products/SKU%20%2F%201/media', (string) $transport->captured[1]->request->getUri());
         }
     }
 
@@ -56,7 +55,6 @@ class AdobePaaSConnectionCheckCapabilityImplTest extends TestCase
 
         foreach ($failures as $failure) {
             $transport = $this->sequenceTransport([
-                new ConnectorHttpResult(200, [], '{"items":[],"search_criteria":{},"total_count":0}'),
                 new ConnectorHttpResult(200, [], '{"items":[{"sku":"SKU-1"}],"search_criteria":{},"total_count":1}'),
                 $failure,
             ]);
@@ -73,18 +71,17 @@ class AdobePaaSConnectionCheckCapabilityImplTest extends TestCase
     {
         $transport = $this->sequenceTransport([
             new ConnectorHttpResult(200, [], '{"items":[],"search_criteria":{},"total_count":0}'),
-            new ConnectorHttpResult(200, [], '{"items":[],"search_criteria":{},"total_count":0}'),
         ]);
 
         $result = $this->capabilityWithTransport($transport)->checkConnection($this->sampleContext());
 
         $this->assertTrue($result->succeeded);
         $this->assertSame(['catalog_total_count' => 0], $result->safeMessageParameters());
-        $this->assertCount(2, $transport->captured);
+        $this->assertCount(1, $transport->captured);
     }
 
     #[Test]
-    public function sends_baseline_request_with_b12_limits_and_then_optionally_probes_catalog_total_count(): void
+    public function product_read_is_the_single_baseline_and_supplies_catalogue_evidence(): void
     {
         $context = new AdobePaaSRequestContext(
             baseUrl: 'https://shop.example.com',
@@ -97,12 +94,6 @@ class AdobePaaSConnectionCheckCapabilityImplTest extends TestCase
             $context,
             new OAuth1SigningContext('fixednonce00000001', 1_700_000_000),
         );
-        $referenceProductsRequest = $requestFactory->buildProductsSearch(
-            $context,
-            new OAuth1SigningContext('fixednonce00000002', 1_700_000_000),
-            ['pageSize' => 1],
-        );
-
         $transport = new class($referenceRequest) implements ConnectorHttpTransport
         {
             public int $sendCount = 0;
@@ -135,11 +126,10 @@ class AdobePaaSConnectionCheckCapabilityImplTest extends TestCase
         $result = $capability->checkConnection($context);
 
         $this->assertTrue($result->succeeded);
-        $this->assertSame(2, $transport->sendCount);
-        $this->assertCount(2, $transport->captured);
+        $this->assertSame(1, $transport->sendCount);
+        $this->assertCount(1, $transport->captured);
         $this->assertSame('GET', $transport->captured[0]->request->getMethod());
         $this->assertSame((string) $referenceRequest->getUri(), (string) $transport->captured[0]->request->getUri());
-        $this->assertSame((string) $referenceProductsRequest->getUri(), (string) $transport->captured[1]->request->getUri());
         $this->assertStringContainsString('oauth_consumer_key="ck_test"', $transport->captured[0]->request->getHeaderLine('Authorization'));
         $this->assertNotSame(
             $referenceRequest->getHeaderLine('Authorization'),
@@ -149,9 +139,22 @@ class AdobePaaSConnectionCheckCapabilityImplTest extends TestCase
         $this->assertSame(5.0, $transport->captured[0]->limits->connectTimeoutSeconds);
         $this->assertSame(30.0, $transport->captured[0]->limits->totalTimeoutSeconds);
         $this->assertSame(256 * 1024, $transport->captured[0]->limits->maxResponseBodyBytes);
-        $this->assertSame(5.0, $transport->captured[1]->limits->connectTimeoutSeconds);
-        $this->assertSame(30.0, $transport->captured[1]->limits->totalTimeoutSeconds);
-        $this->assertSame(256 * 1024, $transport->captured[1]->limits->maxResponseBodyBytes);
+    }
+
+    #[Test]
+    public function product_read_failure_is_authoritative_and_never_falls_back_to_optional_evidence(): void
+    {
+        $transport = $this->sequenceTransport([
+            new ConnectorHttpResult(403, [], '{"message":"forbidden"}'),
+        ]);
+
+        $result = $this->capabilityWithTransport($transport)->checkConnection($this->sampleContext());
+
+        $this->assertFalse($result->succeeded);
+        $this->assertSame(403, $result->httpStatus);
+        $this->assertCount(1, $transport->captured);
+        $this->assertStringContainsString('/V1/products?searchCriteria', (string) $transport->captured[0]->request->getUri());
+        $this->assertStringNotContainsString('/V1/products/attributes', (string) $transport->captured[0]->request->getUri());
     }
 
     #[Test]

@@ -919,7 +919,7 @@ class ConnectorAccountDocumentationTest extends TestCase
     {
         $section = $this->adobeAttributeNormalizationSection();
 
-        $this->assertStringContainsString('### Adobe attribute normalization (Resolved)', $section);
+        $this->assertStringContainsString('### Adobe attribute normalization v1 (Historical contract; superseded for new Adobe discoveries)', $section);
         $this->assertStringContainsString('list endpoint only, no per-attribute enrichment', $section);
         $this->assertStringContainsString('do not add N+1 per-attribute detail requests in v1', $section);
 
@@ -1314,9 +1314,9 @@ class ConnectorAccountDocumentationTest extends TestCase
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
 
         if (! preg_match(
-            '/### Connector schema canonical hashing \(Resolved\)\n\n'
+            '/### Connector schema canonical hashing v1 \(Historical contract\)\n\n'
             .'(.*?)'
-            .'(?=\n### ConnectorSchemaDiff \/ ConnectorSchemaDiffItem \(Resolved schema; dormant runtime\))/s',
+            .'(?=\n### Adobe Product attribute discovery \+ canonical hashing v2 \(Resolved — 2026-09-12\))/s',
             $content,
             $matches,
         )) {
@@ -1363,9 +1363,9 @@ class ConnectorAccountDocumentationTest extends TestCase
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
 
         if (! preg_match(
-            '/(### Adobe attribute normalization \(Resolved\)\n\n'
+            '/(### Adobe attribute normalization v1 \(Historical contract; superseded for new Adobe discoveries\)\n\n'
             .'.*?)'
-            .'(?=\n### Connector schema canonical hashing \(Resolved\))/s',
+            .'(?=\n### Connector schema canonical hashing v1 \(Historical contract\))/s',
             $content,
             $matches,
         )) {

@@ -768,3 +768,21 @@ non-actionable setup state instead of hiding an empty card.
 
 This implementation-specific copy does not rebaseline the separate `Інтеграції` landing
 surface: its page contract and evidence-scoped `Підключення перевірено` status remain intact.
+
+## 21. Magento V1 connection truth / credential rotation freeze
+
+[Resolved — final arbitration — 2026-09-11]
+
+For the standard Magento V1 OAuth1 Integration profile, the platform-specific frozen contract is `docs/connectors/adobe-commerce/MAGENTO_V1_CONNECTION_UX_CONTRACT.md`. It supersedes older Magento-specific connection-check assumptions wherever they conflict with this generic UX contract or historical runtime text.
+
+The Magento V1 baseline is an authenticated bounded Product READ. Product Attributes, media, Discovery, Mapping, Preview, and WRITE readiness are downstream evidence and must not manufacture connection false-green or false-red state.
+
+First connect is a state transition, not merely a persistence event: `FORM -> CHECKING -> CONNECTED | ATTENTION_REQUIRED | TEMPORARILY_UNAVAILABLE`. Merchant green must be evidence-scoped and dated.
+
+Credential replacement is a full OAuth1 quartet test-before-save flow. Candidate credentials are tested transiently outside DB transactions; only a successfully tested fresh snapshot may be committed in a short locked transaction. Failed replacement preserves the previous credential set and must not repaint a still-healthy existing connection red.
+
+Connection truth and Product WRITE readiness remain separate state dimensions. A healthy Product baseline may coexist with `Передача змін товарів призупинена`; this is an operation state, not a new meaning of `ConnectorAccountConnectionStatus`.
+
+Magento V1 uses event-driven checks plus bounded recovery for known transient failures. No arbitrary periodic healthy-idle sweep is required. Merchant presentation retains last-verified time.
+
+Layer A/B remediation leads with business impact and one causal CTA. Structured machine-reliable Magento evidence may refine the remediation; localized free-form response text and raw technical diagnostics remain outside merchant presentation.

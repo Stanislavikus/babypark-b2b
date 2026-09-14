@@ -2,16 +2,12 @@
 
 namespace App\Support\Connectors\AdobePaaS\Command;
 
-use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClient;
-use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncSimpleProductWriteCustomAttribute;
-use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncSimpleProductWriteRequest;
-
 final class AdobeProductSimpleCommandExecutor
 {
     public function __construct(
         private readonly AdobeProductDesiredStateCompiler $compiler,
         private readonly AdobeProductExternalRecordLinkGuard $linkGuard,
-        private readonly AdobeSafeSyncClient $safeSyncClient,
+        private readonly AdobeProductStockSimpleWriteExecutor $stockWriteExecutor,
     ) {}
 
     public function execute(AdobeProductSimpleCommandInput $input): AdobeProductSimpleCommandResult
@@ -28,7 +24,7 @@ final class AdobeProductSimpleCommandExecutor
             return $this->knownNotApplied('semantic_compilation_failed');
         }
 
-        return $this->executeDesiredState($input, $desiredState, consumeTrustedSafeSyncWrite: true);
+        return $this->executeDesiredState($input, $desiredState, consumeTrustedStockWrite: true);
     }
 
     public function executeSimpleChild(
@@ -48,13 +44,13 @@ final class AdobeProductSimpleCommandExecutor
             return $this->knownNotApplied('semantic_compilation_failed');
         }
 
-        return $this->executeDesiredState($input, $desiredState, consumeTrustedSafeSyncWrite: false);
+        return $this->executeDesiredState($input, $desiredState, consumeTrustedStockWrite: false);
     }
 
     private function executeDesiredState(
         AdobeProductSimpleCommandInput $input,
         AdobeProductDesiredState $desiredState,
-        bool $consumeTrustedSafeSyncWrite,
+        bool $consumeTrustedStockWrite,
     ): AdobeProductSimpleCommandResult {
         if ($input->adobeBaseCurrency === null || $input->adobeBaseCurrency === '') {
             return $this->knownNotApplied('currency_evidence_missing');
@@ -97,7 +93,7 @@ final class AdobeProductSimpleCommandExecutor
             );
         }
 
-        if (! $consumeTrustedSafeSyncWrite) {
+        if (! $consumeTrustedStockWrite) {
             return $this->knownNotApplied(
                 'entity_bound_mutation_bridge_required',
                 subjectSku: $trustedSku,
@@ -127,25 +123,11 @@ final class AdobeProductSimpleCommandExecutor
             );
         }
 
-        $writeResult = $this->safeSyncClient->writeSimpleProduct(
+        return $this->stockWriteExecutor->execute(
             $input->workspaceId,
             $input->connectorAccountId,
             $logicalEntityId,
-            $this->buildSafeSyncWriteRequest($desiredState),
-        );
-
-        return new AdobeProductSimpleCommandResult(
-            $writeResult->appliedStateKnowledge,
-            new AdobeProductCommandSafeEvidence(
-                reasonCode: $writeResult->reasonCode,
-                subjectSku: $writeResult->sku,
-                remoteGetClassification: null,
-                consequentialWriteAttempts: $writeResult->consequentialWriteAttempts,
-                reconciliationGetAttempts: 0,
-                externalRecordLinkPersisted: false,
-                ownershipTrustSatisfied: true,
-                warningCodes: $writeResult->warningCodes,
-            ),
+            $desiredState,
         );
     }
 
@@ -208,53 +190,5 @@ final class AdobeProductSimpleCommandExecutor
         }
 
         return $logicalEntityId;
-    }
-
-    private function buildSafeSyncWriteRequest(
-        AdobeProductDesiredState $desiredState,
-    ): AdobeSafeSyncSimpleProductWriteRequest {
-        return new AdobeSafeSyncSimpleProductWriteRequest(
-            expectedSku: $desiredState->sku,
-            name: $desiredState->name,
-            status: $desiredState->status,
-            visibility: $desiredState->visibility,
-            price: $desiredState->price,
-            mappedAttributes: $this->buildSafeSyncMappedAttributes($desiredState->customAttributes),
-        );
-    }
-
-    /**
-     * @param  array<string, mixed>  $customAttributes
-     * @return list<AdobeSafeSyncSimpleProductWriteCustomAttribute>
-     */
-    private function buildSafeSyncMappedAttributes(array $customAttributes): array
-    {
-        $mappedAttributes = [];
-
-        foreach ($customAttributes as $attributeCode => $value) {
-            if (! is_string($attributeCode) || $attributeCode === '') {
-                continue;
-            }
-
-            if (! is_scalar($value)) {
-                continue;
-            }
-
-            $mappedAttributes[] = new AdobeSafeSyncSimpleProductWriteCustomAttribute(
-                $attributeCode,
-                $this->normalizeMappedAttributeValue($value),
-            );
-        }
-
-        return $mappedAttributes;
-    }
-
-    private function normalizeMappedAttributeValue(string|int|float|bool $value): string
-    {
-        if (is_bool($value)) {
-            return $value ? '1' : '0';
-        }
-
-        return (string) $value;
     }
 }

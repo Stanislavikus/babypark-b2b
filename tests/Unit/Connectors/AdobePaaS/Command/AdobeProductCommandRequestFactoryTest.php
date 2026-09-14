@@ -5,6 +5,9 @@ namespace Tests\Unit\Connectors\AdobePaaS\Command;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductCommandRequestFactory;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductDesiredState;
+use App\Support\Connectors\AdobePaaS\Media\AdobeProductMediaDesiredEntry;
+use App\Support\Connectors\AdobePaaS\Media\AdobeProductMediaRole;
+use App\Support\Connectors\AdobePaaS\Media\AdobeProductRemoteMediaMetadataEntry;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
 use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
 use App\Support\Connectors\OAuth1\OAuth1SigningContext;
@@ -88,6 +91,71 @@ class AdobeProductCommandRequestFactoryTest extends TestCase
         $payload = json_decode((string) $request->getBody(), true, flags: JSON_THROW_ON_ERROR);
         $this->assertArrayHasKey('product', $payload);
         $this->assertSame('SKU-TEST-1', $payload['product']['sku']);
+    }
+
+    #[Test]
+    public function default_store_media_null_label_serializes_as_empty_string_for_magento_reset(): void
+    {
+        $request = $this->factory->buildPutMediaEntry(
+            $this->context,
+            'SKU-TEST-1',
+            7,
+            $this->mediaDesiredEntry(null),
+            $this->remoteMediaMetadata(null),
+            $this->signingContext,
+        );
+
+        $payload = json_decode((string) $request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertSame('', $payload['entry']['label']);
+    }
+
+    #[Test]
+    public function non_default_store_media_null_label_remains_null_for_inheritance_semantics(): void
+    {
+        $context = new AdobePaaSRequestContext(
+            baseUrl: 'https://shop.example.com',
+            storeCode: 'uk_store',
+            credentials: $this->context->credentials,
+        );
+        $request = $this->factory->buildPutMediaEntry(
+            $context,
+            'SKU-TEST-1',
+            7,
+            $this->mediaDesiredEntry(null),
+            $this->remoteMediaMetadata(null),
+            $this->signingContext,
+        );
+
+        $payload = json_decode((string) $request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+        $this->assertArrayHasKey('label', $payload['entry']);
+        $this->assertNull($payload['entry']['label']);
+    }
+
+    private function mediaDesiredEntry(?string $label): AdobeProductMediaDesiredEntry
+    {
+        return new AdobeProductMediaDesiredEntry(
+            declarationIndex: 0,
+            role: AdobeProductMediaRole::Primary,
+            label: $label,
+            position: 1,
+            contentSha256: str_repeat('a', 64),
+            mimeType: 'image/jpeg',
+            filename: 'image.jpg',
+            rawBytes: '',
+        );
+    }
+
+    private function remoteMediaMetadata(?string $label): AdobeProductRemoteMediaMetadataEntry
+    {
+        return new AdobeProductRemoteMediaMetadataEntry(
+            entryId: 7,
+            mediaType: 'image',
+            file: '/i/m/image.jpg',
+            label: $label,
+            position: 1,
+            disabled: false,
+            types: ['image', 'small_image', 'thumbnail', 'swatch_image'],
+        );
     }
 
     private function desiredState(): AdobeProductDesiredState

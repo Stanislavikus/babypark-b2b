@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\ProductStructure\ProductStructureIdentity;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -104,7 +105,7 @@ class CustomerRenameMigrationTest extends TestCase
         $variantId = DB::table('product_variants')->value('id');
 
         if ($variantId === null) {
-            $productId = DB::table('products')->insertGetId([
+            $productRow = [
                 'workspace_id' => $workspaceId,
                 'onec_guid' => (string) Str::uuid(),
                 'sku' => 'LEGACY-SKU',
@@ -112,7 +113,13 @@ class CustomerRenameMigrationTest extends TestCase
                 'is_active' => true,
                 'created_at' => now(),
                 'updated_at' => now(),
-            ]);
+            ];
+
+            if (Schema::hasColumn('products', 'product_type_id')) {
+                $productRow['product_type_id'] = ProductStructureIdentity::basicProductTypeId((string) $workspaceId);
+            }
+
+            $productId = DB::table('products')->insertGetId($productRow);
 
             $variantId = DB::table('product_variants')->insertGetId([
                 'workspace_id' => $workspaceId,

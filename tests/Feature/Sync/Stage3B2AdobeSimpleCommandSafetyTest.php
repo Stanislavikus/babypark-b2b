@@ -6,7 +6,6 @@ use App\Models\ExternalRecordLink;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Workspace;
-use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductAppliedStateKnowledge;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductDesiredStateCompiler;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkGuard;
@@ -16,9 +15,6 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersi
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductOwnershipTrustPolicy;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandExecutor;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandInput;
-use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClient;
-use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncRequestFactory;
-use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
@@ -697,19 +693,9 @@ class Stage3B2AdobeSimpleCommandSafetyTest extends TestCase
             $responder ?? fn () => throw new \RuntimeException('HTTP must not be called'),
         );
 
-        $linkGuard = new AdobeProductExternalRecordLinkGuard;
+        $this->app->instance(ConnectorHttpTransport::class, $transport);
 
-        $executor = new AdobeProductSimpleCommandExecutor(
-            new AdobeProductDesiredStateCompiler,
-            $linkGuard,
-            new AdobeSafeSyncClient(
-                app(AdobePaaSRequestContextFactory::class),
-                new AdobeSafeSyncRequestFactory(new OAuth1RequestSigner),
-                $transport,
-            ),
-        );
-
-        return [$executor, $transport];
+        return [$this->app->make(AdobeProductSimpleCommandExecutor::class), $transport];
     }
 
     private function defaultInput(): AdobeProductSimpleCommandInput

@@ -15,8 +15,6 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryResponseMapper;
 use App\Support\Connectors\AdobePaaS\AdobePaaSDiscoveryTransportMapper;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 use App\Support\Connectors\AdobePaaS\AdobePaaSServiceOnlyAttributeEligibility;
-use App\Support\Connectors\CanonicalSchemaFieldHasher;
-use App\Support\Connectors\CanonicalSchemaSnapshotHasher;
 use App\Support\Connectors\ConnectorDiscoveryAttemptResult;
 use App\Support\Connectors\ConnectorSchemaSourceEndpointPathValidator;
 use App\Support\Connectors\OAuth1\OAuth1Credentials;
@@ -90,8 +88,6 @@ trait InteractsWithAdobePaaSDiscoveryIntegration
             new AdobePaaSDiscoveryTransportMapper,
             new AdobePaaSAttributeNormalizer,
             new AdobePaaSServiceOnlyAttributeEligibility,
-            new CanonicalSchemaFieldHasher,
-            new CanonicalSchemaSnapshotHasher,
         );
     }
 

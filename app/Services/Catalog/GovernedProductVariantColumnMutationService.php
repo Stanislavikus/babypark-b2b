@@ -6,6 +6,7 @@ use App\Enums\AttributeStatus;
 use App\Enums\AttributeStorageType;
 use App\Enums\FieldObjectType;
 use App\Exceptions\Catalog\ColumnFieldClearRejectedException;
+use App\Exceptions\Catalog\ColumnFieldCurrentValueMismatchException;
 use App\Exceptions\Catalog\ColumnFieldNotAllowlistedException;
 use App\Models\FieldBinding;
 use App\Models\FieldDefinition;
@@ -44,6 +45,53 @@ final class GovernedProductVariantColumnMutationService
             $nextValue = $this->normalizeSetPayload($definition->code, $value);
             $column = $rule['column'];
             $currentValue = $target->getAttribute($column);
+
+            if ($currentValue === $nextValue) {
+                return new ColumnMutationResult(ColumnMutationResult::NoOp, (string) $binding->id);
+            }
+
+            $target->{$column} = $nextValue;
+            $target->save();
+
+            return new ColumnMutationResult(ColumnMutationResult::Updated, (string) $binding->id);
+        }, self::DEADLOCK_RETRY_ATTEMPTS);
+    }
+
+    public function setIfCurrentValue(
+        string $workspaceId,
+        FieldObjectType $targetType,
+        int|string $targetId,
+        string $fieldBindingId,
+        mixed $expectedCurrentValue,
+        mixed $value,
+        ?callable $beforeMutation = null,
+    ): ColumnMutationResult {
+        return DB::transaction(function () use (
+            $workspaceId,
+            $targetType,
+            $targetId,
+            $fieldBindingId,
+            $expectedCurrentValue,
+            $value,
+            $beforeMutation,
+        ): ColumnMutationResult {
+            $binding = $this->lockBindingForMutation($fieldBindingId, $workspaceId, $targetType);
+            $definition = $this->lockDefinitionForMutation($binding);
+            $rule = $this->resolveAllowlistedRule($binding, $definition);
+            $target = $this->lockTargetForMutation($targetType, $targetId, $workspaceId);
+
+            $column = $rule['column'];
+            $currentValue = $target->getAttribute($column);
+
+            if ($currentValue !== $expectedCurrentValue) {
+                throw ColumnFieldCurrentValueMismatchException::forField($definition->code);
+            }
+
+            if ($beforeMutation !== null) {
+                $beforeMutation();
+            }
+
+            $nextValue = $this->normalizeSetPayload($definition->code, $value);
 
             if ($currentValue === $nextValue) {
                 return new ColumnMutationResult(ColumnMutationResult::NoOp, (string) $binding->id);

@@ -30,6 +30,8 @@ class ReceiveProposalTest extends TestCase
             targetType: FieldObjectType::ProductVariant,
             targetId: '42',
             trustedExternalLinkEvidenceId: 'erl-evidence-1',
+            trustedExternalIdentifier: 'SKU-1',
+            trustedExternalRecordDiscriminator: '77',
             entries: [
                 new ReceiveProposalEntry(
                     fieldBindingId: 'binding-1',
@@ -67,6 +69,8 @@ class ReceiveProposalTest extends TestCase
             targetType: FieldObjectType::Product,
             targetId: '11',
             trustedExternalLinkEvidenceId: 'erl-evidence-2',
+            trustedExternalIdentifier: 'SKU-2',
+            trustedExternalRecordDiscriminator: '77',
             entries: [],
             issuedAt: new DateTimeImmutable,
         );
@@ -90,6 +94,8 @@ class ReceiveProposalTest extends TestCase
             targetType: FieldObjectType::Customer,
             targetId: 'customer-1',
             trustedExternalLinkEvidenceId: 'erl-evidence-3',
+            trustedExternalIdentifier: 'SKU-3',
+            trustedExternalRecordDiscriminator: '77',
             entries: [],
             issuedAt: new DateTimeImmutable,
         );

@@ -55,10 +55,13 @@ class AdobePaaSPilotPayloadPersistenceTest extends TestCase
         $snapshot = ConnectorSchemaSnapshot::withoutWorkspaceScope()->findOrFail($row->snapshot_id);
 
         $this->assertSame(106, $row->fields_received);
+        $this->assertSame(106, $row->fields_identified);
         $this->assertSame(102, $row->fields_normalized);
-        $this->assertSame(102, $snapshot->field_count);
+        $this->assertSame(4, $row->fields_unclassified);
+        $this->assertSame(106, $snapshot->field_count);
+        $this->assertSame('v2', $snapshot->canonical_hash_version);
         $this->assertSame(
-            102,
+            106,
             ConnectorSchemaSnapshotField::withoutWorkspaceScope()->where('snapshot_id', $snapshot->id)->count(),
         );
     }
@@ -96,8 +99,11 @@ class AdobePaaSPilotPayloadPersistenceTest extends TestCase
         );
 
         $this->assertSame(106, $evidence['run']->fields_received);
+        $this->assertSame(106, $evidence['run']->fields_identified);
         $this->assertSame(102, $evidence['run']->fields_normalized);
-        $this->assertSame(102, $evidence['snapshot']->field_count);
+        $this->assertSame(4, $evidence['run']->fields_unclassified);
+        $this->assertSame(106, $evidence['snapshot']->field_count);
+        $this->assertSame('v2', $evidence['snapshot']->canonical_hash_version);
         $this->assertNotEmpty($evidence['snapshot']->canonical_hash);
     }
 }

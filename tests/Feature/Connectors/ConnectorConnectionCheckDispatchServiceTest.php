@@ -4,6 +4,7 @@ namespace Tests\Feature\Connectors;
 
 use App\Enums\ConnectorConnectionCheckLifecycleErrorCode;
 use App\Enums\ConnectorConnectionCheckStatus;
+use App\Enums\ConnectorConnectionCheckTrigger;
 use App\Enums\UserRole;
 use App\Jobs\Connectors\ConnectorConnectionCheckJob;
 use App\Models\ConnectorConnectionCheck;
@@ -60,10 +61,31 @@ class ConnectorConnectionCheckDispatchServiceTest extends TestCase
         $checkId = $this->dispatchService->executeManual($admin, $this->workspace->id, $account->id);
 
         $row = ConnectorConnectionCheck::withoutWorkspaceScope()->findOrFail($checkId);
+        $this->assertSame(ConnectorConnectionCheckTrigger::Manual, $row->trigger);
+        $this->assertSame($admin->getKey(), $row->initiated_by_user_id);
         $this->assertSame(ConnectorConnectionCheckStatus::Queued, $row->status);
         $this->assertNull($row->started_at);
         $this->assertSame(0, $row->execution_attempts);
         $this->assertNotNull($row->retry_until_at);
+
+        Queue::assertPushed(ConnectorConnectionCheckJob::class, function (ConnectorConnectionCheckJob $job) use ($row): bool {
+            return $row->retry_until_at->getTimestamp() === $job->retryUntil()->getTimestamp();
+        });
+    }
+
+    #[Test]
+    public function execute_first_connect_creates_auditable_row_and_dispatches_job(): void
+    {
+        Queue::fake();
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount($this->workspace);
+
+        $checkId = $this->dispatchService->executeFirstConnect($admin, $this->workspace->id, $account->id);
+
+        $row = ConnectorConnectionCheck::withoutWorkspaceScope()->findOrFail($checkId);
+        $this->assertSame(ConnectorConnectionCheckTrigger::FirstConnect, $row->trigger);
+        $this->assertSame($admin->getKey(), $row->initiated_by_user_id);
+        $this->assertSame(ConnectorConnectionCheckStatus::Queued, $row->status);
 
         Queue::assertPushed(ConnectorConnectionCheckJob::class, function (ConnectorConnectionCheckJob $job) use ($row): bool {
             return $row->retry_until_at->getTimestamp() === $job->retryUntil()->getTimestamp();

@@ -487,7 +487,7 @@ Availability, Customers, Orders, B2B Catalogue, Payment, Import, Export.
 - Connector, Import and Export Rules;
 - Regional and Compliance Rules;
 - Documentation Update Rules;
-- Testing Requirements;
+- Testing Requirements, including the resolved risk-based Test Execution Cadence (focused/regression tests per risk-bearing mechanism; MySQL-specific proof where required; one mandatory broad/full local gate before slice/PR closure; green CI before merge);
 - Output Format for Planning Tasks;
 - Output Format for Code Tasks;
 - Small Task Exception;
@@ -692,6 +692,19 @@ cross-platform vocabulary or define runtime/storage behavior.
 - `docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md` — authoritative
   current-base Magento V1 Product field/capability inventory; cluster summaries are
   classification only, not field certification
+- `docs/connectors/adobe-commerce/MAGENTO_V1_CONNECTION_UX_CONTRACT.md` — frozen Magento V1 onboarding / connection truth / credential rotation / permission-remediation / recovery contract; mandatory for Magento connection UI and connection-health runtime work
+- `docs/connectors/adobe-commerce/MAGENTO_V1_PENDING_CERTIFICATION_ITEMS.md` — durable queue of Magento V1 surfaces deliberately deferred during certification; mandatory pre-read before resuming Magento field/surface work so pending blockers are not lost or silently reclassified
+- `docs/connectors/adobe-commerce/MAGENTO_V1_FIELD_PROGRESS.md` + `magento_v1_stage1_real_target_evidence_2026_09_13.json` — Magento Stage 1 runtime-derived resume index and generated per-field evidence export (106/106 current-target identities). Persisted runtime classification is authoritative; the older 2026-09-12 CSV is historical mutation/certification evidence only and must not become a second editable classification truth
+- `docs/connectors/adobe-commerce/MAGENTO_V1_RESEARCH_QUEUE.md` — durable fail-closed queue for Magento provider fields/surfaces/semantics that lack sufficient authoritative evidence; unresolved items must not be promoted to provider-standard/dedicated-owner runtime claims and must remain `review_needed` until evidence is recorded
+- `docs/connectors/adobe-commerce/MAGENTO_V1_STAGE2_CUSTOM_ATTRIBUTES_SETS_GROUPS_HANDOFF.md` — Stage 2 handoff for workspace custom-field materialization and Magento attribute set/group research/implementation; consumes Stage 1 runtime classification rather than re-inventorying Product attributes
+- `docs/connectors/adobe-commerce/MAGENTO_V1_RECEIVE_R4_DYNAMIC_SELECT_STOP_AND_AMEND_2026_09_13.md` — additive R4 Receive contract for mapped workspace custom Dynamic single-select fields; exact option reverse mapping, CAS Apply, no implicit remote-absent clear; public Import support remains false.
+- `docs/connectors/adobe-commerce/magento_v1_receive_r4_dynamic_select_evidence_2026_09_13.json` — R4 code/test closure evidence: exact option reverse resolution, Dynamic CAS, stale-state guards, RemoteAbsent≠Clear, broad Connector/Sync gates; real-target destructive certification remains P-07.
+- `docs/connectors/adobe-commerce/MAGENTO_V1_STAGE2_STRUCTURE_RESEARCH_SYNTHESIS.md` — frozen Stage 2 provider-structure contract: stable `attribute_id` lineage, Product Attribute Set applicability, provider-only groups, option identity/localized labels, and the ordered foundation → reconciler → materializer implementation slices
+- `docs/connectors/adobe-commerce/magento_v1_stage2_structure_reconciliation_evidence_2026_09_13.json` — live read-only Stage 2 structure proof: two consecutive reconciliations with stable provider identities and counts (106 attributes / 4 Product sets / 42 Product groups / 284 memberships / 1387 options), no Product writes
+- `docs/connectors/adobe-commerce/magento_v1_stage2c_materialization_evidence_2026_09_13.json` — live Stage 2-C workspace materialization proof: 18 trusted Variant single-select custom attributes in configured Attribute Set 9 materialized idempotently into 18 workspace definitions/bindings/mappings and 924 option mappings; second run preserved all identities and created no duplicate definitions/bindings
+- `docs/connectors/adobe-commerce/MAGENTO_V1_PROVIDER_IDENTITY_EVIDENCE_2026_09_13.md` — authoritative source log used to close Stage 1 real-target provider-identity questions without widening write capability
+- `docs/connectors/adobe-commerce/magento_v1_custom_behavior_coverage_2026_09_12.json` — read-only real-catalog evidence for the 21 current-target workspace-custom fields not individually mutated: 16 `select/global` + 5 `money/website`, with live-value presence counts and reusable behavior-class onboarding classification
+- `docs/connectors/adobe-commerce/magento_v1_store_scope_inheritance_probe_2026_09_12.json` — P-10 read-only real-target evidence: store topology, scoped-attribute metadata, unavailable authoritative raw-EAV seams, and the deliberate zero-PUT decision pending DB/Admin or target-side diagnostic proof
 - `ADOBE_COMMERCE_V1_INVENTORY_RESEARCH.md` + review synthesis + related Adobe CSVs —
   frozen cross-platform Adobe research baseline
 - `SHOPIFY_V1_INVENTORY_RESEARCH.md` + related Shopify CSVs — frozen Shopify 2026-07 Product/capability research baseline; obey its frozen/not-frozen status marker
@@ -706,6 +719,11 @@ cross-platform vocabulary or define runtime/storage behavior.
 - 02-ATTRIBUTE_DICTIONARY.md
 - 03-DOMAIN_MODEL.md
 - 04-ARCHITECTURE_PRINCIPLES.md
+- `docs/reviews/PRODUCT_STRUCTURE_UX_AI_GPT54_ARBITRATION_2026_09_13.md` — pre-implementation arbitration of GPT-5.4 ProductType/AttributeGroup/Category/AI-enrichment research; records accepted baseline, concrete corrections, and architecture questions that must remain open for Sonnet before final contract freeze.
+- `docs/reviews/PRODUCT_STRUCTURE_UX_AI_FINAL_SYNTHESIS_2026_09_13.md` — final pre-implementation synthesis across repo contracts, GPT-5.4, Sonnet 5 High, primary vendor docs, and Amazon/BigCommerce connector-shape checks; authoritative research conclusion for ProductType/AttributeGroup/Completeness/AI proposal design before adversarial implementation review.
+- `docs/reviews/PRODUCT_STRUCTURE_UX_AI_IMPLEMENTATION_CONTRACT_2026_09_13.md` — authoritative Product Structure implementation contract; **Slice A closed 2026-09-13** with real-MySQL gates and real-catalogue clone smoke evidence recorded in the document; next scope is Slice B.
+- `docs/reviews/PRODUCT_STRUCTURE_UX_AI_SONNET_CONTRACT_REVIEW_2026_09_13.md` — post-contract Sonnet adversarial review resolution; freezes physical PK/FK type, Customer bootstrap exclusion, `manage_product_structure`, out-of-type sync boundary, Basic Product post-create reconciliation, structure revision semantics, and mandatory MySQL gate without changing the ProductType/AttributeGroup architecture.
+- `docs/reviews/PRODUCT_STRUCTURE_UX_AI_GEMINI_CONTRACT_REVIEW_2026_09_13.md` — Gemini 3.1 independent contract review resolution; confirms corrected Slice A contract and records that no additional architectural blocker remained.
 
 **For AI-assisted implementation (architecture and domain tasks):**
 
@@ -723,6 +741,8 @@ cross-platform vocabulary or define runtime/storage behavior.
 - `docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md` when the task
   touches Magento Product inventory, certification, stock Product reads, or entity-bound
   Safe Sync Product writes
+- `docs/connectors/adobe-commerce/MAGENTO_V1_CONNECTION_UX_CONTRACT.md` when the task
+  touches Magento onboarding, connection checks, credentials, store scope, permission remediation, connection recovery, or WRITE-readiness presentation
 - `ADOBE_COMMERCE_V1_INVENTORY_RESEARCH.md` and `SHOPIFY_V1_INVENTORY_RESEARCH.md`
   when the task touches cross-platform Product field/capability research or either
   connector inventory baseline
@@ -733,6 +753,7 @@ cross-platform vocabulary or define runtime/storage behavior.
 - 06-UI_DESIGN_SYSTEM.md
 - 07-TECH_STACK.md
 - relevant sections of 03-DOMAIN_MODEL.md where domain data is displayed
+- `docs/connectors/adobe-commerce/MAGENTO_V1_CONNECTION_UX_CONTRACT.md` for Magento onboarding / connection / credential / permission / recovery surfaces
 
 ---
 

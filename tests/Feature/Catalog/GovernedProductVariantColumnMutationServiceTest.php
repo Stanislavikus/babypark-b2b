@@ -8,6 +8,7 @@ use App\Enums\AttributeStatus;
 use App\Enums\AttributeStorageType;
 use App\Enums\FieldObjectType;
 use App\Exceptions\Catalog\ColumnFieldClearRejectedException;
+use App\Exceptions\Catalog\ColumnFieldCurrentValueMismatchException;
 use App\Exceptions\Catalog\ColumnFieldNotAllowlistedException;
 use App\Exceptions\Catalog\InvalidColumnFieldValueException;
 use App\Models\FieldBinding;
@@ -111,6 +112,64 @@ class GovernedProductVariantColumnMutationServiceTest extends TestCase
 
         $this->assertSame(ColumnMutationResult::NoOp, $result->status);
         $this->assertFalse($result->isMutation());
+        $this->assertSame($updatedAtBefore, $this->product->fresh()->updated_at->toAtomString());
+    }
+
+    public function test_set_if_current_value_updates_name_when_expected_value_matches(): void
+    {
+        $binding = $this->columnBinding('name', FieldObjectType::Product);
+
+        $result = $this->service->setIfCurrentValue(
+            workspaceId: $this->workspace->id,
+            targetType: FieldObjectType::Product,
+            targetId: $this->product->id,
+            fieldBindingId: $binding->id,
+            expectedCurrentValue: 'Initial Product Name',
+            value: 'Remote Product Name',
+        );
+
+        $this->assertSame(ColumnMutationResult::Updated, $result->status);
+        $this->assertSame('Remote Product Name', $this->product->fresh()->name);
+    }
+
+    public function test_set_if_current_value_rejects_stale_local_value_before_noop_or_mutation(): void
+    {
+        $binding = $this->columnBinding('name', FieldObjectType::Product);
+        $this->product->name = 'Changed After Proposal';
+        $this->product->save();
+        $snapshot = $this->productSnapshot();
+
+        $this->expectException(ColumnFieldCurrentValueMismatchException::class);
+
+        try {
+            $this->service->setIfCurrentValue(
+                workspaceId: $this->workspace->id,
+                targetType: FieldObjectType::Product,
+                targetId: $this->product->id,
+                fieldBindingId: $binding->id,
+                expectedCurrentValue: 'Initial Product Name',
+                value: 'Changed After Proposal',
+            );
+        } finally {
+            $this->assertProductSnapshotUnchanged($snapshot);
+        }
+    }
+
+    public function test_set_if_current_value_identical_expected_and_next_value_is_noop(): void
+    {
+        $binding = $this->columnBinding('name', FieldObjectType::Product);
+        $updatedAtBefore = $this->product->updated_at->toAtomString();
+
+        $result = $this->service->setIfCurrentValue(
+            $this->workspace->id,
+            FieldObjectType::Product,
+            $this->product->id,
+            $binding->id,
+            'Initial Product Name',
+            'Initial Product Name',
+        );
+
+        $this->assertSame(ColumnMutationResult::NoOp, $result->status);
         $this->assertSame($updatedAtBefore, $this->product->fresh()->updated_at->toAtomString());
     }
 

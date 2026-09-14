@@ -274,7 +274,7 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
     }
 
     #[Test]
-    public function target_dependent_eav_family_remains_explicitly_incomplete_pending_real_target_expansion(): void
+    public function target_dependent_eav_family_records_partial_real_target_expansion_without_claiming_completeness(): void
     {
         $manifest = $this->manifest()['items'];
         $targetFamily = current(array_filter(
@@ -291,7 +291,8 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
         ));
 
         self::assertIsArray($matrixRow);
-        self::assertSame('pending_real_target_expansion', $matrixRow['field_certification_status']);
+        self::assertSame('target_expanded_24_dynamic_children_verified_family_incomplete', $matrixRow['field_certification_status']);
+        self::assertStringContainsString('real_target_partial_target_expansion_24_dynamic_children', $matrixRow['real_validation_state']);
         self::assertSame('TARGET_DEPENDENT', $matrixRow['read_capability_state']);
         self::assertSame('TARGET_DEPENDENT', $matrixRow['write_capability_state']);
     }
@@ -341,6 +342,123 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
     }
 
     #[Test]
+    public function core_simple_fields_are_real_target_write_read_restore_certified(): void
+    {
+        $rows = array_column($this->matrix()['rows'], null, 'id');
+
+        foreach ([
+            'rest-product-name',
+            'rest-product-price',
+            'rest-product-status',
+            'rest-product-visibility',
+        ] as $rowId) {
+            self::assertSame('SUPPORTED', $rows[$rowId]['read_capability_state'], $rowId);
+            self::assertSame('SUPPORTED', $rows[$rowId]['write_capability_state'], $rowId);
+            self::assertSame('real_target_write_read_restore_verified_2026_09_11', $rows[$rowId]['real_validation_state'], $rowId);
+            self::assertSame('real_target_write_read_restore_verified', $rows[$rowId]['field_certification_status'], $rowId);
+            self::assertStringContainsString('AdobeProductStockSimpleWriteExecutor', $rows[$rowId]['connector_write_seam'], $rowId);
+            self::assertStringContainsString('AdobeProductDocumentReader', $rows[$rowId]['result_or_blocker'], $rowId);
+        }
+
+        self::assertStringContainsString('mapped scalar child attributes', $rows['custom-attributes-container']['connector_write_seam']);
+        self::assertStringNotContainsString('Trusted simple Safe Sync path', $rows['custom-attributes-container']['connector_write_seam']);
+    }
+
+    #[Test]
+    public function real_target_field_certification_ledger_records_verified_and_excluded_children(): void
+    {
+        $ledger = $this->certificationLedger();
+        $rows = array_column($this->matrix()['rows'], null, 'id');
+
+        self::assertSame('2026-09-11', $ledger['certification_date']);
+        self::assertCount(38, $ledger['verified_fields']);
+        self::assertCount(8, $ledger['present_but_not_generic_scalar_certified']);
+        self::assertSame(0, $ledger['post_campaign_drift_proof']['custom_attribute_diff_count']);
+        self::assertTrue($ledger['post_campaign_drift_proof']['core_state_restored']);
+        self::assertFalse($ledger['public_live_support_flipped']);
+        self::assertCount(1, $ledger['receive_apply_proofs']);
+        $receiveProof = $ledger['receive_apply_proofs'][0];
+        self::assertSame('canonical_product_name', $receiveProof['surface']);
+        self::assertSame('1234567890', $receiveProof['target_sku']);
+        self::assertSame(1, $receiveProof['logical_entity_id']);
+        self::assertSame('Test Product', $receiveProof['baseline_name']);
+        self::assertSame('Test Product [Receive Cert]', $receiveProof['probe_name']);
+        self::assertSame('completed', $receiveProof['first_receive_run']['status']);
+        self::assertSame('synchronized', $receiveProof['first_receive_run']['outcome']);
+        self::assertSame('updated', $receiveProof['first_receive_run']['mutation_status']);
+        self::assertSame('completed', $receiveProof['second_receive_run']['status']);
+        self::assertSame('synchronized', $receiveProof['second_receive_run']['outcome']);
+        self::assertSame('updated', $receiveProof['second_receive_run']['mutation_status']);
+        self::assertSame($receiveProof['baseline_configuration_revision'], $receiveProof['final_configuration_revision']);
+        self::assertTrue($receiveProof['normal_receive_restore_completed']);
+        self::assertFalse($receiveProof['emergency_cleanup_used']);
+        self::assertFalse($receiveProof['public_import_live_support_flipped']);
+
+        $verifiedKeys = [];
+        foreach ($ledger['verified_fields'] as $field) {
+            $key = $field['external_field_key'];
+            self::assertNotContains($key, $verifiedKeys, $key);
+            $verifiedKeys[] = $key;
+            self::assertSame('known_applied', $field['send_write_result'], $key);
+            self::assertSame('stock_write_verified', $field['reason_code'], $key);
+            self::assertTrue($field['document_reader_observed_probe'], $key);
+            self::assertSame('known_applied', $field['restore_result'], $key);
+            self::assertTrue($field['final_state_restored'], $key);
+        }
+
+        foreach (['category_ids', 'has_options', 'required_options', 'image', 'small_image', 'thumbnail', 'swatch_image', 'url_key'] as $key) {
+            self::assertContains($key, array_column($ledger['present_but_not_generic_scalar_certified'], 'external_field_key'));
+        }
+
+        self::assertSame('PARTIAL', $rows['rest-tax-class-id']['write_capability_state']);
+        self::assertSame('real_target_command_write_read_restore_verified_2026_09_11', $rows['rest-tax-class-id']['real_validation_state']);
+        self::assertSame('TARGET_DEPENDENT', $rows['dynamic-eav-family']['write_capability_state']);
+        self::assertStringContainsString('24_dynamic_children', $rows['dynamic-eav-family']['real_validation_state']);
+        self::assertSame('real_target_metadata_write_read_restore_verified_2026_09_11', $rows['media-gallery-structure']['real_validation_state']);
+        self::assertSame('real_target_media_role_preservation_verified_2026_09_11', $rows['eav-media-system-attributes']['real_validation_state']);
+        self::assertCount(1, $ledger['special_surface_proofs']);
+        $mediaProof = $ledger['special_surface_proofs'][0];
+        self::assertSame('media_gallery_entry_metadata', $mediaProof['surface']);
+        self::assertNull($mediaProof['baseline_label']);
+        self::assertNull($mediaProof['restore_label']);
+        self::assertSame(['image', 'small_image', 'swatch_image', 'thumbnail'], $mediaProof['roles']);
+        self::assertSame(['image_label', 'small_image_label', 'thumbnail_label'], $mediaProof['materialized_role_label_attributes']);
+        self::assertSame('', $mediaProof['default_store_projection_reset_payload_label']);
+        self::assertFalse($mediaProof['final_role_label_attributes_present']);
+        self::assertSame(42, $mediaProof['final_custom_attribute_count']);
+        self::assertTrue($mediaProof['final_product_state_restored']);
+        self::assertSame(
+            'docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json',
+            $this->matrix()['real_target_field_certification_evidence'],
+        );
+    }
+
+    #[Test]
+    public function p10_store_scope_probe_records_authoritative_blocker_before_mutation(): void
+    {
+        $probe = $this->storeScopeInheritanceProbe();
+
+        self::assertSame('2026-09-12', $probe['probe_date']);
+        self::assertSame('P-10', $probe['pending_item']);
+        self::assertSame('blocked_before_mutation', $probe['status']);
+        self::assertSame('default', $probe['target_scope']['configured_store_code']);
+        self::assertSame(1, $probe['target_scope']['configured_store_view_id']);
+        self::assertSame(8, $probe['store_topology']['active_storefront_view_count']);
+        self::assertSame(0, $probe['store_topology']['admin_store']['id']);
+        self::assertSame(200, $probe['read_only_observations']['product_get']['default']['http_status']);
+        self::assertSame(200, $probe['read_only_observations']['product_get']['all']['http_status']);
+        self::assertSame(400, $probe['read_only_observations']['product_get']['admin']['http_status']);
+        self::assertSame('store', $probe['read_only_observations']['attribute_metadata']['name']['scope']);
+        self::assertSame('store', $probe['read_only_observations']['attribute_metadata']['meta_title']['scope']);
+        self::assertSame(404, $probe['read_only_observations']['safe_sync_handshake']['http_status']);
+        self::assertFalse($probe['authoritative_evidence_assessment']['ordinary_product_get_is_sufficient']);
+        self::assertFalse($probe['authoritative_evidence_assessment']['all_scope_write_usable_as_global_only_probe']);
+        self::assertFalse($probe['mutation_probe']['stock_product_put_executed']);
+        self::assertFalse($probe['conclusion']['p10_cleared']);
+        self::assertFalse($probe['conclusion']['public_live_support_flipped']);
+    }
+
+    #[Test]
     public function current_discovery_frontend_inputs_are_documented(): void
     {
         $source = file_get_contents($this->repoPath('app/Support/Connectors/AdobePaaS/AdobePaaSAttributeNormalizer.php'));
@@ -376,6 +494,28 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
     private function matrix(): array
     {
         $contents = file_get_contents($this->repoPath('docs/connectors/adobe-commerce/magento_v1_product_field_matrix.json'));
+        $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($decoded);
+
+        return $decoded;
+    }
+
+    /** @return array<string, mixed> */
+    private function certificationLedger(): array
+    {
+        $contents = file_get_contents($this->repoPath('docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json'));
+        $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($decoded);
+
+        return $decoded;
+    }
+
+    /** @return array<string, mixed> */
+    private function storeScopeInheritanceProbe(): array
+    {
+        $contents = file_get_contents($this->repoPath('docs/connectors/adobe-commerce/magento_v1_store_scope_inheritance_probe_2026_09_12.json'));
         $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
 
         self::assertIsArray($decoded);

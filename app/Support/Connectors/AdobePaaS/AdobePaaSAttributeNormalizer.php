@@ -10,6 +10,10 @@ use App\Support\Connectors\Exceptions\ConnectorDiscoverySchemaValidationExceptio
 
 final class AdobePaaSAttributeNormalizer
 {
+    public function __construct(
+        private readonly AdobePaaSAttributePayloadProjector $payloadProjector = new AdobePaaSAttributePayloadProjector,
+    ) {}
+
     public function normalize(#[\SensitiveParameter] mixed $raw): CanonicalSchemaField
     {
         if (! $raw instanceof \stdClass) {
@@ -20,6 +24,22 @@ final class AdobePaaSAttributeNormalizer
         }
 
         $attributeCode = $this->requirePresentNonEmptyString($raw, 'attribute_code');
+
+        return $this->normalizeInternal($raw, $attributeCode, includeProviderMetadata: false);
+    }
+
+    public function normalizeIdentifiedV2(
+        #[\SensitiveParameter] \stdClass $raw,
+        string $attributeCode,
+    ): CanonicalSchemaField {
+        return $this->normalizeInternal($raw, $attributeCode, includeProviderMetadata: true);
+    }
+
+    private function normalizeInternal(
+        #[\SensitiveParameter] \stdClass $raw,
+        string $attributeCode,
+        bool $includeProviderMetadata,
+    ): CanonicalSchemaField {
         $frontendInput = $this->requirePresentNonEmptyString($raw, 'frontend_input');
         $normalizedDataType = $this->mapFrontendInput($frontendInput);
         $externalLabel = $this->readNullableString($raw, 'default_frontend_label');
@@ -29,7 +49,9 @@ final class AdobePaaSAttributeNormalizer
         $isLocalizable = $externalScope === 'store';
         $isMultiValue = in_array($frontendInput, ['multiselect', 'gallery'], true);
         $sortOrder = $this->readPosition($raw);
-        $normalizedPayload = $this->buildNormalizedPayload($raw, $frontendInput);
+        $normalizedPayload = $includeProviderMetadata
+            ? $this->payloadProjector->projectStrict($raw)
+            : $this->buildNormalizedPayload($raw, $frontendInput);
 
         return CanonicalSchemaField::create(
             $attributeCode,

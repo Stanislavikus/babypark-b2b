@@ -3,20 +3,23 @@
 namespace Tests\Feature\Connectors;
 
 use App\Enums\ConnectorDiscoveryRunStatus;
+use App\Enums\ConnectorSchemaFieldDisposition;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorDiscoveryRun;
+use App\Models\ConnectorSchemaFieldClassification;
 use App\Models\ConnectorSchemaSnapshot;
 use App\Models\ConnectorSchemaSnapshotField;
 use App\Services\Connectors\ConnectorDiscoveryRunPersistence;
 use App\Services\Connectors\ConnectorDiscoverySourceResolver;
 use App\Support\Connectors\CanonicalSchemaField;
 use App\Support\Connectors\CanonicalSchemaFieldHash;
-use App\Support\Connectors\CanonicalSchemaFieldHasher;
 use App\Support\Connectors\CanonicalSchemaPayload;
-use App\Support\Connectors\CanonicalSchemaSnapshotHasher;
 use App\Support\Connectors\ConnectorDiscoveryAttemptResult;
-use App\Support\Connectors\ConnectorDiscoveryNormalizedField;
+use App\Support\Connectors\ConnectorDiscoveryField;
+use App\Support\Connectors\ConnectorDiscoveryIdentifiedField;
 use App\Support\Connectors\ConnectorDiscoverySnapshotCandidate;
+use App\Support\Connectors\ConnectorSchemaFieldV2Hasher;
+use App\Support\Connectors\ConnectorSchemaSnapshotV2Hasher;
 use Carbon\CarbonImmutable;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
@@ -117,6 +120,47 @@ class ConnectorSchemaSnapshotFieldPayloadTest extends TestCase
     }
 
     #[Test]
+    public function finalize_after_vendor_attempt_projects_current_field_classification(): void
+    {
+        $account = $this->createConnectorAccount();
+        $row = $this->createQueuedRow($account);
+        $metadata = (object) [
+            'frontend_input' => 'text',
+            'scope' => 'global',
+            'backend_type' => 'varchar',
+            'source_model' => null,
+            'backend_model' => null,
+            'is_user_defined' => true,
+            'apply_to' => [],
+        ];
+        $field = $this->buildNormalizedField(
+            externalFieldKey: 'merchant_runtime_attribute',
+            payload: CanonicalSchemaPayload::withProviderMetadata(
+                'adobe.product_attribute.v1',
+                $metadata,
+            ),
+            sortOrder: 7,
+        );
+
+        $this->publishThroughFinalizeAfterVendorAttempt($account, $row, [$field]);
+
+        $persistedField = ConnectorSchemaSnapshotField::withoutWorkspaceScope()
+            ->where('snapshot_id', $row->fresh()->snapshot_id)
+            ->where('external_field_key', 'merchant_runtime_attribute')
+            ->firstOrFail();
+        $classification = ConnectorSchemaFieldClassification::withoutWorkspaceScope()
+            ->where('connector_account_id', $account->id)
+            ->where('connector_schema_source_id', $row->connector_schema_source_id)
+            ->where('external_field_key', 'merchant_runtime_attribute')
+            ->firstOrFail();
+
+        $this->assertSame(ConnectorSchemaFieldDisposition::WorkspaceCustom, $classification->disposition);
+        $this->assertSame($persistedField->id, $classification->latest_snapshot_field_id);
+        $this->assertNotNull($classification->behavior_class);
+        $this->assertSame('stage2_workspace_materialization', $classification->mapping_strategy);
+    }
+
+    #[Test]
     public function canonical_null_sort_order_remains_sql_null_after_publication(): void
     {
         $account = $this->createConnectorAccount();
@@ -184,17 +228,16 @@ class ConnectorSchemaSnapshotFieldPayloadTest extends TestCase
     }
 
     /**
-     * @param  list<ConnectorDiscoveryNormalizedField>  $fields
+     * @param  list<ConnectorDiscoveryField>  $fields
      */
     private function publishThroughFinalizeAfterVendorAttempt(
         ConnectorAccount $account,
         ConnectorDiscoveryRun $row,
         array $fields,
     ): void {
-        $fieldHasher = new CanonicalSchemaFieldHasher;
-        $snapshotHasher = new CanonicalSchemaSnapshotHasher;
+        $snapshotHasher = new ConnectorSchemaSnapshotV2Hasher;
         $fieldHashes = array_map(
-            fn (ConnectorDiscoveryNormalizedField $field): CanonicalSchemaFieldHash => CanonicalSchemaFieldHash::create(
+            fn (ConnectorDiscoveryField $field): CanonicalSchemaFieldHash => CanonicalSchemaFieldHash::create(
                 $field->field->externalFieldKey(),
                 $field->canonicalHash,
             ),
@@ -224,8 +267,8 @@ class ConnectorSchemaSnapshotFieldPayloadTest extends TestCase
         string $externalFieldKey,
         CanonicalSchemaPayload $payload,
         ?int $sortOrder,
-    ): ConnectorDiscoveryNormalizedField {
-        $fieldHasher = new CanonicalSchemaFieldHasher;
+    ): ConnectorDiscoveryField {
+        $fieldHasher = new ConnectorSchemaFieldV2Hasher;
         $canonicalField = CanonicalSchemaField::create(
             $externalFieldKey,
             ucfirst($externalFieldKey),
@@ -238,9 +281,11 @@ class ConnectorSchemaSnapshotFieldPayloadTest extends TestCase
             $sortOrder,
         );
 
-        return new ConnectorDiscoveryNormalizedField(
-            $canonicalField,
-            $fieldHasher->hash($canonicalField),
+        $identifiedField = ConnectorDiscoveryIdentifiedField::normalized($canonicalField);
+
+        return new ConnectorDiscoveryField(
+            $identifiedField,
+            $fieldHasher->hash($identifiedField),
         );
     }
 

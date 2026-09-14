@@ -32,6 +32,7 @@ enum ConnectorDiscoveryRunErrorCode: string
     case AdobeUnrecognizedBadRequest = 'adobe_unrecognized_bad_request';
     case AdobeInvalidCredentials = 'adobe_invalid_credentials';
     case AdobeInsufficientPermissions = 'adobe_insufficient_permissions';
+    case AdobeAccessRejectedUndetermined = 'adobe_access_rejected_undetermined';
     case AdobeInvalidOrUnsupportedEndpoint = 'adobe_invalid_or_unsupported_endpoint';
     case AdobeRequestTimeout = 'adobe_request_timeout';
     case AdobeRateLimited = 'adobe_rate_limited';

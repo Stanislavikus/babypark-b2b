@@ -11,7 +11,7 @@ final readonly class AdobeProductRemoteMediaMetadataEntry
         public int $entryId,
         public string $mediaType,
         public string $file,
-        public string $label,
+        public ?string $label,
         public int $position,
         public bool $disabled,
         public array $types,

@@ -93,6 +93,42 @@ Connector-specific payload structures must not become new core domain fields mer
 
 When the external field has no valid platform representation, treat that as a concrete blocker to resolve through the normal documentation/domain process. Do not silently skip the field.
 
+### 3.1 Mandatory per-field runtime progress state
+
+The connector master matrix may group fields when documenting shared transport/domain mechanics, but every active certification campaign must maintain a **machine-readable per-field progress source with exactly one explicit outcome per discovered external field**. Aggregated cluster rows never replace per-field state.
+
+When a persisted runtime classification/projection exists, **runtime state is authoritative** and JSON/CSV ledgers are generated evidence/exports only. When a connector has not yet implemented such a runtime projection, a machine-readable per-field ledger remains the fallback authoritative source until the runtime projection replaces it. Never maintain two independently editable classification truths.
+
+Minimum per-field facts are:
+
+`external_field_key → normalization/type/scope → behavior_class → disposition/progress_bucket → owner or canonical_code (if any) → mapping strategy/state → certification evidence → next action/reason`
+
+The top-level runtime disposition or fallback `progress_bucket` must make merchant/runtime intent obvious:
+
+- `canonical_platform` — a neutral platform concept exists; automatic mapping is either verified or has an explicit mapping gap;
+- `provider_standard` / connector-specific equivalent — a stable provider field or provider/domain mechanic that must not be forced into global canonical vocabulary;
+- `workspace_custom` — a merchant/workspace-specific discovered attribute retained without global semantic promotion;
+- `system_or_dedicated_owner`, `review_needed`, or `unsupported` — explicit non-generic terminal/attention states where the connector runtime supports them.
+
+**Write-through rule:** discovery/classification/certification work is not complete until the authoritative runtime projection (or fallback ledger) records the resulting state and durable evidence/reason. “We checked it in chat” is not project state.
+
+**Resume rule:** after a chat/session boundary, read the authoritative inventory, persisted runtime classification plus its latest generated evidence export (or the fallback ledger where no runtime projection exists), the pending-blocker queue, and the runtime Atlas. Continue from unresolved runtime/research/blocker state. Do not repeat provider research or re-inventory already-accounted fields unless the external version/snapshot materially changed or a concrete inconsistency is found.
+
+### 3.2 Connector certification is not customer onboarding
+
+Field-by-field connector certification is an engineering activity performed once per connector/version/behavior class. It must not become a manual onboarding requirement for every merchant catalogue.
+
+At workspace discovery time:
+
+1. exact/high-confidence canonical mappings reuse the already-approved canonical/provider mapping rules;
+2. known provider-standard fields reuse the connector's existing owner/transport classification;
+3. workspace custom fields are persisted as discovered fields and matched to an already-certified behavior class (for example data type + scope + requiredness + option/clear semantics);
+4. a new engineering investigation is opened only for an unrecognized behavior class, ambiguous semantic promotion, or a concrete runtime failure.
+
+A catalogue with hundreds or thousands of custom attributes must therefore scale primarily as data classification, not as hundreds or thousands of fresh manual vendor-manual studies. Individual rows still receive explicit progress/results, but proven cluster/behavior mechanics are reused automatically.
+
+For installation-dependent `workspace_custom` attributes, **exact per-code WRITE certification is not an onboarding gate** when the discovered metadata fits an already real-target-certified behavior class and there is no field-specific restriction or runtime failure. The ledger must distinguish `exact field certified` from `behavior-class covered`; both may be onboarding-ready, but only the first may be counted as an exact field WRITE→READ→RESTORE proof. A field that introduces a new type/scope/option/clear/requiredness behavior, or fails at runtime, leaves the reusable fast path and becomes engineering work.
+
 ---
 
 ## 4. Implement Missing Seams as Blocker Removal, Not as New End Goals
@@ -154,17 +190,20 @@ A failure may expose a genuine new architecture or domain ambiguity. In that cas
 
 ## 7. Field-by-Field Certification After Cluster Proof
 
-Once a cluster's representative path works, run every field in that cluster through the proven mechanism.
+Once a cluster's representative path works, run every provider-standard/canonical field in that cluster through the proven mechanism.
 
-Do not assume that all fields pass because one representative field passed.
+Do not assume that standard provider fields pass because one representative field passed.
 
-Every field receives an explicit certification result for each relevant direction.
+Installation-dependent `workspace_custom` codes are different: their connector contract is the discovered behavior class, not the merchant's arbitrary attribute code. Each custom row still receives an explicit result, but it may terminate as `BEHAVIOR CLASS COVERED` without a dedicated destructive WRITE when its metadata matches a real-target-certified class and no field-specific blocker exists. Exact per-code certification remains required for new behavior classes, special semantics, and concrete failures.
+
+Every row receives an explicit certification/classification result for each relevant direction.
 
 Allowed final classifications are:
 
 - `READ PASS`;
 - `WRITE PASS`;
 - `READ + WRITE PASS`;
+- `BEHAVIOR CLASS COVERED` — workspace-custom only; exact representative real-target proof for the matching transport behavior exists and this row introduces no new behavior/failure;
 - `INTENTIONALLY ONE-WAY` — only with a concrete external-platform or product-domain reason and evidence;
 - `SYSTEM / PLATFORM OWNED` — mutation is not semantically valid, with owner/reason recorded;
 - `BLOCKED` — concrete unresolved blocker recorded;
@@ -185,7 +224,7 @@ A connector V1 is not production-ready until all of the following are true:
 3. every field has a platform representation or an explicit documented blocker/classification;
 4. at least one representative field from every cluster has been proven end-to-end on a real target in every supported direction;
 5. errors found during representative probes have been root-caused and the required blockers fixed;
-6. every field has been individually certified through the working cluster mechanism;
+6. every canonical/provider-standard field has been individually certified through the working cluster mechanism, and every workspace-custom row is either exact-field certified or explicitly covered by a certified behavior class with no unresolved exception;
 7. the master matrix contains no unexplained gaps or unknowns;
 8. connector capability/support flags match actual runtime truth;
 9. automated tests and CI pass for the production-intended paths;
@@ -221,6 +260,7 @@ Every connector campaign handoff must state:
 - inventory completion status;
 - clusters and representative fields;
 - master matrix location;
+- authoritative per-field runtime progress source (or fallback ledger) plus latest generated evidence location and disposition/bucket counts;
 - which representative READ probes passed/failed;
 - which representative WRITE probes passed/failed;
 - literal current blockers/errors;

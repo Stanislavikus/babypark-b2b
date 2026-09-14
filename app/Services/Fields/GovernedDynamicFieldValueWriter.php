@@ -12,6 +12,7 @@ use App\Models\Product;
 use App\Models\ProductFieldValue;
 use App\Models\ProductVariant;
 use App\Models\VariantFieldValue;
+use App\Services\Fields\Exceptions\DynamicFieldCurrentValueMismatchException;
 use App\Services\Fields\Exceptions\FieldBindingArchivedException;
 use App\Services\Fields\Exceptions\FieldBindingNotFoundException;
 use App\Services\Fields\Exceptions\FieldBindingObjectTypeMismatchException;
@@ -170,6 +171,37 @@ final class GovernedDynamicFieldValueWriter
      *   - localizable Clear MUST receive a locale (per the public
      *     single-locale API contract).
      */
+    public function setIfCurrentValue(
+        string $workspaceId,
+        FieldObjectType $targetType,
+        int|string $targetId,
+        string $fieldBindingId,
+        mixed $expectedCurrentValue,
+        mixed $value,
+        ?string $locale = null,
+    ): FieldValueWriteResult {
+        if ($value === null) {
+            throw InvalidFieldValuePayloadException::nullPayload();
+        }
+
+        $context = $this->resolveContext(
+            workspaceId: $workspaceId,
+            targetType: $targetType,
+            targetId: $targetId,
+            fieldBindingId: $fieldBindingId,
+            locale: $locale,
+        );
+
+        return $this->mutateWithRetry(
+            context: $context,
+            operation: 'set',
+            value: $value,
+            locale: $locale,
+            compareCurrent: true,
+            expectedCurrentValue: $expectedCurrentValue,
+        );
+    }
+
     public function clear(
         string $workspaceId,
         FieldObjectType $targetType,
@@ -501,6 +533,8 @@ final class GovernedDynamicFieldValueWriter
         string $operation,
         mixed $value,
         ?string $locale,
+        bool $compareCurrent = false,
+        mixed $expectedCurrentValue = null,
     ): FieldValueWriteResult {
         $modelClass = $this->valueModelFor($context['target_type']);
         $entityColumn = $this->entityColumnFor($context['target_type']);
@@ -521,6 +555,8 @@ final class GovernedDynamicFieldValueWriter
                     $value,
                     $locale,
                     $context,
+                    $compareCurrent,
+                    $expectedCurrentValue,
                 ): FieldValueWriteResult {
                     $binding = $this->lockBindingForMutation(
                         fieldBindingId: $fieldBindingId,
@@ -538,6 +574,15 @@ final class GovernedDynamicFieldValueWriter
                         ->where('field_binding_id', $binding->id)
                         ->lockForUpdate()
                         ->first();
+
+                    if ($compareCurrent) {
+                        $this->assertExpectedCurrentValue(
+                            slot: $slot,
+                            definition: $definition,
+                            expectedCurrentValue: $expectedCurrentValue,
+                            locale: $locale,
+                        );
+                    }
 
                     if ($operation === 'set') {
                         return $this->applySet(
@@ -581,6 +626,56 @@ final class GovernedDynamicFieldValueWriter
 
         // Unreachable; the loop either returns or throws.
         throw new \LogicException('mutateWithRetry exited without returning or throwing.');
+    }
+
+    private function assertExpectedCurrentValue(
+        mixed $slot,
+        FieldDefinition $definition,
+        mixed $expectedCurrentValue,
+        ?string $locale,
+    ): void {
+        if ($definition->is_localizable) {
+            $map = $this->readLocalizedMap($slot, $definition->id);
+            $present = array_key_exists((string) $locale, $map);
+
+            if ($expectedCurrentValue === null) {
+                if ($present) {
+                    throw DynamicFieldCurrentValueMismatchException::forField($definition->code);
+                }
+
+                return;
+            }
+
+            $expected = $this->normalizeStringPayloadForType(
+                $definition->data_type,
+                $expectedCurrentValue,
+                $definition,
+            );
+
+            if (! $present || $map[(string) $locale] !== $expected) {
+                throw DynamicFieldCurrentValueMismatchException::forField($definition->code);
+            }
+
+            return;
+        }
+
+        if ($expectedCurrentValue === null) {
+            if ($slot !== null) {
+                throw DynamicFieldCurrentValueMismatchException::forField($definition->code);
+            }
+
+            return;
+        }
+
+        $expectedPayload = $this->canonicalPayloadForNonLocalizableType(
+            $definition->data_type,
+            $expectedCurrentValue,
+            $definition,
+        );
+
+        if (! $this->slotMatchesCanonicalPayload($slot, $expectedPayload)) {
+            throw DynamicFieldCurrentValueMismatchException::forField($definition->code);
+        }
     }
 
     private function isExpectedSlotUniqueViolation(

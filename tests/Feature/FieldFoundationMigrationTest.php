@@ -325,9 +325,44 @@ class FieldFoundationMigrationTest extends TestCase
             ->count());
     }
 
+    protected function tearDown(): void
+    {
+        try {
+            Artisan::call('migrate:fresh');
+        } finally {
+            parent::tearDown();
+        }
+    }
+
     private function migrateThroughPreFieldFoundation(): void
     {
         Artisan::call('migrate:fresh');
+
+        if (Schema::hasTable('adobe_product_attribute_materializations')) {
+            $adobeMaterializationsMigration = require database_path('migrations/2026_09_13_070000_adobe_product_attribute_materializations.php');
+            $adobeMaterializationsMigration->down();
+
+            $this->assertFalse(Schema::hasTable('adobe_product_attribute_materializations'));
+        }
+
+        if (Schema::hasTable('adobe_product_attribute_lineages')) {
+            $adobeStructureMigration = require database_path('migrations/2026_09_13_040000_adobe_product_attribute_structure_foundation.php');
+            $adobeStructureMigration->down();
+
+            $this->assertFalse(Schema::hasTable('adobe_product_attribute_lineages'));
+            $this->assertFalse(Schema::hasTable('adobe_product_attribute_groups'));
+        }
+
+        if (Schema::hasTable('product_types')) {
+            $notNullMigration = require database_path('migrations/2026_09_13_170000_enforce_product_type_not_null.php');
+            $notNullMigration->down();
+
+            $productStructureMigration = require database_path('migrations/2026_09_13_140000_product_structure_foundation.php');
+            $productStructureMigration->down();
+
+            $this->assertFalse(Schema::hasTable('product_types'));
+            $this->assertFalse(Schema::hasTable('product_type_field_placements'));
+        }
 
         if (Schema::hasTable('field_option_mappings')) {
             $fieldOptionMappingsMigration = require database_path('migrations/2026_08_17_100000_field_option_mappings.php');

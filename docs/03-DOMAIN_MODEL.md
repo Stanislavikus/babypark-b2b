@@ -3423,8 +3423,9 @@ Immutable successful normalized schema capture.
 | `discovery_run_id` | UUID FK | Producing run |
 | `previous_snapshot_id` | UUID FK nullable | Chain |
 | `schema_version` | string nullable | From source/account context |
-| `field_count` | unsigned int | Count of normalized snapshot fields only (`fields_normalized`), never the raw received total. |
-| `canonical_hash` | char(64) | Hash of ordered normalized field hashes |
+| `field_count` | unsigned int | **v2 current meaning:** count of persisted identified snapshot fields (`fields_identified`). Historical v1 snapshots counted normalized merchant-facing fields only. |
+| `canonical_hash` | char(64) | Versioned deterministic schema hash; interpret with `canonical_hash_version`. |
+| `canonical_hash_version` | string | `v1` for historical snapshots; `v2` for the universal identified-field discovery contract. Never reinterpret a historical hash under another version. |
 | `captured_at` | timestamp | Vendor-normalized capture instant |
 | `created_at` | timestamp | Append-only |
 
@@ -3445,7 +3446,9 @@ columns — diffs are separate entities.
 | `snapshot_id` | UUID FK | |
 | `external_field_key` | string | Adobe: `attribute_code` |
 | `external_label` | string nullable | |
-| `normalized_data_type` | string | Connector-neutral type code |
+| `normalized_data_type` | string nullable | Connector-neutral type code when semantic normalization succeeds; `null` for an identified-but-unclassified field. Never use sentinel type strings such as `opaque`/`unknown`. |
+| `normalization_status` | string | `normalized` or `unclassified`. |
+| `normalization_failure_reason` | string nullable | Existing `ConnectorDiscoverySchemaValidationReason` value when semantic normalization failed; may be null for intentionally non-normalized system/service fields. |
 | `is_required` | boolean nullable | |
 | `is_multi_value` | boolean nullable | |
 | `is_localizable` | boolean nullable | |
@@ -3457,7 +3460,10 @@ columns — diffs are separate entities.
 
 Unique: `(snapshot_id, external_field_key)`.
 
-### Adobe attribute normalization (Resolved)
+### Adobe attribute normalization v1 (Historical contract; superseded for new Adobe discoveries)
+
+This v1 contract remains authoritative for historical snapshots whose `canonical_hash_version = v1`. It must not be recomputed or silently reinterpreted. New Adobe account discovery publishes under the v2 contract defined after the historical v1 hashing section below.
+
 
 This section defines how Adobe Commerce PaaS/on-prem `GET /V1/products/attributes`
 **list** responses are converted into the canonical
@@ -3669,7 +3675,7 @@ Raw Adobe response bodies are never persisted, only the mapped canonical shape
 (already stated for the hash contract — restated here for the mapping step
 specifically, since that's where raw data first enters the system).
 
-### Connector schema canonical hashing (Resolved)
+### Connector schema canonical hashing v1 (Historical contract)
 
 Canonical hashes provide deterministic no-change detection for normalized
 external schemas. They never hash raw vendor responses.
@@ -3849,6 +3855,60 @@ This is canonicalization contract `v1`. It uses the existing `char(64)` columns
 and requires no migration. Any future change to the preimage or normalization
 rules requires an explicit documentation-level decision and a rebaseline plan;
 the algorithm must never change silently.
+
+### Adobe Product attribute discovery + canonical hashing v2 (Resolved — 2026-09-12)
+
+New Adobe Commerce account discovery for the declared `GET /V1/products/attributes` schema source uses **v2**. V1 above is historical evidence only.
+
+**Identity precedes semantics.** Every raw list item first passes structural identity extraction. A missing, non-string, empty, or invalid-UTF-8 `attribute_code`, a duplicate identified key, transport/envelope failure, or pagination inconsistency invalidates the complete attempt because the returned field set cannot be trusted. Once a trustworthy `attribute_code` exists, semantic normalization failure is field-local: the identified field is persisted with `normalization_status = unclassified` and an explicit failure reason instead of destroying unrelated fields.
+
+`CanonicalSchemaField` remains the normalized-only DTO. V2 discovery uses a separate identified-field state so nullable persistence does not weaken canonical normalized-field invariants.
+
+**Service/internal attributes are inventory, not silent skips.** A trustworthy Magento internal attribute matching the existing strict service-only evidence (`frontend_input = null`, `is_user_defined = false`, `is_visible = false`) is persisted as an identified unclassified field. It is later classified `system_or_dedicated_owner`; it is not a merchant mapping problem. The old pre-normalization skip is superseded for v2.
+
+**Provider metadata whitelist.** V2 retains only explicitly approved metadata from the list response, under versioned `normalized_payload.provider_metadata`: `frontend_input`, `scope`, `backend_type`, `is_user_defined`, `is_visible`, `source_model`, `backend_model`, `apply_to`, `validation_rules`, `is_unique`, and `default_value`, when present. The exact JSON types returned by Magento are preserved after canonical safety validation; for example the current real fixture returns `is_unique` as string `"0"`/`"1"`, not as a boolean. Unknown top-level vendor properties remain ignored. Raw response bodies are never persisted. `apply_to` is retained now because it can alter behavior/applicability even though attribute-set/group workflow remains a later stage.
+
+V2 successful discovery counters have distinct meanings:
+
+- `fields_received` — raw list items received across all pages;
+- `fields_identified` — items with trustworthy unique `external_field_key` that are persisted;
+- `fields_normalized` — identified fields whose connector-neutral semantic normalization succeeded;
+- `fields_unclassified` — identified fields persisted without connector-neutral semantic normalization.
+
+On successful Adobe v2 discovery, `fields_identified = fields_normalized + fields_unclassified` and `ConnectorSchemaSnapshot.field_count = fields_identified`.
+
+#### V2 field canonical hash
+
+`ConnectorSchemaSnapshotField.canonical_hash` for a v2 snapshot is SHA-256 of `babypark.connector-schema-field.v2`, one LF byte, and canonical JSON containing exactly the persisted schema facts: `external_field_key`, `external_label`, `normalization_status`, `normalization_failure_reason`, `normalized_data_type`, `is_required`, `is_multi_value`, `is_localizable`, `external_scope`, `normalized_payload`, and `sort_order`. Nullable semantic columns are `null` for unclassified fields. Provider metadata is part of `normalized_payload`, therefore behavior-relevant metadata changes change the field hash. The same canonical JSON/container/UTF-8 rules as v1 apply.
+
+#### V2 snapshot canonical hash
+
+`ConnectorSchemaSnapshot.canonical_hash` for `canonical_hash_version = v2` is SHA-256 of `babypark.connector-schema-snapshot.v2`, one LF byte, and the canonical JSON list of **all identified persisted fields**, represented by `external_field_key` + v2 field `canonical_hash`, sorted bytewise by external key. Service/internal and other unclassified fields therefore affect v2 schema identity.
+
+Historical rows are preserved: migration backfills existing snapshot rows with `canonical_hash_version = v1` and existing snapshot-field rows with `normalization_status = normalized`; it does not recalculate historical hashes or invent rows for service-only fields that v1 deliberately omitted.
+
+### ConnectorSchemaFieldClassification (Resolved — Magento universal schema Stage 1, 2026-09-12)
+
+`connector_schema_field_classifications` is a **derived, recomputable current projection**, not discovery source truth. Immutable `ConnectorSchemaSnapshotField` rows remain authoritative evidence. One current projection row is keyed by `(workspace_id, connector_account_id, connector_schema_source_id, external_field_key)` and points only to `latest_snapshot_field_id`; a duplicate `latest_snapshot_id` is intentionally forbidden because the snapshot is reachable through that field row.
+
+Persisted facts are: `disposition`, deterministic `behavior_class` + `behavior_signature`, optional `runtime_owner_hint`, optional `canonical_code`, `mapping_strategy`, `classifier_version`, machine-readable `reason_code`, `classified_canonical_hash`, and `computed_at`. Generic readiness/support flags are **not persisted**. Merchant-facing readiness such as usable/deferred/review/blocked must be derived later from classification + effective mapping + runtime owner + operation-specific blockers.
+
+The runtime disposition vocabulary is exactly:
+
+- `canonical_platform`;
+- `provider_standard`;
+- `workspace_custom`;
+- `system_or_dedicated_owner`;
+- `review_needed`;
+- `unsupported`.
+
+**Field identity is not behavior identity.** `external_field_key` never participates in the behavior-class hash. Behavior identity is derived from provider/surface, normalized/raw type facts, scope, cardinality, option semantics, `source_model`, `backend_model`, `apply_to`, required/localizable facts, clear-semantics state, and dedicated runtime owner when proven. `is_user_defined` is classification/disposition evidence, not a behavior dimension; two keys with identical mechanics may therefore reuse one behavior class.
+
+Adobe classification evidence precedence is fail-closed: third-party special models → verified canonical mapping rules / dedicated-owner evidence → verified Canonical Registry channel decisions → provider registry evidence → user-defined custom evidence → review. A verified Adobe channel decision of `account_specific` prevents literal-name promotion to canonical; `deferred` may recognize an active+verified canonical concept only when provider identity is independently proven, but it does not manufacture a verified mapping. Current verified examples: `color` and `manufacturer` are `account_specific`; `meta_title` and `meta_description` are `deferred`.
+
+Provider-standard/dedicated-owner claims must carry durable frozen evidence in `resources/connector-registry/adobe_commerce_product_attribute_registry.json`. Appearance on one real target, label similarity, or `is_user_defined` alone is insufficient. Any unresolved provider object/field/ownership rule is recorded in `docs/connectors/adobe-commerce/MAGENTO_V1_RESEARCH_QUEUE.md` and remains `review_needed` until authoritative evidence closes the item.
+
+Classification is recomputed when a new authoritative snapshot is published. The current row records the latest field hash it classified (`classified_canonical_hash`) and classifier version. An incompatible semantic change such as `select → multiselect` changes the behavior class without silently rewriting persisted FieldMapping state.
 
 ### ConnectorSchemaDiff / ConnectorSchemaDiffItem (Resolved schema; dormant runtime)
 
@@ -4240,6 +4300,8 @@ the production cutover; the separate production activation has now also complete
 
 ### Connection-check capability and error mapping (Resolved)
 
+**Superseding rule:** for the standard Magento V1 OAuth1 Integration profile, `docs/connectors/adobe-commerce/MAGENTO_V1_CONNECTION_UX_CONTRACT.md` is authoritative for connection truth. A successful authenticated bounded Product READ is the only healthy baseline. Product Attributes/media are downstream evidence and may neither create false green nor false red connection state. Structured machine-reliable response fields may refine remediation, but localized free-form vendor message text is never the semantic authority and raw bodies are never merchant-facing. The attribute-first/status-only paragraphs below remain historical implementation context only.
+
 PaaS connection check is a single staged call:
 `GET {base_url}/rest/{store_code}/V1/products/attributes?searchCriteria[pageSize]=1` —
 this proves OAuth signature validity **and** product-attribute read permission
@@ -4543,14 +4605,14 @@ Boundary: `app/Services/Catalog/GovernedProductVariantColumnMutationService.php`
 - Product `description` is admitted only for the canonical global/global System `FieldDefinition` / `FieldBinding` tuple bound to `products.description`; Set requires a PHP string, rejects `null`, preserves the exact string including `''`, rejects physically oversized payloads, and `clear()` sets `NULL`.
 - The first consequential column-backed Receive Apply MUST NOT call GAP-029
   `set()` blindly.
-- Future Apply runtime requires an additive expected-current-value mutation path
-  conceptually equivalent to `setIfCurrentValue(...)`.
-- This expected-current-value precondition must be checked only **after**
-  locking the target Product row inside the authoritative GAP-029 mutation
-  transaction.
-- Existing GAP-029 `set()` / `clear()` semantics remain unchanged. This
-  contract does **not** claim that `setIfCurrentValue(...)` is already
-  implemented.
+- Receive Apply uses the additive GAP-029 expected-current-value mutation path
+  `setIfCurrentValue(...)`.
+- This expected-current-value precondition is checked only **after** locking
+  the target Product row inside the authoritative GAP-029 mutation transaction.
+- Existing GAP-029 `set()` / `clear()` semantics remain unchanged.
+- Implementation truth (2026-09-11): `setIfCurrentValue(...)` is implemented
+  for the frozen first Product-name slice and rejects stale participating local
+  values before either mutation or no-op classification.
 - Immediately before local consequential mutation, the same locked section must
   also verify the Receive `SyncRun` is still executable: the run exists, its
   `status = Running`, `writer_deadline_at` is present, and current time is
@@ -4747,8 +4809,47 @@ The first manual Receive Apply contract remains:
 - Import support flip;
 - merchant UI.
 
-Adobe Products/Import support remains **false** until separate truthful runtime
-and real-target validation work is completed.
+Adobe Products/Import support remains **false** until a separate public-support
+flip is justified; the existence of the internal name-only runtime does not
+advertise merchant Import capability.
+
+**Implementation/certification record — 2026-09-11.** The frozen R3 Product-name
+slice is now implemented internally by `ReceiveLiveImportAdmissionService` and
+`AdobeProductReceiveApplyService`, with GAP-029 `setIfCurrentValue(...)` as the
+final Product mutation boundary. A real-target certification against Magento SKU
+`1234567890` proved `Test Product → Test Product [Receive Cert]` on Magento,
+server-authoritative proposal construction, consequential Live/Import Apply into
+the isolated certification clone, then Magento restore to `Test Product` and a
+second Receive Apply restoring the clone through the same runtime. Both runs
+completed with `SyncRunItem.outcome = synchronized`; final remote/local names,
+configuration operation set, and configuration revision matched the exact
+baseline. This certifies only canonical Product `name`; broader Receive Apply,
+merchant UI, automated sync, and public Adobe Products/Import support remain out
+of scope.
+
+
+### 15. Receive R4 Dynamic Single-Select Stop-and-Amend — 2026-09-13
+
+R3 above remains the historical first Product-name certification. R4 is an additive
+behavior-class widening and does **not** reopen ENTITY TRUST, transport, proposal
+flow, Live Import admission, SyncRun history, or public Import support. The frozen
+implementation contract is
+`docs/connectors/adobe-commerce/MAGENTO_V1_RECEIVE_R4_DYNAMIC_SELECT_STOP_AND_AMEND_2026_09_13.md`.
+
+R4 admits active workspace-owned `WorkspaceCustom` Dynamic single-value Select
+bindings mapped to the explicit trusted Product/ProductVariant target. External
+option values resolve only through current `FieldOptionMapping`; labels/fuzzy
+matching are forbidden. Consequential states are `Differs` and `LocalAbsent`;
+`RemoteAbsent` is observation-only and MUST NOT become an implicit Clear.
+
+Apply preserves R3 fresh authorization, one-time flow consumption, Live Import
+admission, fresh remote reread outside the final transaction, configuration/trust/
+mapping revalidation, and one Product-owned `SyncRunItem`. Dynamic mutation uses
+`GovernedDynamicFieldValueWriter::setIfCurrentValue(...)`; stale local or remote
+state produces `not_applied`. A proposal may carry Product-name plus multiple R4
+Dynamic Select entries; `Equal` entries are non-consequential and all executable
+mutations are atomic within the final transaction. Public Adobe Products/Import
+support remains false.
 
 
 ## Sync Domain Rebaseline (Resolved — normative)

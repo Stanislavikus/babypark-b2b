@@ -426,13 +426,16 @@ final class ConnectorAccountUiState
 
         $previous = $snapshot->relationLoaded('previousSnapshot')
             ? $snapshot->previousSnapshot
-            : $snapshot->previousSnapshot()->first(['id', 'canonical_hash']);
+            : $snapshot->previousSnapshot()->first(['id', 'canonical_hash', 'canonical_hash_version']);
 
         if ($previous === null) {
             return null;
         }
 
-        if ($snapshot->canonical_hash === $previous->canonical_hash) {
+        if (
+            $snapshot->canonical_hash_version === $previous->canonical_hash_version
+            && $snapshot->canonical_hash === $previous->canonical_hash
+        ) {
             return __('connectors.ui.snapshot.no_change');
         }
 

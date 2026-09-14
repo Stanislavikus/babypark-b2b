@@ -27,6 +27,7 @@ class ConnectorSchemaSnapshotFactory extends Factory
             'schema_version' => '1.0',
             'field_count' => 1,
             'canonical_hash' => hash('sha256', Str::uuid()->toString()),
+            'canonical_hash_version' => 'v1',
             'captured_at' => now(),
         ];
     }

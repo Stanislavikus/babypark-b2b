@@ -13,6 +13,8 @@ use App\Filament\Pages\Integrations\Integrations;
 use App\Filament\Pages\Integrations\ListPlatformConnections;
 use App\Filament\Resources\ConnectorAccountResource;
 use App\Filament\Resources\ConnectorDefinitionResource;
+use App\Jobs\Connectors\ConnectorConnectionCheckJob;
+use App\Models\ConnectorAccount;
 use App\Models\ConnectorConnectionCheck;
 use App\Models\ConnectorDefinition;
 use App\Models\User;
@@ -25,6 +27,7 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
@@ -193,6 +196,44 @@ class IntegrationsPageTest extends TestCase
             ->assertSee('Підключення перевірено')
             ->assertSee('Відкрити')
             ->assertDontSeeHtml('>Вимкнено<');
+    }
+
+    #[Test]
+    public function first_connect_automatically_queues_baseline_check_and_redirects_to_overview(): void
+    {
+        Queue::fake();
+        $user = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+
+        $component = Livewire::actingAs($user)
+            ->test(ConnectPlatformIntegration::class, ['platform' => 'adobe_commerce'])
+            ->fillForm([
+                'base_url' => 'https://shop.example.com',
+                'store_code' => 'default',
+                'tenant_context' => null,
+                'consumer_key' => 'ck_first_connect',
+                'consumer_secret' => 'cs_first_connect',
+                'access_token' => 'at_first_connect',
+                'access_token_secret' => 'ts_first_connect',
+            ])
+            ->call('connect');
+
+        $account = ConnectorAccount::withoutWorkspaceScope()
+            ->where('workspace_id', $this->defaultWorkspace()->id)
+            ->where('base_url', 'https://shop.example.com')
+            ->firstOrFail();
+
+        $check = ConnectorConnectionCheck::withoutWorkspaceScope()
+            ->where('workspace_id', $account->workspace_id)
+            ->where('connector_account_id', $account->id)
+            ->sole();
+
+        $this->assertSame(ConnectorAccountConnectionStatus::Untested, $account->connection_status);
+        $this->assertSame(ConnectorConnectionCheckStatus::Queued, $check->status);
+        $this->assertSame(ConnectorConnectionCheckTrigger::FirstConnect, $check->trigger);
+        $this->assertSame($user->getKey(), $check->initiated_by_user_id);
+        $component->assertRedirect(ConnectorAccountResource::getUrl('view', ['record' => $account]));
+
+        Queue::assertPushed(ConnectorConnectionCheckJob::class, 1);
     }
 
     #[Test]

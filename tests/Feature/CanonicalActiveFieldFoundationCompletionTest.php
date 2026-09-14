@@ -21,6 +21,7 @@ use Database\Seeders\CanonicalActiveFieldSeeder;
 use Database\Seeders\FieldDefinitionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Tests\TestCase;
@@ -107,6 +108,8 @@ class CanonicalActiveFieldFoundationCompletionTest extends TestCase
     {
         $codes = [...array_keys($this->columnFields), 'pattern', 'style', 'warranty'];
         $ids = FieldDefinition::withoutWorkspaceScope()->whereIn('code', $codes)->pluck('id');
+        $bindingIdsToRemove = FieldBinding::withoutWorkspaceScope()->whereIn('field_definition_id', $ids)->pluck('id');
+        DB::table('product_type_field_placements')->whereIn('field_binding_id', $bindingIdsToRemove)->delete();
         FieldBinding::withoutWorkspaceScope()->whereIn('field_definition_id', $ids)->delete();
         FieldDefinition::withoutWorkspaceScope()->whereIn('id', $ids)->delete();
 
@@ -152,6 +155,8 @@ class CanonicalActiveFieldFoundationCompletionTest extends TestCase
     public function test_deployment_seed_rolls_back_new_fields_when_a_later_definition_conflicts(): void
     {
         $barcode = $this->definition('barcode_box');
+        $barcodeBindingIds = FieldBinding::withoutWorkspaceScope()->whereBelongsTo($barcode)->pluck('id');
+        DB::table('product_type_field_placements')->whereIn('field_binding_id', $barcodeBindingIds)->delete();
         FieldBinding::withoutWorkspaceScope()->whereBelongsTo($barcode)->delete();
         $barcode->delete();
         $warranty = $this->definition('warranty');

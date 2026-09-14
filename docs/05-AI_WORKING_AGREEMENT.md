@@ -65,6 +65,9 @@ The AI must not:
 
 - generate code from memory when current project files are available;
 - assume that previous chat memory is the source of truth;
+- restart connector inventory/research from zero when an authoritative inventory and persisted per-field runtime classification (or fallback ledger) already exist;
+- keep completed field checks only in chat or scratch notes instead of writing their status/evidence into the authoritative runtime projection or fallback campaign ledger;
+- turn merchant custom attributes into one-by-one vendor research when their discovered behavior class is already certified; use runtime/class evidence (or fallback ledger evidence) and investigate only new behavior or actual failures;
 - create new database fields casually;
 - bypass the Attribute Dictionary;
 - bypass workspace isolation;
@@ -1019,6 +1022,19 @@ Depending on the task, tests may include:
 - no hardcoded client behavior tests.
 
 The AI must not treat tests as optional when the feature affects money, orders, stock, payments, authorization, tenant isolation, or data integrity.
+
+### Test Execution Cadence (Resolved)
+
+The project optimizes test cadence for fast implementation **without reducing the quality bar**. Test depth is selected by risk and blast radius, not by a rule that the full suite must run after every class or file change.
+
+- Every new risk-bearing mechanism — including schema/state-machine changes, CAS or optimistic locking, tenant-isolation logic, authorization boundaries, NOT NULL/backfill cutovers, pricing, stock, orders, payments, connector mutation, and other data-integrity-sensitive behavior — must receive focused/regression coverage at implementation time before work moves past that mechanism.
+- A failing focused/regression test is fixed immediately. It must never be deferred merely because a later broad run is planned.
+- Any invariant that depends on MySQL-specific behavior — including locking, FK/constraint enforcement, generated columns, collation/index semantics, cascade/restrict behavior, or migration shape — must be exercised on MySQL, not only SQLite.
+- The full local suite is **not required after every class or narrowly scoped code change**. For a logically cohesive vertical slice, use focused/regression tests while implementing each risk-bearing mechanism, then run the appropriate broad/full local gate once the slice is integrated.
+- A full local gate is mandatory before a vertical slice / implementation PR is declared complete. The final gate includes the applicable full test suite, `vendor/bin/pint --test`, and `git diff --check`. If the slice has wide blast radius or an intermediate change touches shared migrations, workspace scoping, authorization, common traits, or another cross-cutting seam, additional broad runs during implementation are required when they materially reduce debugging risk.
+- A vertical slice must remain logically cohesive. Do not batch unrelated mechanisms merely to reduce test runs; a late broad failure must still have a small enough suspect set to diagnose efficiently.
+- Local cadence is a productivity optimization only; it is never a substitute for CI. `.github/workflows/mysql-tests.yml` runs targeted MySQL gates, the full test suite on MySQL 8.0, Pint, and `git diff --check` for every pull request targeting `develop`.
+- A PR must not be merged into `develop` until its required CI checks are green. Repository branch-protection / ruleset enforcement should require those checks where GitHub repository settings permit it; if enforcement is not verified, the green-CI-before-merge rule remains a mandatory project process rule.
 
 ---
 

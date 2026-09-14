@@ -8,6 +8,7 @@ final readonly class AdobeProductObservedState
      * @param  array<string, mixed>  $customAttributes
      */
     public function __construct(
+        public int $entityId,
         public string $sku,
         public string $name,
         public int $attributeSetId,

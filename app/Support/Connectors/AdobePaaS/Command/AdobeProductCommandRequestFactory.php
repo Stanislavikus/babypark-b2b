@@ -6,6 +6,7 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSBaseUrl;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 use App\Support\Connectors\AdobePaaS\Exceptions\InvalidAdobePaaSRequestContextException;
 use App\Support\Connectors\AdobePaaS\Media\AdobeProductMediaDesiredEntry;
+use App\Support\Connectors\AdobePaaS\Media\AdobeProductMediaRole;
 use App\Support\Connectors\AdobePaaS\Media\AdobeProductRemoteMediaMetadataEntry;
 use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
 use App\Support\Connectors\OAuth1\OAuth1SigningContext;
@@ -213,7 +214,7 @@ final class AdobeProductCommandRequestFactory
             'POST',
             $context,
             '/V1/products/'.rawurlencode($sku).'/media',
-            $this->encodeMediaEntryPayload(null, $desired, includeContent: true),
+            $this->encodeMediaEntryPayload(null, $desired, includeContent: true, storeCode: $context->storeCode),
             $signingContext,
         );
     }
@@ -230,7 +231,7 @@ final class AdobeProductCommandRequestFactory
             'PUT',
             $context,
             '/V1/products/'.rawurlencode($sku).'/media/'.$entryId,
-            $this->encodeMediaEntryPayload($entryId, $desired, includeContent: false, remoteMetadata: $remoteMetadata),
+            $this->encodeMediaEntryPayload($entryId, $desired, includeContent: false, remoteMetadata: $remoteMetadata, storeCode: $context->storeCode),
             $signingContext,
         );
     }
@@ -240,13 +241,27 @@ final class AdobeProductCommandRequestFactory
         AdobeProductMediaDesiredEntry $desired,
         bool $includeContent,
         ?AdobeProductRemoteMediaMetadataEntry $remoteMetadata = null,
+        string $storeCode = 'default',
     ): string {
+        $types = $desired->magentoTypes();
+
+        if (! $includeContent && $remoteMetadata !== null) {
+            foreach ($remoteMetadata->types as $remoteType) {
+                if (! in_array($remoteType, AdobeProductMediaRole::controlledMagentoTypes(), true)) {
+                    $types[] = $remoteType;
+                }
+            }
+        }
+
+        $types = array_values(array_unique($types));
+        sort($types);
+
         $entry = [
             'id' => $entryId,
             'media_type' => 'image',
-            'label' => $desired->label,
+            'label' => $this->mediaLabelForRequest($desired->label, $storeCode),
             'position' => $desired->position,
-            'types' => $desired->magentoTypes(),
+            'types' => $types,
             'disabled' => false,
         ];
 
@@ -261,6 +276,15 @@ final class AdobeProductCommandRequestFactory
         }
 
         return json_encode(['entry' => $entry], JSON_THROW_ON_ERROR);
+    }
+
+    private function mediaLabelForRequest(?string $label, string $storeCode): ?string
+    {
+        if ($label === null && $storeCode === 'default') {
+            return '';
+        }
+
+        return $label;
     }
 
     private function buildSignedRequest(

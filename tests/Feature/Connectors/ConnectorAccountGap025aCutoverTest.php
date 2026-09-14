@@ -260,6 +260,46 @@ class ConnectorAccountGap025aCutoverTest extends TestCase
     /**
      * @param  array<string, mixed>  $overrides
      */
+    #[Test]
+    public function snapshot_no_change_requires_matching_hash_version_and_hash(): void
+    {
+        $account = $this->createConnectorAccount();
+        $hash = hash('sha256', 'same-bytes-different-contract');
+
+        $v1Run = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded);
+        $v1 = $this->createSnapshotForRun($v1Run, [
+            'canonical_hash' => $hash,
+            'canonical_hash_version' => 'v1',
+        ]);
+        $v1Run->update(['snapshot_id' => $v1->id]);
+
+        $v2Run = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded);
+        $v2 = $this->createSnapshotForRun($v2Run, [
+            'previous_snapshot_id' => $v1->id,
+            'canonical_hash' => $hash,
+            'canonical_hash_version' => 'v2',
+        ]);
+        $v2Run->update([
+            'snapshot_id' => $v2->id,
+            'previous_snapshot_id' => $v1->id,
+        ]);
+
+        $state = app(ConnectorAccountUiState::class);
+        $this->assertNull($state->snapshotStateLabel($v2->fresh()));
+
+        $nextRun = $this->createDiscoveryRun($account, ConnectorDiscoveryRunStatus::Succeeded);
+        $next = $this->createSnapshotForRun($nextRun, [
+            'previous_snapshot_id' => $v2->id,
+            'canonical_hash' => $hash,
+            'canonical_hash_version' => 'v2',
+        ]);
+
+        $this->assertSame(
+            __('connectors.ui.snapshot.no_change'),
+            $state->snapshotStateLabel($next->fresh()),
+        );
+    }
+
     private function createDiscoveryRun(
         ConnectorAccount $account,
         ConnectorDiscoveryRunStatus $status,

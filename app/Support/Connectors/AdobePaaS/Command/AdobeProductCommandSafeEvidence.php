@@ -15,6 +15,7 @@ final readonly class AdobeProductCommandSafeEvidence
         public int $reconciliationGetAttempts = 0,
         public bool $externalRecordLinkPersisted = false,
         public bool $ownershipTrustSatisfied = false,
+        public ?AdobeProductWriteAccessClassification $writeAccessClassification = null,
         public array $warningCodes = [],
     ) {}
 }

@@ -12,5 +12,6 @@ class WorkspacePermissionSeeder extends Seeder
     {
         Permission::findOrCreate(WorkspacePermissions::MANAGE_TAX_SETTINGS, 'web');
         Permission::findOrCreate(WorkspacePermissions::MANAGE_CONNECTOR_ACCOUNTS, 'web');
+        Permission::findOrCreate(WorkspacePermissions::MANAGE_PRODUCT_STRUCTURE, 'web');
     }
 }

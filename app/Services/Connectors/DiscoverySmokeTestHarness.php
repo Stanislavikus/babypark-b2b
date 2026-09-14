@@ -47,6 +47,7 @@ final class DiscoverySmokeTestHarness
     public function __construct(
         private readonly ConnectorProfileRegistry $profileRegistry,
         private readonly ConnectorAccountPersistencePort $settingsService,
+        private readonly AdobePaaSCredentialRotationService $credentialRotationService,
         private readonly ConnectorDiscoveryDispatchPort $dispatchService,
         private readonly WorkspaceAuthorization $workspaceAuthorization,
         private readonly ConnectorSchemaSourceEndpointPathValidator $endpointPathValidator,
@@ -374,16 +375,11 @@ final class DiscoverySmokeTestHarness
 
         $credentials = $prefilledCredentials ?? $prompts->askOAuth1Credentials();
 
-        $this->settingsService->update(
+        $this->credentialRotationService->replace(
             $actor,
             $workspace,
             $existingAccount->id,
-            UpdateConnectorAccountInput::adobePaas(
-                $validated->baseUrl,
-                $validated->storeCode,
-                $validated->tenantContext,
-                CredentialMutation::replace($credentials),
-            ),
+            $credentials,
         );
 
         $existingAccount->refresh();
@@ -543,6 +539,24 @@ final class DiscoverySmokeTestHarness
             );
         }
 
+        $isV2 = $run->fields_identified !== null || $run->fields_unclassified !== null;
+        if ($isV2 && (
+            $run->fields_identified === null
+            || $run->fields_unclassified === null
+            || $run->fields_received < $run->fields_identified
+            || $run->fields_identified !== $run->fields_normalized + $run->fields_unclassified
+        )) {
+            throw new DiscoverySmokeTestAbortedException(
+                sprintf(
+                    'V2 success invariant failed: received=%s, identified=%s, normalized=%s, unclassified=%s.',
+                    (string) $run->fields_received,
+                    (string) $run->fields_identified,
+                    (string) $run->fields_normalized,
+                    (string) $run->fields_unclassified,
+                ),
+            );
+        }
+
         $snapshot = ConnectorSchemaSnapshot::withoutWorkspaceScope()->findOrFail($run->snapshot_id);
 
         if ($snapshot->id !== $run->snapshot_id) {
@@ -569,26 +583,34 @@ final class DiscoverySmokeTestHarness
             throw new DiscoverySmokeTestAbortedException('Snapshot canonical_hash is empty.');
         }
 
-        if ($snapshot->field_count !== $run->fields_normalized) {
-            throw new DiscoverySmokeTestAbortedException(
-                sprintf(
+        $expectedPersistedFieldCount = $isV2 ? $run->fields_identified : $run->fields_normalized;
+
+        if ($snapshot->field_count !== $expectedPersistedFieldCount) {
+            $message = $isV2
+                ? sprintf(
+                    'Snapshot field_count (%d) does not match fields_identified (%d).',
+                    $snapshot->field_count,
+                    $expectedPersistedFieldCount,
+                )
+                : sprintf(
                     'Snapshot field_count (%d) does not match fields_normalized (%d).',
                     $snapshot->field_count,
-                    $run->fields_normalized,
-                ),
-            );
+                    $expectedPersistedFieldCount,
+                );
+
+            throw new DiscoverySmokeTestAbortedException($message);
         }
 
         $fieldCount = ConnectorSchemaSnapshotField::withoutWorkspaceScope()
             ->where('snapshot_id', $snapshot->id)
             ->count();
 
-        if ($fieldCount !== $run->fields_normalized) {
+        if ($fieldCount !== $expectedPersistedFieldCount) {
             throw new DiscoverySmokeTestAbortedException(
                 sprintf(
-                    'Persisted snapshot-field row count (%d) does not match fields_normalized (%d).',
+                    'Persisted snapshot-field row count (%d) does not match expected persisted field count (%d).',
                     $fieldCount,
-                    $run->fields_normalized,
+                    $expectedPersistedFieldCount,
                 ),
             );
         }

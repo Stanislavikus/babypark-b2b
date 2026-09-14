@@ -76,6 +76,86 @@ final class FieldOptionMappingMutationService
         );
     }
 
+    /**
+     * Replace the complete option correspondence set from an already reconciled authoritative provider projection.
+     *
+     * This deliberately skips connector remote re-validation because the caller supplies values from the
+     * persisted provider option-lineage projection. Ownership, Products configuration and internal option
+     * catalogue validation still run under the normal SyncConfiguration mutation lock.
+     *
+     * @param  list<array{internal_option_key: string, external_option_value: string}>  $pairs
+     */
+    public function replaceAuthoritativeSet(
+        ConnectorAccount $account,
+        string $syncConfigurationId,
+        string $fieldMappingId,
+        array $pairs,
+    ): SyncConfiguration {
+        $configuration = $this->resolveConfiguration($account, $syncConfigurationId);
+        $mapping = $this->bindingValidator->assertOwnedMapping($configuration, $fieldMappingId);
+        $this->bindingValidator->assertProductsConfiguration($configuration);
+
+        $normalized = [];
+        foreach ($pairs as $pair) {
+            $internalOptionKey = $pair['internal_option_key'] ?? null;
+            $externalOptionValue = $pair['external_option_value'] ?? null;
+
+            if (! is_string($internalOptionKey) || $internalOptionKey === ''
+                || ! is_string($externalOptionValue) || $externalOptionValue === '') {
+                throw new \InvalidArgumentException('Authoritative option mapping pairs require non-empty string keys and values.');
+            }
+
+            if (isset($normalized[$internalOptionKey]) && $normalized[$internalOptionKey] !== $externalOptionValue) {
+                throw FieldOptionMappingConflictException::internalOptionAlreadyMapped($internalOptionKey);
+            }
+
+            $this->internalOptionValidator->validate($mapping, $internalOptionKey);
+            $normalized[$internalOptionKey] = $externalOptionValue;
+        }
+
+        ksort($normalized, SORT_STRING);
+
+        return $this->mutationCoordinator->mutateLocked(
+            $account,
+            $syncConfigurationId,
+            function (SyncConfiguration $lockedConfiguration) use ($fieldMappingId, $normalized): void {
+                $ownedMapping = $this->bindingValidator->assertOwnedMapping($lockedConfiguration, $fieldMappingId);
+                $this->bindingValidator->assertProductsConfiguration($lockedConfiguration);
+
+                $existing = FieldOptionMapping::withoutWorkspaceScope()
+                    ->where('field_mapping_id', $ownedMapping->id)
+                    ->get()
+                    ->keyBy('internal_option_key');
+
+                foreach ($normalized as $internalOptionKey => $externalOptionValue) {
+                    $this->internalOptionValidator->validate($ownedMapping, $internalOptionKey);
+                    $row = $existing->get($internalOptionKey);
+
+                    if ($row !== null) {
+                        if ((string) $row->external_option_value !== $externalOptionValue) {
+                            $row->external_option_value = $externalOptionValue;
+                            $row->save();
+                        }
+                        $existing->forget($internalOptionKey);
+
+                        continue;
+                    }
+
+                    $this->createMapping(
+                        $lockedConfiguration,
+                        $ownedMapping,
+                        $internalOptionKey,
+                        $externalOptionValue,
+                    );
+                }
+
+                foreach ($existing as $stale) {
+                    $stale->delete();
+                }
+            },
+        );
+    }
+
     public function replace(
         ConnectorAccount $account,
         string $syncConfigurationId,

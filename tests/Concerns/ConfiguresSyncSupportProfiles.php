@@ -58,6 +58,36 @@ trait ConfiguresSyncSupportProfiles
     }
 
     /**
+     * Keep the real Adobe OAuth1 profile identity/request context while making
+     * operation support injectable for internal runtime certification tests.
+     *
+     * @param  list<array{0: SyncDataDomain, 1: SyncSemanticOperation, 2?: SyncRunMode}>  $supportedTriples
+     */
+    protected function configureAdobePaaSSyncSupportProfile(array $supportedTriples = []): void
+    {
+        $normalizedTriples = array_map(
+            static fn (array $entry): array => count($entry) === 2
+                ? [$entry[0], $entry[1], SyncRunMode::Preview]
+                : $entry,
+            $supportedTriples,
+        );
+
+        $container = app(Container::class);
+        $profiles = config('connectors.profiles', []);
+        $profileCode = 'adobe_commerce_paas_oauth1_integration';
+        $profiles[$profileCode]['adapter'] = TestSyncSupportConnectorAdapter::class;
+
+        $container->instance(ConnectorProfileRegistry::class, new ConnectorProfileRegistry(
+            $container,
+            $profiles,
+        ));
+        $container->bind(
+            TestSyncSupportConnectorAdapter::class,
+            fn (): TestSyncSupportConnectorAdapter => new TestSyncSupportConnectorAdapter($normalizedTriples),
+        );
+    }
+
+    /**
      * Adobe Products Export profile identity with injectable mode-aware support truth.
      *
      * @param  list<array{0: SyncDataDomain, 1: SyncSemanticOperation, 2?: SyncRunMode}>  $supportedTriples

@@ -61,6 +61,23 @@ class AdobePaaSAccountSchemaTest extends TestCase
     }
 
     #[Test]
+    public function rejects_reserved_all_store_scope_case_insensitively(): void
+    {
+        foreach (['all', 'ALL', 'All'] as $storeCode) {
+            try {
+                $this->schema->validate(
+                    new AdobePaaSSettingsInput('https://shop.example.com', $storeCode, null),
+                    CredentialMutation::keep(),
+                    ConnectorAccountMutationMode::Update,
+                );
+                $this->fail("Reserved store scope [{$storeCode}] should be rejected.");
+            } catch (ConnectorAccountSettingsValidationException $exception) {
+                $this->assertStringContainsString('[all] is reserved', $exception->getMessage());
+            }
+        }
+    }
+
+    #[Test]
     public function accepts_store_code_with_allowed_character_set(): void
     {
         $state = $this->schema->validate(

@@ -113,6 +113,16 @@ final class EntityTrustAdobeTransportResponder
             ], JSON_THROW_ON_ERROR));
         }
 
+        if ($method === 'GET' && str_contains($uri, '/V1/products?')) {
+            $items = array_values($this->products);
+
+            return new ConnectorHttpResult(200, [], json_encode([
+                'items' => array_slice($items, 0, 1),
+                'search_criteria' => new \stdClass,
+                'total_count' => count($items),
+            ], JSON_THROW_ON_ERROR));
+        }
+
         if ($method === 'GET' && str_contains($uri, '/V1/configurable-products/') && str_contains($uri, '/children')) {
             $parentSku = $this->skuFromConfigurableChildrenUri($uri);
 

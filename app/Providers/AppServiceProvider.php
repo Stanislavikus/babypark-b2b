@@ -17,8 +17,8 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersi
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkPersister;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductOwnershipTrustPolicy;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandExecutor;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductStockSimpleWriteExecutor;
 use App\Support\Connectors\AdobePaaS\Command\ConservativeAdobeProductOwnershipTrustPolicy;
-use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncClient;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncHandshakeProbe;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncHandshakeProbeCapability;
 use App\Support\Connectors\ConnectorProfileRegistry;
@@ -67,7 +67,7 @@ class AppServiceProvider extends ServiceProvider
             fn ($app): AdobeProductSimpleCommandExecutor => new AdobeProductSimpleCommandExecutor(
                 $app->make(AdobeProductDesiredStateCompiler::class),
                 $app->make(AdobeProductExternalRecordLinkGuard::class),
-                $app->make(AdobeSafeSyncClient::class),
+                $app->make(AdobeProductStockSimpleWriteExecutor::class),
             ),
         );
 

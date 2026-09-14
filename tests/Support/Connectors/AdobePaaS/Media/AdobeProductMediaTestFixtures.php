@@ -62,7 +62,7 @@ final class AdobeProductMediaTestFixtures
     public static function remoteMediaMetadataEntry(
         int $id,
         string $file,
-        string $label,
+        ?string $label,
         int $position,
         array $types = [],
         bool $disabled = false,

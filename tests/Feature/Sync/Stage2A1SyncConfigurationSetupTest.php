@@ -108,9 +108,9 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
     }
 
     #[Test]
-    public function permission_catalogue_contains_exactly_ten_permissions_with_manage_sync_configurations(): void
+    public function permission_catalogue_contains_all_permissions_with_manage_sync_configurations(): void
     {
-        $this->assertCount(10, WorkspacePermissions::catalogue());
+        $this->assertCount(11, WorkspacePermissions::catalogue());
         $this->assertContains(WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS, WorkspacePermissions::catalogue());
     }
 
@@ -120,7 +120,7 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
         $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->seed(WorkspaceRbacPermissionSeeder::class);
 
-        $this->assertSame(10, WorkspacePermission::query()->count());
+        $this->assertSame(11, WorkspacePermission::query()->count());
         $this->assertSame(
             1,
             WorkspacePermission::query()

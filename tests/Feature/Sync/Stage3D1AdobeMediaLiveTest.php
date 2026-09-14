@@ -639,6 +639,22 @@ class Stage3D1AdobeMediaLiveTest extends TestCase
     }
 
     #[Test]
+    public function metadata_reader_accepts_real_target_null_label(): void
+    {
+        $filename = AdobeProductMediaTestFixtures::filenameForBytes(AdobeProductMediaTestFixtures::jpegBytes(), 'jpg');
+        $index = (new AdobeProductRemoteMediaMetadataReader)->read(
+            AdobeProductMediaTestFixtures::remoteProductPayloadWithGallery('SKU', [
+                AdobeProductMediaTestFixtures::remoteMediaMetadataEntry(1, '/'.$filename, null, 1, ['image', 'small_image', 'thumbnail', 'swatch_image']),
+            ]),
+        );
+
+        $this->assertTrue($index->isTrusted());
+        $this->assertCount(1, $index->entries);
+        $this->assertNull($index->entries[0]->label);
+        $this->assertSame(['image', 'small_image', 'swatch_image', 'thumbnail'], $index->entries[0]->types);
+    }
+
+    #[Test]
     public function metadata_reader_malformed_gallery_fails_closed(): void
     {
         $index = (new AdobeProductRemoteMediaMetadataReader)->read([
@@ -1057,6 +1073,45 @@ class Stage3D1AdobeMediaLiveTest extends TestCase
     }
 
     #[Test]
+    public function matching_primary_media_preserves_unmanaged_swatch_role_as_no_op(): void
+    {
+        $bytes = AdobeProductMediaTestFixtures::jpegBytes();
+        $filename = AdobeProductMediaTestFixtures::filenameForBytes($bytes, 'jpg');
+        $store = new InMemoryAdobeMediaStore;
+        $store->addEntry(
+            $bytes,
+            $filename,
+            entryId: 43,
+            label: 'Product Label',
+            position: 1,
+            types: ['image', 'small_image', 'thumbnail', 'swatch_image'],
+        );
+
+        [$executor, $adobeTransport] = $this->mediaLiveExecutorStack(
+            adobeResponder: $this->mediaStoreResponder('SWATCH-NOOP-SKU', $store),
+            sourceResponder: fn (): ConnectorHttpResult => new ConnectorHttpResult(
+                200,
+                ['Content-Type' => ['image/jpeg']],
+                $bytes,
+            ),
+        );
+
+        $result = $this->executeMediaAfterSynchronizedCore(
+            $executor,
+            $this->aggregateWithImages(['https://source.test/swatch-noop.jpg']),
+            'SWATCH-NOOP-SKU',
+            label: 'Product Label',
+        );
+
+        $this->assertSame(SyncLiveOutcome::Synchronized, $result->outcome);
+        $this->assertSame('content_and_metadata_match_no_op', $this->mediaEvidenceForIndex($result, 0)['reason_code']);
+        $this->assertFalse(collect($adobeTransport->recordedRequests)->contains(
+            fn (ConnectorOutboundRequest $request): bool => $request->request->getMethod() === 'PUT'
+                && str_contains((string) $request->request->getUri(), '/media'),
+        ));
+    }
+
+    #[Test]
     public function same_filename_different_content_is_ambiguous(): void
     {
         $remoteBytes = AdobeProductMediaTestFixtures::pngBytes();
@@ -1186,6 +1241,51 @@ class Stage3D1AdobeMediaLiveTest extends TestCase
             'media_put_reconciled',
             $this->mediaEvidenceForIndex($result, 0)['reason_code'],
         );
+    }
+
+    #[Test]
+    public function metadata_put_preserves_unmanaged_swatch_role(): void
+    {
+        $bytes = AdobeProductMediaTestFixtures::jpegBytes();
+        $filename = AdobeProductMediaTestFixtures::filenameForBytes($bytes, 'jpg');
+        $store = new InMemoryAdobeMediaStore;
+        $store->addEntry(
+            $bytes,
+            $filename,
+            entryId: 89,
+            label: 'Old Label',
+            position: 1,
+            types: ['image', 'small_image', 'thumbnail', 'swatch_image'],
+        );
+
+        [$executor, $adobeTransport] = $this->mediaLiveExecutorStack(
+            adobeResponder: $this->mediaStoreResponder('SWATCH-PUT-SKU', $store),
+            sourceResponder: fn (): ConnectorHttpResult => new ConnectorHttpResult(
+                200,
+                ['Content-Type' => ['image/jpeg']],
+                $bytes,
+            ),
+        );
+
+        $result = $this->executeMediaAfterSynchronizedCore(
+            $executor,
+            $this->aggregateWithImages(['https://source.test/swatch-put.jpg']),
+            'SWATCH-PUT-SKU',
+            label: 'New Label',
+        );
+
+        $puts = collect($adobeTransport->recordedRequests)->filter(
+            fn (ConnectorOutboundRequest $request): bool => $request->request->getMethod() === 'PUT'
+                && str_contains((string) $request->request->getUri(), '/media'),
+        );
+        $this->assertSame(1, $puts->count());
+        $putBody = json_decode((string) $puts->first()->request->getBody(), true);
+        $this->assertSame(
+            ['image', 'small_image', 'swatch_image', 'thumbnail'],
+            $putBody['entry']['types'] ?? null,
+        );
+        $this->assertSame(SyncLiveOutcome::Synchronized, $result->outcome);
+        $this->assertSame('media_put_reconciled', $this->mediaEvidenceForIndex($result, 0)['reason_code']);
     }
 
     #[Test]

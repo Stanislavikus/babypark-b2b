@@ -19,6 +19,7 @@ use App\Models\SyncRun;
 use App\Models\SyncRunItem;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\ProductStructure\ProductStructureIdentity;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
 use App\Services\Sync\SyncPreviewAdmissionService;
@@ -415,6 +416,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
 
         $foreignProductId = DB::table('products')->insertGetId([
             'workspace_id' => $workspaceB->id,
+            'product_type_id' => ProductStructureIdentity::basicProductTypeId((string) $workspaceB->id),
             'onec_guid' => (string) Str::uuid(),
             'sku' => 'FOREIGN-'.Str::random(6),
             'name' => 'Foreign product',
@@ -526,9 +528,9 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function workspace_permission_catalogue_contains_tenth_permission_including_run_sync_live(): void
+    public function workspace_permission_catalogue_contains_run_sync_live(): void
     {
-        $this->assertCount(10, WorkspacePermissions::catalogue());
+        $this->assertCount(11, WorkspacePermissions::catalogue());
         $this->assertContains(WorkspacePermissions::RUN_SYNC_PREVIEW, WorkspacePermissions::catalogue());
         $this->assertContains(WorkspacePermissions::RUN_SYNC_LIVE, WorkspacePermissions::catalogue());
     }

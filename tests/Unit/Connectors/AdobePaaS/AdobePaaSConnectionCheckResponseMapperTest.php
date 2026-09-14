@@ -88,8 +88,8 @@ class AdobePaaSConnectionCheckResponseMapperTest extends TestCase
      */
     public static function b7AndFallbackStatusProvider(): iterable
     {
-        yield 'unknown 401' => [401, ConnectorConnectionCheckErrorCode::AdobeInvalidCredentials, 'connectors.errors.invalid_credentials'];
-        yield 'unknown 403' => [403, ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions, 'connectors.errors.insufficient_permissions'];
+        yield 'ambiguous 401' => [401, ConnectorConnectionCheckErrorCode::AdobeAccessRejectedUndetermined, 'connectors.errors.connection_access_unconfirmed'];
+        yield 'ambiguous 403' => [403, ConnectorConnectionCheckErrorCode::AdobeAccessRejectedUndetermined, 'connectors.errors.connection_access_unconfirmed'];
         yield '404' => [404, ConnectorConnectionCheckErrorCode::AdobeInvalidOrUnsupportedEndpoint, 'connectors.errors.invalid_or_unsupported_endpoint'];
         yield '408' => [408, ConnectorConnectionCheckErrorCode::AdobeRequestTimeout, 'connectors.errors.timeout'];
         yield '429' => [429, ConnectorConnectionCheckErrorCode::AdobeRateLimited, 'connectors.errors.rate_limited'];
@@ -122,14 +122,51 @@ class AdobePaaSConnectionCheckResponseMapperTest extends TestCase
         yield 'signature sentence at 401' => [
             'oauth_problem=The+signature+is+invalid.+Verify+and+try+again.',
             401,
-            ConnectorConnectionCheckErrorCode::AdobeInvalidCredentials,
+            ConnectorConnectionCheckErrorCode::AdobeAccessRejectedUndetermined,
         ];
 
         yield 'consumer key expired sentence at 401' => [
             'oauth_problem=Consumer+key+has+expired',
             401,
-            ConnectorConnectionCheckErrorCode::AdobeInvalidCredentials,
+            ConnectorConnectionCheckErrorCode::AdobeAccessRejectedUndetermined,
         ];
+    }
+
+    #[Test]
+    #[DataProvider('structuredResourceDenialProvider')]
+    public function structured_resource_denial_is_classified_as_permission_failure(int $status): void
+    {
+        $body = json_encode([
+            'message' => 'localized-or-vendor-controlled-copy-is-not-semantic-authority',
+            'parameters' => ['resources' => 'Magento_Catalog::products'],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $this->mapper->map(new ConnectorHttpResult($status, [], $body));
+
+        $this->assertSame(ConnectorConnectionCheckErrorCode::AdobeInsufficientPermissions, $result->errorCode);
+        $this->assertSame(ConnectorErrorCause::Authorization, $result->cause());
+        $this->assertSame('connectors.errors.insufficient_permissions', $result->messageKey());
+    }
+
+    /** @return iterable<string, array{0: int}> */
+    public static function structuredResourceDenialProvider(): iterable
+    {
+        yield '401 authorization denial' => [401];
+        yield '403 authorization denial' => [403];
+    }
+
+    #[Test]
+    public function free_form_permission_message_without_structured_resource_evidence_stays_ambiguous(): void
+    {
+        $body = json_encode([
+            'message' => "The consumer isn't authorized to access Magento_Catalog::products",
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $this->mapper->map(new ConnectorHttpResult(401, [], $body));
+
+        $this->assertSame(ConnectorConnectionCheckErrorCode::AdobeAccessRejectedUndetermined, $result->errorCode);
+        $this->assertSame(ConnectorErrorCause::Unknown, $result->cause());
+        $this->assertSame('connectors.errors.connection_access_unconfirmed', $result->messageKey());
     }
 
     #[Test]

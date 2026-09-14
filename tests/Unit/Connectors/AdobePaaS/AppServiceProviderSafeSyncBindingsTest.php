@@ -8,7 +8,7 @@ use PHPUnit\Framework\TestCase;
 class AppServiceProviderSafeSyncBindingsTest extends TestCase
 {
     #[Test]
-    public function app_service_provider_preserves_readiness_handshake_binding_when_adding_simple_executor_binding(): void
+    public function app_service_provider_preserves_optional_safe_sync_probe_and_binds_standard_simple_executor_to_stock_writer(): void
     {
         $providerSource = file_get_contents(__DIR__.'/../../../../app/Providers/AppServiceProvider.php');
         $executorSource = file_get_contents(
@@ -30,13 +30,13 @@ class AppServiceProviderSafeSyncBindingsTest extends TestCase
             $providerSource,
         );
         $this->assertStringContainsString(
-            '$app->make(AdobeSafeSyncClient::class),',
+            '$app->make(AdobeProductStockSimpleWriteExecutor::class),',
             $providerSource,
         );
         $this->assertStringContainsString(
-            'private readonly AdobeSafeSyncClient $safeSyncClient,',
+            'private readonly AdobeProductStockSimpleWriteExecutor $stockWriteExecutor,',
             $executorSource,
         );
-        $this->assertStringNotContainsString('?AdobeSafeSyncClient', $executorSource);
+        $this->assertStringNotContainsString('AdobeSafeSyncClient', $executorSource);
     }
 }

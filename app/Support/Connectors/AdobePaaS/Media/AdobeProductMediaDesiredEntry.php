@@ -7,7 +7,7 @@ final readonly class AdobeProductMediaDesiredEntry
     public function __construct(
         public int $declarationIndex,
         public AdobeProductMediaRole $role,
-        public string $label,
+        public ?string $label,
         public int $position,
         public string $contentSha256,
         public string $mimeType,

@@ -6,6 +6,7 @@ final readonly class AdobeProductDesiredState
 {
     /**
      * @param  array<string, mixed>  $customAttributes
+     * @param  list<string>  $clearedCustomAttributeKeys
      */
     public function __construct(
         public string $productVariantId,
@@ -18,5 +19,6 @@ final readonly class AdobeProductDesiredState
         public float $price,
         public string $priceCurrency,
         public array $customAttributes,
+        public array $clearedCustomAttributeKeys = [],
     ) {}
 }

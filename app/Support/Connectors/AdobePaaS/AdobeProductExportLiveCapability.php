@@ -405,6 +405,10 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
             $context['remote_get_classification'] = $evidence->remoteGetClassification->value;
         }
 
+        if ($evidence->writeAccessClassification !== null) {
+            $context['write_access_classification'] = $evidence->writeAccessClassification->value;
+        }
+
         if ($evidence->warningCodes !== []) {
             $context['warning_codes'] = $evidence->warningCodes;
         }

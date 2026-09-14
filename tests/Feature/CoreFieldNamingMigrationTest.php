@@ -11,6 +11,7 @@ use App\Models\Category;
 use App\Models\FieldBinding;
 use App\Models\FieldDefinition;
 use App\Models\Product;
+use App\Services\ProductStructure\ProductStructureIdentity;
 use App\Support\Migrations\FieldFoundationCustomerSeed;
 use App\Support\Workspace\WorkspaceContext;
 use Database\Seeders\FieldDefinitionSeeder;
@@ -105,6 +106,7 @@ class CoreFieldNamingMigrationTest extends TestCase
 
         $productId = DB::table('products')->insertGetId([
             'workspace_id' => app(WorkspaceContext::class)->id(),
+            'product_type_id' => ProductStructureIdentity::basicProductTypeId((string) app(WorkspaceContext::class)->id()),
             'onec_guid' => (string) Str::uuid(),
             'sku' => 'TEST-001',
             'name' => 'Test Product',
@@ -215,6 +217,7 @@ class CoreFieldNamingMigrationTest extends TestCase
 
         DB::table('products')->insert([
             'workspace_id' => app(WorkspaceContext::class)->id(),
+            'product_type_id' => ProductStructureIdentity::basicProductTypeId((string) app(WorkspaceContext::class)->id()),
             'onec_guid' => (string) Str::uuid(),
             'sku' => 'ROLLBACK-001',
             'name' => 'Rollback Product',
