@@ -13,6 +13,7 @@ use App\Filament\Resources\ProductTypeResource\RelationManagers\FieldPlacementsR
 use App\Filament\Resources\ProductTypeResource\RelationManagers\GroupPlacementsRelationManager;
 use App\Models\AttributeGroup;
 use App\Models\Product;
+use App\Models\ProductActiveOptionalGroup;
 use App\Models\ProductType;
 use App\Models\User;
 use App\Models\Workspace;
@@ -220,5 +221,76 @@ class ProductStructureFilamentUiTest extends TestCase
             'product_type_group_placement_id' => $placement->id,
             'is_active' => true,
         ]);
+    }
+
+    #[Test]
+    public function product_table_bulk_structure_actions_use_governed_services(): void
+    {
+        $first = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'onec_guid' => Str::uuid()->toString(),
+            'sku' => 'STRUCT-BULK-1',
+            'name' => 'Structure bulk 1',
+            'is_active' => true,
+        ]);
+        $second = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'onec_guid' => Str::uuid()->toString(),
+            'sku' => 'STRUCT-BULK-2',
+            'name' => 'Structure bulk 2',
+            'is_active' => true,
+        ]);
+        $structure = app(ProductStructureMutationService::class);
+        $custom = $structure->createProductType(
+            $this->manager,
+            $this->workspace,
+            'structure-bulk-custom',
+            ['uk' => 'Bulk type'],
+        );
+
+        Livewire::actingAs($this->manager)
+            ->test(ListProducts::class)
+            ->mountTableBulkAction('assign_product_type', [$first, $second])
+            ->setTableBulkActionData(['target_product_type_id' => $custom->id])
+            ->callMountedTableBulkAction()
+            ->assertNotified();
+
+        $this->assertSame($custom->id, $first->fresh()->product_type_id);
+        $this->assertSame($custom->id, $second->fresh()->product_type_id);
+
+        $group = $structure->createAttributeGroup(
+            $this->manager,
+            $this->workspace,
+            'bulk-extra-group',
+            ['uk' => 'Додаткова bulk'],
+        );
+        $freshType = $custom->fresh();
+        $placement = $structure->putGroupPlacement(
+            $this->manager,
+            $this->workspace,
+            $freshType,
+            $group,
+            100,
+            true,
+            false,
+            $freshType->structure_revision,
+        );
+
+        Livewire::actingAs($this->manager)
+            ->test(ListProducts::class)
+            ->mountTableBulkAction('set_optional_group_state', [$first->fresh(), $second->fresh()])
+            ->setTableBulkActionData([
+                'attribute_group_id' => $group->id,
+                'active' => 1,
+            ])
+            ->callMountedTableBulkAction()
+            ->assertNotified();
+
+        $this->assertSame(2, ProductActiveOptionalGroup::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->whereIn('product_id', [$first->id, $second->id])
+            ->where('product_type_group_placement_id', $placement->id)
+            ->where('is_active', true)
+            ->count());
     }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\AttributeStatus;
+use App\Enums\FieldObjectType;
 use App\Enums\TagBulkOperation;
 use App\Exceptions\Catalog\InvalidTagBulkSelectionException;
 use App\Filament\Concerns\HasProductLightbox;
@@ -11,9 +13,12 @@ use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Filament\Resources\ProductResource\Pages\ViewProduct;
 use App\Filament\Resources\ProductResource\Support\ProductStructureEditor;
 use App\Filament\Resources\ProductResource\Support\TagBulkUi;
+use App\Models\FieldBinding;
 use App\Models\Product;
 use App\Models\ProductType;
+use App\Models\ProductTypeFieldPlacement;
 use App\Models\ProductTypeGroupPlacement;
+use App\Models\ProductVariant;
 use App\Models\Tag;
 use App\Models\User;
 use App\Models\Workspace;
@@ -21,9 +26,12 @@ use App\Services\Catalog\TagManager;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Services\Pricing\ProductPricingSummary;
 use App\Services\ProductStructure\ProductCompletenessService;
+use App\Services\ProductStructure\ProductOptionalGroupBulkMutationService;
 use App\Services\ProductStructure\ProductOptionalGroupMutationService;
+use App\Services\ProductStructure\ProductTypeBulkMutationService;
 use App\Services\ProductStructure\ProductTypeChangeImpactService;
 use App\Services\ProductStructure\ProductTypeMutationService;
+use App\Services\ProductStructure\ProductVariantBulkValueMutationService;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\AdminAvailabilityPresenter;
 use App\Support\ProductFields\AdminProductMargin;
@@ -532,6 +540,7 @@ class ProductResource extends Resource
             ])
             ->recordActions([
                 self::makeEditStructureValuesAction(),
+                self::makeBulkVariantValueAction(),
                 self::makeChangeProductTypeAction(),
                 self::makeOptionalGroupsAction(),
                 ViewAction::make()
@@ -547,6 +556,8 @@ class ProductResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    self::makeProductTypeBulkAction(),
+                    self::makeOptionalGroupBulkAction(),
                     self::makeTagBulkAction(
                         operation: TagBulkOperation::Add,
                         name: 'add_tags',
@@ -616,6 +627,21 @@ class ProductResource extends Resource
             && app(WorkspaceAuthorization::class)->allows($actor, $workspace, WorkspacePermissions::MANAGE_PRODUCT_STRUCTURE);
     }
 
+    private static function canManageCurrentWorkspaceStructure(): bool
+    {
+        $actor = auth()->user();
+        if (! $actor instanceof User) {
+            return false;
+        }
+        $workspace = app(WorkspaceContext::class)->current();
+
+        return app(WorkspaceAuthorization::class)->allows(
+            $actor,
+            $workspace,
+            WorkspacePermissions::MANAGE_PRODUCT_STRUCTURE,
+        );
+    }
+
     public static function makeEditStructureValuesAction(): Action
     {
         return Action::make('edit_structure_values')
@@ -630,6 +656,99 @@ class ProductResource extends Resource
             ->action(function (array $data, Product $record): void {
                 app(ProductStructureEditor::class)->save($record, $data, 'uk');
                 Notification::make()->success()->title('Поля товару збережено')->send();
+            });
+    }
+
+    public static function makeBulkVariantValueAction(): Action
+    {
+        return Action::make('bulk_variant_value')
+            ->label('Одне значення для варіантів')
+            ->icon('heroicon-o-table-cells')
+            ->visible(fn (Product $record): bool => ProductVariant::withoutWorkspaceScope()
+                ->where('workspace_id', $record->workspace_id)
+                ->where('product_id', $record->id)
+                ->where('is_active', true)
+                ->exists()
+                && ProductTypeFieldPlacement::withoutWorkspaceScope()
+                    ->where('workspace_id', $record->workspace_id)
+                    ->where('product_type_id', $record->product_type_id)
+                    ->whereHas('fieldBinding', fn (Builder $query) => $query
+                        ->where('object_type', FieldObjectType::ProductVariant->value)
+                        ->where('status', AttributeStatus::Active->value))
+                    ->exists())
+            ->schema([
+                Select::make('field_binding_id')
+                    ->label('Поле варіанта')
+                    ->options(fn (?Product $record): array => ! $record instanceof Product ? [] : ProductTypeFieldPlacement::withoutWorkspaceScope()
+                        ->with([
+                            'fieldBinding' => fn ($query) => $query->withoutGlobalScopes(),
+                            'fieldBinding.fieldDefinition' => fn ($query) => $query->withoutGlobalScopes(),
+                        ])
+                        ->where('workspace_id', $record->workspace_id)
+                        ->where('product_type_id', $record->product_type_id)
+                        ->orderBy('sort_order')
+                        ->get()
+                        ->filter(fn ($placement): bool => $placement->fieldBinding?->object_type === FieldObjectType::ProductVariant
+                            && $placement->fieldBinding?->status === AttributeStatus::Active
+                            && $placement->fieldBinding?->fieldDefinition?->status === AttributeStatus::Active)
+                        ->mapWithKeys(fn ($placement): array => [
+                            $placement->field_binding_id => $placement->fieldBinding->fieldDefinition->localizedLabel('uk'),
+                        ])->all())
+                    ->required()
+                    ->searchable(),
+                Select::make('variant_ids')
+                    ->label('Варіанти')
+                    ->multiple()
+                    ->options(fn (?Product $record): array => ! $record instanceof Product ? [] : ProductVariant::withoutWorkspaceScope()
+                        ->where('workspace_id', $record->workspace_id)
+                        ->where('product_id', $record->id)
+                        ->where('is_active', true)
+                        ->orderBy('id')
+                        ->get()
+                        ->mapWithKeys(fn (ProductVariant $variant): array => [
+                            $variant->id => $variant->sku ?: 'Variant #'.$variant->id,
+                        ])->all())
+                    ->required()
+                    ->searchable(),
+                Select::make('operation')
+                    ->label('Операція')
+                    ->options(['set' => 'Встановити', 'clear' => 'Очистити'])
+                    ->default('set')
+                    ->required()
+                    ->live(),
+                TextInput::make('value')
+                    ->label('Значення / stable option code')
+                    ->helperText('Для MultiSelect введіть stable codes через кому. Для Boolean: true/false, 1/0, так/ні.')
+                    ->visible(fn (Get $get): bool => $get('operation') === 'set')
+                    ->required(fn (Get $get): bool => $get('operation') === 'set'),
+                TextInput::make('locale')
+                    ->label('Locale для локалізованого поля')
+                    ->default('uk')
+                    ->maxLength(16),
+            ])
+            ->action(function (array $data, Product $record): void {
+                $binding = FieldBinding::withoutWorkspaceScope()->with('fieldDefinition')->findOrFail((string) $data['field_binding_id']);
+                $definition = $binding->fieldDefinition;
+                abort_unless($definition !== null, 422);
+                $service = app(ProductVariantBulkValueMutationService::class);
+                $clear = ($data['operation'] ?? 'set') === 'clear';
+                $value = $clear ? null : $service->coerceTextInput($definition, (string) ($data['value'] ?? ''));
+                $result = $service->apply(
+                    $record,
+                    $binding,
+                    array_map('intval', $data['variant_ids'] ?? []),
+                    $value,
+                    $clear,
+                    filled($data['locale'] ?? null) ? (string) $data['locale'] : null,
+                );
+                $succeeded = count($result['succeeded_variant_ids']);
+                $failed = count($result['failed']);
+
+                Notification::make()
+                    ->title('Масове значення варіантів застосовано')
+                    ->body("Успішно: {$succeeded}. Помилки: {$failed}.")
+                    ->color($failed > 0 ? 'warning' : 'success')
+                    ->send();
             });
     }
 
@@ -730,6 +849,207 @@ class ProductResource extends Resource
     // -------------------------------------------------------------------------
     // Bulk tag actions
     // -------------------------------------------------------------------------
+
+    private static function makeProductTypeBulkAction(): BulkAction
+    {
+        return BulkAction::make('assign_product_type')
+            ->label('Призначити тип товару')
+            ->icon('heroicon-o-squares-2x2')
+            ->visible(fn (): bool => self::canManageCurrentWorkspaceStructure())
+            ->schema([
+                Select::make('target_product_type_id')
+                    ->label('Новий тип товару')
+                    ->options(fn (): array => ProductType::withoutWorkspaceScope()
+                        ->where('workspace_id', app(WorkspaceContext::class)->id())
+                        ->where('status', 'active')
+                        ->orderBy('is_default', 'desc')
+                        ->orderBy('code')
+                        ->get()
+                        ->mapWithKeys(fn (ProductType $type): array => [
+                            $type->id => (string) ($type->localized_labels['uk'] ?? $type->localized_labels['en'] ?? $type->code),
+                        ])->all())
+                    ->required()
+                    ->searchable()
+                    ->live(),
+                Placeholder::make('product_type_bulk_preview')
+                    ->label('Попередній перегляд впливу')
+                    ->content(function (Get $get, ListProducts $livewire): string {
+                        $targetId = $get('target_product_type_id');
+                        $productIds = array_map('intval', $livewire->getSelectedTableRecords()->modelKeys());
+                        if (! filled($targetId) || $productIds === []) {
+                            return 'Оберіть товари та цільовий тип.';
+                        }
+
+                        $workspaceId = app(WorkspaceContext::class)->id();
+                        $target = ProductType::withoutWorkspaceScope()
+                            ->where('workspace_id', $workspaceId)
+                            ->find($targetId);
+                        if (! $target instanceof ProductType) {
+                            return 'Цільовий тип недоступний.';
+                        }
+
+                        $reviewed = 0;
+                        $failed = 0;
+                        $outOfTypeProduct = 0;
+                        $outOfTypeVariant = 0;
+                        $newlyRequired = 0;
+                        $before = 0;
+                        $after = 0;
+
+                        foreach ($productIds as $productId) {
+                            try {
+                                $product = Product::withoutWorkspaceScope()
+                                    ->where('workspace_id', $workspaceId)
+                                    ->findOrFail($productId);
+                                $impact = app(ProductTypeChangeImpactService::class)->preview($product, $target);
+                                $reviewed++;
+                                $outOfTypeProduct += count($impact->outOfTypeProductBindingIds);
+                                $outOfTypeVariant += count($impact->outOfTypeVariantCells);
+                                $newlyRequired += count($impact->newlyRequiredBindingIds);
+                                $before += $impact->completenessBefore ?? 0;
+                                $after += $impact->completenessAfter ?? 0;
+                            } catch (\Throwable) {
+                                $failed++;
+                            }
+                        }
+
+                        $beforeAverage = $reviewed > 0 ? (int) round($before / $reviewed) : 0;
+                        $afterAverage = $reviewed > 0 ? (int) round($after / $reviewed) : 0;
+
+                        return "Перевірено: {$reviewed}; помилки preview: {$failed}. "
+                            ."Out-of-type Product values: {$outOfTypeProduct}; Variant cells: {$outOfTypeVariant}. "
+                            ."Нових required: {$newlyRequired}. Середня повнота: {$beforeAverage}% → {$afterAverage}%. "
+                            .'Значення не видаляються.';
+                    })
+                    ->visible(fn (Get $get): bool => filled($get('target_product_type_id'))),
+            ])
+            ->action(function (Collection $records, array $data, ListProducts $livewire): void {
+                $actor = auth()->user();
+                abort_unless($actor instanceof User, 403);
+                $workspace = app(WorkspaceContext::class)->current();
+                $target = ProductType::withoutWorkspaceScope()
+                    ->where('workspace_id', $workspace->id)
+                    ->findOrFail((string) $data['target_product_type_id']);
+                $productIds = array_map('intval', $livewire->getSelectedTableRecords()->modelKeys());
+                $impacts = [];
+                $previewFailures = 0;
+
+                foreach ($productIds as $productId) {
+                    try {
+                        $product = Product::withoutWorkspaceScope()
+                            ->where('workspace_id', $workspace->id)
+                            ->findOrFail($productId);
+                        $impacts[] = app(ProductTypeChangeImpactService::class)->preview($product, $target);
+                    } catch (\Throwable) {
+                        $previewFailures++;
+                    }
+                }
+
+                $result = app(ProductTypeBulkMutationService::class)->changeMany(
+                    $actor,
+                    $workspace,
+                    $target,
+                    $impacts,
+                );
+                $succeeded = count($result['succeeded_product_ids']);
+                $failed = $previewFailures + count($result['failed']);
+
+                Notification::make()
+                    ->title('Масове призначення типу завершено')
+                    ->body("Успішно: {$succeeded}. Помилки: {$failed}.")
+                    ->color($failed > 0 ? 'warning' : 'success')
+                    ->send();
+                $livewire->deselectAllTableRecords();
+            })
+            ->deselectRecordsAfterCompletion(false);
+    }
+
+    private static function makeOptionalGroupBulkAction(): BulkAction
+    {
+        return BulkAction::make('set_optional_group_state')
+            ->label('Змінити опційну групу')
+            ->icon('heroicon-o-adjustments-horizontal')
+            ->visible(fn (): bool => self::canManageCurrentWorkspaceStructure())
+            ->schema([
+                Select::make('attribute_group_id')
+                    ->label('Опційна група')
+                    ->options(fn (): array => ProductTypeGroupPlacement::withoutWorkspaceScope()
+                        ->with(['attributeGroup' => fn ($query) => $query->withoutGlobalScopes()])
+                        ->where('workspace_id', app(WorkspaceContext::class)->id())
+                        ->where('is_optional', true)
+                        ->orderBy('sort_order')
+                        ->get()
+                        ->unique('attribute_group_id')
+                        ->mapWithKeys(fn (ProductTypeGroupPlacement $placement): array => [
+                            $placement->attribute_group_id => (string) ($placement->attributeGroup?->localized_labels['uk']
+                                ?? $placement->attributeGroup?->localized_labels['en']
+                                ?? $placement->attributeGroup?->code
+                                ?? $placement->attribute_group_id),
+                        ])->all())
+                    ->required()
+                    ->searchable()
+                    ->live(),
+                Select::make('active')
+                    ->label('Стан')
+                    ->options([1 => 'Активувати', 0 => 'Деактивувати'])
+                    ->required(),
+                Placeholder::make('optional_group_bulk_preview')
+                    ->label('Попередній перегляд')
+                    ->content(function (Get $get, ListProducts $livewire): string {
+                        $groupId = $get('attribute_group_id');
+                        $productIds = array_map('intval', $livewire->getSelectedTableRecords()->modelKeys());
+                        if (! filled($groupId) || $productIds === []) {
+                            return 'Оберіть товари та опційну групу.';
+                        }
+
+                        $workspaceId = app(WorkspaceContext::class)->id();
+                        $eligible = 0;
+                        foreach ($productIds as $productId) {
+                            $product = Product::withoutWorkspaceScope()
+                                ->where('workspace_id', $workspaceId)
+                                ->find($productId);
+                            if (! $product instanceof Product) {
+                                continue;
+                            }
+                            if (ProductTypeGroupPlacement::withoutWorkspaceScope()
+                                ->where('workspace_id', $workspaceId)
+                                ->where('product_type_id', $product->product_type_id)
+                                ->where('attribute_group_id', $groupId)
+                                ->where('is_optional', true)
+                                ->exists()) {
+                                $eligible++;
+                            }
+                        }
+                        $ineligible = count($productIds) - $eligible;
+
+                        return "Буде змінено: {$eligible}. Не допускають цю групу: {$ineligible}; вони повернуться як partial failures.";
+                    })
+                    ->visible(fn (Get $get): bool => filled($get('attribute_group_id'))),
+            ])
+            ->action(function (Collection $records, array $data, ListProducts $livewire): void {
+                $actor = auth()->user();
+                abort_unless($actor instanceof User, 403);
+                $workspace = app(WorkspaceContext::class)->current();
+                $productIds = array_map('intval', $livewire->getSelectedTableRecords()->modelKeys());
+                $result = app(ProductOptionalGroupBulkMutationService::class)->setActiveMany(
+                    $actor,
+                    $workspace,
+                    $productIds,
+                    (string) $data['attribute_group_id'],
+                    (bool) $data['active'],
+                );
+                $succeeded = count($result['succeeded_product_ids']);
+                $failed = count($result['failed']);
+
+                Notification::make()
+                    ->title('Масову зміну опційної групи завершено')
+                    ->body("Успішно: {$succeeded}. Помилки: {$failed}.")
+                    ->color($failed > 0 ? 'warning' : 'success')
+                    ->send();
+                $livewire->deselectAllTableRecords();
+            })
+            ->deselectRecordsAfterCompletion(false);
+    }
 
     private static function makeTagBulkAction(
         TagBulkOperation $operation,

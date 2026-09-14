@@ -202,6 +202,23 @@ class ProductStructureEditorUiTest extends TestCase
             ->where('product_id', $product->id)
             ->where('field_binding_id', $preservedBinding->id)
             ->sole()->value_text);
+
+        Livewire::actingAs($admin)
+            ->test(ListProducts::class)
+            ->callTableAction('bulk_variant_value', $product, data: [
+                'field_binding_id' => $variantBinding->id,
+                'variant_ids' => [$variantA->id, $variantB->id],
+                'operation' => 'set',
+                'value' => 'blue',
+                'locale' => 'uk',
+            ])
+            ->assertNotified();
+
+        $this->assertSame(2, VariantFieldValue::withoutWorkspaceScope()
+            ->whereIn('variant_id', [$variantA->id, $variantB->id])
+            ->where('field_binding_id', $variantBinding->id)
+            ->where('value_text', 'blue')
+            ->count());
     }
 
     private function binding(
