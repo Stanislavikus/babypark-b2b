@@ -63,6 +63,7 @@ final class ProductStructureMutationService
         return DB::transaction(function () use ($actor, $workspace, $type, $group, $sortOrder, $optional, $defaultActive): ProductTypeGroupPlacement {
             $this->lockedWorkspace($actor, $workspace);
             $lockedType = $this->lockedType($workspace, $type->id);
+            $this->assertMerchantEditableType($lockedType);
             $lockedGroup = AttributeGroup::withoutWorkspaceScope()->where('workspace_id', $workspace->id)->whereKey($group->id)->lockForUpdate()->firstOrFail();
             $defaultActive = $optional ? $defaultActive : true;
 
@@ -102,6 +103,7 @@ final class ProductStructureMutationService
         return DB::transaction(function () use ($actor, $workspace, $type, $groupPlacement, $binding, $sortOrder, $requiredForCompleteness): ProductTypeFieldPlacement {
             $this->lockedWorkspace($actor, $workspace);
             $lockedType = $this->lockedType($workspace, $type->id);
+            $this->assertMerchantEditableType($lockedType);
             $lockedGroupPlacement = ProductTypeGroupPlacement::withoutWorkspaceScope()
                 ->where('workspace_id', $workspace->id)
                 ->where('product_type_id', $lockedType->id)
@@ -145,6 +147,7 @@ final class ProductStructureMutationService
                 ->lockForUpdate()
                 ->firstOrFail();
             $type = $this->lockedType($workspace, $locked->product_type_id);
+            $this->assertMerchantEditableType($type);
             $locked->delete();
             $this->bumpRevision($type);
         });
@@ -156,6 +159,7 @@ final class ProductStructureMutationService
             $this->lockedWorkspace($actor, $workspace);
             $locked = ProductTypeFieldPlacement::withoutWorkspaceScope()->where('workspace_id', $workspace->id)->whereKey($placement->id)->lockForUpdate()->firstOrFail();
             $type = $this->lockedType($workspace, $locked->product_type_id);
+            $this->assertMerchantEditableType($type);
             $locked->delete();
             $this->bumpRevision($type);
         });
@@ -174,6 +178,13 @@ final class ProductStructureMutationService
     private function lockedType(Workspace $workspace, string $typeId): ProductType
     {
         return ProductType::withoutWorkspaceScope()->where('workspace_id', $workspace->id)->whereKey($typeId)->lockForUpdate()->firstOrFail();
+    }
+
+    private function assertMerchantEditableType(ProductType $type): void
+    {
+        if ($type->is_default) {
+            throw new ProductStructureInvariantException('Basic Product structure is system-managed and cannot be edited directly.');
+        }
     }
 
     private function assertBindingAllowed(Workspace $workspace, FieldBinding $binding): void
