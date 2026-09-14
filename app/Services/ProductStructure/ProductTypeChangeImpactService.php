@@ -19,6 +19,8 @@ use Illuminate\Support\Collection;
 
 final class ProductTypeChangeImpactService
 {
+    public function __construct(private readonly ProductCompletenessService $completeness) {}
+
     public function preview(Product $product, ProductType $targetType): ProductTypeChangeImpact
     {
         if ((string) $product->workspace_id !== (string) $targetType->workspace_id) {
@@ -63,6 +65,9 @@ final class ProductTypeChangeImpactService
             ->pluck('id')
             ->map(fn ($id): int => (int) $id)
             ->all();
+        $locale = app()->getLocale();
+        $completenessBefore = $this->completeness->project($product, $locale);
+        $completenessAfter = $this->completeness->project($product, $locale, $targetType);
 
         return new ProductTypeChangeImpact(
             workspaceId: (string) $product->workspace_id,
@@ -80,6 +85,9 @@ final class ProductTypeChangeImpactService
             invalidOptionalOverrideIds: $invalidOverrideQuery->orderBy('id')->pluck('id')->map('strval')->all(),
             newlyRequiredBindingIds: $this->sortedDiff($targetRequired, $currentRequired),
             affectedActiveVariantIds: $activeVariantIds,
+            completenessProjectionStatus: 'available',
+            completenessBefore: $completenessBefore->percentage,
+            completenessAfter: $completenessAfter->percentage,
         );
     }
 

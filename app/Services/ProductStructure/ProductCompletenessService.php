@@ -28,17 +28,22 @@ final class ProductCompletenessService
         private readonly GovernedProductVariantColumnValuePolicy $columnValuePolicy,
     ) {}
 
-    public function project(Product $product, ?string $locale = null): ProductCompletenessProjection
+    public function project(Product $product, ?string $locale = null, ?ProductType $typeOverride = null): ProductCompletenessProjection
     {
         $locale ??= app()->getLocale();
         $product = Product::withoutWorkspaceScope()
             ->whereKey($product->id)
             ->where('workspace_id', $product->workspace_id)
             ->firstOrFail();
-        $type = ProductType::withoutWorkspaceScope()
-            ->where('workspace_id', $product->workspace_id)
-            ->whereKey($product->product_type_id)
-            ->firstOrFail();
+        $type = $typeOverride instanceof ProductType
+            ? ProductType::withoutWorkspaceScope()
+                ->where('workspace_id', $product->workspace_id)
+                ->whereKey($typeOverride->id)
+                ->firstOrFail()
+            : ProductType::withoutWorkspaceScope()
+                ->where('workspace_id', $product->workspace_id)
+                ->whereKey($product->product_type_id)
+                ->firstOrFail();
 
         $groups = ProductTypeGroupPlacement::withoutWorkspaceScope()
             ->where('workspace_id', $product->workspace_id)

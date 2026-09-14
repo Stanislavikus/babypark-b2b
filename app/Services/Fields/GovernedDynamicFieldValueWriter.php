@@ -929,6 +929,62 @@ final class GovernedDynamicFieldValueWriter
         return new FieldValueWriteResult(FieldValueWriteResult::Updated, (string) $binding->id);
     }
 
+    public function storedSlotValue(FieldDefinition $definition, mixed $slot, ?string $locale = null): mixed
+    {
+        if ($slot === null) {
+            return null;
+        }
+
+        try {
+            $this->assertDataTypeSupported($definition);
+            $this->assertValidationRulesSupported($definition);
+            $this->assertLocalizationContract($definition, $definition->is_localizable ? $locale : null);
+
+            if ($definition->is_localizable) {
+                $map = $this->readLocalizedMap($slot, $definition->id);
+                if ($locale === null || ! array_key_exists($locale, $map)) {
+                    return null;
+                }
+
+                $value = $map[$locale];
+
+                return $value === $this->normalizeStringPayloadForType(
+                    $definition->data_type,
+                    $value,
+                    $definition,
+                ) ? $value : null;
+            }
+
+            $value = match ($definition->data_type) {
+                AttributeDataType::Text,
+                AttributeDataType::LongText,
+                AttributeDataType::Select,
+                AttributeDataType::Date,
+                AttributeDataType::Url => $slot->value_text,
+                AttributeDataType::Number,
+                AttributeDataType::Decimal => $slot->value_num,
+                AttributeDataType::Boolean => match ((string) $slot->value_num) {
+                    '1.000000' => true,
+                    '0.000000' => false,
+                    default => null,
+                },
+                AttributeDataType::MultiSelect => $slot->value_jsonb,
+                default => null,
+            };
+
+            if ($value === null) {
+                return null;
+            }
+
+            return $this->slotMatchesCanonicalPayload(
+                $slot,
+                $this->canonicalPayloadForNonLocalizableType($definition->data_type, $value, $definition),
+            ) ? $value : null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     public function storedSlotIsValid(FieldDefinition $definition, mixed $slot, ?string $locale = null): bool
     {
         if ($slot === null) {

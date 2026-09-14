@@ -9,6 +9,7 @@ use App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Filament\Resources\ProductResource\Pages\ViewProduct;
+use App\Filament\Resources\ProductResource\Support\ProductStructureEditor;
 use App\Filament\Resources\ProductResource\Support\TagBulkUi;
 use App\Models\Product;
 use App\Models\ProductType;
@@ -530,6 +531,7 @@ class ProductResource extends Resource
                     ->multiple(),
             ])
             ->recordActions([
+                self::makeEditStructureValuesAction(),
                 self::makeChangeProductTypeAction(),
                 self::makeOptionalGroupsAction(),
                 ViewAction::make()
@@ -612,6 +614,23 @@ class ProductResource extends Resource
 
         return $workspace instanceof Workspace
             && app(WorkspaceAuthorization::class)->allows($actor, $workspace, WorkspacePermissions::MANAGE_PRODUCT_STRUCTURE);
+    }
+
+    public static function makeEditStructureValuesAction(): Action
+    {
+        return Action::make('edit_structure_values')
+            ->label('Редагувати поля типу')
+            ->icon('heroicon-o-pencil-square')
+            ->modalHeading(fn (Product $record): string => 'Поля типу — '.self::productTypeLabel($record))
+            ->modalWidth('7xl')
+            ->fillForm(fn (Product $record): array => app(ProductStructureEditor::class)->fill($record, 'uk'))
+            ->schema(fn (?Product $record): array => $record instanceof Product
+                ? app(ProductStructureEditor::class)->schema($record, 'uk')
+                : [Placeholder::make('structure_editor_waiting')->content('Оберіть товар.')])
+            ->action(function (array $data, Product $record): void {
+                app(ProductStructureEditor::class)->save($record, $data, 'uk');
+                Notification::make()->success()->title('Поля товару збережено')->send();
+            });
     }
 
     private static function makeChangeProductTypeAction(): Action

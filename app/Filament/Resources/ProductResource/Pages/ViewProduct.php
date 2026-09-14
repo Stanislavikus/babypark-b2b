@@ -17,6 +17,7 @@ class ViewProduct extends ViewRecord
     {
         return [
             EditAction::make(),
+            ProductResource::makeEditStructureValuesAction(),
         ];
     }
 }
