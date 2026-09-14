@@ -1798,8 +1798,10 @@ Remediation Contract; `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md` §16.
 Summary rules for Stage 2A UI — prevent divergence from the contract:
 
 - **Needs attention first** — surface blocked/attention Product outcomes before decorative sync summary.
+- **Aggregate configuration root causes** — identical setup/mapping causes are one merchant task with an affected Product count and optional drill-down; preserve per-item historical evidence underneath. Never repeat the same Mapping action once per Product when one configuration change resolves the cause for all affected Products.
+- **Causal destination** — route each issue to its real owner (Mapping, Option Mapping, Product, Variant, Pricing, connector Setup); never use a Product editor as a generic escape hatch for Pricing or identity.
 - **Exact field context** where evidence permits — use Product Field taxonomy (*Варіант → Характеристики → Колір*), not Preview-specific field labels.
-- **Honest action state** — `NO_EDIT_SURFACE` is the dominant case for Product/Variant findings today; show *[Виправити]* only when an authorized editor exists.
+- **Honest action state** — show *[Виправити]* only when an authorized editor exists; when no safe edit surface exists, use honest non-actionable copy rather than a fake Fix.
 - **Explicit rerun** — when configuration drift makes a historical finding's fix unsafe: *Налаштування змінилися після цієї перевірки. Запустіть перевірку ще раз.*
 - **No technical connector vocabulary** — never expose `attribute_set_id`, snapshot/discovery internals, or raw finding codes in Layer A/B.
 - **Setup-required vs product-blocked** — pre-admission setup: *Потрібно завершити налаштування перед перевіркою*; without setup permission: *У вас немає доступу до цієї настройки* — not *Товар заблокований*.
@@ -1830,11 +1832,11 @@ Summary rules for first-Live UI on `ManageAdobeProductsExportPreview`:
   **false**, but the action must remain non-actionable for consequential execution;
   no bypass of `ConnectorSyncOperationSupport`.
 - **Separate authority** — `run_sync_preview` never implies `run_sync_live`.
-- **Honest confirmation** — merchant copy must state this is a real external
-  transfer and Product data will be re-checked immediately before write. Preview
-  summary is guidance, not a frozen Live payload.
-- **Blocked Products** — explain that Products still not ready during the fresh Live
-  check will not be changed externally.
+- **Magento V1 is link/update-only** — consequential V1 Live mutates only already-existing, trusted-linked Magento Products; never imply that a missing remote Product will be created. Future CREATE is a separate capability/version decision.
+- **Target context** — before confirmation, show the merchant-facing Magento account plus configured store/store-view context in approved vocabulary; an account-scoped link must never look global.
+- **Honest confirmation** — merchant copy must state this is a real external **update** of linked Products and Product data/identity will be re-checked immediately before write. Preview summary is guidance, not a frozen Live payload.
+- **Scope counts** — confirmation shows currently eligible linked updates plus blocked/identity-review counts; do not invent CREATE intent/counts for V1.
+- **Blocked Products** — explain that Products still not ready during the fresh Live check will not be changed externally. If the remote Product does not exist, explain that V1 cannot create it.
 - **Running state** — honest queued/running; optional processed Product count from
   persisted outcomes; no fake percentage progress bar.
 - **Completed vocabulary** — *Синхронізовано* / *Не передано* / *Частково
@@ -1856,13 +1858,40 @@ Export Preview / Live work surface — **not** `SyncLiveMerchantSetupBarrier`, n
 Preview finding, and not a Preview HTTP lookup. Preview readiness does **not**
 imply Live applicability.
 
+The merchant default experience is one **ordered attention journey**, not a Preview
+table followed by a second equally prominent Entity Trust task table. Presentation
+may compose Setup / Product data / Variant / Identity / Runtime rows into one ordered
+worklist, but source enums, persistence, authorization, and remediation stay in their
+own domains.
+
+Progressive-disclosure rules:
+
+- while Adobe Products/Export/Live support is **false**, Entity Trust preparation must
+  not appear as required next work competing with Preview blockers on the default
+  merchant surface; internal/certification access may remain;
+- after truthful Live enablement, surface only actionable identity exceptions by
+  default (`initial_link_required`, `reconfirmation_required`,
+  `relink_review_required`); hide `already_confirmed` / `no_action` from the primary
+  task list;
+- configuration/data remediation comes first in the causal journey; identity review
+  cannot make a Preview-blocked Product ready;
+- if no safe existing Magento Product can be confirmed, tell the merchant that V1
+  updates existing linked Products only and cannot create the missing Product.
+
+Magento V1 page composition should therefore read as one causal flow: Preview totals
+→ aggregated setup blockers → item-specific Product/Variant/Pricing problems →
+actionable identity exceptions (only when Live support is truthful/relevant) → Live
+update action/result. Do not render the historical Preview table and Entity Trust
+table as two equally prominent merchant task queues. V1 action headings use update
+semantics (*Оновлення товарів у Magento*), not generic transfer wording that implies
+CREATE support.
+
 Summary rules for unlinked or trust-insufficient Products in the Live surface:
 
 - **Existing Live outcome** — use `SyncLiveOutcome::NotApplied` with a
   distinguishable merchant-safe linking reason; do **not** add a fifth Live outcome
   or a run-level setup-barrier case for linking.
-- **Worklist placement** — unlinked Products appear in the Live worklist with
-  contextual link/reconfirmation action when the actor is authorized.
+- **Worklist placement** — after truthful Live enablement, actionable unlinked/trust-insufficient Products appear in the ordered merchant attention worklist with contextual link/reconfirmation action when the actor is authorized; already-confirmed/no-action Products stay out of the primary task list.
 - **No Preview mutation** — Preview remains safe/read-only; do not route linking
   through Preview remediation or existence lookup.
 - **Informed confirmation** — before link confirmation the merchant sees a concise

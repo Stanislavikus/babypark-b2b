@@ -8577,21 +8577,34 @@ state. Do not implement one shared mutating `execute(..., dryRun=true)` path.
 
 ##### Create / update / reconciliation
 
-**Superseded for stock Magento no-link path by Stage 3E Stop-and-Amend.** Without
-trusted `ExternalRecordLink`, **no consequential Product mutation** under stock
-Magento (no POST, no blind PUT, no adoption). See **Stage 3E Stop-and-Amend —
-Magento ownership and entity-bound Safe Sync runtime contract**.
+**Resolved — Magento V1 capability freeze (2026-09-14):** Adobe Commerce
+Products / Export / Live V1 is **LINK/UPDATE-ONLY**. A consequential Product write
+requires an already-existing Magento Product plus trusted `ExternalRecordLink` /
+ENTITY TRUST for that exact logical remote entity. V1 performs **no Product
+POST/create**, no blind PUT, no automatic adoption, and no connector-created Product
+provenance. A local Product for which no existing remote Magento Product can be
+safely established is **not executable in Magento V1**; the merchant must first
+create/establish the Product in Magento and then complete the normal link review.
+
+CREATE is not a hidden fallback and is not implied by the word "Export". Any future
+Magento Product CREATE capability is a separate version/capability decision that
+requires a new Stop-and-Amend, create-specific ambiguity/idempotency/concurrency
+contract, and real-target certification. Do not add `SystemConfirmedViaCreate` (or
+equivalent provenance) to V1.
 
 **Historical [Resolved] no-link create (invalidated):** the prior contract assumed
 GET known-missing + POST + reconciliation could prove create ownership. Magento
-primary-source research proved stock `POST /V1/products` is upsert-like and cannot
-prove connector-created identity.
+primary-source research and Security/Concurrency arbitration showed that stock
+Product save semantics plus SKU/concurrency behavior do not provide the atomic
+create-only identity proof required by this project. The exact-SKU postcondition and
+entity-bound safeguards remain load-bearing for linked UPDATE; they do not resurrect
+no-link CREATE.
 
 **Link-first (frozen):** merchant-confirmed linking establishes ENTITY TRUST with
 fresh entity-bound read during confirmation, informed confirmation, and persisted
 discriminator provenance (follow-on runtime). Consequential mutations execute only
-through the first-party Magento entity-bound Safe Sync component — not stock
-SKU-addressed REST.
+through the certified entity-bound linked-UPDATE boundary — never by resolving a
+write target from SKU alone.
 
 **Existing trusted link:** entity-bound load by stored logical `entity_id` → verify
 expected SKU equality → mutate loaded entity only → entity-bound postcondition →
@@ -8607,14 +8620,18 @@ semantics to writes.
 
 ##### Configurable Product execution
 
-Adobe V1 must support normal platform configurable/multi-variant Product. Current
-Preview operation ordering is **not** frozen as Live ordering. Expected dependency
-shape: reconcile/resolve child identities → create/update child simple records →
-reconcile/resolve deterministic parent identity → create/update parent → ensure
-configurable option definitions → ensure child links → verify/reconcile as
-required. Real Adobe validation is required for final command order. No Adobe
-bulk/async write transport in V1 — synchronous Adobe REST through existing
-connector queue runtime.
+Adobe V1 must support normal platform configurable/multi-variant Product **only
+for an already-existing linked Magento family**. Current Preview operation ordering
+is **not** frozen as Live ordering. Every participating parent/child Product identity
+required for a consequential V1 mutation must be established under the Stage 3E
+link-first contract; V1 must not create a missing parent or missing child as a
+fallback. Expected dependency shape is therefore: resolve/verify trusted child
+identities → update linked child simple records → resolve/verify the trusted existing
+parent → update the linked parent → ensure only certified configurable option/link
+mutations → verify/reconcile as required. Missing/ambiguous family identity fails
+closed into per-item link/remediation state. Real Adobe validation is required for
+final command order. No Adobe bulk/async write transport in V1 — synchronous Adobe
+transport through the existing connector queue runtime.
 
 ##### First-Live merchant UX
 
@@ -8657,13 +8674,23 @@ successful Stage 3E real-Adobe validation and truthful Live support flip.
 
 Merchant confirmation concept (only when **all** gates above are satisfied):
 
-> Передати товари в Adobe Commerce?
+- identify the merchant-facing Magento account/target (and configured store/store-view
+  context where relevant) so the user cannot mistake an account-scoped link/write for
+  a global Magento identity;
+- state how many currently eligible **linked** Products are expected to be updated;
+- state how many Products remain blocked / require link review and will not be changed;
+- state plainly that Magento V1 does **not** create new Magento Products.
+
+Copy concept:
+
+> Оновити пов'язані товари в Adobe Commerce?
 >
-> Це реальна дія — дані будуть передані у ваш магазин. Перед передачею ми ще
-> раз перевіримо актуальні дані товарів.
+> Це реальна дія — дані пов'язаних товарів будуть оновлені у вибраному магазині.
+> Нові товари Magento V1 не створює. Перед оновленням ми ще раз перевіримо
+> актуальні дані та відповідність товарів.
 
 Preview summary may guide but must **not** be described as the frozen payload
-Live will send. If Preview contains blocked Products, explain that products still
+Live will send. If Preview contains blocked Products, explain that Products still
 not ready during the fresh Live check will not be changed externally.
 
 Running state: honest queued/running; optional processed Product count from
@@ -8683,8 +8710,9 @@ Preview permission never implies Live authority. No request-access subsystem.
 
 "Retry failed only" is explicitly **out** of Stage 3 V1. Current run snapshot
 freezes `selection.mode = all_products`. V1 recovery: remediate/verify → Preview
-when required → new all-products Live execution → `ExternalRecordLink` +
-reconciliation prevents blind duplicate create.
+when required → new all-products Live execution. Trusted `ExternalRecordLink`,
+entity-bound verification, and ambiguous-outcome rules prevent a blind repeat against
+an unverified remote identity; no Product CREATE path exists in V1.
 
 ##### Live support truth
 
@@ -8694,9 +8722,10 @@ Current Adobe support truth remains:
 - Products / Export / Live = **false**
 
 Keep Live **false** through internal implementation slices 3A–3D. Flip to **true**
-only when advertised V1 is coherent for: simple + configurable Products;
-`ExternalRecordLink`; safe create/update/reconciliation; inactive lifecycle (E13);
-required E14 image behavior; partial/ambiguous Product outcomes; stale-run
+only when advertised V1 is coherent for: simple + configurable **linked UPDATE**
+Products; `ExternalRecordLink`; safe linked update/reconciliation; explicit no-CREATE
+capability truth; inactive lifecycle (E13); required E14 image behavior;
+partial/ambiguous Product outcomes; stale-run
 safety; `run_sync_live` authorization; merchant first-Live UX; real Adobe
 validation (Stage 3E).
 
