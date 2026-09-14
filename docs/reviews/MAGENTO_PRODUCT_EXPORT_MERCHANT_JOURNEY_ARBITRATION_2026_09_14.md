@@ -146,3 +146,58 @@ Until that gate closes, merchant-journey UX corrections may proceed only if they
 **MERCHANT JOURNEY NEEDS NARROW UX/CONTRACT CORRECTION, PLUS A SEPARATE PRODUCT-SCOPE DECISION FOR CREATE.**
 
 Do not implement `SystemConfirmedViaCreate` or restore POST/create from these research reports alone.
+
+## 9. Gemini final review + primary-source verification
+
+Gemini's final recommendation is **ACCEPTED WITH CORRECTIONS**:
+
+**FREEZE — LINK/UPDATE-ONLY MAGENTO V1.**
+
+The decisive verification was performed independently against current Magento `2.4-develop` source, not against the report's intermediate reasoning:
+
+- `POST /V1/products` and `PUT /V1/products/:sku` both dispatch to `ProductRepositoryInterface::save()`.
+- `ProductRepository::save()` resolves an object without an ID by SKU first; when that SKU exists it loads the existing Product and continues through save semantics. Therefore stock POST cannot serve as a BabyPark "create-only, fail-if-exists" safety primitive.
+- `catalog_product_entity.sku` has a normal BTREE index rather than a DB UNIQUE constraint in current declarative schema.
+- current `Sku::beforeSave()` calls `_generateUniqueSku()` and may suffix a conflicting SKU; exact post-save SKU equality remains a load-bearing postcondition.
+- Adobe documents product creation using `POST /V1/products`, but that public API label does not override the repository semantics above for our safety contract.
+
+Gemini's own intermediate statement that POST is create-only is rejected; its final provider-safety conclusion is supported by current Magento source.
+
+### Corrections to the Gemini report
+
+1. `AdobeProductExportPreviewPlanOperation.operation` is semantic operation type (`simple_product`, `configurable_parent`, etc.), not CREATE/UPDATE intent. Keep this correction frozen.
+2. Do not describe ordinary retry of an existing linked update as generically "safe". Current contract remains `tries = 1`, no blind retry, with ambiguity/reconciliation handled explicitly.
+3. Simple↔Configurable transition is **unsupported in Magento V1 by platform contract** unless separately certified; do not overstate this as a universal provider prohibition without direct proof.
+4. Configurable CREATE non-atomicity is an additional reason not to advertise CREATE in V1, but the decisive Simple CREATE problem is already sufficient: stock REST save semantics do not provide the create-only identity boundary our safety contract requires.
+5. A future CREATE capability is not forbidden forever. It would require a new, separately certified provider-side create boundary (for example a first-party component/endpoint) that can prove exact creation, ownership/provenance, response-loss recovery, and configurable partial-failure semantics. It is explicitly outside Magento V1.
+
+### Merchant UX freeze candidates retained
+
+- aggregate repeated configuration blockers in presentation while preserving per-item evidence;
+- one causal remediation action per root cause;
+- route Mapping / Product / Variant / Pricing / Identity findings to their real owner;
+- show Connector Account + external context clearly;
+- hide already-confirmed/no-action identity rows from the primary task list;
+- do not merge Preview and Entity Trust domain enums; unify only presentation rows if useful;
+- while public Live support is false, Entity Trust must not compete with Preview remediation as mandatory default work. It may remain reachable as preparation/status, but the merchant's primary next action is the blocker that actually prevents progress.
+
+## 10. Final freeze decision
+
+**FREEZE — LINK/UPDATE-ONLY MAGENTO V1.**
+
+Magento V1 Product Export means: safely update Products that already exist in the selected Magento Connector Account and have established trusted external identity. It does **not** create a missing Magento Product.
+
+Merchant-facing capability truth must say this explicitly. A Product without trusted identity is not Live-ready; it requires safe matching/confirmation to an existing Magento Product. If no corresponding Magento Product exists, V1 cannot send that Product and must explain the limitation rather than imply an editor/mapping problem.
+
+This is a product-scope freeze for Magento V1, not a universal multi-connector rule. Another provider may support a certifiable create-only primitive and may establish identity from a provider-authoritative create response under its own connector contract.
+
+### Next gate
+
+No additional broad research is required. Next work is:
+
+1. docs-only Stop-and-Amend aligning normative Magento V1 + connector UX contracts with this capability truth and the accepted worklist/progressive-disclosure corrections;
+2. narrow review of that docs patch only;
+3. freeze;
+4. implementation in ordered slices, preserving current fail-closed update safety.
+
+Do not restore POST/create or add a system-confirmed-create trust origin in Magento V1 implementation.
