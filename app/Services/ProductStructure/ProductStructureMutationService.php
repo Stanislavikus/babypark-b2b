@@ -22,15 +22,16 @@ final class ProductStructureMutationService
 {
     public function __construct(private readonly WorkspaceAuthorization $authorization) {}
 
-    public function createProductType(User $actor, Workspace $workspace, string $code, array $labels): ProductType
+    public function createProductType(User $actor, Workspace $workspace, string $code, array $labels, ?string $description = null): ProductType
     {
-        return DB::transaction(function () use ($actor, $workspace, $code, $labels): ProductType {
+        return DB::transaction(function () use ($actor, $workspace, $code, $labels, $description): ProductType {
             $lockedWorkspace = $this->lockedWorkspace($actor, $workspace);
 
             return ProductType::withoutWorkspaceScope()->create([
                 'workspace_id' => $lockedWorkspace->id,
                 'code' => $code,
                 'localized_labels' => $labels,
+                'description' => $description,
                 'status' => 'active',
                 'is_default' => false,
                 'structure_revision' => 1,
@@ -38,15 +39,16 @@ final class ProductStructureMutationService
         });
     }
 
-    public function createAttributeGroup(User $actor, Workspace $workspace, string $code, array $labels): AttributeGroup
+    public function createAttributeGroup(User $actor, Workspace $workspace, string $code, array $labels, ?string $description = null): AttributeGroup
     {
-        return DB::transaction(function () use ($actor, $workspace, $code, $labels): AttributeGroup {
+        return DB::transaction(function () use ($actor, $workspace, $code, $labels, $description): AttributeGroup {
             $lockedWorkspace = $this->lockedWorkspace($actor, $workspace);
 
             return AttributeGroup::withoutWorkspaceScope()->create([
                 'workspace_id' => $lockedWorkspace->id,
                 'code' => $code,
                 'localized_labels' => $labels,
+                'description' => $description,
                 'status' => 'active',
             ]);
         });
@@ -169,6 +171,51 @@ final class ProductStructureMutationService
             $this->assertExpectedRevision($type, $expectedStructureRevision);
             $locked->delete();
             $this->bumpRevision($type);
+        });
+    }
+
+    public function updateProductTypePresentation(
+        User $actor,
+        Workspace $workspace,
+        ProductType $type,
+        array $labels,
+        ?string $description,
+    ): ProductType {
+        return DB::transaction(function () use ($actor, $workspace, $type, $labels, $description): ProductType {
+            $this->lockedWorkspace($actor, $workspace);
+            $lockedType = $this->lockedType($workspace, $type->id);
+            $this->assertMerchantEditableType($lockedType);
+            $lockedType->localized_labels = $labels;
+            $lockedType->description = $description;
+            if ($lockedType->isDirty()) {
+                $lockedType->save();
+            }
+
+            return $lockedType->fresh();
+        });
+    }
+
+    public function updateAttributeGroupPresentation(
+        User $actor,
+        Workspace $workspace,
+        AttributeGroup $group,
+        array $labels,
+        ?string $description,
+    ): AttributeGroup {
+        return DB::transaction(function () use ($actor, $workspace, $group, $labels, $description): AttributeGroup {
+            $this->lockedWorkspace($actor, $workspace);
+            $lockedGroup = AttributeGroup::withoutWorkspaceScope()
+                ->where('workspace_id', $workspace->id)
+                ->whereKey($group->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            $lockedGroup->localized_labels = $labels;
+            $lockedGroup->description = $description;
+            if ($lockedGroup->isDirty()) {
+                $lockedGroup->save();
+            }
+
+            return $lockedGroup->fresh();
         });
     }
 

@@ -1,0 +1,167 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Filament\Resources\AttributeGroupResource\Pages\CreateAttributeGroup;
+use App\Filament\Resources\AttributeGroupResource\Pages\EditAttributeGroup;
+use App\Filament\Resources\AttributeGroupResource\Pages\ListAttributeGroups;
+use App\Filament\Resources\ProductTypeResource;
+use App\Filament\Resources\ProductTypeResource\Pages\EditProductType;
+use App\Filament\Resources\ProductTypeResource\Pages\ListProductTypes;
+use App\Filament\Resources\ProductTypeResource\RelationManagers\FieldPlacementsRelationManager;
+use App\Filament\Resources\ProductTypeResource\RelationManagers\GroupPlacementsRelationManager;
+use App\Models\AttributeGroup;
+use App\Models\ProductType;
+use App\Models\User;
+use App\Models\Workspace;
+use App\Support\Workspace\WorkspacePermissions;
+use Database\Seeders\WorkspaceRbacPermissionSeeder;
+use Filament\Facades\Filament;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\InteractsWithWorkspaceRbac;
+use Tests\TestCase;
+
+class ProductStructureFilamentUiTest extends TestCase
+{
+    use InteractsWithWorkspaceRbac;
+    use RefreshDatabase;
+
+    private Workspace $workspace;
+
+    private User $manager;
+
+    private User $viewer;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(WorkspaceRbacPermissionSeeder::class);
+        $this->workspace = Workspace::query()->where('is_default', true)->sole();
+        $this->manager = User::factory()->create(['is_active' => true]);
+        $this->viewer = User::factory()->create(['is_active' => true]);
+        $managerMembership = $this->makeWorkspaceMembership($this->workspace, $this->manager);
+        $this->makeWorkspaceMembership($this->workspace, $this->viewer);
+        $role = $this->createRoleWithPermissions(
+            $this->workspace->id,
+            'Structure Manager',
+            [WorkspacePermissions::MANAGE_PRODUCT_STRUCTURE],
+        );
+        $this->assignRoleToMembership($managerMembership, $role);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+    }
+
+    #[Test]
+    public function manager_can_fork_basic_product_from_list_action(): void
+    {
+        Livewire::actingAs($this->manager)
+            ->test(ListProductTypes::class)
+            ->assertActionExists('forkBasic')
+            ->callAction('forkBasic', data: [
+                'code' => 'strollers',
+                'label_uk' => 'Коляски',
+                'label_en' => 'Strollers',
+            ])
+            ->assertNotified();
+
+        $this->assertDatabaseHas('product_types', [
+            'workspace_id' => $this->workspace->id,
+            'code' => 'strollers',
+            'is_default' => false,
+        ]);
+    }
+
+    #[Test]
+    public function basic_product_cannot_open_edit_page_or_relation_managers(): void
+    {
+        $basic = ProductType::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('is_default', true)
+            ->sole();
+
+        $this->actingAs($this->manager)
+            ->get(ProductTypeResource::getUrl('edit', ['record' => $basic]))
+            ->assertForbidden();
+
+        $this->assertFalse(GroupPlacementsRelationManager::canViewForRecord($basic, EditProductType::class));
+        $this->assertFalse(FieldPlacementsRelationManager::canViewForRecord($basic, EditProductType::class));
+    }
+
+    #[Test]
+    public function custom_type_edit_page_and_relation_managers_are_available(): void
+    {
+        $custom = ProductType::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'code' => 'custom_type',
+            'localized_labels' => ['uk' => 'Власний тип', 'en' => 'Custom Type'],
+            'status' => 'active',
+            'is_default' => false,
+            'structure_revision' => 1,
+        ]);
+
+        $this->actingAs($this->manager)
+            ->get(ProductTypeResource::getUrl('edit', ['record' => $custom]))
+            ->assertOk();
+
+        $this->assertTrue(GroupPlacementsRelationManager::canViewForRecord($custom, EditProductType::class));
+        $this->assertTrue(FieldPlacementsRelationManager::canViewForRecord($custom, EditProductType::class));
+    }
+
+    #[Test]
+    public function product_type_and_attribute_group_tables_expose_no_delete_actions(): void
+    {
+        $productTypes = Livewire::actingAs($this->manager)->test(ListProductTypes::class);
+        $attributeGroups = Livewire::actingAs($this->manager)->test(ListAttributeGroups::class);
+
+        $this->assertSame(['edit'], array_map(
+            fn ($action): string => $action->getName(),
+            $productTypes->instance()->getTable()->getRecordActions(),
+        ));
+        $this->assertSame(['edit'], array_map(
+            fn ($action): string => $action->getName(),
+            $attributeGroups->instance()->getTable()->getRecordActions(),
+        ));
+    }
+
+    #[Test]
+    public function attribute_group_create_and_edit_use_governed_services(): void
+    {
+        Livewire::actingAs($this->manager)
+            ->test(CreateAttributeGroup::class)
+            ->fillForm([
+                'code' => 'dimensions',
+                'label_uk' => 'Розміри',
+                'label_en' => 'Dimensions',
+                'description' => 'Параметри розміру',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $group = AttributeGroup::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('code', 'dimensions')
+            ->sole();
+
+        Livewire::actingAs($this->manager)
+            ->test(EditAttributeGroup::class, ['record' => $group->getRouteKey()])
+            ->fillForm([
+                'label_uk' => 'Габарити',
+                'label_en' => 'Dimensions',
+                'description' => 'Оновлений опис',
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('Габарити', $group->fresh()->localized_labels['uk']);
+        $this->assertSame('Оновлений опис', $group->fresh()->description);
+    }
+
+    #[Test]
+    public function user_without_manage_permission_cannot_access_structure_resources(): void
+    {
+        $this->actingAs($this->viewer)
+            ->get(ProductTypeResource::getUrl('index'))
+            ->assertForbidden();
+    }
+}
