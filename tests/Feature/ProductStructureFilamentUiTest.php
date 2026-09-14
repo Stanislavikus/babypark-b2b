@@ -2,6 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AttributeDataType;
+use App\Enums\AttributeScope;
+use App\Enums\AttributeStatus;
+use App\Enums\AttributeStorageType;
+use App\Enums\FieldObjectType;
 use App\Filament\Resources\AttributeGroupResource\Pages\CreateAttributeGroup;
 use App\Filament\Resources\AttributeGroupResource\Pages\EditAttributeGroup;
 use App\Filament\Resources\AttributeGroupResource\Pages\ListAttributeGroups;
@@ -12,6 +17,8 @@ use App\Filament\Resources\ProductTypeResource\Pages\ListProductTypes;
 use App\Filament\Resources\ProductTypeResource\RelationManagers\FieldPlacementsRelationManager;
 use App\Filament\Resources\ProductTypeResource\RelationManagers\GroupPlacementsRelationManager;
 use App\Models\AttributeGroup;
+use App\Models\FieldBinding;
+use App\Models\FieldDefinition;
 use App\Models\Product;
 use App\Models\ProductActiveOptionalGroup;
 use App\Models\ProductType;
@@ -22,6 +29,7 @@ use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -147,9 +155,26 @@ class ProductStructureFilamentUiTest extends TestCase
             ->where('workspace_id', $this->workspace->id)
             ->where('code', 'dimensions')
             ->sole();
+        $type = app(ProductStructureMutationService::class)->createProductType(
+            $this->manager,
+            $this->workspace,
+            'dimensions-usage',
+            ['uk' => 'Тип з габаритами'],
+        );
+        app(ProductStructureMutationService::class)->putGroupPlacement(
+            $this->manager,
+            $this->workspace,
+            $type,
+            $group,
+            100,
+            false,
+            true,
+            $type->structure_revision,
+        );
 
         Livewire::actingAs($this->manager)
             ->test(EditAttributeGroup::class, ['record' => $group->getRouteKey()])
+            ->assertSee('Тип з габаритами')
             ->fillForm([
                 'label_uk' => 'Габарити',
                 'label_en' => 'Dimensions',
@@ -168,6 +193,155 @@ class ProductStructureFilamentUiTest extends TestCase
         $this->actingAs($this->viewer)
             ->get(ProductTypeResource::getUrl('index'))
             ->assertForbidden();
+    }
+
+    #[Test]
+    public function product_type_change_modal_shows_real_impact_before_apply(): void
+    {
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'onec_guid' => Str::uuid()->toString(),
+            'sku' => 'STRUCT-PREVIEW-1',
+            'name' => 'Structure preview product',
+            'is_active' => true,
+        ]);
+        $custom = app(ProductStructureMutationService::class)->createProductType(
+            $this->manager,
+            $this->workspace,
+            'structure-preview-custom',
+            ['uk' => 'Тип для preview'],
+        );
+
+        $component = Livewire::actingAs($this->manager)
+            ->test(ListProducts::class)
+            ->mountTableAction('change_product_type', $product)
+            ->set('mountedActions.0.data.product_type_id', $custom->id);
+
+        $modal = html_entity_decode($component->getMountedActionModalHtml());
+        $this->assertStringContainsString('Попередній перегляд впливу', $modal);
+        $this->assertStringContainsString('Значення не видаляються', $modal);
+        $this->assertNotSame($custom->id, $product->fresh()->product_type_id);
+    }
+
+    #[Test]
+    public function group_configuration_rejects_stale_revision_captured_when_modal_opened(): void
+    {
+        $structure = app(ProductStructureMutationService::class);
+        $type = $structure->createProductType($this->manager, $this->workspace, 'stale-ui-type', ['uk' => 'Stale UI']);
+        $group = $structure->createAttributeGroup($this->manager, $this->workspace, 'stale-ui-group', ['uk' => 'Група']);
+        $placement = $structure->putGroupPlacement(
+            $this->manager,
+            $this->workspace,
+            $type,
+            $group,
+            100,
+            false,
+            true,
+            $type->structure_revision,
+        );
+        $type->refresh();
+
+        $component = Livewire::actingAs($this->manager)
+            ->test(GroupPlacementsRelationManager::class, [
+                'ownerRecord' => $type,
+                'pageClass' => EditProductType::class,
+            ])
+            ->mountTableAction('configureGroup', $placement);
+
+        $otherGroup = $structure->createAttributeGroup($this->manager, $this->workspace, 'stale-ui-other', ['uk' => 'Інша']);
+        $structure->putGroupPlacement(
+            $this->manager,
+            $this->workspace,
+            $type->fresh(),
+            $otherGroup,
+            200,
+            false,
+            true,
+            $type->fresh()->structure_revision,
+        );
+
+        $component
+            ->setTableActionData([
+                'sort_order' => 999,
+                'is_optional' => false,
+                'default_active' => true,
+            ])
+            ->callMountedTableAction()
+            ->assertNotified('Структура вже змінилася');
+
+        $this->assertSame(100, $placement->fresh()->sort_order);
+    }
+
+    #[Test]
+    public function field_picker_distinguishes_product_and_variant_bindings(): void
+    {
+        $structure = app(ProductStructureMutationService::class);
+        $type = $structure->createProductType($this->manager, $this->workspace, 'ownership-ui-type', ['uk' => 'Ownership UI']);
+        $group = $structure->createAttributeGroup($this->manager, $this->workspace, 'ownership-ui-group', ['uk' => 'Група']);
+        $structure->putGroupPlacement($this->manager, $this->workspace, $type, $group, 100, false, true, $type->structure_revision);
+        $definition = FieldDefinition::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'code' => 'shared_ownership_label',
+            'data_type' => AttributeDataType::Text,
+            'scope' => AttributeScope::WorkspaceCustom,
+            'localized_labels' => ['uk' => 'Спільне поле'],
+            'validation_rules' => null,
+            'is_localizable' => false,
+            'is_multi_value' => false,
+            'status' => AttributeStatus::Active,
+        ]);
+        foreach ([FieldObjectType::Product, FieldObjectType::ProductVariant] as $objectType) {
+            FieldBinding::withoutWorkspaceScope()->create([
+                'workspace_id' => $this->workspace->id,
+                'field_definition_id' => $definition->id,
+                'object_type' => $objectType,
+                'storage_type' => AttributeStorageType::Dynamic,
+                'storage_path' => null,
+                'field_group' => 'characteristics',
+                'is_required' => false,
+                'is_filterable' => false,
+                'is_sortable' => false,
+                'visibility_settings' => ['admin' => true, 'b2b' => true, 'channels' => []],
+                'sort_order' => 100,
+                'status' => AttributeStatus::Active,
+            ]);
+        }
+
+        $component = Livewire::actingAs($this->manager)
+            ->test(FieldPlacementsRelationManager::class, [
+                'ownerRecord' => $type->fresh(),
+                'pageClass' => EditProductType::class,
+            ])
+            ->mountTableAction('addField');
+        $modal = html_entity_decode($component->getMountedActionModalHtml());
+
+        $this->assertStringContainsString('Спільне поле — Товар', $modal);
+        $this->assertStringContainsString('Спільне поле — Варіант', $modal);
+    }
+
+    #[Test]
+    public function product_table_structure_authorization_is_not_queried_per_row(): void
+    {
+        foreach (range(1, 12) as $index) {
+            Product::withoutWorkspaceScope()->create([
+                'workspace_id' => $this->workspace->id,
+                'onec_guid' => Str::uuid()->toString(),
+                'sku' => 'STRUCT-N1-'.$index,
+                'name' => 'Structure N1 '.$index,
+                'is_active' => true,
+            ]);
+        }
+
+        $queries = [];
+        DB::listen(function ($query) use (&$queries): void {
+            if (str_contains($query->sql, 'workspace_permissions')) {
+                $queries[] = $query->sql;
+            }
+        });
+
+        Livewire::actingAs($this->manager)->test(ListProducts::class);
+
+        $this->assertLessThanOrEqual(1, count($queries), implode("\n", $queries));
     }
 
     #[Test]

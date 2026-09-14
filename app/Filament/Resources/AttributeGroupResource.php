@@ -7,6 +7,7 @@ use App\Filament\Resources\AttributeGroupResource\Pages\EditAttributeGroup;
 use App\Filament\Resources\AttributeGroupResource\Pages\ListAttributeGroups;
 use App\Models\AttributeGroup;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
@@ -37,7 +38,30 @@ class AttributeGroupResource extends Resource
                     ->disabled(fn (?AttributeGroup $record): bool => $record !== null)->dehydrated(),
                 TextInput::make('label_uk')->label('Назва (UK)')->required()->maxLength(255),
                 TextInput::make('label_en')->label('Назва (EN)')->required()->maxLength(255),
-                Textarea::make('description')->label('Опис')->rows(3)->columnSpanFull(),
+                Textarea::make('description')->label('Опис / підказка')->rows(3)->columnSpanFull(),
+                Placeholder::make('used_by_product_types')
+                    ->label('Використовується в типах товару')
+                    ->content(function (?AttributeGroup $record): string {
+                        if (! $record instanceof AttributeGroup) {
+                            return 'Після створення тут буде показано використання групи.';
+                        }
+
+                        $labels = $record->productTypePlacements()
+                            ->with(['productType' => fn ($query) => $query->withoutGlobalScopes()])
+                            ->get()
+                            ->map(fn ($placement): string => (string) ($placement->productType?->localized_labels['uk']
+                                ?? $placement->productType?->localized_labels['en']
+                                ?? $placement->productType?->code
+                                ?? '—'))
+                            ->filter(fn (string $label): bool => $label !== '—')
+                            ->unique()
+                            ->values()
+                            ->all();
+
+                        return $labels === [] ? 'Не використовується' : implode(', ', $labels);
+                    })
+                    ->visible(fn (?AttributeGroup $record): bool => $record instanceof AttributeGroup)
+                    ->columnSpanFull(),
             ])->columns(2),
         ]);
     }

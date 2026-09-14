@@ -14,6 +14,8 @@ class EditProduct extends EditRecord
     {
         return [
             ViewAction::make(),
+            ProductResource::makeChangeProductTypeAction(),
+            ProductResource::makeOptionalGroupsAction(),
             ProductResource::makeEditStructureValuesAction(),
             ProductResource::makeBulkVariantValueAction(),
         ];

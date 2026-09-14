@@ -585,7 +585,11 @@ class ProductResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['variants.stocks', 'category', 'tags']);
+            ->with(['variants.stocks', 'category', 'tags'])
+            ->withExists([
+                'productType as has_optional_product_type_groups' => fn (Builder $query) => $query
+                    ->whereHas('groupPlacements', fn (Builder $groups) => $groups->where('is_optional', true)),
+            ]);
     }
 
     // -------------------------------------------------------------------------
@@ -617,14 +621,10 @@ class ProductResource extends Resource
 
     private static function canManageProductStructure(Product $product): bool
     {
-        $actor = auth()->user();
-        if (! $actor instanceof User) {
-            return false;
-        }
-        $workspace = Workspace::withoutGlobalScopes()->find($product->workspace_id);
+        $workspace = app(WorkspaceContext::class)->current();
 
-        return $workspace instanceof Workspace
-            && app(WorkspaceAuthorization::class)->allows($actor, $workspace, WorkspacePermissions::MANAGE_PRODUCT_STRUCTURE);
+        return (string) $workspace->id === (string) $product->workspace_id
+            && self::canManageCurrentWorkspaceStructure();
     }
 
     private static function canManageCurrentWorkspaceStructure(): bool
@@ -634,12 +634,21 @@ class ProductResource extends Resource
             return false;
         }
         $workspace = app(WorkspaceContext::class)->current();
+        $cacheKey = sprintf('product-structure-permission:%s:%s', $actor->id, $workspace->id);
+        $request = request();
 
-        return app(WorkspaceAuthorization::class)->allows(
+        if ($request->attributes->has($cacheKey)) {
+            return (bool) $request->attributes->get($cacheKey);
+        }
+
+        $allowed = app(WorkspaceAuthorization::class)->allows(
             $actor,
             $workspace,
             WorkspacePermissions::MANAGE_PRODUCT_STRUCTURE,
         );
+        $request->attributes->set($cacheKey, $allowed);
+
+        return $allowed;
     }
 
     public static function makeEditStructureValuesAction(): Action
@@ -752,7 +761,7 @@ class ProductResource extends Resource
             });
     }
 
-    private static function makeChangeProductTypeAction(): Action
+    public static function makeChangeProductTypeAction(): Action
     {
         return Action::make('change_product_type')
             ->label('Змінити тип товару')
@@ -771,10 +780,41 @@ class ProductResource extends Resource
                             $type->id => (string) ($type->localized_labels['uk'] ?? $type->localized_labels['en'] ?? $type->code),
                         ])->all())
                     ->required()
-                    ->searchable(),
+                    ->searchable()
+                    ->live(),
                 Placeholder::make('impact_notice')
-                    ->label('Що станеться')
-                    ->content('Значення полів не видаляються. Поля поза новим типом залишаться як out-of-type data.'),
+                    ->label('Попередній перегляд впливу')
+                    ->content(function (Get $get, ?Product $record): string {
+                        $targetId = $get('product_type_id');
+                        if (! $record instanceof Product || ! filled($targetId)) {
+                            return 'Оберіть новий тип товару, щоб побачити вплив до підтвердження.';
+                        }
+
+                        $target = ProductType::withoutWorkspaceScope()
+                            ->where('workspace_id', $record->workspace_id)
+                            ->find($targetId);
+                        if (! $target instanceof ProductType) {
+                            return 'Обраний тип товару недоступний.';
+                        }
+
+                        try {
+                            $impact = app(ProductTypeChangeImpactService::class)->preview($record, $target);
+                        } catch (\Throwable) {
+                            return 'Не вдалося побудувати попередній перегляд. Зміну не слід підтверджувати.';
+                        }
+
+                        return sprintf(
+                            'Буде прибрано зі структури: %d полів; нових обов’язкових: %d; збережених значень поза новим типом: %d товарних і %d варіантних; недійсних опційних станів: %d. Повнота: %d%% → %d%%. Значення не видаляються.',
+                            count($impact->removedBindingIds),
+                            count($impact->newlyRequiredBindingIds),
+                            count($impact->outOfTypeProductBindingIds),
+                            count($impact->outOfTypeVariantCells),
+                            count($impact->invalidOptionalOverrideIds),
+                            $impact->completenessBefore ?? 0,
+                            $impact->completenessAfter ?? 0,
+                        );
+                    })
+                    ->visible(fn (Get $get): bool => filled($get('product_type_id'))),
             ])
             ->action(function (array $data, Product $record): void {
                 $actor = auth()->user();
@@ -794,17 +834,13 @@ class ProductResource extends Resource
             });
     }
 
-    private static function makeOptionalGroupsAction(): Action
+    public static function makeOptionalGroupsAction(): Action
     {
         return Action::make('optional_groups')
             ->label('Опційні групи')
             ->icon('heroicon-o-adjustments-horizontal')
             ->visible(fn (Product $record): bool => self::canManageProductStructure($record)
-                && ProductTypeGroupPlacement::withoutWorkspaceScope()
-                    ->where('workspace_id', $record->workspace_id)
-                    ->where('product_type_id', $record->product_type_id)
-                    ->where('is_optional', true)
-                    ->exists())
+                && (bool) ($record->has_optional_product_type_groups ?? false))
             ->schema([
                 Select::make('group_placement_id')
                     ->label('Опційна група')
