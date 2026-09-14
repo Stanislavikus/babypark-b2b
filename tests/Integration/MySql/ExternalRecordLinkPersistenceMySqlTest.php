@@ -264,7 +264,15 @@ class ExternalRecordLinkPersistenceMySqlTest extends TestCase
     {
         $version = DB::selectOne('SELECT VERSION() as version')->version;
 
-        Artisan::call('migrate:rollback', ['--step' => 3]);
+        Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_08_22_100000_external_record_link_provenance.php',
+        ]);
+        Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_08_19_110000_external_record_links.php',
+        ]);
+        Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_08_19_100000_sync_run_execution_safety.php',
+        ]);
 
         $this->assertFalse(Schema::hasTable('external_record_links'));
         $this->assertFalse(Schema::hasColumn('sync_runs', 'recoverable_after'));

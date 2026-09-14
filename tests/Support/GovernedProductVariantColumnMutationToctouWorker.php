@@ -3,6 +3,7 @@
 use App\Enums\AttributeStatus;
 use App\Models\FieldDefinition;
 use App\Models\Product;
+use App\Models\ProductType;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 
@@ -79,7 +80,17 @@ function moveProductWorkspaceHold(int $productId, ?string $workspaceId, string $
             ->lockForUpdate()
             ->firstOrFail();
 
+        $targetBasicProductTypeId = ProductType::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->where('is_default', true)
+            ->value('id');
+
+        if (! is_string($targetBasicProductTypeId) || $targetBasicProductTypeId === '') {
+            throw new RuntimeException('Target workspace has no Basic Product type.');
+        }
+
         $product->workspace_id = $workspaceId;
+        $product->product_type_id = $targetBasicProductTypeId;
         $product->save();
 
         file_put_contents($ipcDir.'/target_changed_uncommitted', '1');

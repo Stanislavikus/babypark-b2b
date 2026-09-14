@@ -345,6 +345,14 @@ class FieldFoundationMigrationTest extends TestCase
             $this->assertFalse(Schema::hasTable('adobe_product_attribute_materializations'));
         }
 
+        if (Schema::hasTable('adobe_product_attribute_lineages')) {
+            $adobeStructureMigration = require database_path('migrations/2026_09_13_040000_adobe_product_attribute_structure_foundation.php');
+            $adobeStructureMigration->down();
+
+            $this->assertFalse(Schema::hasTable('adobe_product_attribute_lineages'));
+            $this->assertFalse(Schema::hasTable('adobe_product_attribute_groups'));
+        }
+
         if (Schema::hasTable('product_types')) {
             $notNullMigration = require database_path('migrations/2026_09_13_170000_enforce_product_type_not_null.php');
             $notNullMigration->down();
