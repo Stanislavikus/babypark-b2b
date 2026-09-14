@@ -407,7 +407,8 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('## 17. Merchant First-Live UX (Resolved — Stage 3-0)', $content);
         $this->assertStringContainsString('ManageAdobeProductsExportPreview', $content);
-        $this->assertStringContainsString('Передати товари в Adobe Commerce?', $content);
+        $this->assertStringContainsString("Оновити пов'язані товари в Adobe Commerce?", $content);
+        $this->assertStringContainsString('Products / Export / Live V1 is **LINK/UPDATE-ONLY**', $content);
         $this->assertStringContainsString('ConnectorSyncOperationSupport(Products, Export, Live) === true', $content);
         $this->assertStringContainsString('Stage 3D must not bypass `ConnectorSyncOperationSupport`', $content);
     }

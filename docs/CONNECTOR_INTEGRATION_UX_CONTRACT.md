@@ -359,6 +359,27 @@ Presentation dimensions (no DB enum):
 - **Current actionability:** `ACTION_AVAILABLE`, `VIEW_ONLY`, `PERMISSION_REQUIRED`,
   `NO_EDIT_SURFACE`, `CURRENT_CONFIGURATION_CHANGED`.
 
+### Root-cause aggregation and causal remediation (Resolved — 2026-09-14)
+
+Historical Preview evidence remains per `SyncRunItem`; do **not** rewrite persistence
+or erase per-product evidence merely to simplify the screen. Merchant presentation,
+however, must aggregate identical **configuration-owned** causes. One missing
+required FieldMapping that blocks 54 Products is one setup task with an affected
+count and optional drill-down — not 54 independent merchant tasks and not 54 copies
+of the same remediation button.
+
+Aggregation belongs in the read/presentation model. Its grouping key must preserve
+the actual root cause and remediation target (for example finding kind + affected
+mapping/setup identity), never group unrelated Product-data failures just because
+the copy looks similar. Fixing a configuration root cause requires a fresh Preview
+before current readiness is claimed.
+
+Every actionable finding routes to its actual domain owner: Field Mapping → Mapping;
+option correspondence → Option Mapping; Product value → authorized Product editor;
+Variant value/shape → Variant editor/grid; Price → Pricing; connector setup → Setup.
+Do not route Pricing or identity into Product fields for convenience. When no safe
+edit surface exists, say so honestly instead of rendering a fake Fix action.
+
 ### No fake Fix
 
 Show _[Виправити]_ only when an authorized edit surface exists for the affected
@@ -441,14 +462,32 @@ When **all** admission gates are satisfied (including truthful Live support),
 Preview summary may guide merchant confirmation but must **not** be described as
 the frozen payload Live will send.
 
+### Magento V1 mutation scope and target context (Resolved — 2026-09-14)
+
+Adobe Commerce Products / Export / Live V1 is **LINK/UPDATE-ONLY**. Merchant Live
+copy must never imply that an unlinked/missing Magento Product will be created.
+Before consequential admission, the page identifies the merchant-facing Magento
+account and configured store/store-view context in approved vocabulary. An
+account-scoped Product link must never look like a global "linked to Magento" state.
+
+A Product that has no safely confirmable existing Magento counterpart remains
+blocked for V1. Merchant-safe copy must explain that V1 updates existing linked
+Magento Products and does not create a missing Product; it must not mislabel that
+condition as a field-mapping problem.
+
 ### Merchant confirmation copy
 
 Concept:
 
-> Передати товари в Adobe Commerce?
+> Оновити пов'язані товари в Adobe Commerce?
 >
-> Це реальна дія — дані будуть передані у ваш магазин. Перед передачею ми ще
-> раз перевіримо актуальні дані товарів.
+> Це реальна дія — дані пов'язаних товарів будуть оновлені у вибраному магазині.
+> Нові товари Magento V1 не створює. Перед оновленням ми ще раз перевіримо
+> актуальні дані та відповідність товарів.
+
+The confirmation surface states the current target plus counts for eligible linked
+updates and Products that remain blocked / require identity review. It must not
+invent a CREATE count or mutation intent that the V1 runtime does not support.
 
 If Preview contained blocked Products, explain that Products still not ready
 during the fresh Live check will not be changed externally.
@@ -548,7 +587,7 @@ Until real-target certification is met, merchant consequential Live action
 remains non-actionable and the **Magento** tile keeps the **false** truth
 flag for Adobe Products/Export/Live.
 
-### Presentation boundary
+### Presentation boundary and progressive disclosure (Resolved — 2026-09-14)
 
 Linking belongs to **per-item Live readiness/remediation** on
 `ManageAdobeProductsExportPreview` (Live worklist / item context). It is **not**:
@@ -557,7 +596,60 @@ Linking belongs to **per-item Live readiness/remediation** on
 - a Preview finding or Preview remediation surface;
 - a Preview HTTP lookup or existence-check mutation.
 
-Preview readiness does **not** imply Live applicability.
+Preview readiness does **not** imply Live applicability. Domain/runtime state stays
+separate: Preview findings are not converted into Entity Trust statuses and Entity
+Trust statuses are not converted into Preview findings.
+
+The merchant-facing page nevertheless presents **one ordered attention journey**, not
+two equal task tables that the merchant must mentally reconcile:
+
+1. configuration/setup root causes (aggregated);
+2. Product/Variant/Pricing data problems;
+3. actionable Product-identity review for otherwise relevant linked-UPDATE work;
+4. consequential Live action/result when support truth permits it.
+
+A presentation worklist may normalize these into merchant categories such as Setup,
+Product data, Variant, Identity, and Runtime, but every row retains its source/type
+and domain-specific remediation. This is presentation composition only — no generic
+mega-enum/table and no merging of FieldMapping, Preview, Entity Trust, or Live state.
+
+While `ConnectorSyncOperationSupport(Products, Export, Live) === false`, the default
+merchant journey must **not** present per-item Entity Trust review as required next
+work competing with Preview remediation. The internal/certification surface may
+remain available, but the merchant default state hides/collapses that work behind
+honest "Live is not available yet" capability truth.
+
+After Live support is truthful, primary identity work shows only actionable
+`initial_link_required`, `reconfirmation_required`, or `relink_review_required`
+exceptions. `already_confirmed` / `no_action` belong in status/detail and are hidden
+from the primary task list by default. Configuration/data blockers remain earlier in
+the causal sequence; identity review does not make a Preview-blocked Product ready.
+
+### Magento V1 Products Export Preview composition (Resolved — 2026-09-14)
+
+For the current `ManageAdobeProductsExportPreview` merchant surface:
+
+- keep the top Preview totals (`ready / warning / blocked`) and completed-at evidence;
+- render an aggregated setup block before item rows when configuration-owned causes
+  exist, e.g. *3 налаштування блокують 54 товари*; one root cause gets one causal
+  action and an affected count;
+- item rows then emphasize Product/Variant/Pricing problems that genuinely differ by
+  item. Do not repeat the same Field Mapping button in every Product row merely
+  because the historical Preview stored the same configuration finding per item;
+- while Live support is false, show one honest capability message and do **not**
+  render `Зв'язок товарів з магазином` as a second mandatory task table;
+- after truthful Live enablement, identity exceptions join the ordered attention
+  journey. Merchant heading/copy should describe the task as checking the Product's
+  correspondence in the selected Magento store, not expose Entity Trust terminology;
+- V1 consequential section copy uses **update** semantics (for example *Оновлення
+  товарів у Magento* / *Оновити N товарів*), not copy that implies generic create-or-
+  update transfer;
+- when no safe existing candidate exists, copy concept: *Товар не знайдено в Magento.
+  Magento V1 оновлює лише існуючі товари й не створює нові. Створіть товар у Magento,
+  а потім перевірте відповідність ще раз.*
+
+The exact visual component (cards vs table rows) is implementation detail. The
+causal ordering, aggregation, capability truth, and progressive disclosure are not.
 
 ### Unlinked Product in Live surface
 
@@ -565,10 +657,19 @@ When a Product lacks sufficient trust for consequential Live:
 
 - outcome remains `SyncLiveOutcome::NotApplied` (no fifth Live outcome);
 - merchant-safe linking reason is distinguishable from other `NotApplied` cases;
-- item appears in the Live worklist;
-- contextual link/reconfirmation action is offered when authorized.
+- once Live support is truthful and the item is otherwise relevant/actionable, it
+  appears in the merchant attention worklist;
+- contextual link/reconfirmation action is offered when authorized;
+- if no safe existing Magento candidate can be established, copy states that Magento
+  V1 cannot create the missing Product and therefore cannot update it yet.
 
 Do **not** add a per-product case to the run-level setup barrier for linking.
+
+For configurable initial-link/relink review, when an existing parent SKU hint is
+required but absent, surface a **distinct per-item identity-input reason**. Do not
+reuse `AccountConfigurationNotCurrent` / generic configuration-stale copy: the
+connector account can be current while the merchant simply has not supplied the
+parent identity hint needed to locate the existing configurable parent.
 
 ### Link confirmation authorization
 

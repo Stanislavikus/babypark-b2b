@@ -119,6 +119,13 @@ Do not invent a healthy-idle sweep cadence without new evidence. Recovery pollin
 
 Connection status and Product WRITE readiness are separate state dimensions. Do not create a new connection-status meaning merely to represent WRITE blocked/paused.
 
+**Magento V1 Product WRITE capability is LINK/UPDATE-ONLY (Resolved — 2026-09-14).**
+A Product must already exist in the selected Magento account/store context and have
+merchant-confirmed Entity Trust before consequential V1 mutation. Missing remote
+Products are not created by V1; that limitation is operation capability truth, not a
+connection failure and not a Field Mapping error. Future Product CREATE requires a
+separate version/capability contract and certification.
+
 Before the first verified consequential WRITE, use wording equivalent to:
 
 `Передумови перевірено — передачу ще не виконували`.
