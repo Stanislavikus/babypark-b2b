@@ -74,9 +74,9 @@ class ProductStructureLifecycleTest extends TestCase
         $this->assertContains($productBinding->id, $impact->newlyRequiredBindingIds);
         $this->assertContains(['variant_id' => $variant->id, 'field_binding_id' => $variantBinding->id], $impact->outOfTypeVariantCells);
         $this->assertCount(1, $impact->invalidOptionalOverrideIds);
-        $this->assertSame('deferred_to_slice_b', $impact->completenessProjectionStatus);
-        $this->assertNull($impact->completenessBefore);
-        $this->assertNull($impact->completenessAfter);
+        $this->assertSame('available', $impact->completenessProjectionStatus);
+        $this->assertSame(100, $impact->completenessBefore);
+        $this->assertSame(100, $impact->completenessAfter);
 
         $result = app(ProductTypeMutationService::class)->change($actor, $workspace, $product, $target, $impact);
 
