@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\ProductStructure\Exceptions\ProductStructureInvariantException;
+use App\Support\ProductStructure\Exceptions\ProductStructureStaleException;
 use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -59,11 +60,13 @@ final class ProductStructureMutationService
         int $sortOrder,
         bool $optional,
         bool $defaultActive,
+        ?int $expectedStructureRevision = null,
     ): ProductTypeGroupPlacement {
-        return DB::transaction(function () use ($actor, $workspace, $type, $group, $sortOrder, $optional, $defaultActive): ProductTypeGroupPlacement {
+        return DB::transaction(function () use ($actor, $workspace, $type, $group, $sortOrder, $optional, $defaultActive, $expectedStructureRevision): ProductTypeGroupPlacement {
             $this->lockedWorkspace($actor, $workspace);
             $lockedType = $this->lockedType($workspace, $type->id);
             $this->assertMerchantEditableType($lockedType);
+            $this->assertExpectedRevision($lockedType, $expectedStructureRevision);
             $lockedGroup = AttributeGroup::withoutWorkspaceScope()->where('workspace_id', $workspace->id)->whereKey($group->id)->lockForUpdate()->firstOrFail();
             $defaultActive = $optional ? $defaultActive : true;
 
@@ -99,11 +102,13 @@ final class ProductStructureMutationService
         FieldBinding $binding,
         int $sortOrder,
         bool $requiredForCompleteness,
+        ?int $expectedStructureRevision = null,
     ): ProductTypeFieldPlacement {
-        return DB::transaction(function () use ($actor, $workspace, $type, $groupPlacement, $binding, $sortOrder, $requiredForCompleteness): ProductTypeFieldPlacement {
+        return DB::transaction(function () use ($actor, $workspace, $type, $groupPlacement, $binding, $sortOrder, $requiredForCompleteness, $expectedStructureRevision): ProductTypeFieldPlacement {
             $this->lockedWorkspace($actor, $workspace);
             $lockedType = $this->lockedType($workspace, $type->id);
             $this->assertMerchantEditableType($lockedType);
+            $this->assertExpectedRevision($lockedType, $expectedStructureRevision);
             $lockedGroupPlacement = ProductTypeGroupPlacement::withoutWorkspaceScope()
                 ->where('workspace_id', $workspace->id)
                 ->where('product_type_id', $lockedType->id)
@@ -137,9 +142,9 @@ final class ProductStructureMutationService
         });
     }
 
-    public function removeGroupPlacement(User $actor, Workspace $workspace, ProductTypeGroupPlacement $placement): void
+    public function removeGroupPlacement(User $actor, Workspace $workspace, ProductTypeGroupPlacement $placement, ?int $expectedStructureRevision = null): void
     {
-        DB::transaction(function () use ($actor, $workspace, $placement): void {
+        DB::transaction(function () use ($actor, $workspace, $placement, $expectedStructureRevision): void {
             $this->lockedWorkspace($actor, $workspace);
             $locked = ProductTypeGroupPlacement::withoutWorkspaceScope()
                 ->where('workspace_id', $workspace->id)
@@ -148,18 +153,20 @@ final class ProductStructureMutationService
                 ->firstOrFail();
             $type = $this->lockedType($workspace, $locked->product_type_id);
             $this->assertMerchantEditableType($type);
+            $this->assertExpectedRevision($type, $expectedStructureRevision);
             $locked->delete();
             $this->bumpRevision($type);
         });
     }
 
-    public function removeFieldPlacement(User $actor, Workspace $workspace, ProductTypeFieldPlacement $placement): void
+    public function removeFieldPlacement(User $actor, Workspace $workspace, ProductTypeFieldPlacement $placement, ?int $expectedStructureRevision = null): void
     {
-        DB::transaction(function () use ($actor, $workspace, $placement): void {
+        DB::transaction(function () use ($actor, $workspace, $placement, $expectedStructureRevision): void {
             $this->lockedWorkspace($actor, $workspace);
             $locked = ProductTypeFieldPlacement::withoutWorkspaceScope()->where('workspace_id', $workspace->id)->whereKey($placement->id)->lockForUpdate()->firstOrFail();
             $type = $this->lockedType($workspace, $locked->product_type_id);
             $this->assertMerchantEditableType($type);
+            $this->assertExpectedRevision($type, $expectedStructureRevision);
             $locked->delete();
             $this->bumpRevision($type);
         });
@@ -184,6 +191,13 @@ final class ProductStructureMutationService
     {
         if ($type->is_default) {
             throw new ProductStructureInvariantException('Basic Product structure is system-managed and cannot be edited directly.');
+        }
+    }
+
+    private function assertExpectedRevision(ProductType $type, ?int $expectedRevision): void
+    {
+        if ($expectedRevision !== null && $type->structure_revision !== $expectedRevision) {
+            throw ProductStructureStaleException::revisionMismatch();
         }
     }
 

@@ -25,6 +25,7 @@ use App\Services\ProductStructure\ProductTypeBulkMutationService;
 use App\Services\ProductStructure\ProductTypeChangeImpactService;
 use App\Services\ProductStructure\ProductTypeMutationService;
 use App\Support\ProductStructure\Exceptions\ProductStructureInvariantException;
+use App\Support\ProductStructure\Exceptions\ProductStructureStaleException;
 use App\Support\ProductStructure\Exceptions\ProductTypeChangeStaleException;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -256,6 +257,29 @@ class ProductStructureLifecycleTest extends TestCase
             'product_type_id' => $basic->id,
             'attribute_group_id' => $merchantGroup->id,
         ]);
+    }
+
+    #[Test]
+    public function stale_structure_revision_rejects_merchant_structure_edit(): void
+    {
+        [$workspace, $actor] = $this->authorizedContext();
+        $structure = app(ProductStructureMutationService::class);
+        $type = $structure->createProductType($actor, $workspace, 'cas_type', ['en' => 'CAS Type']);
+        $firstGroup = $structure->createAttributeGroup($actor, $workspace, 'cas_first', ['en' => 'CAS First']);
+        $secondGroup = $structure->createAttributeGroup($actor, $workspace, 'cas_second', ['en' => 'CAS Second']);
+        $revision = $type->fresh()->structure_revision;
+
+        $structure->putGroupPlacement($actor, $workspace, $type, $firstGroup, 100, false, true, $revision);
+
+        try {
+            $structure->putGroupPlacement($actor, $workspace, $type, $secondGroup, 200, false, true, $revision);
+            $this->fail('Expected stale structure revision rejection.');
+        } catch (ProductStructureStaleException) {
+            $this->assertDatabaseMissing('product_type_group_placements', [
+                'product_type_id' => $type->id,
+                'attribute_group_id' => $secondGroup->id,
+            ]);
+        }
     }
 
     #[Test]
