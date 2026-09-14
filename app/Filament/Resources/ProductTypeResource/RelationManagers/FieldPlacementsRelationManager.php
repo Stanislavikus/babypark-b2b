@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\ProductStructure\ProductStructureMutationService;
 use App\Support\ProductStructure\Exceptions\ProductStructureStaleException;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -54,6 +55,7 @@ class FieldPlacementsRelationManager extends RelationManager
     {
         return Action::make('addField')
             ->label('Додати поле')
+            ->fillForm(fn (): array => ['expected_structure_revision' => (int) $this->getOwnerRecord()->structure_revision])
             ->schema($this->fieldSchema(includeBinding: true))
             ->action(function (array $data): void {
                 $this->mutateField($data, null);
@@ -68,6 +70,7 @@ class FieldPlacementsRelationManager extends RelationManager
                 'product_type_group_placement_id' => $record->product_type_group_placement_id,
                 'sort_order' => $record->sort_order,
                 'required_for_completeness' => $record->required_for_completeness,
+                'expected_structure_revision' => (int) $this->getOwnerRecord()->structure_revision,
             ])
             ->schema($this->fieldSchema(includeBinding: false))
             ->action(function (array $data, ProductTypeFieldPlacement $record): void {
@@ -85,6 +88,7 @@ class FieldPlacementsRelationManager extends RelationManager
                 ->required()
                 ->searchable();
         }
+        $schema[] = Hidden::make('expected_structure_revision')->required();
         $schema[] = Select::make('product_type_group_placement_id')
             ->label('Група')
             ->options(fn (): array => $this->groupPlacementOptions())
@@ -111,10 +115,14 @@ class FieldPlacementsRelationManager extends RelationManager
             ->orderBy('sort_order')
             ->get()
             ->mapWithKeys(fn (FieldBinding $binding): array => [
-                $binding->id => (string) ($binding->fieldDefinition?->localized_labels['uk']
-                    ?? $binding->fieldDefinition?->localized_labels['en']
-                    ?? $binding->fieldDefinition?->code
-                    ?? $binding->id),
+                $binding->id => sprintf(
+                    '%s — %s',
+                    (string) ($binding->fieldDefinition?->localized_labels['uk']
+                        ?? $binding->fieldDefinition?->localized_labels['en']
+                        ?? $binding->fieldDefinition?->code
+                        ?? $binding->id),
+                    $binding->object_type === FieldObjectType::Product ? 'Товар' : 'Варіант',
+                ),
             ])->all();
     }
 
@@ -155,7 +163,7 @@ class FieldPlacementsRelationManager extends RelationManager
                 $binding,
                 (int) $data['sort_order'],
                 (bool) ($data['required_for_completeness'] ?? false),
-                $type->structure_revision,
+                (int) $data['expected_structure_revision'],
             );
             Notification::make()->success()->title('Структуру поля збережено')->send();
         } catch (ProductStructureStaleException $exception) {

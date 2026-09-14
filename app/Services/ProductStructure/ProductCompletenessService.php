@@ -14,8 +14,6 @@ use App\Models\ProductType;
 use App\Models\ProductTypeGroupPlacement;
 use App\Models\ProductVariant;
 use App\Models\VariantFieldValue;
-use App\Services\Catalog\GovernedProductVariantColumnEligibility;
-use App\Services\Catalog\GovernedProductVariantColumnValuePolicy;
 use App\Services\Fields\GovernedDynamicFieldValueWriter;
 use App\Support\ProductStructure\ProductCompletenessGroupProjection;
 use App\Support\ProductStructure\ProductCompletenessProjection;
@@ -24,8 +22,7 @@ final class ProductCompletenessService
 {
     public function __construct(
         private readonly GovernedDynamicFieldValueWriter $dynamicValueWriter,
-        private readonly GovernedProductVariantColumnEligibility $columnEligibility,
-        private readonly GovernedProductVariantColumnValuePolicy $columnValuePolicy,
+        private readonly ProductStructureStoredValueReader $storedValueReader,
     ) {}
 
     public function project(Product $product, ?string $locale = null): ProductCompletenessProjection
@@ -276,24 +273,7 @@ final class ProductCompletenessService
             );
         }
 
-        if ($binding->storage_type !== AttributeStorageType::Column) {
-            return false;
-        }
-        $rule = $this->columnEligibility->matchingRule($binding, $definition);
-        if ($rule === null) {
-            return false;
-        }
-
-        $value = $target->getAttribute($rule['column']);
-        if ($value === null) {
-            return false;
-        }
-
-        try {
-            return $this->columnValuePolicy->normalizeSetValue($definition->code, $value) === $value;
-        } catch (\Throwable) {
-            return false;
-        }
+        return $this->storedValueReader->isComplete($target, $binding, $definition);
     }
 
     private function percentage(int $filled, int $required): int

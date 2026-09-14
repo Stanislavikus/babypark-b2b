@@ -8,6 +8,7 @@ use App\Enums\AttributeStatus;
 use App\Enums\AttributeStorageType;
 use App\Enums\FieldObjectType;
 use App\Models\AttributeGroup;
+use App\Models\Category;
 use App\Models\FieldBinding;
 use App\Models\FieldDefinition;
 use App\Models\Product;
@@ -222,6 +223,43 @@ class ProductCompletenessServiceTest extends TestCase
     }
 
     #[Test]
+    public function canonical_product_variant_columns_and_category_relation_are_read_for_completeness(): void
+    {
+        $this->seed(FieldDefinitionSeeder::class);
+        [$workspace, $type, $product, $group] = $this->fixture();
+        $category = Category::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'name' => 'Completeness Category',
+            'stock_display_threshold' => 10,
+        ]);
+        Product::withoutWorkspaceScope()->whereKey($product->id)->update([
+            'brand' => 'BabyPark',
+            'category_id' => $category->id,
+            'min_order_quantity' => 2,
+        ]);
+        $product->refresh();
+        $variant = $this->variant($workspace, $product, true);
+        ProductVariant::withoutWorkspaceScope()->whereKey($variant->id)->update(['barcode_ean' => '4820000000001']);
+
+        foreach (['brand', 'category', 'min_order_quantity', 'sku', 'gtin'] as $code) {
+            $this->place($workspace, $type, $group, $this->canonicalBinding($code), required: true);
+        }
+
+        $complete = app(ProductCompletenessService::class)->project($product, 'uk');
+        $this->assertSame(5, $complete->requiredCount);
+        $this->assertSame(5, $complete->filledCount);
+        $this->assertSame(100, $complete->percentage);
+
+        ProductVariant::withoutWorkspaceScope()->whereKey($variant->id)->update(['barcode_ean' => null]);
+        Product::withoutWorkspaceScope()->whereKey($product->id)->update(['category_id' => null]);
+        $missing = app(ProductCompletenessService::class)->project($product->fresh(), 'uk');
+        $this->assertSame(3, $missing->filledCount);
+        $this->assertCount(1, $missing->missingProductBindingIds);
+        $this->assertCount(1, $missing->missingVariantCells);
+    }
+
+    #[Test]
     public function unsupported_column_binding_fails_safe_without_reading_storage_path_directly(): void
     {
         [$workspace, $type, $product, $group] = $this->fixture();
@@ -398,6 +436,19 @@ class ProductCompletenessServiceTest extends TestCase
             'sort_order' => 100,
             'required_for_completeness' => $required,
         ]);
+    }
+
+    private function canonicalBinding(string $code): FieldBinding
+    {
+        $definition = FieldDefinition::withoutWorkspaceScope()
+            ->whereNull('workspace_id')
+            ->where('code', $code)
+            ->sole();
+
+        return FieldBinding::withoutWorkspaceScope()
+            ->whereNull('workspace_id')
+            ->where('field_definition_id', $definition->id)
+            ->sole();
     }
 
     private function variant(Workspace $workspace, Product $product, bool $active): ProductVariant
