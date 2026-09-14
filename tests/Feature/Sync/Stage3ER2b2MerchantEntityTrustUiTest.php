@@ -5,6 +5,9 @@ namespace Tests\Feature\Sync;
 use App\Enums\EntityTrust\EntityTrustConfirmationMode;
 use App\Enums\EntityTrust\EntityTrustFailureReason;
 use App\Enums\EntityTrust\EntityTrustReadinessStatus;
+use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
+use App\Enums\SyncSemanticOperation;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportPreview;
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
@@ -22,6 +25,7 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\ConfiguresSyncSupportProfiles;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\Concerns\CreatesMerchantConfirmedExternalRecordLinks;
 use Tests\Concerns\InteractsWithEntityTrustFixtures;
@@ -32,6 +36,7 @@ use Tests\TestCase;
 
 class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
 {
+    use ConfiguresSyncSupportProfiles;
     use CreatesConnectorAccountFixtures;
     use CreatesMerchantConfirmedExternalRecordLinks;
     use InteractsWithEntityTrustFixtures;
@@ -57,7 +62,7 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
     }
 
     #[Test]
-    public function live_only_actor_sees_entity_trust_section_in_live_area_but_cannot_review(): void
+    public function live_only_actor_does_not_see_entity_trust_work_while_live_support_is_false(): void
     {
         [$account, $product] = $this->seedSimpleReadyFixture('UI-LIVEONLY-SKU', 5001);
 
@@ -68,16 +73,19 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
 
         Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->assertSet('entityTrustSectionVisible', true)
+            ->assertSet('liveSupportAvailable', false)
+            ->assertSet('entityTrustSectionVisible', false)
             ->assertSet('entityTrustCanReviewOrConfirm', false)
             ->assertSet('entityTrustWorkingSet', [])
-            ->assertSee('data-testid="sync-live-entity-trust-section"', false)
-            ->assertSee(__('entity_trust.section.no_permission'));
+            ->assertDontSee('data-testid="sync-live-entity-trust-section"', false)
+            ->assertSee('data-testid="sync-live-support-not-enabled"', false);
     }
 
     #[Test]
     public function dual_permission_actor_sees_working_set_with_initial_link_required_row(): void
     {
+        $this->enableAdobeProductsExportLiveSupport();
+
         [$account, $product] = $this->seedSimpleReadyFixture('UI-DUAL-SKU', 5010);
         $actor = $this->createEntityTrustActor($account->workspace);
 
@@ -93,6 +101,8 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
     #[Test]
     public function entity_trust_forms_carry_novalidate_attribute(): void
     {
+        $this->enableAdobeProductsExportLiveSupport();
+
         // docs/05-AI_WORKING_AGREEMENT.md: every panel form must keep
         // `novalidate` on the form element so Filament owns validation
         // messaging instead of the browser.
@@ -283,6 +293,8 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
     #[Test]
     public function relink_flow_uses_explicit_relink_path_and_passes_parent_sku_hint(): void
     {
+        $this->enableAdobeProductsExportLiveSupport();
+
         [$account, $product,, $parentSku] = $this->seedConfigurableRelinkRequiredFixture();
         $actor = $this->createEntityTrustActor($account->workspace);
 
@@ -302,6 +314,8 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
     #[Test]
     public function configurable_family_working_set_row_marks_is_configurable_family(): void
     {
+        $this->enableAdobeProductsExportLiveSupport();
+
         [$account, $product] = $this->seedConfigurableReadyFixture();
         $actor = $this->createEntityTrustActor($account->workspace);
 
@@ -400,6 +414,8 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
     #[Test]
     public function revocation_of_dual_permission_clears_entity_trust_action(): void
     {
+        $this->enableAdobeProductsExportLiveSupport();
+
         [$account, $product] = $this->seedSimpleReadyFixture('UI-REVOKE-SKU', 5280);
         $actor = User::factory()->create(['is_active' => true]);
         $membership = $this->grantExactWorkspacePermissions($account->workspace, $actor, [
@@ -505,6 +521,14 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
         );
 
         return [$account, $product, $variants, $parentSku];
+    }
+
+    private function enableAdobeProductsExportLiveSupport(): void
+    {
+        $this->configureAdobePaaSSyncSupportProfile([
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live],
+        ]);
     }
 
     /**

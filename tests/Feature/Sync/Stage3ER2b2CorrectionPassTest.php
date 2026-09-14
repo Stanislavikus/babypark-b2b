@@ -4,6 +4,9 @@ namespace Tests\Feature\Sync;
 
 use App\Enums\EntityTrust\EntityTrustConfirmationMode;
 use App\Enums\EntityTrust\EntityTrustFailureReason;
+use App\Enums\SyncDataDomain;
+use App\Enums\SyncRunMode;
+use App\Enums\SyncSemanticOperation;
 use App\Enums\UserRole;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportPreview;
 use App\Models\ConnectorAccount;
@@ -32,6 +35,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\ConfiguresSyncSupportProfiles;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\Concerns\CreatesMerchantConfirmedExternalRecordLinks;
 use Tests\Concerns\InteractsWithEntityTrustFixtures;
@@ -49,6 +53,7 @@ use Tests\TestCase;
  */
 class Stage3ER2b2CorrectionPassTest extends TestCase
 {
+    use ConfiguresSyncSupportProfiles;
     use CreatesConnectorAccountFixtures;
     use CreatesMerchantConfirmedExternalRecordLinks;
     use InteractsWithEntityTrustFixtures;
@@ -261,6 +266,8 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     #[Test]
     public function simple_explicit_relink_does_not_ask_for_parent_sku_and_uses_no_hint(): void
     {
+        $this->enableAdobeProductsExportLiveSupport();
+
         [$account, $product] = $this->seedSimpleRelinkRequiredFixture('CORR-RELINK-SIMPLE-SKU', 7010);
         $actor = $this->createEntityTrustActor($account->workspace);
 
@@ -280,6 +287,8 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     #[Test]
     public function configurable_explicit_relink_requires_merchant_parent_sku_and_forwards_it(): void
     {
+        $this->enableAdobeProductsExportLiveSupport();
+
         [$account, $product,, $parentSku] = $this->seedConfigurableRelinkRequiredFixture();
         $actor = $this->createEntityTrustActor($account->workspace);
 
@@ -347,6 +356,8 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     #[Test]
     public function initial_link_required_product_rejects_crafted_relink_action_before_backend_review(): void
     {
+        $this->enableAdobeProductsExportLiveSupport();
+
         [$account, $product, $variant] = $this->seedSimpleReadyFixture('CORR-ACTION-REVIEW-ONLY-SKU', 7011);
         $actor = $this->createEntityTrustActor($account->workspace);
 
@@ -365,6 +376,8 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     #[Test]
     public function already_confirmed_product_rejects_crafted_relink_action_without_mutating_existing_trust(): void
     {
+        $this->enableAdobeProductsExportLiveSupport();
+
         [$account, $product, $variant] = $this->seedSimpleReadyFixture('CORR-ACTION-NONE-SKU', 7012);
         $actor = $this->createEntityTrustActor($account->workspace);
 
@@ -390,6 +403,8 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     #[Test]
     public function relink_review_required_product_rejects_crafted_review_action_before_normal_review_flow(): void
     {
+        $this->enableAdobeProductsExportLiveSupport();
+
         [$account, $product, $variant] = $this->seedSimpleReadyFixture('CORR-ACTION-RELINK-SKU', 7013);
         $actor = $this->createEntityTrustActor($account->workspace);
 
@@ -414,6 +429,8 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     #[Test]
     public function extra_children_available_and_non_empty_renders_warning_state(): void
     {
+        $this->enableAdobeProductsExportLiveSupport();
+
         [$account, $product, $variants, $parentSku] = $this->seedConfigurableReadyFixture();
         $actor = $this->createEntityTrustActor($account->workspace);
 
@@ -431,6 +448,8 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     #[Test]
     public function extra_children_available_and_empty_renders_empty_state(): void
     {
+        $this->enableAdobeProductsExportLiveSupport();
+
         [$account, $product, $variants, $parentSku] = $this->seedConfigurableReadyFixture();
         $actor = $this->createEntityTrustActor($account->workspace);
 
@@ -455,6 +474,8 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     #[Test]
     public function extra_children_unavailable_renders_unavailable_state(): void
     {
+        $this->enableAdobeProductsExportLiveSupport();
+
         [$account, $product, $variants, $parentSku] = $this->seedConfigurableReadyFixture();
         $actor = $this->createEntityTrustActor($account->workspace);
 
@@ -978,6 +999,8 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     #[Test]
     public function successful_confirmation_copy_does_not_claim_the_product_is_ready_for_live_transfer(): void
     {
+        $this->enableAdobeProductsExportLiveSupport();
+
         [$account, $product] = $this->seedSimpleReadyFixture('CORR-SUCCESS-COPY-SKU', 7057);
         $actor = $this->createEntityTrustActor($account->workspace);
 
@@ -1027,6 +1050,14 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
         // The Live read model exposes liveSupportAvailable = false in
         // R2b-2 — Live is gated behind a feature flag that remains off.
         $this->assertFalse((bool) $component->get('liveSupportAvailable'));
+    }
+
+    private function enableAdobeProductsExportLiveSupport(): void
+    {
+        $this->configureAdobePaaSSyncSupportProfile([
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live],
+        ]);
     }
 
     // -----------------------------------------------------------------

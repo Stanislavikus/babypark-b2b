@@ -616,7 +616,7 @@ class Stage2A2MerchantPreviewConformanceTest extends TestCase
             ->set('worklistFilter', 'all');
 
         $fieldMappingDestination = $this->destinationForLabel(
-            $component->instance()->worklistRows,
+            $component->instance()->configurationAttentionRows,
             __('sync_preview.remediation.field_mapping'),
         );
 
@@ -714,7 +714,7 @@ class Stage2A2MerchantPreviewConformanceTest extends TestCase
             ->set('worklistFilter', 'all');
 
         $optionMappingDestination = $this->destinationForLabel(
-            $component->instance()->worklistRows,
+            $component->instance()->configurationAttentionRows,
             __('sync_preview.remediation.option_mapping'),
         );
 
@@ -776,7 +776,7 @@ class Stage2A2MerchantPreviewConformanceTest extends TestCase
             ->set('worklistFilter', 'all');
 
         $connectorSetupDestination = $this->destinationForLabel(
-            $component->instance()->worklistRows,
+            $component->instance()->configurationAttentionRows,
             __('sync_preview.remediation.connector_setup'),
         );
 
@@ -1007,6 +1007,12 @@ class Stage2A2MerchantPreviewConformanceTest extends TestCase
     private function destinationForLabel(array $rows, string $label): ?array
     {
         foreach ($rows as $row) {
+            foreach ($row['destinations'] ?? [] as $destination) {
+                if (($destination['label'] ?? null) === $label) {
+                    return $destination;
+                }
+            }
+
             foreach ($row['findings'] ?? [] as $finding) {
                 foreach ($finding['destinations'] ?? [] as $destination) {
                     if (($destination['label'] ?? null) === $label) {

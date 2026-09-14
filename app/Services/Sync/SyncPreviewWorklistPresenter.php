@@ -19,6 +19,7 @@ final class SyncPreviewWorklistPresenter
         private readonly SyncPreviewPresentationContextLoader $contextLoader,
         private readonly SyncPreviewFindingPresenter $findingPresenter,
         private readonly SyncPreviewProductIdentityPresenter $identityPresenter,
+        private readonly SyncPreviewConfigurationAttentionPresenter $configurationAttentionPresenter,
     ) {}
 
     /**
@@ -32,6 +33,7 @@ final class SyncPreviewWorklistPresenter
         User $actor,
         Workspace $workspace,
         Collection $items,
+        bool $includeConfigurationOnlyRows = true,
     ): array {
         if ($items->isEmpty()) {
             return [];
@@ -64,9 +66,16 @@ final class SyncPreviewWorklistPresenter
             }
 
             $findings = [];
+            $hasConfigurationOwnedFinding = false;
 
             foreach ($item->findings ?? [] as $finding) {
                 if (! is_array($finding)) {
+                    continue;
+                }
+
+                if ($this->configurationAttentionPresenter->isConfigurationOwned($finding)) {
+                    $hasConfigurationOwnedFinding = true;
+
                     continue;
                 }
 
@@ -74,13 +83,22 @@ final class SyncPreviewWorklistPresenter
                 $findings[] = $presentation->toArray();
             }
 
-            $attentionSummary = $this->summarizeAttention($findings);
+            $configurationOnly = $hasConfigurationOwnedFinding && $findings === [];
+
+            if ($configurationOnly && ! $includeConfigurationOnlyRows) {
+                continue;
+            }
+
+            $attentionSummary = $configurationOnly
+                ? __('sync_preview.worklist.shared_configuration_attention')
+                : $this->summarizeAttention($findings);
 
             $rows[] = [
                 'identity_html' => $this->identityPresenter->presentHtml($product, $product->variants),
                 'outcome_label' => $this->outcomeLabel($item->previewOutcome()),
                 'outcome_color' => $this->outcomeColor($item->previewOutcome()),
                 'attention_summary' => $attentionSummary,
+                'configuration_attention_only' => $configurationOnly,
                 'findings' => $findings,
             ];
         }
