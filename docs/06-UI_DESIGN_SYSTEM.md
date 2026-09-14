@@ -1801,7 +1801,7 @@ Summary rules for Stage 2A UI — prevent divergence from the contract:
 - **Aggregate configuration root causes** — identical setup/mapping causes are one merchant task with an affected Product count and optional drill-down; preserve per-item historical evidence underneath. Never repeat the same Mapping action once per Product when one configuration change resolves the cause for all affected Products.
 - **Causal destination** — route each issue to its real owner (Mapping, Option Mapping, Product, Variant, Pricing, connector Setup); never use a Product editor as a generic escape hatch for Pricing or identity.
 - **Exact field context** where evidence permits — use Product Field taxonomy (*Варіант → Характеристики → Колір*), not Preview-specific field labels.
-- **Honest action state** — show *[Виправити]* only when an authorized editor exists; when no safe edit surface exists, use honest non-actionable copy rather than a fake Fix.
+- **Honest action state** — `NO_EDIT_SURFACE` remains the explicit actionability state when no safe edit surface exists; show *[Виправити]* only when an authorized editor exists, and otherwise use honest non-actionable copy rather than a fake Fix.
 - **Explicit rerun** — when configuration drift makes a historical finding's fix unsafe: *Налаштування змінилися після цієї перевірки. Запустіть перевірку ще раз.*
 - **No technical connector vocabulary** — never expose `attribute_set_id`, snapshot/discovery internals, or raw finding codes in Layer A/B.
 - **Setup-required vs product-blocked** — pre-admission setup: *Потрібно завершити налаштування перед перевіркою*; without setup permission: *У вас немає доступу до цієї настройки* — not *Товар заблокований*.
