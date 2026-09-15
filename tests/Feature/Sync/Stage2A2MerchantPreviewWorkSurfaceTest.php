@@ -532,6 +532,131 @@ class Stage2A2MerchantPreviewWorkSurfaceTest extends TestCase
     }
 
     #[Test]
+    public function configuration_owned_findings_are_aggregated_across_the_full_run_without_repeated_default_rows(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::RUN_SYNC_PREVIEW);
+
+        $first = $this->createProductWithVariant($workspace, 'Shared blocker A', 'SHARED-A', 'Brand');
+        $second = $this->createProductWithVariant($workspace, 'Shared blocker B', 'SHARED-B', 'Brand');
+        $itemSpecific = $this->createProductWithVariant($workspace, 'Item-specific blocker', 'ITEM-1', 'Brand');
+
+        $run = SyncRun::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $workspace->id,
+            'sync_configuration_id' => $configuration->id,
+            'configuration_revision' => $configuration->configuration_revision,
+            'mode' => SyncRunMode::Preview,
+            'semantic_operation' => SyncSemanticOperation::Export,
+            'status' => SyncRunStatus::Completed,
+            'initiated_by_user_id' => $actor->id,
+            'configuration_snapshot' => ['field_mappings' => []],
+            'completed_at' => now(),
+        ]);
+
+        foreach ([$first, $second] as $product) {
+            SyncRunItem::withoutWorkspaceScope()->create([
+                'id' => (string) Str::uuid(),
+                'workspace_id' => $workspace->id,
+                'sync_run_id' => $run->id,
+                'product_id' => $product->id,
+                'outcome' => SyncPreviewOutcome::Blocked,
+                'findings' => [(new SyncPreviewFinding(
+                    SyncPreviewFindingCode::MissingRequiredFieldMapping,
+                    subject: 'status',
+                ))->toArray()],
+            ]);
+        }
+
+        SyncRunItem::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $workspace->id,
+            'sync_run_id' => $run->id,
+            'product_id' => $itemSpecific->id,
+            'outcome' => SyncPreviewOutcome::Blocked,
+            'findings' => [(new SyncPreviewFinding(SyncPreviewFindingCode::MissingName))->toArray()],
+        ]);
+
+        $component = Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertCount('configurationAttentionRows', 1)
+            ->assertSet('configurationAttentionRows.0.affected_products_count', 2)
+            ->assertSet('configurationAttentionAffectedProductCount', 2)
+            ->assertCount('worklistRows', 1)
+            ->assertSee('data-testid="sync-preview-configuration-attention"', false)
+            ->assertSee('Item-specific blocker')
+            ->assertDontSee('Shared blocker A')
+            ->assertDontSee('Shared blocker B');
+
+        $component
+            ->set('worklistSearch', 'Shared blocker A')
+            ->assertCount('configurationAttentionRows', 1)
+            ->assertSet('configurationAttentionRows.0.affected_products_count', 2)
+            ->assertSet('configurationAttentionAffectedProductCount', 2)
+            ->assertCount('worklistRows', 0);
+
+        $component
+            ->set('worklistFilter', 'all')
+            ->assertCount('configurationAttentionRows', 1)
+            ->assertCount('worklistRows', 1)
+            ->assertSet('worklistRows.0.configuration_attention_only', true)
+            ->assertSee('data-testid="sync-preview-shared-configuration-attention"', false);
+    }
+
+    #[Test]
+    public function configuration_aggregation_uses_semantic_identity_not_rendered_copy(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->adobeAccount($workspace);
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::RUN_SYNC_PREVIEW);
+        $binding = $this->productVariantBinding('color');
+
+        $first = $this->createProductWithVariant($workspace, 'Blue option blocker', 'OPTION-BLUE', 'Brand');
+        $second = $this->createProductWithVariant($workspace, 'Red option blocker', 'OPTION-RED', 'Brand');
+
+        $run = SyncRun::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $workspace->id,
+            'sync_configuration_id' => $configuration->id,
+            'configuration_revision' => $configuration->configuration_revision,
+            'mode' => SyncRunMode::Preview,
+            'semantic_operation' => SyncSemanticOperation::Export,
+            'status' => SyncRunStatus::Completed,
+            'initiated_by_user_id' => $actor->id,
+            'configuration_snapshot' => ['field_mappings' => []],
+            'completed_at' => now(),
+        ]);
+
+        foreach ([[$first, 'blue'], [$second, 'red']] as [$product, $internalOptionKey]) {
+            SyncRunItem::withoutWorkspaceScope()->create([
+                'id' => (string) Str::uuid(),
+                'workspace_id' => $workspace->id,
+                'sync_run_id' => $run->id,
+                'product_id' => $product->id,
+                'outcome' => SyncPreviewOutcome::Blocked,
+                'findings' => [(new SyncPreviewFinding(
+                    SyncPreviewFindingCode::MissingOptionMapping,
+                    subject: $binding->id,
+                    context: ['internal_option_key' => $internalOptionKey],
+                ))->toArray()],
+            ]);
+        }
+
+        $component = Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertCount('configurationAttentionRows', 2)
+            ->assertSet('configurationAttentionAffectedProductCount', 2);
+
+        $rows = $component->instance()->configurationAttentionRows;
+
+        $this->assertSame($rows[0]['summary'], $rows[1]['summary']);
+        $this->assertSame([1, 1], array_column($rows, 'affected_products_count'));
+    }
+
+    #[Test]
     public function same_livewire_component_rejects_after_run_sync_preview_revocation(): void
     {
         $workspace = $this->defaultWorkspace();

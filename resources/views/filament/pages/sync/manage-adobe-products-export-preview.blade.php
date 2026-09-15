@@ -139,6 +139,53 @@
               </div>
             </x-filament::section>
 
+            @if (count($configurationAttentionRows) > 0)
+              <x-filament::section data-testid="sync-preview-configuration-attention">
+                <x-slot name="heading">
+                  {{ __('sync_preview.configuration_attention.title') }}
+                </x-slot>
+                <x-slot name="description">
+                  {{ __('sync_preview.configuration_attention.summary', [
+                    'settings' => count($configurationAttentionRows),
+                    'products' => $configurationAttentionAffectedProductCount,
+                  ]) }}
+                </x-slot>
+
+                <div class="space-y-3">
+                  @foreach ($configurationAttentionRows as $row)
+                    <div
+                      class="rounded-lg border border-gray-200 p-3 dark:border-gray-700"
+                      data-testid="sync-preview-configuration-attention-row"
+                    >
+                      @if (! empty($row['field_context']))
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ $row['field_context'] }}</p>
+                      @endif
+                      <p class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $row['summary'] }}</p>
+                      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {{ __('sync_preview.configuration_attention.affected_products', ['count' => $row['affected_products_count']]) }}
+                      </p>
+                      <div class="mt-2 flex flex-wrap gap-2">
+                        @foreach ($row['destinations'] as $destination)
+                          @if (! empty($destination['action_url']) && ! empty($destination['action_label']))
+                            <x-filament::button
+                              tag="a"
+                              size="xs"
+                              :href="$destination['action_url']"
+                              color="gray"
+                            >
+                              {{ $destination['action_label'] }}
+                            </x-filament::button>
+                          @elseif (! empty($destination['status_message']))
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ $destination['status_message'] }}</p>
+                          @endif
+                        @endforeach
+                      </div>
+                    </div>
+                  @endforeach
+                </div>
+              </x-filament::section>
+            @endif
+
             <x-filament::section>
               <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div class="flex flex-wrap gap-2">
@@ -194,19 +241,25 @@
                           </x-filament::badge>
                         </td>
                         <td class="px-3 py-3">
-                          <div class="space-y-3">
-                            @foreach ($row['findings'] as $finding)
-                              <div class="space-y-1" data-testid="sync-preview-finding">
-                                @if (! empty($finding['variant_context']))
-                                  <p class="text-xs text-gray-500 dark:text-gray-400">{{ $finding['variant_context'] }}</p>
-                                @endif
-                                @if (! empty($finding['field_context']))
-                                  <p class="text-xs text-gray-500 dark:text-gray-400">{{ $finding['field_context'] }}</p>
-                                @endif
-                                <p>{{ $finding['summary'] }}</p>
-                              </div>
-                            @endforeach
-                          </div>
+                          @if (! empty($row['configuration_attention_only']))
+                            <p class="text-sm text-gray-600 dark:text-gray-300" data-testid="sync-preview-shared-configuration-attention">
+                              {{ $row['attention_summary'] }}
+                            </p>
+                          @else
+                            <div class="space-y-3">
+                              @foreach ($row['findings'] as $finding)
+                                <div class="space-y-1" data-testid="sync-preview-finding">
+                                  @if (! empty($finding['variant_context']))
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ $finding['variant_context'] }}</p>
+                                  @endif
+                                  @if (! empty($finding['field_context']))
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ $finding['field_context'] }}</p>
+                                  @endif
+                                  <p>{{ $finding['summary'] }}</p>
+                                </div>
+                              @endforeach
+                            </div>
+                          @endif
                         </td>
                         <td class="px-3 py-3">
                           <div class="space-y-3">

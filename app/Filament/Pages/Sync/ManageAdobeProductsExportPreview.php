@@ -29,6 +29,7 @@ use App\Services\Sync\SyncLiveMerchantReadService;
 use App\Services\Sync\SyncLiveWorklistPresenter;
 use App\Services\Sync\SyncLiveWorklistQuery;
 use App\Services\Sync\SyncPreviewAdmissionService;
+use App\Services\Sync\SyncPreviewConfigurationAttentionPresenter;
 use App\Services\Sync\SyncPreviewMerchantReadService;
 use App\Services\Sync\SyncPreviewWorklistPresenter;
 use App\Services\Sync\SyncPreviewWorklistQuery;
@@ -101,6 +102,11 @@ class ManageAdobeProductsExportPreview extends Page
     public ?int $blockedCount = null;
 
     public ?string $completedAtLabel = null;
+
+    /** @var list<array<string, mixed>> */
+    public array $configurationAttentionRows = [];
+
+    public int $configurationAttentionAffectedProductCount = 0;
 
     /** @var list<array<string, mixed>> */
     public array $worklistRows = [];
@@ -463,8 +469,10 @@ class ManageAdobeProductsExportPreview extends Page
             $this->accountName = $projection->accountName;
         }
 
-        // Stage 3E-R2b-2: entity trust section only surfaces inside the Live area.
-        if ($this->liveSectionVisible) {
+        // Entity Trust remains an internal/certification capability while Live support
+        // is false, but it must not compete with Preview remediation on the default
+        // merchant journey until the connector truthfully advertises Live support.
+        if ($this->liveSectionVisible && $this->liveSupportAvailable) {
             $this->refreshEntityTrustPresentation($user, $workspace);
         } else {
             $this->resetEntityTrustPresentation();
@@ -834,7 +842,8 @@ class ManageAdobeProductsExportPreview extends Page
         $auth = app(AdobeProductsExportLiveAuthorizationService::class);
         $entityTrustAuth = app(AdobeProductEntityTrustAuthorizationService::class);
 
-        $this->entityTrustSectionVisible = $auth->isEligibleLiveTarget($user, $workspace, $this->accountId);
+        $this->entityTrustSectionVisible = $this->liveSupportAvailable
+            && $auth->isEligibleLiveTarget($user, $workspace, $this->accountId);
         $this->entityTrustCanReviewOrConfirm = $this->entityTrustSectionVisible
             && $entityTrustAuth->canReviewOrConfirm($user, $workspace);
 
@@ -994,6 +1003,8 @@ class ManageAdobeProductsExportPreview extends Page
         $this->blockedCount = null;
         $this->completedAtLabel = null;
         $this->resultAttentionStatement = null;
+        $this->configurationAttentionRows = [];
+        $this->configurationAttentionAffectedProductCount = 0;
         $this->worklistRows = [];
 
         if ($readModel->pageState === SyncPreviewMerchantPageState::Completed && $readModel->resultSummary !== null) {
@@ -1103,6 +1114,8 @@ class ManageAdobeProductsExportPreview extends Page
         $this->warningCount = null;
         $this->blockedCount = null;
         $this->completedAtLabel = null;
+        $this->configurationAttentionRows = [];
+        $this->configurationAttentionAffectedProductCount = 0;
         $this->worklistRows = [];
         $this->displayedRunId = null;
     }
@@ -1145,6 +1158,8 @@ class ManageAdobeProductsExportPreview extends Page
         $configurationId = $this->configurationId;
 
         if (! $user instanceof User || $runId === null) {
+            $this->configurationAttentionRows = [];
+            $this->configurationAttentionAffectedProductCount = 0;
             $this->worklistRows = [];
 
             return;
@@ -1156,6 +1171,8 @@ class ManageAdobeProductsExportPreview extends Page
             ->first();
 
         if ($run === null || ! app(SyncPreviewWorklistQuery::class)->isWorklistRenderable($run)) {
+            $this->configurationAttentionRows = [];
+            $this->configurationAttentionAffectedProductCount = 0;
             $this->worklistRows = [];
 
             return;
@@ -1173,6 +1190,23 @@ class ManageAdobeProductsExportPreview extends Page
         $filter = SyncPreviewWorklistFilter::tryFrom($this->worklistFilter)
             ?? SyncPreviewWorklistFilter::NeedsAttention;
 
+        $allItems = app(SyncPreviewWorklistQuery::class)
+            ->baseQuery($workspace, $run)
+            ->orderBy('product_id')
+            ->get();
+
+        $configurationAttentionPresenter = app(SyncPreviewConfigurationAttentionPresenter::class);
+        $this->configurationAttentionRows = $configurationAttentionPresenter->presentRows(
+            $run,
+            $configuration,
+            $this->accountId,
+            $user,
+            $workspace,
+            $allItems,
+        );
+        $this->configurationAttentionAffectedProductCount = $configurationAttentionPresenter
+            ->affectedProductCount($allItems);
+
         $query = app(SyncPreviewWorklistQuery::class)->baseQuery($workspace, $run);
         $query = app(SyncPreviewWorklistQuery::class)->applyOutcomeFilter($query, $filter);
         $query = app(SyncPreviewWorklistQuery::class)->applySearch($query, (string) ($this->worklistSearch ?? ''));
@@ -1189,6 +1223,7 @@ class ManageAdobeProductsExportPreview extends Page
             $user,
             $workspace,
             $items,
+            includeConfigurationOnlyRows: $filter !== SyncPreviewWorklistFilter::NeedsAttention,
         );
     }
 
