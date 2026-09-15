@@ -4964,6 +4964,59 @@ independently-owned configuration must be introduced only when a verified
 product requirement demonstrates the need. Do not split import/export
 configurations merely for hypothetical flexibility.
 
+### Product → Channel Selection + Remote Catalogue Projection
+[Resolved — 2026-09-15]
+
+Normative detail: `docs/PRODUCT_CHANNEL_SELECTION_REMOTE_CATALOGUE_CONTRACT.md`.
+
+The historical first Preview slice used fixed `selection.mode = all_products`.
+That remains current runtime truth until the implementation gap is closed, but it
+is no longer the target merchant-selection model.
+
+Freeze the target architecture:
+
+- the platform has one merchant-owned Master Product Catalogue;
+- `SyncConfiguration` owns destination selection for its domain/external context;
+- first configurable selection mode is Product-level `explicit_products`;
+- one Product may be selected for zero, one, or many destinations;
+- variants inherit Product membership in the first slice;
+- selection is a normalized workspace-guarded relation, not provider-specific
+  Product flags and not a copied provider Product database;
+- every effective membership change advances the parent
+  `SyncConfiguration.configuration_revision` through the shared mutation boundary;
+- Preview resolves one exact Product execution set under the admitted revision;
+- consequential Live binds to one concrete Completed current-revision Preview and
+  may execute only that Preview's Product set; it must not re-query current
+  membership and silently add never-previewed Products;
+- Product data is still re-checked freshly for Live; exact-set binding does not
+  turn Preview into immutable Product-payload replay.
+
+Remote provider catalogue state is a different truth. When a provider exposes a
+useful existing Product/listing universe, the platform may maintain an immutable
+successful **Remote Catalogue Projection** owned by Workspace + ConnectorAccount +
+applicable remote context. It is read-only navigation/matching evidence, not Master
+Product truth, not SyncConfiguration selection, and not `ExternalRecordLink` trust.
+
+For Magento V1:
+
+- remote logical `entity_id` remains the identity authority required by the
+  existing Entity Trust contract;
+- remote-only Magento Products never auto-create Master Products;
+- credential rotation does not change target identity (`base_url + store_code`);
+- failed/incomplete catalogue scans never replace the latest successful remote
+  projection;
+- full catalogue enumeration must be proven above 10k without inheriting schema-
+  discovery limits;
+- fresh remote reads required by Receive/Live contracts remain mandatory before
+  consequential mutation.
+
+SEO/search analytics remains a future provider-neutral evidence domain: multiple
+services (for example DataForSEO plus other SERP/ranking providers) may contribute
+observations without becoming Product columns or Magento Remote Catalogue state.
+Remote-only items may later be analysis targets, but AI/Product mutation remains
+governed by link/import into Master Product plus the approved AI proposal/domain
+writer boundary.
+
 ### FieldMapping — semantic correspondence only
 
 Minimum normative FieldMapping responsibility:
@@ -5980,6 +6033,12 @@ Only **Preview** is executable in the first implementation. The existence of a
 
 ##### First selection contract
 
+**Historical first-slice/current-runtime note:** this section records the original
+Preview foundation. The target configurable-selection architecture is superseded by
+**Product → Channel Selection + Remote Catalogue Projection [Resolved — 2026-09-15]**
+and `docs/PRODUCT_CHANNEL_SELECTION_REMOTE_CATALOGUE_CONTRACT.md`. Until that runtime
+campaign lands, `all_products` remains the truthful current implementation.
+
 First Products Preview uses fixed effective selection:
 
 ```text
@@ -6489,9 +6548,11 @@ required for Preview.
 | **Before first real merchant Preview** | Explicitly reconcile the operation-support boundary so the platform can truthfully represent the runtime actually available. Do not bypass `ConnectorSyncOperationSupport`. If current support vocabulary cannot represent Preview-only support safely, require a narrow Stop-and-Amend before exposure. |
 | **Before Live** *(historical 4C-2a sequencing — prerequisite now fulfilled by Stage 3-0)* | Separate contract for `ExternalRecordLink`, Live permission, Adobe Live executor, idempotency/retry, ambiguous applied-state behavior. Scheduling/history/current issues later. **Stage 3-0 resolves this prerequisite; runtime implementation remains Stage 3A–3E.** |
 
-Fixed `all_products` is a first-slice safe Preview constraint, not a sixth
-Product Owner question. PO-1 and PO-4 remain open. PO-2, PO-3, and PO-5 remain
-untouched.
+Fixed `all_products` is a historical first-slice safe Preview constraint, not
+a permanent selection rule. Product/channel selection is now **Resolved — 2026-09-15**
+by `docs/PRODUCT_CHANNEL_SELECTION_REMOTE_CATALOGUE_CONTRACT.md`; runtime migration
+from `all_products` remains pending. Historical PO-1/PO-4 wording below must not be
+used to reopen that resolved selection architecture.
 
 Historical implementation-slice IDs such as `4C-2b`, `4C-2b-2`, and `4C-2b-3`
 remain tracking labels. They are not mandatory future PR boundaries. Current
