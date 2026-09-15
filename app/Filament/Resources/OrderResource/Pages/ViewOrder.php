@@ -3,13 +3,13 @@
 namespace App\Filament\Resources\OrderResource\Pages;
 
 use App\Filament\Resources\OrderResource;
-use App\Models\Contractor;
-use Filament\Actions;
 use Filament\Actions\Action;
+use Filament\Actions\EditAction;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
-use Filament\Support\Enums\MaxWidth;
+use Filament\Schemas\Schema;
+use Filament\Support\Enums\FontWeight;
+use Filament\Support\Enums\Width;
 
 class ViewOrder extends ViewRecord
 {
@@ -18,21 +18,21 @@ class ViewOrder extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('contractor_info')
-                ->label('Контрагент')
+            Action::make('customer_info')
+                ->label('Клієнт')
                 ->icon('heroicon-o-building-office-2')
                 ->color('info')
-                ->modalHeading(fn () => $this->record->contractor?->name ?? 'Контрагент')
-                ->modalWidth(MaxWidth::Medium)
+                ->modalHeading(fn () => $this->record->customer?->name ?? 'Клієнт')
+                ->modalWidth(Width::Medium)
                 ->modalSubmitAction(false)
                 ->modalCancelActionLabel('Закрити')
-                ->infolist(
-                    fn (Infolist $infolist) => $infolist
-                        ->record($this->record->contractor)
+                ->schema(
+                    fn (Schema $schema) => $schema
+                        ->record($this->record->customer)
                         ->schema([
                             TextEntry::make('name')
                                 ->label('Назва')
-                                ->weight(\Filament\Support\Enums\FontWeight::Bold),
+                                ->weight(FontWeight::Bold),
                             TextEntry::make('manager_name')
                                 ->label('Менеджер')
                                 ->placeholder('—'),
@@ -47,7 +47,7 @@ class ViewOrder extends ViewRecord
                         ])
                         ->columns(2)
                 ),
-            Actions\EditAction::make(),
+            EditAction::make(),
         ];
     }
 }

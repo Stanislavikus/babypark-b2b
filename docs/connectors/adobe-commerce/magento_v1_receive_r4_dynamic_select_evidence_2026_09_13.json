@@ -1,0 +1,50 @@
+{
+  "schema": "magento_v1_receive_r4_dynamic_select_evidence.v1",
+  "date": "2026-09-13",
+  "branch": "campaign/magento-custom-attributes-stage2",
+  "base_commit": "42eff5eac352e8e541b0ba177e7e4f7851aafcb1",
+  "scope": {
+    "receive_behavior_class": "workspace_custom_dynamic_single_select",
+    "provider": "adobe_commerce",
+    "target_types": ["product", "product_variant"],
+    "remote_absent_clear": false,
+    "fuzzy_option_matching": false,
+    "public_import_support_flipped": false
+  },
+  "runtime_contract": {
+    "remote_reader": "AdobeProductDocument",
+    "reverse_option_identity": "FieldOptionMapping.external_option_value -> internal_option_key",
+    "proposal_route": "dynamic_field",
+    "writer": "GovernedDynamicFieldValueWriter::setIfCurrentValue",
+    "consequential_states": ["differs", "local_absent"],
+    "remote_absent_semantics": "no_clear_no_candidate",
+    "ambiguous_reverse_mapping_semantics": "unsupported_or_blocked",
+    "stale_local_semantics": "not_applied",
+    "stale_remote_semantics": "not_applied"
+  },
+  "focused_verification": {
+    "dynamic_receive_tests": {"passed": 5, "assertions": 20},
+    "affected_layer_tests": {"passed": 249, "skipped": 1, "assertions": 886},
+    "dynamic_writer_cas_cases": [
+      "matching_expected_value_updates",
+      "stale_expected_value_rejected",
+      "expected_absent_can_create"
+    ],
+    "receive_cases": [
+      "local_absent_imports_exact_mapped_option",
+      "stale_local_is_not_overwritten",
+      "remote_absent_is_not_clear",
+      "ambiguous_external_option_mapping_blocks",
+      "changed_remote_option_is_not_applied"
+    ]
+  },
+  "broad_verification": {
+    "connectors": {"passed": 367, "assertions": 2207},
+    "sync": {"passed": 1059, "skipped": 3, "assertions": 4332}
+  },
+  "certification_boundary": {
+    "code_and_test_slice_closed": true,
+    "real_target_custom_select_mutation_certified": false,
+    "reason": "Controlled destructive real-target custom-select Receive certification remains P-07 evidence required before any future public Products/Import/Live support claim."
+  }
+}

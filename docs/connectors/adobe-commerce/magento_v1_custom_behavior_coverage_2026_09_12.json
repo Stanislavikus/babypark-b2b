@@ -1,0 +1,273 @@
+{
+    "schema_version": "1.0.0",
+    "evidence_date": "2026-09-12",
+    "connector": "adobe_commerce_paas",
+    "purpose": "workspace_custom_onboarding_behavior_coverage",
+    "discovery_snapshot_id": "a2a3edfa-025f-49cd-ab5b-4e6af71b79e6",
+    "catalog_scan_http_status": 200,
+    "catalog_total_count": 19,
+    "exact_field_write_read_restore_not_claimed_by_this_artifact": true,
+    "representative_transport_evidence": "docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json",
+    "behavior_classes": {
+        "select/global": {
+            "previous_exact_certification_exists": true
+        },
+        "money/website": {
+            "previous_exact_certification_exists": true
+        }
+    },
+    "fields": [
+        {
+            "external_field_key": "c_carseats_child_gender",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 0,
+            "live_value_observed": false,
+            "sample_value": null,
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_schema_only"
+        },
+        {
+            "external_field_key": "c_furniture_color",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 0,
+            "live_value_observed": false,
+            "sample_value": null,
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_schema_only"
+        },
+        {
+            "external_field_key": "c_strollers_age_from",
+            "behavior_class": "money/website",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "0.000000",
+            "representative_exact_certification": [
+                "c_carseats_adac_rating",
+                "c_carseats_weight_from"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_backrest_adjustment",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "1231",
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_backrest_tilt_angle",
+            "behavior_class": "money/website",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "180.000000",
+            "representative_exact_certification": [
+                "c_carseats_adac_rating",
+                "c_carseats_weight_from"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_brake",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "903",
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_bumper",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "1123",
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_car_seat_installation",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "1222",
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_chassis_width",
+            "behavior_class": "money/website",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "59.000000",
+            "representative_exact_certification": [
+                "c_carseats_adac_rating",
+                "c_carseats_weight_from"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_color",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 13,
+            "live_value_observed": true,
+            "sample_value": "101",
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_color_joolz_day_5",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 0,
+            "live_value_observed": false,
+            "sample_value": null,
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_schema_only"
+        },
+        {
+            "external_field_key": "c_strollers_cot_window",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 13,
+            "live_value_observed": true,
+            "sample_value": "1220",
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_folding_type",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "908",
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_hand_luggage",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "1029",
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_handle_adjustment",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "905",
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_max_child_weight",
+            "behavior_class": "money/website",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "22.000000",
+            "representative_exact_certification": [
+                "c_carseats_adac_rating",
+                "c_carseats_weight_from"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_travel_direction",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "1051",
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_type",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "1225",
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_weight",
+            "behavior_class": "money/website",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "12.000000",
+            "representative_exact_certification": [
+                "c_carseats_adac_rating",
+                "c_carseats_weight_from"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_wheel_swivel",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "1053",
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        },
+        {
+            "external_field_key": "c_strollers_wheel_type",
+            "behavior_class": "select/global",
+            "catalog_products_with_value": 16,
+            "live_value_observed": true,
+            "sample_value": "643",
+            "representative_exact_certification": [
+                "c_carseats_color",
+                "c_carseats_fixation"
+            ],
+            "onboarding_readiness": "ready_by_certified_behavior_class_live_value"
+        }
+    ]
+}
