@@ -7,6 +7,7 @@ use App\Enums\AttributeScope;
 use App\Enums\AttributeStatus;
 use App\Enums\AttributeStorageType;
 use App\Enums\FieldObjectType;
+use App\Models\AttributeGroup;
 use App\Models\FieldBinding;
 use App\Models\FieldDefinition;
 use App\Models\Product;
@@ -85,6 +86,34 @@ class ProductStructureFoundationTest extends TestCase
         $this->assertNotContains($customer->id, $ids);
         $this->assertNotContains($hidden->id, $ids);
         $this->assertCount(2, $ids);
+    }
+
+    #[Test]
+    public function basic_reconciliation_preserves_existing_group_presentation_labels(): void
+    {
+        $workspace = Workspace::query()->create(['name' => 'Workspace A']);
+        $this->binding($workspace->id, 'merchant_label_field', FieldObjectType::Product, 'characteristics', true);
+        $basic = ProductType::withoutWorkspaceScope()->where('workspace_id', $workspace->id)->where('is_default', true)->sole();
+        $group = AttributeGroup::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
+            ->where('code', 'characteristics')
+            ->sole();
+        $group->localized_labels = ['en' => 'Merchant Characteristics', 'uk' => 'Характеристики продавця'];
+        $group->save();
+        $this->assertSame(
+            ['en' => 'Merchant Characteristics', 'uk' => 'Характеристики продавця'],
+            $group->fresh()->localized_labels,
+            'Merchant label save must persist before reconciliation.',
+        );
+        $revision = $basic->structure_revision;
+
+        app(BasicProductStructureReconciler::class)->reconcileWorkspace($workspace->id);
+
+        $this->assertSame(
+            ['en' => 'Merchant Characteristics', 'uk' => 'Характеристики продавця'],
+            $group->fresh()->localized_labels,
+        );
+        $this->assertSame($revision, $basic->fresh()->structure_revision);
     }
 
     #[Test]

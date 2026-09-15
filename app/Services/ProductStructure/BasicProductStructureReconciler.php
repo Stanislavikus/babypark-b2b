@@ -112,19 +112,22 @@ final class BasicProductStructureReconciler
                 $groupCode = (string) $groupCode;
                 $groupId = ProductStructureIdentity::attributeGroupId($workspaceId, $groupCode);
                 $group = AttributeGroup::withoutWorkspaceScope()->find($groupId);
-                if (! $group instanceof AttributeGroup) {
+                $groupWasNew = ! $group instanceof AttributeGroup;
+                if ($groupWasNew) {
                     $group = new AttributeGroup;
                     $group->setAttribute('id', $groupId);
                 }
                 $group->fill([
                     'workspace_id' => $workspaceId,
                     'code' => $groupCode,
-                    'localized_labels' => [
-                        'uk' => (string) config("attribute_dictionary.groups.{$groupCode}", Str::headline($groupCode)),
-                        'en' => Str::headline($groupCode),
-                    ],
                     'status' => 'active',
                 ]);
+                if ($groupWasNew) {
+                    $group->localized_labels = [
+                        'uk' => (string) config("attribute_dictionary.groups.{$groupCode}", Str::headline($groupCode)),
+                        'en' => Str::headline($groupCode),
+                    ];
+                }
                 if (! $group->exists || $group->isDirty()) {
                     $group->save();
                     $changed = true;
