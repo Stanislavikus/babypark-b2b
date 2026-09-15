@@ -536,6 +536,32 @@ drawer, form, cart, order flow or mobile layout.
 
 ---
 
+## PRODUCT_CHANNEL_SELECTION_REMOTE_CATALOGUE_CONTRACT.md
+
+Frozen Stop-and-Amend for universal Product-to-destination selection and remote
+catalogue projection (2026-09-15).
+
+Read this document before any work that changes:
+
+- which Products belong to a connector/channel;
+- Master Products channel badges, filters, or bulk assignment;
+- Magento/other channel Product workspaces;
+- Preview/Live Product-set selection semantics;
+- remote Product/listing catalogue scans or read projections;
+- remote-only Product matching/import boundaries;
+- connector catalogue pagination at >10k scale;
+- SEO/search evidence that may target Products or remote-only records;
+- AI/media enrichment architecture that consumes connector/SEO evidence.
+
+Key frozen boundaries: one Master Product catalogue; SyncConfiguration-owned
+Product-level `explicit_products` selection; concrete Preview→Live set binding;
+ConnectorAccount/target-owned immutable successful Remote Catalogue snapshots;
+`ExternalRecordLink` remains identity trust; remote-only records never auto-create
+Products; SEO evidence is provider-neutral; AI remains proposal/governed-writer
+based; remote media remains evidence until explicit import/acceptance.
+
+---
+
 ## 07-TECH_STACK.md
 
 Implementation guardrail for Cursor and AI coding agents.
@@ -686,6 +712,7 @@ cross-platform vocabulary or define runtime/storage behavior.
 - 02-ATTRIBUTE_DICTIONARY.md
 - 03-DOMAIN_MODEL.md
 - CANONICAL_PRODUCT_FIELD_REGISTRY.md and the related `docs/data/*.csv`
+- PRODUCT_CHANNEL_SELECTION_REMOTE_CATALOGUE_CONTRACT.md when the task touches Product/channel membership, remote catalogue projection, Preview/Live selection set, remote-only Products, large-catalogue enumeration, or SEO/AI evidence boundaries
 - IMPLEMENTATION_GAPS.md — open gaps affecting the field or mapping in question
 - 08-CONNECTOR_SYNC_RUNTIME_ATLAS.md — current-state locator only; verify owners in code
 - 09-CONNECTOR_DELIVERY_PROTOCOL.md — mandatory for connector/import/export delivery sequencing and certification

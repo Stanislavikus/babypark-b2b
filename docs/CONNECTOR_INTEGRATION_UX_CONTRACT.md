@@ -145,6 +145,44 @@ Contains merchant sync-configuration concerns. Which data domains and semantic o
     ```
     Repeated per data domain (Ціни, Описи, Залишки, ...) that is bidirectionally enabled. No connector ships a hardcoded default answer — this is a per-merchant, per-domain product decision, not inferred silently. Do not introduce mandatory per-field authority before that product need exists. (Storage/enforcement mechanism remains a backend decision requiring its own scoping pass; this contract fixes the _question asked to the merchant_, not yet the storage/enforcement design.)
 
+### Product selection + channel work surface (Resolved — 2026-09-15)
+
+Normative architecture/detail:
+`docs/PRODUCT_CHANNEL_SELECTION_REMOTE_CATALOGUE_CONTRACT.md`.
+
+After a connector account is verified, merchant Product work belongs to a stable
+channel/account workspace. Do not drop a first-time merchant directly into raw
+Mapping or Preview merely because the connection is healthy.
+
+For Product synchronization:
+
+- Master Products remains the one editable Product catalogue;
+- the channel workspace is a filtered/annotated lens over Products selected for
+  that SyncConfiguration;
+- zero selection shows a plain-language empty state and one causal action such as
+  `Вибрати товари для Magento`;
+- never use `Add to Magento` wording for membership when the connector cannot
+  create a remote Product;
+- Master Products and the channel workspace are two entry points to the same
+  underlying membership operation;
+- main channel rows identify the Product compactly (thumbnail when available,
+  title, SKU, GTIN when useful), show remote correspondence separately from
+  readiness, and collapse findings behind blocker/recommendation counts;
+- one configuration/root-cause problem affecting many Products remains one
+  merchant task with one remediation action and affected count;
+- full Product editing must preserve the merchant's channel context.
+
+A provider's existing remote catalogue is a secondary read-only surface, not a
+second editable Product list. Remote-only records are shown separately from local
+selected Products and never become platform Products or trusted links merely by
+being discovered. Magento V1 may show summary concepts such as `Знайдено в
+Magento`, `Пов'язано з вашим каталогом`, and `Ще не пов'язано`; exact wording is
+localized implementation detail, but the local-vs-remote distinction is not.
+
+Remote catalogue data must be progressively disclosed: the main channel worklist
+must not eagerly render every remote field or full-size media asset. Full/fresh
+remote reads remain operation-driven.
+
 ---
 
 ## 7. Mapping — Layer B
