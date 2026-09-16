@@ -19,6 +19,8 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductOwnershipTrustPolicy;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandExecutor;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductStockSimpleWriteExecutor;
 use App\Support\Connectors\AdobePaaS\Command\ConservativeAdobeProductOwnershipTrustPolicy;
+use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogHttpReadClient;
+use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogReadClient;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncHandshakeProbe;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncHandshakeProbeCapability;
 use App\Support\Connectors\ConnectorProfileRegistry;
@@ -50,6 +52,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             AdobePaaSDiscoveryCapability::class,
             AdobePaaSDiscoveryCapabilityImpl::class,
+        );
+
+        $this->app->bind(
+            AdobeRemoteCatalogReadClient::class,
+            AdobeRemoteCatalogHttpReadClient::class,
         );
 
         $this->app->bind(
