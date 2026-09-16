@@ -151,7 +151,6 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
                     ->sortable()
                     ->description(fn (RemoteCatalogSnapshotItem $record): string => __('product_channels.remote_catalog.identity', [
                         'sku' => $record->sku ?: '—',
-                        'id' => $record->remote_identifier,
                     ])),
                 TextColumn::make('remote_type')
                     ->label(__('product_channels.remote_catalog.columns.type'))

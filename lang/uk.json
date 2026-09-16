@@ -794,7 +794,7 @@
     "product_channels.remote_catalog.table_description": "Ці товари показані з Magento для порівняння. Вони не є товарами вашого основного каталогу й не створюються автоматично.",
     "product_channels.remote_catalog.captured_at": "Каталог зчитано: :time",
     "product_channels.remote_catalog.back_to_channel": "Назад до каналу",
-    "product_channels.remote_catalog.identity": "SKU: :sku · Magento ID: :id",
+    "product_channels.remote_catalog.identity": "SKU: :sku",
     "product_channels.remote_catalog.columns.product": "Товар у Magento",
     "product_channels.remote_catalog.columns.type": "Тип",
     "product_channels.remote_catalog.columns.status": "Статус",
