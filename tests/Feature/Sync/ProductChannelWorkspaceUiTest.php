@@ -8,6 +8,7 @@ use App\Enums\SyncDataDomain;
 use App\Enums\SyncSemanticOperation;
 use App\Enums\UserRole;
 use App\Filament\Pages\Sync\ManageAdobeProductsChannel;
+use App\Filament\Pages\Sync\ManageAdobeProductsExportPreview;
 use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Models\Product;
@@ -130,6 +131,37 @@ class ProductChannelWorkspaceUiTest extends TestCase
             ->assertSet('masterProductCount', 2)
             ->assertSee($selected->name)
             ->assertDontSee($unselected->name);
+    }
+
+    #[Test]
+    public function live_only_actor_can_navigate_from_channel_to_combined_execution_page(): void
+    {
+        $account = $this->createConnectorAccount();
+        $configuration = $this->createProductsExportConfiguration($account->id);
+        $selected = $this->createProduct('CHANNEL-LIVE-ONLY');
+
+        app(ProductChannelSelectionService::class)->add(
+            $this->actor,
+            $this->workspace,
+            $configuration->id,
+            [$selected->id],
+        );
+
+        $liveOnlyActor = $this->createStaffUser(UserRole::Admin);
+        $this->grantExactWorkspacePermissions($this->workspace, $liveOnlyActor, [
+            WorkspacePermissions::RUN_SYNC_LIVE,
+        ]);
+
+        Livewire::actingAs($liveOnlyActor)
+            ->test(ManageAdobeProductsChannel::class, ['account' => $account->id])
+            ->assertOk()
+            ->assertSet('canRunPreview', false)
+            ->assertSet('canOpenExecution', true)
+            ->assertSee('data-testid="product-channel-open-preview"', false);
+
+        Livewire::actingAs($liveOnlyActor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->assertOk();
     }
 
     #[Test]

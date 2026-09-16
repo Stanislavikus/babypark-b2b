@@ -50,7 +50,7 @@
             </x-filament::button>
           @endif
 
-          @if ($canRunPreview && $selectedProductCount > 0)
+          @if ($canOpenExecution && $selectedProductCount > 0)
             <x-filament::button
               tag="a"
               color="gray"

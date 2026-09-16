@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Connectors\AdobeRemoteCatalogProjectionService;
 use App\Services\Connectors\AdobeRemoteCatalogScanDispatchService;
 use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
+use App\Services\Sync\AdobeProductsExportLiveAuthorizationService;
 use App\Services\Sync\AdobeProductsExportPreviewAuthorizationService;
 use App\Services\Sync\ProductChannelSelectionService;
 use App\Services\Sync\SyncConfigurationLookupService;
@@ -57,6 +58,8 @@ class ManageAdobeProductsChannel extends Page implements HasTable
     public bool $canManageSelection = false;
 
     public bool $canRunPreview = false;
+
+    public bool $canOpenExecution = false;
 
     public int $remoteCatalogTotal = 0;
 
@@ -287,6 +290,10 @@ class ManageAdobeProductsChannel extends Page implements HasTable
         $this->canRunPreview = $configuration !== null
             && app(AdobeProductsExportPreviewAuthorizationService::class)
                 ->isEligiblePreviewTarget($user, $workspace, $this->accountId);
+        $this->canOpenExecution = $configuration !== null
+            && ($this->canRunPreview
+                || app(AdobeProductsExportLiveAuthorizationService::class)
+                    ->isEligibleLiveTarget($user, $workspace, $this->accountId));
 
         $remoteCatalog = app(AdobeRemoteCatalogProjectionService::class)->summary($account);
         $this->remoteCatalogTotal = $remoteCatalog->totalCount;
