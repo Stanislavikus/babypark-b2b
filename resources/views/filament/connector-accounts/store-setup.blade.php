@@ -32,17 +32,13 @@
     @else
         <div class="space-y-3 rounded-xl border border-gray-200 p-4 dark:border-white/10">
             <p class="text-sm font-medium text-gray-950 dark:text-white">{{ __('connectors.ui.layer_a.next_step.heading') }}</p>
-            @if ($syncConfigurationId === null && $canConfigureSync)
-                <x-filament::button tag="a" :href="\App\Filament\Pages\Sync\ManageAdobeProductsExportSetup::getUrl(['account' => $record->getKey()])">
-                    {{ __('connectors.ui.layer_a.next_step.configure') }}
-                </x-filament::button>
-            @elseif ($syncConfigurationId !== null && $canCreatePreview)
-                <x-filament::button tag="a" :href="\App\Filament\Pages\Sync\ManageAdobeProductsExportPreview::getUrl(['account' => $record->getKey()])">
-                    {{ __('connectors.ui.layer_a.next_step.preview') }}
+            @if ($canConfigureSync || ($syncConfigurationId !== null && ($canManageSyncConfiguration || $canRunPreview)))
+                <x-filament::button tag="a" :href="\App\Filament\Pages\Sync\ManageAdobeProductsChannel::getUrl(['account' => $record->getKey()])">
+                    {{ __('connectors.ui.layer_a.next_step.open_channel') }}
                 </x-filament::button>
             @elseif ($syncConfigurationId === null && ! $canManageSyncConfiguration)
                 <p class="text-sm text-gray-700 dark:text-gray-300">{{ __('connectors.ui.layer_a.next_step.setup_admin_required') }}</p>
-            @elseif ($syncConfigurationId !== null && ! $canRunPreview)
+            @elseif ($syncConfigurationId !== null && ! $canRunPreview && ! $canManageSyncConfiguration)
                 <p class="text-sm text-gray-700 dark:text-gray-300">{{ __('connectors.ui.layer_a.next_step.preview_permission_required') }}</p>
             @else
                 <p class="text-sm text-gray-700 dark:text-gray-300">{{ __('connectors.ui.layer_a.next_step.unavailable') }}</p>

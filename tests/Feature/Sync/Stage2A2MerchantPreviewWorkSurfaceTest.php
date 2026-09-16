@@ -66,7 +66,7 @@ class Stage2A2MerchantPreviewWorkSurfaceTest extends TestCase
     }
 
     #[Test]
-    public function preview_only_actor_discovers_data_setup_landing_with_preview_action_only(): void
+    public function preview_only_actor_enters_channel_workspace_from_data_setup_landing(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->adobeAccount($workspace);
@@ -75,13 +75,14 @@ class Stage2A2MerchantPreviewWorkSurfaceTest extends TestCase
         Livewire::actingAs($actor)
             ->test(ListSyncDataSetup::class)
             ->assertOk()
-            ->assertSee(__('sync_preview.actions.open_preview'))
+            ->assertSee(__('connectors.ui.layer_a.next_step.open_channel'))
             ->assertDontSee(__('sync_data_setup.page.open_setup'))
-            ->assertSee('data-testid="sync-data-setup-open-preview-'.$account->id.'"', false);
+            ->assertDontSee(__('sync_preview.actions.open_preview'))
+            ->assertSee('data-testid="sync-data-setup-open-channel-'.$account->id.'"', false);
     }
 
     #[Test]
-    public function setup_only_actor_sees_setup_but_not_preview_on_landing(): void
+    public function setup_only_actor_enters_channel_workspace_from_landing(): void
     {
         $workspace = $this->defaultWorkspace();
         $this->adobeAccount($workspace);
@@ -90,12 +91,13 @@ class Stage2A2MerchantPreviewWorkSurfaceTest extends TestCase
         Livewire::actingAs($actor)
             ->test(ListSyncDataSetup::class)
             ->assertOk()
-            ->assertSee(__('sync_data_setup.page.open_setup'))
+            ->assertSee(__('connectors.ui.layer_a.next_step.open_channel'))
+            ->assertDontSee(__('sync_data_setup.page.open_setup'))
             ->assertDontSee(__('sync_preview.actions.open_preview'));
     }
 
     #[Test]
-    public function actor_with_both_permissions_sees_setup_and_preview_actions(): void
+    public function actor_with_both_permissions_sees_single_channel_workspace_action(): void
     {
         $workspace = $this->defaultWorkspace();
         $this->adobeAccount($workspace);
@@ -107,8 +109,9 @@ class Stage2A2MerchantPreviewWorkSurfaceTest extends TestCase
         Livewire::actingAs($actor)
             ->test(ListSyncDataSetup::class)
             ->assertOk()
-            ->assertSee(__('sync_data_setup.page.open_setup'))
-            ->assertSee(__('sync_preview.actions.open_preview'));
+            ->assertSee(__('connectors.ui.layer_a.next_step.open_channel'))
+            ->assertDontSee(__('sync_data_setup.page.open_setup'))
+            ->assertDontSee(__('sync_preview.actions.open_preview'));
     }
 
     #[Test]

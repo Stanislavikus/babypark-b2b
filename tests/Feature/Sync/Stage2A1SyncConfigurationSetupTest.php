@@ -6,6 +6,7 @@ use App\Enums\SyncConfigurationOperationalState;
 use App\Enums\SyncDataDomain;
 use App\Enums\SyncSemanticOperation;
 use App\Filament\Pages\Sync\ListSyncDataSetup;
+use App\Filament\Pages\Sync\ManageAdobeProductsChannel;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
 use App\Filament\Resources\ConnectorAccountResource\Pages\ViewConnectorAccount;
 use App\Models\ConnectorAccount;
@@ -165,7 +166,7 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
     }
 
     #[Test]
-    public function manage_sync_configurations_only_actor_can_discover_data_setup_entry_and_navigate_to_adobe_setup(): void
+    public function manage_sync_configurations_only_actor_enters_adobe_channel_workspace_before_technical_setup(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->adobeAccount($workspace);
@@ -179,15 +180,16 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
         Livewire::actingAs($actor)
             ->test(ListSyncDataSetup::class)
             ->assertOk()
-            ->assertSee(__('sync_data_setup.navigation.label'))
             ->assertSee(__('sync_data_setup.targets.adobe_products_export'))
-            ->assertSee(__('sync_data_setup.page.open_setup'))
-            ->assertSee('data-testid="sync-data-setup-target-'.$account->id.'"', false);
+            ->assertSee(__('connectors.ui.layer_a.next_step.open_channel'))
+            ->assertSee('data-testid="sync-data-setup-target-'.$account->id.'"', false)
+            ->assertSee('data-testid="sync-data-setup-open-channel-'.$account->id.'"', false);
 
         Livewire::actingAs($actor)
-            ->test(ManageAdobeProductsExportSetup::class, ['account' => $account->id])
+            ->test(ManageAdobeProductsChannel::class, ['account' => $account->id])
             ->assertOk()
-            ->assertSee(__('sync_data_setup.adobe_products_export.attribute_set_label'));
+            ->assertSee(__('product_channels.channel.empty_title'))
+            ->assertSee(__('product_channels.channel.select_products'));
     }
 
     #[Test]
@@ -220,7 +222,7 @@ class Stage2A1SyncConfigurationSetupTest extends TestCase
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
             ->assertOk()
             ->assertActionDoesNotExist('openAdobeExportSetup')
-            ->assertSee(__('connectors.ui.layer_a.next_step.configure'));
+            ->assertSee(__('connectors.ui.layer_a.next_step.open_channel'));
     }
 
     #[Test]

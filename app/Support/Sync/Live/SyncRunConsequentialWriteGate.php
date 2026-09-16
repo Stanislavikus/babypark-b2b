@@ -3,6 +3,7 @@
 namespace App\Support\Sync\Live;
 
 use App\Enums\SyncRunStatus;
+use App\Models\SyncConfiguration;
 use App\Models\SyncRun;
 
 final class SyncRunConsequentialWriteGate implements SyncLiveConsequentialWriteGate
@@ -27,11 +28,17 @@ final class SyncRunConsequentialWriteGate implements SyncLiveConsequentialWriteG
             return false;
         }
 
-        if ($run->writer_deadline_at === null) {
+        if ($run->writer_deadline_at === null || ! now()->lessThan($run->writer_deadline_at)) {
             return false;
         }
 
-        return now()->lessThan($run->writer_deadline_at);
+        $currentRevision = SyncConfiguration::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspaceId)
+            ->where('id', $run->sync_configuration_id)
+            ->value('configuration_revision');
+
+        return is_string($currentRevision)
+            && hash_equals((string) $run->configuration_revision, $currentRevision);
     }
 
     public function permitsProductExecution(): bool

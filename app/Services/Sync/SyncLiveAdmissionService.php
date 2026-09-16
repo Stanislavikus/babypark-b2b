@@ -28,7 +28,6 @@ final class SyncLiveAdmissionService
         private readonly WorkspaceAuthorization $authorization,
         private readonly ConnectorSyncSupportResolver $syncSupportResolver,
         private readonly SyncConfigurationMutationCoordinator $mutationCoordinator,
-        private readonly SyncPreviewConfigurationSnapshotBuilder $snapshotBuilder,
         private readonly SyncPreviewConfigurationReadinessResolver $readinessResolver,
         private readonly SyncRunActiveRecoveryService $activeRecoveryService,
         private readonly SyncRuntimeTimingResolver $timingResolver,
@@ -119,19 +118,24 @@ final class SyncLiveAdmissionService
                 throw SyncLiveAdmissionException::activeRunExists($configuration->id);
             }
 
-            $previewEvidenceExists = SyncRun::withoutWorkspaceScope()
+            $sourcePreview = SyncRun::withoutWorkspaceScope()
+                ->where('workspace_id', $configuration->workspace_id)
                 ->where('sync_configuration_id', $configuration->id)
                 ->where('mode', SyncRunMode::Preview)
                 ->where('semantic_operation', SyncSemanticOperation::Export)
                 ->where('status', SyncRunStatus::Completed)
                 ->where('configuration_revision', $configuration->configuration_revision)
-                ->exists();
+                ->orderByDesc('completed_at')
+                ->orderByDesc('id')
+                ->first();
 
-            if (! $previewEvidenceExists) {
+            if ($sourcePreview === null) {
                 throw SyncLiveAdmissionException::previewEvidenceMissing();
             }
 
-            $snapshot = $this->snapshotBuilder->build($configuration, SyncSemanticOperation::Export);
+            $snapshot = is_array($sourcePreview->configuration_snapshot)
+                ? $sourcePreview->configuration_snapshot
+                : [];
 
             $run = SyncRun::withoutWorkspaceScope()->create([
                 'id' => (string) Str::uuid(),
@@ -143,6 +147,7 @@ final class SyncLiveAdmissionService
                 'status' => SyncRunStatus::Queued,
                 'initiated_by_user_id' => $actor->id,
                 'configuration_snapshot' => $snapshot,
+                'source_preview_run_id' => $sourcePreview->id,
                 'queued_abandon_after' => now()->addSeconds($admissionTiming->queuedUndispatchedGraceSeconds),
             ]);
         });

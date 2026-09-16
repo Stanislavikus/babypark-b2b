@@ -17,6 +17,7 @@ final class SyncConfigurationMutationCoordinator
 {
     public function __construct(
         private readonly SyncConfigurationRevisionHasher $revisionHasher,
+        private readonly SyncProductSelectionStore $selectionStore,
     ) {}
 
     /**
@@ -61,6 +62,7 @@ final class SyncConfigurationMutationCoordinator
             $configuration->operational_state,
             $this->effectiveMappingPayload($configuration),
             $configuration->connectorExecutionConfiguration(),
+            $this->selectionStore->descriptorForConfiguration($configuration),
         );
         $configuration->save();
     }

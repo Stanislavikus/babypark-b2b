@@ -11,10 +11,13 @@ use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Filament\Resources\ProductResource\Pages\ViewProduct;
 use App\Filament\Resources\ProductResource\Support\TagBulkUi;
 use App\Models\Product;
+use App\Models\SyncConfigurationProductSelection;
 use App\Models\Tag;
+use App\Models\User;
 use App\Services\Catalog\TagManager;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Services\Pricing\ProductPricingSummary;
+use App\Services\Sync\ProductChannelSelectionService;
 use App\Support\AdminAvailabilityPresenter;
 use App\Support\ProductFields\AdminProductMargin;
 use App\Support\ProductFields\MarginToggle;
@@ -270,7 +273,7 @@ class ProductResource extends Resource
 
         return $table
             ->columns([
-                // --- Default visible columns (7 total) ---
+                // --- Default visible columns (8 total) ---
 
                 // 1. Фото: thumbnail — click opens shared bpOpenLightbox(); does NOT trigger row action
                 ImageColumn::make('first_image')
@@ -337,6 +340,18 @@ class ProductResource extends Resource
                     ->sortable(query: function (Builder $query, string $direction): Builder {
                         return $query->orderBy('is_active', $direction)->orderBy('id', $direction);
                     }),
+
+                TextColumn::make('sync_channels')
+                    ->label(__('product_channels.columns.channels'))
+                    ->getStateUsing(fn (Product $record): array => $record->syncChannelSelections
+                        ->map(fn (SyncConfigurationProductSelection $selection): ?string => $selection->syncConfiguration
+                            ? app(ProductChannelSelectionService::class)->channelLabel($selection->syncConfiguration)
+                            : null)
+                        ->filter()
+                        ->values()
+                        ->all())
+                    ->badge()
+                    ->placeholder('—'),
 
                 // --- Optional / hidden by default columns ---
 
@@ -499,6 +514,26 @@ class ProductResource extends Resource
                         ->pluck('merchant_type', 'merchant_type')
                         ->toArray())
                     ->multiple(),
+
+                SelectFilter::make('sync_channel')
+                    ->label(__('product_channels.filter.label'))
+                    ->options(fn (): array => app(ProductChannelSelectionService::class)
+                        ->channelOptions(app(WorkspaceContext::class)->current()))
+                    ->query(function (Builder $query, array $data): Builder {
+                        $configurationId = $data['value'] ?? null;
+
+                        if (! is_string($configurationId) || $configurationId === '') {
+                            return $query;
+                        }
+
+                        return $query->whereIn(
+                            'products.id',
+                            SyncConfigurationProductSelection::withoutWorkspaceScope()
+                                ->select('product_id')
+                                ->where('workspace_id', app(WorkspaceContext::class)->id())
+                                ->where('sync_configuration_id', $configurationId),
+                        );
+                    }),
             ])
             ->recordActions([
                 ViewAction::make()
@@ -514,6 +549,8 @@ class ProductResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    self::makeChannelBulkAction(adding: true),
+                    self::makeChannelBulkAction(adding: false),
                     self::makeTagBulkAction(
                         operation: TagBulkOperation::Add,
                         name: 'add_tags',
@@ -541,7 +578,12 @@ class ProductResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['variants.stocks', 'category', 'tags']);
+            ->with([
+                'variants.stocks',
+                'category',
+                'tags',
+                'syncChannelSelections.syncConfiguration.connectorAccount.connectorDefinition',
+            ]);
     }
 
     // -------------------------------------------------------------------------
@@ -555,6 +597,70 @@ class ProductResource extends Resource
             'view' => ViewProduct::route('/{record}'),
             'edit' => EditProduct::route('/{record}/edit'),
         ];
+    }
+
+    // -------------------------------------------------------------------------
+    // Product channel assignment actions
+    // -------------------------------------------------------------------------
+
+    private static function makeChannelBulkAction(bool $adding): BulkAction
+    {
+        $name = $adding ? 'add_to_sync_channel' : 'remove_from_sync_channel';
+
+        return BulkAction::make($name)
+            ->label(__($adding ? 'product_channels.actions.add' : 'product_channels.actions.remove'))
+            ->icon($adding ? 'heroicon-o-arrow-right-circle' : 'heroicon-o-minus-circle')
+            ->color($adding ? 'primary' : 'gray')
+            ->schema([
+                Select::make('sync_configuration_id')
+                    ->label(__('product_channels.fields.channel'))
+                    ->options(fn (): array => app(ProductChannelSelectionService::class)
+                        ->channelOptions(app(WorkspaceContext::class)->current()))
+                    ->default(fn (ListProducts $livewire): ?string => $livewire->channelContext)
+                    ->required()
+                    ->native(false)
+                    ->searchable(),
+            ])
+            ->visible(function (): bool {
+                $actor = auth()->user();
+                $workspace = app(WorkspaceContext::class)->current();
+
+                return $actor instanceof User
+                    && app(ProductChannelSelectionService::class)->canManage($actor, $workspace)
+                    && app(ProductChannelSelectionService::class)->channelOptions($workspace) !== [];
+            })
+            ->action(function (Collection $records, array $data, ListProducts $livewire) use ($adding): void {
+                $actor = auth()->user();
+                abort_unless($actor instanceof User, 403);
+
+                $workspace = app(WorkspaceContext::class)->current();
+                $productIds = $livewire->getSelectedTableRecords()->modelKeys();
+                $configurationId = (string) ($data['sync_configuration_id'] ?? '');
+
+                try {
+                    $service = app(ProductChannelSelectionService::class);
+                    $adding
+                        ? $service->add($actor, $workspace, $configurationId, $productIds)
+                        : $service->remove($actor, $workspace, $configurationId, $productIds);
+                } catch (\Throwable $exception) {
+                    report($exception);
+
+                    Notification::make()
+                        ->danger()
+                        ->title(__('product_channels.notifications.failed'))
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                Notification::make()
+                    ->success()
+                    ->title(__($adding ? 'product_channels.notifications.added' : 'product_channels.notifications.removed'))
+                    ->send();
+
+                $livewire->deselectAllTableRecords();
+            })
+            ->deselectRecordsAfterCompletion(false);
     }
 
     // -------------------------------------------------------------------------

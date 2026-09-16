@@ -62,7 +62,11 @@ class ReceiveLiveImportAdmissionServiceTest extends TestCase
         $this->assertSame('platform.sync-run-input.v2', $run->configuration_snapshot['version']);
         $this->assertSame('import', $run->configuration_snapshot['semantic_operation']);
         $this->assertSame(['mode' => 'explicit_product', 'product_id' => (string) $product->id], $run->configuration_snapshot['execution_target']);
-        $this->assertSame(['mode' => 'all_products'], $run->configuration_snapshot['selection']);
+        $this->assertSame([
+            'mode' => 'explicit_products',
+            'product_count' => 0,
+            'product_ids_hash' => hash('sha256', ''),
+        ], $run->configuration_snapshot['selection']);
         $this->assertNotNull($run->started_at);
         $this->assertNotNull($run->writer_deadline_at);
         $this->assertNotNull($run->recoverable_after);

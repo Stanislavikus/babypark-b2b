@@ -10,11 +10,7 @@ final readonly class SyncDataSetupLandingTargetSummary
         public string $accountName,
         public bool $setupUsable,
         public SyncDataSetupTargetKind $targetKind,
-        public bool $setupActionVisible,
-        public bool $previewActionVisible,
-        public bool $liveActionVisible,
-        public ?string $setupUrl,
-        public ?string $previewUrl,
-        public ?string $liveUrl,
+        public bool $channelActionVisible,
+        public ?string $channelUrl,
     ) {}
 }

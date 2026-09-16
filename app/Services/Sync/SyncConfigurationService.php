@@ -12,6 +12,7 @@ use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
 use App\Support\Sync\Exceptions\UnsupportedSyncOperationException;
 use App\Support\Sync\SyncConfigurationRevisionHasher;
 use App\Support\Sync\SyncOperationSet;
+use App\Support\Sync\SyncProductSelectionDescriptor;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -49,6 +50,7 @@ final class SyncConfigurationService
                         $input->operationalState,
                         [],
                         ConnectorExecutionConfiguration::empty(),
+                        SyncProductSelectionDescriptor::empty(),
                     ),
                 ]);
             });

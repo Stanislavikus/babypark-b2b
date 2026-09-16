@@ -66,7 +66,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function revision_hasher_uses_v4_prefix(): void
+    public function revision_hasher_uses_v5_prefix(): void
     {
         $hasher = new SyncConfigurationRevisionHasher;
         $revision = $hasher->hash(
@@ -75,9 +75,9 @@ class SyncRunPersistenceFoundationTest extends TestCase
             [],
         );
 
-        $migration = $this->revisionV4Migration();
+        $migration = $this->revisionV5Migration();
         $reflection = new \ReflectionClass($migration);
-        $hashMethod = $reflection->getMethod('hashRevisionV4');
+        $hashMethod = $reflection->getMethod('hashRevisionV5');
         $hashMethod->setAccessible(true);
         $canonicalMethod = $reflection->getMethod('canonicalizePersistedOperations');
         $canonicalMethod->setAccessible(true);
@@ -86,6 +86,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
             $migration,
             $canonicalMethod->invoke($migration, ['import']),
             SyncConfigurationOperationalState::Enabled->value,
+            [],
             [],
             [],
         );
@@ -98,23 +99,23 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function fixed_selection_all_products_changes_v2_to_v3_revision(): void
+    public function current_revision_differs_from_v2_revision(): void
     {
         $hasher = new SyncConfigurationRevisionHasher;
         $operations = SyncOperationSet::fromOperations([SyncSemanticOperation::Export]);
         $state = SyncConfigurationOperationalState::Enabled;
         $mappings = [new FieldMappingRevisionEntry($this->productBinding()->id, 'sku')];
 
-        $v3 = $hasher->hash($operations, $state, $mappings);
+        $current = $hasher->hash($operations, $state, $mappings);
         $v2 = $this->migrationHashV2(['export'], $state->value, [
             ['field_binding_id' => $this->productBinding()->id, 'external_field_key' => 'sku'],
         ]);
 
-        $this->assertNotSame($v2, $v3);
+        $this->assertNotSame($v2, $current);
     }
 
     #[Test]
-    public function revision_v3_hashes_full_enabled_operation_set(): void
+    public function current_revision_hashes_full_enabled_operation_set(): void
     {
         $hasher = new SyncConfigurationRevisionHasher;
 
@@ -137,7 +138,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function revision_v3_operation_order_and_deduplication_are_canonical(): void
+    public function current_revision_operation_order_and_deduplication_are_canonical(): void
     {
         $hasher = new SyncConfigurationRevisionHasher;
         $state = SyncConfigurationOperationalState::Enabled;
@@ -165,7 +166,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function revision_v3_mapping_order_is_canonical(): void
+    public function current_revision_mapping_order_is_canonical(): void
     {
         $hasher = new SyncConfigurationRevisionHasher;
         $operations = SyncOperationSet::fromOperations([SyncSemanticOperation::Import]);
@@ -187,7 +188,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function migration_v4_matches_runtime_hasher_for_non_canonical_mapping_insert_order(): void
+    public function migration_v5_matches_runtime_hasher_for_non_canonical_mapping_insert_order(): void
     {
         $account = $this->createSyncSupportAccount();
         $configuration = $this->createProductsSyncConfiguration($account);
@@ -216,14 +217,16 @@ class SyncRunPersistenceFoundationTest extends TestCase
             ],
         ]);
 
-        $migration = $this->revisionV4Migration();
+        $migration = $this->revisionV5Migration();
         $reflection = new \ReflectionClass($migration);
-        $hashMethod = $reflection->getMethod('hashRevisionV4');
+        $hashMethod = $reflection->getMethod('hashRevisionV5');
         $hashMethod->setAccessible(true);
         $canonicalMethod = $reflection->getMethod('canonicalizePersistedOperations');
         $canonicalMethod->setAccessible(true);
         $mappingMethod = $reflection->getMethod('canonicalFieldMappingsForConfiguration');
         $mappingMethod->setAccessible(true);
+        $selectionMethod = $reflection->getMethod('selectedProductIdsForConfiguration');
+        $selectionMethod->setAccessible(true);
 
         $migrationHash = $hashMethod->invoke(
             $migration,
@@ -231,6 +234,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
             SyncConfigurationOperationalState::Enabled->value,
             $mappingMethod->invoke($migration, $configuration->id),
             [],
+            $selectionMethod->invoke($migration, $configuration->id),
         );
 
         $runtimeHash = (new SyncConfigurationRevisionHasher)->hash(
@@ -289,7 +293,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function sync_configuration_mutation_path_writes_v3_revision(): void
+    public function sync_configuration_mutation_path_writes_current_revision(): void
     {
         $account = $this->createSyncSupportAccount();
         $configuration = $this->createProductsSyncConfiguration($account);
@@ -312,7 +316,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function field_mapping_mutation_path_writes_v3_revision(): void
+    public function field_mapping_mutation_path_writes_current_revision(): void
     {
         $account = $this->createSyncSupportAccount();
         $configuration = $this->createProductsSyncConfiguration($account);
@@ -787,9 +791,9 @@ class SyncRunPersistenceFoundationTest extends TestCase
         );
     }
 
-    private function revisionV4Migration(): object
+    private function revisionV5Migration(): object
     {
-        return require database_path('migrations/2026_08_17_120000_sync_configuration_revision_v4.php');
+        return require database_path('migrations/2026_09_15_211000_sync_configuration_revision_v5.php');
     }
 
     private function revisionV3Migration(): object

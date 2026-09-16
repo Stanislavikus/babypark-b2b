@@ -11,6 +11,7 @@ final class SyncPreviewConfigurationSnapshotBuilder
 {
     public function __construct(
         private readonly SyncConfigurationMutationCoordinator $mutationCoordinator,
+        private readonly SyncProductSelectionStore $selectionStore,
     ) {}
 
     /**
@@ -37,9 +38,7 @@ final class SyncPreviewConfigurationSnapshotBuilder
             'data_domain' => $configuration->data_domain->value,
             'semantic_operation' => $semanticOperation->value,
             'external_context' => $configuration->external_context ?? [],
-            'selection' => [
-                'mode' => 'all_products',
-            ],
+            'selection' => $this->selectionStore->descriptorForConfiguration($configuration)->toSnapshotArray(),
             'field_mappings' => $fieldMappings,
             'connector_execution_configuration' => $configuration->connectorExecutionConfiguration()->payload(),
         ];

@@ -723,7 +723,7 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
-    public function authorized_setup_actor_gets_exactly_one_setup_cta(): void
+    public function authorized_setup_actor_gets_exactly_one_channel_cta(): void
     {
         $this->bindAdobeExportSetupAuthorizationStub(eligible: true, canAccess: true);
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
@@ -731,15 +731,15 @@ class ConnectorAccountResourceTest extends TestCase
 
         $html = Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->getKey()])
-            ->assertSee(__('connectors.ui.layer_a.next_step.configure'))
+            ->assertSee(__('connectors.ui.layer_a.next_step.open_channel'))
             ->assertDontSee(__('connectors.ui.layer_a.next_step.preview'))
             ->html();
 
-        $this->assertSame(1, substr_count($html, __('connectors.ui.layer_a.next_step.configure')));
+        $this->assertSame(1, substr_count($html, __('connectors.ui.layer_a.next_step.open_channel')));
     }
 
     #[Test]
-    public function products_default_configuration_advances_to_exactly_one_preview_cta(): void
+    public function products_default_configuration_keeps_exactly_one_channel_cta(): void
     {
         $this->bindAdobePreviewAuthorizationStub(true);
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
@@ -748,11 +748,12 @@ class ConnectorAccountResourceTest extends TestCase
 
         $html = Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee(__('connectors.ui.layer_a.next_step.preview'))
+            ->assertSee(__('connectors.ui.layer_a.next_step.open_channel'))
+            ->assertDontSee(__('connectors.ui.layer_a.next_step.preview'))
             ->assertDontSee(__('connectors.ui.layer_a.next_step.configure'))
             ->html();
 
-        $this->assertSame(1, substr_count($html, __('connectors.ui.layer_a.next_step.preview')));
+        $this->assertSame(1, substr_count($html, __('connectors.ui.layer_a.next_step.open_channel')));
     }
 
     #[Test]
@@ -773,7 +774,7 @@ class ConnectorAccountResourceTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee(__('connectors.ui.layer_a.next_step.configure'))
+            ->assertSee(__('connectors.ui.layer_a.next_step.open_channel'))
             ->assertDontSee(__('connectors.ui.layer_a.next_step.preview'));
     }
 
@@ -823,7 +824,7 @@ class ConnectorAccountResourceTest extends TestCase
     }
 
     #[Test]
-    public function preview_authorized_actor_with_technically_unavailable_target_sees_support_explanation(): void
+    public function configured_preview_authorized_actor_can_open_channel_when_preview_is_temporarily_unavailable(): void
     {
         $this->bindAdobePreviewAuthorizationStub(eligible: false, canAccess: true);
         $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
@@ -832,7 +833,7 @@ class ConnectorAccountResourceTest extends TestCase
 
         Livewire::actingAs($admin)
             ->test(ViewConnectorAccount::class, ['record' => $account->fresh()->getKey()])
-            ->assertSee(__('connectors.ui.layer_a.next_step.unavailable'))
+            ->assertSee(__('connectors.ui.layer_a.next_step.open_channel'))
             ->assertDontSee(__('connectors.ui.layer_a.next_step.preview_permission_required'));
     }
 

@@ -31,7 +31,6 @@ use App\Support\Sync\Exceptions\FieldMappingValidationException;
 use App\Support\Sync\FieldMappingRevisionEntry;
 use App\Support\Sync\SyncConfigurationRevisionHasher;
 use App\Support\Sync\SyncExternalContext;
-use App\Support\Sync\SyncOperationSet;
 use App\Support\Workspace\WorkspaceContext;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
@@ -389,16 +388,20 @@ class FieldMappingPersistenceTest extends TestCase
     }
 
     #[Test]
-    public function migration_v4_rebaseline_matches_runtime_hasher_for_empty_mappings(): void
+    public function migration_v4_rebaseline_matches_v5_down_migration_historical_semantics(): void
     {
-        $migration = require database_path('migrations/2026_08_17_120000_sync_configuration_revision_v4.php');
-        $reflection = new \ReflectionClass($migration);
-        $hashMethod = $reflection->getMethod('hashRevisionV4');
-        $hashMethod->setAccessible(true);
-        $canonicalMethod = $reflection->getMethod('canonicalizePersistedOperations');
-        $canonicalMethod->setAccessible(true);
+        $migrationV4 = require database_path('migrations/2026_08_17_120000_sync_configuration_revision_v4.php');
+        $v4Reflection = new \ReflectionClass($migrationV4);
+        $hashV4 = $v4Reflection->getMethod('hashRevisionV4');
+        $hashV4->setAccessible(true);
+        $canonicalV4 = $v4Reflection->getMethod('canonicalizePersistedOperations');
+        $canonicalV4->setAccessible(true);
 
-        $hasher = new SyncConfigurationRevisionHasher;
+        $migrationV5 = require database_path('migrations/2026_09_15_211000_sync_configuration_revision_v5.php');
+        $v5Reflection = new \ReflectionClass($migrationV5);
+        $hashV4FromV5Down = $v5Reflection->getMethod('hashRevisionV4');
+        $hashV4FromV5Down->setAccessible(true);
+
         $cases = [
             [['import'], SyncConfigurationOperationalState::Enabled],
             [['export', 'import'], SyncConfigurationOperationalState::Paused],
@@ -407,23 +410,14 @@ class FieldMappingPersistenceTest extends TestCase
         ];
 
         foreach ($cases as [$operations, $state]) {
-            $canonical = $canonicalMethod->invoke($migration, $operations);
-            $migrationHash = $hashMethod->invoke($migration, $canonical, $state->value, [], []);
-            $runtimeHash = $hasher->hash(
-                SyncOperationSet::fromOperations(
-                    array_map(
-                        static fn (string $operation): SyncSemanticOperation => SyncSemanticOperation::from($operation),
-                        $canonical,
-                    ),
-                ),
-                $state,
-                [],
-            );
+            $canonical = $canonicalV4->invoke($migrationV4, $operations);
+            $originalV4Hash = $hashV4->invoke($migrationV4, $canonical, $state->value, [], []);
+            $v5DownHash = $hashV4FromV5Down->invoke($migrationV5, $canonical, $state->value, [], []);
 
             $this->assertSame(
-                $runtimeHash,
-                $migrationHash,
-                'Revision mismatch for operations ['.implode(',', $operations).'] state '.$state->value,
+                $originalV4Hash,
+                $v5DownHash,
+                'Historical v4 revision mismatch for operations ['.implode(',', $operations).'] state '.$state->value,
             );
         }
     }
