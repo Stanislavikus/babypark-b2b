@@ -97,4 +97,19 @@ class ConnectorAccount extends Model
     {
         return $this->hasMany(SyncConfiguration::class);
     }
+
+    public function remoteCatalogScans(): HasMany
+    {
+        return $this->hasMany(RemoteCatalogScan::class);
+    }
+
+    public function remoteCatalogSnapshots(): HasMany
+    {
+        return $this->hasMany(RemoteCatalogSnapshot::class);
+    }
+
+    public function remoteCatalogCurrentSnapshots(): HasMany
+    {
+        return $this->hasMany(RemoteCatalogCurrentSnapshot::class);
+    }
 }
