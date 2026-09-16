@@ -21,6 +21,8 @@ use App\Models\Workspace;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
 use App\Services\Sync\SyncPreviewAdmissionService;
+use App\Services\Sync\SyncProductSelectionService;
+use App\Services\Sync\SyncProductSelectionStore;
 use App\Services\Sync\UpdateSyncConfigurationInput;
 use App\Support\Sync\ConnectorExecutionConfiguration;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
@@ -84,6 +86,20 @@ class SyncPreviewExecutionTest extends TestCase
             'is_active' => true,
         ]);
 
+        $excludedProduct = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $account->workspace_id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'EXCLUDED-SKU',
+            'name' => 'Excluded Product',
+            'is_active' => true,
+        ]);
+
+        $configuration = app(SyncProductSelectionService::class)->replace(
+            $account,
+            $configuration->id,
+            [$product->id],
+        );
+
         $run = app(SyncPreviewAdmissionService::class)->admit(
             $actor,
             $account,
@@ -94,6 +110,7 @@ class SyncPreviewExecutionTest extends TestCase
         (new SyncPreviewRunJob($account->workspace_id, $account->id, $run->id))->handle(
             app(ProductExecutionAggregateBuilder::class),
             app(SyncPreviewConnectorCapabilityResolver::class),
+            app(SyncProductSelectionStore::class),
         );
 
         $run = SyncRun::withoutWorkspaceScope()->findOrFail($run->id);
@@ -102,6 +119,10 @@ class SyncPreviewExecutionTest extends TestCase
         $item = SyncRunItem::withoutWorkspaceScope()->where('sync_run_id', $run->id)->sole();
         $this->assertSame($product->id, $item->product_id);
         $this->assertSame(SyncPreviewOutcome::Ready, $item->previewOutcome());
+        $this->assertFalse(SyncRunItem::withoutWorkspaceScope()
+            ->where('sync_run_id', $run->id)
+            ->where('product_id', $excludedProduct->id)
+            ->exists());
     }
 
     #[Test]
@@ -124,6 +145,7 @@ class SyncPreviewExecutionTest extends TestCase
             (new SyncPreviewRunJob($account->workspace_id, $account->id, $run->id))->handle(
                 $builder,
                 app(SyncPreviewConnectorCapabilityResolver::class),
+                app(SyncProductSelectionStore::class),
             );
             $this->fail('Expected preview job to throw.');
         } catch (SyncPreviewRunJobExecutionException) {
@@ -136,7 +158,7 @@ class SyncPreviewExecutionTest extends TestCase
     }
 
     #[Test]
-    public function preview_job_uses_admitted_snapshot_after_live_configuration_mutation(): void
+    public function queued_preview_fails_closed_when_configuration_revision_changes_before_selection_resolution(): void
     {
         $account = $this->createSyncSupportAccount();
         $configuration = $this->prepareMappedConfiguration($account);
@@ -149,26 +171,30 @@ class SyncPreviewExecutionTest extends TestCase
             SyncSemanticOperation::Export,
         );
 
-        $admittedSnapshot = $run->configuration_snapshot;
-        $this->assertSame(4, $admittedSnapshot['connector_execution_configuration']['attribute_set_id']);
+        $admittedRevision = $run->configuration_revision;
 
-        app(SyncConfigurationService::class)->updateConnectorExecutionConfiguration(
+        $updated = app(SyncConfigurationService::class)->updateConnectorExecutionConfiguration(
             $account,
             $configuration->id,
             ConnectorExecutionConfiguration::fromPayload(['attribute_set_id' => 12]),
         );
 
-        (new SyncPreviewRunJob($account->workspace_id, $account->id, $run->id))->handle(
-            app(ProductExecutionAggregateBuilder::class),
-            app(SyncPreviewConnectorCapabilityResolver::class),
-        );
+        $this->assertNotSame($admittedRevision, $updated->configuration_revision);
+
+        try {
+            (new SyncPreviewRunJob($account->workspace_id, $account->id, $run->id))->handle(
+                app(ProductExecutionAggregateBuilder::class),
+                app(SyncPreviewConnectorCapabilityResolver::class),
+                app(SyncProductSelectionStore::class),
+            );
+            $this->fail('Expected stale queued Preview to fail closed.');
+        } catch (SyncPreviewRunJobExecutionException) {
+            // expected
+        }
 
         $run = SyncRun::withoutWorkspaceScope()->findOrFail($run->id);
-        $this->assertSame(SyncRunStatus::Completed, $run->status);
-        $this->assertSame(
-            4,
-            $run->configuration_snapshot['connector_execution_configuration']['attribute_set_id'],
-        );
+        $this->assertSame(SyncRunStatus::Failed, $run->status);
+        $this->assertNotNull($run->completed_at);
     }
 
     private function prepareMappedConfiguration(ConnectorAccount $account): SyncConfiguration

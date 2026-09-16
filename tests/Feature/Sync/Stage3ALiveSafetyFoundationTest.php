@@ -23,6 +23,7 @@ use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
 use App\Services\Sync\SyncLiveAdmissionService;
 use App\Services\Sync\SyncPreviewAdmissionService;
+use App\Services\Sync\SyncProductSelectionStore;
 use App\Services\Sync\SyncRunActiveRecoveryService;
 use App\Services\Sync\SyncRuntimeTimingResolver;
 use App\Services\Sync\UpdateSyncConfigurationInput;
@@ -35,6 +36,7 @@ use App\Support\Sync\Exceptions\SyncRuntimeTimingConfigurationException;
 use App\Support\Sync\Live\SyncLiveConnectorCapabilityResolver;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
 use App\Support\Sync\Preview\SyncPreviewConnectorCapabilityResolver;
+use App\Support\Sync\SyncProductSelectionDescriptor;
 use App\Support\Sync\SyncRuntimeExecutionTiming;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
@@ -382,6 +384,7 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         (new SyncPreviewRunJob($account->workspace_id, $account->id, $run->id))->handle(
             app(ProductExecutionAggregateBuilder::class),
             app(SyncPreviewConnectorCapabilityResolver::class),
+            app(SyncProductSelectionStore::class),
         );
 
         $this->assertSame(SyncRunStatus::Failed, $run->fresh()->status);
@@ -417,6 +420,7 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
             $job->handle(
                 app(ProductExecutionAggregateBuilder::class),
                 app(SyncPreviewConnectorCapabilityResolver::class),
+                app(SyncProductSelectionStore::class),
             );
         } catch (\Throwable) {
             // Preview execution may fail after reservation; lease timestamps are the proof target.
@@ -632,12 +636,14 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         $account = $this->createSyncSupportAccount();
         $configuration = $this->prepareReadyConfiguration($account);
         $actor = $this->grantLivePermission($account->workspace);
-        $this->seedCompletedPreview($account, $configuration);
+        $sourcePreview = $this->seedCompletedPreview($account, $configuration);
 
         $run = app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
 
         $this->assertSame(SyncRunMode::Live, $run->mode);
         $this->assertSame(SyncRunStatus::Queued, $run->status);
+        $this->assertSame($sourcePreview->id, $run->source_preview_run_id);
+        $this->assertSame($sourcePreview->configuration_snapshot, $run->configuration_snapshot);
         Bus::assertDispatched(SyncLiveRunJob::class);
     }
 
@@ -647,6 +653,8 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         $account = $this->createSyncSupportAccount();
         $configuration = $this->prepareReadyConfiguration($account);
 
+        $sourcePreview = $this->seedCompletedPreview($account, $configuration);
+
         $run = SyncRun::withoutWorkspaceScope()->create([
             'id' => (string) Str::uuid(),
             'workspace_id' => $account->workspace_id,
@@ -655,7 +663,8 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
             'mode' => SyncRunMode::Live,
             'semantic_operation' => SyncSemanticOperation::Export,
             'status' => SyncRunStatus::Queued,
-            'configuration_snapshot' => ['selection' => ['mode' => 'all_products']],
+            'configuration_snapshot' => $sourcePreview->configuration_snapshot,
+            'source_preview_run_id' => $sourcePreview->id,
         ]);
 
         (new SyncLiveRunJob($account->workspace_id, $account->id, $run->id))->handle(
@@ -764,9 +773,9 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         return $configuration->refresh();
     }
 
-    private function seedCompletedPreview(ConnectorAccount $account, SyncConfiguration $configuration): void
+    private function seedCompletedPreview(ConnectorAccount $account, SyncConfiguration $configuration): SyncRun
     {
-        SyncRun::withoutWorkspaceScope()->create([
+        return SyncRun::withoutWorkspaceScope()->create([
             'id' => (string) Str::uuid(),
             'workspace_id' => $account->workspace_id,
             'sync_configuration_id' => $configuration->id,
@@ -774,7 +783,7 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
             'mode' => SyncRunMode::Preview,
             'semantic_operation' => SyncSemanticOperation::Export,
             'status' => SyncRunStatus::Completed,
-            'configuration_snapshot' => ['selection' => ['mode' => 'all_products']],
+            'configuration_snapshot' => ['selection' => SyncProductSelectionDescriptor::empty()->toSnapshotArray()],
             'completed_at' => now(),
         ]);
     }

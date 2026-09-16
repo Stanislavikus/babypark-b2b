@@ -9,6 +9,7 @@ use App\Support\Sync\FieldMappingRevisionEntry;
 use App\Support\Sync\FieldOptionMappingRevisionEntry;
 use App\Support\Sync\SyncConfigurationRevisionHasher;
 use App\Support\Sync\SyncOperationSet;
+use App\Support\Sync\SyncProductSelectionDescriptor;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -178,7 +179,7 @@ class SyncConfigurationRevisionHasherTest extends TestCase
     }
 
     #[Test]
-    public function revision_hasher_matches_v4_migration_hash(): void
+    public function revision_hasher_matches_v5_migration_hash(): void
     {
         $operations = SyncOperationSet::fromOperations([SyncSemanticOperation::Export]);
         $state = SyncConfigurationOperationalState::Enabled;
@@ -187,16 +188,19 @@ class SyncConfigurationRevisionHasherTest extends TestCase
             externalFieldKey: 'sku',
         );
 
+        $selection = SyncProductSelectionDescriptor::fromProductIds([9, 2]);
+
         $runtime = $this->hasher->hash(
             $operations,
             $state,
             [$mapping],
             ConnectorExecutionConfiguration::fromPayload(['attribute_set_id' => 9]),
+            $selection,
         );
 
-        $migration = require database_path('migrations/2026_08_17_120000_sync_configuration_revision_v4.php');
+        $migration = require database_path('migrations/2026_09_15_211000_sync_configuration_revision_v5.php');
         $reflection = new \ReflectionClass($migration);
-        $hashMethod = $reflection->getMethod('hashRevisionV4');
+        $hashMethod = $reflection->getMethod('hashRevisionV5');
         $hashMethod->setAccessible(true);
 
         $migrationHash = $hashMethod->invoke(
@@ -209,13 +213,14 @@ class SyncConfigurationRevisionHasherTest extends TestCase
                 'option_mappings' => [],
             ]],
             ['attribute_set_id' => 9],
+            [2, 9],
         );
 
         $this->assertSame($migrationHash, $runtime);
     }
 
     #[Test]
-    public function v4_revision_namespace_is_customer_neutral(): void
+    public function v5_revision_namespace_is_customer_neutral(): void
     {
         $reflection = new \ReflectionClass(SyncConfigurationRevisionHasher::class);
         $prefixConstant = $reflection->getReflectionConstant('PREFIX');
@@ -223,7 +228,7 @@ class SyncConfigurationRevisionHasherTest extends TestCase
         $prefix = $prefixConstant->getValue();
 
         $this->assertIsString($prefix);
-        $this->assertStringStartsWith('platform.sync-configuration-revision.v4', $prefix);
+        $this->assertStringStartsWith('platform.sync-configuration-revision.v5', $prefix);
         $this->assertStringNotContainsString('babypark', $prefix);
     }
 
@@ -266,7 +271,7 @@ class SyncConfigurationRevisionHasherTest extends TestCase
     }
 
     #[Test]
-    public function nested_object_key_order_produces_identical_v4_revision(): void
+    public function nested_object_key_order_produces_identical_v5_revision(): void
     {
         $left = ConnectorExecutionConfiguration::fromPayload([
             'nested' => ['a' => 1, 'b' => 2],
@@ -292,9 +297,9 @@ class SyncConfigurationRevisionHasherTest extends TestCase
 
         $this->assertSame($runtimeLeft, $runtimeRight);
 
-        $migration = require database_path('migrations/2026_08_17_120000_sync_configuration_revision_v4.php');
+        $migration = require database_path('migrations/2026_09_15_211000_sync_configuration_revision_v5.php');
         $reflection = new \ReflectionClass($migration);
-        $hashMethod = $reflection->getMethod('hashRevisionV4');
+        $hashMethod = $reflection->getMethod('hashRevisionV5');
         $hashMethod->setAccessible(true);
 
         $migrationHash = $hashMethod->invoke(
@@ -303,34 +308,61 @@ class SyncConfigurationRevisionHasherTest extends TestCase
             SyncConfigurationOperationalState::Enabled->value,
             [],
             ['nested' => ['b' => 2, 'a' => 1]],
+            [],
         );
 
         $this->assertSame($migrationHash, $runtimeLeft);
     }
 
     #[Test]
-    public function v4_migration_down_restores_v3_hash_semantics(): void
+    public function selection_membership_is_canonical_and_advances_revision_only_when_effective_set_changes(): void
     {
-        $migrationV4 = require database_path('migrations/2026_08_17_120000_sync_configuration_revision_v4.php');
-        $reflectionV4 = new \ReflectionClass($migrationV4);
-        $downMethod = $reflectionV4->getMethod('rebaselineConfigurationRevisionsToV3');
-        $downMethod->setAccessible(true);
+        $operations = SyncOperationSet::fromOperations([SyncSemanticOperation::Export]);
+        $state = SyncConfigurationOperationalState::Enabled;
 
-        $migrationV3 = require database_path('migrations/2026_08_16_100000_sync_configuration_revision_v3.php');
-        $reflectionV3 = new \ReflectionClass($migrationV3);
-        $hashV3 = $reflectionV3->getMethod('hashRevisionV3');
-        $hashV3->setAccessible(true);
-        $canonical = $reflectionV3->getMethod('canonicalizePersistedOperations');
-        $canonical->setAccessible(true);
+        $left = $this->hasher->hash(
+            $operations,
+            $state,
+            [],
+            ConnectorExecutionConfiguration::empty(),
+            SyncProductSelectionDescriptor::fromProductIds([9, 2, 9]),
+        );
+        $sameSetDifferentOrder = $this->hasher->hash(
+            $operations,
+            $state,
+            [],
+            ConnectorExecutionConfiguration::empty(),
+            SyncProductSelectionDescriptor::fromProductIds([2, 9]),
+        );
+        $differentSet = $this->hasher->hash(
+            $operations,
+            $state,
+            [],
+            ConnectorExecutionConfiguration::empty(),
+            SyncProductSelectionDescriptor::fromProductIds([2, 10]),
+        );
 
-        $expectedV3 = $hashV3->invoke(
-            $migrationV3,
-            $canonical->invoke($migrationV3, ['import']),
+        $this->assertSame($left, $sameSetDifferentOrder);
+        $this->assertNotSame($left, $differentSet);
+    }
+
+    #[Test]
+    public function v5_migration_down_restores_v4_hash_semantics(): void
+    {
+        $migrationV5 = require database_path('migrations/2026_09_15_211000_sync_configuration_revision_v5.php');
+        $reflectionV5 = new \ReflectionClass($migrationV5);
+        $hashV4 = $reflectionV5->getMethod('hashRevisionV4');
+        $hashV4->setAccessible(true);
+
+        $expectedV4 = $hashV4->invoke(
+            $migrationV5,
+            ['import'],
             SyncConfigurationOperationalState::Enabled->value,
+            [],
             [],
         );
 
-        $this->assertSame(64, strlen($expectedV3));
-        $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $expectedV3);
+        $this->assertSame(64, strlen($expectedV4));
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $expectedV4);
     }
 }

@@ -4,9 +4,10 @@ namespace App\Jobs\Connectors;
 
 use App\Enums\SyncRunStatus;
 use App\Models\ConnectorAccount;
-use App\Models\Product;
+use App\Models\SyncConfiguration;
 use App\Models\SyncRun;
 use App\Models\SyncRunItem;
+use App\Services\Sync\SyncProductSelectionStore;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
 use App\Support\Sync\Preview\SyncPreviewConnectorCapabilityResolver;
 use App\Support\Sync\SyncRuntimeExecutionTiming;
@@ -46,9 +47,10 @@ class SyncPreviewRunJob implements ShouldQueue
     public function handle(
         ProductExecutionAggregateBuilder $aggregateBuilder,
         SyncPreviewConnectorCapabilityResolver $capabilityResolver,
+        SyncProductSelectionStore $selectionStore,
     ): void {
         try {
-            $this->execute($aggregateBuilder, $capabilityResolver);
+            $this->execute($aggregateBuilder, $capabilityResolver, $selectionStore);
         } catch (\Throwable) {
             $this->terminalizeFailedRun();
 
@@ -59,6 +61,7 @@ class SyncPreviewRunJob implements ShouldQueue
     private function execute(
         ProductExecutionAggregateBuilder $aggregateBuilder,
         SyncPreviewConnectorCapabilityResolver $capabilityResolver,
+        SyncProductSelectionStore $selectionStore,
     ): void {
         $reserved = DB::transaction(function (): ?SyncRun {
             $run = SyncRun::withoutWorkspaceScope()
@@ -98,12 +101,31 @@ class SyncPreviewRunJob implements ShouldQueue
         $snapshot = $run->configuration_snapshot ?? [];
         $snapshot = is_array($snapshot) ? $snapshot : [];
 
-        $productIds = Product::withoutWorkspaceScope()
-            ->where('workspace_id', $this->workspaceId)
-            ->orderBy('id')
-            ->pluck('id')
-            ->map(static fn ($id): string => (string) $id)
-            ->all();
+        $productIds = DB::transaction(function () use ($run, $selectionStore): array {
+            $configuration = SyncConfiguration::withoutWorkspaceScope()
+                ->where('workspace_id', $this->workspaceId)
+                ->where('connector_account_id', $this->connectorAccountId)
+                ->where('id', $run->sync_configuration_id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($configuration === null) {
+                throw new \RuntimeException('Preview sync configuration is unavailable during selection resolution.');
+            }
+
+            if (! hash_equals((string) $run->configuration_revision, (string) $configuration->configuration_revision)) {
+                throw new \RuntimeException('Preview sync configuration revision changed before selection resolution.');
+            }
+
+            $descriptor = $selectionStore->descriptorForConfiguration($configuration);
+            $selection = $run->configuration_snapshot['selection'] ?? null;
+
+            if (! $descriptor->matchesSnapshot($selection)) {
+                throw new \RuntimeException('Preview Product selection no longer matches admitted selection evidence.');
+            }
+
+            return array_map(static fn (int $id): string => (string) $id, $descriptor->productIds);
+        });
 
         $aggregates = $aggregateBuilder->buildForProductIds($this->workspaceId, $productIds, $snapshot);
         $returnedProductIds = array_map(

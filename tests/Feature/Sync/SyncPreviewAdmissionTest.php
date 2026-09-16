@@ -18,6 +18,7 @@ use App\Services\Sync\SyncPreviewAdmissionService;
 use App\Services\Sync\UpdateSyncConfigurationInput;
 use App\Support\Sync\ConnectorExecutionConfiguration;
 use App\Support\Sync\Exceptions\SyncPreviewAdmissionException;
+use App\Support\Sync\SyncProductSelectionDescriptor;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -91,7 +92,10 @@ class SyncPreviewAdmissionTest extends TestCase
         $this->assertSame(SyncRunStatus::Queued, $run->status);
         $this->assertSame(SyncRunMode::Preview, $run->mode);
         $this->assertSame('platform.sync-run-input.v1', $run->configuration_snapshot['version']);
-        $this->assertSame('all_products', $run->configuration_snapshot['selection']['mode']);
+        $this->assertSame(
+            SyncProductSelectionDescriptor::empty()->toSnapshotArray(),
+            $run->configuration_snapshot['selection'],
+        );
 
         Bus::assertDispatched(SyncPreviewRunJob::class);
     }

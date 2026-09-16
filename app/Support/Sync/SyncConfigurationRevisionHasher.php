@@ -6,7 +6,7 @@ use App\Enums\SyncConfigurationOperationalState;
 
 final class SyncConfigurationRevisionHasher
 {
-    private const PREFIX = 'platform.sync-configuration-revision.v4';
+    private const PREFIX = 'platform.sync-configuration-revision.v5';
 
     /**
      * @param  list<FieldMappingRevisionEntry|array{
@@ -20,13 +20,12 @@ final class SyncConfigurationRevisionHasher
         SyncConfigurationOperationalState $operationalState,
         array $fieldMappings = [],
         ?ConnectorExecutionConfiguration $connectorExecutionConfiguration = null,
+        ?SyncProductSelectionDescriptor $selection = null,
     ): string {
         $payload = new \stdClass;
         $payload->enabled_operations = $enabledOperations->values();
         $payload->operational_state = $operationalState->value;
-        $selection = new \stdClass;
-        $selection->mode = 'all_products';
-        $payload->selection = $selection;
+        $payload->selection = ($selection ?? SyncProductSelectionDescriptor::empty())->toRevisionArray();
         $payload->connector_execution_configuration = ($connectorExecutionConfiguration ?? ConnectorExecutionConfiguration::empty())
             ->toRevisionArray();
         $payload->field_mappings = $this->canonicalizeFieldMappings($fieldMappings);

@@ -27,6 +27,7 @@ class SyncRun extends Model
         'status',
         'initiated_by_user_id',
         'configuration_snapshot',
+        'source_preview_run_id',
         'started_at',
         'completed_at',
         'queued_abandon_after',
@@ -69,5 +70,10 @@ class SyncRun extends Model
     public function items(): HasMany
     {
         return $this->hasMany(SyncRunItem::class);
+    }
+
+    public function sourcePreviewRun(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_preview_run_id');
     }
 }

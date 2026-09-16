@@ -7,7 +7,6 @@ use App\Enums\SyncRunMode;
 use App\Enums\SyncRunStatus;
 use App\Enums\SyncSemanticOperation;
 use App\Models\ConnectorAccount;
-use App\Models\Product;
 use App\Models\SyncConfiguration;
 use App\Models\SyncRun;
 use App\Models\SyncRunItem;
@@ -137,17 +136,40 @@ class SyncLiveRunJob implements Interruptible, ShouldQueue
         $snapshot = $run->configuration_snapshot ?? [];
         $snapshot = is_array($snapshot) ? $snapshot : [];
 
+        if (! hash_equals((string) $run->configuration_revision, (string) $configuration->configuration_revision)) {
+            throw new \RuntimeException('Live sync configuration revision changed after admission.');
+        }
+
         $selection = $snapshot['selection'] ?? null;
         $selectionMode = is_array($selection) ? ($selection['mode'] ?? null) : null;
 
-        if ($selectionMode !== 'all_products') {
+        if ($selectionMode !== 'explicit_products') {
             throw new \RuntimeException('Live sync snapshot selection mode is not supported.');
         }
 
-        $productIds = Product::withoutWorkspaceScope()
+        if ($run->source_preview_run_id === null) {
+            throw new \RuntimeException('Live sync run is missing concrete source Preview evidence.');
+        }
+
+        $sourcePreview = SyncRun::withoutWorkspaceScope()
             ->where('workspace_id', $this->workspaceId)
-            ->orderBy('id')
-            ->pluck('id')
+            ->where('id', $run->source_preview_run_id)
+            ->where('sync_configuration_id', $run->sync_configuration_id)
+            ->where('mode', SyncRunMode::Preview)
+            ->where('semantic_operation', SyncSemanticOperation::Export)
+            ->where('status', SyncRunStatus::Completed)
+            ->where('configuration_revision', $run->configuration_revision)
+            ->first();
+
+        if ($sourcePreview === null) {
+            throw new \RuntimeException('Live source Preview evidence is unavailable or incompatible.');
+        }
+
+        $productIds = SyncRunItem::withoutWorkspaceScope()
+            ->where('workspace_id', $this->workspaceId)
+            ->where('sync_run_id', $sourcePreview->id)
+            ->orderBy('product_id')
+            ->pluck('product_id')
             ->map(static fn ($id): string => (string) $id)
             ->all();
 

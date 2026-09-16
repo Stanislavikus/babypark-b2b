@@ -126,4 +126,9 @@ class SyncConfiguration extends Model
     {
         return $this->hasMany(SyncRun::class);
     }
+
+    public function productSelections(): HasMany
+    {
+        return $this->hasMany(SyncConfigurationProductSelection::class);
+    }
 }
