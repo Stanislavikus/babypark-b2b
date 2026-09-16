@@ -161,11 +161,19 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
                 $copy = mb_strtolower(implode(' ', [
                     __('product_channels.remote_catalog.table_description'),
                     __('product_channels.remote_catalog.captured_at', ['time' => 'now']),
+                    __('product_channels.remote_catalog.identity', [
+                        'sku' => 'SAFE-SKU',
+                        'id' => '987654321',
+                    ]),
                 ]));
 
                 foreach ($forbiddenFragments as $fragment) {
                     $this->assertStringNotContainsString($fragment, $copy);
                 }
+
+                $this->assertStringNotContainsString('987654321', $copy);
+                $this->assertStringNotContainsString('entity_id', $copy);
+                $this->assertStringNotContainsString('magento id', $copy);
             }
         } finally {
             app()->setLocale($originalLocale);

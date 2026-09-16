@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceAuthorization;
+use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshot;
 use App\Support\Sync\EntityTrust\EntityTrustMerchantFieldComparison;
 use App\Support\Sync\EntityTrust\EntityTrustMerchantOutcome;
 use App\Support\Sync\EntityTrust\EntityTrustMerchantSubjectRow;
@@ -49,6 +50,8 @@ final class EntityTrustMerchantOrchestrator
         bool $isConfigurableFamily,
         bool $explicitRelink = false,
         ?string $existingParentSkuHint = null,
+        ?int $expectedPrimaryLogicalEntityId = null,
+        ?AdobeConnectorAccountTargetSnapshot $expectedTargetSnapshot = null,
     ): EntityTrustMerchantOutcome {
         $productName = (string) $product->name;
         $primarySku = $product->variants[0]?->sku ?? null;
@@ -64,6 +67,8 @@ final class EntityTrustMerchantOrchestrator
                 (string) $product->id,
                 $existingParentSkuHint,
                 $explicitRelink,
+                $expectedPrimaryLogicalEntityId,
+                $expectedTargetSnapshot,
             );
 
             return $this->outcomeFromReview(

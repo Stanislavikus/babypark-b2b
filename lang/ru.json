@@ -777,9 +777,14 @@
     "product_channels.remote_catalog.table_description": "Эти товары показаны из Magento для сравнения. Они не являются товарами вашего основного каталога и не создаются автоматически.",
     "product_channels.remote_catalog.captured_at": "Каталог считан: :time",
     "product_channels.remote_catalog.back_to_channel": "Назад к каналу",
-    "product_channels.remote_catalog.identity": "SKU: :sku · Magento ID: :id",
+    "product_channels.remote_catalog.identity": "SKU: :sku",
     "product_channels.remote_catalog.columns.product": "Товар в Magento",
     "product_channels.remote_catalog.columns.type": "Тип",
     "product_channels.remote_catalog.columns.status": "Статус",
-    "product_channels.remote_catalog.columns.updated": "Обновлено в Magento"
+    "product_channels.remote_catalog.columns.updated": "Обновлено в Magento",
+    "product_channels.remote_catalog.link.action": "Связать с товаром каталога",
+    "product_channels.remote_catalog.link.heading": "Связать товар Magento",
+    "product_channels.remote_catalog.link.description": "Выберите существующий товар вашего каталога, который соответствует «:name». Связь будет сохранена только после свежей проверки Magento и вашего подтверждения.",
+    "product_channels.remote_catalog.link.product_label": "Товар вашего каталога",
+    "product_channels.remote_catalog.link.review": "Проверить соответствие"
 }

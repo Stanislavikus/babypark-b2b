@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Sync\SyncConfigurationLookupService;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
+use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshot;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshotResolver;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeProductCandidateDiscoveryClient;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeProductEntityTrustComparisonBuilder;
@@ -43,9 +44,16 @@ final class AdobeProductEntityTrustReviewService
         string $productId,
         ?string $existingParentSkuHint = null,
         bool $explicitRelink = false,
+        ?int $expectedPrimaryLogicalEntityId = null,
+        ?AdobeConnectorAccountTargetSnapshot $expectedTargetSnapshot = null,
     ): EntityTrustReviewResult {
         $this->authorization->assertReviewOrConfirm($actor, $workspace);
         $account = $this->authorization->resolveConnectorAccount($actor, $workspace, $connectorAccountId);
+        $targetSnapshot = $this->targetSnapshotResolver->resolve($account);
+
+        if ($expectedTargetSnapshot !== null && ! $targetSnapshot->equals($expectedTargetSnapshot)) {
+            throw EntityTrustException::reviewTargetMismatch();
+        }
 
         $configuration = $this->configurationLookup->findProductsDefaultContext($account);
 
@@ -60,13 +68,35 @@ final class AdobeProductEntityTrustReviewService
 
         $intent = $this->intentResolver->resolve($configuration, $product, $existingParentSkuHint, $explicitRelink);
         $context = $this->contextFactory->create($workspace->id, $account->id);
-        $targetSnapshot = $this->targetSnapshotResolver->resolve($account);
+        $contextTargetSnapshot = new AdobeConnectorAccountTargetSnapshot($context->baseUrl, $context->storeCode);
 
-        if ($intent->mode === EntityTrustConfirmationMode::SimpleVariant) {
-            return $this->reviewSimple($actor, $account, $product, $intent, $context, $targetSnapshot, $explicitRelink);
+        if (! $contextTargetSnapshot->equals($targetSnapshot)) {
+            throw EntityTrustException::reviewTargetMismatch();
         }
 
-        return $this->reviewConfigurable($actor, $account, $product, $intent, $context, $targetSnapshot, $explicitRelink);
+        if ($intent->mode === EntityTrustConfirmationMode::SimpleVariant) {
+            return $this->reviewSimple(
+                $actor,
+                $account,
+                $product,
+                $intent,
+                $context,
+                $targetSnapshot,
+                $explicitRelink,
+                $expectedPrimaryLogicalEntityId,
+            );
+        }
+
+        return $this->reviewConfigurable(
+            $actor,
+            $account,
+            $product,
+            $intent,
+            $context,
+            $targetSnapshot,
+            $explicitRelink,
+            $expectedPrimaryLogicalEntityId,
+        );
     }
 
     private function reviewSimple(
@@ -77,10 +107,17 @@ final class AdobeProductEntityTrustReviewService
         $context,
         $targetSnapshot,
         bool $explicitRelink,
+        ?int $expectedPrimaryLogicalEntityId,
     ): EntityTrustReviewResult {
         $desired = $intent->simpleDesiredState;
         $verified = $this->verifier->verifySimpleOrChild($context, $desired->sku);
         $observed = $verified->candidate->simpleObservedState;
+
+        if ($expectedPrimaryLogicalEntityId !== null
+            && $verified->logicalEntityId !== $expectedPrimaryLogicalEntityId
+        ) {
+            throw EntityTrustException::candidateUntrusted();
+        }
 
         if ($observed === null) {
             throw EntityTrustException::candidateUntrusted();
@@ -138,10 +175,17 @@ final class AdobeProductEntityTrustReviewService
         $context,
         $targetSnapshot,
         bool $explicitRelink,
+        ?int $expectedPrimaryLogicalEntityId,
     ): EntityTrustReviewResult {
         $configurable = $intent->configurableDesiredState;
         $parentVerified = $this->verifier->verifyConfigurableParent($context, $configurable->parentSku);
         $parentObserved = $parentVerified->candidate->parentObservedState;
+
+        if ($expectedPrimaryLogicalEntityId !== null
+            && $parentVerified->logicalEntityId !== $expectedPrimaryLogicalEntityId
+        ) {
+            throw EntityTrustException::candidateUntrusted();
+        }
 
         if ($parentObserved === null) {
             throw EntityTrustException::candidateUntrusted();
