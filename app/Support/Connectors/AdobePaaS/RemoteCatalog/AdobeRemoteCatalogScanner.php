@@ -21,7 +21,7 @@ final class AdobeRemoteCatalogScanner
         private readonly RemoteCatalogScanService $scanService,
     ) {}
 
-    public function scan(ConnectorAccount $account): RemoteCatalogSnapshot
+    public function scan(ConnectorAccount $account, ?string $executionToken = null): RemoteCatalogSnapshot
     {
         $account = $this->freshAccount($account);
         $context = $this->contextFactory->create((string) $account->workspace_id, (string) $account->id);
@@ -32,6 +32,7 @@ final class AdobeRemoteCatalogScanner
             SyncDataDomain::Products,
             $target->toEnvelopeArray(),
             $boundary->totalCount,
+            $executionToken,
         );
 
         try {

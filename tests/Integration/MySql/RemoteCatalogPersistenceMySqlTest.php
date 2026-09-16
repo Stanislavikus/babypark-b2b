@@ -74,6 +74,7 @@ class RemoteCatalogPersistenceMySqlTest extends TestCase
             'data_domain' => SyncDataDomain::Products->value,
             'target_context' => json_encode(['base_url' => 'https://shop.example.com', 'store_code' => 'default']),
             'status' => RemoteCatalogScanStatus::Running->value,
+            'generation' => 1,
             'received_item_count' => 0,
             'started_at' => now(),
             'created_at' => now(),
@@ -145,6 +146,44 @@ class RemoteCatalogPersistenceMySqlTest extends TestCase
             'scan_id' => $scan->id,
             'target_context' => json_encode($target),
             'item_count' => 0,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    public function test_mysql_rejects_duplicate_remote_catalog_execution_token(): void
+    {
+        $account = $this->createConnectorAccount();
+        $service = app(RemoteCatalogScanService::class);
+        $target = app(AdobeConnectorAccountTargetSnapshotResolver::class)->resolve($account)->toEnvelopeArray();
+        $executionToken = (string) Str::uuid();
+
+        $service->begin($account, SyncDataDomain::Products, $target, 0, $executionToken);
+        $this->expectException(QueryException::class);
+
+        $service->begin($account, SyncDataDomain::Products, $target, 0, $executionToken);
+    }
+
+    public function test_mysql_rejects_duplicate_generation_for_same_remote_catalog_owner(): void
+    {
+        $account = $this->createConnectorAccount();
+        $service = app(RemoteCatalogScanService::class);
+        $target = app(AdobeConnectorAccountTargetSnapshotResolver::class)->resolve($account)->toEnvelopeArray();
+        $scan = $service->begin($account, SyncDataDomain::Products, $target, 0);
+
+        $this->assertSame(1, $scan->generation);
+        $this->expectException(QueryException::class);
+
+        DB::table('remote_catalog_scans')->insert([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'data_domain' => SyncDataDomain::Products->value,
+            'target_context' => json_encode($target),
+            'status' => RemoteCatalogScanStatus::Running->value,
+            'generation' => 1,
+            'received_item_count' => 0,
+            'started_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
         ]);

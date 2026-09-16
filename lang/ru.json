@@ -764,5 +764,22 @@
     "product_channels.product_status.inactive": "Неактивный",
     "product_channels.identity.sku": "SKU: :sku",
     "product_channels.identity.gtin": "GTIN: :gtin",
-    "product_channels.columns.channels": "Каналы"
+    "product_channels.columns.channels": "Каналы",
+    "product_channels.remote_catalog.heading": "Каталог в Magento",
+    "product_channels.remote_catalog.not_scanned": "Каталог Magento ещё не считан. Обновите его, чтобы увидеть удалённые товары и связи.",
+    "product_channels.remote_catalog.summary": "Найдено в Magento: :remote · Связано с вашим каталогом: :linked · Ещё не связано: :unlinked",
+    "product_channels.remote_catalog.refresh": "Обновить каталог Magento",
+    "product_channels.remote_catalog.scan_running": "Каталог обновляется…",
+    "product_channels.remote_catalog.scan_queued": "Обновление каталога Magento запущено",
+    "product_channels.remote_catalog.open_remote_only": "Посмотреть несвязанные товары",
+    "product_channels.remote_catalog.title": "Каталог Magento · :account",
+    "product_channels.remote_catalog.table_heading": "Товары в Magento, которые ещё не связаны",
+    "product_channels.remote_catalog.table_description": "Эти товары показаны из Magento для сравнения. Они не являются товарами вашего основного каталога и не создаются автоматически.",
+    "product_channels.remote_catalog.captured_at": "Каталог считан: :time",
+    "product_channels.remote_catalog.back_to_channel": "Назад к каналу",
+    "product_channels.remote_catalog.identity": "SKU: :sku · Magento ID: :id",
+    "product_channels.remote_catalog.columns.product": "Товар в Magento",
+    "product_channels.remote_catalog.columns.type": "Тип",
+    "product_channels.remote_catalog.columns.status": "Статус",
+    "product_channels.remote_catalog.columns.updated": "Обновлено в Magento"
 }

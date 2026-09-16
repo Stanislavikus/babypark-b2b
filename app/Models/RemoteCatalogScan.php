@@ -16,7 +16,7 @@ class RemoteCatalogScan extends Model
     use HasUuids;
 
     protected $fillable = [
-        'workspace_id', 'connector_account_id', 'data_domain', 'target_context', 'status',
+        'workspace_id', 'connector_account_id', 'data_domain', 'target_context', 'status', 'generation', 'execution_token',
         'expected_item_count', 'received_item_count', 'failure_code', 'failure_detail',
         'started_at', 'finished_at',
     ];
@@ -27,6 +27,7 @@ class RemoteCatalogScan extends Model
             'data_domain' => SyncDataDomain::class,
             'target_context' => 'array',
             'status' => RemoteCatalogScanStatus::class,
+            'generation' => 'integer',
             'expected_item_count' => 'integer',
             'received_item_count' => 'integer',
             'started_at' => 'datetime',

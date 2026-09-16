@@ -15,6 +15,8 @@ return new class extends Migration
             $table->string('data_domain', 64);
             $table->json('target_context');
             $table->string('status', 32);
+            $table->unsignedBigInteger('generation');
+            $table->uuid('execution_token')->nullable();
             $table->unsignedBigInteger('expected_item_count')->nullable();
             $table->unsignedBigInteger('received_item_count')->default(0);
             $table->string('failure_code')->nullable();
@@ -28,10 +30,11 @@ return new class extends Migration
                 ['workspace_id', 'connector_account_id', 'data_domain', 'id'],
                 'rcs_owner_id_unique',
             );
-            $table->index(
-                ['workspace_id', 'connector_account_id', 'data_domain', 'started_at'],
-                'rcs_owner_started_idx',
+            $table->unique(
+                ['workspace_id', 'connector_account_id', 'data_domain', 'generation'],
+                'rcs_owner_generation_unique',
             );
+            $table->unique('execution_token', 'rcs_execution_token_unique');
         });
 
         Schema::table('remote_catalog_scans', function (Blueprint $table) {

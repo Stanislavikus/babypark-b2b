@@ -781,5 +781,22 @@
     "product_channels.product_status.inactive": "Inactive",
     "product_channels.identity.sku": "SKU: :sku",
     "product_channels.identity.gtin": "GTIN: :gtin",
-    "product_channels.columns.channels": "Channels"
+    "product_channels.columns.channels": "Channels",
+    "product_channels.remote_catalog.heading": "Magento catalogue",
+    "product_channels.remote_catalog.not_scanned": "The Magento catalogue has not been read yet. Refresh it to see remote products and links.",
+    "product_channels.remote_catalog.summary": "Found in Magento: :remote · Linked to your catalogue: :linked · Not linked yet: :unlinked",
+    "product_channels.remote_catalog.refresh": "Refresh Magento catalogue",
+    "product_channels.remote_catalog.scan_running": "Catalogue refresh is running…",
+    "product_channels.remote_catalog.scan_queued": "Magento catalogue refresh started",
+    "product_channels.remote_catalog.open_remote_only": "View unlinked products",
+    "product_channels.remote_catalog.title": "Magento catalogue · :account",
+    "product_channels.remote_catalog.table_heading": "Magento products not linked yet",
+    "product_channels.remote_catalog.table_description": "These products are shown from Magento for comparison. They are not products in your main catalogue and are not created automatically.",
+    "product_channels.remote_catalog.captured_at": "Catalogue read: :time",
+    "product_channels.remote_catalog.back_to_channel": "Back to channel",
+    "product_channels.remote_catalog.identity": "SKU: :sku · Magento ID: :id",
+    "product_channels.remote_catalog.columns.product": "Magento product",
+    "product_channels.remote_catalog.columns.type": "Type",
+    "product_channels.remote_catalog.columns.status": "Status",
+    "product_channels.remote_catalog.columns.updated": "Updated in Magento"
 }

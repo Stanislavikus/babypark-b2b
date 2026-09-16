@@ -14,7 +14,6 @@ use App\Services\Connectors\RemoteCatalogCurrentSnapshotResolver;
 use App\Services\Connectors\RemoteCatalogScanService;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshotResolver;
 use App\Support\Connectors\RemoteCatalog\RemoteCatalogItemCandidate;
-use Carbon\CarbonImmutable;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -118,22 +117,18 @@ class RemoteCatalogSnapshotFoundationTest extends TestCase
         $account = $this->createConnectorAccount();
         $target = $this->target($account);
 
-        CarbonImmutable::setTestNow('2026-09-16 10:00:00');
         $older = $this->scans->begin($account, SyncDataDomain::Products, $target, 0);
-
-        CarbonImmutable::setTestNow('2026-09-16 10:01:00');
         $newer = $this->scans->begin($account, SyncDataDomain::Products, $target, 0);
         $newerSnapshot = $this->scans->publish($newer);
 
-        CarbonImmutable::setTestNow('2026-09-16 10:02:00');
+        $this->assertSame(1, $older->generation);
+        $this->assertSame(2, $newer->generation);
 
         try {
             $this->scans->publish($older);
             $this->fail('Expected older scan publication to be rejected.');
         } catch (StaleRemoteCatalogScanException) {
             // expected
-        } finally {
-            CarbonImmutable::setTestNow();
         }
 
         $this->assertSame($newerSnapshot->id, $this->current->resolve($account, SyncDataDomain::Products, $target)?->id);

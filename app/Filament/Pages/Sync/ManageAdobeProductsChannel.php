@@ -7,6 +7,8 @@ use App\Models\ConnectorAccount;
 use App\Models\Product;
 use App\Models\SyncConfigurationProductSelection;
 use App\Models\User;
+use App\Services\Connectors\AdobeRemoteCatalogProjectionService;
+use App\Services\Connectors\AdobeRemoteCatalogScanDispatchService;
 use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
 use App\Services\Sync\AdobeProductsExportPreviewAuthorizationService;
 use App\Services\Sync\ProductChannelSelectionService;
@@ -55,6 +57,16 @@ class ManageAdobeProductsChannel extends Page implements HasTable
     public bool $canManageSelection = false;
 
     public bool $canRunPreview = false;
+
+    public int $remoteCatalogTotal = 0;
+
+    public int $linkedRemoteCount = 0;
+
+    public int $remoteOnlyCount = 0;
+
+    public bool $hasRemoteCatalogSnapshot = false;
+
+    public bool $remoteCatalogScanRunning = false;
 
     public static function canAccess(array $parameters = []): bool
     {
@@ -147,6 +159,26 @@ class ManageAdobeProductsChannel extends Page implements HasTable
             ->paginated([20, 50, 100])
             ->defaultPaginationPageOption(20)
             ->defaultSort('name');
+    }
+
+    public function refreshRemoteCatalog(): void
+    {
+        $user = Auth::user();
+        abort_unless($user instanceof User, 403);
+        $workspace = $this->resolveSyncDataSetupLandingWorkspace();
+
+        app(AdobeRemoteCatalogScanDispatchService::class)->dispatch(
+            $user,
+            $workspace,
+            $this->accountId,
+        );
+
+        $this->remoteCatalogScanRunning = true;
+
+        Notification::make()
+            ->success()
+            ->title(__('product_channels.remote_catalog.scan_queued'))
+            ->send();
     }
 
     public function selectProducts(): void
@@ -255,6 +287,13 @@ class ManageAdobeProductsChannel extends Page implements HasTable
         $this->canRunPreview = $configuration !== null
             && app(AdobeProductsExportPreviewAuthorizationService::class)
                 ->isEligiblePreviewTarget($user, $workspace, $this->accountId);
+
+        $remoteCatalog = app(AdobeRemoteCatalogProjectionService::class)->summary($account);
+        $this->remoteCatalogTotal = $remoteCatalog->totalCount;
+        $this->linkedRemoteCount = $remoteCatalog->linkedCount;
+        $this->remoteOnlyCount = $remoteCatalog->remoteOnlyCount;
+        $this->hasRemoteCatalogSnapshot = $remoteCatalog->snapshot !== null;
+        $this->remoteCatalogScanRunning = $remoteCatalog->scanRunning;
     }
 
     private function productIdentityDescription(Product $product): string

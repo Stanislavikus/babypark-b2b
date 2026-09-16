@@ -26,6 +26,7 @@ final class RemoteCatalogScanService
         SyncDataDomain $dataDomain,
         array $targetContext,
         ?int $expectedItemCount = null,
+        ?string $executionToken = null,
     ): RemoteCatalogScan {
         $targetContext = $this->normalizeTargetContext($targetContext);
 
@@ -33,12 +34,18 @@ final class RemoteCatalogScanService
             throw new InvalidArgumentException('Expected remote catalogue item count must be non-negative.');
         }
 
-        return DB::transaction(function () use ($account, $dataDomain, $targetContext, $expectedItemCount): RemoteCatalogScan {
+        return DB::transaction(function () use ($account, $dataDomain, $targetContext, $expectedItemCount, $executionToken): RemoteCatalogScan {
             $lockedAccount = ConnectorAccount::withoutWorkspaceScope()
                 ->where('workspace_id', $account->workspace_id)
                 ->whereKey($account->id)
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            $generation = ((int) RemoteCatalogScan::withoutWorkspaceScope()
+                ->where('workspace_id', $lockedAccount->workspace_id)
+                ->where('connector_account_id', $lockedAccount->id)
+                ->where('data_domain', $dataDomain->value)
+                ->max('generation')) + 1;
 
             $scan = RemoteCatalogScan::withoutWorkspaceScope()->create([
                 'workspace_id' => $lockedAccount->workspace_id,
@@ -46,6 +53,8 @@ final class RemoteCatalogScanService
                 'data_domain' => $dataDomain,
                 'target_context' => $targetContext,
                 'status' => RemoteCatalogScanStatus::Running,
+                'generation' => $generation,
+                'execution_token' => $executionToken,
                 'expected_item_count' => $expectedItemCount,
                 'received_item_count' => 0,
                 'started_at' => now(),
@@ -169,7 +178,7 @@ final class RemoteCatalogScanService
                 if ($previousSnapshot !== null) {
                     $previousScan = RemoteCatalogScan::withoutWorkspaceScope()->findOrFail($previousSnapshot->scan_id);
 
-                    if ($previousScan->started_at->greaterThan($lockedScan->started_at)) {
+                    if ($previousScan->generation > $lockedScan->generation) {
                         throw new StaleRemoteCatalogScanException(
                             'An older remote catalogue scan cannot supersede a newer published snapshot.',
                         );
