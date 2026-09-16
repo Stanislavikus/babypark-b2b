@@ -12,6 +12,8 @@ use App\Models\FieldDefinition;
 use App\Models\Product;
 use App\Models\ProductFieldValue;
 use App\Models\ProductType;
+use App\Models\ProductTypeFieldPlacement;
+use App\Models\ProductTypeGroupPlacement;
 use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\VariantFieldValue;
@@ -23,6 +25,7 @@ use App\Services\ProductStructure\ProductTypeBulkMutationService;
 use App\Services\ProductStructure\ProductTypeChangeImpactService;
 use App\Services\ProductStructure\ProductTypeMutationService;
 use App\Support\ProductStructure\Exceptions\ProductStructureInvariantException;
+use App\Support\ProductStructure\Exceptions\ProductStructureStaleException;
 use App\Support\ProductStructure\Exceptions\ProductTypeChangeStaleException;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -50,14 +53,20 @@ class ProductStructureLifecycleTest extends TestCase
         VariantFieldValue::withoutWorkspaceScope()->create(['workspace_id' => $workspace->id, 'variant_id' => $variant->id, 'field_binding_id' => $variantBinding->id, 'value_text' => 'KEEP-V']);
 
         $structure = app(ProductStructureMutationService::class);
+        $source = $structure->createProductType($actor, $workspace, 'source_type', ['en' => 'Source Type']);
+        $sourceImpact = app(ProductTypeChangeImpactService::class)->preview($product, $source);
+        app(ProductTypeMutationService::class)->change($actor, $workspace, $product, $source, $sourceImpact);
         $target = $structure->createProductType($actor, $workspace, 'target_type', ['en' => 'Target Type']);
         $targetGroup = $structure->createAttributeGroup($actor, $workspace, 'target_general', ['en' => 'Target General']);
         $targetPlacement = $structure->putGroupPlacement($actor, $workspace, $target, $targetGroup, 100, false, true);
         $structure->putFieldPlacement($actor, $workspace, $target, $targetPlacement, $productBinding, 100, true);
 
-        $basic = ProductType::withoutWorkspaceScope()->where('workspace_id', $workspace->id)->where('is_default', true)->sole();
+        $sourceGroup = $structure->createAttributeGroup($actor, $workspace, 'source_general', ['en' => 'Source General']);
+        $sourcePlacement = $structure->putGroupPlacement($actor, $workspace, $source, $sourceGroup, 100, false, true);
+        $structure->putFieldPlacement($actor, $workspace, $source, $sourcePlacement, $variantBinding, 100, false);
+
         $optionalGroup = $structure->createAttributeGroup($actor, $workspace, 'cellular', ['en' => 'Cellular']);
-        $optionalPlacement = $structure->putGroupPlacement($actor, $workspace, $basic, $optionalGroup, 900, true, false);
+        $optionalPlacement = $structure->putGroupPlacement($actor, $workspace, $source, $optionalGroup, 900, true, false);
         app(ProductOptionalGroupMutationService::class)->setActive($actor, $workspace, $product, $optionalPlacement, true);
 
         $impact = app(ProductTypeChangeImpactService::class)->preview($product->fresh(), $target->fresh());
@@ -108,10 +117,12 @@ class ProductStructureLifecycleTest extends TestCase
     {
         [$workspace, $actor] = $this->authorizedContext();
         $product = $this->product($workspace);
-        $basic = $product->productType()->withoutGlobalScopes()->sole();
         $structure = app(ProductStructureMutationService::class);
+        $type = $structure->createProductType($actor, $workspace, 'optional_type', ['en' => 'Optional Type']);
+        $typeImpact = app(ProductTypeChangeImpactService::class)->preview($product, $type);
+        app(ProductTypeMutationService::class)->change($actor, $workspace, $product, $type, $typeImpact);
         $group = $structure->createAttributeGroup($actor, $workspace, 'optional_test', ['en' => 'Optional Test']);
-        $optional = $structure->putGroupPlacement($actor, $workspace, $basic, $group, 500, true, false);
+        $optional = $structure->putGroupPlacement($actor, $workspace, $type, $group, 500, true, false);
         $resolver = app(ProductOptionalGroupStateResolver::class);
 
         $this->assertFalse($resolver->isActive($product, $optional));
@@ -122,7 +133,7 @@ class ProductStructureLifecycleTest extends TestCase
         $this->assertDatabaseMissing('product_active_optional_groups', ['product_id' => $product->id, 'product_type_group_placement_id' => $optional->id]);
 
         $requiredGroup = $structure->createAttributeGroup($actor, $workspace, 'required_test', ['en' => 'Required Test']);
-        $required = $structure->putGroupPlacement($actor, $workspace, $basic, $requiredGroup, 600, false, false);
+        $required = $structure->putGroupPlacement($actor, $workspace, $type, $requiredGroup, 600, false, false);
         $this->expectException(ProductStructureInvariantException::class);
         app(ProductOptionalGroupMutationService::class)->setActive($actor, $workspace, $product, $required, false);
     }
@@ -208,6 +219,67 @@ class ProductStructureLifecycleTest extends TestCase
 
         $this->assertSame($before + 1, $type->fresh()->structure_revision);
         $this->assertDatabaseMissing('product_type_group_placements', ['id' => $placement->id]);
+    }
+
+    #[Test]
+    public function basic_product_rejects_all_merchant_structural_mutations(): void
+    {
+        [$workspace, $actor] = $this->authorizedContext();
+        $structure = app(ProductStructureMutationService::class);
+        $binding = $this->binding($workspace->id, 'basic_guard_field', FieldObjectType::Product);
+        $basic = ProductType::withoutWorkspaceScope()->where('workspace_id', $workspace->id)->where('is_default', true)->sole();
+        $fieldPlacement = ProductTypeFieldPlacement::withoutWorkspaceScope()
+            ->where('product_type_id', $basic->id)
+            ->where('field_binding_id', $binding->id)
+            ->sole();
+        $groupPlacement = ProductTypeGroupPlacement::withoutWorkspaceScope()->findOrFail($fieldPlacement->product_type_group_placement_id);
+        $merchantGroup = $structure->createAttributeGroup($actor, $workspace, 'merchant_group', ['en' => 'Merchant Group']);
+        $revision = $basic->structure_revision;
+
+        foreach ([
+            'put group placement' => fn () => $structure->putGroupPlacement($actor, $workspace, $basic, $merchantGroup, 500, true, false),
+            'put field placement' => fn () => $structure->putFieldPlacement($actor, $workspace, $basic, $groupPlacement, $binding, 500, true),
+            'remove field placement' => fn () => $structure->removeFieldPlacement($actor, $workspace, $fieldPlacement),
+            'remove group placement' => fn () => $structure->removeGroupPlacement($actor, $workspace, $groupPlacement),
+        ] as $label => $mutation) {
+            try {
+                $mutation();
+                $this->fail("Expected Basic Product {$label} to be rejected.");
+            } catch (ProductStructureInvariantException $exception) {
+                $this->assertStringContainsString('system-managed', $exception->getMessage(), $label);
+            }
+        }
+
+        $this->assertSame($revision, $basic->fresh()->structure_revision);
+        $this->assertDatabaseHas('product_type_field_placements', ['id' => $fieldPlacement->id]);
+        $this->assertDatabaseHas('product_type_group_placements', ['id' => $groupPlacement->id]);
+        $this->assertDatabaseMissing('product_type_group_placements', [
+            'product_type_id' => $basic->id,
+            'attribute_group_id' => $merchantGroup->id,
+        ]);
+    }
+
+    #[Test]
+    public function stale_structure_revision_rejects_merchant_structure_edit(): void
+    {
+        [$workspace, $actor] = $this->authorizedContext();
+        $structure = app(ProductStructureMutationService::class);
+        $type = $structure->createProductType($actor, $workspace, 'cas_type', ['en' => 'CAS Type']);
+        $firstGroup = $structure->createAttributeGroup($actor, $workspace, 'cas_first', ['en' => 'CAS First']);
+        $secondGroup = $structure->createAttributeGroup($actor, $workspace, 'cas_second', ['en' => 'CAS Second']);
+        $revision = $type->fresh()->structure_revision;
+
+        $structure->putGroupPlacement($actor, $workspace, $type, $firstGroup, 100, false, true, $revision);
+
+        try {
+            $structure->putGroupPlacement($actor, $workspace, $type, $secondGroup, 200, false, true, $revision);
+            $this->fail('Expected stale structure revision rejection.');
+        } catch (ProductStructureStaleException) {
+            $this->assertDatabaseMissing('product_type_group_placements', [
+                'product_type_id' => $type->id,
+                'attribute_group_id' => $secondGroup->id,
+            ]);
+        }
     }
 
     #[Test]
