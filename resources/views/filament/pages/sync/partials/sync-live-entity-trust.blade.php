@@ -256,6 +256,7 @@
       </div>
     @endif
 
+    @if (! ($entityTrustHideWorkingSet ?? false))
     <div class="overflow-x-auto" data-testid="sync-live-entity-trust-working-set">
       <table class="w-full min-w-full text-sm">
         <thead>
@@ -416,5 +417,6 @@
         </tbody>
       </table>
     </div>
+    @endif
   </x-filament::section>
 @endif

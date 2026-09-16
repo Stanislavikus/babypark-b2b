@@ -798,5 +798,10 @@
     "product_channels.remote_catalog.columns.product": "Товар у Magento",
     "product_channels.remote_catalog.columns.type": "Тип",
     "product_channels.remote_catalog.columns.status": "Статус",
-    "product_channels.remote_catalog.columns.updated": "Оновлено в Magento"
+    "product_channels.remote_catalog.columns.updated": "Оновлено в Magento",
+    "product_channels.remote_catalog.link.action": "Пов’язати з товаром каталогу",
+    "product_channels.remote_catalog.link.heading": "Пов’язати товар Magento",
+    "product_channels.remote_catalog.link.description": "Виберіть існуючий товар вашого каталогу, який відповідає «:name». Зв’язок буде збережено лише після свіжої перевірки Magento та вашого підтвердження.",
+    "product_channels.remote_catalog.link.product_label": "Товар вашого каталогу",
+    "product_channels.remote_catalog.link.review": "Перевірити відповідність"
 }

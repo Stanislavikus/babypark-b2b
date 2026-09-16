@@ -24,6 +24,10 @@
       </div>
     </x-filament::section>
 
+    @include('filament.pages.sync.partials.sync-live-entity-trust', [
+      'entityTrustHideWorkingSet' => true,
+    ])
+
     {{ $this->table }}
   </div>
 </x-filament-panels::page>

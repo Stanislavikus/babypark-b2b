@@ -798,5 +798,10 @@
     "product_channels.remote_catalog.columns.product": "Magento product",
     "product_channels.remote_catalog.columns.type": "Type",
     "product_channels.remote_catalog.columns.status": "Status",
-    "product_channels.remote_catalog.columns.updated": "Updated in Magento"
+    "product_channels.remote_catalog.columns.updated": "Updated in Magento",
+    "product_channels.remote_catalog.link.action": "Link to catalogue product",
+    "product_channels.remote_catalog.link.heading": "Link Magento product",
+    "product_channels.remote_catalog.link.description": "Choose the existing catalogue product that corresponds to “:name”. The link is saved only after a fresh Magento verification and your confirmation.",
+    "product_channels.remote_catalog.link.product_label": "Catalogue product",
+    "product_channels.remote_catalog.link.review": "Review match"
 }
