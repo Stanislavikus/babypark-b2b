@@ -140,7 +140,7 @@ class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
     }
 
     #[Test]
-    public function live_only_actor_discovers_landing_with_live_action_only(): void
+    public function live_only_actor_enters_channel_workspace_from_landing(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->adobeAccount($workspace);
@@ -149,9 +149,10 @@ class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
         Livewire::actingAs($actor)
             ->test(ListSyncDataSetup::class)
             ->assertOk()
-            ->assertSee(__('sync_live.actions.open_live'))
+            ->assertSee(__('connectors.ui.layer_a.next_step.open_channel'))
+            ->assertDontSee(__('sync_live.actions.open_live'))
             ->assertDontSee(__('sync_preview.actions.open_preview'))
-            ->assertSee('data-testid="sync-data-setup-open-live-'.$account->id.'"', false);
+            ->assertSee('data-testid="sync-data-setup-open-channel-'.$account->id.'"', false);
     }
 
     #[Test]

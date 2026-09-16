@@ -7,6 +7,7 @@ use App\Enums\PriceListStatus;
 use App\Enums\SyncConfigurationOperationalState;
 use App\Enums\SyncDataDomain;
 use App\Enums\SyncLiveOutcome;
+use App\Enums\SyncPreviewOutcome;
 use App\Enums\SyncRunMode;
 use App\Enums\SyncRunStatus;
 use App\Enums\SyncSemanticOperation;
@@ -29,6 +30,7 @@ use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
 use App\Services\Sync\SyncLiveAdmissionService;
 use App\Services\Sync\SyncPreviewConfigurationSnapshotBuilder;
+use App\Services\Sync\SyncProductSelectionService;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductAppliedStateKnowledge;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandExecutor;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandInput;
@@ -96,7 +98,7 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
         $configuration = $this->prepareMappedConfiguration($account);
         [$product, $variant] = $this->createPricedProductVariant($account->workspace, 'LIVE-SKU-1', 150.0);
 
-        $run = $this->queuedLiveRun($account, $configuration, $this->fullSnapshot($configuration));
+        $run = $this->queuedLiveRun($account, $configuration);
 
         (new SyncLiveRunJob($account->workspace_id, $account->id, $run->id))->handle(
             app(ProductExecutionAggregateBuilder::class),
@@ -160,10 +162,10 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
         $configuration = $this->prepareMappedConfiguration($account);
         $this->createPricedProductVariant($account->workspace, 'LIVE-SKU-2', 100.0);
 
-        $snapshot = $this->fullSnapshot($configuration);
+        $run = $this->queuedLiveRun($account, $configuration);
+        $snapshot = $run->configuration_snapshot;
         $snapshot['selection']['mode'] = 'subset';
-
-        $run = $this->queuedLiveRun($account, $configuration, $snapshot);
+        $run->update(['configuration_snapshot' => $snapshot]);
 
         try {
             (new SyncLiveRunJob($account->workspace_id, $account->id, $run->id))->handle(
@@ -195,7 +197,7 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
         $configuration = $this->prepareMappedConfiguration($account);
         $this->createPricedProductVariant($account->workspace, 'LIVE-SKU-3', 100.0);
 
-        $run = $this->queuedLiveRun($account, $configuration, $this->fullSnapshot($configuration));
+        $run = $this->queuedLiveRun($account, $configuration);
 
         try {
             (new SyncLiveRunJob($account->workspace_id, $account->id, $run->id))->handle(
@@ -267,7 +269,7 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
             ->where('product_variant_id', $variant->id)
             ->update(['price' => 250.0]);
 
-        $run = $this->queuedLiveRun($account, $configuration, $this->fullSnapshot($configuration));
+        $run = $this->queuedLiveRun($account, $configuration);
 
         (new SyncLiveRunJob($account->workspace_id, $account->id, $run->id))->handle(
             app(ProductExecutionAggregateBuilder::class),
@@ -313,7 +315,7 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
             $this->attachVariantPrice($workspace, $variant, 100 + $index);
         }
 
-        $run = $this->queuedLiveRun($account, $configuration, $this->fullSnapshot($configuration));
+        $run = $this->queuedLiveRun($account, $configuration);
 
         (new SyncLiveRunJob($account->workspace_id, $account->id, $run->id))->handle(
             app(ProductExecutionAggregateBuilder::class),
@@ -387,7 +389,7 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
         $configuration = $this->prepareMappedConfiguration($account);
         [$product] = $this->createPricedProductVariant($account->workspace, 'SAFE-SKU', 100.0);
 
-        $run = $this->queuedLiveRun($account, $configuration, $this->fullSnapshot($configuration));
+        $run = $this->queuedLiveRun($account, $configuration);
 
         SyncRunItem::withoutWorkspaceScope()->create([
             'id' => (string) Str::uuid(),
@@ -419,7 +421,7 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
         $configuration = $this->prepareMappedConfiguration($account);
         $this->createPricedProductVariant($account->workspace, 'SAFE-SKU', 100.0);
 
-        $run = $this->queuedLiveRun($account, $configuration, $this->fullSnapshot($configuration));
+        $run = $this->queuedLiveRun($account, $configuration);
 
         (new SyncLiveRunJob($account->workspace_id, $account->id, $run->id))->handle(
             app(ProductExecutionAggregateBuilder::class),
@@ -601,8 +603,44 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
     private function queuedLiveRun(
         ConnectorAccount $account,
         SyncConfiguration $configuration,
-        array $snapshot,
     ): SyncRun {
+        $productIds = Product::withoutWorkspaceScope()
+            ->where('workspace_id', $account->workspace_id)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(static fn ($id): string => (string) $id)
+            ->all();
+
+        $configuration = app(SyncProductSelectionService::class)->replace(
+            $account,
+            $configuration->id,
+            $productIds,
+        )->refresh();
+
+        $snapshot = $this->fullSnapshot($configuration);
+        $sourcePreview = SyncRun::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'sync_configuration_id' => $configuration->id,
+            'configuration_revision' => $configuration->configuration_revision,
+            'mode' => SyncRunMode::Preview,
+            'semantic_operation' => SyncSemanticOperation::Export,
+            'status' => SyncRunStatus::Completed,
+            'configuration_snapshot' => $snapshot,
+            'completed_at' => now(),
+        ]);
+
+        foreach ($productIds as $productId) {
+            SyncRunItem::withoutWorkspaceScope()->create([
+                'id' => (string) Str::uuid(),
+                'workspace_id' => $account->workspace_id,
+                'sync_run_id' => $sourcePreview->id,
+                'product_id' => $productId,
+                'outcome' => SyncPreviewOutcome::Ready->value,
+                'findings' => [],
+            ]);
+        }
+
         return SyncRun::withoutWorkspaceScope()->create([
             'id' => (string) Str::uuid(),
             'workspace_id' => $account->workspace_id,
@@ -612,6 +650,7 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
             'semantic_operation' => SyncSemanticOperation::Export,
             'status' => SyncRunStatus::Queued,
             'configuration_snapshot' => $snapshot,
+            'source_preview_run_id' => $sourcePreview->id,
         ]);
     }
 
