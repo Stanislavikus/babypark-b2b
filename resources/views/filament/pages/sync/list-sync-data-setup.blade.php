@@ -30,36 +30,14 @@
               </div>
 
               <div class="flex flex-wrap gap-2">
-                @if ($target['setup_action_visible'])
+                @if ($target['channel_action_visible'])
                   <x-filament::button
                     tag="a"
-                    :href="$target['setup_url']"
-                    color="gray"
-                    data-testid="sync-data-setup-open-setup-{{ $target['account_id'] }}"
-                  >
-                    {{ __('sync_data_setup.page.open_setup') }}
-                  </x-filament::button>
-                @endif
-
-                @if ($target['preview_action_visible'])
-                  <x-filament::button
-                    tag="a"
-                    :href="$target['preview_url']"
+                    :href="$target['channel_url']"
                     color="primary"
-                    data-testid="sync-data-setup-open-preview-{{ $target['account_id'] }}"
+                    data-testid="sync-data-setup-open-channel-{{ $target['account_id'] }}"
                   >
-                    {{ __('sync_preview.actions.open_preview') }}
-                  </x-filament::button>
-                @endif
-
-                @if ($target['live_action_visible'])
-                  <x-filament::button
-                    tag="a"
-                    :href="$target['live_url']"
-                    color="danger"
-                    data-testid="sync-data-setup-open-live-{{ $target['account_id'] }}"
-                  >
-                    {{ __('sync_live.actions.open_live') }}
+                    {{ __('connectors.ui.layer_a.next_step.open_channel') }}
                   </x-filament::button>
                 @endif
               </div>

@@ -2,11 +2,11 @@
 
 namespace App\Services\Sync;
 
-use App\Filament\Pages\Sync\ManageAdobeProductsExportPreview;
-use App\Filament\Pages\Sync\ManageAdobeProductsExportSetup;
+use App\Filament\Pages\Sync\ManageAdobeProductsChannel;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceAuthorization;
+use App\Support\Connectors\Exceptions\ConnectorProfileNotFoundException;
 use App\Support\Sync\AdobeProductExportSetup\AdobeProductExportSetupTargetEligibility;
 use App\Support\Sync\AdobeProductExportSetup\SyncDataSetupLandingTargetSummary;
 use App\Support\Sync\AdobeProductExportSetup\SyncDataSetupTargetKind;
@@ -65,6 +65,30 @@ final class SyncDataSetupLandingService
         );
     }
 
+    public function canAccessChannelTarget(
+        User $actor,
+        Workspace $workspace,
+        string $connectorAccountId,
+    ): bool {
+        if (! $this->canAccessLanding($actor, $workspace)) {
+            return false;
+        }
+
+        $projection = $this->projectionQuery->resolveEligibility($workspace->id, $connectorAccountId);
+
+        if ($projection === null) {
+            return false;
+        }
+
+        try {
+            return ($this->canAccessSetup($actor, $workspace) && $this->targetEligibility->isEligible($projection))
+                || ($this->canAccessPreview($actor, $workspace) && $this->targetEligibility->isPreviewEligible($projection))
+                || ($this->canAccessLive($actor, $workspace) && $this->targetEligibility->isLiveEligible($projection));
+        } catch (ConnectorProfileNotFoundException) {
+            return false;
+        }
+    }
+
     /**
      * @return list<SyncDataSetupLandingTargetSummary>
      */
@@ -94,18 +118,8 @@ final class SyncDataSetupLandingService
                 accountName: $eligibilityProjection->accountName,
                 setupUsable: $eligibilityProjection->isSetupUsable(),
                 targetKind: SyncDataSetupTargetKind::AdobeProductsExport,
-                setupActionVisible: $setupVisible,
-                previewActionVisible: $previewVisible,
-                liveActionVisible: $liveVisible,
-                setupUrl: $setupVisible
-                    ? ManageAdobeProductsExportSetup::getUrl(['account' => $eligibilityProjection->id])
-                    : null,
-                previewUrl: $previewVisible
-                    ? ManageAdobeProductsExportPreview::getUrl(['account' => $eligibilityProjection->id])
-                    : null,
-                liveUrl: $liveVisible
-                    ? ManageAdobeProductsExportPreview::getUrl(['account' => $eligibilityProjection->id])
-                    : null,
+                channelActionVisible: true,
+                channelUrl: ManageAdobeProductsChannel::getUrl(['account' => $eligibilityProjection->id]),
             );
         }
 

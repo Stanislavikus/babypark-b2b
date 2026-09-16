@@ -101,6 +101,11 @@ class Product extends Model
         return $this->hasMany(ProductVariant::class);
     }
 
+    public function syncChannelSelections(): HasMany
+    {
+        return $this->hasMany(SyncConfigurationProductSelection::class, 'product_id');
+    }
+
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class)
