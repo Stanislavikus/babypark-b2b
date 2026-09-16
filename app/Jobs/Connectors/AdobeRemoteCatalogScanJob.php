@@ -29,7 +29,9 @@ class AdobeRemoteCatalogScanJob implements ShouldBeUnique, ShouldQueue
 
     public bool $failOnTimeout = true;
 
-    public int $tries = 1;
+    public int $tries = 40;
+
+    public int $maxExceptions = 1;
 
     public int $uniqueFor = 3600;
 

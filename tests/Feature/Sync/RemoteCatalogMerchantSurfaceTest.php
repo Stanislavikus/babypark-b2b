@@ -16,7 +16,12 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceUser;
 use App\Services\Connectors\RemoteCatalogScanService;
+use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshotResolver;
+use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogBoundary;
+use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogPage;
+use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogReadClient;
+use App\Support\Connectors\ConnectorAccountOperationLock;
 use App\Support\Connectors\RemoteCatalog\RemoteCatalogItemCandidate;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
@@ -24,7 +29,10 @@ use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Queue\WorkerOptions;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -208,6 +216,97 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
             ->assertNotified();
 
         Bus::assertDispatched(AdobeRemoteCatalogScanJob::class);
+    }
+
+    #[Test]
+    public function background_scan_survives_one_shared_lock_contention_before_execution(): void
+    {
+        $account = $this->createConnectorAccount();
+        $executionToken = (string) Str::uuid();
+
+        $this->app->bind(AdobeRemoteCatalogReadClient::class, static fn (): AdobeRemoteCatalogReadClient => new class implements AdobeRemoteCatalogReadClient
+        {
+            public function captureBoundary(AdobePaaSRequestContext $context): AdobeRemoteCatalogBoundary
+            {
+                return new AdobeRemoteCatalogBoundary(0, null);
+            }
+
+            public function readPage(AdobePaaSRequestContext $context, int $lastSeenEntityId, int $maxEntityId, int $pageSize): AdobeRemoteCatalogPage
+            {
+                throw new \LogicException('Zero-item boundary must not read a page.');
+            }
+
+            public function countWithinBoundary(AdobePaaSRequestContext $context, int $maxEntityId): int
+            {
+                return 0;
+            }
+        });
+
+        Queue::connection('database_connectors')->push(new AdobeRemoteCatalogScanJob(
+            (string) $this->workspace->id,
+            (string) $account->id,
+            $executionToken,
+        ));
+
+        $lock = Cache::lock(ConnectorAccountOperationLock::cacheKey((string) $account->id), 1100);
+        $this->assertTrue($lock->get());
+
+        $worker = app('queue.worker')->setCache(Cache::store());
+        $options = new WorkerOptions(timeout: 900, sleep: 0, maxTries: 3);
+
+        $worker->runNextJob('database_connectors', 'connectors', $options);
+        $this->assertDatabaseMissing('remote_catalog_scans', ['execution_token' => $executionToken]);
+
+        $lock->release();
+        $this->travel(31)->seconds();
+
+        $worker->runNextJob('database_connectors', 'connectors', $options);
+
+        $this->assertDatabaseHas('remote_catalog_scans', [
+            'execution_token' => $executionToken,
+            'status' => RemoteCatalogScanStatus::Succeeded->value,
+        ]);
+        $this->assertDatabaseCount('failed_jobs', 0);
+    }
+
+    #[Test]
+    public function background_scan_execution_exception_fails_once_without_full_scan_retry(): void
+    {
+        $account = $this->createConnectorAccount();
+
+        $this->app->bind(AdobeRemoteCatalogReadClient::class, static fn (): AdobeRemoteCatalogReadClient => new class implements AdobeRemoteCatalogReadClient
+        {
+            public function captureBoundary(AdobePaaSRequestContext $context): AdobeRemoteCatalogBoundary
+            {
+                throw new \RuntimeException('remote read failed');
+            }
+
+            public function readPage(AdobePaaSRequestContext $context, int $lastSeenEntityId, int $maxEntityId, int $pageSize): AdobeRemoteCatalogPage
+            {
+                throw new \LogicException('Page read must not be reached.');
+            }
+
+            public function countWithinBoundary(AdobePaaSRequestContext $context, int $maxEntityId): int
+            {
+                throw new \LogicException('Bounded count must not be reached.');
+            }
+        });
+
+        Queue::connection('database_connectors')->push(new AdobeRemoteCatalogScanJob(
+            (string) $this->workspace->id,
+            (string) $account->id,
+            (string) Str::uuid(),
+        ));
+
+        $worker = app('queue.worker')->setCache(Cache::store());
+        $worker->runNextJob(
+            'database_connectors',
+            'connectors',
+            new WorkerOptions(timeout: 900, sleep: 0, maxTries: 3),
+        );
+
+        $this->assertDatabaseCount('jobs', 0);
+        $this->assertDatabaseCount('remote_catalog_scans', 0);
     }
 
     #[Test]
