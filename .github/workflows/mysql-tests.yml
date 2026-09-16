@@ -4,6 +4,10 @@ on:
   pull_request:
     branches: [develop]
 
+concurrency:
+  group: mysql-tests-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   mysql-tests:
     runs-on: ubuntu-latest
