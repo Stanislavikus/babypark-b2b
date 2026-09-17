@@ -434,7 +434,7 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
     }
 
     #[Test]
-    public function p10_store_scope_probe_records_authoritative_blocker_before_mutation(): void
+    public function p10_historical_store_scope_probe_records_authoritative_blocker_before_mutation(): void
     {
         $probe = $this->storeScopeInheritanceProbe();
 
@@ -456,6 +456,41 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
         self::assertFalse($probe['mutation_probe']['stock_product_put_executed']);
         self::assertFalse($probe['conclusion']['p10_cleared']);
         self::assertFalse($probe['conclusion']['public_live_support_flipped']);
+    }
+
+    #[Test]
+    public function p10_store_scope_certification_closes_hidden_override_risk_for_default_store_path(): void
+    {
+        $evidence = $this->storeScopeInheritanceCertification();
+
+        self::assertSame('2026-09-17', $evidence['certification_date']);
+        self::assertSame('P-10', $evidence['pending_item']);
+        self::assertSame('resolved_pass', $evidence['status']);
+        self::assertSame('default', $evidence['target_scope']['configured_store_code']);
+        self::assertSame(1, $evidence['target_scope']['configured_store_view_id']);
+        self::assertSame(6, $evidence['baseline']['inherited_canary_count']);
+        self::assertSame(0, $evidence['baseline']['store_1_override_count']);
+        self::assertSame(
+            ['image', 'small_image', 'swatch_image', 'thumbnail', 'url_key', 'cost'],
+            array_column($evidence['canaries'], 'attribute_code'),
+        );
+        self::assertSame(150, $evidence['controlled_write']['original_value']);
+        self::assertSame(151, $evidence['controlled_write']['probe_value']);
+        self::assertSame('known_applied', $evidence['controlled_write']['result']);
+        self::assertSame('stock_write_verified', $evidence['controlled_write']['reason_code']);
+        self::assertSame(1, $evidence['controlled_write']['consequential_write_attempts']);
+        self::assertSame(0, $evidence['controlled_write']['new_store_1_override_count']);
+        self::assertSame([], $evidence['controlled_write']['new_store_1_overrides']);
+        self::assertTrue($evidence['restore']['raw_eav_matches_baseline']);
+        self::assertSame(150, $evidence['final_read']['price']);
+        self::assertSame(1, $evidence['final_read']['logical_entity_id']);
+        self::assertTrue($evidence['conclusion']['p10_cleared']);
+        self::assertFalse($evidence['conclusion']['hidden_store_view_override_side_effect_observed']);
+        self::assertFalse($evidence['conclusion']['public_live_support_flipped']);
+
+        $markdown = file_get_contents($this->repoPath('docs/connectors/adobe-commerce/MAGENTO_V1_PENDING_CERTIFICATION_ITEMS.md'));
+        self::assertStringContainsString('P-10 — Store-view Product PUT may materialize untouched scoped overrides — CLOSED 2026-09-17 [Resolved]', $markdown);
+        self::assertStringContainsString('magento_v1_store_scope_inheritance_certification_2026_09_17.json', $markdown);
     }
 
     #[Test]
@@ -516,6 +551,17 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
     private function storeScopeInheritanceProbe(): array
     {
         $contents = file_get_contents($this->repoPath('docs/connectors/adobe-commerce/magento_v1_store_scope_inheritance_probe_2026_09_12.json'));
+        $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertIsArray($decoded);
+
+        return $decoded;
+    }
+
+    /** @return array<string, mixed> */
+    private function storeScopeInheritanceCertification(): array
+    {
+        $contents = file_get_contents($this->repoPath('docs/connectors/adobe-commerce/magento_v1_store_scope_inheritance_certification_2026_09_17.json'));
         $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
 
         self::assertIsArray($decoded);
