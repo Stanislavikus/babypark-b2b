@@ -232,6 +232,9 @@ class ExternalRecordLinkPersistenceMySqlTest extends TestCase
         $this->assertTrue(Schema::hasColumn('external_record_links', 'established_at'));
 
         Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_09_17_090000_add_entity_trust_lookup_index_to_external_record_links.php',
+        ]);
+        Artisan::call('migrate:rollback', [
             '--path' => 'database/migrations/2026_08_22_100000_external_record_link_provenance.php',
         ]);
 
@@ -240,6 +243,7 @@ class ExternalRecordLinkPersistenceMySqlTest extends TestCase
         Artisan::call('migrate');
 
         $this->assertTrue(Schema::hasColumn('external_record_links', 'trust_origin'));
+        $this->assertEntityTrustLookupIndexShape();
     }
 
     #[Test]
@@ -265,6 +269,9 @@ class ExternalRecordLinkPersistenceMySqlTest extends TestCase
         $version = DB::selectOne('SELECT VERSION() as version')->version;
 
         Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_09_17_090000_add_entity_trust_lookup_index_to_external_record_links.php',
+        ]);
+        Artisan::call('migrate:rollback', [
             '--path' => 'database/migrations/2026_08_22_100000_external_record_link_provenance.php',
         ]);
         Artisan::call('migrate:rollback', [
@@ -281,6 +288,25 @@ class ExternalRecordLinkPersistenceMySqlTest extends TestCase
 
         $this->assertTrue(Schema::hasTable('external_record_links'));
         $this->assertTrue(Schema::hasColumn('sync_runs', 'recoverable_after'));
+        $this->assertEntityTrustLookupIndexShape();
         $this->assertNotEmpty($version);
+    }
+
+    private function assertEntityTrustLookupIndexShape(): void
+    {
+        $columns = array_map(
+            static fn (object $row): string => (string) ($row->column_name ?? $row->COLUMN_NAME),
+            DB::select(
+                "SELECT column_name FROM information_schema.statistics
+                 WHERE table_schema = DATABASE() AND table_name = 'external_record_links'
+                   AND index_name = 'erl_ws_account_trust_discriminator_idx'
+                 ORDER BY seq_in_index",
+            ),
+        );
+
+        $this->assertSame(
+            ['workspace_id', 'connector_account_id', 'trust_origin', 'external_record_discriminator'],
+            $columns,
+        );
     }
 }
