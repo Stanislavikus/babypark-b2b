@@ -314,6 +314,7 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
                     'reconciliation_get_attempts' => $evidence->reconciliationGetAttempts,
                     'external_record_link_persisted' => $evidence->externalRecordLinkPersisted,
                     'ownership_trust_satisfied' => $evidence->ownershipTrustSatisfied,
+                    'write_access_classification' => $evidence->writeAccessClassification?->value,
                 ],
             );
         }

@@ -106,6 +106,52 @@ final class AdobeConfigurableOptionCommandExecutor
         );
     }
 
+    public function executeNoOpOnly(
+        AdobeConfigurableCommandInput $input,
+        AdobeConfigurableOptionDesiredState $desiredOption,
+    ): AdobeConfigurableCommandEvidence {
+        $context = $this->contextFactory->create($input->workspaceId, $input->connectorAccountId);
+        $parentSku = $input->desiredState->parentSku;
+
+        [$optionsGetResult] = $this->remoteStateClient->getConfigurableOptions($context, $parentSku);
+        $remoteOptions = $this->optionStateReader->read($optionsGetResult);
+
+        if ($remoteOptions === null) {
+            return $this->unknownOrAmbiguous('configurable_options_get_untrusted', $parentSku, $desiredOption);
+        }
+
+        $matchingByAttribute = array_values(array_filter(
+            $remoteOptions,
+            static fn (AdobeConfigurableRemoteOptionState $option): bool => $option->attributeId === $desiredOption->attributeId,
+        ));
+
+        if (count($matchingByAttribute) > 1) {
+            return $this->unknownOrAmbiguous('ambiguous_configurable_option_identity', $parentSku, $desiredOption);
+        }
+
+        $existing = $matchingByAttribute[0] ?? null;
+
+        if ($existing !== null && $this->controlledStateMatches($desiredOption, $existing)) {
+            return $this->knownApplied('configurable_option_no_op', $parentSku, $desiredOption, $existing->optionId);
+        }
+
+        if ($existing !== null && $this->requiresDestructiveValueRemoval($desiredOption, $existing)) {
+            return $this->knownNotApplied(
+                'configurable_option_value_removal_requires_adobe_validation',
+                $parentSku,
+                $desiredOption,
+                $existing->optionId,
+            );
+        }
+
+        return $this->knownNotApplied(
+            'configurable_option_mutation_not_certified',
+            $parentSku,
+            $desiredOption,
+            $existing?->optionId,
+        );
+    }
+
     private function reconcileAfterWrite(
         AdobeConfigurableCommandInput $input,
         AdobePaaSRequestContext $context,

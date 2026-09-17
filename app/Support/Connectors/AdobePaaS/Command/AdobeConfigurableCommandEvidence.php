@@ -16,5 +16,6 @@ final readonly class AdobeConfigurableCommandEvidence
         public int $reconciliationGetAttempts = 0,
         public bool $externalRecordLinkPersisted = false,
         public bool $ownershipTrustSatisfied = false,
+        public ?AdobeProductWriteAccessClassification $writeAccessClassification = null,
     ) {}
 }

@@ -31,6 +31,7 @@ final class AdobeConfigurableDesiredStateCompiler
         AdobeProductExportSemanticResult $semanticResult,
         string $workspaceId,
         ?AdobeProductExportExecutionMetadata $metadata,
+        ?string $trustedExistingParentSku = null,
     ): AdobeConfigurableDesiredState {
         if ($semanticResult->hasBlockingFindings()) {
             throw AdobeProductCommandCompilationException::blockingSemanticFindings();
@@ -40,7 +41,10 @@ final class AdobeConfigurableDesiredStateCompiler
         $parentContext = $parentOperation->context;
 
         $productId = $this->requireInt($parentContext, 'product_id', 'product_id');
-        $parentSku = $this->parentSkuGenerator->generate($workspaceId, $productId);
+        $trustedExistingParentSku = is_string($trustedExistingParentSku) ? trim($trustedExistingParentSku) : null;
+        $parentSku = $trustedExistingParentSku !== '' && $trustedExistingParentSku !== null
+            ? $trustedExistingParentSku
+            : $this->parentSkuGenerator->generate($workspaceId, $productId);
 
         $name = $this->requireString($parentContext, 'name');
         $attributeSetId = $this->requireInt($parentContext, 'attribute_set_id', 'attribute_set_id');

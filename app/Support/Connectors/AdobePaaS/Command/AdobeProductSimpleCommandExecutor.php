@@ -44,7 +44,7 @@ final class AdobeProductSimpleCommandExecutor
             return $this->knownNotApplied('semantic_compilation_failed');
         }
 
-        return $this->executeDesiredState($input, $desiredState, consumeTrustedStockWrite: false);
+        return $this->executeDesiredState($input, $desiredState, consumeTrustedStockWrite: true);
     }
 
     private function executeDesiredState(
