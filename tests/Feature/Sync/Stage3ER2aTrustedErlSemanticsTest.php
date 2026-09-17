@@ -86,6 +86,9 @@ class Stage3ER2aTrustedErlSemanticsTest extends TestCase
         $this->assertProvenanceColumnsExist();
 
         Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_09_17_090000_add_entity_trust_lookup_index_to_external_record_links.php',
+        ]);
+        Artisan::call('migrate:rollback', [
             '--path' => 'database/migrations/2026_08_22_100000_external_record_link_provenance.php',
         ]);
 
