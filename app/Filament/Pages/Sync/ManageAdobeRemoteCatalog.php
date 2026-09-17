@@ -23,6 +23,7 @@ use Filament\Pages\Page;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Support\Htmlable;
@@ -141,7 +142,7 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
     public function table(Table $table): Table
     {
         return $table
-            ->query(fn (): Builder => $this->remoteOnlyQuery())
+            ->query(fn (): Builder => $this->catalogItemsQuery())
             ->heading(__('product_channels.remote_catalog.table_heading'))
             ->description(__('product_channels.remote_catalog.table_description'))
             ->columns([
@@ -155,6 +156,13 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
                 TextColumn::make('remote_type')
                     ->label(__('product_channels.remote_catalog.columns.type'))
                     ->badge(),
+                TextColumn::make('is_linked')
+                    ->label(__('product_channels.remote_catalog.columns.link_status'))
+                    ->formatStateUsing(fn (mixed $state): string => $state
+                        ? __('product_channels.remote_catalog.link_status.linked')
+                        : __('product_channels.remote_catalog.link_status.unlinked'))
+                    ->badge()
+                    ->color(fn (mixed $state): string => $state ? 'success' : 'warning'),
                 TextColumn::make('remote_status')
                     ->label(__('product_channels.remote_catalog.columns.status'))
                     ->badge(),
@@ -162,11 +170,28 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
                     ->label(__('product_channels.remote_catalog.columns.updated'))
                     ->dateTime(),
             ])
+            ->filters([
+                SelectFilter::make('link_status')
+                    ->label(__('product_channels.remote_catalog.filters.link_status'))
+                    ->options([
+                        'linked' => __('product_channels.remote_catalog.link_status.linked'),
+                        'unlinked' => __('product_channels.remote_catalog.link_status.unlinked'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        $status = $data['value'] ?? null;
+
+                        return app(AdobeRemoteCatalogProjectionService::class)->filterItemsByLinkStatus(
+                            $query,
+                            $this->resolveAccount($this->accountId),
+                            is_string($status) ? $status : null,
+                        );
+                    }),
+            ])
             ->recordActions([
                 Action::make('linkMasterProduct')
                     ->label(__('product_channels.remote_catalog.link.action'))
                     ->icon('heroicon-o-link')
-                    ->visible(fn (): bool => $this->canReviewOrConfirm())
+                    ->visible(fn (RemoteCatalogSnapshotItem $record): bool => $this->canReviewOrConfirm() && ! (bool) $record->getAttribute('is_linked'))
                     ->modalHeading(__('product_channels.remote_catalog.link.heading'))
                     ->modalDescription(fn (RemoteCatalogSnapshotItem $record): string => __(
                         'product_channels.remote_catalog.link.description',
@@ -396,7 +421,7 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
         }
     }
 
-    private function remoteOnlyQuery(): Builder
+    private function catalogItemsQuery(): Builder
     {
         $workspace = $this->resolveSyncDataSetupLandingWorkspace();
         $account = ConnectorAccount::withoutWorkspaceScope()
@@ -413,7 +438,7 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
                 ->first();
 
         return app(AdobeRemoteCatalogProjectionService::class)
-            ->remoteOnlyItemsQuery($account, $snapshot);
+            ->itemsQuery($account, $snapshot);
     }
 
     private function resolveAccount(string $accountId): ConnectorAccount

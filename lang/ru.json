@@ -773,8 +773,8 @@
     "product_channels.remote_catalog.scan_queued": "Обновление каталога Magento запущено",
     "product_channels.remote_catalog.open_remote_only": "Посмотреть несвязанные товары",
     "product_channels.remote_catalog.title": "Каталог Magento · :account",
-    "product_channels.remote_catalog.table_heading": "Товары в Magento, которые ещё не связаны",
-    "product_channels.remote_catalog.table_description": "Эти товары показаны из Magento для сравнения. Они не являются товарами вашего основного каталога и не создаются автоматически.",
+    "product_channels.remote_catalog.table_heading": "Каталог Magento",
+    "product_channels.remote_catalog.table_description": "Все товары, считанные из Magento для этого магазина. Статус связи показывает, какие из них уже подтверждённо связаны с вашим основным каталогом.",
     "product_channels.remote_catalog.captured_at": "Каталог считан: :time",
     "product_channels.remote_catalog.back_to_channel": "Назад к каналу",
     "product_channels.remote_catalog.identity": "SKU: :sku",
@@ -786,5 +786,11 @@
     "product_channels.remote_catalog.link.heading": "Связать товар Magento",
     "product_channels.remote_catalog.link.description": "Выберите существующий товар вашего каталога, который соответствует «:name». Связь будет сохранена только после свежей проверки Magento и вашего подтверждения.",
     "product_channels.remote_catalog.link.product_label": "Товар вашего каталога",
-    "product_channels.remote_catalog.link.review": "Проверить соответствие"
+    "product_channels.remote_catalog.link.review": "Проверить соответствие",
+    "product_channels.channel.open_master_catalog": "Основной каталог",
+    "product_channels.remote_catalog.open_catalog": "Посмотреть каталог Magento",
+    "product_channels.remote_catalog.columns.link_status": "Связь с каталогом",
+    "product_channels.remote_catalog.filters.link_status": "Связь с каталогом",
+    "product_channels.remote_catalog.link_status.linked": "Связано",
+    "product_channels.remote_catalog.link_status.unlinked": "Не связано"
 }

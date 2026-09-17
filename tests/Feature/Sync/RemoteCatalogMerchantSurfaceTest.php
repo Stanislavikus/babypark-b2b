@@ -75,7 +75,7 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
     }
 
     #[Test]
-    public function channel_summary_and_remote_only_surface_use_current_snapshot_and_trusted_links(): void
+    public function channel_summary_and_full_remote_catalogue_use_current_snapshot_and_trusted_links(): void
     {
         $account = $this->createConnectorAccount();
         $linkedProduct = Product::withoutWorkspaceScope()->create([
@@ -126,17 +126,30 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
                 'remote' => 3,
                 'linked' => 1,
                 'unlinked' => 2,
-            ]));
+            ]))
+            ->assertSee(__('product_channels.remote_catalog.open_catalog'));
         $remoteCatalog = Livewire::actingAs($this->actor)
             ->test(ManageAdobeRemoteCatalog::class, ['account' => $account->id])
             ->assertSet('remoteCatalogTotal', 3)
             ->assertSet('linkedRemoteCount', 1)
             ->assertSet('remoteOnlyCount', 2)
+            ->assertSee('Remote linked')
             ->assertSee('Remote only A')
-            ->assertSee('Remote only B')
-            ->assertDontSee('Remote linked');
+            ->assertSee('Remote only B');
 
         $remoteCatalog
+            ->filterTable('link_status', 'linked')
+            ->assertSee('Remote linked')
+            ->assertDontSee('Remote only A')
+            ->assertDontSee('Remote only B');
+        $remoteCatalog
+            ->resetTableFilters()
+            ->filterTable('link_status', 'unlinked')
+            ->assertDontSee('Remote linked')
+            ->assertSee('Remote only A')
+            ->assertSee('Remote only B');
+        $remoteCatalog
+            ->resetTableFilters()
             ->searchTable('REMOTE-502')
             ->assertSee('Remote only A')
             ->assertDontSee('Remote only B');
@@ -181,7 +194,7 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
     }
 
     #[Test]
-    public function remote_only_surface_stops_presenting_old_target_snapshot_after_target_change(): void
+    public function remote_catalog_surface_stops_presenting_old_target_snapshot_after_target_change(): void
     {
         $account = $this->createConnectorAccount();
         $scan = app(RemoteCatalogScanService::class)->begin(
