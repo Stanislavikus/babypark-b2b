@@ -51,7 +51,7 @@ final class AdobeRemoteCatalogProjectionService
     }
 
     /** @return Builder<RemoteCatalogSnapshotItem> */
-    public function remoteOnlyItemsQuery(ConnectorAccount $account, ?RemoteCatalogSnapshot $snapshot = null): Builder
+    public function itemsQuery(ConnectorAccount $account, ?RemoteCatalogSnapshot $snapshot = null): Builder
     {
         $snapshot ??= $this->currentSnapshot($account);
         $query = RemoteCatalogSnapshotItem::withoutWorkspaceScope()
@@ -62,8 +62,43 @@ final class AdobeRemoteCatalogProjectionService
         }
 
         return $query
+            ->select('remote_catalog_snapshot_items.*')
             ->where('snapshot_id', $snapshot->id)
-            ->whereNotIn('remote_identifier', $this->trustedRemoteIdentifiersQuery($account));
+            ->addSelect([
+                'is_linked' => ExternalRecordLink::withoutWorkspaceScope()
+                    ->selectRaw('1')
+                    ->where('workspace_id', $account->workspace_id)
+                    ->where('connector_account_id', $account->id)
+                    ->where('trust_origin', ExternalRecordLinkTrustOrigin::MerchantConfirmed->value)
+                    ->whereNotNull('external_record_discriminator')
+                    ->whereNotNull('established_by_workspace_user_id')
+                    ->whereNotNull('established_at')
+                    ->whereColumn(
+                        'external_record_discriminator',
+                        'remote_catalog_snapshot_items.remote_identifier',
+                    )
+                    ->limit(1),
+            ]);
+    }
+
+    /** @return Builder<RemoteCatalogSnapshotItem> */
+    public function remoteOnlyItemsQuery(ConnectorAccount $account, ?RemoteCatalogSnapshot $snapshot = null): Builder
+    {
+        return $this->filterItemsByLinkStatus(
+            $this->itemsQuery($account, $snapshot),
+            $account,
+            'unlinked',
+        );
+    }
+
+    /** @param Builder<RemoteCatalogSnapshotItem> $query */
+    public function filterItemsByLinkStatus(Builder $query, ConnectorAccount $account, ?string $status): Builder
+    {
+        return match ($status) {
+            'linked' => $query->whereIn('remote_identifier', $this->trustedRemoteIdentifiersQuery($account)),
+            'unlinked' => $query->whereNotIn('remote_identifier', $this->trustedRemoteIdentifiersQuery($account)),
+            default => $query,
+        };
     }
 
     public function currentSnapshot(ConnectorAccount $account): ?RemoteCatalogSnapshot

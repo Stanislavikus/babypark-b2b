@@ -298,7 +298,8 @@ class RemoteCatalogEntityTrustLinkingTest extends TestCase
             ->assertSet('entityTrustReviewFlowId', null)
             ->assertSet('linkedRemoteCount', 1)
             ->assertSet('remoteOnlyCount', 0)
-            ->assertDontSee('Remote UI product');
+            ->assertSee('Remote UI product')
+            ->assertTableActionHidden('linkMasterProduct', $item);
 
         $this->assertDatabaseHas('external_record_links', [
             'workspace_id' => $account->workspace_id,

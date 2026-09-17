@@ -81,6 +81,8 @@ class ProductChannelWorkspaceUiTest extends TestCase
             ->assertSee('data-testid="product-channel-empty-selection"', false)
             ->assertSee(__('product_channels.channel.empty_title'))
             ->assertSee(__('product_channels.channel.select_products'))
+            ->assertSee('data-testid="product-channel-open-master-catalog"', false)
+            ->assertSee(__('product_channels.channel.open_master_catalog'))
             ->assertDontSee('data-testid="product-channel-open-preview"', false);
     }
 

@@ -29,6 +29,15 @@
         @endif
 
         <div class="flex flex-wrap gap-2">
+          <x-filament::button
+            tag="a"
+            color="gray"
+            :href="\App\Filament\Resources\ProductResource::getUrl('index', $configurationId ? ['channel' => $configurationId] : [])"
+            data-testid="product-channel-open-master-catalog"
+          >
+            {{ __('product_channels.channel.open_master_catalog') }}
+          </x-filament::button>
+
           @if ($canManageSelection)
             <x-filament::button wire:click="selectProducts" data-testid="product-channel-select-products">
               {{ __('product_channels.channel.select_products') }}
@@ -107,7 +116,7 @@
               :href="\App\Filament\Pages\Sync\ManageAdobeRemoteCatalog::getUrl(['account' => $accountId])"
               data-testid="product-channel-open-remote-catalog"
             >
-              {{ __('product_channels.remote_catalog.open_remote_only') }}
+              {{ __('product_channels.remote_catalog.open_catalog') }}
             </x-filament::button>
           @endif
         </div>
