@@ -75,7 +75,7 @@ D. **Custom Receive/Export**
 - Existing Magento attribute→Attribute Group membership is not available from the standard read contract used here; no guess is permitted.
 - Product vs ProductVariant ownership for arbitrary merchant attributes needs a separate evidence-based resolver.
 - Store-scope localized select/multiselect remains constrained by the current governed writer contract.
-- P-10 Product PUT store-scope inheritance risk remains orthogonal; this Stage 2 foundation is read-only until write admission is separately proven.
+- P-10 Product PUT store-scope inheritance risk was orthogonal to this read-only foundation and is now closed for the supported `default` store path by `magento_v1_store_scope_inheritance_certification_2026_09_17.json`; Stage 2 materialization itself still does not widen write admission.
 
 ## Stage 2-C live materialization proof (2026-09-13)
 

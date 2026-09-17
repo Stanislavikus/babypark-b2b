@@ -732,6 +732,7 @@ cross-platform vocabulary or define runtime/storage behavior.
 - `docs/connectors/adobe-commerce/MAGENTO_V1_PROVIDER_IDENTITY_EVIDENCE_2026_09_13.md` — authoritative source log used to close Stage 1 real-target provider-identity questions without widening write capability
 - `docs/connectors/adobe-commerce/magento_v1_custom_behavior_coverage_2026_09_12.json` — read-only real-catalog evidence for the 21 current-target workspace-custom fields not individually mutated: 16 `select/global` + 5 `money/website`, with live-value presence counts and reusable behavior-class onboarding classification
 - `docs/connectors/adobe-commerce/magento_v1_store_scope_inheritance_probe_2026_09_12.json` — P-10 read-only real-target evidence: store topology, scoped-attribute metadata, unavailable authoritative raw-EAV seams, and the deliberate zero-PUT decision pending DB/Admin or target-side diagnostic proof
+- `docs/connectors/adobe-commerce/magento_v1_store_scope_inheritance_certification_2026_09_17.json` — P-10 closure evidence: read-only raw-EAV baseline/after/final observation around the existing production moduleless GET→PUT→GET writer, zero new store-1 overrides across all current inherited canaries, verified restore, P-10 resolved for the supported `default` store path
 - `ADOBE_COMMERCE_V1_INVENTORY_RESEARCH.md` + review synthesis + related Adobe CSVs —
   frozen cross-platform Adobe research baseline
 - `SHOPIFY_V1_INVENTORY_RESEARCH.md` + related Shopify CSVs — frozen Shopify 2026-07 Product/capability research baseline; obey its frozen/not-frozen status marker
