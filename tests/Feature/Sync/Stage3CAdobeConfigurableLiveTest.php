@@ -867,6 +867,116 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
     }
 
     #[Test]
+    public function linked_family_stops_remaining_child_writes_after_known_not_applied_child(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product, $variants] = $this->createConfigurableProduct($workspace, 'CFG-CHILD-STOP');
+        $parentSku = 'MERCHANT-PARENT-SKU';
+
+        $thirdVariant = ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'CFG-CHILD-STOP-VAR-BLUE-2',
+            'is_active' => true,
+            'base_price_cache' => 100,
+        ]);
+        VariantFieldValue::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'variant_id' => $thirdVariant->id,
+            'field_binding_id' => $this->productVariantBinding('color')->id,
+            'value_text' => 'blue',
+        ]);
+        $this->attachVariantPrice($workspace, $thirdVariant, 100);
+        $variants[] = $thirdVariant;
+
+        usort($variants, static fn (ProductVariant $left, ProductVariant $right): int => strcmp((string) $left->id, (string) $right->id));
+        [$firstVariant, $refusedVariant, $laterVariant] = $variants;
+
+        ExternalRecordLink::query()->create($this->merchantConfirmedParentLinkAttributes(
+            $workspace, $account->id, $product, $parentSku, '100',
+        ));
+        ExternalRecordLink::query()->create($this->merchantConfirmedVariantLinkAttributes(
+            $workspace, $account->id, $firstVariant, $firstVariant->sku, '101',
+        ));
+        ExternalRecordLink::query()->create($this->merchantConfirmedVariantLinkAttributes(
+            $workspace, $account->id, $refusedVariant, $refusedVariant->sku, 'invalid-discriminator',
+        ));
+        ExternalRecordLink::query()->create($this->merchantConfirmedVariantLinkAttributes(
+            $workspace, $account->id, $laterVariant, $laterVariant->sku, '103',
+        ));
+
+        $updated = false;
+        $transport = new RecordingConnectorHttpTransport(function ($outbound) use ($firstVariant, &$updated): ConnectorHttpResult {
+            $request = $outbound->request;
+            $method = $request->getMethod();
+            $uri = (string) $request->getUri();
+
+            if (! str_ends_with($uri, '/V1/products/'.rawurlencode($firstVariant->sku))) {
+                return new ConnectorHttpResult(500, [], '{}');
+            }
+
+            if ($method === 'PUT') {
+                $updated = true;
+
+                return new ConnectorHttpResult(200, [], '{}');
+            }
+
+            if ($method === 'GET') {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'id' => 101,
+                    'sku' => $firstVariant->sku,
+                    'name' => 'Configurable Product',
+                    'attribute_set_id' => 4,
+                    'type_id' => 'simple',
+                    'status' => 1,
+                    'visibility' => 1,
+                    'price' => $updated ? 100.0 : 90.0,
+                    'custom_attributes' => [
+                        ['attribute_code' => 'color', 'value' => 93],
+                    ],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            return new ConnectorHttpResult(500, [], '{}');
+        });
+        $this->app->instance(ConnectorHttpTransport::class, $transport);
+
+        $children = collect($variants)->map(static fn (ProductVariant $variant): array => [
+            'variant_id' => (string) $variant->id,
+            'sku' => $variant->sku,
+            'color' => 'blue',
+            'color_index' => '93',
+        ])->all();
+
+        $result = app(AdobeConfigurableProductCommandCoordinator::class)->execute(
+            $workspace->id,
+            $account->id,
+            AdobeConfigurableCommandTestFixtures::configurableSemanticResult($product->id, $children),
+            'UAH',
+            $this->metadataFixture(),
+            new SyncLiveConsequentialWriteGateStub(true),
+        );
+
+        $this->assertSame(SyncLiveOutcome::Partial, $result->outcome);
+        $this->assertCount(2, $result->commandEvidence);
+        $this->assertSame('stock_write_verified', $result->commandEvidence[0]->reasonCode);
+        $this->assertSame('trusted_link_discriminator_invalid', $result->commandEvidence[1]->reasonCode);
+        $this->assertSame($refusedVariant->sku, $result->commandEvidence[1]->subjectSku);
+
+        $this->assertSame(1, collect($transport->recordedRequests)->filter(
+            fn ($entry) => $entry->request->getMethod() === 'PUT',
+        )->count());
+        $this->assertFalse(collect($transport->recordedRequests)->contains(
+            fn ($entry) => str_contains((string) $entry->request->getUri(), rawurlencode($laterVariant->sku)),
+        ));
+        $this->assertFalse(collect($transport->recordedRequests)->contains(
+            fn ($entry) => str_contains((string) $entry->request->getUri(), rawurlencode($parentSku)),
+        ));
+    }
+
+    #[Test]
     public function option_no_op_only_rejects_drift_without_option_write(): void
     {
         $workspace = $this->defaultWorkspace();

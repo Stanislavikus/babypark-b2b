@@ -94,7 +94,7 @@ final class AdobeConfigurableProductCommandCoordinator
             $childEvidence = $this->mapSimpleChildEvidence($childResult, $variantId);
             $evidence[] = $childEvidence;
 
-            if ($childEvidence->appliedStateKnowledge === AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous) {
+            if ($childEvidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
                 $stopWrites = true;
 
                 break;
