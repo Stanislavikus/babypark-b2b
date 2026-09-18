@@ -809,5 +809,8 @@
     "product_channels.remote_catalog.columns.link_status": "Catalogue link",
     "product_channels.remote_catalog.filters.link_status": "Catalogue link",
     "product_channels.remote_catalog.link_status.linked": "Linked",
-    "product_channels.remote_catalog.link_status.unlinked": "Not linked"
+    "product_channels.remote_catalog.link_status.unlinked": "Not linked",
+    "sync.preview.findings.missing_category_mapping": "Category mapping is missing",
+    "sync.preview.findings.invalid_category_mapping": "Category mapping has an invalid Adobe Commerce category ID",
+    "sync_preview.remediation.category_mapping": "Category mapping"
 }

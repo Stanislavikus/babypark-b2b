@@ -14,6 +14,7 @@ final readonly class ProductExecutionAggregate
         public array $variants,
         public int $sellableVariantCount,
         public ProductExecutionImageInput $imageInput,
+        public ?int $categoryId = null,
     ) {}
 
     public function hasSellableVariants(): bool

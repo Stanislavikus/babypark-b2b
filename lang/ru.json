@@ -792,5 +792,8 @@
     "product_channels.remote_catalog.columns.link_status": "Связь с каталогом",
     "product_channels.remote_catalog.filters.link_status": "Связь с каталогом",
     "product_channels.remote_catalog.link_status.linked": "Связано",
-    "product_channels.remote_catalog.link_status.unlinked": "Не связано"
+    "product_channels.remote_catalog.link_status.unlinked": "Не связано",
+    "sync.preview.findings.missing_category_mapping": "Отсутствует сопоставление категории",
+    "sync.preview.findings.invalid_category_mapping": "В сопоставлении категории указан некорректный ID категории Adobe Commerce",
+    "sync_preview.remediation.category_mapping": "Сопоставление категорий"
 }

@@ -11,6 +11,7 @@ use App\Enums\PriceListItemStatus;
 use App\Enums\PriceListStatus;
 use App\Enums\SyncPreviewFindingCode;
 use App\Enums\SyncPreviewOutcome;
+use App\Models\Category;
 use App\Models\FieldBinding;
 use App\Models\FieldDefinition;
 use App\Models\PriceList;
@@ -79,6 +80,46 @@ class AdobeProductExportPreviewPlannerTest extends TestCase
         $this->assertSame(SyncPreviewOutcome::Blocked, $result->outcome);
         $this->assertTrue(collect($result->findings)->contains(
             fn ($finding) => $finding->code === SyncPreviewFindingCode::MissingName,
+        ));
+    }
+
+    #[Test]
+    public function invalid_adobe_category_id_blocks_preview_before_live(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $category = Category::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'name' => 'Mapped local category',
+        ]);
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'CAT-INVALID',
+            'name' => 'Invalid category mapping product',
+            'category_id' => $category->id,
+            'is_active' => true,
+        ]);
+        $variant = $this->createVariant($product, 'CAT-INVALID-VAR', null);
+        $this->seedDefaultPrice($variant);
+
+        $snapshot = $this->snapshotWithMappings([]);
+        $snapshot['category_mappings'] = [[
+            'category_id' => $category->id,
+            'external_category_id' => 'not-a-magento-id',
+        ]];
+
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            $snapshot,
+        )[0];
+
+        $result = $this->planner->plan($aggregate, $snapshot, $this->metadataFixture());
+
+        $this->assertSame(SyncPreviewOutcome::Blocked, $result->outcome);
+        $this->assertTrue(collect($result->findings)->contains(
+            fn ($finding) => $finding->code === SyncPreviewFindingCode::InvalidCategoryMapping
+                && ($finding->context['external_category_id'] ?? null) === 'not-a-magento-id',
         ));
     }
 

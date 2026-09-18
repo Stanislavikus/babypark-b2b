@@ -12,6 +12,7 @@ final class SyncPreviewConfigurationSnapshotBuilder
     public function __construct(
         private readonly SyncConfigurationMutationCoordinator $mutationCoordinator,
         private readonly SyncProductSelectionStore $selectionStore,
+        private readonly ConnectorCategoryMappingSnapshotService $categoryMappingSnapshotService,
     ) {}
 
     /**
@@ -33,6 +34,11 @@ final class SyncPreviewConfigurationSnapshotBuilder
             $this->mutationCoordinator->effectiveMappingPayload($configuration),
         );
 
+        $categoryMappings = $this->categoryMappingSnapshotService->payload(
+            $configuration->workspace_id,
+            $configuration->connector_account_id,
+        );
+
         return [
             'version' => 'platform.sync-run-input.v1',
             'data_domain' => $configuration->data_domain->value,
@@ -40,6 +46,8 @@ final class SyncPreviewConfigurationSnapshotBuilder
             'external_context' => $configuration->external_context ?? [],
             'selection' => $this->selectionStore->descriptorForConfiguration($configuration)->toSnapshotArray(),
             'field_mappings' => $fieldMappings,
+            'category_mappings' => $categoryMappings,
+            'category_mapping_revision' => $this->categoryMappingSnapshotService->revisionFromPayload($categoryMappings),
             'connector_execution_configuration' => $configuration->connectorExecutionConfiguration()->payload(),
         ];
     }

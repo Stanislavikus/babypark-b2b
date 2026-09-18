@@ -8,6 +8,8 @@ enum SyncPreviewFindingCode: string
     case MissingMappedProductValue = 'missing_mapped_product_value';
     case MissingMappedVariantValue = 'missing_mapped_variant_value';
     case MissingOptionMapping = 'missing_option_mapping';
+    case MissingCategoryMapping = 'missing_category_mapping';
+    case InvalidCategoryMapping = 'invalid_category_mapping';
     case MissingSku = 'missing_sku';
     case MissingName = 'missing_name';
     case PriceUnavailable = 'price_unavailable';

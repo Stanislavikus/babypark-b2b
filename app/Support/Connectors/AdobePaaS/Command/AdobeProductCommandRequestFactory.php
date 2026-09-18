@@ -189,6 +189,43 @@ final class AdobeProductCommandRequestFactory
         );
     }
 
+    public function buildPostCategoryProductLink(
+        AdobePaaSRequestContext $context,
+        string $externalCategoryId,
+        string $sku,
+        OAuth1SigningContext $signingContext,
+    ): RequestInterface {
+        $payload = json_encode([
+            'productLink' => [
+                'sku' => $sku,
+                'category_id' => $externalCategoryId,
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        return $this->buildSignedRequest(
+            'POST',
+            $context,
+            '/V1/categories/'.rawurlencode($externalCategoryId).'/products',
+            $payload,
+            $signingContext,
+        );
+    }
+
+    public function buildDeleteCategoryProductLink(
+        AdobePaaSRequestContext $context,
+        string $externalCategoryId,
+        string $sku,
+        OAuth1SigningContext $signingContext,
+    ): RequestInterface {
+        return $this->buildSignedRequest(
+            'DELETE',
+            $context,
+            '/V1/categories/'.rawurlencode($externalCategoryId).'/products/'.rawurlencode($sku),
+            null,
+            $signingContext,
+        );
+    }
+
     public function buildGetMediaEntry(
         AdobePaaSRequestContext $context,
         string $sku,

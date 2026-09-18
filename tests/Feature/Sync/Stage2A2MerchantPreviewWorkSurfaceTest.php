@@ -485,7 +485,7 @@ class Stage2A2MerchantPreviewWorkSurfaceTest extends TestCase
     }
 
     #[Test]
-    public function all_seventeen_finding_codes_render_without_exception(): void
+    public function all_finding_codes_render_without_exception(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->adobeAccount($workspace);

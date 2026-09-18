@@ -31,6 +31,7 @@ final class SyncLiveAdmissionService
         private readonly SyncPreviewConfigurationReadinessResolver $readinessResolver,
         private readonly SyncRunActiveRecoveryService $activeRecoveryService,
         private readonly SyncRuntimeTimingResolver $timingResolver,
+        private readonly ConnectorCategoryMappingSnapshotService $categoryMappingSnapshotService,
     ) {}
 
     public function admit(
@@ -136,6 +137,18 @@ final class SyncLiveAdmissionService
             $snapshot = is_array($sourcePreview->configuration_snapshot)
                 ? $sourcePreview->configuration_snapshot
                 : [];
+
+            $snapshotCategoryMappingRevision = $snapshot['category_mapping_revision'] ?? null;
+            $currentCategoryMappingRevision = $this->categoryMappingSnapshotService->revision(
+                $configuration->workspace_id,
+                $configuration->connector_account_id,
+            );
+
+            if (! is_string($snapshotCategoryMappingRevision)
+                || ! hash_equals($currentCategoryMappingRevision, $snapshotCategoryMappingRevision)
+            ) {
+                throw SyncLiveAdmissionException::previewEvidenceMissing();
+            }
 
             $run = SyncRun::withoutWorkspaceScope()->create([
                 'id' => (string) Str::uuid(),

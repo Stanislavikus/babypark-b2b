@@ -23,6 +23,7 @@ use App\Models\Workspace;
 use App\Services\Sync\CreateSyncConfigurationInput;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
+use App\Services\Sync\SyncPreviewConfigurationSnapshotBuilder;
 use App\Services\Sync\UpdateSyncConfigurationInput;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectorAdapter;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
@@ -1134,7 +1135,10 @@ class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
             'semantic_operation' => SyncSemanticOperation::Export,
             'status' => SyncRunStatus::Completed,
             'initiated_by_user_id' => $actor->id,
-            'configuration_snapshot' => ['field_mappings' => []],
+            'configuration_snapshot' => app(SyncPreviewConfigurationSnapshotBuilder::class)->build(
+                $configuration,
+                SyncSemanticOperation::Export,
+            ),
             'completed_at' => now(),
         ]);
     }

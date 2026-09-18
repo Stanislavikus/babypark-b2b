@@ -92,6 +92,27 @@ final class AdobeProductExportSemanticPlanner
 
         $findings = array_merge($findings, $this->evaluateRequiredProductMappedValues($aggregate));
 
+        if ($aggregate->categoryId !== null) {
+            $externalCategoryId = $this->categoryMappingValue($configurationSnapshot, $aggregate->categoryId);
+
+            if ($externalCategoryId === null) {
+                $findings[] = $this->finding(
+                    'missing_category_mapping',
+                    subject: (string) $aggregate->categoryId,
+                    context: ['category_id' => $aggregate->categoryId],
+                );
+            } elseif (preg_match('/^[1-9][0-9]*$/', $externalCategoryId) !== 1) {
+                $findings[] = $this->finding(
+                    'invalid_category_mapping',
+                    subject: (string) $aggregate->categoryId,
+                    context: [
+                        'category_id' => $aggregate->categoryId,
+                        'external_category_id' => $externalCategoryId,
+                    ],
+                );
+            }
+        }
+
         if ($nameBindingId !== null) {
             $nameMapped = $aggregate->productValues[$nameBindingId] ?? null;
 
@@ -808,6 +829,36 @@ final class AdobeProductExportSemanticPlanner
             'vat_rate' => $resolvedPrice->vatRate,
             'source' => $resolvedPrice->source,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $configurationSnapshot
+     */
+    private function categoryMappingValue(array $configurationSnapshot, int $categoryId): ?string
+    {
+        $mappings = $configurationSnapshot['category_mappings'] ?? [];
+
+        if (! is_array($mappings) || ! array_is_list($mappings)) {
+            return null;
+        }
+
+        foreach ($mappings as $mapping) {
+            if (! is_array($mapping)) {
+                continue;
+            }
+
+            $mappedCategoryId = $mapping['category_id'] ?? null;
+            $externalCategoryId = $mapping['external_category_id'] ?? null;
+
+            if ((int) $mappedCategoryId === $categoryId
+                && is_string($externalCategoryId)
+                && trim($externalCategoryId) !== ''
+            ) {
+                return trim($externalCategoryId);
+            }
+        }
+
+        return null;
     }
 
     private function mappedScalarValue(?MappedFieldValue $mapped): mixed

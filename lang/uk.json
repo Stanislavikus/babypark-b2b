@@ -809,5 +809,8 @@
     "product_channels.remote_catalog.columns.link_status": "Зв’язок з каталогом",
     "product_channels.remote_catalog.filters.link_status": "Зв’язок з каталогом",
     "product_channels.remote_catalog.link_status.linked": "Пов’язано",
-    "product_channels.remote_catalog.link_status.unlinked": "Не пов’язано"
+    "product_channels.remote_catalog.link_status.unlinked": "Не пов’язано",
+    "sync.preview.findings.missing_category_mapping": "Відсутнє зіставлення категорії",
+    "sync.preview.findings.invalid_category_mapping": "У зіставленні категорії вказано некоректний ID категорії Adobe Commerce",
+    "sync_preview.remediation.category_mapping": "Зіставлення категорій"
 }

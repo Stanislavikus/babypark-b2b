@@ -43,6 +43,49 @@ final readonly class AdobeProductDocument
     }
 
     /**
+     * @return list<string>
+     */
+    public function categoryIds(): array
+    {
+        $extensionAttributes = $this->originalPayload['extension_attributes'] ?? null;
+
+        if (! is_array($extensionAttributes) || array_is_list($extensionAttributes)) {
+            return [];
+        }
+
+        $links = $extensionAttributes['category_links'] ?? null;
+
+        if (! is_array($links) || ! array_is_list($links)) {
+            return [];
+        }
+
+        $ids = [];
+
+        foreach ($links as $link) {
+            if (! is_array($link)) {
+                continue;
+            }
+
+            $categoryId = $link['category_id'] ?? null;
+
+            if (is_int($categoryId) && $categoryId > 0) {
+                $ids[] = (string) $categoryId;
+
+                continue;
+            }
+
+            if (is_string($categoryId) && preg_match('/^[1-9][0-9]*$/', $categoryId) === 1) {
+                $ids[] = $categoryId;
+            }
+        }
+
+        $result = array_values(array_unique($ids, SORT_STRING));
+        sort($result, SORT_NATURAL);
+
+        return $result;
+    }
+
+    /**
      * @return array{present: bool, value: mixed}
      */
     public function externalValue(string $externalFieldKey): array

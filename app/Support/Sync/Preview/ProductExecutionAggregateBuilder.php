@@ -158,6 +158,7 @@ class ProductExecutionAggregateBuilder
                     variants: $variantSlices,
                     sellableVariantCount: $sellableVariants->count(),
                     imageInput: $this->buildImageInput($product),
+                    categoryId: $product->category_id !== null ? (int) $product->category_id : null,
                 );
             })
             ->values()
