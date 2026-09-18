@@ -386,6 +386,48 @@ class MagentoV1ModulelessSimpleWriteTest extends TestCase
     }
 
     #[Test]
+    public function certified_optional_store_date_clear_uses_empty_string_and_verifies_remote_absence(): void
+    {
+        $remoteHasAttribute = true;
+        $transport = $this->bindTransport(function (ConnectorOutboundRequest $request) use (&$remoteHasAttribute): ConnectorHttpResult {
+            if ($request->request->getMethod() === 'GET') {
+                return $this->productResult(77, 100.0, $remoteHasAttribute ? [[
+                    'attribute_code' => 'custom_design_from',
+                    'value' => '2025-02-17 00:00:00',
+                ]] : []);
+            }
+
+            $payload = json_decode((string) $request->request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+            $clearEntry = collect($payload['product']['custom_attributes'] ?? [])->first(
+                static fn (array $entry): bool => ($entry['attribute_code'] ?? null) === 'custom_design_from',
+            );
+
+            $this->assertIsArray($clearEntry);
+            $this->assertSame('', $clearEntry['value'] ?? null);
+            $remoteHasAttribute = false;
+
+            return new ConnectorHttpResult(200, [], '{}');
+        });
+        [$workspace, $account, $variant] = $this->trustedVariant('77');
+
+        $result = $this->execute($workspace, $account->id, $variant->id, contextOverrides: [
+            'mapped_product_values' => [
+                'binding-custom-design-from' => [
+                    'external_field_key' => 'custom_design_from',
+                    'external_value' => '',
+                    'external_frontend_input' => 'date',
+                    'external_scope' => 'store',
+                    'external_is_required' => false,
+                ],
+            ],
+        ]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
+        $this->assertSame('stock_write_verified', $result->evidence->reasonCode);
+        $this->assertSame(['GET', 'PUT', 'GET'], $this->methods($transport));
+    }
+
+    #[Test]
     public function optional_website_price_clear_remains_fail_closed(): void
     {
         $transport = $this->bindTransport(fn () => $this->productResult(77, 100.0, [[

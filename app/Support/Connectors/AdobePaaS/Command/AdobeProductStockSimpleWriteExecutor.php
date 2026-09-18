@@ -261,7 +261,7 @@ final class AdobeProductStockSimpleWriteExecutor
             }
 
             if ($intent->scope === 'store'
-                && in_array($intent->frontendInput, ['text', 'textarea'], true)
+                && in_array($intent->frontendInput, ['text', 'textarea', 'date'], true)
             ) {
                 $payloads[$attributeCode] = '';
 

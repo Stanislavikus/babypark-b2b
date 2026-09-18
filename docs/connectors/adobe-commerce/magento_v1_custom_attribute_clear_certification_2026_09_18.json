@@ -68,6 +68,31 @@
       },
       "restore_runtime": "KnownApplied / stock_write_verified",
       "exact_restore": true
+    },
+    {
+      "behavior": {
+        "frontend_input": "date",
+        "scope": "store",
+        "is_required": false
+      },
+      "target_field": "custom_design_from",
+      "target_sku": "Універсальна коляска Joolz Day5",
+      "target_logical_entity_id": 3,
+      "baseline": "2025-02-17 00:00:00",
+      "negative_probe": {
+        "clear_payload": null,
+        "http_status": 200,
+        "effective_value_unchanged": true
+      },
+      "clear_payload": "",
+      "postcondition": "attribute absent",
+      "clear_runtime": "KnownApplied / stock_write_verified",
+      "clear_attempts": {
+        "put": 1,
+        "reconciliation_get": 1
+      },
+      "restore_runtime": "KnownApplied / stock_write_verified",
+      "exact_restore": true
     }
   ],
   "final_independent_read": {
@@ -76,20 +101,45 @@
     "meta_keyword": "Test Product",
     "country_of_manufacture": "CN",
     "price": 150,
-    "temporary_external_record_links": 0
+    "temporary_external_record_links": 0,
+    "joolz_custom_design_from": "2025-02-17 00:00:00",
+    "joolz_logical_entity_id": 3
   },
   "fail_closed_boundaries": [
     "required attributes are never cleared",
     "optional global text remains unsupported",
     "website-scoped price/decimal remains unsupported",
     "store/website select clear remains unsupported",
-    "texteditor/date/datetime/boolean/plain-decimal/multiselect remain unsupported until separate proof",
-    "missing/unknown provider frontend_input, scope, or is_required metadata remains unsupported"
+    "texteditor/datetime/boolean/plain-decimal/multiselect remain unsupported until separate proof",
+    "missing/unknown provider frontend_input, scope, or is_required metadata remains unsupported",
+    "scoped inherit/use-default semantics are never inferred from effective GET equality"
   ],
   "runtime_contract": [
     "clear admission is behavior-metadata driven, never field-code allowlisted",
     "writer sends only the certified clear payload for stale remote values",
     "successful reconciliation requires the cleared attribute to be absent on fresh GET",
     "uncertified clear drift returns stock_custom_attribute_clear_not_certified with zero PUT"
-  ]
+  ],
+  "classifier_contract": {
+    "classifier_version": "adobe.product_attribute_classifier.v2",
+    "behavior_signature_clear_semantics": {
+      "optional_store_text_textarea_date": "empty_string_to_absent_verified",
+      "optional_global_select": "null_to_absent_verified",
+      "required": "required_not_clearable",
+      "all_other_or_unknown": "fail_closed_not_certified"
+    },
+    "field_code_allowlist_used": false
+  },
+  "target_inventory_boundaries": {
+    "optional_boolean_generic_candidate_present": false,
+    "boolean_fields_observed": [
+      "price_type",
+      "sku_type",
+      "weight_type"
+    ],
+    "boolean_fields_observed_are_required": true,
+    "optional_plain_decimal_custom_attribute_candidate_present": false,
+    "weight_is_top_level_product_capability": true,
+    "tier_price_is_dedicated_pricing_surface": true
+  }
 }

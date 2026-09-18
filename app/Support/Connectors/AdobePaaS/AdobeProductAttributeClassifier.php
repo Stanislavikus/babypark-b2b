@@ -11,7 +11,7 @@ use App\Support\Connectors\ConnectorSchemaFieldClassificationDecision;
 
 final class AdobeProductAttributeClassifier
 {
-    public const CLASSIFIER_VERSION = 'adobe.product_attribute_classifier.v1';
+    public const CLASSIFIER_VERSION = 'adobe.product_attribute_classifier.v2';
 
     public function __construct(
         private readonly CanonicalRegistryReader $registryReader,
@@ -209,13 +209,39 @@ final class AdobeProductAttributeClassifier
             'backend_model' => $this->nullableNonEmptyString($metadata['backend_model'] ?? null),
             'apply_to' => $applyTo,
             'runtime_owner' => $runtimeOwnerHint ?? 'generic_field_candidate',
-            'clear_semantics' => 'not_discovered',
+            'clear_semantics' => $this->clearSemantics($field, $metadata),
         ];
 
         $canonical = $this->sortRecursively($signature);
         $json = json_encode($canonical, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         return ['adobe.product_attribute.v1.'.substr(hash('sha256', $json), 0, 24), $canonical];
+    }
+
+    private function clearSemantics(
+        ConnectorSchemaSnapshotField $field,
+        array $metadata,
+    ): string {
+        if ($field->is_required === true) {
+            return 'required_not_clearable';
+        }
+
+        if ($field->is_required !== false) {
+            return 'fail_closed_not_certified';
+        }
+
+        $frontendInput = $metadata['frontend_input'] ?? null;
+        $scope = $field->external_scope ?? ($metadata['scope'] ?? null);
+
+        if ($scope === 'store' && in_array($frontendInput, ['text', 'textarea', 'date'], true)) {
+            return 'empty_string_to_absent_verified';
+        }
+
+        if ($scope === 'global' && $frontendInput === 'select') {
+            return 'null_to_absent_verified';
+        }
+
+        return 'fail_closed_not_certified';
     }
 
     private function optionSemantics(array $payload, array $metadata): string
