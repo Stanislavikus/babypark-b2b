@@ -6,9 +6,12 @@ use App\Support\CanonicalCoverage\BigCommerceCoverage;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Tests\Support\CleansTemporaryDirectories;
 
 class BigCommerceCoverageTest extends TestCase
 {
+    use CleansTemporaryDirectories;
+
     #[Test]
     public function committed_provider_slice_has_complete_reproducible_coverage(): void
     {
@@ -227,7 +230,7 @@ class BigCommerceCoverageTest extends TestCase
     private function temporaryCorpus(): string
     {
         $source = dirname(__DIR__, 3);
-        $root = sys_get_temp_dir().'/bigcommerce-coverage-'.bin2hex(random_bytes(8));
+        $root = $this->trackTemporaryDirectory(sys_get_temp_dir().'/bigcommerce-coverage-'.bin2hex(random_bytes(8)));
         foreach ([BigCommerceCoverage::SOURCE, BigCommerceCoverage::MANIFEST, BigCommerceCoverage::COVERAGE, BigCommerceCoverage::CONCEPTS, BigCommerceCoverage::DISAGREEMENTS] as $file) {
             if (! is_dir($root.'/'.dirname($file))) {
                 mkdir($root.'/'.dirname($file), 0777, true);
