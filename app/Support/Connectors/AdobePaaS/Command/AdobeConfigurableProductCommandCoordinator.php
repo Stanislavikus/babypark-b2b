@@ -184,7 +184,7 @@ final class AdobeConfigurableProductCommandCoordinator
         }
 
         if ($this->allChildLinksKnownApplied($evidence, $desiredState->childLinks)) {
-            $lifecycleEvidence = $this->inactiveLifecycleExecutor->executeNoOpOnly($input);
+            $lifecycleEvidence = $this->inactiveLifecycleExecutor->execute($input);
             $evidence = array_merge($evidence, $lifecycleEvidence);
         }
 

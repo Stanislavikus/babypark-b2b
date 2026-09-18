@@ -268,6 +268,8 @@ Durable evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_linked
 
 Follow-on Configurable structure evidence on the same date certifies the **existing-option UPDATE-only** seam against family `524000027bbg`: validation setup changed only option `id=3` position `0→1`; the production coordinator restored `1→0` through exactly one option PUT plus one reconciliation GET and returned `SYNCHRONIZED`; independent GET proved the exact option id/attribute/label/value set and child links returned to baseline. Missing option CREATE and destructive option-value removal remain fail-closed and are not certified. Durable evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_structure_certification_2026_09_18.json`.
 
+The same structure campaign then certified **trusted child relink**. Validation setup removed `524000027bbg-Чорний` through Adobe's configurable-child DELETE endpoint. Production coordinator freshly revalidated the MerchantConfirmed parent and child logical identities, issued exactly one child-link POST, reconciled the children list, then detected Magento's unlink/relink option-value side effect and restored the option through the certified existing-option UPDATE path. Final children, `attribute_id=138`, label, position and values `[63,79]` matched baseline. Magento recreated the internal configurable option row so its vendor-managed option `id` changed `9→10`; runtime already matches option identity by `attribute_id` and uses the current option id only as a fresh remote PUT handle, so no platform/trust identity changed. Inactive linked lifecycle remains pending.
+
 
 Post-Ready review did not broaden the certified write surface. It added fail-closed parent preflight before child HTTP, applied the observed media-label materialization guard to parent PUT admission, and rejected orphaned role-label projections. These corrections only remove unsafe consequential attempts; the real-target mutation/restore evidence above remains the certification basis.
 
@@ -283,7 +285,7 @@ separate evidence where applicable:
 
 - field-by-field Simple Product WRITE validation beyond the verified base-price cycle;
 - installation-dependent mapped EAV values and explicit clear semantics;
-- configurable structure mutation beyond the now-certified existing-family core parent/child UPDATE and existing-option UPDATE-only paths (option CREATE/value removal, child-link mutation, inactive linked lifecycle mutation);
+- configurable structure mutation beyond the now-certified existing-family core parent/child UPDATE, existing-option UPDATE-only, and trusted child-relink paths (option CREATE/value removal and inactive linked lifecycle mutation);
 - media mutation;
 - remaining product-type and connector-owned surfaces.
 

@@ -60,7 +60,67 @@
   "remaining_structure_boundaries": [
     "configurable option CREATE is not certified",
     "configurable option destructive value removal is not certified",
-    "configurable child-link mutation remains no-op-only pending real-target proof",
     "inactive linked lifecycle mutation remains no-op-only pending real-target proof"
-  ]
+  ],
+  "child_link_relink": {
+    "status": "resolved_pass",
+    "family_sku": "524000027bbg",
+    "target_child_sku": "524000027bbg-Чорний",
+    "target_child_logical_entity_id": 13,
+    "validation_setup": {
+      "operation": "DELETE configurable child",
+      "baseline_children": [
+        "524000027bbg-1",
+        "524000027bbg-Чорний"
+      ],
+      "after_delete_children": [
+        "524000027bbg-1"
+      ],
+      "setup_verified": true
+    },
+    "production_runtime": {
+      "path": "AdobeConfigurableProductCommandCoordinator -> AdobeConfigurableChildLinkCommandExecutor::executeTrustedRelinkOnly",
+      "outcome": "synchronized",
+      "child_link_result": "KnownApplied / configurable_child_link_reconciled",
+      "child_link_consequential_posts": 1,
+      "child_link_reconciliation_gets": 1,
+      "parent_and_child_identity_freshly_verified_before_post": true,
+      "other_child_link_result": "configurable_child_link_no_op",
+      "children_core_result": "stock_state_already_matches",
+      "parent_core_result": "configurable_parent_state_already_matches"
+    },
+    "magento_side_effect": {
+      "unlink_reduced_option_values": [
+        63
+      ],
+      "relink_required_option_repair": true,
+      "option_repair_result": "KnownApplied / configurable_option_put_reconciled",
+      "option_repair_consequential_puts": 1,
+      "option_repair_reconciliation_gets": 1,
+      "configurable_option_row_id_before": 9,
+      "configurable_option_row_id_after": 10,
+      "interpretation": "Magento-managed configurable option row id may churn after unlink/relink; runtime identity is matched by configurable attribute_id and fresh option id is only a current remote handle."
+    },
+    "final_independent_read": {
+      "children_restored": [
+        "524000027bbg-1",
+        "524000027bbg-Чорний"
+      ],
+      "option_attribute_id": 138,
+      "option_label": "Коляски - Колір",
+      "option_position": 0,
+      "option_values": [
+        63,
+        79
+      ],
+      "semantic_structure_restored": true,
+      "vendor_managed_option_row_id_churn_only": true
+    },
+    "local_fixture": {
+      "temporary_state_only": true,
+      "database_transaction_rolled_back": true,
+      "merchant_confirmed_links_persisted_after_certification": false,
+      "temporary_variants_persisted_after_certification": false
+    }
+  }
 }

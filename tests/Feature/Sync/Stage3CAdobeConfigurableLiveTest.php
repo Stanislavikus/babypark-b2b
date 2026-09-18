@@ -2035,6 +2035,105 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
     }
 
     #[Test]
+    public function trusted_linked_inactive_child_disables_with_one_verified_status_put(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product] = $this->createConfigurableProduct($workspace, 'CFG-LIFECYCLE-WRITE');
+        $parentSku = 'MERCHANT-PARENT-SKU';
+        $inactive = ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'CFG-LIFECYCLE-WRITE-INACTIVE',
+            'is_active' => false,
+            'base_price_cache' => 100,
+        ]);
+        ExternalRecordLink::query()->create($this->merchantConfirmedVariantLinkAttributes(
+            $workspace,
+            $account->id,
+            $inactive,
+            $inactive->sku,
+            '103',
+        ));
+        $input = $this->configurableInput(
+            $workspace,
+            $account,
+            $product,
+            $parentSku,
+            new SyncLiveConsequentialWriteGateStub(true),
+        );
+
+        $disabled = false;
+        $transport = new RecordingConnectorHttpTransport(function ($outbound) use (
+            $parentSku,
+            $inactive,
+            &$disabled,
+        ): ConnectorHttpResult {
+            $request = $outbound->request;
+            $uri = (string) $request->getUri();
+
+            if (str_ends_with($uri, '/V1/configurable-products/'.rawurlencode($parentSku).'/children')) {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    ['sku' => $inactive->sku],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            if (str_ends_with($uri, '/V1/products/'.rawurlencode($inactive->sku))) {
+                if ($request->getMethod() === 'PUT') {
+                    $payload = json_decode((string) $request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+                    $this->assertSame(2, $payload['product']['status'] ?? null);
+                    $disabled = true;
+
+                    return new ConnectorHttpResult(200, [], '{}');
+                }
+
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'id' => 103,
+                    'sku' => $inactive->sku,
+                    'name' => 'Inactive Child',
+                    'attribute_set_id' => 4,
+                    'type_id' => 'simple',
+                    'status' => $disabled ? 2 : 1,
+                    'visibility' => 1,
+                    'price' => 100.0,
+                    'custom_attributes' => [],
+                    'media_gallery_entries' => [],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            return new ConnectorHttpResult(404, [], '{}');
+        });
+
+        $normalizer = new AdobeProductRemoteStateNormalizer;
+        $client = new AdobeProductRemoteStateClient(
+            app(AdobePaaSRequestContextFactory::class),
+            new AdobeProductCommandRequestFactory(new OAuth1RequestSigner),
+            $transport,
+            new AdobeProductRemoteGetClassifier($normalizer),
+        );
+        $executor = new AdobeConfigurableInactiveLinkedVariantLifecycleExecutor(
+            app(AdobePaaSRequestContextFactory::class),
+            $client,
+            $normalizer,
+            new AdobeProductRemoteStateComparator,
+            new AdobeProductExternalRecordLinkGuard,
+            new AdobeConfigurableRemoteOptionStateReader,
+        );
+
+        $results = $executor->execute($input);
+
+        $this->assertCount(1, $results);
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $results[0]->appliedStateKnowledge);
+        $this->assertSame('inactive_linked_child_disabled', $results[0]->reasonCode);
+        $this->assertSame(1, $results[0]->consequentialWriteAttempts);
+        $this->assertSame(1, $results[0]->reconciliationGetAttempts);
+        $this->assertSame(1, collect($transport->recordedRequests)->filter(
+            fn ($entry) => $entry->request->getMethod() === 'PUT',
+        )->count());
+    }
+
+    #[Test]
     public function inactive_lifecycle_no_op_only_rejects_status_drift_without_put(): void
     {
         $workspace = $this->defaultWorkspace();
@@ -2092,6 +2191,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
             $normalizer,
             new AdobeProductRemoteStateComparator,
             new AdobeProductExternalRecordLinkGuard,
+            new AdobeConfigurableRemoteOptionStateReader,
         );
 
         $results = $executor->executeNoOpOnly($input);
@@ -2615,6 +2715,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
                 $normalizer,
                 $comparator,
                 $linkGuard,
+                $optionReader,
             ),
             new AdobeConfigurableAppliedStateAggregator,
             $linkGuard,
