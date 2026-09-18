@@ -8,9 +8,12 @@ use App\Support\CanonicalCoverage\GoogleMerchantCoverage;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Tests\Support\CleansTemporaryDirectories;
 
 class GoogleMerchantCoverageTest extends TestCase
 {
+    use CleansTemporaryDirectories;
+
     #[Test]
     public function committed_google_slice_is_complete(): void
     {
@@ -193,7 +196,7 @@ class GoogleMerchantCoverageTest extends TestCase
     private function temporaryCorpus(): string
     {
         $source = dirname(__DIR__, 3);
-        $root = sys_get_temp_dir().'/google-coverage-'.bin2hex(random_bytes(6));
+        $root = $this->trackTemporaryDirectory(sys_get_temp_dir().'/google-coverage-'.bin2hex(random_bytes(6)));
         foreach ([GoogleMerchantCoverage::ATTRIBUTES, GoogleMerchantCoverage::PRODUCT_INPUT, GoogleMerchantCoverage::MANIFEST, GoogleMerchantCoverage::COVERAGE, GoogleMerchantCoverage::CONCEPTS, GoogleMerchantCoverage::DISAGREEMENTS] as $file) {
             if (! is_dir($root.'/'.dirname($file))) {
                 mkdir($root.'/'.dirname($file), 0777, true);

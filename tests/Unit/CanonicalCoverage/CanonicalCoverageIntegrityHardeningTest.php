@@ -10,9 +10,12 @@ use App\Support\CanonicalCoverage\ShopifyCoverage;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Tests\Support\CleansTemporaryDirectories;
 
 class CanonicalCoverageIntegrityHardeningTest extends TestCase
 {
+    use CleansTemporaryDirectories;
+
     #[Test]
     public function shopify_master_semantic_reclassification_is_rejected(): void
     {
@@ -200,7 +203,7 @@ class CanonicalCoverageIntegrityHardeningTest extends TestCase
     private function temporaryCorpus(array $files): string
     {
         $source = dirname(__DIR__, 3);
-        $root = sys_get_temp_dir().'/canonical-coverage-hardening-'.bin2hex(random_bytes(8));
+        $root = $this->trackTemporaryDirectory(sys_get_temp_dir().'/canonical-coverage-hardening-'.bin2hex(random_bytes(8)));
 
         foreach ($files as $file) {
             $target = "$root/$file";

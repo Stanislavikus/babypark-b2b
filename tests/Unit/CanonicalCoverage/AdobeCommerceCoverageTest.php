@@ -7,9 +7,12 @@ use App\Support\CanonicalCoverage\BigCommerceCoverage;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Tests\Support\CleansTemporaryDirectories;
 
 class AdobeCommerceCoverageTest extends TestCase
 {
+    use CleansTemporaryDirectories;
+
     #[Test]
     public function committed_adobe_slice_has_complete_validated_coverage(): void
     {
@@ -402,7 +405,7 @@ class AdobeCommerceCoverageTest extends TestCase
     private function temporaryCorpus(): string
     {
         $source = dirname(__DIR__, 3);
-        $root = sys_get_temp_dir().'/adobe-coverage-'.bin2hex(random_bytes(8));
+        $root = $this->trackTemporaryDirectory(sys_get_temp_dir().'/adobe-coverage-'.bin2hex(random_bytes(8)));
         $files = [AdobeCommerceCoverage::MASTER, AdobeCommerceCoverage::STRUCTURED, AdobeCommerceCoverage::ALIASES, AdobeCommerceCoverage::CLUSTERS, AdobeCommerceCoverage::SOURCES, AdobeCommerceCoverage::MANIFEST, AdobeCommerceCoverage::COVERAGE, AdobeCommerceCoverage::CONCEPTS, AdobeCommerceCoverage::DISAGREEMENTS];
         foreach ($files as $file) {
             if (! is_dir($root.'/'.dirname($file))) {

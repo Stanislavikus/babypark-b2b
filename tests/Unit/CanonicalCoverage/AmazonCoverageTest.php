@@ -9,9 +9,12 @@ use App\Support\CanonicalCoverage\GoogleMerchantCoverage;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Tests\Support\CleansTemporaryDirectories;
 
 class AmazonCoverageTest extends TestCase
 {
+    use CleansTemporaryDirectories;
+
     #[Test]
     public function committed_amazon_slice_is_complete_and_frozen(): void
     {
@@ -223,7 +226,7 @@ class AmazonCoverageTest extends TestCase
     private function temporaryCorpus(): string
     {
         $source = dirname(__DIR__, 3);
-        $root = sys_get_temp_dir().'/amazon-coverage-'.bin2hex(random_bytes(6));
+        $root = $this->trackTemporaryDirectory(sys_get_temp_dir().'/amazon-coverage-'.bin2hex(random_bytes(6)));
         foreach ([AmazonCoverage::META, AmazonCoverage::LUGGAGE, AmazonCoverage::MANIFEST, AmazonCoverage::COVERAGE, AmazonCoverage::CONCEPTS, AmazonCoverage::DISAGREEMENTS] as $file) {
             if (! is_dir($root.'/'.dirname($file))) {
                 mkdir($root.'/'.dirname($file), 0777, true);
