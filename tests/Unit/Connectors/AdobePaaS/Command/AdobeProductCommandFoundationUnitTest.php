@@ -151,6 +151,25 @@ class AdobeProductCommandFoundationUnitTest extends TestCase
     }
 
     #[Test]
+    public function product_get_rejects_orphaned_media_role_label_projection(): void
+    {
+        $payload = AdobeProductCommandTestFixtures::remoteProductPayload([
+            'media_gallery_entries' => [],
+            'custom_attributes' => [
+                ['attribute_code' => 'image_label', 'value' => 'Orphaned role label'],
+            ],
+        ]);
+
+        $result = $this->classifier->classify(
+            'SKU-TEST-1',
+            new ConnectorHttpResult(200, [], json_encode($payload, JSON_THROW_ON_ERROR)),
+        );
+
+        $this->assertSame(AdobeProductRemoteGetClassification::Found, $result->classification);
+        $this->assertFalse($result->mediaRoleLabelMaterializationSafe);
+    }
+
+    #[Test]
     public function product_get_rejects_mismatched_existing_media_role_label_projection(): void
     {
         $payload = AdobeProductCommandTestFixtures::remoteProductPayload([

@@ -3,6 +3,7 @@
 namespace App\Support\Connectors\AdobePaaS\Command;
 
 use App\Support\Connectors\AdobePaaS\AdobePaaSAccessRejectionEvidence;
+use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
 
 final class AdobeConfigurableParentCommandExecutor
@@ -14,61 +15,27 @@ final class AdobeConfigurableParentCommandExecutor
         private readonly AdobeProductRemoteStateComparator $comparator,
     ) {}
 
+    public function preflight(AdobeConfigurableCommandInput $input): ?AdobeConfigurableCommandEvidence
+    {
+        return $this->inspectPreWriteState($input)['blockingEvidence'];
+    }
+
     public function execute(AdobeConfigurableCommandInput $input): AdobeConfigurableCommandEvidence
     {
+        $inspection = $this->inspectPreWriteState($input);
+
+        if ($inspection['blockingEvidence'] !== null) {
+            return $inspection['blockingEvidence'];
+        }
+
         $desiredState = $input->desiredState->parent;
+        $trustedSku = $inspection['trustedSku'];
+        $trustedEntityId = $inspection['trustedEntityId'];
+        $context = $inspection['context'];
+        $observed = $inspection['observedState'];
 
-        if ($this->linkGuard->hasParentSkuCrossSubjectCollision(
-            $input->workspaceId,
-            $input->connectorAccountId,
-            $desiredState->sku,
-            $desiredState->productId,
-        )) {
-            return $this->knownNotApplied('external_record_link_collision', $desiredState->sku);
-        }
-
-        $trustedLookup = $this->linkGuard->resolveTrustedParentLinkBySubject(
-            $input->workspaceId,
-            $input->connectorAccountId,
-            $desiredState->productId,
-        );
-
-        if ($trustedLookup->isAmbiguous()) {
-            return $this->unknownOrAmbiguous('ambiguous_parent_identity_links', $desiredState->sku);
-        }
-
-        if (! $trustedLookup->isTrusted() || $trustedLookup->link === null) {
-            return $this->knownNotApplied('link_required', $desiredState->sku);
-        }
-
-        $trustedSku = $trustedLookup->link->external_identifier;
-        if (! is_string($trustedSku) || $trustedSku === '' || $trustedSku !== $desiredState->sku) {
-            return $this->knownNotApplied('trusted_parent_link_sku_mismatch', $trustedSku ?: $desiredState->sku, ownershipTrustSatisfied: true);
-        }
-
-        $trustedEntityId = $this->parseLogicalEntityId((string) $trustedLookup->link->external_record_discriminator);
-        if ($trustedEntityId === null) {
-            return $this->knownNotApplied('trusted_parent_discriminator_invalid', $trustedSku, ownershipTrustSatisfied: true);
-        }
-
-        $context = $this->contextFactory->create($input->workspaceId, $input->connectorAccountId);
-        $preRead = $this->remoteStateClient->getParentWithContext($context, $trustedSku);
-
-        if ($preRead->classification === AdobeProductRemoteGetClassification::TrustedKnownMissing) {
-            return $this->knownNotApplied('linked_remote_parent_missing', $trustedSku, ownershipTrustSatisfied: true);
-        }
-
-        $observed = $preRead->observedState;
-        if ($preRead->classification !== AdobeProductRemoteGetClassification::Found || $observed === null) {
-            return $this->unknownOrAmbiguous('configurable_parent_pre_read_untrusted_or_failed', $trustedSku, ownershipTrustSatisfied: true);
-        }
-
-        if ($observed->entityId !== $trustedEntityId) {
-            return $this->knownNotApplied('configurable_parent_identity_mismatch', $trustedSku, ownershipTrustSatisfied: true);
-        }
-
-        if ($desiredState->typeId !== 'configurable' || $observed->typeId !== 'configurable') {
-            return $this->knownNotApplied('configurable_parent_type_mismatch', $trustedSku, ownershipTrustSatisfied: true);
+        if ($trustedSku === null || $trustedEntityId === null || $context === null || $observed === null) {
+            return $this->unknownOrAmbiguous('configurable_parent_preflight_incomplete', $desiredState->sku);
         }
 
         if ($this->comparator->parentControlledStateMatches($desiredState, $observed)) {
@@ -125,6 +92,135 @@ final class AdobeConfigurableParentCommandExecutor
             reconciliationGetAttempts: 1,
             ownershipTrustSatisfied: true,
         );
+    }
+
+    /**
+     * @return array{
+     *     blockingEvidence: ?AdobeConfigurableCommandEvidence,
+     *     context: ?AdobePaaSRequestContext,
+     *     trustedSku: ?string,
+     *     trustedEntityId: ?int,
+     *     observedState: ?AdobeProductParentObservedState
+     * }
+     */
+    private function inspectPreWriteState(AdobeConfigurableCommandInput $input): array
+    {
+        $desiredState = $input->desiredState->parent;
+
+        if ($this->linkGuard->hasParentSkuCrossSubjectCollision(
+            $input->workspaceId,
+            $input->connectorAccountId,
+            $desiredState->sku,
+            $desiredState->productId,
+        )) {
+            return $this->blockedInspection($this->knownNotApplied('external_record_link_collision', $desiredState->sku));
+        }
+
+        $trustedLookup = $this->linkGuard->resolveTrustedParentLinkBySubject(
+            $input->workspaceId,
+            $input->connectorAccountId,
+            $desiredState->productId,
+        );
+
+        if ($trustedLookup->isAmbiguous()) {
+            return $this->blockedInspection($this->unknownOrAmbiguous('ambiguous_parent_identity_links', $desiredState->sku));
+        }
+
+        if (! $trustedLookup->isTrusted() || $trustedLookup->link === null) {
+            return $this->blockedInspection($this->knownNotApplied('link_required', $desiredState->sku));
+        }
+
+        $trustedSku = $trustedLookup->link->external_identifier;
+        if (! is_string($trustedSku) || $trustedSku === '' || $trustedSku !== $desiredState->sku) {
+            return $this->blockedInspection($this->knownNotApplied(
+                'trusted_parent_link_sku_mismatch',
+                $trustedSku ?: $desiredState->sku,
+                ownershipTrustSatisfied: true,
+            ));
+        }
+
+        $trustedEntityId = $this->parseLogicalEntityId((string) $trustedLookup->link->external_record_discriminator);
+        if ($trustedEntityId === null) {
+            return $this->blockedInspection($this->knownNotApplied(
+                'trusted_parent_discriminator_invalid',
+                $trustedSku,
+                ownershipTrustSatisfied: true,
+            ));
+        }
+
+        $context = $this->contextFactory->create($input->workspaceId, $input->connectorAccountId);
+        $preRead = $this->remoteStateClient->getParentWithContext($context, $trustedSku);
+
+        if ($preRead->classification === AdobeProductRemoteGetClassification::TrustedKnownMissing) {
+            return $this->blockedInspection($this->knownNotApplied(
+                'linked_remote_parent_missing',
+                $trustedSku,
+                ownershipTrustSatisfied: true,
+            ));
+        }
+
+        $observed = $preRead->observedState;
+        if ($preRead->classification !== AdobeProductRemoteGetClassification::Found || $observed === null) {
+            return $this->blockedInspection($this->unknownOrAmbiguous(
+                'configurable_parent_pre_read_untrusted_or_failed',
+                $trustedSku,
+                ownershipTrustSatisfied: true,
+            ));
+        }
+
+        if ($observed->entityId !== $trustedEntityId) {
+            return $this->blockedInspection($this->knownNotApplied(
+                'configurable_parent_identity_mismatch',
+                $trustedSku,
+                ownershipTrustSatisfied: true,
+            ));
+        }
+
+        if ($desiredState->typeId !== 'configurable' || $observed->typeId !== 'configurable') {
+            return $this->blockedInspection($this->knownNotApplied(
+                'configurable_parent_type_mismatch',
+                $trustedSku,
+                ownershipTrustSatisfied: true,
+            ));
+        }
+
+        if (! $this->comparator->parentControlledStateMatches($desiredState, $observed)
+            && $preRead->mediaRoleLabelMaterializationSafe !== true
+        ) {
+            return $this->blockedInspection($this->knownNotApplied(
+                'configurable_parent_media_role_label_side_effect_not_safe',
+                $trustedSku,
+                ownershipTrustSatisfied: true,
+            ));
+        }
+
+        return [
+            'blockingEvidence' => null,
+            'context' => $context,
+            'trustedSku' => $trustedSku,
+            'trustedEntityId' => $trustedEntityId,
+            'observedState' => $observed,
+        ];
+    }
+
+    /**
+     * @return array{
+     *     blockingEvidence: AdobeConfigurableCommandEvidence,
+     *     context: null,
+     *     trustedSku: null,
+     *     trustedEntityId: null,
+     *     observedState: null
+     * }
+     */
+    private function blockedInspection(AdobeConfigurableCommandEvidence $evidence): array
+    {
+        return [
+            'blockingEvidence' => $evidence,
+            'context' => null,
+            'trustedSku' => null,
+            'trustedEntityId' => null,
+            'observedState' => null,
+        ];
     }
 
     private function permitsConsequentialWrite(AdobeConfigurableCommandInput $input): bool

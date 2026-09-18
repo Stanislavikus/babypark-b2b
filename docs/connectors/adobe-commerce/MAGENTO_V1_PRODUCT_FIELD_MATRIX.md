@@ -230,7 +230,7 @@ moduleless-by-default rebaseline is now implemented for trusted Simple Product W
   `type_id = simple`, and Magento entity `id` equal to the trusted discriminator before PUT.
 - POST/create and blind consequential PUT retry are absent from the standard Simple path.
 - Trusted Receive continues to use `AdobeProductDocumentReader` over stock Product GET.
-- Existing-family configurable children now consume the same stock Simple GET→PUT→GET writer under MerchantConfirmed ERL identity, preserve the fresh remote child name, and require fresh media-role label materialization-safety evidence before PUT; unsafe or unknown media state fails closed with zero consequential writes.
+- Existing-family configurable children now consume the same stock Simple GET→PUT→GET writer under MerchantConfirmed ERL identity, preserve the fresh remote child name, and require fresh media-role label materialization-safety evidence before PUT; unsafe or unknown media state fails closed with zero consequential writes. Before any child HTTP, the configurable coordinator preflights the trusted parent discriminator plus fresh parent identity/type; parent drift requiring PUT is also gated by media-role label materialization safety, and orphaned role-label projections are classified unsafe.
 - Safe Sync remains implemented only as an optional Enhanced Safety primitive and is not the
   standard-path prerequisite.
 - Mapping remains a **platform-owned workflow** over persisted and normalised discovered metadata;
@@ -265,6 +265,8 @@ PR #226 real-target certification proved the existing-family Configurable core U
 - final independent default-store and `all` reads matched the pre-write raw baselines except Magento-managed `updated_at`; merchant child names, entity ids, option values `63/79`, media role-label state, and links were preserved.
 
 Durable evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_linked_update_certification_2026_09_18.json`. Public Adobe Products / Export / Live support remains false.
+
+Post-Ready review did not broaden the certified write surface. It added fail-closed parent preflight before child HTTP, applied the observed media-label materialization guard to parent PUT admission, and rejected orphaned role-label projections. These corrections only remove unsafe consequential attempts; the real-target mutation/restore evidence above remains the certification basis.
 
 A separate read-only missing-SKU probe returned HTTP 404 with a message-only body and no
 structured `parameters`. The classifier therefore remained conservative `untrusted_or_failed`;

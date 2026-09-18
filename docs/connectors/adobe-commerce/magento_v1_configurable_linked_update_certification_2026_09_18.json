@@ -108,7 +108,10 @@
     "option": {
       "attribute_id": 138,
       "option_id": 3,
-      "values": [63, 79],
+      "values": [
+        63,
+        79
+      ],
       "outcome": "configurable_option_no_op"
     },
     "child_links": {
@@ -148,5 +151,13 @@
     "inactive linked lifecycle mutation remains no-op-only",
     "P-09 non-default-store media label clear/inheritance semantics remain open"
   ],
-  "conclusion": "Existing-family Magento V1 Configurable core linked UPDATE is real-target certified for trusted parent and media-safe trusted children, with fail-closed protection for observed media role-label materialization risk and exact restore evidence."
+  "conclusion": "Existing-family Magento V1 Configurable core linked UPDATE is real-target certified for trusted parent and media-safe trusted children, with fail-closed protection for observed media role-label materialization risk and exact restore evidence.",
+  "post_certification_review_hardening": {
+    "write_surface_broadened": false,
+    "parent_preflight_before_child_http": "trusted parent provenance/discriminator plus fresh identity/type must pass before any child HTTP",
+    "parent_put_media_role_label_guard": "parent drift requiring Product PUT is KnownNotApplied unless fresh GET proves media-role label materialization safety",
+    "orphaned_role_label_projection": "unsafe",
+    "real_target_rewrite_required": false,
+    "rationale": "review corrections only remove unsafe consequential attempts; they do not add a new write operation or widen an existing one"
+  }
 }

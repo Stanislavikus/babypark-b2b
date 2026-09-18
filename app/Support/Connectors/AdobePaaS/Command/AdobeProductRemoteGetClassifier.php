@@ -72,6 +72,7 @@ final class AdobeProductRemoteGetClassifier
             return new AdobeProductParentRemoteGetResult(
                 AdobeProductRemoteGetClassification::Found,
                 $observed,
+                $this->mediaRoleLabelMaterializationSafe($payload),
             );
         }
 
@@ -113,6 +114,8 @@ final class AdobeProductRemoteGetClassifier
             'thumbnail' => 'thumbnail_label',
         ];
 
+        $assignedRoles = array_fill_keys(array_keys($roleLabelAttributes), false);
+
         foreach ($entries as $entry) {
             if (! is_array($entry)) {
                 return null;
@@ -133,6 +136,7 @@ final class AdobeProductRemoteGetClassifier
                     continue;
                 }
 
+                $assignedRoles[$role] = true;
                 $hasProjection = array_key_exists($labelAttribute, $customAttributeValues);
 
                 if ($label === null || $label === '') {
@@ -146,6 +150,12 @@ final class AdobeProductRemoteGetClassifier
                 if (! $hasProjection || $customAttributeValues[$labelAttribute] !== $label) {
                     return false;
                 }
+            }
+        }
+
+        foreach ($roleLabelAttributes as $role => $labelAttribute) {
+            if (! $assignedRoles[$role] && array_key_exists($labelAttribute, $customAttributeValues)) {
+                return false;
             }
         }
 

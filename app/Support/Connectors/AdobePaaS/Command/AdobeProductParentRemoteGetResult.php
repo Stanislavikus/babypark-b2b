@@ -7,5 +7,6 @@ final readonly class AdobeProductParentRemoteGetResult
     public function __construct(
         public AdobeProductRemoteGetClassification $classification,
         public ?AdobeProductParentObservedState $observedState = null,
+        public ?bool $mediaRoleLabelMaterializationSafe = null,
     ) {}
 }

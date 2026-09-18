@@ -76,6 +76,20 @@ final class AdobeConfigurableProductCommandCoordinator
             consequentialWriteGate: $consequentialWriteGate,
         );
 
+        if ($consequentialWriteGate !== null
+            && $consequentialWriteGate->permitsConsequentialWrite()
+            && $consequentialWriteGate->permitsProductExecution()
+        ) {
+            $parentPreflightEvidence = $this->parentExecutor->preflight($input);
+
+            if ($parentPreflightEvidence !== null) {
+                return new AdobeConfigurableProductExecutionResult(
+                    outcome: $this->aggregator->aggregate([$parentPreflightEvidence]),
+                    commandEvidence: [$parentPreflightEvidence],
+                );
+            }
+        }
+
         /** @var list<AdobeConfigurableCommandEvidence> $evidence */
         $evidence = [];
 
