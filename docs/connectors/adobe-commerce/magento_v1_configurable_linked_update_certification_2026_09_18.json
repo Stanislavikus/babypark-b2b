@@ -1,0 +1,152 @@
+{
+  "schema_version": "1.0.0",
+  "certification_date": "2026-09-18",
+  "connector": "adobe-commerce",
+  "campaign": "magento-v1-configurable-linked-update",
+  "pull_request": 226,
+  "runtime_commit": "d6bb5f3d18277fe3ec2086e707fc1ffb4bd3b515",
+  "status": "resolved_pass",
+  "public_support_changed": false,
+  "target_context": {
+    "configured_store_code": "default",
+    "base_currency": "USD",
+    "product_create_used": false,
+    "blind_write_retry_used": false
+  },
+  "certified_runtime": {
+    "identity_authority": "MerchantConfirmed ExternalRecordLink",
+    "identity_discriminator": "Magento logical numeric entity_id",
+    "child_write_path": "AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor::executeConfigurableChild",
+    "parent_write_path": "AdobeConfigurableParentCommandExecutor",
+    "structure_paths": "configurable options, child links, and inactive lifecycle remain no-op-only"
+  },
+  "parent_update_proof": {
+    "parent_sku": "J-Fl-DUOs-01",
+    "logical_entity_id": 6,
+    "type_id": "configurable",
+    "mutation": "name baseline -> baseline + [B2B CERT]",
+    "mutation_result": "KnownApplied / stock_write_verified",
+    "mutation_consequential_puts": 1,
+    "mutation_reconciliation_gets": 1,
+    "independent_read_verified_identity_and_mutation": true,
+    "restore_result": "KnownApplied / stock_write_verified",
+    "restore_consequential_puts": 1,
+    "restore_reconciliation_gets": 1,
+    "final_parent_controlled_state_matches_baseline": true,
+    "options_unchanged": true,
+    "child_links_unchanged": true
+  },
+  "side_effect_discovery": {
+    "family_sku": "J-Fl-DUOs-01",
+    "child_skus": [
+      "J-Fl-DUOs-01-Синій-1",
+      "J-Fl-DUOs-01-Зелений"
+    ],
+    "observed_effect": "ordinary stock Product PUT materialized default-store image_label, small_image_label, and thumbnail_label projections that were absent before the PUT",
+    "global_scope_affected": false,
+    "other_store_views_affected": false,
+    "default_store_only": true,
+    "direct_empty_custom_attribute_clear_succeeded": false,
+    "corrective_restore": "existing P-09 default-store media label reset with empty-string label",
+    "corrective_restore_verified": {
+      "role_label_projections_absent_again": true,
+      "effective_gallery_labels_returned_to_inherited_values": true,
+      "media_content_hashes_unchanged": true,
+      "media_roles_unchanged": true,
+      "files_unchanged": true,
+      "family_identity_price_status_visibility_options_links_restored": true
+    }
+  },
+  "post_correction_negative_proof": {
+    "family_sku": "J-Fl-DUOs-01",
+    "result": "not_applied",
+    "reason": "configurable_child_media_role_label_side_effect_not_safe",
+    "command_kind": "simple_child",
+    "consequential_write_attempts": 0,
+    "reconciliation_get_attempts": 0,
+    "full_family_state_unchanged_after_guard": true
+  },
+  "post_correction_positive_proof": {
+    "parent": {
+      "sku": "524000027bbg",
+      "logical_entity_id": 14,
+      "type_id": "configurable",
+      "outcome": "configurable_parent_state_already_matches",
+      "consequential_write_attempts": 0
+    },
+    "children": [
+      {
+        "sku": "524000027bbg-1",
+        "logical_entity_id": 12,
+        "merchant_name_preserved": "Прогулянкова коляска Cybex Melio-Темно-синій",
+        "baseline_price": 20700,
+        "controlled_price": 20701,
+        "restored_price": 20700,
+        "color_option_value": 63,
+        "media_role_label_materialization_safe": true,
+        "mutation_result": "KnownApplied / stock_write_verified",
+        "mutation_consequential_puts": 1,
+        "mutation_reconciliation_gets": 1,
+        "restore_result": "KnownApplied / stock_write_verified"
+      },
+      {
+        "sku": "524000027bbg-Чорний",
+        "logical_entity_id": 13,
+        "merchant_name_preserved": "Прогулянкова коляска Cybex Melio-Чорний",
+        "baseline_price": 22000,
+        "controlled_price": 22001,
+        "restored_price": 22000,
+        "color_option_value": 79,
+        "media_role_label_materialization_safe": true,
+        "mutation_result": "KnownApplied / stock_write_verified",
+        "mutation_consequential_puts": 1,
+        "mutation_reconciliation_gets": 1,
+        "restore_result": "KnownApplied / stock_write_verified"
+      }
+    ],
+    "coordinator_outcome": "synchronized",
+    "option": {
+      "attribute_id": 138,
+      "option_id": 3,
+      "values": [63, 79],
+      "outcome": "configurable_option_no_op"
+    },
+    "child_links": {
+      "outcome": "configurable_child_link_no_op",
+      "unchanged": true
+    },
+    "independent_post_write_read_verified": true,
+    "final_default_and_all_scope_raw_payloads_match_baseline_except_updated_at": true,
+    "final_options_match_baseline": true,
+    "final_link_identity_matches_baseline": true
+  },
+  "runtime_correction": {
+    "configurable_child_preserves_fresh_remote_name": true,
+    "standalone_simple_behavior_changed": false,
+    "media_role_label_safety_source": "fresh Product GET media_gallery_entries plus custom_attributes",
+    "unsafe_or_unknown_media_role_label_state": "KnownNotApplied before PUT",
+    "safe_media_role_label_state": "each assigned image/small_image/thumbnail gallery label has an equal existing role-label projection, or both label and projection are absent"
+  },
+  "local_certification_fixture": {
+    "temporary_state_only": true,
+    "database_transaction_rolled_back": true,
+    "temporary_default_price_list_currency_alignment": "UAH -> USD -> rollback to UAH",
+    "temporary_optional_description_mapping_removal": true,
+    "merchant_confirmed_links_persisted_after_certification": false
+  },
+  "local_test_evidence": {
+    "focused_tests_passed": 90,
+    "focused_assertions": 279,
+    "pint": "PASS",
+    "git_diff_check": "PASS"
+  },
+  "remaining_boundaries": [
+    "public Adobe Products / Export / Live support remains false",
+    "Product CREATE remains unsupported",
+    "configurable option mutation remains no-op-only",
+    "configurable child-link mutation remains no-op-only",
+    "inactive linked lifecycle mutation remains no-op-only",
+    "P-09 non-default-store media label clear/inheritance semantics remain open"
+  ],
+  "conclusion": "Existing-family Magento V1 Configurable core linked UPDATE is real-target certified for trusted parent and media-safe trusted children, with fail-closed protection for observed media role-label materialization risk and exact restore evidence."
+}
