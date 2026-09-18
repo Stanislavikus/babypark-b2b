@@ -252,13 +252,27 @@ class ExternalRecordLinkPersistenceMySqlTest extends TestCase
         $version = DB::selectOne('SELECT VERSION() as version')->version;
 
         $this->assertTrue(Schema::hasTable('external_record_links'));
+        $this->assertTrue(Schema::hasTable('adobe_product_category_assignments'));
 
+        Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_09_18_200000_magento_category_relation_runtime.php',
+        ]);
+        Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_09_17_090000_add_entity_trust_lookup_index_to_external_record_links.php',
+        ]);
+        Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_08_22_100000_external_record_link_provenance.php',
+        ]);
         Artisan::call('migrate:rollback', [
             '--path' => 'database/migrations/2026_08_19_110000_external_record_links.php',
         ]);
 
+        $this->assertFalse(Schema::hasTable('adobe_product_category_assignments'));
         Artisan::call('migrate');
         $this->assertTrue(Schema::hasTable('external_record_links'));
+        $this->assertTrue(Schema::hasColumn('external_record_links', 'trust_origin'));
+        $this->assertTrue(Schema::hasTable('adobe_product_category_assignments'));
+        $this->assertEntityTrustLookupIndexShape();
 
         $this->assertNotEmpty($version);
     }
@@ -268,6 +282,9 @@ class ExternalRecordLinkPersistenceMySqlTest extends TestCase
     {
         $version = DB::selectOne('SELECT VERSION() as version')->version;
 
+        Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_09_18_200000_magento_category_relation_runtime.php',
+        ]);
         Artisan::call('migrate:rollback', [
             '--path' => 'database/migrations/2026_09_17_090000_add_entity_trust_lookup_index_to_external_record_links.php',
         ]);
@@ -282,11 +299,13 @@ class ExternalRecordLinkPersistenceMySqlTest extends TestCase
         ]);
 
         $this->assertFalse(Schema::hasTable('external_record_links'));
+        $this->assertFalse(Schema::hasTable('adobe_product_category_assignments'));
         $this->assertFalse(Schema::hasColumn('sync_runs', 'recoverable_after'));
 
         Artisan::call('migrate');
 
         $this->assertTrue(Schema::hasTable('external_record_links'));
+        $this->assertTrue(Schema::hasTable('adobe_product_category_assignments'));
         $this->assertTrue(Schema::hasColumn('sync_runs', 'recoverable_after'));
         $this->assertEntityTrustLookupIndexShape();
         $this->assertNotEmpty($version);

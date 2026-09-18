@@ -672,7 +672,10 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         $this->assertSame(SyncRunMode::Live, $run->mode);
         $this->assertSame(SyncRunStatus::Queued, $run->status);
         $this->assertSame($sourcePreview->id, $run->source_preview_run_id);
-        $this->assertSame($sourcePreview->configuration_snapshot, $run->configuration_snapshot);
+        $this->assertSame(
+            $sourcePreview->refresh()->configuration_snapshot,
+            $run->refresh()->configuration_snapshot,
+        );
         Bus::assertDispatched(SyncLiveRunJob::class);
     }
 
