@@ -7,6 +7,7 @@ final readonly class AdobeProductDesiredState
     /**
      * @param  array<string, mixed>  $customAttributes
      * @param  list<string>  $clearedCustomAttributeKeys
+     * @param  list<AdobeProductCustomAttributeClearIntent>  $customAttributeClearIntents
      */
     public function __construct(
         public string $productVariantId,
@@ -20,5 +21,6 @@ final readonly class AdobeProductDesiredState
         public string $priceCurrency,
         public array $customAttributes,
         public array $clearedCustomAttributeKeys = [],
+        public array $customAttributeClearIntents = [],
     ) {}
 }

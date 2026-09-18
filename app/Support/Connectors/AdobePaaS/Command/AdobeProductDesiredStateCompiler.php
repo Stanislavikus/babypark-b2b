@@ -110,7 +110,7 @@ final class AdobeProductDesiredStateCompiler
             throw AdobeProductCommandCompilationException::invalidResolvedPrice('currency');
         }
 
-        [$customAttributes, $clearedCustomAttributeKeys] = $this->compileCustomAttributeIntent($context);
+        [$customAttributes, $clearedCustomAttributeKeys, $customAttributeClearIntents] = $this->compileCustomAttributeIntent($context);
 
         return new AdobeProductDesiredState(
             productVariantId: $variantId,
@@ -124,6 +124,7 @@ final class AdobeProductDesiredStateCompiler
             priceCurrency: $currency,
             customAttributes: $customAttributes,
             clearedCustomAttributeKeys: $clearedCustomAttributeKeys,
+            customAttributeClearIntents: $customAttributeClearIntents,
         );
     }
 
@@ -188,7 +189,7 @@ final class AdobeProductDesiredStateCompiler
             throw AdobeProductCommandCompilationException::invalidResolvedPrice('currency');
         }
 
-        [$customAttributes, $clearedCustomAttributeKeys] = $this->compileCustomAttributeIntent($context);
+        [$customAttributes, $clearedCustomAttributeKeys, $customAttributeClearIntents] = $this->compileCustomAttributeIntent($context);
         $customAttributes = $this->mergeResolvedConfigurableValues(
             $customAttributes,
             $context['resolved_configurable_values'] ?? [],
@@ -211,6 +212,7 @@ final class AdobeProductDesiredStateCompiler
             priceCurrency: $currency,
             customAttributes: $customAttributes,
             clearedCustomAttributeKeys: $clearedCustomAttributeKeys,
+            customAttributeClearIntents: $customAttributeClearIntents,
         );
     }
 
@@ -297,12 +299,13 @@ final class AdobeProductDesiredStateCompiler
 
     /**
      * @param  array<string, mixed>  $context
-     * @return array{0: array<string, mixed>, 1: list<string>}
+     * @return array{0: array<string, mixed>, 1: list<string>, 2: list<AdobeProductCustomAttributeClearIntent>}
      */
     private function compileCustomAttributeIntent(array $context): array
     {
         $customAttributes = [];
         $clearedCustomAttributeKeys = [];
+        $customAttributeClearIntents = [];
 
         foreach (['mapped_product_values', 'mapped_variant_values'] as $mappedKey) {
             $mappedValues = $context[$mappedKey] ?? [];
@@ -334,12 +337,24 @@ final class AdobeProductDesiredStateCompiler
                 if ($externalValue === null || $externalValue === '') {
                     unset($customAttributes[$externalFieldKey]);
                     $clearedCustomAttributeKeys[$externalFieldKey] = true;
+                    $customAttributeClearIntents[$externalFieldKey] = new AdobeProductCustomAttributeClearIntent(
+                        attributeCode: $externalFieldKey,
+                        frontendInput: is_string($entry['external_frontend_input'] ?? null)
+                            ? $entry['external_frontend_input']
+                            : null,
+                        scope: is_string($entry['external_scope'] ?? null)
+                            ? $entry['external_scope']
+                            : null,
+                        isRequired: is_bool($entry['external_is_required'] ?? null)
+                            ? $entry['external_is_required']
+                            : null,
+                    );
 
                     continue;
                 }
 
                 $customAttributes[$externalFieldKey] = $externalValue;
-                unset($clearedCustomAttributeKeys[$externalFieldKey]);
+                unset($clearedCustomAttributeKeys[$externalFieldKey], $customAttributeClearIntents[$externalFieldKey]);
             }
         }
 
@@ -347,6 +362,8 @@ final class AdobeProductDesiredStateCompiler
         $clearedKeys = array_keys($clearedCustomAttributeKeys);
         sort($clearedKeys);
 
-        return [$customAttributes, $clearedKeys];
+        $clearIntents = array_values($customAttributeClearIntents);
+
+        return [$customAttributes, $clearedKeys, $clearIntents];
     }
 }

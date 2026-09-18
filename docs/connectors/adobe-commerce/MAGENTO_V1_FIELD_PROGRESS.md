@@ -1,11 +1,13 @@
 # Magento V1 Field Progress
 
 **Status:** Stage 1 runtime-derived resume index
-**Updated:** 2026-09-13
+**Updated:** 2026-09-18
 **Authoritative real-target evidence:** `magento_v1_stage1_real_target_evidence_2026_09_13.json`
 **Historical engineering ledger:** `magento_v1_real_target_field_progress_2026_09_12.csv` (historical only; not runtime classification truth)
 
 Runtime classification is now authoritative. The historical CSV remains evidence of earlier exact WRITE→READ→RESTORE and behavior-class work, but it must not be edited as a competing field-classification source.
+
+P-03 closure on 2026-09-18 advances the Adobe Product attribute classifier to `adobe.product_attribute_classifier.v2`. Behavior signatures now carry deterministic `clear_semantics`: verified empty-string-to-absence for optional store text/textarea/date, verified null-to-absence for optional global select, required-not-clearable for required fields, and fail-closed-not-certified for every other tuple. Literal Magento attribute keys are not part of this capability decision.
 
 ## Current Stage 1 snapshot
 

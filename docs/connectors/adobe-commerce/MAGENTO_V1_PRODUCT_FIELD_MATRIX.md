@@ -189,6 +189,8 @@ At implementation commit `10d05db59b857ba51a4851338cd6186c969c19c9`, the standar
 
 The subsequent field-by-field campaign certifies **all four current core Simple fields plus 34 present scalar/select custom attributes on this target** through the same production stock writer, `AdobeProductDocumentReader` observation, and exact restore. The target ledger is `docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json`. After the EAV campaign the full 42-custom-attribute baseline and final snapshot were identical (`42 -> 42`, diff count `0`) and the core Product state was also restored exactly. This does not flip public Live support and does not certify configurable, relation, URL-rewrite side effects, system-owned flags, or custom-attribute clear semantics.
 
+A follow-on P-03 campaign on 2026-09-18 certifies clear semantics by **behavior tuple, not field code**. Optional store `text`, `textarea`, and `date` use an empty-string payload and require fresh GET absence; optional global `select` uses `null` and requires fresh GET absence. Required fields and all unproved type/scope combinations remain fail-closed. The date probe additionally proved that `null` may return HTTP 200 without clearing the value. `AdobeProductAttributeClassifier v2` exposes these states through behavior-signature `clear_semantics`, so discovery/UI/AI can reason about the same capability contract as the writer. Evidence: `docs/connectors/adobe-commerce/magento_v1_custom_attribute_clear_certification_2026_09_18.json`.
+
 Media was then certified separately through the stock media surface. Real target gallery entry `id=1` accepted a metadata-only PUT changing `label: null -> [B2B Media Cert]`, reconciliation returned `KnownApplied / media_put_reconciled`, and gallery metadata was returned to `null` with the same content SHA-256 prefix `337699db3f3e` and roles `image`, `small_image`, `thumbnail`, plus preserved unmanaged `swatch_image`. Full Product verification then exposed a Magento side effect: `image_label`, `small_image_label`, and `thumbnail_label` had been materialized with the certification text even though gallery `label` was already `null`. A default-store media PUT with `label=""` removed those role-label EAV projections while Magento normalized gallery label back to `null`; the final Product returned to the original 42 custom attributes with core/media state intact. Request serialization now preserves this default-store reset rule, while non-default store-view inheritance/explicit-empty semantics remain pending. This proves default-store metadata mutation/reconciliation and full side-effect restore for the existing entry; it does not certify media create/delete, non-default store-view label clearing, or connector ownership of `swatch_image`.
 
 A read-only real-target probe for a deliberately absent SKU returned HTTP 404 with a `message` key only and no structured `parameters`; the current classifier therefore conservatively returns `untrusted_or_failed`. The synthetic structured trusted-missing fixture is not treated as real-target evidence.
@@ -252,6 +254,7 @@ On 2026-09-11 the certification target verified the core trusted Simple path wit
 - controlled restore `151 -> 150`;
 - restore again returned `KnownApplied / stock_write_verified`;
 - final independent GET confirmed the original price `150` and unchanged identity.
+- follow-on P-03 clear certification on the same trusted Simple Product now admits only behavior tuples proven on real target: optional store `text` and `textarea` clear with `""`, and optional global `select` clear with `null`; every successful clear requires fresh GET absence, while required/unknown/unsupported type-scope tuples remain zero-write fail-closed. Evidence: `docs/connectors/adobe-commerce/magento_v1_custom_attribute_clear_certification_2026_09_18.json`.
 
 ### Existing-family Configurable linked UPDATE certification — 2026-09-18
 
@@ -286,7 +289,7 @@ row. `Adobe Products / Export / Live = false` remains authoritative. The followi
 separate evidence where applicable:
 
 - field-by-field Simple Product WRITE validation beyond the verified base-price cycle;
-- installation-dependent mapped EAV values and explicit clear semantics;
+- installation-dependent mapped EAV values beyond the certified bounded V1 clear tuples;
 - media mutation;
 - remaining product-type and connector-owned surfaces.
 

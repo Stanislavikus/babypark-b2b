@@ -72,6 +72,59 @@ class AdobeProductAttributeClassifierTest extends TestCase
         $this->assertSame($first->behaviorSignature, $second->behaviorSignature);
     }
 
+    public function test_behavior_signature_exposes_certified_clear_semantics_by_metadata_tuple(): void
+    {
+        $classifier = app(AdobeProductAttributeClassifier::class);
+
+        $storeText = $classifier->classify($this->field(
+            'merchant_text',
+            frontendInput: 'text',
+            normalizedType: 'text',
+            backendType: 'varchar',
+            scope: 'store',
+            required: false,
+        ));
+        $storeDate = $classifier->classify($this->field(
+            'merchant_date',
+            frontendInput: 'date',
+            normalizedType: 'date',
+            backendType: 'datetime',
+            scope: 'store',
+            required: false,
+        ));
+        $globalSelect = $classifier->classify($this->field(
+            'merchant_select',
+            frontendInput: 'select',
+            normalizedType: 'select',
+            sourceModel: 'Magento\Eav\Model\Entity\Attribute\Source\Table',
+            scope: 'global',
+            required: false,
+        ));
+        $requiredSelect = $classifier->classify($this->field(
+            'merchant_required_select',
+            frontendInput: 'select',
+            normalizedType: 'select',
+            sourceModel: 'Magento\Eav\Model\Entity\Attribute\Source\Table',
+            scope: 'global',
+            required: true,
+        ));
+        $websitePrice = $classifier->classify($this->field(
+            'merchant_price_like',
+            frontendInput: 'price',
+            normalizedType: 'money',
+            backendType: 'decimal',
+            scope: 'website',
+            required: false,
+        ));
+
+        $this->assertSame('empty_string_to_absent_verified', $storeText->behaviorSignature['clear_semantics'] ?? null);
+        $this->assertSame('empty_string_to_absent_verified', $storeDate->behaviorSignature['clear_semantics'] ?? null);
+        $this->assertSame('null_to_absent_verified', $globalSelect->behaviorSignature['clear_semantics'] ?? null);
+        $this->assertSame('required_not_clearable', $requiredSelect->behaviorSignature['clear_semantics'] ?? null);
+        $this->assertSame('fail_closed_not_certified', $websitePrice->behaviorSignature['clear_semantics'] ?? null);
+        $this->assertSame('adobe.product_attribute_classifier.v2', $storeText->classifierVersion);
+    }
+
     public function test_behavior_class_changes_when_behavior_changing_metadata_changes(): void
     {
         $classifier = app(AdobeProductAttributeClassifier::class);
@@ -241,10 +294,12 @@ class AdobeProductAttributeClassifierTest extends TestCase
         string $backendType = 'int',
         bool $multi = false,
         string $normalizationStatus = 'normalized',
+        string $scope = 'global',
+        bool $required = false,
     ): ConnectorSchemaSnapshotField {
         $metadata = [
             'frontend_input' => $frontendInput,
-            'scope' => 'global',
+            'scope' => $scope,
             'backend_type' => $backendType,
             'source_model' => $sourceModel,
             'backend_model' => $backendModel,
@@ -258,10 +313,10 @@ class AdobeProductAttributeClassifierTest extends TestCase
             'normalization_status' => $normalizationStatus,
             'normalization_failure_reason' => $normalizationStatus === 'normalized' ? null : 'unmapped_value',
             'normalized_data_type' => $normalizedType,
-            'is_required' => false,
+            'is_required' => $required,
             'is_multi_value' => $multi,
             'is_localizable' => false,
-            'external_scope' => $normalizedType === null ? null : 'global',
+            'external_scope' => $normalizedType === null ? null : $scope,
             'normalized_payload' => [
                 'options' => [['value' => '1'], ['value' => '2']],
                 'provider_metadata' => $metadata,

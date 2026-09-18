@@ -615,10 +615,17 @@ final class AdobeProductExportSemanticPlanner
             $externalFieldKey = is_array($mapping) ? ($mapping['external_field_key'] ?? null) : null;
             $optionMappings = is_array($mapping) ? ($mapping['option_mappings'] ?? []) : [];
 
+            $attributeMetadata = is_string($externalFieldKey) && $externalFieldKey !== ''
+                ? $metadata?->attributeByCode($externalFieldKey)
+                : null;
+
             $entry = [
                 'internal_code' => $mapped->internalCode,
                 'internal_value' => $mapped->value,
                 'external_value' => $mapped->value,
+                'external_frontend_input' => $attributeMetadata?->frontendInput,
+                'external_scope' => $attributeMetadata?->scope,
+                'external_is_required' => $attributeMetadata?->isRequired,
             ];
 
             if ($mapped->dataType === AttributeDataType::Select && ! $mapped->isMultiValue) {
