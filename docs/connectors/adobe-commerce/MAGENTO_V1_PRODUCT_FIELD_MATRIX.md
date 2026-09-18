@@ -266,6 +266,9 @@ PR #226 real-target certification proved the existing-family Configurable core U
 
 Durable evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_linked_update_certification_2026_09_18.json`. Public Adobe Products / Export / Live support remains false.
 
+Follow-on Configurable structure evidence on the same date certifies the **existing-option UPDATE-only** seam against family `524000027bbg`: validation setup changed only option `id=3` position `0→1`; the production coordinator restored `1→0` through exactly one option PUT plus one reconciliation GET and returned `SYNCHRONIZED`; independent GET proved the exact option id/attribute/label/value set and child links returned to baseline. Missing option CREATE and destructive option-value removal remain fail-closed and are not certified. Durable evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_structure_certification_2026_09_18.json`.
+
+
 Post-Ready review did not broaden the certified write surface. It added fail-closed parent preflight before child HTTP, applied the observed media-label materialization guard to parent PUT admission, and rejected orphaned role-label projections. These corrections only remove unsafe consequential attempts; the real-target mutation/restore evidence above remains the certification basis.
 
 A separate read-only missing-SKU probe returned HTTP 404 with a message-only body and no
@@ -280,7 +283,7 @@ separate evidence where applicable:
 
 - field-by-field Simple Product WRITE validation beyond the verified base-price cycle;
 - installation-dependent mapped EAV values and explicit clear semantics;
-- configurable structure mutation beyond the now-certified existing-family core parent/child UPDATE path (option mutation, child-link mutation, inactive linked lifecycle mutation);
+- configurable structure mutation beyond the now-certified existing-family core parent/child UPDATE and existing-option UPDATE-only paths (option CREATE/value removal, child-link mutation, inactive linked lifecycle mutation);
 - media mutation;
 - remaining product-type and connector-owned surfaces.
 

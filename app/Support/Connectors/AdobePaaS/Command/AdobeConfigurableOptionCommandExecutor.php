@@ -106,6 +106,81 @@ final class AdobeConfigurableOptionCommandExecutor
         );
     }
 
+    public function executeExistingUpdateOnly(
+        AdobeConfigurableCommandInput $input,
+        AdobeConfigurableOptionDesiredState $desiredOption,
+    ): AdobeConfigurableCommandEvidence {
+        $context = $this->contextFactory->create($input->workspaceId, $input->connectorAccountId);
+        $parentSku = $input->desiredState->parentSku;
+
+        [$optionsGetResult] = $this->remoteStateClient->getConfigurableOptions($context, $parentSku);
+        $remoteOptions = $this->optionStateReader->read($optionsGetResult);
+
+        if ($remoteOptions === null) {
+            return $this->unknownOrAmbiguous('configurable_options_get_untrusted', $parentSku, $desiredOption);
+        }
+
+        $matchingByAttribute = array_values(array_filter(
+            $remoteOptions,
+            static fn (AdobeConfigurableRemoteOptionState $option): bool => $option->attributeId === $desiredOption->attributeId,
+        ));
+
+        if (count($matchingByAttribute) > 1) {
+            return $this->unknownOrAmbiguous('ambiguous_configurable_option_identity', $parentSku, $desiredOption);
+        }
+
+        $existing = $matchingByAttribute[0] ?? null;
+
+        if ($existing !== null && $this->controlledStateMatches($desiredOption, $existing)) {
+            return $this->knownApplied('configurable_option_no_op', $parentSku, $desiredOption, $existing->optionId);
+        }
+
+        if ($existing === null) {
+            return $this->knownNotApplied(
+                'configurable_option_create_not_certified',
+                $parentSku,
+                $desiredOption,
+            );
+        }
+
+        if ($this->requiresDestructiveValueRemoval($desiredOption, $existing)) {
+            return $this->knownNotApplied(
+                'configurable_option_value_removal_requires_adobe_validation',
+                $parentSku,
+                $desiredOption,
+                $existing->optionId,
+            );
+        }
+
+        if (! $this->permitsConsequentialWrite($input)) {
+            return $this->knownNotApplied(
+                'writer_lease_expired_before_consequential_write',
+                $parentSku,
+                $desiredOption,
+                $existing->optionId,
+            );
+        }
+
+        [$putResult, $putTransportException] = $this->remoteStateClient->putConfigurableOption(
+            $context,
+            $parentSku,
+            $existing->optionId,
+            $desiredOption,
+        );
+
+        return $this->reconcileAfterWrite(
+            $input,
+            $context,
+            $parentSku,
+            $desiredOption,
+            $existing->optionId,
+            $putResult,
+            $putTransportException,
+            consequentialWriteAttempts: 1,
+            reasonCode: 'configurable_option_put',
+        );
+    }
+
     public function executeNoOpOnly(
         AdobeConfigurableCommandInput $input,
         AdobeConfigurableOptionDesiredState $desiredOption,

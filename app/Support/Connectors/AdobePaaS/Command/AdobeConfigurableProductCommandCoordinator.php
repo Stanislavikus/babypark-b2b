@@ -149,7 +149,7 @@ final class AdobeConfigurableProductCommandCoordinator
         $optionsKnownApplied = true;
 
         foreach ($desiredState->options as $desiredOption) {
-            $optionEvidence = $this->optionExecutor->executeNoOpOnly($input, $desiredOption);
+            $optionEvidence = $this->optionExecutor->executeExistingUpdateOnly($input, $desiredOption);
             $evidence[] = $optionEvidence;
 
             if ($optionEvidence->appliedStateKnowledge === AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous) {

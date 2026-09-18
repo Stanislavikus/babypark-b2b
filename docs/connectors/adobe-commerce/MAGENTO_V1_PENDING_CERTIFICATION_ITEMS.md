@@ -87,3 +87,12 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Conclusion: the supported default-store stock Product PUT path did **not** materialize untouched inherited store/website EAV overrides on the certification target. P-10 is closed for this supported V1 path. This closure does not itself flip public Live support or claim broader non-default-store/media-label inheritance semantics.
 - Evidence: `docs/connectors/adobe-commerce/magento_v1_store_scope_inheritance_certification_2026_09_17.json`.
 - Reviewer candidate: no further review required unless the supported store-context/write path changes.
+
+### P-11 — Existing-family Configurable structure mutation
+
+- Surface: configurable option mutation, child-link mutation, inactive linked-child lifecycle.
+- Current truth: real-target certification on 2026-09-18 now proves **existing configurable option UPDATE-only** for trusted family `524000027bbg`. A controlled validation setup changed option `id=3` / attribute `138` position `0→1`; production `AdobeConfigurableProductCommandCoordinator -> AdobeConfigurableOptionCommandExecutor::executeExistingUpdateOnly()` restored `1→0` with `KnownApplied / configurable_option_put_reconciled`, exactly one PUT and one reconciliation GET. Parent and children were no-op, child links stayed unchanged, the final independent option GET matched the complete baseline, and temporary local MerchantConfirmed fixtures rolled back.
+- Fail-closed boundary: missing option remains `configurable_option_create_not_certified` with zero write; destructive value removal remains `configurable_option_value_removal_requires_adobe_validation` with zero write. The broader historic option POST/create executor remains dormant. Child-link and inactive lifecycle mutations remain no-op-only.
+- Remaining proof: controlled unlink → production relink → independent exact restore for one trusted child; then trusted inactive-child status disable → verified restore without Product CREATE or blind retry.
+- Evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_structure_certification_2026_09_18.json`.
+- Reviewer candidate: only if real-target child-link/lifecycle behavior contradicts the frozen moduleless V1 path or exposes new identity/transaction ambiguity.

@@ -1,0 +1,66 @@
+{
+  "schema_version": "1.0.0",
+  "certification_date": "2026-09-18",
+  "connector": "adobe-commerce",
+  "campaign": "magento-v1-configurable-structure",
+  "base_develop": "64ad36c0cbf9f57fe51da104c73743e4be445a34",
+  "public_support_changed": false,
+  "product_create_used": false,
+  "option_existing_update": {
+    "status": "resolved_pass",
+    "family_sku": "524000027bbg",
+    "parent_logical_entity_id": 14,
+    "configured_store_code": "default",
+    "baseline": {
+      "option_id": 3,
+      "attribute_id": 138,
+      "label": "Коляски - Колір",
+      "position": 0,
+      "values": [
+        63,
+        79
+      ],
+      "children": [
+        "524000027bbg-1",
+        "524000027bbg-Чорний"
+      ]
+    },
+    "controlled_setup_drift": {
+      "field": "position",
+      "from": 0,
+      "to": 1,
+      "verified_by_independent_get": true,
+      "child_links_unchanged": true
+    },
+    "production_runtime": {
+      "path": "AdobeConfigurableProductCommandCoordinator -> AdobeConfigurableOptionCommandExecutor::executeExistingUpdateOnly",
+      "outcome": "synchronized",
+      "option_result": "KnownApplied / configurable_option_put_reconciled",
+      "consequential_puts": 1,
+      "reconciliation_gets": 1,
+      "children": "stock_state_already_matches",
+      "parent": "configurable_parent_state_already_matches",
+      "child_links": "configurable_child_link_no_op"
+    },
+    "final_independent_read": {
+      "exact_option_baseline_restored": true,
+      "child_links_unchanged": true
+    },
+    "local_fixture": {
+      "temporary_state_only": true,
+      "database_transaction_rolled_back": true,
+      "merchant_confirmed_links_persisted_after_certification": false,
+      "temporary_variants_persisted_after_certification": false
+    },
+    "fail_closed_boundaries": {
+      "missing_option": "configurable_option_create_not_certified / zero write",
+      "destructive_value_removal": "configurable_option_value_removal_requires_adobe_validation / zero write"
+    }
+  },
+  "remaining_structure_boundaries": [
+    "configurable option CREATE is not certified",
+    "configurable option destructive value removal is not certified",
+    "configurable child-link mutation remains no-op-only pending real-target proof",
+    "inactive linked lifecycle mutation remains no-op-only pending real-target proof"
+  ]
+}
