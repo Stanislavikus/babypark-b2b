@@ -252,6 +252,7 @@ On 2026-09-11 the certification target verified the core trusted Simple path wit
 - controlled restore `151 -> 150`;
 - restore again returned `KnownApplied / stock_write_verified`;
 - final independent GET confirmed the original price `150` and unchanged identity.
+- follow-on P-03 clear certification on the same trusted Simple Product now admits only behavior tuples proven on real target: optional store `text` and `textarea` clear with `""`, and optional global `select` clear with `null`; every successful clear requires fresh GET absence, while required/unknown/unsupported type-scope tuples remain zero-write fail-closed. Evidence: `docs/connectors/adobe-commerce/magento_v1_custom_attribute_clear_certification_2026_09_18.json`.
 
 ### Existing-family Configurable linked UPDATE certification — 2026-09-18
 
@@ -286,7 +287,7 @@ row. `Adobe Products / Export / Live = false` remains authoritative. The followi
 separate evidence where applicable:
 
 - field-by-field Simple Product WRITE validation beyond the verified base-price cycle;
-- installation-dependent mapped EAV values and explicit clear semantics;
+- installation-dependent mapped EAV values beyond the certified bounded V1 clear tuples;
 - media mutation;
 - remaining product-type and connector-owned surfaces.
 

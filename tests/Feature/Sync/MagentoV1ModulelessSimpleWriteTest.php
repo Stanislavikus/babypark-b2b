@@ -257,6 +257,213 @@ class MagentoV1ModulelessSimpleWriteTest extends TestCase
     }
 
     #[Test]
+    public function certified_optional_store_text_clear_uses_empty_string_and_verifies_remote_absence(): void
+    {
+        $remoteHasAttribute = true;
+        $transport = $this->bindTransport(function (ConnectorOutboundRequest $request) use (&$remoteHasAttribute): ConnectorHttpResult {
+            if ($request->request->getMethod() === 'GET') {
+                return $this->productResult(77, 100.0, $remoteHasAttribute ? [[
+                    'attribute_code' => 'meta_title',
+                    'value' => 'stale',
+                ]] : []);
+            }
+
+            $payload = json_decode((string) $request->request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+            $clearEntry = collect($payload['product']['custom_attributes'] ?? [])->first(
+                static fn (array $entry): bool => ($entry['attribute_code'] ?? null) === 'meta_title',
+            );
+
+            $this->assertIsArray($clearEntry);
+            $this->assertSame('', $clearEntry['value'] ?? null);
+            $remoteHasAttribute = false;
+
+            return new ConnectorHttpResult(200, [], '{}');
+        });
+        [$workspace, $account, $variant] = $this->trustedVariant('77');
+
+        $result = $this->execute($workspace, $account->id, $variant->id, contextOverrides: [
+            'mapped_product_values' => [
+                'binding-meta-title' => [
+                    'external_field_key' => 'meta_title',
+                    'external_value' => '',
+                    'external_frontend_input' => 'text',
+                    'external_scope' => 'store',
+                    'external_is_required' => false,
+                ],
+            ],
+        ]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
+        $this->assertSame('stock_write_verified', $result->evidence->reasonCode);
+        $this->assertSame(1, $result->evidence->consequentialWriteAttempts);
+        $this->assertSame(1, $result->evidence->reconciliationGetAttempts);
+        $this->assertSame(['GET', 'PUT', 'GET'], $this->methods($transport));
+    }
+
+    #[Test]
+    public function certified_optional_store_textarea_clear_uses_empty_string_and_verifies_remote_absence(): void
+    {
+        $remoteHasAttribute = true;
+        $transport = $this->bindTransport(function (ConnectorOutboundRequest $request) use (&$remoteHasAttribute): ConnectorHttpResult {
+            if ($request->request->getMethod() === 'GET') {
+                return $this->productResult(77, 100.0, $remoteHasAttribute ? [[
+                    'attribute_code' => 'meta_keyword',
+                    'value' => 'stale',
+                ]] : []);
+            }
+
+            $payload = json_decode((string) $request->request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+            $clearEntry = collect($payload['product']['custom_attributes'] ?? [])->first(
+                static fn (array $entry): bool => ($entry['attribute_code'] ?? null) === 'meta_keyword',
+            );
+
+            $this->assertIsArray($clearEntry);
+            $this->assertSame('', $clearEntry['value'] ?? null);
+            $remoteHasAttribute = false;
+
+            return new ConnectorHttpResult(200, [], '{}');
+        });
+        [$workspace, $account, $variant] = $this->trustedVariant('77');
+
+        $result = $this->execute($workspace, $account->id, $variant->id, contextOverrides: [
+            'mapped_product_values' => [
+                'binding-meta-keyword' => [
+                    'external_field_key' => 'meta_keyword',
+                    'external_value' => '',
+                    'external_frontend_input' => 'textarea',
+                    'external_scope' => 'store',
+                    'external_is_required' => false,
+                ],
+            ],
+        ]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
+        $this->assertSame('stock_write_verified', $result->evidence->reasonCode);
+        $this->assertSame(['GET', 'PUT', 'GET'], $this->methods($transport));
+    }
+
+    #[Test]
+    public function certified_optional_global_select_clear_uses_null_and_verifies_remote_absence(): void
+    {
+        $remoteHasAttribute = true;
+        $transport = $this->bindTransport(function (ConnectorOutboundRequest $request) use (&$remoteHasAttribute): ConnectorHttpResult {
+            if ($request->request->getMethod() === 'GET') {
+                return $this->productResult(77, 100.0, $remoteHasAttribute ? [[
+                    'attribute_code' => 'country_of_manufacture',
+                    'value' => 'CN',
+                ]] : []);
+            }
+
+            $payload = json_decode((string) $request->request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+            $clearEntry = collect($payload['product']['custom_attributes'] ?? [])->first(
+                static fn (array $entry): bool => ($entry['attribute_code'] ?? null) === 'country_of_manufacture',
+            );
+
+            $this->assertIsArray($clearEntry);
+            $this->assertArrayHasKey('value', $clearEntry);
+            $this->assertNull($clearEntry['value']);
+            $remoteHasAttribute = false;
+
+            return new ConnectorHttpResult(200, [], '{}');
+        });
+        [$workspace, $account, $variant] = $this->trustedVariant('77');
+
+        $result = $this->execute($workspace, $account->id, $variant->id, contextOverrides: [
+            'mapped_product_values' => [
+                'binding-country' => [
+                    'external_field_key' => 'country_of_manufacture',
+                    'external_value' => '',
+                    'external_frontend_input' => 'select',
+                    'external_scope' => 'global',
+                    'external_is_required' => false,
+                ],
+            ],
+        ]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
+        $this->assertSame('stock_write_verified', $result->evidence->reasonCode);
+        $this->assertSame(['GET', 'PUT', 'GET'], $this->methods($transport));
+    }
+
+    #[Test]
+    public function optional_website_price_clear_remains_fail_closed(): void
+    {
+        $transport = $this->bindTransport(fn () => $this->productResult(77, 100.0, [[
+            'attribute_code' => 'c_carseats_adac_rating',
+            'value' => '2.000000',
+        ]]));
+        [$workspace, $account, $variant] = $this->trustedVariant('77');
+
+        $result = $this->execute($workspace, $account->id, $variant->id, contextOverrides: [
+            'mapped_product_values' => [
+                'binding-rating' => [
+                    'external_field_key' => 'c_carseats_adac_rating',
+                    'external_value' => '',
+                    'external_frontend_input' => 'price',
+                    'external_scope' => 'website',
+                    'external_is_required' => false,
+                ],
+            ],
+        ]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
+        $this->assertSame('stock_custom_attribute_clear_not_certified', $result->evidence->reasonCode);
+        $this->assertSame(['GET'], $this->methods($transport));
+    }
+
+    #[Test]
+    public function required_store_text_clear_remains_fail_closed(): void
+    {
+        $transport = $this->bindTransport(fn () => $this->productResult(77, 100.0, [[
+            'attribute_code' => 'required_text',
+            'value' => 'stale',
+        ]]));
+        [$workspace, $account, $variant] = $this->trustedVariant('77');
+
+        $result = $this->execute($workspace, $account->id, $variant->id, contextOverrides: [
+            'mapped_product_values' => [
+                'binding-required-text' => [
+                    'external_field_key' => 'required_text',
+                    'external_value' => '',
+                    'external_frontend_input' => 'text',
+                    'external_scope' => 'store',
+                    'external_is_required' => true,
+                ],
+            ],
+        ]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
+        $this->assertSame('stock_custom_attribute_clear_not_certified', $result->evidence->reasonCode);
+        $this->assertSame(['GET'], $this->methods($transport));
+    }
+
+    #[Test]
+    public function optional_global_text_clear_remains_fail_closed(): void
+    {
+        $transport = $this->bindTransport(fn () => $this->productResult(77, 100.0, [[
+            'attribute_code' => 'global_text',
+            'value' => 'stale',
+        ]]));
+        [$workspace, $account, $variant] = $this->trustedVariant('77');
+
+        $result = $this->execute($workspace, $account->id, $variant->id, contextOverrides: [
+            'mapped_product_values' => [
+                'binding-global-text' => [
+                    'external_field_key' => 'global_text',
+                    'external_value' => '',
+                    'external_frontend_input' => 'text',
+                    'external_scope' => 'global',
+                    'external_is_required' => false,
+                ],
+            ],
+        ]);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
+        $this->assertSame('stock_custom_attribute_clear_not_certified', $result->evidence->reasonCode);
+        $this->assertSame(['GET'], $this->methods($transport));
+    }
+
+    #[Test]
     public function uncertified_custom_attribute_clear_with_remote_stale_value_fails_before_put(): void
     {
         $transport = $this->bindTransport(fn () => $this->productResult(77, 100.0, [[

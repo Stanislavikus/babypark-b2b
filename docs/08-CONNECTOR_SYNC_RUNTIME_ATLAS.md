@@ -215,6 +215,8 @@ with the same verified outcome. Independent GETs before, after WRITE, and after 
 `entity_id = 1`, exact SKU, `type_id = simple`, `attribute_set_id = 9`, `status = 1`, and
 `visibility = 4`.
 
+On 2026-09-18 the same trusted Simple path closed P-03 custom-attribute clear semantics with a bounded behavior policy. Provider `frontend_input`, `scope`, and `is_required` metadata now travels into the command clear intent. Real target proved optional store `text` (`meta_title`) and `textarea` (`meta_keyword`) clear with `value=""`, plus optional global `select` (`country_of_manufacture`) clear with `value=null`; each required one PUT + one reconciliation GET, fresh GET absence, and exact production restore. All unproved type/scope combinations remain fail-closed before PUT. Durable evidence: `docs/connectors/adobe-commerce/magento_v1_custom_attribute_clear_certification_2026_09_18.json`.
+
 A read-only missing-SKU probe on the same target returned HTTP 404 with a message-only JSON body
 and no structured `parameters`; the current classifier therefore correctly remained conservative
 `untrusted_or_failed` rather than inventing `TrustedKnownMissing`.

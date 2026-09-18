@@ -188,6 +188,60 @@ class AdobeProductExportSemanticPlannerTest extends TestCase
     }
 
     #[Test]
+    public function projected_clear_value_carries_provider_behavior_metadata(): void
+    {
+        $aggregate = new ProductExecutionAggregate(
+            productId: 'product-1',
+            productValues: [
+                'binding-name' => $this->mappedValue('binding-name', 'name', FieldObjectType::Product, AttributeDataType::Text, 'Simple Product'),
+                'binding-status' => $this->mappedValue('binding-status', 'status', FieldObjectType::Product, AttributeDataType::Boolean, true),
+                'binding-meta-title' => $this->mappedValue('binding-meta-title', 'meta_title', FieldObjectType::Product, AttributeDataType::Text, ''),
+            ],
+            variants: [
+                new ProductVariantExecutionSlice(
+                    variantId: 'variant-1',
+                    values: [
+                        'binding-sku' => $this->mappedValue('binding-sku', 'sku', FieldObjectType::ProductVariant, AttributeDataType::Text, 'SKU-1'),
+                    ],
+                    resolvedPrice: $this->makeResolvedPrice(),
+                    priceResolutionStatus: PriceResolutionStatus::Resolved->value,
+                ),
+            ],
+            sellableVariantCount: 1,
+            imageInput: $this->emptyImageInput(),
+        );
+        $snapshot = $this->snapshotWithCoreMappings();
+        $snapshot['field_mappings'][] = [
+            'field_binding_id' => 'binding-meta-title',
+            'external_field_key' => 'meta_title',
+        ];
+        $metadata = $this->metadataFixture();
+        $metadata = new AdobeProductExportExecutionMetadata(
+            selectedAttributeSetId: $metadata->selectedAttributeSetId,
+            attributeSets: $metadata->attributeSets,
+            attributes: array_merge($metadata->attributes, [
+                'meta_title' => new AdobeAttributeMetadata(
+                    attributeId: 84,
+                    code: 'meta_title',
+                    frontendInput: 'text',
+                    scope: 'store',
+                    options: [],
+                    isRequired: false,
+                ),
+            ]),
+        );
+
+        $result = $this->planner->evaluate($aggregate, $snapshot, $metadata);
+        $mapped = $result->operations[0]->context['mapped_product_values']['binding-meta-title'] ?? null;
+
+        $this->assertNotNull($mapped);
+        $this->assertSame('', $mapped['external_value']);
+        $this->assertSame('text', $mapped['external_frontend_input']);
+        $this->assertSame('store', $mapped['external_scope']);
+        $this->assertFalse($mapped['external_is_required']);
+    }
+
+    #[Test]
     public function inactive_product_maps_to_adobe_disabled_status(): void
     {
         $aggregate = $this->simpleAggregate(active: false);

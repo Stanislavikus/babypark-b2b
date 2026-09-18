@@ -115,10 +115,13 @@ final class AdobeProductStockSimpleWriteExecutor
                 priceCurrency: $desiredState->priceCurrency,
                 customAttributes: $desiredState->customAttributes,
                 clearedCustomAttributeKeys: $desiredState->clearedCustomAttributeKeys,
+                customAttributeClearIntents: $desiredState->customAttributeClearIntents,
             );
         }
 
-        if ($this->hasUncertifiedCustomAttributeClearDrift($desiredState, $observed)) {
+        $certifiedClearPayloads = $this->certifiedCustomAttributeClearPayloads($desiredState, $observed);
+
+        if ($certifiedClearPayloads === null) {
             return $this->knownNotApplied(
                 'stock_custom_attribute_clear_not_certified',
                 $desiredState->sku,
@@ -126,7 +129,9 @@ final class AdobeProductStockSimpleWriteExecutor
             );
         }
 
-        if ($this->comparator->controlledStateMatches($desiredState, $observed)) {
+        if ($this->comparator->controlledStateMatches($desiredState, $observed)
+            && $this->clearPostconditionsSatisfied($desiredState, $observed)
+        ) {
             return $this->knownApplied(
                 'stock_state_already_matches',
                 $desiredState->sku,
@@ -134,9 +139,11 @@ final class AdobeProductStockSimpleWriteExecutor
             );
         }
 
+        $writeState = $this->withCertifiedClearPayloads($desiredState, $certifiedClearPayloads);
+
         [$writeHttp, $writeTransportException] = $this->remoteStateClient->putProduct(
             $context,
-            $desiredState,
+            $writeState,
         );
 
         if ($writeTransportException !== null || $writeHttp === null) {
@@ -201,7 +208,9 @@ final class AdobeProductStockSimpleWriteExecutor
                 );
             }
 
-            if ($this->comparator->controlledStateMatches($desiredState, $observed)) {
+            if ($this->comparator->controlledStateMatches($desiredState, $observed)
+                && $this->clearPostconditionsSatisfied($desiredState, $observed)
+            ) {
                 return $this->knownApplied(
                     'stock_write_verified',
                     $desiredState->sku,
@@ -223,17 +232,92 @@ final class AdobeProductStockSimpleWriteExecutor
         );
     }
 
-    private function hasUncertifiedCustomAttributeClearDrift(
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function certifiedCustomAttributeClearPayloads(
+        AdobeProductDesiredState $desiredState,
+        AdobeProductObservedState $observedState,
+    ): ?array {
+        $intentsByCode = [];
+
+        foreach ($desiredState->customAttributeClearIntents as $intent) {
+            $intentsByCode[$intent->attributeCode] = $intent;
+        }
+
+        $payloads = [];
+
+        foreach ($desiredState->clearedCustomAttributeKeys as $attributeCode) {
+            if (! array_key_exists($attributeCode, $observedState->customAttributes)) {
+                continue;
+            }
+
+            $intent = $intentsByCode[$attributeCode] ?? null;
+
+            if (! $intent instanceof AdobeProductCustomAttributeClearIntent
+                || $intent->isRequired !== false
+            ) {
+                return null;
+            }
+
+            if ($intent->scope === 'store'
+                && in_array($intent->frontendInput, ['text', 'textarea'], true)
+            ) {
+                $payloads[$attributeCode] = '';
+
+                continue;
+            }
+
+            if ($intent->scope === 'global' && $intent->frontendInput === 'select') {
+                $payloads[$attributeCode] = null;
+
+                continue;
+            }
+
+            return null;
+        }
+
+        return $payloads;
+    }
+
+    /**
+     * @param  array<string, mixed>  $clearPayloads
+     */
+    private function withCertifiedClearPayloads(
+        AdobeProductDesiredState $desiredState,
+        array $clearPayloads,
+    ): AdobeProductDesiredState {
+        if ($clearPayloads === []) {
+            return $desiredState;
+        }
+
+        return new AdobeProductDesiredState(
+            productVariantId: $desiredState->productVariantId,
+            sku: $desiredState->sku,
+            name: $desiredState->name,
+            attributeSetId: $desiredState->attributeSetId,
+            typeId: $desiredState->typeId,
+            status: $desiredState->status,
+            visibility: $desiredState->visibility,
+            price: $desiredState->price,
+            priceCurrency: $desiredState->priceCurrency,
+            customAttributes: array_merge($desiredState->customAttributes, $clearPayloads),
+            clearedCustomAttributeKeys: $desiredState->clearedCustomAttributeKeys,
+            customAttributeClearIntents: $desiredState->customAttributeClearIntents,
+        );
+    }
+
+    private function clearPostconditionsSatisfied(
         AdobeProductDesiredState $desiredState,
         AdobeProductObservedState $observedState,
     ): bool {
         foreach ($desiredState->clearedCustomAttributeKeys as $attributeCode) {
             if (array_key_exists($attributeCode, $observedState->customAttributes)) {
-                return true;
+                return false;
             }
         }
 
-        return false;
+        return true;
     }
 
     private function writeAccessClassification(ConnectorHttpResult $httpResult): ?AdobeProductWriteAccessClassification

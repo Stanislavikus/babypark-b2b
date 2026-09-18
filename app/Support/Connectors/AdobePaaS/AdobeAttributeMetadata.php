@@ -14,5 +14,6 @@ final readonly class AdobeAttributeMetadata
         public string $scope,
         public array $options,
         public ?string $defaultFrontendLabel = null,
+        public ?bool $isRequired = null,
     ) {}
 }

@@ -146,7 +146,8 @@ final class AdobeProductExportMetadataReader
             $current = $attributes[$code];
             $needsDetail = $current->attributeId === 0
                 || $current->frontendInput === ''
-                || $current->scope === '';
+                || $current->scope === ''
+                || $current->isRequired === null;
 
             if ($needsDetail) {
                 $detail = $this->fetchAttributeDetail($context, $code);
@@ -165,6 +166,7 @@ final class AdobeProductExportMetadataReader
                     scope: $current->scope,
                     options: $this->fetchAttributeOptions($context, $code),
                     defaultFrontendLabel: $current->defaultFrontendLabel,
+                    isRequired: $current->isRequired,
                 );
             }
         }
@@ -194,6 +196,7 @@ final class AdobeProductExportMetadataReader
             scope: $scope,
             options: $this->normalizeInlineOptions($item['options'] ?? null),
             defaultFrontendLabel: $this->readNullableString($item, 'default_frontend_label'),
+            isRequired: $this->readNullableBool($item, 'is_required'),
         );
     }
 
@@ -240,6 +243,7 @@ final class AdobeProductExportMetadataReader
             scope: $scope,
             options: $options,
             defaultFrontendLabel: $this->readNullableString($detail, 'default_frontend_label') ?? $current->defaultFrontendLabel,
+            isRequired: $this->readNullableBool($detail, 'is_required') ?? $current->isRequired,
         );
     }
 
@@ -383,6 +387,16 @@ final class AdobeProductExportMetadataReader
         }
 
         return $value;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     */
+    private function readNullableBool(array $item, string $key): ?bool
+    {
+        $value = $item[$key] ?? null;
+
+        return is_bool($value) ? $value : null;
     }
 
     /**

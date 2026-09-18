@@ -58,6 +58,7 @@ class AdobeProductExportMetadataReaderTest extends TestCase
                         'attribute_code' => 'color',
                         'frontend_input' => 'select',
                         'scope' => 'global',
+                        'is_required' => false,
                         'options' => [
                             ['value' => '93', 'label' => 'Red'],
                         ],
@@ -100,6 +101,7 @@ class AdobeProductExportMetadataReaderTest extends TestCase
                         'attribute_code' => 'color',
                         'frontend_input' => 'select',
                         'scope' => 'global',
+                        'is_required' => false,
                         'options' => [
                             ['value' => '93', 'label' => 'Red'],
                         ],
@@ -116,6 +118,7 @@ class AdobeProductExportMetadataReaderTest extends TestCase
         $this->assertTrue($metadata->isConfigurableCompatible('color'));
         $this->assertTrue($metadata->optionExists('color', '93'));
         $this->assertFalse($metadata->optionExists('color', '94'));
+        $this->assertFalse($metadata->attributeByCode('color')?->isRequired);
     }
 
     #[Test]

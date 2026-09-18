@@ -23,14 +23,16 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Needed proof: capture route/rewrite state before mutation, controlled key change, verify canonical route/redirects, restore key, then prove rewrite state is intentionally restored or explicitly retained according to V1 policy.
 - Reviewer candidate: yes.
 
-### P-03 — Custom-attribute clear semantics
+### P-03 — Custom-attribute clear semantics — CLOSED 2026-09-18 [Resolved]
 
 - Surface: mapped scalar EAV attributes transitioning from value to empty/null.
-- Current truth: false `KnownApplied` was removed; stale remote values now fail closed with `stock_custom_attribute_clear_not_certified` and zero PUT. Real target probes on 2026-09-11 show type/scope-specific behavior: optional store-scoped text `meta_title` with `value=""` becomes absent; required global select `manufacturer` rejects `""` with HTTP 400 but `null` removes the attribute; optional website-scoped price/decimal `c_carseats_adac_rating` maps `""` to `0.000000`, while `null` returns HTTP 200 but the effective GET remains `2.000000` (consistent with inherited/use-default behavior on a non-admin store view). Every probe was immediately restored and final custom-attribute diff was zero.
-- Frozen V1 decision after independent GPT-5.4 + Sonnet review: there is no universal clear payload. Required attributes are never clearable. Scoped `inherit/use default` is not claimed through stock Product REST because effective GET cannot prove raw override removal. `price`/non-global decimal and `multiselect` remain fail-closed. Optional text-like clear is admitted only per separately certified target/type evidence; optional select/date/boolean/plain-decimal require their own proof before admission.
-- Why still open: only representative target cases are certified; cross-type and cross-store semantics remain incomplete.
-- Needed proof: add only narrowly proven type/scope clear rules, with fail-closed default and scope-aware postconditions; never infer override removal from effective-value equality alone.
-- Reviewer candidate: no broad re-review needed; reopen only for a new type/scope rule or contradictory real-target evidence.
+- Closure proof: V1 now has a bounded, provider-metadata-driven clear policy rather than a universal payload. Real-target production runtime on trusted Simple SKU `1234567890` / `entity_id=1` certified three behavior tuples: optional store-scoped `text` uses `""` and requires remote absence (`meta_title`); optional store-scoped `textarea` uses `""` and requires remote absence (`meta_keyword`); optional global `select` uses `null` and requires remote absence (`country_of_manufacture`). Each clear completed as `KnownApplied / stock_write_verified` with exactly one PUT + one reconciliation GET, and each production restore returned the exact 42-custom-attribute baseline.
+- Runtime guard: provider `frontend_input`, `scope`, and `is_required` are carried from fresh export metadata through semantic projection into a typed clear intent. A stale clear request is admitted only for the three certified tuples above; any missing metadata, required field, unsupported type/scope, website-scoped price/decimal, multiselect, store/website select, global text, texteditor/date/datetime/boolean/plain-decimal, or other unproved behavior remains `stock_custom_attribute_clear_not_certified` with zero PUT.
+- Postcondition: success is never inferred from HTTP alone or effective-value equality; fresh GET must show the cleared attribute absent while the rest of the controlled Product state matches.
+- Historical evidence retained: required global `manufacturer` showed why vendor acceptance is not sufficient policy authority, and website-scoped `c_carseats_adac_rating` demonstrated inherited/effective-value ambiguity. Those behaviors remain intentionally unsupported for clear in V1.
+- Public support: Adobe Products / Export / Live remains false; this closure does not flip merchant-visible support.
+- Evidence: `docs/connectors/adobe-commerce/magento_v1_custom_attribute_clear_certification_2026_09_18.json`.
+- Reviewer candidate: no further review required unless a future scope admits another type/scope tuple or contradicts these real-target postconditions.
 ### P-04 — Real WRITE permission-denial evidence
 
 - Surface: stock Product/media WRITE authorization failure.

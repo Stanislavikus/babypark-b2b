@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.0.0",
+  "certification_date": "2026-09-18",
+  "connector": "adobe-commerce",
+  "campaign": "magento-v1-custom-attribute-clear-semantics",
+  "base_develop": "abb121d82c7b0e76179e33084e182447952b755a",
+  "target": {
+    "sku": "1234567890",
+    "logical_entity_id": 1,
+    "type_id": "simple",
+    "attribute_set_id": 9,
+    "store_code": "default"
+  },
+  "public_support_changed": false,
+  "product_create_used": false,
+  "blind_retry_used": false,
+  "certified_rules": [
+    {
+      "behavior": {
+        "frontend_input": "text",
+        "scope": "store",
+        "is_required": false
+      },
+      "target_field": "meta_title",
+      "baseline": "Test Product",
+      "clear_payload": "",
+      "postcondition": "attribute absent",
+      "clear_runtime": "KnownApplied / stock_write_verified",
+      "clear_attempts": {
+        "put": 1,
+        "reconciliation_get": 1
+      },
+      "restore_runtime": "KnownApplied / stock_write_verified",
+      "exact_restore": true
+    },
+    {
+      "behavior": {
+        "frontend_input": "textarea",
+        "scope": "store",
+        "is_required": false
+      },
+      "target_field": "meta_keyword",
+      "baseline": "Test Product",
+      "clear_payload": "",
+      "postcondition": "attribute absent",
+      "clear_runtime": "KnownApplied / stock_write_verified",
+      "clear_attempts": {
+        "put": 1,
+        "reconciliation_get": 1
+      },
+      "restore_runtime": "KnownApplied / stock_write_verified",
+      "exact_restore": true
+    },
+    {
+      "behavior": {
+        "frontend_input": "select",
+        "scope": "global",
+        "is_required": false
+      },
+      "target_field": "country_of_manufacture",
+      "baseline": "CN",
+      "clear_payload": null,
+      "postcondition": "attribute absent",
+      "clear_runtime": "KnownApplied / stock_write_verified",
+      "clear_attempts": {
+        "put": 1,
+        "reconciliation_get": 1
+      },
+      "restore_runtime": "KnownApplied / stock_write_verified",
+      "exact_restore": true
+    }
+  ],
+  "final_independent_read": {
+    "custom_attribute_count": 42,
+    "meta_title": "Test Product",
+    "meta_keyword": "Test Product",
+    "country_of_manufacture": "CN",
+    "price": 150,
+    "temporary_external_record_links": 0
+  },
+  "fail_closed_boundaries": [
+    "required attributes are never cleared",
+    "optional global text remains unsupported",
+    "website-scoped price/decimal remains unsupported",
+    "store/website select clear remains unsupported",
+    "texteditor/date/datetime/boolean/plain-decimal/multiselect remain unsupported until separate proof",
+    "missing/unknown provider frontend_input, scope, or is_required metadata remains unsupported"
+  ],
+  "runtime_contract": [
+    "clear admission is behavior-metadata driven, never field-code allowlisted",
+    "writer sends only the certified clear payload for stale remote values",
+    "successful reconciliation requires the cleared attribute to be absent on fresh GET",
+    "uncertified clear drift returns stock_custom_attribute_clear_not_certified with zero PUT"
+  ]
+}
