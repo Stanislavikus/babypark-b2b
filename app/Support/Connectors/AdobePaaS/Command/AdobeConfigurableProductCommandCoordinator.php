@@ -146,36 +146,36 @@ final class AdobeConfigurableProductCommandCoordinator
             );
         }
 
-        $optionsKnownApplied = true;
-
         foreach ($desiredState->options as $desiredOption) {
-            $optionEvidence = $this->optionExecutor->executeNoOpOnly($input, $desiredOption);
-            $evidence[] = $optionEvidence;
+            $optionPreflightEvidence = $this->optionExecutor->preflightExistingUpdateOnly($input, $desiredOption);
 
-            if ($optionEvidence->appliedStateKnowledge === AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous) {
+            if ($optionPreflightEvidence !== null) {
+                $evidence[] = $optionPreflightEvidence;
+
                 return new AdobeConfigurableProductExecutionResult(
                     outcome: $this->aggregator->aggregate($evidence),
                     commandEvidence: $evidence,
                 );
             }
-
-            if ($optionEvidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
-                $optionsKnownApplied = false;
-            }
-        }
-
-        if (! $optionsKnownApplied) {
-            return new AdobeConfigurableProductExecutionResult(
-                outcome: $this->aggregator->aggregate($evidence),
-                commandEvidence: $evidence,
-            );
         }
 
         foreach ($desiredState->childLinks as $desiredLink) {
-            $linkEvidence = $this->childLinkExecutor->executeNoOpOnly($input, $desiredLink);
+            $linkEvidence = $this->childLinkExecutor->executeTrustedRelinkOnly($input, $desiredLink);
             $evidence[] = $linkEvidence;
 
-            if ($linkEvidence->appliedStateKnowledge === AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous) {
+            if ($linkEvidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
+                return new AdobeConfigurableProductExecutionResult(
+                    outcome: $this->aggregator->aggregate($evidence),
+                    commandEvidence: $evidence,
+                );
+            }
+        }
+
+        foreach ($desiredState->options as $desiredOption) {
+            $optionEvidence = $this->optionExecutor->executeExistingUpdateOnly($input, $desiredOption);
+            $evidence[] = $optionEvidence;
+
+            if ($optionEvidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
                 return new AdobeConfigurableProductExecutionResult(
                     outcome: $this->aggregator->aggregate($evidence),
                     commandEvidence: $evidence,
@@ -184,7 +184,7 @@ final class AdobeConfigurableProductCommandCoordinator
         }
 
         if ($this->allChildLinksKnownApplied($evidence, $desiredState->childLinks)) {
-            $lifecycleEvidence = $this->inactiveLifecycleExecutor->executeNoOpOnly($input);
+            $lifecycleEvidence = $this->inactiveLifecycleExecutor->execute($input);
             $evidence = array_merge($evidence, $lifecycleEvidence);
         }
 

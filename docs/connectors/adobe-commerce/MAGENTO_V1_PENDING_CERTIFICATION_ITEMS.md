@@ -87,3 +87,13 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Conclusion: the supported default-store stock Product PUT path did **not** materialize untouched inherited store/website EAV overrides on the certification target. P-10 is closed for this supported V1 path. This closure does not itself flip public Live support or claim broader non-default-store/media-label inheritance semantics.
 - Evidence: `docs/connectors/adobe-commerce/magento_v1_store_scope_inheritance_certification_2026_09_17.json`.
 - Reviewer candidate: no further review required unless the supported store-context/write path changes.
+
+### P-11 — Existing-family Configurable structure mutation — CLOSED 2026-09-18 [Resolved]
+
+- Surface: existing configurable option correction, trusted desired-child relink, and trusted still-linked inactive-child lifecycle.
+- Closure proof: real-target family `524000027bbg` completed all three frozen V1 structure repairs through production-intended runtime. Existing option non-destructive drift was reconciled by one PUT + GET. A validation-only missing-child drift was restored by one identity-verified child POST + GET followed by semantic option re-read/reconciliation; Magento provider option row id churn was observed and is treated as a mutable remote handle, not identity authority. Finally, linked child `524000027bbg-Чорний` / `entity_id=13` completed verified status `1→2→1` through lifecycle disable and the certified active-child restore path, with exact final identity/price/media/link/option baseline.
+- Fail-closed/unsupported boundaries: missing option CREATE remains `configurable_option_create_not_certified`; destructive option-value removal is not exposed by the standard existing-option path — remote values absent from the active desired set are preserved with zero write instead of being removed; remote child unlink/removal is not exposed as a production capability; Product CREATE and blind consequential retry remain forbidden.
+- Identity/safety: MerchantConfirmed ERL remains authority; parent/child SKU + numeric Magento logical `entity_id` + type are freshly checked around structure writes; inactive lifecycle additionally requires the child to still be linked and fresh media-role-label materialization safety before Product PUT.
+- Public support: Adobe Products / Export / Live remains false; this closure certifies the internal V1 runtime and does not flip merchant-visible support.
+- Evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_structure_certification_2026_09_18.json`.
+- Reviewer candidate: no further architecture review required unless a future scope expands into option CREATE/value removal, remote unlink/removal, or new identity/transaction semantics.

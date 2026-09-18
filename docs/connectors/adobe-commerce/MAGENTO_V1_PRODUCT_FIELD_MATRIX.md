@@ -266,6 +266,13 @@ PR #226 real-target certification proved the existing-family Configurable core U
 
 Durable evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_linked_update_certification_2026_09_18.json`. Public Adobe Products / Export / Live support remains false.
 
+Follow-on Configurable structure evidence on the same date certifies the **existing-option UPDATE-only** seam against family `524000027bbg`: validation setup changed only option `id=3` position `0→1`; the production coordinator restored `1→0` through exactly one option PUT plus one reconciliation GET and returned `SYNCHRONIZED`; independent GET proved the exact option id/attribute/label/value set and child links returned to baseline. Missing option CREATE remains fail-closed. Destructive option-value removal is not exposed; the standard existing-option path preserves remote values absent from the active desired set instead of deleting them. Durable evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_structure_certification_2026_09_18.json`.
+
+The same structure campaign then certified **trusted desired-child relink**. Validation-only setup removed `524000027bbg-1`, which reduced remote option values from `[63,79]` to `[79]`. Production runtime admitted the repair only after read-only option preflight and fresh MerchantConfirmed parent/child identity checks, issued exactly one child-link POST plus one reconciliation GET, then re-read and restored semantic option state through one existing-option PUT plus one reconciliation GET. Final links and option semantics matched baseline. Magento rebuilt only its provider-generated configurable option row id (`8→9`); runtime therefore treats that id as a fresh remote handle, never platform identity. Remote unlink/removal is not exposed as a production capability.
+
+The final structure slice certified **trusted inactive linked-child lifecycle** on `524000027bbg-Чорний` / logical `entity_id=13` through the production coordinator using the real active-only execution shape: desired configurable values contained only active-child value `63`, while remote option values remained `[63,79]`. The coordinator preserved remote value `79` with `KnownApplied / configurable_option_remote_values_preserved` and zero option PUT, kept both child links intact, then fresh identity/type/link/media-safety checks admitted exactly one status PUT `1→2` plus one reconciliation GET (`KnownApplied / inactive_linked_child_disabled`). The fixture was then returned to active and the already-certified configurable-child core writer restored `2→1` with `KnownApplied / stock_write_verified`, one PUT plus one GET. Independent final read proved entity id, SKU/type, price `22000`, media roles/gallery, both links and option semantics exactly restored; no emergency restore was required.
+
+
 Post-Ready review did not broaden the certified write surface. It added fail-closed parent preflight before child HTTP, applied the observed media-label materialization guard to parent PUT admission, and rejected orphaned role-label projections. These corrections only remove unsafe consequential attempts; the real-target mutation/restore evidence above remains the certification basis.
 
 A separate read-only missing-SKU probe returned HTTP 404 with a message-only body and no
@@ -280,7 +287,6 @@ separate evidence where applicable:
 
 - field-by-field Simple Product WRITE validation beyond the verified base-price cycle;
 - installation-dependent mapped EAV values and explicit clear semantics;
-- configurable structure mutation beyond the now-certified existing-family core parent/child UPDATE path (option mutation, child-link mutation, inactive linked lifecycle mutation);
 - media mutation;
 - remaining product-type and connector-owned surfaces.
 

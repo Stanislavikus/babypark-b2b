@@ -1,0 +1,198 @@
+{
+  "schema_version": "1.0.0",
+  "certification_date": "2026-09-18",
+  "connector": "adobe-commerce",
+  "campaign": "magento-v1-configurable-structure",
+  "base_develop": "64ad36c0cbf9f57fe51da104c73743e4be445a34",
+  "public_support_changed": false,
+  "product_create_used": false,
+  "option_existing_update": {
+    "status": "resolved_pass",
+    "family_sku": "524000027bbg",
+    "parent_logical_entity_id": 14,
+    "configured_store_code": "default",
+    "baseline": {
+      "option_id": 3,
+      "attribute_id": 138,
+      "label": "Коляски - Колір",
+      "position": 0,
+      "values": [
+        63,
+        79
+      ],
+      "children": [
+        "524000027bbg-1",
+        "524000027bbg-Чорний"
+      ]
+    },
+    "controlled_setup_drift": {
+      "field": "position",
+      "from": 0,
+      "to": 1,
+      "verified_by_independent_get": true,
+      "child_links_unchanged": true
+    },
+    "production_runtime": {
+      "path": "AdobeConfigurableProductCommandCoordinator -> AdobeConfigurableOptionCommandExecutor::executeExistingUpdateOnly",
+      "outcome": "synchronized",
+      "option_result": "KnownApplied / configurable_option_put_reconciled",
+      "consequential_puts": 1,
+      "reconciliation_gets": 1,
+      "children": "stock_state_already_matches",
+      "parent": "configurable_parent_state_already_matches",
+      "child_links": "configurable_child_link_no_op"
+    },
+    "final_independent_read": {
+      "exact_option_baseline_restored": true,
+      "child_links_unchanged": true
+    },
+    "local_fixture": {
+      "temporary_state_only": true,
+      "database_transaction_rolled_back": true,
+      "merchant_confirmed_links_persisted_after_certification": false,
+      "temporary_variants_persisted_after_certification": false
+    },
+    "fail_closed_boundaries": {
+      "missing_option": "configurable_option_create_not_certified / zero write",
+      "destructive_value_removal": "configurable_option_value_removal_requires_adobe_validation / zero write"
+    }
+  },
+  "remaining_structure_boundaries": [
+    "configurable option CREATE is intentionally not certified and remains fail-closed",
+    "destructive configurable option value removal is not exposed; existing remote extra values are preserved non-destructively",
+    "remote child unlink/removal is not exposed as a production capability"
+  ],
+  "child_link_relink": {
+    "status": "resolved_pass",
+    "family_sku": "524000027bbg",
+    "target_child_sku": "524000027bbg-1",
+    "target_child_logical_entity_id": 12,
+    "validation_setup": {
+      "operation": "DELETE existing child link only to create controlled reversible drift",
+      "production_unlink_capability_claimed": false,
+      "baseline_children": [
+        "524000027bbg-1",
+        "524000027bbg-Чорний"
+      ],
+      "after_delete_children": [
+        "524000027bbg-Чорний"
+      ],
+      "baseline_option_semantics": {
+        "attribute_id": 138,
+        "label": "Коляски - Колір",
+        "position": 0,
+        "values": [
+          63,
+          79
+        ]
+      },
+      "after_delete_option_values": [
+        79
+      ],
+      "setup_verified": true
+    },
+    "production_runtime": {
+      "path": "option read-only preflight -> executeTrustedRelinkOnly -> post-link executeExistingUpdateOnly",
+      "outcome": "synchronized",
+      "child_link_result": "KnownApplied / configurable_child_link_reconciled",
+      "child_link_consequential_posts": 1,
+      "child_link_reconciliation_gets": 1,
+      "post_link_option_result": "KnownApplied / configurable_option_put_reconciled",
+      "post_link_option_puts": 1,
+      "post_link_option_reconciliation_gets": 1,
+      "parent_and_child_identity_freshly_verified_before_post": true,
+      "product_create_used": false,
+      "blind_retry_used": false
+    },
+    "magento_side_effect": {
+      "configurable_option_row_id_before": 8,
+      "configurable_option_row_id_after": 9,
+      "interpretation": "official Magento link management may rebuild the provider-generated configurable option row; option row id is a mutable remote handle, not platform identity authority",
+      "runtime_response": "re-read option by attribute identity after structure write and reconcile semantic state using the current remote option id"
+    },
+    "final_independent_read": {
+      "children_restored": [
+        "524000027bbg-1",
+        "524000027bbg-Чорний"
+      ],
+      "option_attribute_id": 138,
+      "option_label": "Коляски - Колір",
+      "option_position": 0,
+      "option_values": [
+        63,
+        79
+      ],
+      "semantic_structure_restored": true,
+      "temporary_merchant_confirmed_links_remaining": 0,
+      "temporary_variants_remaining": 0
+    }
+  },
+  "status": "resolved_pass",
+  "inactive_linked_lifecycle": {
+    "status": "resolved_pass",
+    "family_sku": "524000027bbg",
+    "target_child_sku": "524000027bbg-Чорний",
+    "target_child_logical_entity_id": 13,
+    "baseline": {
+      "status": 1,
+      "price": 22000,
+      "type_id": "simple",
+      "links_exact": [
+        "524000027bbg-1",
+        "524000027bbg-Чорний"
+      ],
+      "option_semantics": {
+        "attribute_id": 138,
+        "label": "Коляски - Колір",
+        "position": 0,
+        "values": [
+          63,
+          79
+        ]
+      }
+    },
+    "production_disable": {
+      "result": "KnownApplied / inactive_linked_child_disabled",
+      "status_transition": "1 -> 2",
+      "consequential_puts": 1,
+      "reconciliation_gets": 1,
+      "fresh_identity_verified": true,
+      "still_linked_verified_before_write": true,
+      "media_role_label_materialization_safe_required": true,
+      "active_desired_option_values": [
+        63
+      ],
+      "remote_option_values_before_and_after": [
+        63,
+        79
+      ],
+      "remote_inactive_option_value_preservation_result": "KnownApplied / configurable_option_remote_values_preserved",
+      "option_consequential_puts": 0,
+      "production_coordinator_reachability_verified": true,
+      "coordinator_outcome": "synchronized"
+    },
+    "production_restore": {
+      "path": "certified active configurable child core writer",
+      "result": "KnownApplied / stock_write_verified",
+      "status_transition": "2 -> 1",
+      "consequential_puts": 1,
+      "reconciliation_gets": 1
+    },
+    "final_independent_read": {
+      "entity_id": 13,
+      "sku": "524000027bbg-Чорний",
+      "type_id": "simple",
+      "status": 1,
+      "price": 22000,
+      "media_roles_and_gallery_unchanged": true,
+      "links_exact_baseline": true,
+      "option_semantics_exact_baseline": true,
+      "full_controlled_baseline_restored": true,
+      "emergency_restore_used": false,
+      "temporary_merchant_confirmed_links_remaining": 0,
+      "temporary_variants_remaining": 0,
+      "current_provider_option_row_id_after_all_structure_cycles": 10
+    }
+  },
+  "conclusion": "Frozen Magento V1 existing-family Configurable structure scope is real-target certified through the production coordinator for existing-option UPDATE-only, non-destructive preservation of remote inactive option values, trusted desired-child relink, and trusted still-linked inactive-child disable with exact restore; unsupported create/remove operations remain fail-closed or unexposed and public Live support remains false."
+}

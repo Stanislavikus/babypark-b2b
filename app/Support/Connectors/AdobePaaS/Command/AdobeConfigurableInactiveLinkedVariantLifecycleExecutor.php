@@ -15,6 +15,7 @@ final class AdobeConfigurableInactiveLinkedVariantLifecycleExecutor
         private readonly AdobeProductRemoteStateNormalizer $normalizer,
         private readonly AdobeProductRemoteStateComparator $comparator,
         private readonly AdobeProductExternalRecordLinkGuard $linkGuard,
+        private readonly AdobeConfigurableRemoteOptionStateReader $optionStateReader,
     ) {}
 
     /**
@@ -29,6 +30,26 @@ final class AdobeConfigurableInactiveLinkedVariantLifecycleExecutor
             ->where('is_active', false)
             ->orderBy('id')
             ->get();
+
+        if ($inactiveVariants->isEmpty()) {
+            return [];
+        }
+
+        $context = $this->contextFactory->create($input->workspaceId, $input->connectorAccountId);
+        [$childrenGetResult] = $this->remoteStateClient->getConfigurableChildren(
+            $context,
+            $input->desiredState->parentSku,
+        );
+        $linkedChildSkus = $this->optionStateReader->readChildSkus($childrenGetResult);
+
+        if ($linkedChildSkus === null) {
+            return [new AdobeConfigurableCommandEvidence(
+                commandKind: 'inactive_child_lifecycle',
+                appliedStateKnowledge: AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous,
+                reasonCode: 'configurable_children_get_untrusted_before_inactive_lifecycle',
+                subjectSku: $input->desiredState->parentSku,
+            )];
+        }
 
         $evidence = [];
 
@@ -56,7 +77,42 @@ final class AdobeConfigurableInactiveLinkedVariantLifecycleExecutor
             }
 
             $storedSku = $trustedLookup->link->external_identifier;
-            $context = $this->contextFactory->create($input->workspaceId, $input->connectorAccountId);
+            $trustedEntityId = $this->parseLogicalEntityId(
+                (string) $trustedLookup->link->external_record_discriminator,
+            );
+
+            if (! is_string($storedSku)
+                || $storedSku === ''
+                || $storedSku !== $variant->sku
+                || $trustedEntityId === null
+                || $this->linkGuard->hasCrossSubjectCollision(
+                    $input->workspaceId,
+                    $input->connectorAccountId,
+                    $storedSku,
+                    $variantId,
+                )
+                || $this->linkGuard->hasVariantDiscriminatorCrossSubjectCollision(
+                    $input->workspaceId,
+                    $input->connectorAccountId,
+                    (string) $trustedEntityId,
+                    $variantId,
+                )
+            ) {
+                $evidence[] = new AdobeConfigurableCommandEvidence(
+                    commandKind: 'inactive_child_lifecycle',
+                    appliedStateKnowledge: AdobeProductAppliedStateKnowledge::KnownNotApplied,
+                    reasonCode: 'inactive_linked_child_identity_not_safe',
+                    subjectSku: is_string($storedSku) ? $storedSku : null,
+                    variantId: $variantId,
+                );
+
+                continue;
+            }
+
+            if (! in_array($storedSku, $linkedChildSkus, true)) {
+                continue;
+            }
+
             $initialGet = $this->remoteStateClient->getProductWithContext($context, $storedSku);
 
             if ($initialGet->classification === AdobeProductRemoteGetClassification::TrustedKnownMissing) {
@@ -85,11 +141,37 @@ final class AdobeConfigurableInactiveLinkedVariantLifecycleExecutor
                 continue;
             }
 
+            if ($initialGet->observedState->entityId !== $trustedEntityId
+                || $initialGet->observedState->typeId !== 'simple'
+            ) {
+                $evidence[] = new AdobeConfigurableCommandEvidence(
+                    commandKind: 'inactive_child_lifecycle',
+                    appliedStateKnowledge: AdobeProductAppliedStateKnowledge::KnownNotApplied,
+                    reasonCode: 'inactive_linked_child_identity_mismatch',
+                    subjectSku: $storedSku,
+                    variantId: $variantId,
+                );
+
+                continue;
+            }
+
             if ($this->comparator->productStatusMatches(self::DISABLED_STATUS, $initialGet->observedState)) {
                 $evidence[] = new AdobeConfigurableCommandEvidence(
                     commandKind: 'inactive_child_lifecycle',
                     appliedStateKnowledge: AdobeProductAppliedStateKnowledge::KnownApplied,
                     reasonCode: 'inactive_linked_child_already_disabled',
+                    subjectSku: $storedSku,
+                    variantId: $variantId,
+                );
+
+                continue;
+            }
+
+            if ($initialGet->mediaRoleLabelMaterializationSafe !== true) {
+                $evidence[] = new AdobeConfigurableCommandEvidence(
+                    commandKind: 'inactive_child_lifecycle',
+                    appliedStateKnowledge: AdobeProductAppliedStateKnowledge::KnownNotApplied,
+                    reasonCode: 'inactive_linked_child_media_role_label_side_effect_not_safe',
                     subjectSku: $storedSku,
                     variantId: $variantId,
                 );
@@ -109,7 +191,7 @@ final class AdobeConfigurableInactiveLinkedVariantLifecycleExecutor
                 continue;
             }
 
-            [$putResult, $putTransportException] = $this->remoteStateClient->putProductStatus(
+            $this->remoteStateClient->putProductStatus(
                 $context,
                 $storedSku,
                 self::DISABLED_STATUS,
@@ -119,6 +201,8 @@ final class AdobeConfigurableInactiveLinkedVariantLifecycleExecutor
 
             if ($reconciliationGet->classification !== AdobeProductRemoteGetClassification::Found
                 || $reconciliationGet->observedState === null
+                || $reconciliationGet->observedState->entityId !== $trustedEntityId
+                || $reconciliationGet->observedState->typeId !== 'simple'
                 || ! $this->comparator->productStatusMatches(self::DISABLED_STATUS, $reconciliationGet->observedState)
             ) {
                 $evidence[] = new AdobeConfigurableCommandEvidence(
@@ -276,6 +360,18 @@ final class AdobeConfigurableInactiveLinkedVariantLifecycleExecutor
             return true;
         }
 
-        return $input->consequentialWriteGate->permitsConsequentialWrite();
+        return $input->consequentialWriteGate->permitsConsequentialWrite()
+            && $input->consequentialWriteGate->permitsProductExecution();
+    }
+
+    private function parseLogicalEntityId(string $discriminator): ?int
+    {
+        if (preg_match('/^[1-9][0-9]*$/', $discriminator) !== 1) {
+            return null;
+        }
+
+        $entityId = (int) $discriminator;
+
+        return (string) $entityId === $discriminator ? $entityId : null;
     }
 }
