@@ -666,6 +666,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
                         'custom_attributes' => [
                             ['attribute_code' => 'color', 'value' => $colorIndex],
                         ],
+                        'media_gallery_entries' => [],
                     ], JSON_THROW_ON_ERROR));
                 }
             }
@@ -746,8 +747,18 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
         ));
 
         $childState = [
-            $variants[0]->sku => ['id' => 101, 'color' => 93, 'updated' => false],
-            $variants[1]->sku => ['id' => 102, 'color' => 94, 'updated' => false],
+            $variants[0]->sku => [
+                'id' => 101,
+                'color' => 93,
+                'name' => 'Merchant Blue Child',
+                'updated' => false,
+            ],
+            $variants[1]->sku => [
+                'id' => 102,
+                'color' => 94,
+                'name' => 'Merchant Red Child',
+                'updated' => false,
+            ],
         ];
         $parentUpdated = false;
 
@@ -767,6 +778,8 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
                 }
 
                 if ($method === 'PUT') {
+                    $payload = json_decode((string) $request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+                    $this->assertSame($state['name'], $payload['product']['name'] ?? null);
                     $state['updated'] = true;
 
                     return new ConnectorHttpResult(200, [], '{}');
@@ -776,7 +789,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
                     return new ConnectorHttpResult(200, [], json_encode([
                         'id' => $state['id'],
                         'sku' => $sku,
-                        'name' => 'Configurable Product',
+                        'name' => $state['name'],
                         'attribute_set_id' => 4,
                         'type_id' => 'simple',
                         'status' => 1,
@@ -785,6 +798,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
                         'custom_attributes' => [
                             ['attribute_code' => 'color', 'value' => $state['color']],
                         ],
+                        'media_gallery_entries' => [],
                     ], JSON_THROW_ON_ERROR));
                 }
             }
@@ -867,6 +881,94 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
     }
 
     #[Test]
+    public function linked_family_child_with_unmaterialized_media_role_labels_fails_before_put(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product, $variants] = $this->createConfigurableProduct($workspace, 'CFG-MEDIA-SIDE-EFFECT');
+        $parentSku = 'MERCHANT-PARENT-SKU';
+
+        ExternalRecordLink::query()->create($this->merchantConfirmedParentLinkAttributes(
+            $workspace, $account->id, $product, $parentSku, '100',
+        ));
+        ExternalRecordLink::query()->create($this->merchantConfirmedVariantLinkAttributes(
+            $workspace, $account->id, $variants[0], $variants[0]->sku, '101',
+        ));
+        ExternalRecordLink::query()->create($this->merchantConfirmedVariantLinkAttributes(
+            $workspace, $account->id, $variants[1], $variants[1]->sku, '102',
+        ));
+
+        $childState = [
+            $variants[0]->sku => ['id' => 101, 'color' => 93],
+            $variants[1]->sku => ['id' => 102, 'color' => 94],
+        ];
+
+        $transport = new RecordingConnectorHttpTransport(function ($outbound) use ($childState): ConnectorHttpResult {
+            $request = $outbound->request;
+            $method = $request->getMethod();
+            $uri = (string) $request->getUri();
+
+            foreach ($childState as $sku => $state) {
+                if (! str_ends_with($uri, '/V1/products/'.rawurlencode($sku))) {
+                    continue;
+                }
+
+                $this->assertSame('GET', $method);
+
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'id' => $state['id'],
+                    'sku' => $sku,
+                    'name' => 'Merchant Child Name',
+                    'attribute_set_id' => 4,
+                    'type_id' => 'simple',
+                    'status' => 1,
+                    'visibility' => 1,
+                    'price' => 90.0,
+                    'custom_attributes' => [
+                        ['attribute_code' => 'color', 'value' => $state['color']],
+                    ],
+                    'media_gallery_entries' => [[
+                        'id' => 501,
+                        'label' => 'Merchant media label',
+                        'types' => ['image', 'small_image', 'thumbnail'],
+                    ]],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            throw new \RuntimeException('No parent or structure request is allowed after unsafe child evidence.');
+        });
+        $this->app->instance(ConnectorHttpTransport::class, $transport);
+
+        $result = app(AdobeConfigurableProductCommandCoordinator::class)->execute(
+            $workspace->id,
+            $account->id,
+            AdobeConfigurableCommandTestFixtures::configurableSemanticResult(
+                $product->id,
+                [
+                    ['variant_id' => (string) $variants[0]->id, 'sku' => $variants[0]->sku, 'color' => 'blue', 'color_index' => '93'],
+                    ['variant_id' => (string) $variants[1]->id, 'sku' => $variants[1]->sku, 'color' => 'red', 'color_index' => '94'],
+                ],
+            ),
+            'UAH',
+            $this->metadataFixture(),
+            new SyncLiveConsequentialWriteGateStub(true),
+        );
+
+        $this->assertSame(SyncLiveOutcome::NotApplied, $result->outcome);
+        $this->assertCount(1, $result->commandEvidence);
+        $this->assertSame('simple_child', $result->commandEvidence[0]->commandKind);
+        $this->assertSame(
+            'configurable_child_media_role_label_side_effect_not_safe',
+            $result->commandEvidence[0]->reasonCode,
+        );
+        $this->assertSame(0, $result->commandEvidence[0]->consequentialWriteAttempts);
+        $this->assertSame(['GET'], array_map(
+            static fn ($entry): string => $entry->request->getMethod(),
+            $transport->recordedRequests,
+        ));
+    }
+
+    #[Test]
     public function linked_family_stops_remaining_child_writes_after_known_not_applied_child(): void
     {
         $workspace = $this->defaultWorkspace();
@@ -936,6 +1038,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
                     'custom_attributes' => [
                         ['attribute_code' => 'color', 'value' => 93],
                     ],
+                    'media_gallery_entries' => [],
                 ], JSON_THROW_ON_ERROR));
             }
 

@@ -21,6 +21,40 @@ final class AdobeProductStockSimpleWriteExecutor
         int $trustedEntityId,
         AdobeProductDesiredState $desiredState,
     ): AdobeProductSimpleCommandResult {
+        return $this->executeWithPolicy(
+            $workspaceId,
+            $connectorAccountId,
+            $trustedEntityId,
+            $desiredState,
+            preserveObservedName: false,
+            requireMediaRoleLabelMaterializationSafety: false,
+        );
+    }
+
+    public function executeConfigurableChild(
+        string $workspaceId,
+        string $connectorAccountId,
+        int $trustedEntityId,
+        AdobeProductDesiredState $desiredState,
+    ): AdobeProductSimpleCommandResult {
+        return $this->executeWithPolicy(
+            $workspaceId,
+            $connectorAccountId,
+            $trustedEntityId,
+            $desiredState,
+            preserveObservedName: true,
+            requireMediaRoleLabelMaterializationSafety: true,
+        );
+    }
+
+    private function executeWithPolicy(
+        string $workspaceId,
+        string $connectorAccountId,
+        int $trustedEntityId,
+        AdobeProductDesiredState $desiredState,
+        bool $preserveObservedName,
+        bool $requireMediaRoleLabelMaterializationSafety,
+    ): AdobeProductSimpleCommandResult {
         $context = $this->contextFactory->create($workspaceId, $connectorAccountId);
         $preRead = $this->remoteStateClient->getProductWithContext($context, $desiredState->sku);
 
@@ -55,6 +89,32 @@ final class AdobeProductStockSimpleWriteExecutor
                 'remote_product_type_mismatch',
                 $desiredState->sku,
                 $preRead->classification,
+            );
+        }
+
+        if ($requireMediaRoleLabelMaterializationSafety
+            && $preRead->mediaRoleLabelMaterializationSafe !== true
+        ) {
+            return $this->knownNotApplied(
+                'configurable_child_media_role_label_side_effect_not_safe',
+                $desiredState->sku,
+                $preRead->classification,
+            );
+        }
+
+        if ($preserveObservedName && $desiredState->name !== $observed->name) {
+            $desiredState = new AdobeProductDesiredState(
+                productVariantId: $desiredState->productVariantId,
+                sku: $desiredState->sku,
+                name: $observed->name,
+                attributeSetId: $desiredState->attributeSetId,
+                typeId: $desiredState->typeId,
+                status: $desiredState->status,
+                visibility: $desiredState->visibility,
+                price: $desiredState->price,
+                priceCurrency: $desiredState->priceCurrency,
+                customAttributes: $desiredState->customAttributes,
+                clearedCustomAttributeKeys: $desiredState->clearedCustomAttributeKeys,
             );
         }
 

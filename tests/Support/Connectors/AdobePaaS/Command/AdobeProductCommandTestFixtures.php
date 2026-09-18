@@ -81,6 +81,7 @@ final class AdobeProductCommandTestFixtures
             'visibility' => 4,
             'price' => 100.0,
             'custom_attributes' => [],
+            'media_gallery_entries' => [],
         ], $overrides);
     }
 
