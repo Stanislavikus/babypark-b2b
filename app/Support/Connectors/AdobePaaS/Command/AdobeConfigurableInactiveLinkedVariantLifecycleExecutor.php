@@ -149,6 +149,98 @@ final class AdobeConfigurableInactiveLinkedVariantLifecycleExecutor
     }
 
     /**
+     * @return list<AdobeConfigurableCommandEvidence>
+     */
+    public function executeNoOpOnly(
+        AdobeConfigurableCommandInput $input,
+    ): array {
+        $inactiveVariants = ProductVariant::withoutWorkspaceScope()
+            ->where('workspace_id', $input->workspaceId)
+            ->where('product_id', $input->desiredState->productId)
+            ->where('is_active', false)
+            ->orderBy('id')
+            ->get();
+
+        $evidence = [];
+
+        foreach ($inactiveVariants as $variant) {
+            $variantId = (string) $variant->id;
+            $trustedLookup = $this->linkGuard->resolveTrustedVariantLinkBySubject(
+                $input->workspaceId,
+                $input->connectorAccountId,
+                $variantId,
+            );
+
+            if ($trustedLookup->isNone()) {
+                continue;
+            }
+
+            if ($trustedLookup->isAmbiguous()) {
+                $evidence[] = new AdobeConfigurableCommandEvidence(
+                    commandKind: 'inactive_child_lifecycle',
+                    appliedStateKnowledge: AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous,
+                    reasonCode: 'ambiguous_inactive_child_identity_links',
+                    variantId: $variantId,
+                );
+
+                continue;
+            }
+
+            $storedSku = $trustedLookup->link->external_identifier;
+            $context = $this->contextFactory->create($input->workspaceId, $input->connectorAccountId);
+            $initialGet = $this->remoteStateClient->getProductWithContext($context, $storedSku);
+
+            if ($initialGet->classification === AdobeProductRemoteGetClassification::TrustedKnownMissing) {
+                $evidence[] = new AdobeConfigurableCommandEvidence(
+                    commandKind: 'inactive_child_lifecycle',
+                    appliedStateKnowledge: AdobeProductAppliedStateKnowledge::KnownNotApplied,
+                    reasonCode: 'inactive_linked_child_missing_no_recreate',
+                    subjectSku: $storedSku,
+                    variantId: $variantId,
+                );
+
+                continue;
+            }
+
+            if ($initialGet->classification !== AdobeProductRemoteGetClassification::Found
+                || $initialGet->observedState === null
+            ) {
+                $evidence[] = new AdobeConfigurableCommandEvidence(
+                    commandKind: 'inactive_child_lifecycle',
+                    appliedStateKnowledge: AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous,
+                    reasonCode: 'inactive_linked_child_get_untrusted',
+                    subjectSku: $storedSku,
+                    variantId: $variantId,
+                );
+
+                continue;
+            }
+
+            if ($this->comparator->productStatusMatches(self::DISABLED_STATUS, $initialGet->observedState)) {
+                $evidence[] = new AdobeConfigurableCommandEvidence(
+                    commandKind: 'inactive_child_lifecycle',
+                    appliedStateKnowledge: AdobeProductAppliedStateKnowledge::KnownApplied,
+                    reasonCode: 'inactive_linked_child_already_disabled',
+                    subjectSku: $storedSku,
+                    variantId: $variantId,
+                );
+
+                continue;
+            }
+
+            $evidence[] = new AdobeConfigurableCommandEvidence(
+                commandKind: 'inactive_child_lifecycle',
+                appliedStateKnowledge: AdobeProductAppliedStateKnowledge::KnownNotApplied,
+                reasonCode: 'inactive_linked_child_status_mutation_not_certified',
+                subjectSku: $storedSku,
+                variantId: $variantId,
+            );
+        }
+
+        return $evidence;
+    }
+
+    /**
      * @return list<string>
      */
     public function linkedInactiveVariantIds(string $workspaceId, string $connectorAccountId, int $productId): array

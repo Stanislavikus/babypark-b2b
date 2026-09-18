@@ -101,6 +101,95 @@ class AdobeProductCommandFoundationUnitTest extends TestCase
 
         $this->assertSame(AdobeProductRemoteGetClassification::Found, $result->classification);
         $this->assertNotNull($result->observedState);
+        $this->assertTrue($result->mediaRoleLabelMaterializationSafe);
+    }
+
+    #[Test]
+    public function product_get_detects_media_role_label_materialization_risk(): void
+    {
+        $payload = AdobeProductCommandTestFixtures::remoteProductPayload([
+            'media_gallery_entries' => [[
+                'id' => 1,
+                'label' => 'Merchant media label',
+                'types' => ['image', 'small_image', 'thumbnail'],
+            ]],
+            'custom_attributes' => [],
+        ]);
+
+        $result = $this->classifier->classify(
+            'SKU-TEST-1',
+            new ConnectorHttpResult(200, [], json_encode($payload, JSON_THROW_ON_ERROR)),
+        );
+
+        $this->assertSame(AdobeProductRemoteGetClassification::Found, $result->classification);
+        $this->assertFalse($result->mediaRoleLabelMaterializationSafe);
+    }
+
+    #[Test]
+    public function product_get_accepts_existing_media_role_label_projections_as_safe(): void
+    {
+        $payload = AdobeProductCommandTestFixtures::remoteProductPayload([
+            'media_gallery_entries' => [[
+                'id' => 1,
+                'label' => 'Merchant media label',
+                'types' => ['image', 'small_image', 'thumbnail'],
+            ]],
+            'custom_attributes' => [
+                ['attribute_code' => 'image_label', 'value' => 'Merchant media label'],
+                ['attribute_code' => 'small_image_label', 'value' => 'Merchant media label'],
+                ['attribute_code' => 'thumbnail_label', 'value' => 'Merchant media label'],
+            ],
+        ]);
+
+        $result = $this->classifier->classify(
+            'SKU-TEST-1',
+            new ConnectorHttpResult(200, [], json_encode($payload, JSON_THROW_ON_ERROR)),
+        );
+
+        $this->assertSame(AdobeProductRemoteGetClassification::Found, $result->classification);
+        $this->assertTrue($result->mediaRoleLabelMaterializationSafe);
+    }
+
+    #[Test]
+    public function product_get_rejects_orphaned_media_role_label_projection(): void
+    {
+        $payload = AdobeProductCommandTestFixtures::remoteProductPayload([
+            'media_gallery_entries' => [],
+            'custom_attributes' => [
+                ['attribute_code' => 'image_label', 'value' => 'Orphaned role label'],
+            ],
+        ]);
+
+        $result = $this->classifier->classify(
+            'SKU-TEST-1',
+            new ConnectorHttpResult(200, [], json_encode($payload, JSON_THROW_ON_ERROR)),
+        );
+
+        $this->assertSame(AdobeProductRemoteGetClassification::Found, $result->classification);
+        $this->assertFalse($result->mediaRoleLabelMaterializationSafe);
+    }
+
+    #[Test]
+    public function product_get_rejects_mismatched_existing_media_role_label_projection(): void
+    {
+        $payload = AdobeProductCommandTestFixtures::remoteProductPayload([
+            'media_gallery_entries' => [[
+                'id' => 1,
+                'label' => 'Gallery label',
+                'types' => ['image'],
+            ]],
+            'custom_attributes' => [
+                ['attribute_code' => 'image_label', 'value' => 'Different projection'],
+            ],
+        ]);
+
+        $result = $this->classifier->classify(
+            'SKU-TEST-1',
+            new ConnectorHttpResult(200, [], json_encode($payload, JSON_THROW_ON_ERROR)),
+        );
+
+        $this->assertSame(AdobeProductRemoteGetClassification::Found, $result->classification);
+        $this->assertFalse($result->mediaRoleLabelMaterializationSafe);
     }
 
     #[Test]

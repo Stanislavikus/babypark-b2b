@@ -36,6 +36,7 @@ final class AdobeProductRemoteGetClassifier
             return new AdobeProductRemoteGetResult(
                 AdobeProductRemoteGetClassification::Found,
                 $observed,
+                $this->mediaRoleLabelMaterializationSafe($payload),
             );
         }
 
@@ -71,6 +72,7 @@ final class AdobeProductRemoteGetClassifier
             return new AdobeProductParentRemoteGetResult(
                 AdobeProductRemoteGetClassification::Found,
                 $observed,
+                $this->mediaRoleLabelMaterializationSafe($payload),
             );
         }
 
@@ -79,6 +81,85 @@ final class AdobeProductRemoteGetClassifier
         }
 
         return new AdobeProductParentRemoteGetResult(AdobeProductRemoteGetClassification::UntrustedOrFailed);
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function mediaRoleLabelMaterializationSafe(array $payload): ?bool
+    {
+        $entries = $payload['media_gallery_entries'] ?? null;
+        $customAttributes = $payload['custom_attributes'] ?? null;
+
+        if (! is_array($entries) || ! is_array($customAttributes)) {
+            return null;
+        }
+
+        $customAttributeValues = [];
+
+        foreach ($customAttributes as $attribute) {
+            if (! is_array($attribute)) {
+                return null;
+            }
+
+            $code = $attribute['attribute_code'] ?? null;
+            if (! is_string($code) || $code === '') {
+                return null;
+            }
+
+            $customAttributeValues[$code] = $attribute['value'] ?? null;
+        }
+
+        $roleLabelAttributes = [
+            'image' => 'image_label',
+            'small_image' => 'small_image_label',
+            'thumbnail' => 'thumbnail_label',
+        ];
+
+        $assignedRoles = array_fill_keys(array_keys($roleLabelAttributes), false);
+
+        foreach ($entries as $entry) {
+            if (! is_array($entry)) {
+                return null;
+            }
+
+            $label = $entry['label'] ?? null;
+            if ($label !== null && ! is_string($label)) {
+                return null;
+            }
+
+            $types = $entry['types'] ?? null;
+            if (! is_array($types)) {
+                return null;
+            }
+
+            foreach ($roleLabelAttributes as $role => $labelAttribute) {
+                if (! in_array($role, $types, true)) {
+                    continue;
+                }
+
+                $assignedRoles[$role] = true;
+                $hasProjection = array_key_exists($labelAttribute, $customAttributeValues);
+
+                if ($label === null || $label === '') {
+                    if ($hasProjection) {
+                        return false;
+                    }
+
+                    continue;
+                }
+
+                if (! $hasProjection || $customAttributeValues[$labelAttribute] !== $label) {
+                    return false;
+                }
+            }
+        }
+
+        foreach ($roleLabelAttributes as $role => $labelAttribute) {
+            if (! $assignedRoles[$role] && array_key_exists($labelAttribute, $customAttributeValues)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function isTrustedProductMissingEvidence(string $requestedSku, string $body): bool

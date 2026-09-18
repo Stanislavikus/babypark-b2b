@@ -108,6 +108,7 @@ final class AdobeConfigurableCommandTestFixtures
             'status' => 1,
             'visibility' => 4,
             'custom_attributes' => [],
+            'media_gallery_entries' => [],
         ], $overrides);
     }
 

@@ -24,7 +24,12 @@ final class AdobeProductSimpleCommandExecutor
             return $this->knownNotApplied('semantic_compilation_failed');
         }
 
-        return $this->executeDesiredState($input, $desiredState, consumeTrustedStockWrite: true);
+        return $this->executeDesiredState(
+            $input,
+            $desiredState,
+            consumeTrustedStockWrite: true,
+            configurableChild: false,
+        );
     }
 
     public function executeSimpleChild(
@@ -44,13 +49,19 @@ final class AdobeProductSimpleCommandExecutor
             return $this->knownNotApplied('semantic_compilation_failed');
         }
 
-        return $this->executeDesiredState($input, $desiredState, consumeTrustedStockWrite: false);
+        return $this->executeDesiredState(
+            $input,
+            $desiredState,
+            consumeTrustedStockWrite: true,
+            configurableChild: true,
+        );
     }
 
     private function executeDesiredState(
         AdobeProductSimpleCommandInput $input,
         AdobeProductDesiredState $desiredState,
         bool $consumeTrustedStockWrite,
+        bool $configurableChild,
     ): AdobeProductSimpleCommandResult {
         if ($input->adobeBaseCurrency === null || $input->adobeBaseCurrency === '') {
             return $this->knownNotApplied('currency_evidence_missing');
@@ -120,6 +131,15 @@ final class AdobeProductSimpleCommandExecutor
                 'consequential_write_gate_closed',
                 subjectSku: $trustedSku,
                 ownershipTrustSatisfied: true,
+            );
+        }
+
+        if ($configurableChild) {
+            return $this->stockWriteExecutor->executeConfigurableChild(
+                $input->workspaceId,
+                $input->connectorAccountId,
+                $logicalEntityId,
+                $desiredState,
             );
         }
 

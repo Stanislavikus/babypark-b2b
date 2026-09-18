@@ -416,7 +416,7 @@ class Stage3ER2aTrustedErlSemanticsTest extends TestCase
     }
 
     #[Test]
-    public function configurable_parent_trusted_erl_fails_closed_before_http(): void
+    public function configurable_parent_invalid_trusted_discriminator_fails_closed_before_http(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
@@ -429,15 +429,15 @@ class Stage3ER2aTrustedErlSemanticsTest extends TestCase
                 $account->id,
                 $product,
                 'CFG-PARENT',
-                '900',
+                'invalid-discriminator',
                 $actor,
             ),
         );
 
-        $executor = new AdobeConfigurableParentCommandExecutor(new AdobeProductExternalRecordLinkGuard);
+        $executor = app(AdobeConfigurableParentCommandExecutor::class);
         $semantic = AdobeConfigurableCommandTestFixtures::configurableSemanticResult($product->id);
         $desired = (new AdobeConfigurableDesiredStateCompiler(new AdobeConfigurableParentSkuGenerator))
-            ->compile($semantic, $workspace->id, null);
+            ->compile($semantic, $workspace->id, null, 'CFG-PARENT');
         $input = new AdobeConfigurableCommandInput(
             workspaceId: $workspace->id,
             connectorAccountId: $account->id,
@@ -451,7 +451,7 @@ class Stage3ER2aTrustedErlSemanticsTest extends TestCase
 
         $this->assertSame('configurable_parent', $result->commandKind);
         $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
-        $this->assertSame('entity_bound_mutation_bridge_required', $result->reasonCode);
+        $this->assertSame('trusted_parent_discriminator_invalid', $result->reasonCode);
         $this->assertSame(0, $result->consequentialWriteAttempts);
         $this->assertSame(0, $result->reconciliationGetAttempts);
     }

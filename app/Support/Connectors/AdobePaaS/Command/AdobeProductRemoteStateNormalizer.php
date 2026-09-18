@@ -118,6 +118,7 @@ final class AdobeProductRemoteStateNormalizer
         }
 
         return new AdobeProductParentObservedState(
+            entityId: $entityId,
             sku: $sku,
             name: $name,
             attributeSetId: (int) $attributeSetId,

@@ -26,7 +26,7 @@ manifest.
   - trusted simple Product execution consumes
     `AdobeProductStockSimpleWriteExecutor` over stock `PUT /V1/products/{sku}`; Safe Sync remains optional Enhanced Safety
 - trusted Receive uses `AdobeProductDocumentReader` (stock `GET /V1/products/{sku}`)
-  - configurable child remains fail-closed
+  - trusted existing-family configurable children use the stock Simple GET→PUT→GET writer only when fresh Product GET proves media-role label materialization safety; otherwise they fail closed before PUT
   - no duplicate Product GET transport, OAuth signer, or request factory exists
   - trusted stock `PUT /V1/products/{sku}` consequential writer exists for merchant-confirmed simple Product updates; public support remains false
 
@@ -230,7 +230,7 @@ moduleless-by-default rebaseline is now implemented for trusted Simple Product W
   `type_id = simple`, and Magento entity `id` equal to the trusted discriminator before PUT.
 - POST/create and blind consequential PUT retry are absent from the standard Simple path.
 - Trusted Receive continues to use `AdobeProductDocumentReader` over stock Product GET.
-- The configurable child path remains fail-closed for this standard Simple migration.
+- Existing-family configurable children now consume the same stock Simple GET→PUT→GET writer under MerchantConfirmed ERL identity, preserve the fresh remote child name, and require fresh media-role label materialization-safety evidence before PUT; unsafe or unknown media state fails closed with zero consequential writes. Before any child HTTP, the configurable coordinator preflights the trusted parent discriminator plus fresh parent identity/type; parent drift requiring PUT is also gated by media-role label materialization safety, and orphaned role-label projections are classified unsafe.
 - Safe Sync remains implemented only as an optional Enhanced Safety primitive and is not the
   standard-path prerequisite.
 - Mapping remains a **platform-owned workflow** over persisted and normalised discovered metadata;
@@ -253,6 +253,21 @@ On 2026-09-11 the certification target verified the core trusted Simple path wit
 - restore again returned `KnownApplied / stock_write_verified`;
 - final independent GET confirmed the original price `150` and unchanged identity.
 
+### Existing-family Configurable linked UPDATE certification — 2026-09-18
+
+PR #226 real-target certification proved the existing-family Configurable core UPDATE path without Product CREATE:
+
+- trusted parent `J-Fl-DUOs-01` / logical `entity_id=6` completed a controlled name PUT and exact restore through `AdobeConfigurableParentCommandExecutor`; options and child links remained unchanged;
+- certification discovered that an ordinary default-store Product PUT on Junama children with non-empty gallery labels but absent `image_label` / `small_image_label` / `thumbnail_label` projections materialized those projections as a side effect; the target was restored exactly through the already-certified P-09 default-store media-label reset;
+- runtime commit `d6bb5f3d18277fe3ec2086e707fc1ffb4bd3b515` therefore makes Configurable child execution preserve the fresh remote child name and fail closed before PUT unless the fresh Product GET proves every assigned image/small-image/thumbnail gallery label is already represented by the equal role-label projection (or both are absent); standalone Simple semantics are unchanged;
+- the negative Junama rerun returned `KnownNotApplied / configurable_child_media_role_label_side_effect_not_safe` with zero consequential writes and unchanged family state;
+- positive family `524000027bbg` then completed two child price writes (`20700→20701`, `22000→22001`) with `KnownApplied / stock_write_verified`, one PUT plus one reconciliation GET per child; parent/options/links were no-op, and both children were restored through the same stock writer;
+- final independent default-store and `all` reads matched the pre-write raw baselines except Magento-managed `updated_at`; merchant child names, entity ids, option values `63/79`, media role-label state, and links were preserved.
+
+Durable evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_linked_update_certification_2026_09_18.json`. Public Adobe Products / Export / Live support remains false.
+
+Post-Ready review did not broaden the certified write surface. It added fail-closed parent preflight before child HTTP, applied the observed media-label materialization guard to parent PUT admission, and rejected orphaned role-label projections. These corrections only remove unsafe consequential attempts; the real-target mutation/restore evidence above remains the certification basis.
+
 A separate read-only missing-SKU probe returned HTTP 404 with a message-only body and no
 structured `parameters`. The classifier therefore remained conservative `untrusted_or_failed`;
 this target did not prove the synthetic `TrustedKnownMissing` fixture shape.
@@ -265,7 +280,7 @@ separate evidence where applicable:
 
 - field-by-field Simple Product WRITE validation beyond the verified base-price cycle;
 - installation-dependent mapped EAV values and explicit clear semantics;
-- configurable Product mutation;
+- configurable structure mutation beyond the now-certified existing-family core parent/child UPDATE path (option mutation, child-link mutation, inactive linked lifecycle mutation);
 - media mutation;
 - remaining product-type and connector-owned surfaces.
 

@@ -72,6 +72,31 @@ final class AdobeConfigurableChildLinkCommandExecutor
         );
     }
 
+    public function executeNoOpOnly(
+        AdobeConfigurableCommandInput $input,
+        AdobeConfigurableChildLinkDesiredState $desiredLink,
+    ): AdobeConfigurableCommandEvidence {
+        $context = $this->contextFactory->create($input->workspaceId, $input->connectorAccountId);
+        $parentSku = $input->desiredState->parentSku;
+
+        [$childrenGetResult] = $this->remoteStateClient->getConfigurableChildren($context, $parentSku);
+        $childSkus = $this->optionStateReader->readChildSkus($childrenGetResult);
+
+        if ($childSkus === null) {
+            return $this->unknownOrAmbiguous('configurable_children_get_untrusted', $parentSku, $desiredLink);
+        }
+
+        if (in_array($desiredLink->childSku, $childSkus, true)) {
+            return $this->knownApplied('configurable_child_link_no_op', $parentSku, $desiredLink);
+        }
+
+        return $this->knownNotApplied(
+            'configurable_child_link_mutation_not_certified',
+            $parentSku,
+            $desiredLink,
+        );
+    }
+
     private function permitsConsequentialWrite(AdobeConfigurableCommandInput $input): bool
     {
         if ($input->consequentialWriteGate === null) {

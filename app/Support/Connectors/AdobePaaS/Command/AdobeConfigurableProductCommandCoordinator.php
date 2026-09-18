@@ -40,8 +40,19 @@ final class AdobeConfigurableProductCommandCoordinator
             );
         }
 
+        $trustedExistingParentSku = $this->resolveTrustedExistingParentSku(
+            $workspaceId,
+            $connectorAccountId,
+            $semanticResult,
+        );
+
         try {
-            $desiredState = $this->desiredStateCompiler->compile($semanticResult, $workspaceId, $metadata);
+            $desiredState = $this->desiredStateCompiler->compile(
+                $semanticResult,
+                $workspaceId,
+                $metadata,
+                $trustedExistingParentSku,
+            );
         } catch (AdobeProductCommandCompilationException) {
             $evidence = new AdobeConfigurableCommandEvidence(
                 commandKind: 'configurable_compile',
@@ -65,6 +76,20 @@ final class AdobeConfigurableProductCommandCoordinator
             consequentialWriteGate: $consequentialWriteGate,
         );
 
+        if ($consequentialWriteGate !== null
+            && $consequentialWriteGate->permitsConsequentialWrite()
+            && $consequentialWriteGate->permitsProductExecution()
+        ) {
+            $parentPreflightEvidence = $this->parentExecutor->preflight($input);
+
+            if ($parentPreflightEvidence !== null) {
+                return new AdobeConfigurableProductExecutionResult(
+                    outcome: $this->aggregator->aggregate([$parentPreflightEvidence]),
+                    commandEvidence: [$parentPreflightEvidence],
+                );
+            }
+        }
+
         /** @var list<AdobeConfigurableCommandEvidence> $evidence */
         $evidence = [];
 
@@ -83,7 +108,7 @@ final class AdobeConfigurableProductCommandCoordinator
             $childEvidence = $this->mapSimpleChildEvidence($childResult, $variantId);
             $evidence[] = $childEvidence;
 
-            if ($childEvidence->appliedStateKnowledge === AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous) {
+            if ($childEvidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
                 $stopWrites = true;
 
                 break;
@@ -124,7 +149,7 @@ final class AdobeConfigurableProductCommandCoordinator
         $optionsKnownApplied = true;
 
         foreach ($desiredState->options as $desiredOption) {
-            $optionEvidence = $this->optionExecutor->execute($input, $desiredOption);
+            $optionEvidence = $this->optionExecutor->executeNoOpOnly($input, $desiredOption);
             $evidence[] = $optionEvidence;
 
             if ($optionEvidence->appliedStateKnowledge === AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous) {
@@ -147,7 +172,7 @@ final class AdobeConfigurableProductCommandCoordinator
         }
 
         foreach ($desiredState->childLinks as $desiredLink) {
-            $linkEvidence = $this->childLinkExecutor->execute($input, $desiredLink);
+            $linkEvidence = $this->childLinkExecutor->executeNoOpOnly($input, $desiredLink);
             $evidence[] = $linkEvidence;
 
             if ($linkEvidence->appliedStateKnowledge === AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous) {
@@ -159,7 +184,7 @@ final class AdobeConfigurableProductCommandCoordinator
         }
 
         if ($this->allChildLinksKnownApplied($evidence, $desiredState->childLinks)) {
-            $lifecycleEvidence = $this->inactiveLifecycleExecutor->execute($input);
+            $lifecycleEvidence = $this->inactiveLifecycleExecutor->executeNoOpOnly($input);
             $evidence = array_merge($evidence, $lifecycleEvidence);
         }
 
@@ -167,6 +192,32 @@ final class AdobeConfigurableProductCommandCoordinator
             outcome: $this->aggregator->aggregate($evidence),
             commandEvidence: $evidence,
         );
+    }
+
+    private function resolveTrustedExistingParentSku(
+        string $workspaceId,
+        string $connectorAccountId,
+        AdobeProductExportSemanticResult $semanticResult,
+    ): ?string {
+        $productId = $this->resolveProductId($semanticResult);
+
+        if ($productId === null) {
+            return null;
+        }
+
+        $lookup = $this->linkGuard->resolveTrustedParentLinkBySubject(
+            $workspaceId,
+            $connectorAccountId,
+            $productId,
+        );
+
+        if (! $lookup->isTrusted() || $lookup->link === null) {
+            return null;
+        }
+
+        $parentSku = $lookup->link->external_identifier;
+
+        return is_string($parentSku) && trim($parentSku) !== '' ? trim($parentSku) : null;
     }
 
     private function resolveClassificationTransitionEvidence(
@@ -304,6 +355,7 @@ final class AdobeConfigurableProductCommandCoordinator
             reconciliationGetAttempts: $result->evidence->reconciliationGetAttempts,
             externalRecordLinkPersisted: $result->evidence->externalRecordLinkPersisted,
             ownershipTrustSatisfied: $result->evidence->ownershipTrustSatisfied,
+            writeAccessClassification: $result->evidence->writeAccessClassification,
         );
     }
 }
