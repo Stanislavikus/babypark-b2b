@@ -59,7 +59,7 @@
   },
   "remaining_structure_boundaries": [
     "configurable option CREATE is intentionally not certified and remains fail-closed",
-    "configurable option destructive value removal is intentionally not certified and remains fail-closed",
+    "destructive configurable option value removal is not exposed; existing remote extra values are preserved non-destructively",
     "remote child unlink/removal is not exposed as a production capability"
   ],
   "child_link_relink": {
@@ -158,7 +158,18 @@
       "reconciliation_gets": 1,
       "fresh_identity_verified": true,
       "still_linked_verified_before_write": true,
-      "media_role_label_materialization_safe_required": true
+      "media_role_label_materialization_safe_required": true,
+      "active_desired_option_values": [
+        63
+      ],
+      "remote_option_values_before_and_after": [
+        63,
+        79
+      ],
+      "remote_inactive_option_value_preservation_result": "KnownApplied / configurable_option_remote_values_preserved",
+      "option_consequential_puts": 0,
+      "production_coordinator_reachability_verified": true,
+      "coordinator_outcome": "synchronized"
     },
     "production_restore": {
       "path": "certified active configurable child core writer",
@@ -183,5 +194,5 @@
       "current_provider_option_row_id_after_all_structure_cycles": 10
     }
   },
-  "conclusion": "Frozen Magento V1 existing-family Configurable structure scope is real-target certified for existing-option UPDATE-only, trusted desired-child relink, and trusted still-linked inactive-child disable with exact restore; unsupported destructive/create/remove operations remain fail-closed and public Live support remains false."
+  "conclusion": "Frozen Magento V1 existing-family Configurable structure scope is real-target certified through the production coordinator for existing-option UPDATE-only, non-destructive preservation of remote inactive option values, trusted desired-child relink, and trusted still-linked inactive-child disable with exact restore; unsupported create/remove operations remain fail-closed or unexposed and public Live support remains false."
 }

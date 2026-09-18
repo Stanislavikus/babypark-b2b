@@ -147,15 +147,6 @@ final class AdobeConfigurableOptionCommandExecutor
             );
         }
 
-        if ($this->requiresDestructiveValueRemoval($desiredOption, $existing)) {
-            return $this->knownNotApplied(
-                'configurable_option_value_removal_requires_adobe_validation',
-                $parentSku,
-                $desiredOption,
-                $existing->optionId,
-            );
-        }
-
         return null;
     }
 
@@ -196,9 +187,11 @@ final class AdobeConfigurableOptionCommandExecutor
             );
         }
 
-        if ($this->requiresDestructiveValueRemoval($desiredOption, $existing)) {
-            return $this->knownNotApplied(
-                'configurable_option_value_removal_requires_adobe_validation',
+        $effectiveDesiredOption = $this->preserveObservedValues($desiredOption, $existing);
+
+        if ($this->controlledStateMatches($effectiveDesiredOption, $existing)) {
+            return $this->knownApplied(
+                'configurable_option_remote_values_preserved',
                 $parentSku,
                 $desiredOption,
                 $existing->optionId,
@@ -218,14 +211,14 @@ final class AdobeConfigurableOptionCommandExecutor
             $context,
             $parentSku,
             $existing->optionId,
-            $desiredOption,
+            $effectiveDesiredOption,
         );
 
         return $this->reconcileAfterWrite(
             $input,
             $context,
             $parentSku,
-            $desiredOption,
+            $effectiveDesiredOption,
             $existing->optionId,
             $putResult,
             $putTransportException,
@@ -371,6 +364,31 @@ final class AdobeConfigurableOptionCommandExecutor
         sort($observedIndexes);
 
         return $desiredIndexes === $observedIndexes;
+    }
+
+    private function preserveObservedValues(
+        AdobeConfigurableOptionDesiredState $desired,
+        AdobeConfigurableRemoteOptionState $observed,
+    ): AdobeConfigurableOptionDesiredState {
+        $valuesByIndex = [];
+
+        foreach ($desired->values as $value) {
+            $valuesByIndex[$value->valueIndex] = $value;
+        }
+
+        foreach ($observed->values as $observedIndex) {
+            $valuesByIndex[$observedIndex] ??= new AdobeConfigurableOptionValueDesiredState($observedIndex);
+        }
+
+        ksort($valuesByIndex);
+
+        return new AdobeConfigurableOptionDesiredState(
+            externalFieldKey: $desired->externalFieldKey,
+            attributeId: $desired->attributeId,
+            label: $desired->label,
+            position: $desired->position,
+            values: array_values($valuesByIndex),
+        );
     }
 
     private function requiresDestructiveValueRemoval(

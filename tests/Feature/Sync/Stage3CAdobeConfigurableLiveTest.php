@@ -48,6 +48,7 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandInput;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductStockSimpleWriteExecutor;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductWriteAccessClassification;
 use App\Support\Connectors\AdobePaaS\Command\ConservativeAdobeProductOwnershipTrustPolicy;
+use App\Support\Connectors\AdobePaaS\Semantic\AdobeProductExportSemanticResult;
 use App\Support\Connectors\OAuth1\OAuth1RequestSigner;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorHttpTransport;
@@ -1527,7 +1528,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
     }
 
     #[Test]
-    public function existing_option_update_only_blocks_value_removal_before_put(): void
+    public function existing_option_update_only_preserves_remote_extra_values_without_put(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
@@ -1571,8 +1572,8 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
 
         $result = $executor->executeExistingUpdateOnly($input, $desiredOption);
 
-        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
-        $this->assertSame('configurable_option_value_removal_requires_adobe_validation', $result->reasonCode);
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
+        $this->assertSame('configurable_option_remote_values_preserved', $result->reasonCode);
         $this->assertSame(0, $result->consequentialWriteAttempts);
         $this->assertSame(['GET'], array_map(
             static fn ($entry): string => $entry->request->getMethod(),
@@ -2032,6 +2033,160 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
             static fn ($entry): string => $entry->request->getMethod(),
             $transport->recordedRequests,
         ));
+    }
+
+    #[Test]
+    public function coordinator_preserves_remote_inactive_option_value_and_reaches_lifecycle(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product, $variants] = $this->createConfigurableProduct($workspace, 'CFG-LIFECYCLE-COORD');
+        $parentSku = 'MERCHANT-PARENT-SKU';
+        $active = $variants[0];
+        $inactive = $variants[1];
+        $inactive->update(['is_active' => false]);
+
+        ExternalRecordLink::query()->create($this->merchantConfirmedParentLinkAttributes(
+            $workspace, $account->id, $product, $parentSku, '100',
+        ));
+        ExternalRecordLink::query()->create($this->merchantConfirmedVariantLinkAttributes(
+            $workspace, $account->id, $active, $active->sku, '101',
+        ));
+        ExternalRecordLink::query()->create($this->merchantConfirmedVariantLinkAttributes(
+            $workspace, $account->id, $inactive, $inactive->sku, '102',
+        ));
+
+        $semantic = AdobeConfigurableCommandTestFixtures::configurableSemanticResult(
+            $product->id,
+            [
+                ['variant_id' => (string) $active->id, 'sku' => $active->sku, 'color' => 'blue', 'color_index' => '93'],
+                ['variant_id' => (string) $inactive->id, 'sku' => $inactive->sku, 'color' => 'red', 'color_index' => '94'],
+            ],
+        );
+        $operations = array_values(array_filter(
+            $semantic->operations,
+            static function ($operation) use ($inactive): bool {
+                if ($operation->operation === 'option_assignment'
+                    && ($operation->context['internal_option_key'] ?? null) === 'red'
+                ) {
+                    return false;
+                }
+
+                if (in_array($operation->operation, ['simple_child', 'child_link'], true)
+                    && (string) ($operation->context['variant_id'] ?? '') === (string) $inactive->id
+                ) {
+                    return false;
+                }
+
+                return true;
+            },
+        ));
+        $semantic = new AdobeProductExportSemanticResult(
+            $semantic->findings,
+            $operations,
+        );
+
+        $disabled = false;
+        $transport = new RecordingConnectorHttpTransport(function ($outbound) use (
+            $parentSku,
+            $active,
+            $inactive,
+            &$disabled,
+        ): ConnectorHttpResult {
+            $request = $outbound->request;
+            $method = $request->getMethod();
+            $uri = (string) $request->getUri();
+
+            if (str_ends_with($uri, '/V1/products/'.rawurlencode($parentSku))) {
+                return new ConnectorHttpResult(200, [], json_encode(
+                    AdobeConfigurableCommandTestFixtures::remoteParentPayload($parentSku, ['id' => 100]),
+                    JSON_THROW_ON_ERROR,
+                ));
+            }
+
+            if (str_ends_with($uri, '/V1/products/'.rawurlencode($active->sku))) {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'id' => 101,
+                    'sku' => $active->sku,
+                    'name' => 'Configurable Product',
+                    'attribute_set_id' => 4,
+                    'type_id' => 'simple',
+                    'status' => 1,
+                    'visibility' => 1,
+                    'price' => 100.0,
+                    'custom_attributes' => [['attribute_code' => 'color', 'value' => 93]],
+                    'media_gallery_entries' => [],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            if (str_ends_with($uri, '/V1/products/'.rawurlencode($inactive->sku))) {
+                if ($method === 'PUT') {
+                    $payload = json_decode((string) $request->getBody(), true, flags: JSON_THROW_ON_ERROR);
+                    $this->assertSame(2, $payload['product']['status'] ?? null);
+                    $disabled = true;
+
+                    return new ConnectorHttpResult(200, [], '{}');
+                }
+
+                return new ConnectorHttpResult(200, [], json_encode([
+                    'id' => 102,
+                    'sku' => $inactive->sku,
+                    'name' => 'Inactive Child',
+                    'attribute_set_id' => 4,
+                    'type_id' => 'simple',
+                    'status' => $disabled ? 2 : 1,
+                    'visibility' => 1,
+                    'price' => 100.0,
+                    'custom_attributes' => [['attribute_code' => 'color', 'value' => 94]],
+                    'media_gallery_entries' => [],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            if (str_ends_with($uri, '/V1/configurable-products/'.rawurlencode($parentSku).'/options/all')) {
+                return new ConnectorHttpResult(200, [], json_encode([[
+                    'id' => 201,
+                    'attribute_id' => '100',
+                    'label' => 'color',
+                    'position' => 0,
+                    'values' => [['value_index' => 93], ['value_index' => 94]],
+                ]], JSON_THROW_ON_ERROR));
+            }
+
+            if (str_ends_with($uri, '/V1/configurable-products/'.rawurlencode($parentSku).'/children')) {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    ['sku' => $active->sku],
+                    ['sku' => $inactive->sku],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            return new ConnectorHttpResult(404, [], '{}');
+        });
+        $this->app->instance(ConnectorHttpTransport::class, $transport);
+
+        $result = app(AdobeConfigurableProductCommandCoordinator::class)->execute(
+            $workspace->id,
+            $account->id,
+            $semantic,
+            'UAH',
+            $this->metadataFixture(),
+            new SyncLiveConsequentialWriteGateStub(true),
+        );
+
+        $this->assertSame(SyncLiveOutcome::Synchronized, $result->outcome);
+        $this->assertTrue(collect($result->commandEvidence)->contains(
+            fn ($entry) => $entry->commandKind === 'configurable_option'
+                && $entry->reasonCode === 'configurable_option_remote_values_preserved'
+                && $entry->consequentialWriteAttempts === 0,
+        ));
+        $this->assertTrue(collect($result->commandEvidence)->contains(
+            fn ($entry) => $entry->commandKind === 'inactive_child_lifecycle'
+                && $entry->reasonCode === 'inactive_linked_child_disabled'
+                && $entry->subjectSku === $inactive->sku
+                && $entry->consequentialWriteAttempts === 1,
+        ));
+        $this->assertSame(1, collect($transport->recordedRequests)->filter(
+            fn ($entry) => $entry->request->getMethod() === 'PUT',
+        )->count());
     }
 
     #[Test]
