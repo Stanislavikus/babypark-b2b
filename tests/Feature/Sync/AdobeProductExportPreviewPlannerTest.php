@@ -337,9 +337,15 @@ class AdobeProductExportPreviewPlannerTest extends TestCase
             fn ($operation) => ($operation->context['value_index'] ?? null) === '95',
         ));
 
-        $simpleChild = collect($operations)->first(
-            fn ($operation) => $operation->operation === 'simple_child',
+        $simpleChildren = collect($operations)
+            ->filter(fn ($operation) => $operation->operation === 'simple_child')
+            ->values();
+        $this->assertSame(
+            ['VAR-BLUE', 'VAR-RED'],
+            $simpleChildren->map(fn ($operation) => $operation->context['sku'])->all(),
         );
+
+        $simpleChild = $simpleChildren->first();
         $this->assertNotNull($simpleChild);
         $this->assertSame('VAR-BLUE', $simpleChild->context['sku']);
         $this->assertSame('not_visible', $simpleChild->context['visibility']);
