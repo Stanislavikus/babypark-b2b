@@ -2,16 +2,22 @@
 
 namespace App\Models;
 
+use App\Services\ProductStructure\BasicProductStructureReconciler;
+use App\Support\Workspace\BelongsToWorkspace;
+use App\Support\Workspace\WorkspaceContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Product extends Model
 {
+    use BelongsToWorkspace;
     use HasFactory;
 
     protected $fillable = [
+        'workspace_id',
         'onec_guid',
         'sku',
         'barcode_ean',
@@ -19,6 +25,7 @@ class Product extends Model
         'name',
         'category_id',
         'brand',
+        'merchant_type',
         'unit',
         'min_order_quantity',
         'order_step',
@@ -27,8 +34,8 @@ class Product extends Model
         'units_per_box',
         'boxes_per_pallet',
         'lead_time_days',
-        'weight_netto',
-        'weight_brutto',
+        'net_weight',
+        'gross_weight',
         'volume_m3',
         'depth_mm',
         'width_mm',
@@ -38,10 +45,27 @@ class Product extends Model
         'rozetka_category_id',
         'meta_title',
         'meta_description',
-        'product_url',
+        'url',
         'is_active',
         'synced_at',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Product $product): void {
+            if ($product->getAttribute('product_type_id') !== null) {
+                return;
+            }
+
+            $reconciler = app(BasicProductStructureReconciler::class);
+            if (! $reconciler->available()) {
+                return;
+            }
+
+            $workspaceId = (string) ($product->getAttribute('workspace_id') ?? app(WorkspaceContext::class)->id());
+            $product->setAttribute('product_type_id', $reconciler->ensureWorkspace($workspaceId)->id);
+        });
+    }
 
     protected function casts(): array
     {
@@ -51,10 +75,15 @@ class Product extends Model
             'synced_at' => 'datetime',
             'min_order_quantity' => 'integer',
             'order_step' => 'integer',
-            'weight_netto' => 'decimal:3',
-            'weight_brutto' => 'decimal:3',
+            'net_weight' => 'decimal:3',
+            'gross_weight' => 'decimal:3',
             'volume_m3' => 'decimal:6',
         ];
+    }
+
+    public function productType(): BelongsTo
+    {
+        return $this->belongsTo(ProductType::class);
     }
 
     public function category(): BelongsTo
@@ -62,8 +91,31 @@ class Product extends Model
         return $this->belongsTo(Category::class);
     }
 
+    public function workspace(): BelongsTo
+    {
+        return $this->belongsTo(Workspace::class);
+    }
+
     public function variants(): HasMany
     {
         return $this->hasMany(ProductVariant::class);
+    }
+
+    public function syncChannelSelections(): HasMany
+    {
+        return $this->hasMany(SyncConfigurationProductSelection::class, 'product_id');
+    }
+
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class)
+            ->using(ProductTag::class)
+            ->withPivot('workspace_id')
+            ->withPivotValue('workspace_id', $this->relationWorkspaceId());
+    }
+
+    private function relationWorkspaceId(): string
+    {
+        return (string) ($this->getAttribute('workspace_id') ?? app(WorkspaceContext::class)->id());
     }
 }

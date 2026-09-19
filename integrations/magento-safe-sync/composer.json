@@ -1,0 +1,21 @@
+{
+    "name": "b2b-platform/magento-safe-sync",
+    "description": "First-party Magento Safe Sync foundation for entity-bound product verification and isolated simple product writes.",
+    "type": "magento2-module",
+    "license": [
+        "proprietary"
+    ],
+    "require": {
+        "php": ">=8.4 <8.6",
+        "magento/framework": ">=103.0.8-p5 <103.0.10",
+        "magento/module-catalog": ">=104.0.8-p5 <104.0.10"
+    },
+    "autoload": {
+        "files": [
+            "registration.php"
+        ],
+        "psr-4": {
+            "B2BPlatform\\MagentoSafeSync\\": ""
+        }
+    }
+}

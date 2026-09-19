@@ -2,13 +2,17 @@
 
 namespace App\Livewire\Cabinet;
 
-use App\Enums\ReservationStatus;
+use App\Enums\CatalogProductDisplayState;
 use App\Models\Category;
-use App\Models\Product;
 use App\Models\ProductVariant;
-use App\Models\Reservation;
+use App\Services\Availability\ReservationCreator;
+use App\Services\Pricing\CustomerCatalogQuery;
+use App\Services\Pricing\PriceResolutionSnapshot;
+use App\Support\CatalogRowData;
+use App\Support\Pricing\CustomerCatalogCriteria;
+use App\Support\Pricing\CustomerFacingPriceLabel;
 use App\Support\SessionCart;
-use Illuminate\Database\Eloquent\Builder;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
@@ -161,16 +165,17 @@ class Catalog extends Component
      */
     public function reserve(int $variantId, int $minQty): void
     {
-        $contractor = Auth::guard('contractor')->user();
+        $customer = Auth::guard('customer')->user();
         $qty = max($minQty, (int) ($this->quantities[$variantId] ?? $minQty));
 
-        Reservation::create([
-            'contractor_id' => $contractor->id,
-            'variant_id' => $variantId,
-            'quantity' => $qty,
-            'status' => ReservationStatus::Active,
-            'expires_at' => now()->addHours(config('b2b.reservation_ttl_hours', 48)),
-        ]);
+        $variant = ProductVariant::query()->findOrFail($variantId);
+
+        app(ReservationCreator::class)->create(
+            $variant,
+            $qty,
+            customer: $customer,
+            ttlMinutes: config('b2b.reservation_ttl_hours', 48) * 60,
+        );
 
         $this->flashMessage = 'Бронювання створено';
         $this->dispatch('flash', message: $this->flashMessage);
@@ -178,95 +183,50 @@ class Catalog extends Component
 
     public function render()
     {
-        $contractor = Auth::guard('contractor')->user();
+        $customer = Auth::guard('customer')->user();
+        $snapshot = new PriceResolutionSnapshot(CarbonImmutable::now());
 
-        $query = Product::query()
-            ->where('is_active', true)
-            ->whereHas('variants.prices', fn ($q) => $q->where('contractor_id', $contractor->id))
-            ->with([
-                'category',
-                'variants' => fn ($q) => $q->where('is_active', true),
-                'variants.prices' => fn ($q) => $q->where('contractor_id', $contractor->id),
-                'variants.stocks',
-            ]);
+        $criteria = CustomerCatalogCriteria::fromLegacy(
+            search: $this->search,
+            categoryIds: $this->selectedCategories,
+            brandIds: $this->selectedBrands,
+            sortBy: $this->sortBy,
+            sortDir: $this->sortDir,
+        );
 
-        if (filled($this->search)) {
-            $query->where(fn ($q) => $q
-                ->where('name', 'like', "%{$this->search}%")
-                ->orWhere('sku', 'like', "%{$this->search}%")
-                ->orWhere('brand', 'like', "%{$this->search}%")
-            );
-        }
-
-        if (! empty($this->selectedCategories)) {
-            $query->whereIn('category_id', $this->selectedCategories);
-        }
-
-        if (! empty($this->selectedBrands)) {
-            $query->whereIn('brand', $this->selectedBrands);
-        }
-
-        $query = $this->applySorting($query, $contractor);
-        $products = $query->paginate(24);
+        $catalogQuery = app(CustomerCatalogQuery::class);
+        $products = $catalogQuery->paginateFor($customer, $criteria);
 
         $productData = [];
         foreach ($products as $product) {
-            $threshold = $product->category?->stock_display_threshold ?? 10;
-            $activeVariants = $product->variants->where('is_active', true);
-            $variantsWithPrice = $activeVariants->filter(fn ($v) => $v->prices->isNotEmpty());
-            $firstVariant = $variantsWithPrice->first();
-
-            $allPrices = $variantsWithPrice->flatMap(fn ($v) => $v->prices);
-            $maxRrp = (float) ($allPrices->max('recommended_retail_price') ?? 0);
-            $maxMyPrice = (float) ($allPrices->max('price_with_vat') ?? 0);
-
-            $totalAvailQty = $activeVariants->sum(fn ($v) => $v->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0)));
-            $totalExpQty = $activeVariants->sum(fn ($v) => $v->stocks->sum('expected_quantity')) ?? 0;
-            $earliestExpDate = $activeVariants
-                ->flatMap(fn ($v) => $v->stocks)
-                ->whereNotNull('expected_date')
-                ->sortBy('expected_date')
-                ->first()
-                ?->expected_date;
-
-            $badge = ProductVariant::badgeFromQty($totalAvailQty, $totalExpQty, $earliestExpDate, $threshold);
-
-            $variantAvailQty = $firstVariant
-                ? $firstVariant->stocks->sum(fn ($s) => $s->quantity - ($s->reserved ?? 0))
-                : 0;
-            $variantExpQty = $firstVariant
-                ? ($firstVariant->stocks->sum('expected_quantity') ?? 0)
-                : 0;
-
-            $maxQty = match ($badge['color']) {
-                'success', 'warning' => $variantAvailQty,
-                'info' => $variantExpQty,
-                default => 0,
-            };
-
-            $minQty = max(1, $product->min_order_quantity);
-            $step = max(1, $product->order_step);
+            $row = CatalogRowData::forProduct($product, $customer, 1, $snapshot);
+            $firstVariant = $row->displayedVariant;
 
             if ($firstVariant && ! isset($this->quantities[$firstVariant->id])) {
-                $this->quantities[$firstVariant->id] = $minQty;
+                $this->quantities[$firstVariant->id] = $row->minQty;
             }
 
             $productData[$product->id] = [
-                'badge' => $badge,
+                'badge' => $row->badge,
                 'firstVariant' => $firstVariant,
-                'maxRrp' => $maxRrp,
-                'maxMyPrice' => $maxMyPrice,
-                'maxQty' => $maxQty,
-                'minQty' => $minQty,
-                'step' => $step,
+                'maxRrp' => (float) ($row->rrp ?? 0),
+                'maxMyPrice' => (float) ($row->price ?? 0),
+                'priceLabel' => $row->myPriceDisplay !== null
+                    ? CustomerFacingPriceLabel::forDisplay($row->myPriceDisplay)
+                    : ($row->displayState === CatalogProductDisplayState::ConfigurationError
+                        ? 'Помилка конфігурації цін'
+                        : ($row->displayState === CatalogProductDisplayState::PriceUnavailable
+                            ? 'Ціна недоступна'
+                            : null)),
+                'maxQty' => $row->maxQty,
+                'minQty' => $row->minQty,
+                'step' => $row->step,
+                'displayState' => $row->displayState,
             ];
         }
 
         $categories = Category::orderBy('name')->get();
-        $brands = Product::where('is_active', true)
-            ->whereNotNull('brand')
-            ->whereHas('variants.prices', fn ($q) => $q->where('contractor_id', $contractor->id))
-            ->distinct()->orderBy('brand')->pluck('brand');
+        $brands = $catalogQuery->availableBrands($customer);
 
         return view('livewire.cabinet.catalog', compact(
             'products',
@@ -274,70 +234,5 @@ class Catalog extends Component
             'categories',
             'brands',
         ));
-    }
-
-    private function applySorting(Builder $query, $contractor): Builder
-    {
-        $dir = in_array($this->sortDir, ['asc', 'desc']) ? $this->sortDir : 'asc';
-
-        return match ($this->sortBy) {
-            'sku' => $query->orderBy('sku', $dir),
-            'name' => $query->orderBy('name', $dir),
-            'category' => $query->orderBy(
-                Category::select('name')
-                    ->whereColumn('categories.id', 'products.category_id')
-                    ->limit(1),
-                $dir
-            ),
-            'brand' => $query->orderBy('brand', $dir),
-            'stock' => $this->applyStockSorting($query, $dir),
-            'price' => $query->orderByRaw(
-                "COALESCE((SELECT MAX(p.price_with_vat) FROM prices p
-                    INNER JOIN product_variants pv ON p.variant_id = pv.id
-                    WHERE pv.product_id = products.id
-                    AND p.contractor_id = ?), 0) {$dir}",
-                [$contractor->id]
-            ),
-            'rrp' => $query->orderByRaw(
-                "COALESCE((SELECT MAX(p.recommended_retail_price) FROM prices p
-                    INNER JOIN product_variants pv ON p.variant_id = pv.id
-                    WHERE pv.product_id = products.id
-                    AND p.contractor_id = ?), 0) {$dir}",
-                [$contractor->id]
-            ),
-            'margin' => $query->orderByRaw(
-                "COALESCE((SELECT MAX(p.recommended_retail_price) - MIN(p.price_with_vat) FROM prices p
-                    INNER JOIN product_variants pv ON p.variant_id = pv.id
-                    WHERE pv.product_id = products.id
-                    AND p.contractor_id = ?), 0) {$dir}",
-                [$contractor->id]
-            ),
-            default => $query->orderBy('sku', 'asc'),
-        };
-    }
-
-    private function applyStockSorting(Builder $query, string $dir): Builder
-    {
-        $totalQty = '(SELECT COALESCE(SUM(s.quantity), 0)
-                      FROM stocks s
-                      INNER JOIN product_variants pv ON s.variant_id = pv.id
-                      WHERE pv.product_id = products.id)';
-
-        $minExpectedDate = '(SELECT MIN(s.expected_date)
-                            FROM stocks s
-                            INNER JOIN product_variants pv ON s.variant_id = pv.id
-                            WHERE pv.product_id = products.id
-                            AND s.expected_date IS NOT NULL)';
-
-        $priorityExpr = "CASE
-            WHEN {$totalQty} > 0 THEN 0
-            WHEN {$minExpectedDate} IS NOT NULL THEN 1
-            ELSE 2
-        END";
-
-        return $query
-            ->orderByRaw("{$priorityExpr} {$dir}")
-            ->orderByRaw("{$totalQty} DESC")
-            ->orderByRaw("{$minExpectedDate} ASC");
     }
 }

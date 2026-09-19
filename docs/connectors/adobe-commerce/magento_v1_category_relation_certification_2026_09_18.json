@@ -1,0 +1,46 @@
+{
+    "campaign": "Magento V1 P-01 category relation runtime",
+    "date": "2026-09-18",
+    "target_sku": "1234567890",
+    "temporary_external_category_id": "7",
+    "result": "PASS",
+    "baseline": {
+        "entity_id": 1,
+        "type_id": "simple",
+        "category_ids": [
+            "5"
+        ]
+    },
+    "add": {
+        "outcome": "synchronized",
+        "findings": [],
+        "category_ids": [
+            "5",
+            "7"
+        ],
+        "assignment_state": "managed",
+        "assignment_anchor_entity_id": "1"
+    },
+    "restore": {
+        "outcome": "synchronized",
+        "findings": [],
+        "category_ids": [
+            "5"
+        ],
+        "remaining_assignment_rows": 0
+    },
+    "cleanup": {
+        "temporary_erl_remaining": 0,
+        "temporary_assignment_rows_remaining": 0,
+        "temporary_variant_remaining": 0,
+        "temporary_product_remaining": 0,
+        "temporary_category_remaining": 0
+    },
+    "final_independent_read": {
+        "entity_id": 1,
+        "sku": "1234567890",
+        "category_ids": [
+            "5"
+        ]
+    }
+}
