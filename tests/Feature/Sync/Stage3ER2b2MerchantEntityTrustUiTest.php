@@ -62,7 +62,7 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
     }
 
     #[Test]
-    public function live_only_actor_does_not_see_entity_trust_work_while_live_support_is_false(): void
+    public function live_only_actor_sees_entity_trust_section_but_cannot_review_or_confirm(): void
     {
         [$account, $product] = $this->seedSimpleReadyFixture('UI-LIVEONLY-SKU', 5001);
 
@@ -73,12 +73,13 @@ class Stage3ER2b2MerchantEntityTrustUiTest extends TestCase
 
         Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->assertSet('liveSupportAvailable', false)
-            ->assertSet('entityTrustSectionVisible', false)
+            ->assertSet('liveSupportAvailable', true)
+            ->assertSet('entityTrustSectionVisible', true)
             ->assertSet('entityTrustCanReviewOrConfirm', false)
             ->assertSet('entityTrustWorkingSet', [])
-            ->assertDontSee('data-testid="sync-live-entity-trust-section"', false)
-            ->assertSee('data-testid="sync-live-support-not-enabled"', false);
+            ->assertSee('data-testid="sync-live-entity-trust-section"', false)
+            ->assertDontSee('data-testid="sync-live-entity-trust-action-review"', false)
+            ->assertDontSee('data-testid="sync-live-support-not-enabled"', false);
     }
 
     #[Test]

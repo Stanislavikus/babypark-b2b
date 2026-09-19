@@ -4,6 +4,7 @@ use App\Support\Connectors\AdobePaaS\AdobeFieldOptionMappingOptionValidator;
 use App\Support\Connectors\AdobePaaS\AdobePaaSAccountSchema;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectorAdapter;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportLiveCapability;
+use App\Support\Connectors\AdobePaaS\AdobeProductExportLiveRuntimeReadiness;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportPreviewCapability;
 
 return [
@@ -27,6 +28,7 @@ return [
             ],
             'preview_capability' => AdobeProductExportPreviewCapability::class,
             'live_capability' => AdobeProductExportLiveCapability::class,
+            'live_runtime_readiness' => AdobeProductExportLiveRuntimeReadiness::class,
             'field_option_mapping_validator' => AdobeFieldOptionMappingOptionValidator::class,
         ],
     ],

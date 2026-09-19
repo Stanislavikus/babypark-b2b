@@ -10,6 +10,10 @@ use App\Support\Sync\Preview\ProductExecutionAggregate;
 
 final class TestSyncLiveCapability implements SyncLiveConnectorCapability
 {
+    public int $prepareRunCalls = 0;
+
+    public int $executeProductCalls = 0;
+
     /**
      * @param  array<string, mixed>  $snapshot
      */
@@ -18,6 +22,8 @@ final class TestSyncLiveCapability implements SyncLiveConnectorCapability
         string $connectorAccountId,
         array $snapshot,
     ): object {
+        $this->prepareRunCalls++;
+
         return (object) [
             'workspace_id' => $workspaceId,
             'connector_account_id' => $connectorAccountId,
@@ -34,6 +40,8 @@ final class TestSyncLiveCapability implements SyncLiveConnectorCapability
         object $runContext,
         SyncLiveConsequentialWriteGate $consequentialWriteGate,
     ): SyncLiveProductExecutionResult {
+        $this->executeProductCalls++;
+
         return new SyncLiveProductExecutionResult(
             outcome: SyncLiveOutcome::Synchronized,
             findings: [],

@@ -36,6 +36,7 @@ use App\Support\Sync\ConnectorExecutionConfiguration;
 use App\Support\Sync\Exceptions\SyncLiveAdmissionException;
 use App\Support\Sync\Exceptions\SyncPreviewAdmissionException;
 use App\Support\Sync\Exceptions\SyncRuntimeTimingConfigurationException;
+use App\Support\Sync\Live\ConnectorLiveRuntimeReadinessResolver;
 use App\Support\Sync\Live\SyncLiveConnectorCapabilityResolver;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
 use App\Support\Sync\Preview\SyncPreviewConnectorCapabilityResolver;
@@ -48,6 +49,7 @@ use Illuminate\Contracts\Queue\Interruptible;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
@@ -55,6 +57,8 @@ use Tests\Concerns\ConfiguresSyncSupportProfiles;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\Concerns\InteractsWithFieldMappingFixtures;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
+use Tests\Support\Sync\TestConnectorLiveRuntimeReadiness;
+use Tests\Support\Sync\TestSyncLiveCapability;
 use Tests\TestCase;
 
 class Stage3ALiveSafetyFoundationTest extends TestCase
@@ -603,14 +607,14 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
     }
 
     #[Test]
-    public function adobe_production_live_support_remains_false(): void
+    public function adobe_production_live_support_is_true_after_real_target_truth_flip(): void
     {
         app()->forgetInstance(ConnectorProfileRegistry::class);
 
         $account = $this->createConnectorAccount();
         $resolver = app(ConnectorSyncSupportResolver::class);
 
-        $this->assertFalse($resolver->supports(
+        $this->assertTrue($resolver->supports(
             $account,
             SyncDataDomain::Products,
             SyncSemanticOperation::Export,
@@ -655,6 +659,62 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         $this->expectException(SyncLiveAdmissionException::class);
 
         app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+    }
+
+    #[Test]
+    public function live_admission_runtime_readiness_probe_runs_outside_database_transaction(): void
+    {
+        Bus::fake();
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->grantLivePermission($account->workspace);
+        $this->seedCompletedPreview($account, $configuration);
+
+        $readiness = new TestConnectorLiveRuntimeReadiness;
+        $this->app->instance(TestConnectorLiveRuntimeReadiness::class, $readiness);
+
+        $entryTransactionLevel = DB::transactionLevel();
+        $run = app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+
+        $this->assertSame([$entryTransactionLevel], $readiness->transactionLevels);
+        $this->assertSame(1, $readiness->checks);
+        $this->assertSame(SyncRunStatus::Queued, $run->status);
+        Bus::assertDispatched(SyncLiveRunJob::class);
+    }
+
+    #[Test]
+    public function live_admission_fails_closed_when_runtime_readiness_is_not_ready(): void
+    {
+        Bus::fake();
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->grantLivePermission($account->workspace);
+        $this->seedCompletedPreview($account, $configuration);
+
+        $readiness = new TestConnectorLiveRuntimeReadiness;
+        $readiness->ready = false;
+        $this->app->instance(TestConnectorLiveRuntimeReadiness::class, $readiness);
+
+        $entryTransactionLevel = DB::transactionLevel();
+
+        try {
+            app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+            $this->fail('Expected runtime readiness to block Live admission.');
+        } catch (SyncLiveAdmissionException $exception) {
+            $this->assertSame(
+                'Connector account is not ready for live execution right now.',
+                $exception->getMessage(),
+            );
+        }
+
+        $this->assertSame([$entryTransactionLevel], $readiness->transactionLevels);
+        $this->assertSame(0, SyncRun::withoutWorkspaceScope()
+            ->where('sync_configuration_id', $configuration->id)
+            ->where('mode', SyncRunMode::Live)
+            ->count());
+        Bus::assertNotDispatched(SyncLiveRunJob::class);
     }
 
     #[Test]
@@ -709,6 +769,89 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         $this->assertNotNull($run->completed_at);
         $this->assertNotNull($run->writer_deadline_at);
         $this->assertNotNull($run->recoverable_after);
+    }
+
+    #[Test]
+    public function live_worker_fails_before_product_execution_when_runtime_readiness_is_not_ready(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+        $sourcePreview = $this->seedCompletedPreview($account, $configuration);
+
+        $run = SyncRun::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'sync_configuration_id' => $configuration->id,
+            'configuration_revision' => $configuration->configuration_revision,
+            'mode' => SyncRunMode::Live,
+            'semantic_operation' => SyncSemanticOperation::Export,
+            'status' => SyncRunStatus::Queued,
+            'configuration_snapshot' => $sourcePreview->configuration_snapshot,
+            'source_preview_run_id' => $sourcePreview->id,
+        ]);
+
+        $readiness = new TestConnectorLiveRuntimeReadiness;
+        $readiness->ready = false;
+        $this->app->instance(TestConnectorLiveRuntimeReadiness::class, $readiness);
+
+        $capability = new TestSyncLiveCapability;
+        $this->app->instance(TestSyncLiveCapability::class, $capability);
+
+        $entryTransactionLevel = DB::transactionLevel();
+        (new SyncLiveRunJob($account->workspace_id, $account->id, $run->id))->handle(
+            app(ProductExecutionAggregateBuilder::class),
+            app(SyncLiveConnectorCapabilityResolver::class),
+            app(ConnectorLiveRuntimeReadinessResolver::class),
+        );
+
+        $this->assertSame([$entryTransactionLevel], $readiness->transactionLevels);
+        $this->assertSame(1, $readiness->checks);
+        $this->assertSame(1, $capability->prepareRunCalls);
+        $this->assertSame(0, $capability->executeProductCalls);
+        $this->assertSame(SyncRunStatus::Failed, $run->fresh()->status);
+        $this->assertSame(0, SyncRunItem::withoutWorkspaceScope()->where('sync_run_id', $run->id)->count());
+    }
+
+    #[Test]
+    public function live_worker_rechecks_writer_gate_after_runtime_readiness(): void
+    {
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+        $sourcePreview = $this->seedCompletedPreview($account, $configuration);
+
+        $run = SyncRun::withoutWorkspaceScope()->create([
+            'id' => (string) Str::uuid(),
+            'workspace_id' => $account->workspace_id,
+            'sync_configuration_id' => $configuration->id,
+            'configuration_revision' => $configuration->configuration_revision,
+            'mode' => SyncRunMode::Live,
+            'semantic_operation' => SyncSemanticOperation::Export,
+            'status' => SyncRunStatus::Queued,
+            'configuration_snapshot' => $sourcePreview->configuration_snapshot,
+            'source_preview_run_id' => $sourcePreview->id,
+        ]);
+
+        $readiness = new TestConnectorLiveRuntimeReadiness;
+        $readiness->onCheck = static function () use ($configuration): void {
+            SyncConfiguration::withoutWorkspaceScope()
+                ->whereKey($configuration->id)
+                ->update(['configuration_revision' => str_repeat('f', 64)]);
+        };
+        $this->app->instance(TestConnectorLiveRuntimeReadiness::class, $readiness);
+
+        $capability = new TestSyncLiveCapability;
+        $this->app->instance(TestSyncLiveCapability::class, $capability);
+
+        (new SyncLiveRunJob($account->workspace_id, $account->id, $run->id))->handle(
+            app(ProductExecutionAggregateBuilder::class),
+            app(SyncLiveConnectorCapabilityResolver::class),
+            app(ConnectorLiveRuntimeReadinessResolver::class),
+        );
+
+        $this->assertSame(1, $readiness->checks);
+        $this->assertSame(0, $capability->executeProductCalls);
+        $this->assertSame(SyncRunStatus::Failed, $run->fresh()->status);
+        $this->assertSame(0, SyncRunItem::withoutWorkspaceScope()->where('sync_run_id', $run->id)->count());
     }
 
     #[Test]

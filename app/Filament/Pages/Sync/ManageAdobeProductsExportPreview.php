@@ -393,7 +393,14 @@ class ManageAdobeProductsExportPreview extends Page
             );
         } catch (AuthorizationException) {
             abort(403);
-        } catch (SyncLiveAdmissionException) {
+        } catch (SyncLiveAdmissionException $exception) {
+            if ($exception->isRuntimeNotReady()) {
+                Notification::make()
+                    ->title(__('sync_live.errors.runtime_not_ready'))
+                    ->danger()
+                    ->send();
+            }
+
             $this->refreshPresentation();
 
             return;

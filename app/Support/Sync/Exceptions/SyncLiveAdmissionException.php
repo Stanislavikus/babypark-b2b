@@ -6,6 +6,8 @@ use RuntimeException;
 
 final class SyncLiveAdmissionException extends RuntimeException
 {
+    private const string RUNTIME_NOT_READY_MESSAGE = 'Connector account is not ready for live execution right now.';
+
     public static function notAuthorized(): self
     {
         return new self('Live execution is not authorized for this workspace.');
@@ -49,6 +51,16 @@ final class SyncLiveAdmissionException extends RuntimeException
     public static function previewEvidenceMissing(): self
     {
         return new self('A completed current-revision preview run is required before live execution.');
+    }
+
+    public static function runtimeNotReady(): self
+    {
+        return new self(self::RUNTIME_NOT_READY_MESSAGE);
+    }
+
+    public function isRuntimeNotReady(): bool
+    {
+        return $this->getMessage() === self::RUNTIME_NOT_READY_MESSAGE;
     }
 
     public static function dispatchFailed(?\Throwable $previous = null): self

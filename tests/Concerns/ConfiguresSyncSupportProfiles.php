@@ -10,6 +10,7 @@ use App\Support\Connectors\ConnectorProfileRegistry;
 use Illuminate\Contracts\Container\Container;
 use Tests\Support\Connectors\TestSyncSupportConnectorAccountSchema;
 use Tests\Support\Connectors\TestSyncSupportConnectorAdapter;
+use Tests\Support\Sync\TestConnectorLiveRuntimeReadiness;
 use Tests\Support\Sync\TestFieldOptionMappingOptionValidator;
 use Tests\Support\Sync\TestSyncLiveCapability;
 use Tests\Support\Sync\TestSyncPreviewCapability;
@@ -43,6 +44,7 @@ trait ConfiguresSyncSupportProfiles
             'capabilities' => [],
             'preview_capability' => TestSyncPreviewCapability::class,
             'live_capability' => TestSyncLiveCapability::class,
+            'live_runtime_readiness' => TestConnectorLiveRuntimeReadiness::class,
             'field_option_mapping_validator' => TestFieldOptionMappingOptionValidator::class,
         ];
 
@@ -76,6 +78,7 @@ trait ConfiguresSyncSupportProfiles
         $profiles = config('connectors.profiles', []);
         $profileCode = 'adobe_commerce_paas_oauth1_integration';
         $profiles[$profileCode]['adapter'] = TestSyncSupportConnectorAdapter::class;
+        $profiles[$profileCode]['live_runtime_readiness'] = TestConnectorLiveRuntimeReadiness::class;
 
         $container->instance(ConnectorProfileRegistry::class, new ConnectorProfileRegistry(
             $container,
@@ -116,6 +119,7 @@ trait ConfiguresSyncSupportProfiles
             'capabilities' => [],
             'preview_capability' => AdobeProductExportPreviewCapability::class,
             'live_capability' => TestSyncLiveCapability::class,
+            'live_runtime_readiness' => TestConnectorLiveRuntimeReadiness::class,
             'field_option_mapping_validator' => TestFieldOptionMappingOptionValidator::class,
         ];
 
@@ -157,6 +161,7 @@ trait ConfiguresSyncSupportProfiles
             'capabilities' => [],
             'preview_capability' => TestSyncPreviewCapability::class,
             'live_capability' => TestSyncLiveCapability::class,
+            'live_runtime_readiness' => TestConnectorLiveRuntimeReadiness::class,
             'field_option_mapping_validator' => TestFieldOptionMappingOptionValidator::class,
         ];
 

@@ -15,8 +15,10 @@ use App\Support\Connectors\Exceptions\DisabledConnectorProfileException;
 use App\Support\Connectors\Exceptions\InvalidConnectorProfileConfiguration;
 use App\Support\Connectors\Exceptions\UnsupportedConnectorCapabilityException;
 use App\Support\Connectors\ValidatedConnectorAccountState;
+use App\Support\Sync\Live\ConnectorLiveRuntimeReadiness;
 use Illuminate\Contracts\Container\Container;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Support\Sync\TestConnectorLiveRuntimeReadiness;
 use Tests\TestCase;
 
 class ConnectorProfileRegistryTest extends TestCase
@@ -38,6 +40,8 @@ class ConnectorProfileRegistryTest extends TestCase
             ConnectorCapability::AccountSetup,
         ], $definition->capabilities);
         $this->assertTrue($definition->supports(ConnectorCapability::AccountSetup));
+        $this->assertNotNull($definition->liveRuntimeReadinessClass);
+        $this->assertTrue(is_subclass_of($definition->liveRuntimeReadinessClass, ConnectorLiveRuntimeReadiness::class));
 
         $adapter = $registry->resolveAdapter('adobe_commerce_paas_oauth1_integration');
 
@@ -236,6 +240,30 @@ class ConnectorProfileRegistryTest extends TestCase
     }
 
     #[Test]
+    public function validates_live_runtime_readiness_contract_when_configured(): void
+    {
+        $registry = $this->registryWithProfiles([
+            'ready_profile' => $this->validProfile([
+                'live_runtime_readiness' => TestConnectorLiveRuntimeReadiness::class,
+            ]),
+        ]);
+
+        $this->assertSame(
+            TestConnectorLiveRuntimeReadiness::class,
+            $registry->profileDefinition('ready_profile')->liveRuntimeReadinessClass,
+        );
+
+        $this->expectException(InvalidConnectorProfileConfiguration::class);
+        $this->expectExceptionMessage('must implement App\Support\Sync\Live\ConnectorLiveRuntimeReadiness');
+
+        $this->registryWithProfiles([
+            'broken_profile' => $this->validProfile([
+                'live_runtime_readiness' => NotAConnectorLiveRuntimeReadiness::class,
+            ]),
+        ]);
+    }
+
+    #[Test]
     public function resolves_adapter_through_container_not_direct_instantiation(): void
     {
         $expectedAdapter = new TestConnectorAdapter('container-bound');
@@ -419,6 +447,8 @@ final class TestConnectorAdapter implements ConnectorAdapter
 final class NotAConnectorAdapter {}
 
 final class NotAConnectorAccountSchema {}
+
+final class NotAConnectorLiveRuntimeReadiness {}
 
 final class TestConnectorAccountSchema implements ConnectorAccountSchema
 {

@@ -632,6 +632,7 @@
     "sync_live.confirmation.message": "Transfer products to Adobe Commerce? This is a real action — data will be sent to your store. We will re-check current product data before transfer.",
     "sync_live.confirmation.blocked_products_notice": "Products that are still not ready during the fresh transfer check will not be changed externally. Blocked from the last check: :count.",
     "sync_live.errors.start_failed": "Could not start the transfer. Please try again later.",
+    "sync_live.errors.runtime_not_ready": "Adobe Commerce is not ready for transfer right now. Check the connection and try again.",
     "sync_live.outcomes.synchronized": "Synchronized",
     "sync_live.outcomes.not_applied": "Not transferred",
     "sync_live.outcomes.partial": "Partially synchronized",

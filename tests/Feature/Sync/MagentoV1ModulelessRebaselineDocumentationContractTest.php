@@ -270,10 +270,10 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
         $content = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
         $this->assertStringContainsString('## Moduleless standard-path migration record', $content);
-        $this->assertStringContainsString('resolved in runtime and core real-target verified — 2026-09-11', $content);
+        $this->assertStringContainsString('core runtime verified — 2026-09-11; Export Live truth flip resolved — 2026-09-19', $content);
         $this->assertStringContainsString('standard trusted Simple Product execution no longer calls', $content);
         $this->assertStringContainsString('AdobeProductSimpleCommandExecutor', $content);
-        $this->assertStringContainsString('Adobe Products/Export/Live public support remains `false`', $content);
+        $this->assertStringContainsString('Adobe Products/Export/Live public support is `true` for the certified bounded standard-path V1 scope', $content);
     }
 
     #[Test]
@@ -285,8 +285,8 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
         $this->assertStringContainsString('runtime migrated and core verified — 2026-09-11', $content);
         $this->assertStringContainsString('AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor', $content);
         $this->assertStringContainsString('controlled stock WRITE `150 -> 151`', $content);
-        $this->assertStringContainsString('`Adobe Products / Export / Live = false` remains authoritative', $content);
-        $this->assertStringContainsString('field-by-field Simple Product WRITE validation', $content);
+        $this->assertStringContainsString('Adobe Products / Export / Live = true', $content);
+        $this->assertStringContainsString('Scope that remains pending after the 2026-09-19 Export Live truth flip', $content);
     }
 
     #[Test]
@@ -296,7 +296,9 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
 
         $this->assertStringContainsString('Inventory presence does **not** mean current connector support', $content);
         $this->assertStringContainsString('Completeness is no longer proven by a magic stable-field count', $content);
-        $this->assertStringContainsString('Public support truth remains unchanged: `Adobe Products / Export / Live = false`', $content);
+        $this->assertStringContainsString('Public support truth:', $content);
+        $this->assertStringContainsString('`Adobe Products / Export / Live = true`', $content);
+        $this->assertStringContainsString('`Adobe Products / Import / Live = false`', $content);
     }
 
     #[Test]

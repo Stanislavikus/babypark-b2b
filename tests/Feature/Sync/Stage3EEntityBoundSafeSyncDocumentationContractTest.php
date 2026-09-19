@@ -323,29 +323,31 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
     }
 
     #[Test]
-    public function implementation_gaps_documents_stage_3e_docs_contract_done(): void
+    public function implementation_gaps_documents_stage_3e_historical_contract_and_current_truth_flip(): void
     {
         $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString('**Stage 3E — Real Adobe Validation + Truth Flip**', $gaps);
-        $this->assertStringContainsString('**Done (docs contract)**', $gaps);
-        $this->assertStringContainsString('entity-bound Safe Sync runtime contract frozen', $gaps);
-        $this->assertStringContainsString('**standard moduleless trusted simple Product WRITE consumption is implemented internally**', $gaps);
-        $this->assertStringContainsString('**Safe Sync simple WRITE remains implemented as an optional Enhanced Safety primitive and is no longer the standard-path dependency**', $gaps);
-        $this->assertStringContainsString('support remains **false**', $gaps);
+        $this->assertStringContainsString('**Done + public truth flip completed 2026-09-19**', $gaps);
+        $this->assertStringContainsString('historical entity-bound Safe Sync and Post-#168 amendments remain recorded', $gaps);
+        $this->assertStringContainsString('standard Magento V1 is moduleless-by-default', $gaps);
+        $this->assertStringContainsString('optional Safe Sync Enhanced Safety', $gaps);
+        $this->assertStringContainsString('Products/Export/Live = **true**', $gaps);
+        $this->assertStringContainsString('Products/Import/Live = **false**', $gaps);
     }
 
     #[Test]
-    public function atlas_documents_stage_3e_docs_contract_row(): void
+    public function atlas_marks_stage_3e_docs_contract_historical_and_current_runtime_moduleless(): void
     {
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
         $this->assertStringContainsString('Stage 3E entity-bound Safe Sync contract (docs)', $atlas);
-        $this->assertStringContainsString('DOCS CONTRACT DONE — runtime pending', $atlas);
+        $this->assertStringContainsString('HISTORICAL CONTRACT — STANDARD PATH SUPERSEDED BY MODULELESS [Resolved]', $atlas);
         $this->assertStringContainsString('Stage 3E Magento Safe Sync enhanced-safety runtime', $atlas);
         $this->assertStringContainsString('IMPLEMENTED (internal optional primitive; support false; not standard-path prerequisite)', $atlas);
         $this->assertStringContainsString('Magento V1 moduleless stock simple trusted WRITE', $atlas);
-        $this->assertStringContainsString('IMPLEMENTED + CORE REAL-TARGET VERIFIED (support false; field-by-field certification pending)', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED + REAL-TARGET VERIFIED + PUBLIC IN BOUNDED EXPORT LIVE V1', $atlas);
+        $this->assertStringContainsString('ConnectorLiveRuntimeReadiness', $atlas);
         $this->assertStringContainsString('Stage3EEntityBoundSafeSyncDocumentationContractTest.php', $atlas);
     }
 
@@ -618,41 +620,33 @@ class Stage3EEntityBoundSafeSyncDocumentationContractTest extends TestCase
     }
 
     #[Test]
-    public function atlas_documents_post_168_amendment_and_dormant_discrepancies(): void
+    public function atlas_preserves_post_168_history_but_marks_discrepancies_superseded(): void
     {
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
         $this->assertStringContainsString('Stage 3E Magento Safe Sync enhanced-safety runtime', $atlas);
         $this->assertStringContainsString('IMPLEMENTED (internal optional primitive; support false; not standard-path prerequisite)', $atlas);
         $this->assertStringContainsString('Magento V1 moduleless stock simple trusted WRITE', $atlas);
-        $this->assertStringContainsString('IMPLEMENTED + CORE REAL-TARGET VERIFIED (support false; field-by-field certification pending)', $atlas);
+        $this->assertStringContainsString('IMPLEMENTED + REAL-TARGET VERIFIED + PUBLIC IN BOUNDED EXPORT LIVE V1', $atlas);
         $this->assertStringContainsString('Stage 3E disposable validation harness', $atlas);
-        $this->assertStringContainsString('IMPLEMENTED (internal; validation-only; support false; no real-target certification executed)', $atlas);
-        $this->assertStringContainsString('the standard Magento V1 Simple writer no longer depends on this path', $atlas);
-        $this->assertStringContainsString('at most one stock PUT', $atlas);
         $this->assertStringContainsString('Stage 3E post-#168 dormant code-vs-docs discrepancies', $atlas);
-        $this->assertStringContainsString('DOCUMENTED (dormant; not fixed)', $atlas);
-        $this->assertStringContainsString('Production-unreachable code paths that still use stock SKU-addressed', $atlas);
-        $this->assertStringContainsString('media (`GalleryManagement`); configurable options / child link; lifecycle status / visibility', $atlas);
-        $this->assertStringContainsString('replaced before their respective Live path becomes reachable', $atlas);
+        $this->assertStringContainsString('HISTORICAL — SUPERSEDED BY LATER CERTIFIED RUNTIMES', $atlas);
+        $this->assertStringContainsString('original post-#168 amendment recorded media/configurable/lifecycle SKU-addressed paths as production-unreachable', $atlas);
+        $this->assertStringContainsString('original amendment remains historical evidence', $atlas);
     }
 
     #[Test]
-    public function implementation_gaps_documents_post_168_amendment_summary(): void
+    public function implementation_gaps_current_state_supersedes_post_168_pre_flip_blockers(): void
     {
         $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
-        $this->assertStringContainsString('**Stage 3E Post-#168 Real-Target Certification Amendment (docs only) is recorded**', $gaps);
-        $this->assertStringContainsString('9 decisions (current state, media-neutral Product save, connection quarantine,', $gaps);
-        $this->assertStringContainsString('a `Code-vs-docs dormant discrepancies` table', $gaps);
-        $this->assertStringContainsString('no change to the first-party `integrations/magento-safe-sync` module in this campaign', $gaps);
-        $this->assertStringContainsString('Laravel trusted simple execution now consumes the moduleless stock REST writer', $gaps);
-        $this->assertStringContainsString('Safe Sync remains optional Enhanced Safety', $gaps);
-        $this->assertStringContainsString('no `composer.json` change', $gaps);
-        $this->assertStringContainsString('validation-only Laravel control plane', $gaps);
-        $this->assertStringContainsString('no real-target validation harness execution/certification in this PR', $gaps);
-        $this->assertStringContainsString('no Live support enablement', $gaps);
-        $this->assertStringContainsString('no deployment', $gaps);
+        $this->assertStringContainsString('historical entity-bound Safe Sync and Post-#168 amendments remain recorded', $gaps);
+        $this->assertStringContainsString('standard Magento V1 is moduleless-by-default', $gaps);
+        $this->assertStringContainsString('optional Safe Sync Enhanced Safety', $gaps);
+        $this->assertStringContainsString('P-01/P-02/P-03/P-10/P-11 and Configurable/media/lifecycle paths have real-target evidence', $gaps);
+        $this->assertStringContainsString('real-target E2E no-op, one-PUT change, restore, and zero-write currency mismatch', $gaps);
+        $this->assertStringContainsString('Products/Export/Live = **true**', $gaps);
+        $this->assertStringContainsString('Products/Import/Live = **false**', $gaps);
     }
 
     /**

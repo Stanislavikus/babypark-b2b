@@ -44,6 +44,7 @@ use Tests\Concerns\ConfiguresSyncSupportProfiles;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\Concerns\InteractsWithFieldMappingFixtures;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
+use Tests\Support\Sync\TestConnectorLiveRuntimeReadiness;
 use Tests\TestCase;
 
 class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
@@ -157,11 +158,11 @@ class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
     }
 
     #[Test]
-    public function adobe_profile_reports_live_support_false(): void
+    public function adobe_profile_reports_live_support_true(): void
     {
         $account = $this->adobeAccount($this->defaultWorkspace());
 
-        $this->assertFalse(app(ConnectorSyncSupportResolver::class)->supports(
+        $this->assertTrue(app(ConnectorSyncSupportResolver::class)->supports(
             $account,
             SyncDataDomain::Products,
             SyncSemanticOperation::Export,
@@ -170,7 +171,7 @@ class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
     }
 
     #[Test]
-    public function live_support_false_keeps_transfer_non_actionable_without_button(): void
+    public function current_preview_makes_supported_live_transfer_actionable(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->adobeAccount($workspace);
@@ -180,24 +181,16 @@ class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
 
         Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->assertSet('liveSupportAvailable', false)
-            ->assertSet('canStartLive', false)
+            ->assertSet('liveSupportAvailable', true)
+            ->assertSet('canStartLive', true)
             ->assertSet('liveLifecycleState', 'none')
-            ->assertSee(__('sync_live.states.support_not_enabled'))
-            ->assertDontSee('data-testid="sync-live-start"', false)
-            ->assertDontSee('wire:confirm', false);
-
-        $countBefore = SyncRun::withoutWorkspaceScope()->where('mode', SyncRunMode::Live)->count();
-
-        Livewire::actingAs($actor)
-            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
-            ->call('startLive');
-
-        $this->assertSame($countBefore, SyncRun::withoutWorkspaceScope()->where('mode', SyncRunMode::Live)->count());
+            ->assertDontSee(__('sync_live.states.support_not_enabled'))
+            ->assertSee('data-testid="sync-live-start"', false)
+            ->assertSee('wire:confirm', false);
     }
 
     #[Test]
-    public function completed_live_history_remains_visible_when_support_is_false(): void
+    public function completed_live_history_remains_visible_while_new_run_is_actionable(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->adobeAccount($workspace);
@@ -211,10 +204,10 @@ class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
         Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
             ->assertSet('liveLifecycleState', 'completed')
-            ->assertSet('liveSupportAvailable', false)
-            ->assertSet('canStartLive', false)
+            ->assertSet('liveSupportAvailable', true)
+            ->assertSet('canStartLive', true)
             ->assertSet('liveSynchronizedCount', 1)
-            ->assertSee(__('sync_live.states.support_not_enabled'))
+            ->assertDontSee(__('sync_live.states.support_not_enabled'))
             ->assertSee('data-testid="sync-live-completed-summary"', false);
     }
 
@@ -767,6 +760,39 @@ class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
     }
 
     #[Test]
+    public function start_live_surfaces_transient_runtime_readiness_failure_without_creating_a_run(): void
+    {
+        Bus::fake();
+
+        $this->configureAdobeProductsExportSyncSupportProfile([
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live],
+        ]);
+
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace, ['auth_profile' => 'test_adobe_products_export_sync_support']);
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->actorWithPermission($workspace, WorkspacePermissions::RUN_SYNC_LIVE);
+        $this->seedCompletedPreview($configuration, $actor);
+
+        $readiness = new TestConnectorLiveRuntimeReadiness;
+        $readiness->ready = false;
+        $this->app->instance(TestConnectorLiveRuntimeReadiness::class, $readiness);
+
+        $countBefore = SyncRun::withoutWorkspaceScope()->where('mode', SyncRunMode::Live)->count();
+
+        Livewire::actingAs($actor)
+            ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id])
+            ->call('startLive')
+            ->assertNotified(__('sync_live.errors.runtime_not_ready'))
+            ->assertSet('canStartLive', true);
+
+        $this->assertSame(1, $readiness->checks);
+        $this->assertSame($countBefore, SyncRun::withoutWorkspaceScope()->where('mode', SyncRunMode::Live)->count());
+        Bus::assertNotDispatched(SyncLiveRunJob::class);
+    }
+
+    #[Test]
     public function start_live_does_not_create_second_run_when_active_run_blocks_admission(): void
     {
         Bus::fake();
@@ -980,9 +1006,9 @@ class Stage3D2MerchantFirstLiveWorkSurfaceTest extends TestCase
     }
 
     #[Test]
-    public function adobe_adapter_live_support_remains_false_after_implementation(): void
+    public function adobe_adapter_live_support_is_true_after_real_target_truth_flip(): void
     {
-        $this->assertFalse((new AdobePaaSConnectorAdapter)->supports(
+        $this->assertTrue((new AdobePaaSConnectorAdapter)->supports(
             SyncDataDomain::Products,
             SyncSemanticOperation::Export,
             SyncRunMode::Live,

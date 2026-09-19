@@ -19,6 +19,6 @@ final class AdobePaaSConnectorAdapter implements ConnectorAdapter, ConnectorSync
             return false;
         }
 
-        return $mode === SyncRunMode::Preview;
+        return in_array($mode, [SyncRunMode::Preview, SyncRunMode::Live], true);
     }
 }
