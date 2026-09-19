@@ -413,6 +413,7 @@
     "sync.preview.findings.attribute_set_unconfigured": "Не налаштовано набір атрибутів Adobe",
     "sync.preview.findings.attribute_set_invalid": "Набір атрибутів Adobe недійсний",
     "sync.preview.findings.mapped_field_absent_from_selected_set": "Зіставлене поле відсутнє у вибраному наборі атрибутів",
+    "sync.preview.findings.routing_field_mapping_not_supported": "Це поле маршрутизації Magento недоступне для звичайного зіставлення полів",
     "sync.preview.findings.invalid_configurable_attribute": "Зіставлене поле не є дійсним конфігурованим атрибутом",
     "sync.preview.findings.external_option_missing_or_stale": "Зовнішня опція відсутня або застаріла",
     "sync.preview.findings.no_configurable_dimension": "Не зіставлено конфігурований параметр",

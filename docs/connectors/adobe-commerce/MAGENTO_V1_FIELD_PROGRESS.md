@@ -7,7 +7,7 @@
 
 Runtime classification is now authoritative. The historical CSV remains evidence of earlier exact WRITE→READ→RESTORE and behavior-class work, but it must not be edited as a competing field-classification source.
 
-P-03 closure on 2026-09-18 advances the Adobe Product attribute classifier to `adobe.product_attribute_classifier.v2`. Behavior signatures now carry deterministic `clear_semantics`: verified empty-string-to-absence for optional store text/textarea/date, verified null-to-absence for optional global select, required-not-clearable for required fields, and fail-closed-not-certified for every other tuple. Literal Magento attribute keys are not part of this capability decision.
+P-03 closure on 2026-09-18 advanced the Adobe Product attribute classifier to `adobe.product_attribute_classifier.v2`; P-02 closure on 2026-09-19 advances current runtime to `adobe.product_attribute_classifier.v3` by adding an explicit routing-field clear exception for `url_key` / `url_path`. Behavior signatures now carry deterministic `clear_semantics`: verified empty-string-to-absence for optional store text/textarea/date, verified null-to-absence for optional global select, required-not-clearable for required fields, and fail-closed-not-certified for every other tuple. Literal Magento attribute keys are not part of this capability decision.
 
 ## Current Stage 1 snapshot
 

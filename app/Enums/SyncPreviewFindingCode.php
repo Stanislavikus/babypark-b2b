@@ -17,6 +17,7 @@ enum SyncPreviewFindingCode: string
     case AttributeSetUnconfigured = 'attribute_set_unconfigured';
     case AttributeSetInvalid = 'attribute_set_invalid';
     case MappedFieldAbsentFromSelectedSet = 'mapped_field_absent_from_selected_set';
+    case RoutingFieldMappingNotSupported = 'routing_field_mapping_not_supported';
     case InvalidConfigurableAttribute = 'invalid_configurable_attribute';
     case ExternalOptionMissingOrStale = 'external_option_missing_or_stale';
     case NoConfigurableDimension = 'no_configurable_dimension';

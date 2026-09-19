@@ -11,7 +11,7 @@ use App\Support\Connectors\ConnectorSchemaFieldClassificationDecision;
 
 final class AdobeProductAttributeClassifier
 {
-    public const CLASSIFIER_VERSION = 'adobe.product_attribute_classifier.v2';
+    public const CLASSIFIER_VERSION = 'adobe.product_attribute_classifier.v3';
 
     public function __construct(
         private readonly CanonicalRegistryReader $registryReader,
@@ -222,6 +222,10 @@ final class AdobeProductAttributeClassifier
         ConnectorSchemaSnapshotField $field,
         array $metadata,
     ): string {
+        if (AdobeProductRoutingFieldPolicy::isRoutingExternalKey($field->external_field_key)) {
+            return 'fail_closed_not_certified';
+        }
+
         if ($field->is_required === true) {
             return 'required_not_clearable';
         }

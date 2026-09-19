@@ -116,13 +116,22 @@ class AdobeProductAttributeClassifierTest extends TestCase
             scope: 'website',
             required: false,
         ));
+        $urlKey = $classifier->classify($this->field(
+            'url_key',
+            frontendInput: 'text',
+            normalizedType: 'text',
+            backendType: 'varchar',
+            scope: 'store',
+            required: false,
+        ));
 
         $this->assertSame('empty_string_to_absent_verified', $storeText->behaviorSignature['clear_semantics'] ?? null);
         $this->assertSame('empty_string_to_absent_verified', $storeDate->behaviorSignature['clear_semantics'] ?? null);
         $this->assertSame('null_to_absent_verified', $globalSelect->behaviorSignature['clear_semantics'] ?? null);
         $this->assertSame('required_not_clearable', $requiredSelect->behaviorSignature['clear_semantics'] ?? null);
         $this->assertSame('fail_closed_not_certified', $websitePrice->behaviorSignature['clear_semantics'] ?? null);
-        $this->assertSame('adobe.product_attribute_classifier.v2', $storeText->classifierVersion);
+        $this->assertSame('fail_closed_not_certified', $urlKey->behaviorSignature['clear_semantics'] ?? null);
+        $this->assertSame('adobe.product_attribute_classifier.v3', $storeText->classifierVersion);
     }
 
     public function test_behavior_class_changes_when_behavior_changing_metadata_changes(): void

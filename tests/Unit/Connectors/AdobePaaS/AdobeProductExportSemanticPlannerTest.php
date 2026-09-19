@@ -242,6 +242,115 @@ class AdobeProductExportSemanticPlannerTest extends TestCase
     }
 
     #[Test]
+    public function routing_fields_emit_blocking_mapping_findings(): void
+    {
+        foreach (['url_key', 'url_path'] as $externalFieldKey) {
+            $aggregate = new ProductExecutionAggregate(
+                productId: 'product-1',
+                productValues: [
+                    'binding-name' => $this->mappedValue('binding-name', 'name', FieldObjectType::Product, AttributeDataType::Text, 'Simple Product'),
+                    'binding-status' => $this->mappedValue('binding-status', 'status', FieldObjectType::Product, AttributeDataType::Boolean, true),
+                    'binding-route' => $this->mappedValue('binding-route', 'merchant_route_key', FieldObjectType::Product, AttributeDataType::Text, 'temporary-route'),
+                ],
+                variants: [
+                    new ProductVariantExecutionSlice(
+                        variantId: 'variant-1',
+                        values: [
+                            'binding-sku' => $this->mappedValue('binding-sku', 'sku', FieldObjectType::ProductVariant, AttributeDataType::Text, 'SKU-1'),
+                        ],
+                        resolvedPrice: $this->makeResolvedPrice(),
+                        priceResolutionStatus: PriceResolutionStatus::Resolved->value,
+                    ),
+                ],
+                sellableVariantCount: 1,
+                imageInput: $this->emptyImageInput(),
+            );
+
+            $snapshot = $this->snapshotWithCoreMappings();
+            $snapshot['field_mappings'][] = [
+                'field_binding_id' => 'binding-route',
+                'external_field_key' => $externalFieldKey,
+            ];
+            $baseMetadata = $this->metadataFixture();
+            $metadata = new AdobeProductExportExecutionMetadata(
+                selectedAttributeSetId: $baseMetadata->selectedAttributeSetId,
+                attributeSets: $baseMetadata->attributeSets,
+                attributes: array_merge($baseMetadata->attributes, [
+                    $externalFieldKey => new AdobeAttributeMetadata(
+                        attributeId: 98,
+                        code: $externalFieldKey,
+                        frontendInput: 'text',
+                        scope: 'store',
+                        options: [],
+                        isRequired: false,
+                    ),
+                ]),
+            );
+
+            $result = $this->planner->evaluate($aggregate, $snapshot, $metadata);
+
+            $this->assertTrue($result->hasBlockingFindings(), $externalFieldKey);
+            $this->assertTrue($result->hasFindingCode('routing_field_mapping_not_supported'), $externalFieldKey);
+            $finding = collect($result->findings)
+                ->first(fn ($finding) => $finding->code === 'routing_field_mapping_not_supported');
+            $this->assertSame($externalFieldKey, $finding?->subject);
+            $this->assertSame('binding-route', $finding?->context['field_binding_id'] ?? null);
+        }
+    }
+
+    #[Test]
+    public function configurable_child_never_inherits_product_level_routing_values(): void
+    {
+        $base = $this->configurableAggregate();
+        $aggregate = new ProductExecutionAggregate(
+            productId: $base->productId,
+            productValues: array_merge($base->productValues, [
+                'binding-route' => $this->mappedValue(
+                    'binding-route',
+                    'merchant_route_key',
+                    FieldObjectType::Product,
+                    AttributeDataType::Text,
+                    'temporary-route',
+                ),
+            ]),
+            variants: $base->variants,
+            sellableVariantCount: $base->sellableVariantCount,
+            imageInput: $base->imageInput,
+        );
+        $snapshot = $this->configurableSnapshot();
+        $snapshot['field_mappings'][] = [
+            'field_binding_id' => 'binding-route',
+            'external_field_key' => 'url_key',
+        ];
+        $baseMetadata = $this->metadataFixture();
+        $metadata = new AdobeProductExportExecutionMetadata(
+            selectedAttributeSetId: $baseMetadata->selectedAttributeSetId,
+            attributeSets: $baseMetadata->attributeSets,
+            attributes: array_merge($baseMetadata->attributes, [
+                'url_key' => new AdobeAttributeMetadata(
+                    attributeId: 98,
+                    code: 'url_key',
+                    frontendInput: 'text',
+                    scope: 'store',
+                    options: [],
+                    isRequired: false,
+                ),
+            ]),
+        );
+
+        $result = $this->planner->evaluate($aggregate, $snapshot, $metadata);
+
+        $this->assertTrue($result->hasFindingCode('routing_field_mapping_not_supported'));
+        $children = collect($result->operations)
+            ->filter(fn ($operation) => $operation->operation === 'simple_child');
+
+        $this->assertCount(2, $children);
+        foreach ($children as $child) {
+            $this->assertArrayNotHasKey('binding-route', $child->context['mapped_product_values']);
+        }
+    }
+
+    #[Test]
     public function inactive_product_maps_to_adobe_disabled_status(): void
     {
         $aggregate = $this->simpleAggregate(active: false);

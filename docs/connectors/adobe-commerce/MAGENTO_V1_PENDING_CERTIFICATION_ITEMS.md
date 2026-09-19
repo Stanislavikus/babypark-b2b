@@ -23,13 +23,18 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Public support: Adobe Products / Export / Live remains false; this closure certifies the P-01 relation capability only.
 - Evidence: `docs/connectors/adobe-commerce/magento_v1_category_relation_certification_2026_09_18.json`.
 - Reviewer candidate: no further architecture review required unless future scope changes category ownership, Store View semantics, or destructive provenance rules.
-### P-02 — `url_key` / URL rewrite side effects
+### P-02 — `url_key` / URL rewrite side effects — CLOSED 2026-09-19 [Resolved]
 
-- Surface: store-scoped `url_key` plus Commerce URL rewrite/redirect state.
-- Current truth: `url_key` is readable as a Product attribute, but a generic change/restore cycle is not sufficient proof because changing the key can leave URL rewrite history/redirects.
-- Why deferred: restore of the attribute alone may not restore rewrite side effects.
-- Needed proof: capture route/rewrite state before mutation, controlled key change, verify canonical route/redirects, restore key, then prove rewrite state is intentionally restored or explicitly retained according to V1 policy.
-- Reviewer candidate: yes.
+- Evidence: `docs/connectors/adobe-commerce/magento_v1_url_key_rewrite_certification_2026_09_19.json`.
+- `url_key` is a routing capability, not an ordinary mapped scalar. Generic FieldMapping WRITE/CLEAR is blocked and `url_path` remains a read-only/deprecated provider projection.
+- Empty/null/reset `url_key` is unsupported in Magento V1. Magento may auto-generate a key from Product name, so P-03 generic store/text clear semantics must never apply.
+- A non-empty `url_key` change uses the existing trusted stock Product PUT transport only after exact entity-id/type pre-read; Magento owns generated canonical/category rewrites and redirect history.
+- Real target certification passed on two existing Simple products (Joolz entity `3`, Layla entity `5`): A → temporary B → A, each change/restore returned `known_applied / stock_write_verified` with exactly one consequential PUT and one reconciliation GET.
+- On the certified target, the mutation behaved Store-View-locally: configured `default` changed while the Joolz sibling `babypark_ua`, `babypark_ru`, and `babypark_en` routes stayed on their baseline key. Old canonical A disappeared during B and temporary B disappeared after restore, so no retained redirect history was observed on this save path.
+- Collision proof passed: attempting to assign Joolz the already-owned Layla key was rejected; both Product keys and both canonical routes remained unchanged with no partial rewrite mutation.
+- Configurable Product-level routing values are not projected into `simple_child` operations; variant-level `url_key` remains unsupported.
+- GraphQL `route()` / `url_rewrites` is certification evidence only, not a universal production runtime dependency.
+- No Magento module, rewrite CRUD/ownership ledger, Product CREATE, canonical `slug`, or public Adobe Products/Export/Live support flip is introduced by P-02.
 
 ### P-03 — Custom-attribute clear semantics — CLOSED 2026-09-18 [Resolved]
 

@@ -38,4 +38,9 @@ final class AdobeProductCommandCompilationException extends \RuntimeException
     {
         return new self('Adobe Product command cannot resolve external field key for mapped binding: '.$bindingId);
     }
+
+    public static function routingFieldMappingNotSupported(string $externalFieldKey): self
+    {
+        return new self('Adobe Product routing field is not supported by generic mapping: '.$externalFieldKey);
+    }
 }
