@@ -6,7 +6,10 @@
   "scope": {
     "receive_behavior_class": "workspace_custom_dynamic_single_select",
     "provider": "adobe_commerce",
-    "target_types": ["product", "product_variant"],
+    "target_types": [
+      "product",
+      "product_variant"
+    ],
     "remote_absent_clear": false,
     "fuzzy_option_matching": false,
     "public_import_support_flipped": false
@@ -16,15 +19,25 @@
     "reverse_option_identity": "FieldOptionMapping.external_option_value -> internal_option_key",
     "proposal_route": "dynamic_field",
     "writer": "GovernedDynamicFieldValueWriter::setIfCurrentValue",
-    "consequential_states": ["differs", "local_absent"],
+    "consequential_states": [
+      "differs",
+      "local_absent"
+    ],
     "remote_absent_semantics": "no_clear_no_candidate",
     "ambiguous_reverse_mapping_semantics": "unsupported_or_blocked",
     "stale_local_semantics": "not_applied",
     "stale_remote_semantics": "not_applied"
   },
   "focused_verification": {
-    "dynamic_receive_tests": {"passed": 5, "assertions": 20},
-    "affected_layer_tests": {"passed": 249, "skipped": 1, "assertions": 886},
+    "dynamic_receive_tests": {
+      "passed": 5,
+      "assertions": 20
+    },
+    "affected_layer_tests": {
+      "passed": 249,
+      "skipped": 1,
+      "assertions": 886
+    },
     "dynamic_writer_cas_cases": [
       "matching_expected_value_updates",
       "stale_expected_value_rejected",
@@ -39,12 +52,22 @@
     ]
   },
   "broad_verification": {
-    "connectors": {"passed": 367, "assertions": 2207},
-    "sync": {"passed": 1059, "skipped": 3, "assertions": 4332}
+    "connectors": {
+      "passed": 367,
+      "assertions": 2207
+    },
+    "sync": {
+      "passed": 1059,
+      "skipped": 3,
+      "assertions": 4332
+    }
   },
   "certification_boundary": {
     "code_and_test_slice_closed": true,
-    "real_target_custom_select_mutation_certified": false,
-    "reason": "Controlled destructive real-target custom-select Receive certification remains P-07 evidence required before any future public Products/Import/Live support claim."
+    "real_target_custom_select_mutation_certified": true,
+    "real_target_certification_date": "2026-09-19",
+    "real_target_evidence": "docs/connectors/adobe-commerce/magento_v1_receive_r4_real_target_certification_2026_09_19.json",
+    "public_products_import_live_support": false,
+    "reason": "R4 behavior-class implementation is now supplemented by controlled destructive real-target Dynamic single-select change/proposal/apply/restore evidence. Public Import/Live remains a separate product capability decision."
   }
 }

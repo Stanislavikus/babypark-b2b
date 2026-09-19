@@ -754,7 +754,7 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             $atlasContent,
         );
         $this->assertStringContainsString(
-            'Adobe Products Receive name proposal orchestration | IMPLEMENTED (internal; proposal is zero-mutation; name-only Apply exists; no merchant entrypoint; public Import support false)',
+            'Adobe Products Receive proposal orchestration | IMPLEMENTED (internal; R3 Product name + R4 Dynamic single-select; proposal is zero-mutation; no merchant entrypoint; public Import support false)',
             $atlasContent,
         );
         $this->assertStringContainsString(
@@ -762,15 +762,15 @@ class ReceiveImportFoundationDocumentationContractTest extends TestCase
             $atlasContent,
         );
         $this->assertStringContainsString(
-            'Consequential Apply is a separate internal R3 runtime and normal Adobe Products/Import support remains disabled.',
+            'R3 Product name and R4 Dynamic Select are both real-target certified; normal Adobe Products/Import support remains disabled.',
             $atlasContent,
         );
         $this->assertStringContainsString(
-            'Import support must **not** be inferred from the existence of this internal Adobe service because normal Adobe Products/Import admission remains disabled.',
+            'Import support must **not** be inferred from this internal runtime because normal Adobe Products/Import admission remains disabled.',
             $atlasContent,
         );
         $this->assertStringContainsString(
-            'Receive Apply runtime | IMPLEMENTED (internal; R3 Product `name` only; public Adobe Import/Live support false; real-target certified 2026-09-11)',
+            'Receive Apply runtime | IMPLEMENTED (internal; R3 Product `name` + R4 workspace-custom Dynamic single-select; public Adobe Import/Live support false; real-target certified 2026-09-11 and 2026-09-19)',
             $atlasContent,
         );
         $this->assertStringContainsString(
