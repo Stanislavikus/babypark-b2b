@@ -83,4 +83,19 @@ class SyncPreviewFindingReferenceResolverTest extends TestCase
         $this->assertNull($reference->variantId);
         $this->assertFalse($reference->showsVariantContext);
     }
+
+    #[Test]
+    public function routing_field_mapping_finding_resolves_mapping_reference(): void
+    {
+        $reference = $this->resolver->resolve([
+            'code' => SyncPreviewFindingCode::RoutingFieldMappingNotSupported->value,
+            'subject' => 'url_key',
+            'context' => ['field_binding_id' => 'binding-route'],
+        ]);
+
+        $this->assertSame(SyncPreviewFindingCode::RoutingFieldMappingNotSupported, $reference->code);
+        $this->assertSame('binding-route', $reference->fieldBindingId);
+        $this->assertSame('url_key', $reference->externalFieldKey);
+        $this->assertFalse($reference->showsVariantContext);
+    }
 }

@@ -413,6 +413,7 @@
     "sync.preview.findings.attribute_set_unconfigured": "Adobe attribute set is not configured",
     "sync.preview.findings.attribute_set_invalid": "Adobe attribute set is invalid",
     "sync.preview.findings.mapped_field_absent_from_selected_set": "Mapped field is absent from the selected attribute set",
+    "sync.preview.findings.routing_field_mapping_not_supported": "This Magento routing field is not available for standard field mapping",
     "sync.preview.findings.invalid_configurable_attribute": "Mapped field is not a valid configurable attribute",
     "sync.preview.findings.external_option_missing_or_stale": "External option is missing or stale",
     "sync.preview.findings.no_configurable_dimension": "No configurable dimension is mapped",

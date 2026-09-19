@@ -4,6 +4,7 @@ namespace App\Support\Connectors\AdobePaaS\Command;
 
 use App\Support\Connectors\AdobePaaS\AdobeAttributeMetadata;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionMetadata;
+use App\Support\Connectors\AdobePaaS\AdobeProductRoutingFieldPolicy;
 use App\Support\Connectors\AdobePaaS\Semantic\AdobeProductExportSemanticOperation;
 use App\Support\Connectors\AdobePaaS\Semantic\AdobeProductExportSemanticResult;
 
@@ -251,6 +252,10 @@ final class AdobeConfigurableDesiredStateCompiler
                 }
 
                 continue;
+            }
+
+            if (AdobeProductRoutingFieldPolicy::isRoutingExternalKey($externalFieldKey)) {
+                throw AdobeProductCommandCompilationException::routingFieldMappingNotSupported($externalFieldKey);
             }
 
             if (in_array($externalFieldKey, self::CONNECTOR_OWNED_EXTERNAL_KEYS, true)) {

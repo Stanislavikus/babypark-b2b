@@ -795,5 +795,6 @@
     "product_channels.remote_catalog.link_status.unlinked": "Не связано",
     "sync.preview.findings.missing_category_mapping": "Отсутствует сопоставление категории",
     "sync.preview.findings.invalid_category_mapping": "В сопоставлении категории указан некорректный ID категории Adobe Commerce",
-    "sync_preview.remediation.category_mapping": "Сопоставление категорий"
+    "sync_preview.remediation.category_mapping": "Сопоставление категорий",
+    "sync.preview.findings.routing_field_mapping_not_supported": "Это поле маршрутизации Magento недоступно для обычного сопоставления полей"
 }

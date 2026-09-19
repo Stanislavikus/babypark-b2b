@@ -115,6 +115,7 @@ final class SyncPreviewFindingReferenceResolver
                 showsVariantContext: false,
             ),
             SyncPreviewFindingCode::MappedFieldAbsentFromSelectedSet,
+            SyncPreviewFindingCode::RoutingFieldMappingNotSupported,
             SyncPreviewFindingCode::InvalidConfigurableAttribute => new SyncPreviewFindingReference(
                 code: $code,
                 fieldBindingId: $contextBindingId,

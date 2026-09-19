@@ -430,6 +430,34 @@ class AdobeProductCommandFoundationUnitTest extends TestCase
     }
 
     #[Test]
+    public function generic_compiler_rejects_routing_field_writes_and_clears(): void
+    {
+        foreach (['url_key', 'url_path'] as $externalFieldKey) {
+            foreach (['temporary-route', ''] as $externalValue) {
+                try {
+                    $this->compiler->compileFromSemanticResult(
+                        AdobeProductCommandTestFixtures::semanticResult([
+                            'mapped_product_values' => [
+                                'binding-route' => [
+                                    'external_field_key' => $externalFieldKey,
+                                    'external_value' => $externalValue,
+                                    'external_frontend_input' => 'text',
+                                    'external_scope' => 'store',
+                                    'external_is_required' => false,
+                                ],
+                            ],
+                        ]),
+                    );
+
+                    $this->fail('Routing field generic compilation must fail closed: '.$externalFieldKey);
+                } catch (AdobeProductCommandCompilationException $exception) {
+                    $this->assertStringContainsString($externalFieldKey, $exception->getMessage());
+                }
+            }
+        }
+    }
+
+    #[Test]
     public function compiler_has_no_public_operation_compilation_boundary(): void
     {
         $reflection = new \ReflectionClass(AdobeProductDesiredStateCompiler::class);

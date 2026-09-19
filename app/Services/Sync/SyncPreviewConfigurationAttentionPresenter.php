@@ -170,6 +170,7 @@ final class SyncPreviewConfigurationAttentionPresenter
                 'subject' => $subject,
             ],
             SyncPreviewFindingCode::MappedFieldAbsentFromSelectedSet,
+            SyncPreviewFindingCode::RoutingFieldMappingNotSupported,
             SyncPreviewFindingCode::InvalidConfigurableAttribute => [
                 'code' => $code->value,
                 'external_field_key' => $subject,
@@ -198,6 +199,7 @@ final class SyncPreviewConfigurationAttentionPresenter
                 && $identity['external_field_key'] !== null
                 && $identity['external_option_value'] !== null,
             SyncPreviewFindingCode::MappedFieldAbsentFromSelectedSet,
+            SyncPreviewFindingCode::RoutingFieldMappingNotSupported,
             SyncPreviewFindingCode::InvalidConfigurableAttribute => $identity['external_field_key'] !== null
                 && $identity['field_binding_id'] !== null,
             SyncPreviewFindingCode::AttributeSetUnconfigured,

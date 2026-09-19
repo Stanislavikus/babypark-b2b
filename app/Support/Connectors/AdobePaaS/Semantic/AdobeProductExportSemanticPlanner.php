@@ -6,6 +6,7 @@ use App\Enums\AttributeDataType;
 use App\Enums\FieldObjectType;
 use App\Services\Pricing\ResolvedPrice;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionMetadata;
+use App\Support\Connectors\AdobePaaS\AdobeProductRoutingFieldPolicy;
 use App\Support\Sync\Preview\MappedFieldValue;
 use App\Support\Sync\Preview\ProductExecutionAggregate;
 use App\Support\Sync\Preview\ProductVariantExecutionSlice;
@@ -54,6 +55,18 @@ final class AdobeProductExportSemanticPlanner
         /** @var list<array<string, mixed>> $fieldMappings */
         $fieldMappings = $configurationSnapshot['field_mappings'] ?? [];
         $mappedBindings = $this->indexedFieldMappings($fieldMappings);
+
+        foreach ($mappedBindings as $bindingId => $mapping) {
+            $externalKey = $mapping['external_field_key'] ?? null;
+
+            if (AdobeProductRoutingFieldPolicy::isRoutingExternalKey($externalKey)) {
+                $findings[] = $this->finding(
+                    'routing_field_mapping_not_supported',
+                    subject: $externalKey,
+                    context: ['field_binding_id' => $bindingId],
+                );
+            }
+        }
 
         $nameBindingId = $this->findBindingIdByExternalKey($fieldMappings, 'name');
         $skuBindingId = $this->findBindingIdByExternalKey($fieldMappings, 'sku');
@@ -524,7 +537,7 @@ final class AdobeProductExportSemanticPlanner
                     'visibility_numeric' => self::VISIBILITY_NOT_VISIBLE_NUMERIC,
                     'status' => $adobeStatus,
                     'name' => is_string($name) ? $name : (is_scalar($name) ? (string) $name : null),
-                    'mapped_product_values' => $projectedProduct['projected'],
+                    'mapped_product_values' => AdobeProductRoutingFieldPolicy::withoutRoutingValues($projectedProduct['projected']),
                     'mapped_variant_values' => $projectedVariant['projected'],
                     'resolved_configurable_values' => $resolvedConfigurableByVariant[$variantSlice->variantId] ?? [],
                     'resolved_price' => $this->serializeResolvedPrice($variantSlice->resolvedPrice),

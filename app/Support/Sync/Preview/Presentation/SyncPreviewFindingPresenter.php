@@ -86,6 +86,7 @@ final class SyncPreviewFindingPresenter
                 $reference->fieldBindingId,
                 $context,
             ),
+            SyncPreviewFindingCode::RoutingFieldMappingNotSupported,
             SyncPreviewFindingCode::InvalidConfigurableAttribute,
             SyncPreviewFindingCode::NoConfigurableDimension => $this->presentFieldMappingFinding(
                 $code,
