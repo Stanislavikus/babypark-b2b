@@ -74,6 +74,6 @@ class ProductChannelSelectionRemoteCatalogueDocumentationContractTest extends Te
         $this->assertStringContainsString('**Product→Channel Selection + Remote Catalogue Projection**', $gaps);
         $this->assertStringContainsString('**Runtime implemented through merchant linking candidate integration; production-readiness evidence still pending**', $gaps);
         $this->assertStringContainsString('Magento >10k enumeration still requires representative real-target proof before production-readiness claims', $gaps);
-        $this->assertStringContainsString('Adobe Products/Export/Live support remains **false**', $gaps);
+        $this->assertStringContainsString('Adobe Products/Export/Live is now **true** for the certified bounded scope', $gaps);
     }
 }
