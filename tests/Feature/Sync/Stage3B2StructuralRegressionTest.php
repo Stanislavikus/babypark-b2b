@@ -7,6 +7,7 @@ use App\Enums\SyncRunMode;
 use App\Enums\SyncSemanticOperation;
 use App\Support\Connectors\AdobePaaS\AdobePaaSConnectorAdapter;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportLiveCapability;
+use App\Support\Connectors\AdobePaaS\AdobeProductExportLiveRuntimeReadiness;
 use App\Support\Connectors\ConnectorProfileRegistry;
 use App\Support\Connectors\ConnectorSyncSupportResolver;
 use Database\Seeders\ConnectorFoundationSeeder;
@@ -51,28 +52,18 @@ class Stage3B2StructuralRegressionTest extends TestCase
     }
 
     #[Test]
-    public function live_capability_binding_does_not_flip_advertised_live_support(): void
+    public function adobe_profile_declares_live_runtime_readiness_binding(): void
     {
-        $adapter = new AdobePaaSConnectorAdapter;
-        $account = $this->createConnectorAccount();
+        $definition = app(ConnectorProfileRegistry::class)->profileDefinition('adobe_commerce_paas_oauth1_integration');
 
-        $this->assertFalse($adapter->supports(
-            SyncDataDomain::Products,
-            SyncSemanticOperation::Export,
-            SyncRunMode::Live,
-        ));
-
-        $resolver = app(ConnectorSyncSupportResolver::class);
-        $this->assertFalse($resolver->supports(
-            $account,
-            SyncDataDomain::Products,
-            SyncSemanticOperation::Export,
-            SyncRunMode::Live,
-        ));
+        $this->assertSame(
+            AdobeProductExportLiveRuntimeReadiness::class,
+            $definition->liveRuntimeReadinessClass,
+        );
     }
 
     #[Test]
-    public function adobe_products_export_live_support_remains_false(): void
+    public function live_capability_binding_and_advertised_support_are_aligned_after_truth_flip(): void
     {
         $adapter = new AdobePaaSConnectorAdapter;
         $account = $this->createConnectorAccount();
@@ -82,18 +73,28 @@ class Stage3B2StructuralRegressionTest extends TestCase
             SyncSemanticOperation::Export,
             SyncRunMode::Preview,
         ));
-
-        $this->assertFalse($adapter->supports(
+        $this->assertTrue($adapter->supports(
             SyncDataDomain::Products,
             SyncSemanticOperation::Export,
             SyncRunMode::Live,
         ));
+        $this->assertFalse($adapter->supports(
+            SyncDataDomain::Products,
+            SyncSemanticOperation::Import,
+            SyncRunMode::Live,
+        ));
 
         $resolver = app(ConnectorSyncSupportResolver::class);
-        $this->assertFalse($resolver->supports(
+        $this->assertTrue($resolver->supports(
             $account,
             SyncDataDomain::Products,
             SyncSemanticOperation::Export,
+            SyncRunMode::Live,
+        ));
+        $this->assertFalse($resolver->supports(
+            $account,
+            SyncDataDomain::Products,
+            SyncSemanticOperation::Import,
             SyncRunMode::Live,
         ));
     }

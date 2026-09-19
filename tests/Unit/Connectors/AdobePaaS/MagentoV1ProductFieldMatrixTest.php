@@ -40,7 +40,7 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
         $manifestIds = array_fill_keys(array_column($manifest['items'], 'id'), true);
 
         self::assertTrue($matrix['authoritative']);
-        self::assertSame('partial_pending_real_target', $matrix['completion_state']);
+        self::assertSame('export_live_supported_bounded_v1', $matrix['completion_state']);
         self::assertFalse($matrix['cluster_summaries_are_field_complete']);
         self::assertSame(self::STATUSES, $matrix['status_vocabulary']);
         self::assertNotEmpty($matrix['rows']);
@@ -337,7 +337,8 @@ final class MagentoV1ProductFieldMatrixTest extends TestCase
         foreach ($actualFields as $field) {
             self::assertStringContainsString('`'.$field.'`', $markdown);
         }
-        self::assertStringContainsString('Adobe Products / Export / Live = false', $markdown);
+        self::assertStringContainsString('Adobe Products / Export / Live = true', $markdown);
+        self::assertStringContainsString('Adobe Products / Import / Live = false', $markdown);
         self::assertStringContainsString('trusted simple Product execution consumes', $markdown);
     }
 

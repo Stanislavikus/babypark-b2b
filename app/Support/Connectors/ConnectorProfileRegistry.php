@@ -8,6 +8,7 @@ use App\Support\Connectors\Exceptions\DisabledConnectorProfileException;
 use App\Support\Connectors\Exceptions\InvalidConnectorProfileConfiguration;
 use App\Support\Connectors\Exceptions\UnsupportedConnectorCapabilityException;
 use App\Support\Sync\FieldOptionMappingOptionValidator;
+use App\Support\Sync\Live\ConnectorLiveRuntimeReadiness;
 use App\Support\Sync\Live\SyncLiveConnectorCapability;
 use App\Support\Sync\Preview\SyncPreviewConnectorCapability;
 use Illuminate\Contracts\Container\Container;
@@ -375,6 +376,45 @@ class ConnectorProfileRegistry
             $liveCapabilityClass = $configuredLiveCapability;
         }
 
+        $liveRuntimeReadinessClass = null;
+
+        if (array_key_exists('live_runtime_readiness', $profileConfig)) {
+            $configuredReadiness = $profileConfig['live_runtime_readiness'];
+
+            if (! is_string($configuredReadiness) || $configuredReadiness === '') {
+                throw new InvalidConnectorProfileConfiguration(
+                    sprintf(
+                        'Connector profile [%s] key [live_runtime_readiness] must be a non-empty class-string.',
+                        $profileCode,
+                    ),
+                );
+            }
+
+            if (! class_exists($configuredReadiness)) {
+                throw new InvalidConnectorProfileConfiguration(
+                    sprintf(
+                        'Connector profile [%s] live_runtime_readiness class [%s] does not exist.',
+                        $profileCode,
+                        $configuredReadiness,
+                    ),
+                );
+            }
+
+            if (! is_subclass_of($configuredReadiness, ConnectorLiveRuntimeReadiness::class)
+                && $configuredReadiness !== ConnectorLiveRuntimeReadiness::class) {
+                throw new InvalidConnectorProfileConfiguration(
+                    sprintf(
+                        'Connector profile [%s] live_runtime_readiness class [%s] must implement %s.',
+                        $profileCode,
+                        $configuredReadiness,
+                        ConnectorLiveRuntimeReadiness::class,
+                    ),
+                );
+            }
+
+            $liveRuntimeReadinessClass = $configuredReadiness;
+        }
+
         $fieldOptionMappingValidatorClass = null;
 
         if (array_key_exists('field_option_mapping_validator', $profileConfig)) {
@@ -423,6 +463,7 @@ class ConnectorProfileRegistry
             capabilities: $capabilities,
             previewCapabilityClass: $previewCapabilityClass,
             liveCapabilityClass: $liveCapabilityClass,
+            liveRuntimeReadinessClass: $liveRuntimeReadinessClass,
             fieldOptionMappingValidatorClass: $fieldOptionMappingValidatorClass,
         );
     }

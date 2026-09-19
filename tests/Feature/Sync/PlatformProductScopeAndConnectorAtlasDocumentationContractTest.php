@@ -503,7 +503,7 @@ class PlatformProductScopeAndConnectorAtlasDocumentationContractTest extends Tes
     {
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
-        $this->assertStringContainsString('| Live execution | IMPLEMENTED (Stage 3B generic orchestration', $atlas);
+        $this->assertStringContainsString('| Live execution | IMPLEMENTED + REAL-TARGET E2E VERIFIED; PUBLIC FOR ADOBE PRODUCTS/EXPORT/LIVE |', $atlas);
         $this->assertStringNotContainsString('Live execution job shell', $atlas);
         $this->assertStringNotContainsString('Stage 3A shell — fail-closed, no Adobe write', $atlas);
     }

@@ -1,9 +1,9 @@
 # Magento / Adobe Commerce V1 Product Field Matrix
 
 **Contract version:** `3.0.0`
-**Repository base:** `133a31ab056ea0292faee5512d77cef0f3986c59`
-**Refresh date:** `2026-08-31`
-**Completion state:** `partial_pending_real_target`
+**Repository base:** `75465daf210cc019377282f4015fae2153b21e07`
+**Refresh date:** `2026-09-19`
+**Completion state:** `export_live_supported_bounded_v1`
 **Source manifest:** `docs/connectors/adobe-commerce/magento_v1_product_external_inventory.json`
 
 This markdown is the human-readable audit for the authoritative machine contract in
@@ -16,10 +16,10 @@ manifest.
 
 - Repository external inventory is source-complete for the official Magento/Adobe
   surfaces researched in this contract.
-- Certification remains `partial_pending_real_target`.
+- Per-field certification remains partial for installation-dependent and intentionally unadvertised behavior classes; this does not reopen the certified bounded Export Live capability.
 - Installation-dependent EAV still requires real target expansion.
 - Inventory presence does **not** mean current connector support.
-- Public support truth remains unchanged: `Adobe Products / Export / Live = false`.
+- **[Resolved 2026-09-19] Public support truth:** `Adobe Products / Export / Preview = true`; `Adobe Products / Export / Live = true`; `Adobe Products / Import / Live = false`. Truth-flip evidence: `magento_v1_products_export_live_certification_2026_09_19.json`.
 - The accepted runtime seams remain unchanged:
   - `AdobeProductDocumentReader` reuses
     `AdobeProductRemoteStateClient::sendReadOnlyGetWithContext()`
@@ -28,7 +28,7 @@ manifest.
 - trusted Receive uses `AdobeProductDocumentReader` (stock `GET /V1/products/{sku}`)
   - trusted existing-family configurable children use the stock Simple GET→PUT→GET writer only when fresh Product GET proves media-role label materialization safety; otherwise they fail closed before PUT
   - no duplicate Product GET transport, OAuth signer, or request factory exists
-  - trusted stock `PUT /V1/products/{sku}` consequential writer exists for merchant-confirmed simple Product updates; public support remains false
+  - trusted stock `PUT /V1/products/{sku}` consequential writer is public for the certified merchant-confirmed Export Live V1 scope; Product CREATE remains unsupported and Import Live remains false
 
 ## Source-derived coverage
 
@@ -187,7 +187,7 @@ At implementation commit `10d05db59b857ba51a4851338cd6186c969c19c9`, the standar
 - the same production runtime restored `151 -> 150`;
 - result: `KnownApplied`, `stock_write_verified`; independent GET confirmed the original state restored.
 
-The subsequent field-by-field campaign certifies **all four current core Simple fields plus 34 present scalar/select custom attributes on this target** through the same production stock writer, `AdobeProductDocumentReader` observation, and exact restore. The target ledger is `docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json`. After the EAV campaign the full 42-custom-attribute baseline and final snapshot were identical (`42 -> 42`, diff count `0`) and the core Product state was also restored exactly. This does not flip public Live support and does not certify configurable, relation, URL-rewrite side effects, system-owned flags, or custom-attribute clear semantics.
+The subsequent field-by-field campaign certifies **all four current core Simple fields plus 34 present scalar/select custom attributes on this target** through the same production stock writer, `AdobeProductDocumentReader` observation, and exact restore. The target ledger is `docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json`. After the EAV campaign the full 42-custom-attribute baseline and final snapshot were identical (`42 -> 42`, diff count `0`) and the core Product state was also restored exactly. **At that certification stage** public Live support was not flipped and configurable, relation, URL-rewrite side effects, system-owned flags, and custom-attribute clear semantics still required separate work; the later 2026-09-19 truth-flip closure supersedes only the support-status part of that historical statement.
 
 A follow-on P-03 campaign on 2026-09-18 certifies clear semantics by **behavior tuple, not field code**. Optional store `text`, `textarea`, and `date` use an empty-string payload and require fresh GET absence; optional global `select` uses `null` and requires fresh GET absence. Required fields and all unproved type/scope combinations remain fail-closed. The date probe additionally proved that `null` may return HTTP 200 without clearing the value. `AdobeProductAttributeClassifier v2` exposes these states through behavior-signature `clear_semantics`, so discovery/UI/AI can reason about the same capability contract as the writer. Evidence: `docs/connectors/adobe-commerce/magento_v1_custom_attribute_clear_certification_2026_09_18.json`.
 
@@ -208,9 +208,9 @@ Any other `frontend_input` remains fail-closed until explicitly verified and map
 
 - no runtime architecture redesign
 - no Product core expansion merely because Magento exposes a field
-- no support flip
+- no support flip **as a side effect of that historical correction alone**
 - no Safe Sync module rewrite
-- no public support flip or deployment as a side effect of certification
+- no public support flip or deployment **from that historical correction alone**
 - no deploy
 
 ---
@@ -267,7 +267,7 @@ PR #226 real-target certification proved the existing-family Configurable core U
 - positive family `524000027bbg` then completed two child price writes (`20700→20701`, `22000→22001`) with `KnownApplied / stock_write_verified`, one PUT plus one reconciliation GET per child; parent/options/links were no-op, and both children were restored through the same stock writer;
 - final independent default-store and `all` reads matched the pre-write raw baselines except Magento-managed `updated_at`; merchant child names, entity ids, option values `63/79`, media role-label state, and links were preserved.
 
-Durable evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_linked_update_certification_2026_09_18.json`. Public Adobe Products / Export / Live support remains false.
+Durable evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_linked_update_certification_2026_09_18.json`. At the close of that 2026-09-18 slice public Adobe Products / Export / Live support was still false; the 2026-09-19 bounded E2E truth-flip evidence supersedes that historical status.
 
 Follow-on Configurable structure evidence on the same date certifies the **existing-option UPDATE-only** seam against family `524000027bbg`: validation setup changed only option `id=3` position `0→1`; the production coordinator restored `1→0` through exactly one option PUT plus one reconciliation GET and returned `SYNCHRONIZED`; independent GET proved the exact option id/attribute/label/value set and child links returned to baseline. Missing option CREATE remains fail-closed. Destructive option-value removal is not exposed; the standard existing-option path preserves remote values absent from the active desired set instead of deleting them. Durable evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_structure_certification_2026_09_18.json`.
 
@@ -282,16 +282,9 @@ A separate read-only missing-SKU probe returned HTTP 404 with a message-only bod
 structured `parameters`. The classifier therefore remained conservative `untrusted_or_failed`;
 this target did not prove the synthetic `TrustedKnownMissing` fixture shape.
 
-### Scope that remains pending
+### Scope that remains pending after the 2026-09-19 Export Live truth flip
 
-This certification does **not** introduce public Live support and does not certify every matrix
-row. `Adobe Products / Export / Live = false` remains authoritative. The following still require
-separate evidence where applicable:
-
-- field-by-field Simple Product WRITE validation beyond the verified base-price cycle;
-- installation-dependent mapped EAV values beyond the certified bounded V1 clear tuples;
-- media mutation;
-- remaining product-type and connector-owned surfaces.
+The bounded standard Magento V1 capability is now public for `Adobe Products / Export / Live = true`, backed by `magento_v1_products_export_live_certification_2026_09_19.json`. This does **not** mean every inventory row is writable or that every deferred behavior has been promoted into the advertised V1 surface. Separate evidence remains required where applicable for installation-dependent EAV behavior outside the certified tuples, direct `swatch_image` ownership, non-default Store View media-label clear/inheritance behavior, negative-path permission-denial target evidence, and future product-type/surface expansion. Adobe Products / Import / Live remains false under the separate Receive contract.
 
 The matrix's `safe_sync_write_state` continues to describe the optional Safe Sync primitive where
-it exists; it is not the owner of the standard Simple runtime anymore.
+it exists; it is not the owner of the standard moduleless Export Live runtime.

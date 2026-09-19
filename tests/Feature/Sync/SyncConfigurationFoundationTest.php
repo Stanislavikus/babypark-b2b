@@ -581,7 +581,7 @@ class SyncConfigurationFoundationTest extends TestCase
     }
 
     #[Test]
-    public function adobe_commerce_profile_supports_products_export_preview_only(): void
+    public function adobe_commerce_profile_supports_products_export_preview_and_live(): void
     {
         $account = $this->createConnectorAccount();
 
@@ -589,7 +589,7 @@ class SyncConfigurationFoundationTest extends TestCase
 
         $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview));
         $this->assertTrue($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview));
-        $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live));
+        $this->assertTrue($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live));
 
         $this->expectException(UnsupportedSyncOperationException::class);
 

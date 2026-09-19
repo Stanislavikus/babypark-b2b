@@ -74,6 +74,7 @@ use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
+use Tests\Concerns\ConfiguresSyncSupportProfiles;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\Concerns\InteractsWithFieldMappingFixtures;
 use Tests\Concerns\InteractsWithWorkspaceRbac;
@@ -82,12 +83,14 @@ use Tests\Support\Connectors\AdobePaaS\Command\AdobeProductCommandTestFixtures;
 use Tests\Support\Connectors\AdobePaaS\Media\AdobeProductMediaTestFixtures;
 use Tests\Support\Connectors\RecordingConnectorHttpTransport;
 use Tests\Support\Sync\SyncLiveConsequentialWriteGateStub;
+use Tests\Support\Sync\TestConnectorLiveRuntimeReadiness;
 use Tests\TestCase;
 use Tests\Unit\Connectors\Transport\FakeDnsResolver;
 use Tests\Unit\Connectors\Transport\Support\FakeMonotonicClock;
 
 class Stage3D1AdobeMediaLiveTest extends TestCase
 {
+    use ConfiguresSyncSupportProfiles;
     use CreatesConnectorAccountFixtures;
     use InteractsWithFieldMappingFixtures;
     use InteractsWithWorkspaceRbac;
@@ -1592,18 +1595,18 @@ class Stage3D1AdobeMediaLiveTest extends TestCase
     }
 
     #[Test]
-    public function advertised_live_support_remains_false_despite_media_live_executor(): void
+    public function advertised_live_support_is_true_after_real_target_truth_flip(): void
     {
         $adapter = new AdobePaaSConnectorAdapter;
         $account = $this->createConnectorAccount();
 
-        $this->assertFalse($adapter->supports(
+        $this->assertTrue($adapter->supports(
             SyncDataDomain::Products,
             SyncSemanticOperation::Export,
             SyncRunMode::Live,
         ));
 
-        $this->assertFalse(app(ConnectorSyncSupportResolver::class)->supports(
+        $this->assertTrue(app(ConnectorSyncSupportResolver::class)->supports(
             $account,
             SyncDataDomain::Products,
             SyncSemanticOperation::Export,
@@ -1612,15 +1615,23 @@ class Stage3D1AdobeMediaLiveTest extends TestCase
     }
 
     #[Test]
-    public function production_live_admission_rejects_adobe_while_live_support_is_false(): void
+    public function production_live_admission_fails_closed_when_runtime_readiness_is_not_ready(): void
     {
+        $this->configureAdobePaaSSyncSupportProfile([
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview],
+            [SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live],
+        ]);
+
+        $readiness = new TestConnectorLiveRuntimeReadiness;
+        $readiness->ready = false;
+        $this->app->instance(TestConnectorLiveRuntimeReadiness::class, $readiness);
+
         $account = $this->createConnectorAccount();
         $configuration = $this->prepareMappedConfiguration($account);
         $actor = $this->grantLivePermission($account->workspace);
         $this->seedCompletedPreview($account, $configuration);
 
         $this->expectException(SyncLiveAdmissionException::class);
-
         app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
     }
 

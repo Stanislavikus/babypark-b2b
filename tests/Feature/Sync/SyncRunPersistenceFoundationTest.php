@@ -540,7 +540,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
     }
 
     #[Test]
-    public function adobe_products_export_supports_preview_only(): void
+    public function adobe_products_export_supports_preview_and_live(): void
     {
         app()->forgetInstance(ConnectorProfileRegistry::class);
 
@@ -548,7 +548,7 @@ class SyncRunPersistenceFoundationTest extends TestCase
         $resolver = app(ConnectorSyncSupportResolver::class);
 
         $this->assertTrue($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Preview));
-        $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live));
+        $this->assertTrue($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Export, SyncRunMode::Live));
         $this->assertFalse($resolver->supports($account, SyncDataDomain::Products, SyncSemanticOperation::Import, SyncRunMode::Preview));
 
         $this->configureSyncSupportProfile([

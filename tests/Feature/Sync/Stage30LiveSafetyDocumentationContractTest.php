@@ -244,14 +244,14 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
     }
 
     #[Test]
-    public function live_support_remains_false_through_internal_slices(): void
+    public function current_live_support_truth_is_flipped_after_historical_internal_slices(): void
     {
         $section = $this->stage30ContractSection();
         $stages = $this->coherentStagesSection();
 
         $this->assertStringContainsString('Products / Export / Preview = **true**', $section);
-        $this->assertStringContainsString('Products / Export / Live = **false**', $section);
-        $this->assertStringContainsString('Keep Live **false** through internal implementation slices 3A–3D', $section);
+        $this->assertStringContainsString('Products / Export / Live = **true**', $section);
+        $this->assertStringContainsString('[Resolved — 2026-09-19 — standard moduleless Magento V1 truth flip]', $section);
         $this->assertStringContainsString('remains **false**', $stages);
     }
 
@@ -303,7 +303,8 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
     {
         $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
-        $this->assertStringContainsString('Stage 3-0 docs contract **Done**', $gaps);
+        $this->assertStringContainsString('**Stage 3-0 — Live Safety, Identity & First-Live Contract**', $gaps);
+        $this->assertStringContainsString('**Done (docs contract)**', $gaps);
     }
 
     #[Test]
@@ -371,14 +372,14 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
     }
 
     #[Test]
-    public function stage_3d_cannot_bypass_live_false_support_truth(): void
+    public function historical_stage_3d_non_actionable_gate_is_preserved_but_current_truth_is_flipped(): void
     {
         $stages = $this->coherentStagesSection();
         $section = $this->stage30ContractSection();
 
         $this->assertStringContainsString('non-actionable', $stages);
         $this->assertStringContainsString('must not bypass `ConnectorSyncOperationSupport`', $stages);
-        $this->assertStringContainsString('Keep Live **false** through internal implementation slices 3A–3D', $section);
+        $this->assertStringContainsString('Products / Export / Live = **true**', $section);
     }
 
     #[Test]
@@ -391,13 +392,13 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
     }
 
     #[Test]
-    public function adobe_products_export_live_remains_false_in_current_runtime(): void
+    public function adobe_products_export_live_is_true_in_current_runtime(): void
     {
         $section = $this->stage30ContractSection();
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
-        $this->assertStringContainsString('Products / Export / Live = **false**', $section);
-        $this->assertStringContainsString('| Adobe Products/Export/Live support truth | CONFIRMED ABSENT (public) |', $atlas);
+        $this->assertStringContainsString('Products / Export / Live = **true**', $section);
+        $this->assertStringContainsString('| Adobe Products/Export/Live support truth | SUPPORTED (public) — [Resolved 2026-09-19] |', $atlas);
     }
 
     #[Test]
@@ -483,11 +484,13 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
         $gaps = File::get(base_path('docs/IMPLEMENTATION_GAPS.md'));
 
         $this->assertStringContainsString('**Stage 3B — Adobe Simple Live integration**', $gaps);
-        $this->assertStringContainsString('**Done (internal)**', $gaps);
-        $this->assertStringContainsString('generic `SyncLiveRunJob` orchestration', $gaps);
-        $this->assertStringContainsString('Adobe simple `live_capability` binding', $gaps);
+        $this->assertStringContainsString('**Done + public for the certified Magento V1 scope**', $gaps);
+        $this->assertStringContainsString('generic Live capability seam', $gaps);
+        $this->assertStringContainsString('AdobeProductExportLiveCapability', $gaps);
+        $this->assertStringContainsString('fresh `ConnectorLiveRuntimeReadiness`', $gaps);
         $this->assertStringContainsString('**Stage 3C — Adobe Configurable Live**', $gaps);
-        $this->assertStringContainsString('merchant Live unreachable until Stage 3E', $gaps);
+        $this->assertStringContainsString('Products/Export/Live = **true**', $gaps);
+        $this->assertStringContainsString('Products/Import/Live = **false**', $gaps);
 
         $this->assertStringNotContainsString('Done, unwired', $gaps);
         $this->assertStringNotContainsString('remaining Stage 3B', $gaps);
@@ -501,7 +504,7 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
     {
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
-        $this->assertStringContainsString('| Live execution | IMPLEMENTED (Stage 3B generic orchestration', $atlas);
+        $this->assertStringContainsString('| Live execution | IMPLEMENTED + REAL-TARGET E2E VERIFIED; PUBLIC FOR ADOBE PRODUCTS/EXPORT/LIVE |', $atlas);
         $this->assertStringNotContainsString('Live execution job shell', $atlas);
         $this->assertStringNotContainsString('Stage 3A shell — fail-closed, no Adobe write', $atlas);
     }

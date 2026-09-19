@@ -1,10 +1,10 @@
 # Magento V1 Pending Certification Items
 
-**Status:** active campaign ledger  
-**Updated:** 2026-09-18
-**Branch:** `campaign/magento-v1-real-certification`
+**Status:** bounded follow-up certification ledger
+**Updated:** 2026-09-19
+**Branch:** `campaign/magento-v1-production-live`
 
-This file is the durable queue for Magento V1 issues deliberately deferred during field-by-field certification. An item stays here until it is implemented/certified or explicitly closed with evidence. Public Adobe Products / Export / Live support remains false while required items are open.
+This file is the durable queue for Magento V1 issues deliberately deferred during certification. An item stays here until it is implemented/certified or explicitly closed with evidence. **[Resolved 2026-09-19] Adobe Products / Export / Live is now supported for the certified standard moduleless V1 scope**; evidence is `docs/connectors/adobe-commerce/magento_v1_products_export_live_certification_2026_09_19.json`. Open items below are bounded follow-ups and are not blockers for that advertised Export Live scope unless a future scope expansion makes them relevant. Adobe Products / Import / Live remains false.
 
 ## Open items
 
@@ -20,7 +20,7 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Execution consistency: effective account category mappings and their deterministic revision are captured in Preview `configuration_snapshot`; Live admission rejects Preview evidence if the account mapping revision changed after Preview.
 - Concurrency: remote relation execution is serialized with the existing ConnectorAccount operation cache lock; DB row locks are held only in short local state-transition transactions, never across Magento HTTP.
 - Real-target proof: trusted Simple SKU `1234567890` / `entity_id=1` baseline category `5`; runtime granular ADD of temporary category `7` produced `[5,7]` + managed ledger; runtime granular DELETE restored exactly `[5]`; zero assignment rows and zero temporary local fixtures remained; independent final GET confirmed baseline.
-- Public support: Adobe Products / Export / Live remains false; this closure certifies the P-01 relation capability only.
+- Historical support state at P-01 closure: Adobe Products / Export / Live was still false; the later 2026-09-19 bounded truth flip supersedes only that support-status statement, not the P-01 relation boundary.
 - Evidence: `docs/connectors/adobe-commerce/magento_v1_category_relation_certification_2026_09_18.json`.
 - Reviewer candidate: no further architecture review required unless future scope changes category ownership, Store View semantics, or destructive provenance rules.
 ### P-02 — `url_key` / URL rewrite side effects — CLOSED 2026-09-19 [Resolved]
@@ -45,7 +45,7 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Target boundary audit: no optional generic boolean attribute exists on the certification schema (observed booleans are required), and no suitable generic optional plain-decimal custom attribute exists; `weight` is a top-level Product capability and `tier_price` is a dedicated pricing surface. V1 therefore makes no unsupported clear claim for those classes.
 - Postcondition: success is never inferred from HTTP alone or effective-value equality; fresh GET must show the cleared attribute absent while the rest of the controlled Product state matches.
 - Historical evidence retained: required global `manufacturer` showed why vendor acceptance is not sufficient policy authority, and website-scoped `c_carseats_adac_rating` demonstrated inherited/effective-value ambiguity. Those behaviors remain intentionally unsupported for clear in V1.
-- Public support: Adobe Products / Export / Live remains false; this closure does not flip merchant-visible support.
+- Historical support state at P-03 closure: Adobe Products / Export / Live was still false; the later 2026-09-19 bounded truth flip supersedes only that support-status statement.
 - Evidence: `docs/connectors/adobe-commerce/magento_v1_custom_attribute_clear_certification_2026_09_18.json`.
 - Reviewer candidate: no further review required unless a future scope admits another type/scope tuple or contradicts these real-target postconditions.
 ### P-04 — Real WRITE permission-denial evidence
@@ -54,6 +54,7 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Current truth: runtime distinguishes structured `401/403 + parameters.resources` from ambiguous access rejection, but proof is fixture-based.
 - Why deferred: inducing this safely requires changing Magento Integration permissions.
 - Needed proof: controlled permission removal/restoration, captured safe response shape, confirmation that WRITE failure stays operation-specific and connection READ truth remains green.
+- Export Live gate: **NON-BLOCKING for the certified target/scope** — the 2026-09-19 real merchant-path smoke proves positive WRITE permission; current structured denial handling remains fail-closed. Closing P-04 would require intentionally reducing Magento Integration ACL and is retained as negative-path operational evidence work.
 - Reviewer candidate: yes if real response contradicts current classifier.
 
 ### P-05 — Trusted-missing 404 semantics
@@ -62,6 +63,7 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Current truth: this target returned 404 with `message` only and no structured `parameters`; runtime conservatively returns `untrusted_or_failed` and performs zero PUT.
 - Why deferred: insufficient evidence to promote message-only 404 to `TrustedKnownMissing`.
 - Needed proof: official/runtime identity context sufficient to distinguish trusted deletion from routing/store-scope/auth failure without parsing free-form message.
+- Export Live gate: **NON-BLOCKING** — current classification is deliberately conservative and produces zero PUT, so the unresolved distinction reduces diagnosis precision rather than write safety.
 - Reviewer candidate: yes.
 ### P-06 — `swatch_image` direct ownership
 
@@ -69,6 +71,7 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Current truth: media metadata correction now preserves an existing remote `swatch_image` during primary-image no-op/PUT and real-target restore. The connector does not yet claim direct swatch-role assignment ownership.
 - Why deferred: preserving an unmanaged role is different from supporting its mutation.
 - Needed proof: decide V1 ownership, then either certify explicit swatch assignment/removal or keep the role read/preserve-only.
+- Export Live gate: **NON-BLOCKING** — V1 keeps `swatch_image` read/preserve-only and does not advertise direct swatch-role assignment/removal.
 - Reviewer candidate: yes if ownership is expanded.
 
 ### P-07 — Magento Receive Apply breadth
@@ -77,6 +80,7 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Current truth: R3 consequential Receive Apply remains real-target certified for canonical Product `name`. R4 (2026-09-13) additively implements behavior-class Receive for active workspace custom Dynamic single-select fields: exact `FieldOptionMapping` reverse resolution, `Differs` / `LocalAbsent` proposal states, fresh remote revalidation, and `GovernedDynamicFieldValueWriter::setIfCurrentValue(...)` stale-local protection. No Magento field code is individually allowlisted. `RemoteAbsent` is not Clear. Public Adobe Products/Import/Live support remains false and there is no merchant Apply UI.
 - Why still open: R4 is code/test certified but has not yet received a destructive real-target Receive mutation certification for a custom attribute; broader behavior classes (including Money/MultiSelect/etc.) remain intentionally unclaimed.
 - Needed proof: complete R4 broad regression and, before advertising public Import support, run a controlled real-target custom-select change/read/apply/restore certification. Future breadth expands by behavior class through its owning writer, never by assuming outbound certification implies Receive writability.
+- Export Live gate: **NOT APPLICABLE** — P-07 governs Receive/Import. Adobe Products / Import / Live remains false and is a separate capability truth.
 - Reviewer candidate: yes for a narrow R4 implementation review or when the next behavior class is admitted.
 
 ### P-08 — Product WRITE paused/remediation presentation — CLOSED 2026-09-12
@@ -92,6 +96,7 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Current truth: on the real default-store target, media `label=null` alone restored gallery metadata but left role-label EAV values; `label=""` cleared those projections and Magento normalized gallery label back to `null` with content/roles unchanged. During the 2026-09-18 Configurable linked-update certification, ordinary Product PUT on Junama children with non-empty gallery labels and previously absent role-label projections materialized `image_label` / `small_image_label` / `thumbnail_label` only in the configured `default` store view; `all` and other store views stayed unchanged. The already-certified default-store `label=""` media reset removed those projections again without changing media content, file, or roles. Configurable child runtime now fails closed before Product PUT unless fresh GET proves assigned gallery labels and role-label projections are already equal (or both absent). Post-certification review hardened the same boundary further: orphaned role-label projections are unsafe, the configurable parent is identity/type preflighted before any child HTTP, and parent drift that would require Product PUT also requires media-role label materialization safety. Request serialization remains context-aware: default-store null reset emits `""`; non-default store-view null remains `null`.
 - Why deferred: non-default store views distinguish `null` (use default/inherit) from `""` (explicit empty), so only the default-store reset is certified.
 - Needed proof: a real non-default store-view inheritance/explicit-empty cycle before claiming cross-store media-label clear support.
+- Export Live gate: **NON-BLOCKING for the advertised default-store V1 scope** — default-store reset/materialization safety is certified; cross-store media-label clear is not advertised.
 - Reviewer candidate: yes if V1 ownership expands beyond default-store media labels.
 
 ### P-10 — Store-view Product PUT may materialize untouched scoped overrides — CLOSED 2026-09-17 [Resolved]
@@ -101,7 +106,7 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Closure proof: temporary SSH access was used only for a read-only Magento bootstrap/ResourceConnection raw-EAV observer. For real Product `SKU 1234567890`, logical `entity_id=1`, store `default` / `store_id=1`, an exhaustive non-global EAV scan found six inherited canaries with an Admin row and no store-1 row: `image`, `small_image`, `swatch_image`, `thumbnail`, `url_key`, and website-scoped `cost`. Baseline raw-EAV SHA-256 was `a900f7ce31d24565bfb497809bc5da92e186169a39dc4ed6bb8bcda2802e4c22`.
 - Production mutation: the existing moduleless runtime `AdobeProductSimpleCommandExecutor -> AdobeProductStockSimpleWriteExecutor` executed the normal `GET -> PUT -> GET` cycle for price `150 -> 151`; result was `KnownApplied / stock_write_verified`, with exactly one consequential PUT and one reconciliation GET. The raw-EAV snapshot after the PUT had the identical SHA-256 and zero new store-1 overrides across all six canaries.
 - Restore: the same production writer restored price `151 -> 150` with `KnownApplied / stock_write_verified`. Final raw-EAV SHA-256 again matched baseline exactly, and an independent production `AdobeProductDocumentReader` GET returned `entity_id=1`, SKU `1234567890`, type `simple`, price `150`, name `Test Product`.
-- Conclusion: the supported default-store stock Product PUT path did **not** materialize untouched inherited store/website EAV overrides on the certification target. P-10 is closed for this supported V1 path. This closure does not itself flip public Live support or claim broader non-default-store/media-label inheritance semantics.
+- Conclusion: the supported default-store stock Product PUT path did **not** materialize untouched inherited store/website EAV overrides on the certification target. P-10 is closed for this supported V1 path. At P-10 closure this evidence did not itself flip public Live support; the later 2026-09-19 bounded truth flip supersedes that historical status without broadening non-default-store/media-label inheritance semantics.
 - Evidence: `docs/connectors/adobe-commerce/magento_v1_store_scope_inheritance_certification_2026_09_17.json`.
 - Reviewer candidate: no further review required unless the supported store-context/write path changes.
 
@@ -111,6 +116,6 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Closure proof: real-target family `524000027bbg` completed all three frozen V1 structure repairs through production-intended runtime. Existing option non-destructive drift was reconciled by one PUT + GET. A validation-only missing-child drift was restored by one identity-verified child POST + GET followed by semantic option re-read/reconciliation; Magento provider option row id churn was observed and is treated as a mutable remote handle, not identity authority. Finally, linked child `524000027bbg-Чорний` / `entity_id=13` completed verified status `1→2→1` through lifecycle disable and the certified active-child restore path, with exact final identity/price/media/link/option baseline.
 - Fail-closed/unsupported boundaries: missing option CREATE remains `configurable_option_create_not_certified`; destructive option-value removal is not exposed by the standard existing-option path — remote values absent from the active desired set are preserved with zero write instead of being removed; remote child unlink/removal is not exposed as a production capability; Product CREATE and blind consequential retry remain forbidden.
 - Identity/safety: MerchantConfirmed ERL remains authority; parent/child SKU + numeric Magento logical `entity_id` + type are freshly checked around structure writes; inactive lifecycle additionally requires the child to still be linked and fresh media-role-label materialization safety before Product PUT.
-- Public support: Adobe Products / Export / Live remains false; this closure certifies the internal V1 runtime and does not flip merchant-visible support.
+- Historical support state at P-11 closure: Adobe Products / Export / Live was still false; the later 2026-09-19 bounded truth flip supersedes only that support-status statement and does not broaden P-11 structure ownership.
 - Evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_structure_certification_2026_09_18.json`.
 - Reviewer candidate: no further architecture review required unless a future scope expands into option CREATE/value removal, remote unlink/removal, or new identity/transaction semantics.

@@ -1039,17 +1039,15 @@ class Stage3ER2b2CorrectionPassTest extends TestCase
     }
 
     #[Test]
-    public function live_support_remains_disabled_in_r2b2_correction_pass(): void
+    public function live_support_is_enabled_after_real_target_truth_flip(): void
     {
-        [$account, $product] = $this->seedSimpleReadyFixture('CORR-LIVE-OFF-SKU', 7060);
+        [$account, $product] = $this->seedSimpleReadyFixture('CORR-LIVE-ON-SKU', 7060);
         $actor = $this->createEntityTrustActor($account->workspace);
 
         $component = Livewire::actingAs($actor)
             ->test(ManageAdobeProductsExportPreview::class, ['account' => $account->id]);
 
-        // The Live read model exposes liveSupportAvailable = false in
-        // R2b-2 — Live is gated behind a feature flag that remains off.
-        $this->assertFalse((bool) $component->get('liveSupportAvailable'));
+        $this->assertTrue((bool) $component->get('liveSupportAvailable'));
     }
 
     private function enableAdobeProductsExportLiveSupport(): void

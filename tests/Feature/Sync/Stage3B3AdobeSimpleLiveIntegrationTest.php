@@ -38,7 +38,6 @@ use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorHttpTransport;
 use App\Support\Connectors\Transport\ConnectorOutboundRequest;
 use App\Support\Sync\ConnectorExecutionConfiguration;
-use App\Support\Sync\Exceptions\SyncLiveAdmissionException;
 use App\Support\Sync\Live\SyncLiveConnectorCapabilityResolver;
 use App\Support\Sync\Live\SyncLiveConsequentialWriteGate;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
@@ -48,6 +47,7 @@ use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
@@ -78,16 +78,21 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
     }
 
     #[Test]
-    public function production_live_admission_rejects_adobe_while_support_is_false(): void
+    public function production_live_admission_accepts_adobe_after_fresh_runtime_readiness(): void
     {
+        Bus::fake();
+        $this->bindAdobeTransport();
         $account = $this->createConnectorAccount();
         $configuration = $this->prepareMappedConfiguration($account);
         $actor = $this->grantLivePermission($account->workspace);
         $this->seedCompletedPreview($account, $configuration);
 
-        $this->expectException(SyncLiveAdmissionException::class);
+        $run = app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
 
-        app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+        $this->assertSame(SyncRunStatus::Queued, $run->status);
+        $this->assertSame(SyncRunMode::Live, $run->mode);
+        $this->assertSame($configuration->configuration_revision, $run->configuration_revision);
+        Bus::assertDispatched(SyncLiveRunJob::class);
     }
 
     #[Test]
@@ -457,6 +462,14 @@ class Stage3B3AdobeSimpleLiveIntegrationTest extends TestCase
     {
         $uri = (string) $request->request->getUri();
         $method = $request->request->getMethod();
+
+        if ($method === 'GET' && str_contains($uri, '/V1/products?')) {
+            return new ConnectorHttpResult(200, [], json_encode([
+                'items' => [],
+                'search_criteria' => (object) [],
+                'total_count' => 0,
+            ], JSON_THROW_ON_ERROR));
+        }
 
         if (str_contains($uri, '/store/storeConfigs')) {
             return new ConnectorHttpResult(200, [], json_encode([

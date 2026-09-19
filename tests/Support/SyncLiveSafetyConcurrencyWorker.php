@@ -18,7 +18,9 @@ use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Facades\DB;
 use Tests\Support\Connectors\TestSyncSupportConnectorAccountSchema;
 use Tests\Support\Connectors\TestSyncSupportConnectorAdapter;
+use Tests\Support\Sync\TestConnectorLiveRuntimeReadiness;
 use Tests\Support\Sync\TestFieldOptionMappingOptionValidator;
+use Tests\Support\Sync\TestSyncLiveCapability;
 use Tests\Support\Sync\TestSyncPreviewCapability;
 
 require __DIR__.'/../../vendor/autoload.php';
@@ -37,6 +39,8 @@ $container->instance(ConnectorProfileRegistry::class, new ConnectorProfileRegist
             'account_schema' => TestSyncSupportConnectorAccountSchema::class,
             'capabilities' => [],
             'preview_capability' => TestSyncPreviewCapability::class,
+            'live_capability' => TestSyncLiveCapability::class,
+            'live_runtime_readiness' => TestConnectorLiveRuntimeReadiness::class,
             'field_option_mapping_validator' => TestFieldOptionMappingOptionValidator::class,
         ],
     ],

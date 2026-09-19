@@ -17,6 +17,7 @@ use App\Support\Connectors\ConnectorSyncSupportResolver;
 use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
 use App\Support\Sync\Exceptions\SyncLiveAdmissionException;
 use App\Support\Sync\Exceptions\SyncRuntimeTimingConfigurationException;
+use App\Support\Sync\Live\ConnectorLiveRuntimeReadinessResolver;
 use App\Support\Sync\Preview\SyncPreviewConfigurationReadinessResolver;
 use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Support\Facades\DB;
@@ -32,6 +33,7 @@ final class SyncLiveAdmissionService
         private readonly SyncRunActiveRecoveryService $activeRecoveryService,
         private readonly SyncRuntimeTimingResolver $timingResolver,
         private readonly ConnectorCategoryMappingSnapshotService $categoryMappingSnapshotService,
+        private readonly ConnectorLiveRuntimeReadinessResolver $liveRuntimeReadinessResolver,
     ) {}
 
     public function admit(
@@ -42,6 +44,8 @@ final class SyncLiveAdmissionService
         if (DB::transactionLevel() > 0 && ! app()->environment('testing')) {
             throw new \RuntimeException('Sync live admission must not run inside a nested transaction.');
         }
+
+        $this->assertRuntimeReadyBeforeAdmission($actor, $account);
 
         $run = null;
         $admissionTiming = null;
@@ -198,5 +202,38 @@ final class SyncLiveAdmissionService
             ]);
 
         return $run->refresh();
+    }
+
+    private function assertRuntimeReadyBeforeAdmission(User $actor, ConnectorAccount $account): void
+    {
+        $workspace = Workspace::query()->whereKey($account->workspace_id)->firstOrFail();
+
+        if (! $this->authorization->allows($actor, $workspace, WorkspacePermissions::RUN_SYNC_LIVE)) {
+            throw SyncLiveAdmissionException::notAuthorized();
+        }
+
+        $freshAccount = ConnectorAccount::withoutWorkspaceScope()
+            ->where('workspace_id', $account->workspace_id)
+            ->where('id', $account->id)
+            ->firstOrFail();
+
+        if (! $freshAccount->is_enabled) {
+            throw SyncLiveAdmissionException::accountNotEnabled($freshAccount->id);
+        }
+
+        if (! $this->syncSupportResolver->supports(
+            $freshAccount,
+            SyncDataDomain::Products,
+            SyncSemanticOperation::Export,
+            SyncRunMode::Live,
+        )) {
+            throw SyncLiveAdmissionException::operationNotSupported();
+        }
+
+        $readiness = $this->liveRuntimeReadinessResolver->resolve($freshAccount);
+
+        if (! $readiness->isReady($freshAccount->workspace_id, $freshAccount->id)) {
+            throw SyncLiveAdmissionException::runtimeNotReady();
+        }
     }
 }

@@ -11,6 +11,7 @@ use App\Models\SyncConfiguration;
 use App\Models\SyncRun;
 use App\Models\SyncRunItem;
 use App\Support\Sync\Exceptions\SyncConfigurationNotFoundException;
+use App\Support\Sync\Live\ConnectorLiveRuntimeReadinessResolver;
 use App\Support\Sync\Live\SyncLiveConnectorCapabilityResolver;
 use App\Support\Sync\Live\SyncRunConsequentialWriteGate;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
@@ -64,9 +65,14 @@ class SyncLiveRunJob implements Interruptible, ShouldQueue
     public function handle(
         ProductExecutionAggregateBuilder $aggregateBuilder,
         SyncLiveConnectorCapabilityResolver $capabilityResolver,
+        ?ConnectorLiveRuntimeReadinessResolver $runtimeReadinessResolver = null,
     ): void {
         try {
-            $this->execute($aggregateBuilder, $capabilityResolver);
+            $this->execute(
+                $aggregateBuilder,
+                $capabilityResolver,
+                $runtimeReadinessResolver ?? app(ConnectorLiveRuntimeReadinessResolver::class),
+            );
         } catch (\Throwable) {
             $this->terminalizeFailedRun();
 
@@ -77,6 +83,7 @@ class SyncLiveRunJob implements Interruptible, ShouldQueue
     private function execute(
         ProductExecutionAggregateBuilder $aggregateBuilder,
         SyncLiveConnectorCapabilityResolver $capabilityResolver,
+        ConnectorLiveRuntimeReadinessResolver $runtimeReadinessResolver,
     ): void {
         $reserved = DB::transaction(function (): ?SyncRun {
             $run = SyncRun::withoutWorkspaceScope()
@@ -195,6 +202,19 @@ class SyncLiveRunJob implements Interruptible, ShouldQueue
         );
 
         $writeGate = new SyncRunConsequentialWriteGate($this->workspaceId, $this->syncRunId);
+        $runtimeReadiness = $runtimeReadinessResolver->resolve($account);
+
+        if (! $runtimeReadiness->isReady($this->workspaceId, $this->connectorAccountId)) {
+            $this->terminalizeFailedRun();
+
+            return;
+        }
+
+        if (! $writeGate->permitsConsequentialWrite()) {
+            $this->terminalizeFailedRun();
+
+            return;
+        }
 
         foreach ($aggregates as $aggregate) {
             if (! $writeGate->permitsProductExecution()) {

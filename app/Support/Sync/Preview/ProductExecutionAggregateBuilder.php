@@ -50,7 +50,9 @@ class ProductExecutionAggregateBuilder
         $products = Product::withoutWorkspaceScope()
             ->where('workspace_id', $workspaceId)
             ->whereIn('id', $productIds)
-            ->with(['variants' => static fn ($query) => $query->where('is_active', true)])
+            ->with(['variants' => static fn ($query) => $query
+                ->where('is_active', true)
+                ->orderBy('id')])
             ->orderBy('id')
             ->get();
 

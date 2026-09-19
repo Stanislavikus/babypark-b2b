@@ -632,6 +632,7 @@
     "sync_live.confirmation.message": "Передати товари в Adobe Commerce? Це реальна дія — дані будуть передані у ваш магазин. Перед передачею ми ще раз перевіримо актуальні дані товарів.",
     "sync_live.confirmation.blocked_products_notice": "Товари, які під час актуальної перевірки перед передачею ще не готові, зовні не будуть змінені. Заблоковано за останньою перевіркою: :count.",
     "sync_live.errors.start_failed": "Не вдалося розпочати передачу. Спробуйте пізніше.",
+    "sync_live.errors.runtime_not_ready": "Adobe Commerce зараз не готовий до передачі. Перевірте підключення та спробуйте ще раз.",
     "sync_live.outcomes.synchronized": "Синхронізовано",
     "sync_live.outcomes.not_applied": "Не передано",
     "sync_live.outcomes.partial": "Частково синхронізовано",

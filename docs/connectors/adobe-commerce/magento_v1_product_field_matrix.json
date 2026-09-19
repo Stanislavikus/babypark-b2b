@@ -2,9 +2,9 @@
   "schema_version": "3.0.0",
   "contract": "Magento / Adobe Commerce V1 Product Field Matrix",
   "authoritative": true,
-  "repository_base": "ff5768a730f1055e3c684c6537d0906f229a486e",
-  "refresh_date": "2026-09-08",
-  "completion_state": "partial_pending_real_target",
+  "repository_base": "75465daf210cc019377282f4015fae2153b21e07",
+  "refresh_date": "2026-09-19",
+  "completion_state": "export_live_supported_bounded_v1",
   "cluster_summaries_are_field_complete": false,
   "source_manifest_path": "docs/connectors/adobe-commerce/magento_v1_product_external_inventory.json",
   "documentation_map_path": "docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md",
@@ -161,7 +161,7 @@
       "real_validation_state": "real_target_write_read_restore_verified_2026_09_11",
       "field_certification_status": "real_target_write_read_restore_verified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Real target verified controlled name cycle Test Product -> Test Product [B2B Cert] -> Test Product through the production stock writer; AdobeProductDocumentReader observed the mutated value before restore; identity remained entity_id=1 and public Live support remains false."
+      "result_or_blocker": "Real target verified controlled name cycle Test Product -> Test Product [B2B Cert] -> Test Product through the production stock writer; AdobeProductDocumentReader observed the mutated value before restore; identity remained entity_id=1 and public Live support was still false at that certification stage; the 2026-09-19 bounded Export Live truth flip supersedes that historical support status."
     },
     {
       "id": "rest-product-attribute-set-id",
@@ -257,7 +257,7 @@
       "real_validation_state": "real_target_write_read_restore_verified_2026_09_11",
       "field_certification_status": "real_target_write_read_restore_verified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Real target verified controlled price cycle 150 -> 151 -> 150 through the production stock writer; AdobeProductDocumentReader observed the mutated value before restore; identity remained entity_id=1 and public Live support remains false."
+      "result_or_blocker": "Real target verified controlled price cycle 150 -> 151 -> 150 through the production stock writer; AdobeProductDocumentReader observed the mutated value before restore; identity remained entity_id=1 and public Live support was still false at that certification stage; the 2026-09-19 bounded Export Live truth flip supersedes that historical support status."
     },
     {
       "id": "rest-product-status",
@@ -289,7 +289,7 @@
       "real_validation_state": "real_target_write_read_restore_verified_2026_09_11",
       "field_certification_status": "real_target_write_read_restore_verified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Real target verified controlled status cycle 1 -> 2 -> 1 through the production stock writer; AdobeProductDocumentReader observed the mutated value before restore; identity remained entity_id=1 and public Live support remains false."
+      "result_or_blocker": "Real target verified controlled status cycle 1 -> 2 -> 1 through the production stock writer; AdobeProductDocumentReader observed the mutated value before restore; identity remained entity_id=1 and public Live support was still false at that certification stage; the 2026-09-19 bounded Export Live truth flip supersedes that historical support status."
     },
     {
       "id": "bulk-product-online",
@@ -353,7 +353,7 @@
       "real_validation_state": "real_target_write_read_restore_verified_2026_09_11",
       "field_certification_status": "real_target_write_read_restore_verified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Real target verified controlled visibility cycle 4 -> 2 -> 4 through the production stock writer; AdobeProductDocumentReader observed the mutated value before restore; identity remained entity_id=1 and public Live support remains false."
+      "result_or_blocker": "Real target verified controlled visibility cycle 4 -> 2 -> 4 through the production stock writer; AdobeProductDocumentReader observed the mutated value before restore; identity remained entity_id=1 and public Live support was still false at that certification stage; the 2026-09-19 bounded Export Live truth flip supersedes that historical support status."
     },
     {
       "id": "rest-product-type-id",
@@ -643,7 +643,7 @@
       "real_validation_state": "real_target_metadata_write_read_restore_verified_2026_09_11",
       "field_certification_status": "media_metadata_put_reconciled_nullable_label_and_role_preservation_verified",
       "installation_condition": "not_target_dependent",
-      "result_or_blocker": "Real target entry id=1 verified label null -> [B2B Media Cert] -> null with stable content hash and roles image/small_image/thumbnail/swatch_image. Public support remains false; media create/delete and swatch ownership remain separately uncertified."
+      "result_or_blocker": "Real target entry id=1 verified label null -> [B2B Media Cert] -> null with stable content hash and roles image/small_image/thumbnail/swatch_image. At that media-certification stage public support was still false; the 2026-09-19 bounded Export Live truth flip supersedes that historical support status. Media create/delete and swatch ownership remain separately uncertified."
     },
     {
       "id": "eav-media-system-attributes",
@@ -1370,5 +1370,6 @@
       "result_or_blocker": "Dynamic EAV remains target-dependent. Certified clear tuples are optional store text/textarea/date and optional global select; all unproved tuples remain fail-closed and do not become engineering-by-field work."
     }
   ],
-  "real_target_field_certification_evidence": "docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json"
+  "real_target_field_certification_evidence": "docs/connectors/adobe-commerce/magento_v1_real_target_field_certification_2026_09_11.json",
+  "live_export_certification_evidence": "docs/connectors/adobe-commerce/magento_v1_products_export_live_certification_2026_09_19.json"
 }

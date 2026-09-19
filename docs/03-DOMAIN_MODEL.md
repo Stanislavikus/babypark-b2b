@@ -8800,23 +8800,61 @@ entity-bound verification, and ambiguous-outcome rules prevent a blind repeat ag
 an unverified remote identity; no Product CREATE path exists in V1.
 
 ##### Live support truth
+[Resolved — 2026-09-19 — standard moduleless Magento V1 truth flip]
 
-Current Adobe support truth remains:
+Current Adobe support truth is:
 
 - Products / Export / Preview = **true**
-- Products / Export / Live = **false**
+- Products / Export / Live = **true**
+- Products / Import / Live = **false**
+- Magento Product CREATE = **unsupported in V1**
 
-Keep Live **false** through internal implementation slices 3A–3D. Flip to **true**
-only when advertised V1 is coherent for: simple + configurable **linked UPDATE**
-Products; `ExternalRecordLink`; safe linked update/reconciliation; explicit no-CREATE
-capability truth; inactive lifecycle (E13); required E14 image behavior;
-partial/ambiguous Product outcomes; stale-run
-safety; `run_sync_live` authorization; merchant first-Live UX; real Adobe
-validation (Stage 3E).
+The standard path is moduleless and uses the certified stock REST linked-UPDATE
+runtime. The truth flip is backed by
+`docs/connectors/adobe-commerce/magento_v1_products_export_live_certification_2026_09_19.json`.
+
+The final real-target smoke used one existing MerchantConfirmed linked Simple
+Product in configured Store View `default` and proved the whole merchant path:
+current-revision Preview → Live admission → fresh account-specific
+`ConnectorLiveRuntimeReadiness` → worker-side fresh readiness after writer lease →
+DB-fresh `SyncRunConsequentialWriteGate` recheck → semantic planning → trusted
+linked UPDATE/no-op → reconciliation → persisted Product outcome. Baseline no-op
+completed as `stock_state_already_matches` with zero consequential writes. A
+controlled Product-name change completed as `stock_write_verified` with exactly
+one PUT plus one reconciliation GET, and the same merchant path restored the
+original remote state with exactly one PUT plus one GET. Independent final read
+matched the baseline controlled state. All temporary local trust/category/selection/
+pricing certification fixtures were removed and the original configuration
+revision was restored exactly.
+
+`ConnectorLiveRuntimeReadiness` is a fresh read-only prerequisite, not a test
+WRITE and not a Safe Sync-module handshake. The Adobe standard-path readiness
+probe performs the existing bounded Product connection baseline plus the exact
+configured Store View base-currency read. It runs outside the admission DB
+transaction and again in the worker immediately before first Product execution;
+the worker then rechecks the DB-fresh consequential-write gate to close the
+readiness-to-write TOCTOU window.
+
+The certified scope includes the required E14 image behavior under its existing bounded ownership rules. The truth flip is intentionally bounded. P-04 negative permission-denial target
+evidence remains deferred because producing it safely requires temporarily
+restricting Magento Integration ACL; the runtime remains fail-closed and the real
+Live smoke proves positive WRITE permission. P-05 remains conservative zero-WRITE
+on message-only missing 404. P-06 `swatch_image` remains read/preserve-only.
+P-09 non-default Store View media-label clear remains outside the advertised
+default-store V1 scope. P-07 governs Receive/Import and does not imply Import
+support.
 
 ##### Real Adobe validation gate
 
-Before support truth flips, an explicitly authorized disposable Adobe smoke
+**Historical pre-moduleless gate — superseded for the standard moduleless path by the 2026-09-19 truth-flip resolution above.**
+
+The following text records the earlier Safe Sync-centric Stage 3E validation gate.
+The 2026-09-19 standard moduleless truth-flip resolution above supersedes it as a
+prerequisite for ordinary Magento V1 Export Live. It remains relevant only as
+historical design evidence and to the optional Enhanced Safety component where
+applicable.
+
+Before the historical support truth flip, an explicitly authorized disposable Adobe smoke
 validation harness must prove actual target-version behavior on **linked** Products
 (not stock no-link create; auto-create OUT of V1). At minimum: SIMPLE linked
 (entity-bound verify/update/reconcile/disable/rerun); CONFIGURABLE linked family
