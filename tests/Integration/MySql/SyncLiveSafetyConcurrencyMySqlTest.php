@@ -17,6 +17,7 @@ use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
 use App\Services\Sync\SyncLiveAdmissionService;
 use App\Services\Sync\SyncPreviewAdmissionService;
+use App\Services\Sync\SyncPreviewConfigurationSnapshotBuilder;
 use App\Services\Sync\UpdateSyncConfigurationInput;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Sync\ConnectorExecutionConfiguration;
@@ -488,7 +489,10 @@ class SyncLiveSafetyConcurrencyMySqlTest extends TestCase
             'mode' => SyncRunMode::Preview,
             'semantic_operation' => SyncSemanticOperation::Export,
             'status' => SyncRunStatus::Completed,
-            'configuration_snapshot' => ['selection' => ['mode' => 'all_products']],
+            'configuration_snapshot' => app(SyncPreviewConfigurationSnapshotBuilder::class)->build(
+                $configuration,
+                SyncSemanticOperation::Export,
+            ),
             'completed_at' => now(),
         ]);
 

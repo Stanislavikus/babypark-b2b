@@ -7066,6 +7066,18 @@ it does not create a parallel rule):
 - Magento **Website** or **Store Group** names are never REST store codes —
   only the explicit REST store code is identity for the write scope.
 
+**[Resolved — P-01 Category relation global-context amendment — 2026-09-18]**
+The `all` prohibition above continues to govern Product value / media / localized
+consequential WRITE scope. One narrow exception exists for the dedicated Magento
+category-product membership owner: `CategoryLinkRepositoryInterface::save/deleteByIds`
+operate on the global `catalog_category_product` relation and are executed through
+`/rest/all`. Real-target certification proved that the same granular DELETE through
+`/rest/default` can website-filter a globally present relation and return HTTP 400
+`The category doesn't contain the specified product.`. This exception authorizes
+only category membership POST/DELETE; it does not authorize whole-array category
+replacement, Product field writes, media writes, localization fan-out, or generic
+multi-Store-View mutation.
+
 Future multi-store extensibility is preserved by routing additional
 Store Views through their own explicit execution contexts, not by
 relaxing the above.
@@ -7943,6 +7955,18 @@ For Safe Sync consequential WRITEs specifically:
   the existing E12 freeze on localized value fan-out).
 - Magento **Website** or **Store Group** names are never REST store codes —
   only the explicit REST store code is identity for the write scope.
+
+**[Resolved — P-01 Category relation global-context amendment — 2026-09-18]**
+The `all` prohibition above continues to govern Product value / media / localized
+consequential WRITE scope. One narrow exception exists for the dedicated Magento
+category-product membership owner: `CategoryLinkRepositoryInterface::save/deleteByIds`
+operate on the global `catalog_category_product` relation and are executed through
+`/rest/all`. Real-target certification proved that the same granular DELETE through
+`/rest/default` can website-filter a globally present relation and return HTTP 400
+`The category doesn't contain the specified product.`. This exception authorizes
+only category membership POST/DELETE; it does not authorize whole-array category
+replacement, Product field writes, media writes, localization fan-out, or generic
+multi-Store-View mutation.
 
 Future multi-store extensibility is preserved by routing additional
 Store Views through their own explicit execution contexts, not through

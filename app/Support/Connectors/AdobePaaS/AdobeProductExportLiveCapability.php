@@ -3,6 +3,7 @@
 namespace App\Support\Connectors\AdobePaaS;
 
 use App\Enums\SyncLiveOutcome;
+use App\Support\Connectors\AdobePaaS\Category\AdobeProductCategoryRelationExecutor;
 use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableProductCommandCoordinator;
 use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableProductExecutionResult;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductAppliedStateKnowledge;
@@ -38,6 +39,7 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
         private readonly AdobeConfigurableProductCommandCoordinator $configurableCoordinator,
         private readonly AdobeProductExternalRecordLinkGuard $linkGuard,
         private readonly AdobeProductMediaLiveExecutor $mediaLiveExecutor,
+        private readonly AdobeProductCategoryRelationExecutor $categoryRelationExecutor,
     ) {}
 
     /**
@@ -119,10 +121,20 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
 
             $coreResult = $this->mapConfigurableResult($configurableResult, $semanticResult);
 
-            return $this->mediaLiveExecutor->executeAfterCoreProduct(
+            $productResult = $this->mediaLiveExecutor->executeAfterCoreProduct(
                 $aggregate,
                 $semanticResult,
                 $coreResult,
+                $runContext,
+                $consequentialWriteGate,
+                isConfigurablePath: true,
+            );
+
+            return $this->categoryRelationExecutor->executeAfterProduct(
+                $aggregate,
+                $snapshot,
+                $semanticResult,
+                $productResult,
                 $runContext,
                 $consequentialWriteGate,
                 isConfigurablePath: true,
@@ -151,10 +163,20 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
 
         $coreResult = $this->mapCommandResult($commandResult, $semanticResult);
 
-        return $this->mediaLiveExecutor->executeAfterCoreProduct(
+        $productResult = $this->mediaLiveExecutor->executeAfterCoreProduct(
             $aggregate,
             $semanticResult,
             $coreResult,
+            $runContext,
+            $consequentialWriteGate,
+            isConfigurablePath: false,
+        );
+
+        return $this->categoryRelationExecutor->executeAfterProduct(
+            $aggregate,
+            $snapshot,
+            $semanticResult,
+            $productResult,
             $runContext,
             $consequentialWriteGate,
             isConfigurablePath: false,

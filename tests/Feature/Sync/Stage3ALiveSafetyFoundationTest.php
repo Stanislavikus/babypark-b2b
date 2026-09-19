@@ -13,7 +13,9 @@ use App\Enums\UserRole;
 use App\Jobs\Connectors\SyncLiveRunJob;
 use App\Jobs\Connectors\SyncLiveRunJobExecutionException;
 use App\Jobs\Connectors\SyncPreviewRunJob;
+use App\Models\Category;
 use App\Models\ConnectorAccount;
+use App\Models\ConnectorCategoryMapping;
 use App\Models\SyncConfiguration;
 use App\Models\SyncRun;
 use App\Models\SyncRunItem;
@@ -23,6 +25,7 @@ use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
 use App\Services\Sync\SyncLiveAdmissionService;
 use App\Services\Sync\SyncPreviewAdmissionService;
+use App\Services\Sync\SyncPreviewConfigurationSnapshotBuilder;
 use App\Services\Sync\SyncProductSelectionStore;
 use App\Services\Sync\SyncRunActiveRecoveryService;
 use App\Services\Sync\SyncRuntimeTimingResolver;
@@ -36,7 +39,6 @@ use App\Support\Sync\Exceptions\SyncRuntimeTimingConfigurationException;
 use App\Support\Sync\Live\SyncLiveConnectorCapabilityResolver;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
 use App\Support\Sync\Preview\SyncPreviewConnectorCapabilityResolver;
-use App\Support\Sync\SyncProductSelectionDescriptor;
 use App\Support\Sync\SyncRuntimeExecutionTiming;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
@@ -629,6 +631,33 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
     }
 
     #[Test]
+    public function live_admission_rejects_preview_when_account_category_mapping_changed(): void
+    {
+        Bus::fake();
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+        $actor = $this->grantLivePermission($account->workspace);
+        $this->seedCompletedPreview($account, $configuration);
+
+        $category = Category::withoutWorkspaceScope()->create([
+            'workspace_id' => $account->workspace_id,
+            'name' => 'Category mapping changed after Preview',
+        ]);
+
+        ConnectorCategoryMapping::withoutWorkspaceScope()->create([
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'category_id' => $category->id,
+            'external_category_id' => '7',
+        ]);
+
+        $this->expectException(SyncLiveAdmissionException::class);
+
+        app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+    }
+
+    #[Test]
     public function live_admission_accepts_test_profile_with_preview_evidence(): void
     {
         Bus::fake();
@@ -643,7 +672,10 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         $this->assertSame(SyncRunMode::Live, $run->mode);
         $this->assertSame(SyncRunStatus::Queued, $run->status);
         $this->assertSame($sourcePreview->id, $run->source_preview_run_id);
-        $this->assertSame($sourcePreview->configuration_snapshot, $run->configuration_snapshot);
+        $this->assertSame(
+            $sourcePreview->refresh()->configuration_snapshot,
+            $run->refresh()->configuration_snapshot,
+        );
         Bus::assertDispatched(SyncLiveRunJob::class);
     }
 
@@ -783,7 +815,10 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
             'mode' => SyncRunMode::Preview,
             'semantic_operation' => SyncSemanticOperation::Export,
             'status' => SyncRunStatus::Completed,
-            'configuration_snapshot' => ['selection' => SyncProductSelectionDescriptor::empty()->toSnapshotArray()],
+            'configuration_snapshot' => app(SyncPreviewConfigurationSnapshotBuilder::class)->build(
+                $configuration,
+                SyncSemanticOperation::Export,
+            ),
             'completed_at' => now(),
         ]);
     }

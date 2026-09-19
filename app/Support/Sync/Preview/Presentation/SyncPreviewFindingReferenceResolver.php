@@ -37,6 +37,17 @@ final class SyncPreviewFindingReferenceResolver
                 externalOptionValue: null,
                 showsVariantContext: false,
             ),
+            SyncPreviewFindingCode::MissingCategoryMapping,
+            SyncPreviewFindingCode::InvalidCategoryMapping => new SyncPreviewFindingReference(
+                code: $code,
+                fieldBindingId: null,
+                variantId: null,
+                productId: null,
+                internalOptionKey: null,
+                externalFieldKey: null,
+                externalOptionValue: null,
+                showsVariantContext: false,
+            ),
             SyncPreviewFindingCode::MissingMappedProductValue => new SyncPreviewFindingReference(
                 code: $code,
                 fieldBindingId: $subject,

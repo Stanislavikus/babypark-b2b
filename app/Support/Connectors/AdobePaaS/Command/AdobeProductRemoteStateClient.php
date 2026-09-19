@@ -246,6 +246,42 @@ final class AdobeProductRemoteStateClient
     /**
      * @return array{0: ?ConnectorHttpResult, 1: ?ConnectorTransportException}
      */
+    public function postCategoryProductLink(
+        AdobePaaSRequestContext $context,
+        string $externalCategoryId,
+        string $sku,
+    ): array {
+        return $this->send(
+            $this->requestFactory->buildPostCategoryProductLink(
+                $context,
+                $externalCategoryId,
+                $sku,
+                $this->newSigningContext(),
+            ),
+        );
+    }
+
+    /**
+     * @return array{0: ?ConnectorHttpResult, 1: ?ConnectorTransportException}
+     */
+    public function deleteCategoryProductLink(
+        AdobePaaSRequestContext $context,
+        string $externalCategoryId,
+        string $sku,
+    ): array {
+        return $this->send(
+            $this->requestFactory->buildDeleteCategoryProductLink(
+                $context,
+                $externalCategoryId,
+                $sku,
+                $this->newSigningContext(),
+            ),
+        );
+    }
+
+    /**
+     * @return array{0: ?ConnectorHttpResult, 1: ?ConnectorTransportException}
+     */
     private function send(RequestInterface $request): array
     {
         $outboundRequest = new ConnectorOutboundRequest(

@@ -55,6 +55,12 @@ final class SyncPreviewFindingPresenter
                 is_string($finding['subject'] ?? null) ? $finding['subject'] : null,
                 $context,
             ),
+            SyncPreviewFindingCode::MissingCategoryMapping,
+            SyncPreviewFindingCode::InvalidCategoryMapping => $this->presentCategoryMappingFinding(
+                $code,
+                $context,
+                $productId,
+            ),
             SyncPreviewFindingCode::MissingMappedProductValue,
             SyncPreviewFindingCode::MissingName => $this->presentProductDataFinding($code, $fieldContext, $variantContext, $context, $productId),
             SyncPreviewFindingCode::MissingMappedVariantValue,
@@ -179,6 +185,22 @@ final class SyncPreviewFindingPresenter
             destinations: [
                 $this->fieldMappingDestination($context, $mappingActionability),
                 $this->connectorSetupDestination($context, $setupActionability),
+            ],
+        );
+    }
+
+    private function presentCategoryMappingFinding(
+        SyncPreviewFindingCode $code,
+        SyncPreviewPresentationContext $context,
+        string $productId,
+    ): SyncPreviewFindingPresentation {
+        return new SyncPreviewFindingPresentation(
+            summary: __($code->messageKey()),
+            fieldContext: null,
+            variantContext: null,
+            destinations: [
+                $this->noEditSurfaceDestination(SyncPreviewRemediationArea::CategoryMapping),
+                $this->productContextDestination($context, $productId),
             ],
         );
     }

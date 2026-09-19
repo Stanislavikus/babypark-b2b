@@ -1,20 +1,28 @@
 # Magento V1 Pending Certification Items
 
 **Status:** active campaign ledger  
-**Updated:** 2026-09-12
+**Updated:** 2026-09-18
 **Branch:** `campaign/magento-v1-real-certification`
 
 This file is the durable queue for Magento V1 issues deliberately deferred during field-by-field certification. An item stays here until it is implemented/certified or explicitly closed with evidence. Public Adobe Products / Export / Live support remains false while required items are open.
 
 ## Open items
 
-### P-01 — Category relation runtime
+### P-01 — Category relation runtime — CLOSED 2026-09-18 [Resolved]
 
-- Surface: `extension_attributes.category_links` / category-product relation.
-- Current truth: Product GET exposes multiple `category_links`, but the platform Product domain currently owns a single `category_id` (`belongsTo Category`); no category mapping / external category-id binding or dedicated Adobe category relation writer exists in `app/`.
-- Why deferred: must not be pushed through scalar `custom_attributes`, reduced to an arbitrary “first category”, or allowed to delete provider-only category links.
-- Needed proof: dedicated read/write relation seam, controlled assign/unassign or replace semantics, reconciliation, exact restore, no Product-core aliasing.
-- Reviewer candidate: yes, after implementation because relation replacement semantics can cause destructive assignment loss.
+- Surface: `extension_attributes.category_links` / Magento category-product membership relation.
+- Domain boundary: platform Product continues to own one Merchant Category (`products.category_id`). Magento may expose multiple category links. Category correspondence is therefore a dedicated ConnectorAccount-scoped relation mapping, not `FieldMapping`, not Product multi-category redesign, and not Standard Category.
+- Persistence: `connector_category_mappings` stores local Category → external Magento category ID with forward uniqueness only; many local categories may intentionally collapse to one external category. `adobe_product_category_assignments` stores destructive ownership only by exact trusted `ExternalRecordLink + external_category_id`; it stores neither `category_id`, `product_id`, nor `product_variant_id`.
+- Identity: standalone Simple uses the trusted Variant-subject ERL; Configurable parent uses the trusted Product-subject ERL. A managed assignment also stores the Magento logical `entity_id` witness and fails closed on anchor drift.
+- Provider-only safety: a pre-existing Magento category link is satisfaction evidence only and is never adopted as platform-owned. DELETE is allowed only for a locally proven managed assignment. Ambiguous ADD becomes `add_ambiguous` and never gains destructive ownership from a later GET alone; ambiguous consequential mutation is never blindly retried inside the same execution.
+- Write semantics: use only granular `CategoryLinkRepositoryInterface::save/deleteByIds` REST endpoints. Whole-array `CategoryLinkManagementInterface::assignProductToCategories` is forbidden because it can remove unrelated categories. Category change is add-before-remove and diffing occurs on distinct external category IDs, so many-local→one-external collapse cannot generate a remove of the same remote relation.
+- Global relation context: category-product membership is a global Magento catalog relation. Real-target certification proved that `/rest/default/V1/categories/{id}/products` can website-filter a valid global relation and make granular DELETE return HTTP 400 `The category doesn't contain the specified product.` for a Product not assigned to that Store View's website. The dedicated P-01 relation writer therefore uses `/rest/all` only for granular category membership POST/DELETE. This is a narrow relation-owner exception and does not authorize Product field, media, localized value, or general multi-Store-View writes under `all`.
+- Execution consistency: effective account category mappings and their deterministic revision are captured in Preview `configuration_snapshot`; Live admission rejects Preview evidence if the account mapping revision changed after Preview.
+- Concurrency: remote relation execution is serialized with the existing ConnectorAccount operation cache lock; DB row locks are held only in short local state-transition transactions, never across Magento HTTP.
+- Real-target proof: trusted Simple SKU `1234567890` / `entity_id=1` baseline category `5`; runtime granular ADD of temporary category `7` produced `[5,7]` + managed ledger; runtime granular DELETE restored exactly `[5]`; zero assignment rows and zero temporary local fixtures remained; independent final GET confirmed baseline.
+- Public support: Adobe Products / Export / Live remains false; this closure certifies the P-01 relation capability only.
+- Evidence: `docs/connectors/adobe-commerce/magento_v1_category_relation_certification_2026_09_18.json`.
+- Reviewer candidate: no further architecture review required unless future scope changes category ownership, Store View semantics, or destructive provenance rules.
 ### P-02 — `url_key` / URL rewrite side effects
 
 - Surface: store-scoped `url_key` plus Commerce URL rewrite/redirect state.
