@@ -4851,6 +4851,29 @@ Dynamic Select entries; `Equal` entries are non-consequential and all executable
 mutations are atomic within the final transaction. Public Adobe Products/Import
 support remains false.
 
+**Real-target certification record — 2026-09-19.** R4 Dynamic single-select Receive
+is now real-target certified on existing Simple Joolz SKU
+`Універсальна коляска Joolz Day5` / Magento logical `entity_id=3`. The Receive
+subject was the required local `ProductVariant` with a MerchantConfirmed
+**Variant-subject** `ExternalRecordLink`; no Product-subject identity was substituted.
+Provider field `c_strollers_hand_luggage` used exact provider option identities
+`1029 (No)` and `1028 (Yes)`. The certified cycle proved stock-writer remote
+change `1029→1028`, server-authoritative `Differs` proposal, real stale-local
+fail-closed `not_applied / receive_apply_local_value_changed`, successful Dynamic
+CAS Apply to `1028`, stock-writer restore `1028→1029`, and a second Receive Apply
+restoring the local value to `1029`. Both remote writes were independently
+reconciled with exactly one PUT + one GET. Temporary trust/mapping/value/schema
+fixtures were removed; the Products configuration returned to its exact baseline
+revision and `[export]` operation set. Product Structure cleanup preserved the
+monotonic `ProductType.structure_revision` contract rather than rewinding it.
+
+This closes P-07 evidence for the R4 **behavior class only**. It does not flip public
+Adobe Products / Import / Live support, add a merchant Apply UI, admit
+`RemoteAbsent` as Clear, or widen Receive to other datatypes/domains. For
+standalone Magento Simple products, the cross-cutting identity invariant remains:
+certified identity is Variant-subject, not Product-subject. Evidence:
+`docs/connectors/adobe-commerce/magento_v1_receive_r4_real_target_certification_2026_09_19.json`.
+
 
 ## Sync Domain Rebaseline (Resolved — normative)
 
