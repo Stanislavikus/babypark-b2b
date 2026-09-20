@@ -411,7 +411,8 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
         $this->assertStringContainsString("Оновити пов'язані товари в Adobe Commerce?", $content);
         $this->assertStringContainsString('Products / Export / Live V1 is **LINK/UPDATE-ONLY**', $content);
         $this->assertStringContainsString('ConnectorSyncOperationSupport(Products, Export, Live) === true', $content);
-        $this->assertStringContainsString('Stage 3D must not bypass `ConnectorSyncOperationSupport`', $content);
+        $this->assertStringContainsString('No merchant surface may bypass `ConnectorSyncOperationSupport`', $content);
+        $this->assertStringContainsString('bounded truthful support flip completed on 2026-09-19', $content);
     }
 
     #[Test]
@@ -422,8 +423,10 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
         $this->assertStringContainsString('### Merchant First-Live interaction rules (Resolved — Stage 3-0)', $content);
         $this->assertStringContainsString('no "retry failed only" action in Stage 3 V1', $content);
         $this->assertStringContainsString('ConnectorSyncOperationSupport(Products, Export, Live) === true', $content);
-        $this->assertStringContainsString('Stage 3D may implement Live UI/read model while support is', $content);
-        $this->assertStringContainsString('**false**, but the action must remain non-actionable', $content);
+        $this->assertStringContainsString('**Current status [Resolved — 2026-09-19]:**', $content);
+        $this->assertStringContainsString('Products / Export / Live is **true**', $content);
+        $this->assertStringContainsString('**Historical Stage 3D boundary**', $content);
+        $this->assertStringContainsString('current exposure still never bypasses', $content);
     }
 
     /**

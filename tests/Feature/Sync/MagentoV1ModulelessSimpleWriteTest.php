@@ -99,6 +99,33 @@ class MagentoV1ModulelessSimpleWriteTest extends TestCase
     }
 
     #[Test]
+    public function post_write_identity_mismatch_is_ambiguous_and_never_known_applied(): void
+    {
+        $getCount = 0;
+        $transport = $this->bindTransport(function (ConnectorOutboundRequest $request) use (&$getCount): ConnectorHttpResult {
+            if ($request->request->getMethod() === 'GET') {
+                $getCount++;
+
+                return $this->productResult(
+                    $getCount === 1 ? 77 : 999,
+                    $getCount === 1 ? 50.0 : 100.0,
+                );
+            }
+
+            return new ConnectorHttpResult(200, [], '{}');
+        });
+        [$workspace, $account, $variant] = $this->trustedVariant('77');
+
+        $result = $this->execute($workspace, $account->id, $variant->id);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous, $result->appliedStateKnowledge);
+        $this->assertSame('stock_post_write_identity_mismatch', $result->evidence->reasonCode);
+        $this->assertSame(1, $result->evidence->consequentialWriteAttempts);
+        $this->assertSame(1, $result->evidence->reconciliationGetAttempts);
+        $this->assertSame(['GET', 'PUT', 'GET'], $this->methods($transport));
+    }
+
+    #[Test]
     public function linked_remote_missing_never_falls_back_to_post_create(): void
     {
         $transport = $this->bindTransport(fn () => new ConnectorHttpResult(

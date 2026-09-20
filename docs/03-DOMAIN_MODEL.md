@@ -7264,6 +7264,11 @@ Key runtime behaviors (Stage 2B):
 
 Independently reviewable after 2A architecture is established.
 
+> **Historical implementation-status block.** The Stage 3A–3E status text below
+> records the pre-certification sequence. Current public support truth is defined
+> later by **Live support truth [Resolved — 2026-09-19]**: Products/Export/Live =
+> true, Products/Import/Live = false, Product CREATE unsupported.
+
 **Stage 3-0 — Live Safety, Identity & First-Live Contract** — **Done (docs contract)**
 
 Docs-only freeze before the first consequential external write. See **Live Safety,
@@ -7415,6 +7420,12 @@ Product, the old trust does **not** automatically transfer.
 
 Explicitly reject **SKU TRUST** ("whatever currently occupies this SKU is ours")
 because that would be automatic adoption after delete/recreate.
+
+> **Historical scope marker — superseded for the standard moduleless path.**
+> The frozen rule below remains normative for the optional first-party Safe Sync /
+> Enhanced Safety path. For the certified standard moduleless Magento V1 path, it
+> is superseded by **Standard moduleless post-trust identity verification
+> [Resolved — 2026-09-20]** below.
 
 **Post-trust read rule (frozen):** after a trusted `ExternalRecordLink` exists,
 stock SKU GET (`GET /V1/products/:sku`) must **not** participate in
@@ -8159,6 +8170,10 @@ point for the `support = true` flip.
 
 #### Post-#168 status after this docs amendment
 
+> **Historical snapshot.** This table is preserved as the status at the time of
+> the post-#168 amendment. Its `support false` / pending truth-flip rows are
+> superseded by **Live support truth [Resolved — 2026-09-19]** below.
+
 | Item | Status |
 |---|---|
 | Stage 3E docs contract | **Done** — entity-bound Safe Sync runtime contract frozen |
@@ -8589,6 +8604,12 @@ slice. Normative contract for Stage 3A–3E implementation.
 
 ##### Current baseline truth (frozen)
 
+> **Historical baseline.** This subsection predates the 2026-09-19 bounded
+> moduleless truth flip. Where it says Production Live is not implemented or
+> Export Live is not supported, the later **Live support truth** resolution
+> supersedes that status only; the recorded safety invariants remain historical
+> design evidence unless explicitly superseded.
+
 | Stage | Status |
 |---|---|
 | Stage 1 — Preview Engine | **Done** |
@@ -8866,6 +8887,51 @@ on message-only missing 404. P-06 `swatch_image` remains read/preserve-only.
 P-09 non-default Store View media-label clear remains outside the advertised
 default-store V1 scope. P-07 governs Receive/Import and does not imply Import
 support.
+
+##### Standard moduleless post-trust identity verification
+[Resolved — 2026-09-20 — architecture-closure amendment]
+
+For the **standard moduleless Magento V1 path only**, this resolution supersedes
+both the earlier Stage 3E **Post-trust read rule (frozen)** and the 2026-09-03
+moduleless clause saying that amendment did not change the entity-bound mutation
+boundary. Those earlier rules remain normative for the optional first-party Safe
+Sync / Enhanced Safety path; they are not deleted or weakened there.
+
+The certified standard path intentionally uses the stock Magento Product REST
+addressing model:
+
+- MerchantConfirmed `ExternalRecordLink` plus
+  `external_record_discriminator = Magento entity_id` remains identity authority.
+- Expected SKU remains a mandatory equality/addressing precondition and is **not**
+  identity authority.
+- Immediately before a consequential stock Product PUT, fresh
+  `GET /V1/products/:sku` must classify Found and its logical `entity_id` must
+  equal the trusted discriminator; required type compatibility must also hold.
+- The consequential Product PUT is SKU-addressed because the stock Magento REST
+  Product update route is SKU-addressed.
+- After every attempted consequential Product PUT that is not a proven
+  permission-denial no-apply, reconciliation again reads the SKU and may return
+  `KnownApplied` only when fresh logical `entity_id` still equals the trusted
+  discriminator, type remains compatible, and controlled postconditions match.
+- A post-write identity mismatch is `UnknownOrAmbiguous`
+  (`stock_post_write_identity_mismatch`), never `KnownApplied`, and must not be
+  blindly retried.
+
+**Accepted bounded residual risk:** between successful pre-write identity
+verification and the SKU-addressed PUT, a concurrent merchant/admin destructive
+action could delete/recreate or reassign that SKU to a different Magento logical
+Product. The stock PUT could then reach that different Product before
+reconciliation detects the changed `entity_id`. Standard moduleless V1 therefore
+**detects but does not structurally prevent** this narrow race. It is accepted for
+the bounded standard V1 scope because it requires a concurrent destructive
+identity change inside the write window and the platform cannot report false
+success afterward. Target-side atomic identity enforcement belongs to the
+optional Enhanced Safety path when that capability is applicable and certified.
+
+This acceptance is **not SKU TRUST** and is not a generic relaxation of entity
+identity. Any future stock path that cannot perform both pre-write and post-write
+logical-identity checks remains unsupported/fail-closed until separately resolved
+and certified.
 
 ##### Real Adobe validation gate
 

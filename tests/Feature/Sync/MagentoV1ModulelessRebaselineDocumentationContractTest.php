@@ -401,7 +401,9 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
         );
 
         $this->assertStringContainsString('real-target certification', $link_first);
-        $this->assertStringContainsString('actual consequential WRITE', $link_first);
+        $this->assertStringContainsString('actual standard shipping', $link_first);
+        $this->assertStringContainsString('post-write identity mismatch is ambiguous', $link_first);
+        $this->assertStringContainsString('2026-09-20', $link_first);
     }
 
     #[Test]
