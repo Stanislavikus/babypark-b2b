@@ -247,41 +247,48 @@ This qualification supersedes any reading of GPT-5.4's checklist as proof that t
 
 ---
 
-## 9. Consolidated correction backlog — before Opus 5 arbitration
+## 9. Consolidated correction backlog — after GPT-5.4 + Opus 5 arbitration
 
 | Correction ID | Source | Action | Risk | Required before architecture CLOSED? |
 |---|---|---|---|---|
-| C-001 | GPT-5.4 / Lead confirmed | Reconcile current/normative `CONNECTOR_INTEGRATION_UX_CONTRACT.md` with 2026-09-19 Export Live truth | GREEN docs, high truth importance | **YES** |
+| C-001 | GPT-5.4 / Lead confirmed | Reconcile current/normative `CONNECTOR_INTEGRATION_UX_CONTRACT.md` and its `06-UI_DESIGN_SYSTEM.md` summary with 2026-09-19 Export Live truth | GREEN docs, high truth importance | **YES** |
 | C-002 | Lead addition | Add section-scoped contract tests tying UX current truth to adapter/Domain/Atlas truth | GREEN tests | **YES** |
-| C-003 | GPT-5.4 / Lead partial | Add immediate historical/superseded banner to old Stage 3E status/amendment blocks in `03-DOMAIN_MODEL.md` without rewriting history | GREEN docs | **YES for clean closure** |
-| C-004 | Process | Add Opus 5 findings below, deduplicate against C-001..C-003, then implement only accepted corrections | pending | **YES** |
+| C-003 | GPT-5.4 / Lead partial | Mark stale Stage 3E `Live=false / NOT IMPLEMENTED` status blocks as historical without rewriting evidence | GREEN docs | **YES for clean closure** |
+| C-004 | Opus 5 / Lead confirmed | Explicitly supersede the frozen entity-bound post-trust rule **for the standard moduleless path only**; preserve it for optional Safe Sync / Enhanced Safety; record pre/post `entity_id` verification and the accepted narrow SKU-reassignment residual risk | GREEN docs; high identity-truth importance | **YES** |
+| C-005 | Opus 5 / Lead addition | Regression-test that an `entity_id` change between PUT and reconciliation GET is `UnknownOrAmbiguous / stock_post_write_identity_mismatch`, never `KnownApplied` | GREEN tests | **YES** |
+| C-006 | Opus 5 hardening | Mechanically assert that the dormant `postProduct()` CREATE primitive has no production Command caller | GREEN tests | **YES for closure hardening** |
 
-No runtime/data-model/auth/concurrency/transaction correction is accepted from GPT-5.4 at this stage.
+No runtime/data-model/auth/authorization/concurrency/transaction code correction is accepted from either final architect audit. The only concurrency-adjacent finding is C-004's already-existing stock-API identity race, which is explicitly bounded, detected after the attempted write, and accepted for the standard moduleless V1 scope rather than silently inherited.
 
 ---
 
 ## 10. Independent review source B — Opus 5
 
-**Status:** PENDING USER-SUPPLIED REVIEW
+**Reviewer base:** `develop @ d63ae74831fa9c1015655ac81ad9e86810922400`
+**Reviewer verdict:** `B. ARCHITECTURE CAN CLOSE AFTER DOC CORRECTION ONLY`.
+**Coverage note:** Opus explicitly did not claim a fresh 22/22 re-verification; it concentrated on the entity-bound-vs-moduleless contradiction plus No-CREATE and Import=false structural claims.
 
-When the Opus 5 result arrives, record every materially distinct claim here with:
+| ID | Opus 5 conclusion | Lead status | Closure impact | Lead arbitration |
+|---|---|---|---|---|
+| O5-01 | Frozen post-trust rule still requires entity-bound verification, while standard production writer reconciles by SKU | **CONFIRMED** | **DOC PRECEDENCE / BLOCKS CLOSURE** | Later moduleless amendment explicitly said it did not change the entity-bound mutation boundary; 2026-09-19 superseded a different gate but not this rule. C-004 required. |
+| O5-02 | This contradiction is not itself a current runtime false-success defect | **CONFIRMED WITH BOUNDED RISK** | No runtime redesign | Pre-write and post-write reads compare fresh Magento `entity_id` to trusted ERL discriminator. Post-write mismatch is `UnknownOrAmbiguous`, never `KnownApplied`. The remaining pre-GET→PUT SKU-reassignment race is detection-after-write rather than prevention and is now an explicit accepted standard-path limitation. C-004/C-005. |
+| O5-03 | Product CREATE is structurally absent from the shipping V1 path | **CONFIRMED** | Positive invariant + hardening | `postProduct()` exists only as a dormant low-level primitive; no production Command caller exists. Add C-006 so a future accidental wiring fails CI. |
+| O5-04 | Products / Import / Live = false is code-enforced above R4 | **CONFIRMED** | No correction | `AdobePaaSConnectorAdapter::supports()` rejects every operation except Products/Export, while Preview+Live are supported only for Export. |
+| O5-05 | P-04 / P-05 / P-06 / P-09 remain non-blocking for the advertised bounded Export scope | **CONFIRMED** | No correction | Matches the pending ledger and GPT-5.4 arbitration. P-09 remains a UX truthfulness input if a surface implies multi-store media ownership. |
+| O5-06 | Architecture evidence does not prove merchant usability | **CONFIRMED / NEXT CAMPAIGN** | Not an architecture blocker | Machine-path certification does not certify a non-technical merchant journey. This is the explicit next Magento UX/UI audit after architecture closure. |
 
-- exact claim;
-- Lead status: `CONFIRMED / PARTIALLY CONFIRMED / REJECTED / OBSOLETE`;
-- exact authoritative doc/code/test/evidence seam;
-- overlap with GPT-5.4 finding/correction if any;
-- resulting correction ID or explicit no-action reason.
-
-Do not implement the consolidated correction backlog until Opus 5 arbitration is complete, unless an active safety/runtime blocker is discovered.
+**Lead synthesis:** GPT-5.4 and Opus 5 independently converge on the same closure class: no accepted runtime redesign is required for the currently advertised bounded Magento V1 scope; architecture can close after the accepted documentation-precedence corrections and mechanical guards are green.
 
 ---
 
 ## 11. Current Lead verdict
 
-**Runtime architecture verdict:** no architecture/runtime blocker was confirmed from GPT-5.4's audit for the currently advertised bounded Magento V1 Export Live scope.
+**Runtime architecture verdict:** no architecture/runtime blocker requiring redesign was confirmed by either GPT-5.4 or Opus 5 for the currently advertised bounded Magento V1 Export Live scope.
 
-**Formal architecture closure verdict:** **NOT CLOSED YET**.
+**Formal architecture closure verdict:** **CORRECTIONS IMPLEMENTED; NOT CLOSED ON `develop` UNTIL THIS CORRECTION PR MERGES WITH GREEN CI**.
 
-Reason: confirmed documentation-precedence conflict + missing mechanical guard remain, and the user explicitly requires an independent Opus 5 audit before final closure.
+Accepted C-001..C-006 are implemented on `audit/magento-v1-architecture-final` with no application-runtime change. Final local closure gate after correction: `148 passed / 919 assertions` across the relevant Connector UX / moduleless rebaseline / Stage 3-0 / Stage 3E Safe Sync / implementation-truth / truth-flip / moduleless simple-write suites. `Pint --test` passes for all four changed PHP test files, `git diff --check` is clean, and `git diff --name-only -- app` is empty.
 
-**UI/UX verdict:** deliberately **NOT ASSESSED HERE**. Magento merchant-facing completeness is a separate campaign after architecture closure.
+After this branch is independently verified/CI-green and merged into `develop`, the Magento V1 architecture-closure campaign may be marked **CLOSED** for the currently advertised bounded scope. Deferred P-items remain explicit future/bounded capabilities and do not reopen closure unless advertised scope expands.
+
+**UI/UX verdict:** deliberately **NOT ASSESSED HERE**. Merchant usability, causal remediation, vocabulary for bounded exclusions, and removal of engineering complexity from the merchant journey are the next separate Magento UX/UI correction campaign.

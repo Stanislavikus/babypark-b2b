@@ -51,6 +51,62 @@ final class MagentoV1ProductsExportLiveTruthFlipDocumentationContractTest extend
     }
 
     #[Test]
+    public function highest_precedence_ux_contract_matches_current_moduleless_live_truth(): void
+    {
+        $ux = File::get(base_path('docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md'));
+        $this->assertSame(1, preg_match(
+            '/^## 17\\. Merchant First-Live UX.*?$(.*?)^## 18\\. Per-item Live linking/ms',
+            $ux,
+            $firstLiveMatch,
+        ));
+        $this->assertSame(1, preg_match(
+            '/^## 18\\. Per-item Live linking.*?$(.*?)^## 19\\. Connector Account Overview/ms',
+            $ux,
+            $linkingMatch,
+        ));
+        $firstLive = $firstLiveMatch[1];
+        $linking = $linkingMatch[1];
+
+        $this->assertStringNotContainsString('advertised Live support remains **false**', $firstLive);
+        $this->assertStringContainsString('Products / Export / Live = **true**', $ux);
+        $this->assertStringContainsString('Products / Import / Live = **false**', $ux);
+        $this->assertStringContainsString('Magento Product CREATE = **unsupported in V1**', $ux);
+        $this->assertStringContainsString('Safe Sync is optional Enhanced Safety', $ux);
+
+        $this->assertStringContainsString('**Truth-flip status: COMPLETED 2026-09-19.**', $ux);
+        $this->assertStringContainsString('certified **standard moduleless** path', $ux);
+        $this->assertStringContainsString('post-write identity mismatch is ambiguous', $ux);
+        $this->assertStringNotContainsString(
+            'Truthful Adobe Products/Export/Live advertised support remains **false**',
+            $linking,
+        );
+
+        $domain = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
+        $this->assertStringContainsString(
+            '[Resolved — 2026-09-20 — architecture-closure amendment]',
+            $domain,
+        );
+        $this->assertStringContainsString('**detects but does not structurally prevent** this narrow race', $domain);
+        $this->assertStringContainsString('`stock_post_write_identity_mismatch`', $domain);
+    }
+
+    #[Test]
+    public function product_create_primitive_has_no_production_command_caller(): void
+    {
+        foreach (File::allFiles(app_path('Support/Connectors/AdobePaaS/Command')) as $file) {
+            if ($file->getFilename() === 'AdobeProductRemoteStateClient.php') {
+                continue;
+            }
+
+            $this->assertStringNotContainsString(
+                'postProduct(',
+                File::get($file->getPathname()),
+                $file->getPathname(),
+            );
+        }
+    }
+
+    #[Test]
     public function durable_evidence_proves_noop_write_restore_and_cleanup(): void
     {
         $evidence = json_decode(

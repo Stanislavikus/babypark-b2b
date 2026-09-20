@@ -10,7 +10,7 @@
 
 **Non-goal:** This contract does not itself authorize arbitrary backend work and is not the workspace-permission implementation specification beyond the approved domain authorization contract in `docs/03-DOMAIN_MODEL.md` → **Workspace access model and authorization (Resolved — Task 4C-1c-2a)** and **Preview-first Sync Execution Foundation Contract (Resolved — Task 4C-2a)** / **Merchant Preview Authorization & Remediation Contract (Resolved — Stage 2-0)**. Some underlying mechanisms are already shipped (for example `ConnectorCapability`, Discovery runtime, snapshot persistence, workspace isolation guards, Layer-B Mapping UI on `ManageSyncFieldMappings`, Mapping → Available Fields supporting reference with workspace-scoped Mapping authorization, Stage 1 Preview Engine with `run_sync_preview` and persisted zero-mutation Preview runs, Stage 2A-1 `manage_sync_configurations` runtime permission and Adobe Products Export Layer-B setup, Stage 2A-2 merchant Preview work surface and remediation presentation, **Stage 2B Option Mapping remediation UI on `ManageSyncFieldOptionMappings`**). Missing backend/runtime/security prerequisites require their own scoped tasks. Specifically, Task **4C-1c-2b** Layer-B Mapping UI and its Mapping-side Available Fields supporting path are shipped (PR #139, merge `9a4be2f`). Task **4C-2a** freezes Preview execution architecture (docs only); **`run_sync_preview` runtime and `SyncRun` Preview execution are implemented in Stage 1** (PR #145). **Stage 2-0** freezes merchant Preview authorization/remediation contract (docs only). **Stage 2A** (2A-1 + 2A-2) is **shipped** — `manage_sync_configurations`, non-mutating existence lookup, Adobe Products Export setup, merchant Preview UI, and contextual remediation presentation. **Stage 2B is shipped** — Option Mapping remediation on `ManageSyncFieldOptionMappings` using existing `view_sync_mappings` / `manage_sync_mappings` permissions only. Mechanisms that explicitly remain future include scheduling, issue aggregation/bulk resolution, sync-run history, ownership persistence/enforcement, broader Layer-C platform-support identity/gating, and **Stage 3B–3E** Live Engine implementation slices (**Stage 3A** Live Safety foundation is **shipped** — `run_sync_live`, stale active-run recovery, `ExternalRecordLink` persistence, Live admission/shell; **Stage 3-0** Live Safety contract is **Done (docs)**). Do **not** claim that historical pre-B-2 fixed `User.role` authorization satisfies this UX contract — that transitional behavior is historical evidence only under **GAP-026** / PR #102.
 
-**Existing-vs-future boundary:** This contract defines the _required UX_ for synchronization, preview/dry-run, scheduling, mapping, issues, history, and bulk resolution _when those surfaces/concerns are implemented_. Normative sync domain shape is now settled in `docs/03-DOMAIN_MODEL.md` (Sync Domain Rebaseline: `SyncConfiguration` → `FieldMapping` + `SyncRun` → `SyncRunItem`, account-scoped `ExternalRecordLink`). **Preview computation/runtime is shipped** — Stage 1 Preview Engine delivers persisted zero-mutation Preview (`run_sync_preview`, admission, Preview `SyncRun` persistence). **Stage 2A-2 merchant Preview work surface and remediation presentation are shipped**; **Stage 2A is Done**. **Stage 2B Option Mapping remediation UI is shipped** on `ManageSyncFieldOptionMappings` (existing `view_sync_mappings` / `manage_sync_mappings` permissions only; authoritative persisted connector snapshot metadata on read with zero HTTP; `confirm`/`replace` retain connector external validation outside locked DB transaction; Preview findings remain historical after remediation; narrow stale/orphan option-mapping cleanup does **not** fix Product/Variant select value integrity). **Stage 3A Live Safety foundation is shipped** — `run_sync_live` runtime permission, stale active-run recovery, `ExternalRecordLink` persistence foundation, `SyncLiveAdmissionService`, and fail-closed Live job shell (no Adobe write, no merchant consequential Live UI). Merchant consequential Live execution (**Stage 3B–3E**; **Stage 3-0** docs contract **Done**) — including **Stage 3E-R2a per-item ownership/ERL-provenance rewrite and Stage 3E-R2b-1 backend link-trust services (`AdobeProductEntityTrustReviewService`, `AdobeProductEntityTrustConfirmationService`, `AdobeProductEntityTrustLinkReadinessProjector`, `AdobeProductEntityTrustAuthorizationService` dual-permission enforcement, `EntityTrustReviewEnvelopeService` 15-minute TTL envelopes, and target-snapshot binding via `ConnectorAccountSettingsService`)** and **Stage 3E-R2b-2 merchant-confirmed Filament/Livewire confirmation UI on `ManageAdobeProductsExportPreview`** (per-item readiness/remediation, opaque server-side review-flow store, exhaustive 19-case `EntityTrustFailureReason` presentation, and dual-permission Confirm/Review/Renew actions over the Stage 2-0 contract) — are **shipped**, but truthful flip of Adobe Products/Export/Live advertised support remains **false** and still requires **real-target certification** of the **actual standard shipping implementation** for every advertised V1 consequential Live mutation category, proving all still-frozen safety and domain invariants. The current first-party Magento entity-bound Safe Sync implementation may remain current-runtime evidence and / or an optional Enhanced Safety primitive, but it is **not** a mandatory product prerequisite under the Post-#168 / Post-D6 moduleless-by-default decision. Until real-target certification is met, merchant consequential Live action remains non-actionable and the **Magento** tile keeps the **false** truth flag for Adobe Products/Export/Live. Scheduling beyond Discovery, issue aggregation, bulk resolution, sync-run history, ownership persistence/enforcement, and broader merchant sync surfaces remain future implementation gaps requiring their own scoped passes before the corresponding UI ships. This contract does **not** assert that every entity or runtime mechanism exists beyond what is confirmed elsewhere in this document — but a reader must **not** conclude that dry-run/preview computation is still absent. Those platform-owned sync UX/orchestration concerns do **not** become `ConnectorCapability` cases merely because they are optional or future.
+**Existing-vs-future boundary:** This contract defines the _required UX_ for synchronization, preview/dry-run, scheduling, mapping, issues, history, and bulk resolution _when those surfaces/concerns are implemented_. Normative sync domain shape is now settled in `docs/03-DOMAIN_MODEL.md` (Sync Domain Rebaseline: `SyncConfiguration` → `FieldMapping` + `SyncRun` → `SyncRunItem`, account-scoped `ExternalRecordLink`). **Preview computation/runtime is shipped** — Stage 1 Preview Engine delivers persisted zero-mutation Preview (`run_sync_preview`, admission, Preview `SyncRun` persistence). **Stage 2A-2 merchant Preview work surface and remediation presentation are shipped**; **Stage 2A is Done**. **Stage 2B Option Mapping remediation UI is shipped** on `ManageSyncFieldOptionMappings` (existing `view_sync_mappings` / `manage_sync_mappings` permissions only; authoritative persisted connector snapshot metadata on read with zero HTTP; `confirm`/`replace` retain connector external validation outside locked DB transaction; Preview findings remain historical after remediation; narrow stale/orphan option-mapping cleanup does **not** fix Product/Variant select value integrity). **Stage 3A Live Safety foundation is shipped** — `run_sync_live` runtime permission, stale active-run recovery, `ExternalRecordLink` persistence foundation, `SyncLiveAdmissionService`, and fail-closed Live job shell (no Adobe write, no merchant consequential Live UI). Merchant consequential Live execution (**Stage 3B–3E**; **Stage 3-0** docs contract **Done**) — including **Stage 3E-R2a per-item ownership/ERL-provenance rewrite and Stage 3E-R2b-1 backend link-trust services (`AdobeProductEntityTrustReviewService`, `AdobeProductEntityTrustConfirmationService`, `AdobeProductEntityTrustLinkReadinessProjector`, `AdobeProductEntityTrustAuthorizationService` dual-permission enforcement, `EntityTrustReviewEnvelopeService` 15-minute TTL envelopes, and target-snapshot binding via `ConnectorAccountSettingsService`)** and **Stage 3E-R2b-2 merchant-confirmed Filament/Livewire confirmation UI on `ManageAdobeProductsExportPreview`** (per-item readiness/remediation, opaque server-side review-flow store, exhaustive 19-case `EntityTrustFailureReason` presentation, and dual-permission Confirm/Review/Renew actions over the Stage 2-0 contract) — are **shipped**. Real-target certification of the actual standard shipping implementation completed on **2026-09-19**, and Adobe Products/Export/Live advertised support is now **true** for the certified bounded V1 scope. Products/Import/Live remains **false**, Magento Product CREATE remains unsupported, the standard path is moduleless, and Safe Sync remains optional Enhanced Safety. The current first-party Magento entity-bound Safe Sync implementation may remain current-runtime evidence and / or an optional Enhanced Safety primitive, but it is **not** a mandatory product prerequisite under the Post-#168 / Post-D6 moduleless-by-default decision. The 2026-09-19 real-target certification is complete; merchant consequential Live is actionable only when all current admission/readiness/trust gates pass, and the **Magento** tile uses the **true** truth flag for the certified bounded Adobe Products/Export/Live scope. Scheduling beyond Discovery, issue aggregation, bulk resolution, sync-run history, ownership persistence/enforcement, and broader merchant sync surfaces remain future implementation gaps requiring their own scoped passes before the corresponding UI ships. This contract does **not** assert that every entity or runtime mechanism exists beyond what is confirmed elsewhere in this document — but a reader must **not** conclude that dry-run/preview computation is still absent. Those platform-owned sync UX/orchestration concerns do **not** become `ConnectorCapability` cases merely because they are optional or future.
 
 ---
 
@@ -447,20 +447,18 @@ Normative detail: `docs/03-DOMAIN_MODEL.md` → **Live Safety, Identity & First-
 Contract (Resolved — Stage 3-0)**. Summary-level UI rules:
 `docs/06-UI_DESIGN_SYSTEM.md` → Merchant First-Live interaction rules.
 
-**Implementation status:** Stage 3-0 is **docs-only**. No merchant Live action,
-Adobe write, or support-truth flip ships in the Stage 3-0 slice. **Stage 3A Live
-Safety foundation is shipped** — `run_sync_live` runtime permission, stale
-active-run recovery, `ExternalRecordLink` persistence foundation,
-`SyncLiveAdmissionService`, and fail-closed `SyncLiveRunJob` shell (no Adobe
-write). **Stage 3D merchant first-Live UI/read model is shipped (internal)** on
-`ManageAdobeProductsExportPreview` — dual-authority page presence, Live read
-model, worklist/result presentation, and dormant `startLive()` admission path;
-merchant consequential Live action remains **non-actionable** while
-`ConnectorSyncOperationSupport(Products, Export, Live) === false`. Adobe Product
-and media Live write/reconciliation runtime is **implemented internally** through
-normative Stage 3D (3B/3C/3D-1/3D-2); advertised Live support remains **false**.
-Merchant consequential exposure and production enablement wait for Stage 3E
-real-target validation and truthful support flip.
+**Current implementation/support status [Resolved — 2026-09-19]:** Stage 3A Live
+safety, Stage 3B/3C Product execution, Stage 3D media + merchant first-Live, and
+the Stage 3E bounded real-target certification are complete for the advertised
+standard moduleless Magento V1 scope. `ManageAdobeProductsExportPreview` owns the
+merchant Live work surface and `startLive()` delegates to the existing admission
+contract. Current public truth is: Products / Export / Preview = **true**,
+Products / Export / Live = **true**, Products / Import / Live = **false**, and
+Magento Product CREATE = **unsupported in V1**. Consequential Live remains
+Preview-first and is actionable only when current authorization, configuration
+revision, runtime readiness, MerchantConfirmed identity trust, writer-gate, and
+reconciliation requirements all pass. Safe Sync is optional Enhanced Safety, not
+a prerequisite for the standard path.
 
 ### Smallest first-Live surface
 
@@ -475,8 +473,8 @@ permissions, and connector-account permissions. Preview permission never implies
 Live authority. `run_sync_live` is **authority only** — it does **not** mean
 connector/runtime currently supports Live. Possession of `run_sync_live` does
 **not** imply `ConnectorSyncOperationSupport(Products, Export, Live) === true`.
-Merchant consequential Live execution remains gated by that support-truth check
-until the Stage 3E flip.
+Merchant consequential Live execution remains gated by that support-truth check;
+the bounded Stage 3E truth flip completed on 2026-09-19.
 
 ### Merchant consequential Live admission gates
 
@@ -490,9 +488,10 @@ admission/exposure:
 - `ConnectorSyncOperationSupport(Products, Export, Live) === true`.
 
 Preview prerequisite is **trust/readiness** — not executable Live support.
-Stage 3D must not bypass `ConnectorSyncOperationSupport` or expose a consequential
-Live action while Live support remains **false**. Actionable merchant exposure
-happens only after Stage 3E real-Adobe validation and truthful support flip.
+No merchant surface may bypass `ConnectorSyncOperationSupport`. Current
+actionable Live exposure exists only because Stage 3E real-Adobe validation and
+the bounded truthful support flip completed on 2026-09-19; if support is false
+for a future scope/profile, the consequential action is non-actionable again.
 
 ### Preview prerequisite
 
@@ -557,8 +556,8 @@ Normative detail: `docs/03-DOMAIN_MODEL.md` → **Stage 3E Stop-and-Amend — Ma
 ownership and entity-bound Safe Sync runtime contract**. Summary-level UI rules:
 `docs/06-UI_DESIGN_SYSTEM.md` → Per-item Live linking.
 
-**Implementation status:** Per-item Live linking is split across two shipped
-slices plus remaining truth-flip prerequisites.
+**Implementation status:** Per-item Live linking is shipped, and the bounded
+Adobe Products/Export/Live truth flip completed on 2026-09-19.
 
 - **Stage 3E-R2a (shipped)** — per-item ownership/ERL-provenance rewrite
   (foundation prerequisite for per-item link lifecycle and ownership
@@ -598,10 +597,11 @@ slices plus remaining truth-flip prerequisites.
   confirm, stale-flow fail-closed, conflict handling, vocabulary, and
   configurable-family support.
 
-Truthful Adobe Products/Export/Live advertised support remains **false**.
-Both R2b slices ship the _necessary_ link-trust mechanism, but they are
-**not sufficient** for the exemplary consequential Live truth flip. The flip
-still requires:
+**Truth-flip status: COMPLETED 2026-09-19.** Adobe Products/Export/Live
+advertised support is **true** for the certified bounded standard moduleless V1
+scope. The R2b link-trust slices were necessary but not sufficient by themselves.
+The following were certification prerequisites and remain active safety/domain
+invariants for that support:
 
 - **real-target certification** of the **actual standard shipping
   implementation** for every advertised V1 consequential Live mutation
@@ -621,9 +621,10 @@ remain current-runtime evidence and / or an optional Enhanced Safety
 primitive, but it is **not** a mandatory product prerequisite under the
 Post-#168 / Post-D6 moduleless-by-default decision.
 
-Until real-target certification is met, merchant consequential Live action
-remains non-actionable and the **Magento** tile keeps the **false** truth
-flag for Adobe Products/Export/Live.
+Real-target certification completed on 2026-09-19. Merchant consequential Live
+is now actionable only when all current support, authorization, Preview,
+readiness, and identity-trust gates pass; the **Magento** tile uses the **true**
+truth flag for the certified bounded Adobe Products/Export/Live scope.
 
 ### Presentation boundary and progressive disclosure (Resolved — 2026-09-14)
 
@@ -651,13 +652,12 @@ Product data, Variant, Identity, and Runtime, but every row retains its source/t
 and domain-specific remediation. This is presentation composition only — no generic
 mega-enum/table and no merging of FieldMapping, Preview, Entity Trust, or Live state.
 
-While `ConnectorSyncOperationSupport(Products, Export, Live) === false`, the default
-merchant journey must **not** present per-item Entity Trust review as required next
-work competing with Preview remediation. The internal/certification surface may
-remain available, but the merchant default state hides/collapses that work behind
-honest "Live is not available yet" capability truth.
-
-After Live support is truthful, primary identity work shows only actionable
+**Historical pre-truth-flip presentation rule:** while
+`ConnectorSyncOperationSupport(Products, Export, Live) === false`, the default
+merchant journey must not present per-item identity review as required next work
+competing with Preview remediation; capability-unavailable truth dominates.
+Current certified Magento V1 Export Live support is **true**, so primary identity
+work shows only actionable
 `initial_link_required`, `reconfirmation_required`, or `relink_review_required`
 exceptions. `already_confirmed` / `no_action` belong in status/detail and are hidden
 from the primary task list by default. Configuration/data blockers remain earlier in
@@ -674,9 +674,10 @@ For the current `ManageAdobeProductsExportPreview` merchant surface:
 - item rows then emphasize Product/Variant/Pricing problems that genuinely differ by
   item. Do not repeat the same Field Mapping button in every Product row merely
   because the historical Preview stored the same configuration finding per item;
-- while Live support is false, show one honest capability message and do **not**
-  render `Зв'язок товарів з магазином` as a second mandatory task table;
-- after truthful Live enablement, identity exceptions join the ordered attention
+- historical pre-truth-flip behavior: when Live support is false, show one honest
+  capability message and do **not** render `Зв'язок товарів з магазином` as a
+  second mandatory task table;
+- with current truthful Live support, identity exceptions join the ordered attention
   journey. Merchant heading/copy should describe the task as checking the Product's
   correspondence in the selected Magento store, not expose Entity Trust terminology;
 - V1 consequential section copy uses **update** semantics (for example *Оновлення
@@ -767,20 +768,29 @@ in Layer A/B.
 
 Merchant-confirmed linking establishes ENTITY TRUST (logical Magento Product
 identity via stored `entity_id` discriminator), not SKU trust. Expected SKU remains
-a mandatory equality precondition but is not identity authority. After trust exists,
-stock SKU GET must not prove verification/reconciliation/applied state.
+a mandatory equality/addressing precondition but is not identity authority.
+
+For the optional first-party Safe Sync / Enhanced Safety path, post-bind
+verification remains entity-bound. For the certified **standard moduleless** path,
+the stock Product API is SKU-addressed, so every consequential Product update must
+freshly verify the trusted logical `entity_id` **before** PUT and again during
+post-write reconciliation. A post-write identity mismatch is ambiguous, never
+successful, and is never blindly retried. The accepted bounded residual risk is
+that a destructive target-side SKU reassignment in the narrow pre-GET→PUT window
+can be detected only after the attempted stock PUT; this limitation is documented
+normatively in `03-DOMAIN_MODEL.md` → **Standard moduleless post-trust identity
+verification [Resolved — 2026-09-20]**.
 
 Pre-trust candidate discovery may use bounded stock SKU lookup; final confirmation
 must freshly verify exact logical entity + expected SKU.
 
 Therefore link-first + entity trust + informed confirmation are **required** but
-**not sufficient** for exemplary consequential Live. Truth flip waits for
-**real-target certification** of the **actual consequential WRITE
-implementation** against all still-frozen safety invariants (entity trust;
+were **not sufficient** by themselves for consequential Live. The 2026-09-19
+truth flip followed real-target certification of the actual standard shipping
+WRITE implementation against the bounded safety invariants (entity trust;
 `ExternalRecordLink` / `entity_id` identity authority; SKU
-equality/precondition; no blind ambiguous retry; Preview-first; no
-automatic Product create V1; post-write verification; fail-closed identity
-uncertainty) for every advertised V1 Live mutation category.
+equality/precondition; no blind ambiguous retry; Preview-first; no automatic
+Product create V1; post-write verification; fail-closed identity uncertainty).
 
 The current first-party Magento entity-bound Safe Sync implementation may
 remain current-runtime evidence and / or an optional Enhanced Safety

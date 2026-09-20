@@ -1813,10 +1813,12 @@ Summary rules for Stage 2A UI — prevent divergence from the contract:
 Normative detail: `docs/03-DOMAIN_MODEL.md` → **Live Safety, Identity & First-Live
 Contract (Resolved — Stage 3-0)**; `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md` §17.
 
-**Docs-only in Stage 3-0.** No consequential Live action ships until Stage 3E
-truthful support flip. Stage 3D-2 ships the merchant Live UI/read model while
-support remains **false**; the action must remain non-actionable for consequential
-execution until Stage 3E.
+**Current status [Resolved — 2026-09-19]:** the bounded Stage 3E real-target
+certification and truthful support flip are complete for standard moduleless
+Magento V1. Products / Export / Live is **true**; Products / Import / Live remains
+**false**; Product CREATE remains unsupported. Historical Stage 3D-2 shipped the
+merchant Live UI/read model while support was false and kept consequential action
+non-actionable until that completed Stage 3E flip.
 
 Summary rules for first-Live UI on `ManageAdobeProductsExportPreview`:
 
@@ -1829,9 +1831,10 @@ Summary rules for first-Live UI on `ManageAdobeProductsExportPreview`:
   Preview prerequisite alone are insufficient.
 - **Authority ≠ availability** — `run_sync_live` is authority, not connector Live
   support. Preview is trust/readiness prerequisite, not executable Live support.
-- **Stage 3D boundary** — Stage 3D may implement Live UI/read model while support is
-  **false**, but the action must remain non-actionable for consequential execution;
-  no bypass of `ConnectorSyncOperationSupport`.
+- **Historical Stage 3D boundary** — Stage 3D was allowed to implement the Live
+  UI/read model while support was **false**, but consequential action remained
+  non-actionable; current exposure still never bypasses
+  `ConnectorSyncOperationSupport`.
 - **Separate authority** — `run_sync_preview` never implies `run_sync_live`.
 - **Magento V1 is link/update-only** — consequential V1 Live mutates only already-existing, trusted-linked Magento Products; never imply that a missing remote Product will be created. Future CREATE is a separate capability/version decision.
 - **Target context** — before confirmation, show the merchant-facing Magento account plus configured store/store-view context in approved vocabulary; an account-scoped link must never look global.
@@ -1867,11 +1870,12 @@ own domains.
 
 Progressive-disclosure rules:
 
-- while Adobe Products/Export/Live support is **false**, Entity Trust preparation must
-  not appear as required next work competing with Preview blockers on the default
-  merchant surface; internal/certification access may remain;
-- after truthful Live enablement, surface only actionable identity exceptions by
-  default (`initial_link_required`, `reconfirmation_required`,
+- **historical pre-truth-flip rule:** while Adobe Products/Export/Live support was
+  **false**, Entity Trust preparation did not appear as required next work competing
+  with Preview blockers on the default merchant surface; internal/certification
+  access could remain;
+- with current truthful Export Live support, surface only actionable identity
+  exceptions by default (`initial_link_required`, `reconfirmation_required`,
   `relink_review_required`); hide `already_confirmed` / `no_action` from the primary
   task list;
 - configuration/data remediation comes first in the causal journey; identity review
@@ -1909,12 +1913,14 @@ Summary rules for unlinked or trust-insufficient Products in the Live surface:
   `entity_id`, discriminator, ownership policy, reconciliation, or HTTP evidence in
   Layer A/B.
 - **Link-first ≠ Live-ready** — merchant-confirmed link establishes ENTITY TRUST
-  but does **not** by itself authorize consequential Live; exemplary Live support
-  flip waits for real-target certification of the actual consequential WRITE
-  implementation against all still-frozen safety invariants for every advertised
-  V1 Live mutation category. The current first-party Magento entity-bound Safe
-  Sync implementation may remain current-runtime evidence and / or an optional
-  Enhanced Safety primitive, but it is **not** a mandatory product prerequisite.
+  but does **not** by itself authorize consequential Live. The 2026-09-19 support
+  flip followed real-target certification of the actual standard shipping WRITE
+  implementation. For the standard moduleless path, fresh trusted `entity_id`
+  equality is required before the SKU-addressed PUT and again during post-write
+  reconciliation; a mismatch is ambiguous, never successful. The bounded residual
+  race is documented in `03-DOMAIN_MODEL.md` → **Standard moduleless post-trust
+  identity verification [Resolved — 2026-09-20]**. First-party entity-bound Safe
+  Sync remains optional Enhanced Safety, not a mandatory product prerequisite.
 - **Account readiness** — `ConnectorSyncOperationSupport` (static capability) and
   `ConnectorLiveRuntimeReadiness` (fresh account prerequisite) are separate; cached
   handshake is presentation-only; do not persist handshake evidence on
