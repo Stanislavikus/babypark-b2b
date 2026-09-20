@@ -39,8 +39,14 @@
     "field_binding_storage_type": "dynamic",
     "field_mapping_id": "a2c8fa87-4a31-4229-b7d8-838cbbea5f77",
     "field_option_mappings": [
-      {"internal_option_key": "1028", "external_option_value": "1028"},
-      {"internal_option_key": "1029", "external_option_value": "1029"}
+      {
+        "internal_option_key": "1028",
+        "external_option_value": "1028"
+      },
+      {
+        "internal_option_key": "1029",
+        "external_option_value": "1029"
+      }
     ],
     "external_record_link_id": "a2c8fa87-5fd3-4f49-af25-73616d5485c9",
     "external_record_link_variant_id": 3,
@@ -76,6 +82,22 @@
     "remote_after": "1028",
     "overwrite_occurred": false
   },
+  "local_reset_before_successful_apply": {
+    "from": "1028",
+    "to": "1029",
+    "writer": "GovernedDynamicFieldValueWriter::set",
+    "reason": "restore the proposal baseline after the deliberate stale-local mutation so a fresh consequential Differs proposal can be built",
+    "remote_remained": "1028"
+  },
+  "fresh_proposal_after_local_reset": {
+    "flow_id": "1319a02b199cf6ea9b9b65a51e32d8e653d18f151b3745f28a609a450a78f842",
+    "target_type": "product_variant",
+    "target_id": "3",
+    "domain_route": "dynamic_field",
+    "diff_state": "differs",
+    "local_canonical_value": "1029",
+    "remote_canonical_value": "1028"
+  },
   "receive_apply_probe": {
     "run_id": "a2c8fa8c-9750-42c5-9582-4b3bc060d2bf",
     "status": "completed",
@@ -108,7 +130,9 @@
     "remote_option_final": "1029",
     "configuration_revision_final": "26cc92b95161535dc29ea9410a46c72eb087686e8a266a84ca31fabc0aa11fc9",
     "configuration_revision_matches_baseline": true,
-    "enabled_operations_final": ["export"],
+    "enabled_operations_final": [
+      "export"
+    ],
     "temporary_external_record_links_remaining": 0,
     "temporary_field_definitions_remaining": 0,
     "temporary_field_mappings_remaining": 0,
@@ -122,6 +146,13 @@
       "revision_policy": "monotonic; intentionally not rewound",
       "cleanup_method": "bounded DB transaction removed only the known temporary placement and incremented ProductType.structure_revision before deleting the temporary binding/definition",
       "permission_catalogue_note": "local dev DB lacked the canonical manage_product_structure permission row, so a temporary governed cleanup role could not be created; no role row was created"
+    },
+    "initial_fixture_teardown_observation": {
+      "result": "partial_cleanup_then_follow_up",
+      "blocked_step": "FieldBinding deletion",
+      "reason": "temporary admin-visible FieldBinding had been auto-placed into Basic Product by BasicProductStructureReconciler, so the FK correctly prevented deleting the binding first",
+      "final_resolution": "removed only the known temporary ProductTypeFieldPlacement while monotonically advancing ProductType.structure_revision, then deleted the temporary FieldBinding and FieldDefinition",
+      "final_residual": "zero"
     }
   },
   "verification_boundary": {

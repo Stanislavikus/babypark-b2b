@@ -34,6 +34,21 @@ class MagentoV1ReceiveR4RealTargetCertificationDocumentationContractTest extends
             data_get($evidence, 'real_target_stale_local_proof.finding_code'),
         );
 
+        $this->assertSame('1028', data_get($evidence, 'local_reset_before_successful_apply.from'));
+        $this->assertSame('1029', data_get($evidence, 'local_reset_before_successful_apply.to'));
+        $this->assertSame(
+            'GovernedDynamicFieldValueWriter::set',
+            data_get($evidence, 'local_reset_before_successful_apply.writer'),
+        );
+        $this->assertSame('1028', data_get($evidence, 'local_reset_before_successful_apply.remote_remained'));
+        $this->assertSame('differs', data_get($evidence, 'fresh_proposal_after_local_reset.diff_state'));
+        $this->assertSame('1029', data_get($evidence, 'fresh_proposal_after_local_reset.local_canonical_value'));
+        $this->assertSame('1028', data_get($evidence, 'fresh_proposal_after_local_reset.remote_canonical_value'));
+        $this->assertSame(
+            '1319a02b199cf6ea9b9b65a51e32d8e653d18f151b3745f28a609a450a78f842',
+            data_get($evidence, 'fresh_proposal_after_local_reset.flow_id'),
+        );
+
         $this->assertSame('synchronized', data_get($evidence, 'receive_apply_probe.outcome'));
         $this->assertSame('receive_dynamic_field_applied', data_get($evidence, 'receive_apply_probe.finding_code'));
         $this->assertSame('synchronized', data_get($evidence, 'receive_apply_restore.outcome'));
