@@ -2,6 +2,7 @@
 
 > **Status: PROPOSED — discussion / independent challenge before [Resolved].**
 > Base: `origin/develop @ ec47527ab1a71f65dbdce3b605bdc4f9f82d15f3`.
+> Decision B has now received Gemini independent challenge; use `PRODUCT_WORKBENCH_DECISION_B_GEMINI_ARBITRATION_2026_09_21.md` as the corrected Lead synthesis for that seam.
 
 ## Decision A — Magento daily workspace row universe
 

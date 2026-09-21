@@ -758,6 +758,7 @@ cross-platform vocabulary or define runtime/storage behavior.
 - `docs/reviews/PRODUCT_WORKBENCH_GPT54_TARGETED_RESEARCH_TASK_2026_09_21.md` — targeted GPT-5.4 repo/architecture research task for the remaining structural questions only: Magento workspace row universe, Product draft/lifecycle semantics, scalable Remote Catalogue Index V2, category/Attribute Set preparation, readiness, saved Views, settings inheritance, and automated price/stock path.
 - `docs/reviews/PRODUCT_WORKBENCH_TWO_STRUCTURAL_DECISIONS_2026_09_21.md` — Lead decision study for the two remaining Workbench structural seams: remote-catalogue-first Magento Overview and sparse/default target classification for Magento Category + Attribute Set. Proposed, not yet [Resolved].
 - `docs/reviews/PRODUCT_WORKBENCH_DECISION_B_GEMINI_CHALLENGE_TASK_2026_09_21.md` — narrow Gemini 3.1 independent architecture challenge for Decision B only; tests ProductType→Attribute Set default ownership, sparse per-Product overrides, category multiplicity, persistence and Preview/revision integration without redesigning the whole Workbench.
+- `docs/reviews/PRODUCT_WORKBENCH_DECISION_B_GEMINI_ARBITRATION_2026_09_21.md` — Lead synthesis of Gemini's Decision-B challenge; accepts sparse defaults/overrides, corrects Product-vs-Variant scope, rejects JSON/stored account revision, reuses observed Adobe Attribute Structure, and separates future CREATE Attribute Set selection from existing-product structural truth.
 
 **For AI-assisted implementation (architecture and domain tasks):**
 
