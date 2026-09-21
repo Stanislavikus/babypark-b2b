@@ -753,6 +753,7 @@ cross-platform vocabulary or define runtime/storage behavior.
 - `docs/reviews/PRODUCT_STRUCTURE_UX_AI_IMPLEMENTATION_CONTRACT_2026_09_13.md` — authoritative Product Structure implementation contract; **Slice A closed 2026-09-13** with real-MySQL gates and real-catalogue clone smoke evidence recorded in the document; next scope is Slice B.
 - `docs/reviews/PRODUCT_STRUCTURE_UX_AI_SONNET_CONTRACT_REVIEW_2026_09_13.md` — post-contract Sonnet adversarial review resolution; freezes physical PK/FK type, Customer bootstrap exclusion, `manage_product_structure`, out-of-type sync boundary, Basic Product post-create reconciliation, structure revision semantics, and mandatory MySQL gate without changing the ProductType/AttributeGroup architecture.
 - `docs/reviews/PRODUCT_STRUCTURE_UX_AI_GEMINI_CONTRACT_REVIEW_2026_09_13.md` — Gemini 3.1 independent contract review resolution; confirms corrected Slice A contract and records that no additional architectural blocker remained.
+- `docs/reviews/PRODUCT_WORKBENCH_CHANNEL_UX_SYNTHESIS_2026_09_21.md` — **DRAFT research input, not [Resolved]**; whole-system Product Workbench / channel / SEO / AI / media / settings synthesis created before the next merchant-UX implementation. Must be consulted for Product Workbench, Magento daily-work UX, View/column/action design, SEO/AI/media work, and settings ownership until superseded by a frozen contract.
 
 **For AI-assisted implementation (architecture and domain tasks):**
 
