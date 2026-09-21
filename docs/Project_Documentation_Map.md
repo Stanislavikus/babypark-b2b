@@ -766,6 +766,9 @@ cross-platform vocabulary or define runtime/storage behavior.
 - `docs/reviews/PRODUCT_WORKBENCH_FABLE_PROTOTYPE_TASK_2026_09_21.md` — strict visual-prototype brief for the resolved Workbench semantics; asks for dense-operational and calmer-merchant variants without permitting domain/runtime redesign or fake CREATE/import capabilities.
 - `docs/reviews/PRODUCT_WORKBENCH_GROK_VISUAL_ARBITRATION_2026_09_21.md` — Lead review of Grok 4.6 prototype commit `e130676…`; accepts the A+B shell but requires one correction pass for unsupported Publication row execution/bulk controls, invented link similarity evidence, scalable Product selection, drawer ownership, and final A/B hybrid density.
 - `docs/reviews/PRODUCT_WORKBENCH_GROK_VISUAL_CORRECTION_TASK_2026_09_21.md` — narrow one-pass Grok correction task that preserves frozen semantics and produces the final hybrid screenshots/source before visual UX freeze.
+- `docs/reviews/PRODUCT_WORKBENCH_VISUAL_UX_FINAL_ARBITRATION_2026_09_21.md` — Lead final review of corrected Hybrid commit `7df5fce…`; verifies V-01..V-08 are closed and declares the Hybrid ready for product-owner visual freeze approval.
+- `docs/reviews/PRODUCT_WORKBENCH_VISUAL_UX_CONTRACT_FREEZE_CANDIDATE_2026_09_21.md` — exact merchant-facing visual/interaction freeze candidate for the Hybrid Workbench; not [Resolved] until explicit product-owner approval.
+- `docs/reviews/PRODUCT_WORKBENCH_UX1_IMPLEMENTATION_TASK_DRAFT_2026_09_21.md` — draft YELLOW executor task for the first post-freeze campaign: Workbench shell + remote Overview + Publication/Links composition on existing runtime, with no new persistence or unsupported capabilities.
 
 **For AI-assisted implementation (architecture and domain tasks):**
 
