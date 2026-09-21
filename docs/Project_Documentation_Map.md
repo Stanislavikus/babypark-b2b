@@ -764,6 +764,8 @@ cross-platform vocabulary or define runtime/storage behavior.
 - `docs/reviews/PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_2026_09_21.md` — **[Resolved — 2026-09-21]** Product-owner-approved A+B structural contract. Freezes Magento `Огляд / Публікація / Зв'язки` row universes, default+sparse Category/Attribute-Set classification semantics, Projection V2 boundary, planner migration boundary, and Preview/Live determinism rules.
 - `docs/reviews/PRODUCT_WORKBENCH_LEAD_VISUAL_UX_STUDY_2026_09_21.md` — **DRAFT visual/interaction research input, not [Resolved]**; Lead review of actual Workbench/Remote Catalogue/Product grid code plus current Plytix/Akeneo/ChannelEngine patterns. Defines the proposed merchant shell, per-View columns/actions, migration away from the current button maze, and the shortest UX campaign sequence.
 - `docs/reviews/PRODUCT_WORKBENCH_FABLE_PROTOTYPE_TASK_2026_09_21.md` — strict visual-prototype brief for the resolved Workbench semantics; asks for dense-operational and calmer-merchant variants without permitting domain/runtime redesign or fake CREATE/import capabilities.
+- `docs/reviews/PRODUCT_WORKBENCH_GROK_VISUAL_ARBITRATION_2026_09_21.md` — Lead review of Grok 4.6 prototype commit `e130676…`; accepts the A+B shell but requires one correction pass for unsupported Publication row execution/bulk controls, invented link similarity evidence, scalable Product selection, drawer ownership, and final A/B hybrid density.
+- `docs/reviews/PRODUCT_WORKBENCH_GROK_VISUAL_CORRECTION_TASK_2026_09_21.md` — narrow one-pass Grok correction task that preserves frozen semantics and produces the final hybrid screenshots/source before visual UX freeze.
 
 **For AI-assisted implementation (architecture and domain tasks):**
 
