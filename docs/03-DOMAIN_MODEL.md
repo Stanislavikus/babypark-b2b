@@ -4988,7 +4988,7 @@ product requirement demonstrates the need. Do not split import/export
 configurations merely for hypothetical flexibility.
 
 ### Product → Channel Selection + Remote Catalogue Projection
-[Resolved — 2026-09-15]
+[Resolved — 2026-09-15; presentation ordering amended 2026-09-21]
 
 Normative detail: `docs/PRODUCT_CHANNEL_SELECTION_REMOTE_CATALOGUE_CONTRACT.md`.
 
@@ -5019,6 +5019,14 @@ useful existing Product/listing universe, the platform may maintain an immutable
 successful **Remote Catalogue Projection** owned by Workspace + ConnectorAccount +
 applicable remote context. It is read-only navigation/matching evidence, not Master
 Product truth, not SyncConfiguration selection, and not `ExternalRecordLink` trust.
+
+[Resolved — 2026-09-21] Magento daily-work presentation uses distinct row universes:
+
+- `Огляд` = current successful Magento Remote Catalogue snapshot;
+- `Публікація` = local Master Products selected/linked for outbound preparation;
+- `Зв'язки` = correspondence/matching between remote and Master Product universes.
+
+This does not merge the two truths. Remote-only rows shown in `Огляд` do not become Master Products or trusted links merely by appearing there.
 
 For Magento V1:
 
@@ -6711,16 +6719,35 @@ current producer requires it. Document only as a watch-item.
 Reject accidental equivalence: platform ProductType == Adobe `attribute_set_id`.
 Adobe `attribute_set_id` is not a generic Product field.
 
+[Resolved — 2026-09-21] Multiple-Attribute-Set target model:
+
 | Concern | Owner |
 |---|---|
-| Semantic owner | Connector / Adobe profile — vendor attribute-set identity |
-| Persistence owner | SyncConfiguration-owned connector execution configuration |
-| Revision participation | Yes — part of `configuration_revision` when present |
-| `configuration_snapshot` participation | Yes — run-effective connector execution configuration |
-| Merchant/default behavior | Connected-account default / discovered attribute set; merchant does not edit it as a Product field |
-| Future multiple attribute-set compatibility | Additional SyncConfiguration-owned connector configuration or connector-owned mapping; not ProductType and not FieldDefinition. A later connector-owned mapping from Product classification/type to Adobe attribute sets is allowed if that becomes the correct generalized Adobe behavior. |
+| Semantic owner | Connector / Adobe profile — vendor Attribute Set identity |
+| Current runtime owner until migration lands | SyncConfiguration-owned `connector_execution_configuration.attribute_set_id` (single-set execution shape) |
+| Target default owner for a Product not yet existing in Magento | Account-scoped connector mapping `ProductType -> observed Adobe Attribute Set` |
+| Target exception owner | Sparse Product + ConnectorAccount override referencing one observed Adobe Attribute Set |
+| Existing trusted Magento Product | Observed remote `attribute_set_id` is structural context for field applicability/readiness; a different ProductType default must not silently change it |
+| Revision/snapshot participation | Yes — effective classification is frozen into Preview evidence through canonical snapshot payload + deterministic revision/hash and rechecked at Live admission |
+| Merchant behavior | Recommendation/default may be corrected explicitly and reset to automatic/default; `attribute_set_id` is not edited as a generic Product field |
 
-**First Magento V1 shape:** one SyncConfiguration resolves one Adobe attribute-set context/default for its run. Heterogeneous Products must not silently receive an invalid attribute set. Preview must block/report a Product when the selected Adobe configuration cannot represent its required mapped attributes. Future multiple-attribute-set support remains possible through connector-owned configuration/mapping.
+**Current-vs-target boundary:** current Magento V1 runtime still reads one SyncConfiguration-level `attribute_set_id`. Moving to per-Product effective Attribute Set requires a named semantic-planner/metadata migration slice. `AdobeProductExportSemanticPlanner` must stop treating the config-wide value as final execution truth, resolve an effective set per Product, and evaluate fields/configurable dimensions against the persisted Adobe Attribute Structure catalogue without per-Product provider HTTP reads. This is a planned implementation gap, not permission to keep the single-set model as final architecture.
+
+Changing the Attribute Set of an already existing trusted Magento Product is **not** authorized by this decision. That is a separate consequential capability requiring its own research/certification.
+
+#### E5.1 Magento target category + Attribute Set classification [Resolved — 2026-09-21]
+
+Normative structural detail: `docs/reviews/PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_2026_09_21.md`.
+
+Category defaults and exceptions follow the same no-copy principle:
+
+- existing account-scoped `ConnectorCategoryMapping` remains the default `Master Category -> one target Magento category` seam;
+- a Product/account may carry zero/one/many normalized category override rows; no rows means inherit the Category default, deleting rows resets to automatic/default;
+- multiple Magento categories are allowed; do not invent a primary category unless later provider/product evidence requires it;
+- desired categories do not authorize deleting provider-only remote categories. Existing category-relation ownership semantics remain authoritative: add missing desired managed relations and remove only relations previously managed by this platform;
+- classification overrides live at Product scope. `ProductVariant` inherits Product-level Category/Attribute Set classification in the first supported scope;
+- `ExternalRecordLink` remains identity trust and must not be reused as pre-create classification intent;
+- `AdobeProductCategoryAssignment` remains remote relation ownership/reconciliation evidence and must not be reused as desired pre-publication configuration.
 
 Do not persist `attribute_set_id` in `external_context` merely because that
 field is JSON. `external_context` remains external business context

@@ -111,5 +111,5 @@ Do not reopen these without newer authoritative evidence or a proven implementat
 ## Lead recommendation
 
 Freeze A+B exactly through
-`PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_FREEZE_CANDIDATE_2026_09_21.md` after explicit
+`PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_2026_09_21.md` after explicit
 product-owner approval.

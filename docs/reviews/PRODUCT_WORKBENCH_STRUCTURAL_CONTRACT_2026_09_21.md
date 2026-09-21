@@ -1,9 +1,9 @@
-# Product Workbench Structural Contract — Freeze Candidate — 2026-09-21
+# Product Workbench Structural Contract — [Resolved — 2026-09-21]
 
-> **STATUS: READY FOR PRODUCT-OWNER APPROVAL — NOT [Resolved] YET**
+> **STATUS: [Resolved — 2026-09-21] — PRODUCT OWNER APPROVED**
 >
-> This document becomes [Resolved] only after explicit product-owner approval.
-> Base: `origin/develop @ ec47527ab1a71f65dbdce3b605bdc4f9f82d15f3`.
+> Product-owner approval received 2026-09-21. Reopen only for conflict with newer authoritative docs or a proven implementation blocker.
+> Base at freeze: `origin/develop @ ec47527ab1a71f65dbdce3b605bdc4f9f82d15f3`.
 
 ## Goal
 
@@ -313,13 +313,11 @@ Separate campaigns remain:
 - Price/stock automated high-frequency channel path — separate runtime campaign.
 - AI/SEO enrichment — Workbench-aligned but not required to freeze A+B.
 
-## Freeze gate
+## Freeze implementation note
 
-On explicit product-owner approval:
+This document is now `[Resolved — 2026-09-21]`. The documentation-freeze campaign must:
 
-1. mark this document `[Resolved — 2026-09-21]`;
-2. amend the presentation-order wording in
-   `PRODUCT_CHANNEL_SELECTION_REMOTE_CATALOGUE_CONTRACT.md`;
-3. amend relevant UX contract sections so `Огляд / Публікація / Зв'язки` are authoritative;
-4. update implementation-contract tests for the frozen documentation truth;
-5. do not change runtime code in the documentation freeze commit.
+1. amend the presentation-order wording in `PRODUCT_CHANNEL_SELECTION_REMOTE_CATALOGUE_CONTRACT.md`;
+2. amend relevant Domain/UX/UI summary sections so `Огляд / Публікація / Зв'язки` and Decision-B classification semantics are authoritative;
+3. update documentation-contract tests for the frozen truth;
+4. make **no runtime code changes** in the documentation freeze commit.
