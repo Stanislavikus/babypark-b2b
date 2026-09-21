@@ -77,7 +77,7 @@ Default visible columns should start from the strongest scan/orientation fields:
 | Thumbnail | yes | lightweight preview; remote index must eventually supply it |
 | Назва | yes | UI label for canonical `Product.name` / remote name |
 | Бренд | yes | canonical brand where available |
-| Категорія | yes | show breadcrumb/path; filters must support branch/leaf |
+| Категорія | yes | show breadcrumb/path; default filter interaction is hierarchical tree-select with branch/leaf selection |
 | Стан даних / completeness | candidate | profile-specific completeness, not generic sync truth |
 | Зв'язок з каталогом | yes | linked / candidate / remote-only; distinct from readiness |
 | Magento state | yes | provider publication/enabled state; distinct from platform status |
@@ -115,14 +115,22 @@ A channel grid needs a visible **platform product lifecycle/status** distinct fr
 enabled/disabled state and distinct from connector publication state.
 
 The product may exist as an early draft created from 1C/import with only identity/basic data,
-then be enriched by AI/human review, then become publishable. Exact persistence/status enum
-is **OPEN** and must not be invented in this draft.
+then be enriched by AI/human review, then become publishable. **Current repository truth is the
+boolean `products.is_active` contract; a richer draft/active/archived lifecycle was previously
+deferred.** Exact richer persistence/status semantics therefore remain **OPEN** and must not be
+invented in this draft.
 
 UX requirement: drafts must be discoverable/filterable and must not remain forgotten forever.
 Readiness/completeness and lifecycle status are separate dimensions.
 ## 6. Core Views
 
 ### 6.1 Огляд
+
+**Proposed row universe after product-owner hands-on review:** the current successful Magento
+Remote Catalogue snapshot — the actual store catalogue/state. This is a proposed information-
+architecture Stop-and-Amend to the 2026-09-15 contract ordering, not a change in ownership:
+remote rows remain provider observation and do not become Master Products merely by appearing
+here.
 
 Default scanning/navigation view. Candidate defaults:
 
@@ -143,12 +151,13 @@ Same product universe, different columns/actions:
   | Обов'язкові дані | Зображення | Next action | Last result
 ```
 
-The runtime may decide Create / Update / No change / future Delete, but merchant labels should
-describe the consequential effect clearly.
+The target action model may eventually decide Create / Update / No change / future Delete, but
+merchant labels must describe the consequential effect clearly. **Current certified Magento V1
+must render only actions/outcomes that its support truth can execute; `Створити` must not appear
+until CREATE has its own architecture, runtime, support flip and real-target certification.**
 
 This View must eventually support the newly required **Magento Product CREATE** capability;
-current certified Magento V1 remains UPDATE-only until CREATE receives its own architecture,
-implementation and real-target certification.
+current certified Magento V1 remains UPDATE-only until that separate RED campaign closes.
 
 ### 6.3 Контент і SEO
 
@@ -268,13 +277,15 @@ ranking cannot be mistaken for current evidence.
 
 ## 11. Settings ownership layers
 
-Do not create one giant “Settings” page.
+Do not create one giant “Settings” form. Keep ownership separated, but provide one discoverable
+settings index/map so an owner/support person can always answer “where do I change X?” without
+hunting across unrelated screens.
 
 ### 11.1 Platform/System owner settings
 
 Reserved for system-wide operational policy and defaults, for example:
 
-- supported AI/SEO providers and provider credentials;
+- supported AI/SEO provider integrations and provider credentials;
 - global safety/limit policies;
 - available generation models/capabilities;
 - allowed image processing profiles/technical ceilings;
@@ -290,7 +301,7 @@ Merchant-configurable defaults, for example:
 - preferred content style/tone;
 - target content language(s);
 - image output dimensions/weight preferences within platform constraints;
-- SEO research defaults;
+- SEO research business defaults such as target market/search engine/country where applicable;
 - AI review/approval preferences where policy allows;
 - channel-specific defaults that genuinely apply account-wide.
 
@@ -383,7 +394,7 @@ The following are accepted as the current research direction, subject to indepen
   target Attribute Set and target required fields.
 - Exact source and scalable read shape for remote Magento thumbnail, brand, category path and
   Attribute Set on 10k–100k catalogues.
-- Saved Views persistence scope: system presets only first, or user/workspace custom Views?
+- Saved Views first release should use system presets; research whether current framework/repo makes user/workspace custom Views cheap enough for the same campaign or a later follow-up.
 - Which completeness/readiness indicators are default in Overview vs Publication.
 - Exact settings persistence and inheritance model.
 - Magento CREATE semantics and remote-only Magento → Master import semantics.
@@ -417,7 +428,7 @@ smuggled into a UX-only PR. They require dedicated architecture/certification wo
 
 Do not produce the final implementation task until:
 
-1. Sonnet findings are arbitrated against this draft and actual repo;
+1. Sonnet findings are arbitrated against this draft and actual repo (**completed; see `PRODUCT_WORKBENCH_SONNET_ARBITRATION_2026_09_21.md`**);
 2. targeted GPT-5.4 findings for structural open questions are arbitrated;
 3. Lead writes a frozen implementation contract or explicitly marks unresolved capability
    slices as deferred;
