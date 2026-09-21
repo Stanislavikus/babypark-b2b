@@ -145,43 +145,37 @@ Contains merchant sync-configuration concerns. Which data domains and semantic o
     ```
     Repeated per data domain (Ціни, Описи, Залишки, ...) that is bidirectionally enabled. No connector ships a hardcoded default answer — this is a per-merchant, per-domain product decision, not inferred silently. Do not introduce mandatory per-field authority before that product need exists. (Storage/enforcement mechanism remains a backend decision requiring its own scoping pass; this contract fixes the _question asked to the merchant_, not yet the storage/enforcement design.)
 
-### Product selection + channel work surface (Resolved — 2026-09-15)
+### Product Workbench + channel work surface (Resolved — 2026-09-21)
 
 Normative architecture/detail:
-`docs/PRODUCT_CHANNEL_SELECTION_REMOTE_CATALOGUE_CONTRACT.md`.
+- `docs/PRODUCT_CHANNEL_SELECTION_REMOTE_CATALOGUE_CONTRACT.md`;
+- `docs/reviews/PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_2026_09_21.md`.
 
-After a connector account is verified, merchant Product work belongs to a stable
-channel/account workspace. Do not drop a first-time merchant directly into raw
-Mapping or Preview merely because the connection is healthy.
+After a connector account is verified, merchant Product work belongs to a stable channel/account workspace. `Інтеграції` owns connection/credentials/health; the channel workspace is the daily Product work surface. Do not drop a first-time merchant directly into raw Mapping or Preview merely because the connection is healthy.
 
-For Product synchronization:
+For Magento Product work, keep distinct row universes:
+
+- **`Огляд`** defaults to the current successful Magento Remote Catalogue snapshot — what actually exists in the connected store;
+- **`Публікація`** shows local Master Products selected/linked for outbound preparation;
+- **`Зв'язки`** shows remote↔Master correspondence/matching;
+- never merge remote-only rows and local-not-yet-created Products into one ambiguous default table.
+
+Ownership remains explicit even when the views are visually adjacent: Remote Catalogue is provider observation, Master Product is platform truth, `ExternalRecordLink` is trusted correspondence, and selection is outbound intent.
+
+Current Magento Remote Catalogue projection can initially expose SKU, remote name, type/status/freshness and platform-derived link state. Thumbnail/brand/category must not become default-visible promises until **Remote Catalogue Projection V2** supplies them at catalogue scale without per-Product provider reads.
+
+For the local **`Публікація`** worklist:
 
 - Master Products remains the one editable Product catalogue;
-- the channel workspace is a filtered/annotated lens over Products selected for
-  that SyncConfiguration;
-- zero selection shows a plain-language empty state and one causal action such as
-  `Вибрати товари для Magento`;
-- never use `Add to Magento` wording for membership when the connector cannot
-  create a remote Product;
-- Master Products and the channel workspace are two entry points to the same
-  underlying membership operation;
-- main channel rows identify the Product compactly (thumbnail when available,
-  title, SKU, GTIN when useful), show remote correspondence separately from
-  readiness, and collapse findings behind blocker/recommendation counts;
-- one configuration/root-cause problem affecting many Products remains one
-  merchant task with one remediation action and affected count;
-- full Product editing must preserve the merchant's channel context.
+- zero selection shows one causal action such as `Вибрати товари для Magento`;
+- current V1 must not use `Додати в Magento`/Create wording for a capability that is still unsupported; future CREATE becomes visible only after its separate support/certification flip;
+- rows identify the Product compactly, keep correspondence separate from readiness/provider/publication state, and collapse detailed findings behind blocker/recommendation counts;
+- one configuration/root-cause problem affecting many Products remains one merchant task with one remediation action and affected count;
+- full Product editing should preserve Workbench filters/position, preferably through a side drawer where practical.
 
-A provider's existing remote catalogue is a secondary read-only surface, not a
-second editable Product list. Remote-only records are shown separately from local
-selected Products and never become platform Products or trusted links merely by
-being discovered. Magento V1 may show summary concepts such as `Знайдено в
-Magento`, `Пов'язано з вашим каталогом`, and `Ще не пов'язано`; exact wording is
-localized implementation detail, but the local-vs-remote distinction is not.
+Target classification UX follows the 2026-09-21 structural contract: Magento Category defaults derive from account-scoped Master Category mapping with sparse Product exceptions; future-CREATE Attribute Set defaults derive from account-scoped ProductType mapping with sparse Product exceptions. An authorized user can correct/reset these choices. Existing trusted Magento Products use their observed remote Attribute Set as structural context; a mismatch must not silently trigger an Attribute Set change.
 
-Remote catalogue data must be progressively disclosed: the main channel worklist
-must not eagerly render every remote field or full-size media asset. Full/fresh
-remote reads remain operation-driven.
+Remote-only records in `Огляд` may be browsed/searched/filtered and linked, but do not auto-create Master Products or trusted links. Full/fresh remote reads remain operation-driven, and the list must not eagerly render heavyweight remote payloads/full-size media.
 
 ---
 

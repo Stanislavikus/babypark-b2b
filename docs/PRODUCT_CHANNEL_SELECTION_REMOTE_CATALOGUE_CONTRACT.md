@@ -1,7 +1,8 @@
 # Product → Channel Selection + Remote Catalogue Projection Contract
 
-**Status:** FROZEN — STOP-AND-AMEND 2026-09-15
+**Status:** FROZEN — STOP-AND-AMEND 2026-09-21
 **Date:** 2026-09-15
+**Last amended:** 2026-09-21 — Product Workbench structural ordering
 **Scope:** universal Product-to-destination selection, merchant channel workspaces,
 remote-catalogue projection, Preview→Live selection evidence, and future SEO/AI/media
 compatibility. Magento / Adobe Commerce V1 is the first concrete implementation target.
@@ -27,6 +28,27 @@ It preserves without reopening:
 The current runtime may continue to execute `all_products` until the implementation campaign
 for this contract lands. That is an implementation gap, not permission to reinterpret this
 contract as optional.
+
+## [Resolved — 2026-09-21] Product Workbench presentation-order amendment
+
+Normative structural detail: `docs/reviews/PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_2026_09_21.md`.
+
+The 2026-09-15 contract correctly separated local Master Product selection from Remote Catalogue
+observation, but its presentation order is superseded for the Magento daily workspace:
+
+- **`Огляд`** uses the current successful Magento Remote Catalogue snapshot as its row universe;
+- **`Публікація`** uses local Master Products selected/linked for outbound preparation;
+- **`Зв'язки`** presents correspondence/matching between the remote and Master Product universes;
+- no default UNION table may merge remote-only rows with local-not-yet-created Products as one ambiguous product list.
+
+This amendment changes information architecture only. Ownership remains unchanged:
+
+- Remote Catalogue row = provider observation/evidence;
+- Master Product = platform product truth;
+- `ExternalRecordLink` = trusted remote correspondence;
+- Sync Product selection = outbound intent.
+
+The current Remote Catalogue projection does not yet provide brand/category fields and current Adobe scanning does not yet supply the target thumbnail experience. Those default-visible/filterable columns require the separately named **Remote Catalogue Projection V2** and must not be implied by the initial `Огляд` implementation.
 
 ## Product goal
 
@@ -186,25 +208,28 @@ The merchant may manage the same selection from either:
 
 Both are lenses over the same membership relation.
 
-### Main channel worklist
+### View-aware channel worklists [Resolved — 2026-09-21]
 
-The primary Product table shows local Products selected for that channel. Recommended identity
-cluster:
+The channel workspace has distinct row universes instead of one ambiguous primary table.
+
+**`Огляд`** is remote-catalogue-first for Magento: it shows the current successful provider snapshot. The first implementation may show only fields the projection actually owns today (SKU, remote name, type, provider status, freshness, plus platform-derived link state). Thumbnail/brand/category become default-visible only after Remote Catalogue Projection V2 supplies them at catalogue scale.
+
+**`Публікація`** shows local Master Products selected/linked for this channel. Recommended identity cluster:
 
 - thumbnail when available;
-- title;
+- title/name;
 - SKU;
 - GTIN when present/useful.
 
-Do not render every finding as a permanent multiline block. Preserve separate merchant-visible
-truth dimensions at least for:
+For local publication rows, preserve separate merchant-visible truth dimensions at least for:
 
 - remote correspondence (`Пов'язано`, `Потрібно підтвердити`, `Не знайдено` or equivalent);
 - readiness (`Готово`, blocker/recommendation counts);
 - one causal next action.
 
-Do not persist one generic mega-status that merges membership, identity, readiness, and run
-result.
+**`Зв'язки`** shows remote↔Master correspondence/matching and may support bulk confirmation plus row-level correction. Candidate similarity does not become trusted identity without the existing Entity Trust confirmation boundary.
+
+Do not persist one generic mega-status that merges membership, identity, readiness, provider state, and run result.
 
 A Product row may summarize findings as, for example:
 
@@ -212,9 +237,7 @@ A Product row may summarize findings as, for example:
 
 with progressive disclosure for the actual list.
 
-Full Product editing must preserve the merchant's channel work context. First implementation
-may open the Product editor in a separate browser tab; do not replace the channel worklist and
-force the merchant to reconstruct filters/position after every fix.
+Full Product editing must preserve the merchant's current Workbench/View context. A drawer is preferred where practical; a separate browser tab remains acceptable for first implementation when it preserves filters/position.
 
 ## 5. Root-cause-first remediation stays above Product detail
 
@@ -317,7 +340,7 @@ A Product existing only in Magento remains a remote-only record until the mercha
 links it to an existing Master Product or a future Import-to-Catalogue capability explicitly
 creates a governed Product.
 
-Remote-only records may be shown in a separate secondary surface such as:
+Remote-only records are first-class rows in the Magento **`Огляд`** remote-catalogue View and may be summarized as:
 
 ```text
 Знайдено в Magento: 1 026
@@ -325,9 +348,9 @@ Remote-only records may be shown in a separate secondary surface such as:
 Ще не пов'язано: 995
 ```
 
-and may be browsed/searched for matching.
+They may be browsed/searched/filtered for matching and merchant confidence that the connected store was read correctly.
 
-They must not be mixed into the main local Product worklist as if they were Master Products.
+They must not be mixed into the **`Публікація`** local Master Product worklist as if they were Master Products, and appearing in `Огляд` must not auto-create a Master Product or trusted link.
 
 Current Magento V1 does not authorize remote Product -> new internal Product creation. A future
 `Імпортувати до каталогу` action requires its own Receive/Product-creation contract and governed
