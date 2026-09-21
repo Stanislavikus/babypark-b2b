@@ -388,14 +388,14 @@ function openOverlay(id) {
   const el = document.getElementById(id);
   if (!el) return;
   el.classList.add("open");
-  if (id === "drawer") updateAnnotation();
+  updateAnnotation();
 }
 
 function closeOverlay(id) {
   const el = document.getElementById(id);
   if (!el) return;
   el.classList.remove("open");
-  if (id === "drawer") updateAnnotation();
+  updateAnnotation();
 }
 
 document.addEventListener("click", (event) => {
@@ -448,5 +448,8 @@ setVariant("a");
 setPhase("p1");
 setView("overview");
 applyHash();
+if (new URLSearchParams(location.search).get("capture") === "1") {
+  document.body.classList.add("capture");
+}
 updateAnnotation();
 window.addEventListener("hashchange", applyHash);
