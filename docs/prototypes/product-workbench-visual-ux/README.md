@@ -10,6 +10,8 @@ Static Filament-language prototype for the Magento Product Workbench.
 
 Open `index.html` in a browser (or serve this folder). Prototype chrome at the top is **not** merchant UI.
 
+Deep links also work with query strings, for example `?capture=1&variant=b&view=publication` (hides chrome). Hash form: `#a/overview/p1`.
+
 ## Variants
 
 | Chrome control | Meaning |

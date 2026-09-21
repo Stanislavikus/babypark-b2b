@@ -205,7 +205,7 @@ const publicationRows = [
     ready: { label: "Ще немає в Magento", tone: "neutral" },
     problems: "1",
     next: { label: "Створення недоступне", kind: "disabled" },
-    nextB: { label: "Створення недоступне", kind: "disabled" },
+    nextB: { label: "Недоступно", kind: "disabled" },
     result: "Лише оновлення існуючих",
   },
 ];
@@ -431,8 +431,32 @@ function syncHash() {
 }
 
 function applyHash() {
+  const q = new URLSearchParams(location.search);
+  if (q.get("capture") === "1") {
+    document.body.classList.add("capture");
+  }
+  if (q.get("variant") === "a" || q.get("variant") === "b") {
+    setVariant(q.get("variant"));
+  }
+  if (q.get("view")) setView(q.get("view"));
+  if (q.get("phase") === "p1" || q.get("phase") === "v2") setPhase(q.get("phase"));
+  if (q.get("drawer") === "1") document.getElementById("drawer").classList.add("open");
+  if (q.get("pane")) {
+    const name = q.get("pane");
+    document.querySelectorAll("#drawer-tabs button").forEach((btn) => {
+      btn.classList.toggle("active", btn.getAttribute("data-pane") === name);
+    });
+    ["basic", "magento", "content", "seo", "media", "history"].forEach((id) => {
+      const pane = document.getElementById(`pane-${id}`);
+      if (pane) pane.hidden = id !== name;
+    });
+  }
+
   const raw = location.hash.replace(/^#/, "");
-  if (!raw) return;
+  if (!raw) {
+    updateAnnotation();
+    return;
+  }
   applyingHash = true;
   const [variant, view, phase, extra] = raw.split("/");
   if (variant === "a" || variant === "b") setVariant(variant);
@@ -443,9 +467,6 @@ function applyHash() {
     const token = id === "link-review" ? "link" : id === "select-products" ? "select" : id;
     document.getElementById(id).classList.toggle("open", extras.has(token));
   });
-  if (new URLSearchParams(location.search).get("capture") === "1") {
-    document.body.classList.add("capture");
-  }
   applyingHash = false;
   updateAnnotation();
 }

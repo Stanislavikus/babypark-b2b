@@ -53,15 +53,15 @@
 }
 
 [data-variant="b"] {
-  --sidebar-w: 17.25rem;
+  --sidebar-w: 15.5rem;
   --page-pad: 1.65rem 1.9rem 2.1rem;
   --title: 1.9rem;
   --subtitle: 0.95rem;
   --body: 0.95rem;
   --row-h: 3.55rem;
   --cell-y: 0.78rem;
-  --cell-x: 0.95rem;
-  --thumb: 2.85rem;
+  --cell-x: 0.7rem;
+  --thumb: 2.35rem;
   --radius: 0.8rem;
   --gap: 1.25rem;
   --badge-y: 0.22rem;
@@ -340,6 +340,11 @@ h1 {
 
 [data-variant="a"] .btn { padding: 0.28rem 0.55rem; font-size: 0.72rem; }
 [data-variant="b"] .btn { padding: 0.52rem 0.95rem; font-size: 0.875rem; }
+[data-variant="b"] .action-cell .btn,
+[data-variant="b"] .toolbar .btn {
+  padding: 0.4rem 0.7rem;
+  font-size: 0.8rem;
+}
 [data-variant="b"] h1 { font-weight: 700; }
 [data-variant="a"] h1 { font-weight: 600; }
 
@@ -427,8 +432,10 @@ h1 {
   background: var(--surface);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius);
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: var(--shadow);
+  max-width: 100%;
 }
 
 table {
@@ -526,7 +533,14 @@ tbody tr.is-open { background: #fef3c7; }
   max-width: 16rem;
 }
 
-.action-cell { white-space: nowrap; }
+[data-variant="b"] .breadcrumb,
+[data-variant="b"] td.muted {
+  font-size: 0.8rem;
+  max-width: 11rem;
+}
+
+.action-cell { white-space: normal; }
+.action-cell .btn { white-space: nowrap; }
 
 .pager {
   display: flex;
