@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="uk" data-variant="a" class="hidden-phase-v2">
+<html lang="uk" data-variant="hybrid" class="hidden-phase-v2">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,8 +11,9 @@
     <strong>Prototype chrome</strong>
     <div class="chrome-group">
       Variant
-      <button type="button" data-variant-set="a" class="active">A dense operational</button>
-      <button type="button" data-variant-set="b">B calmer merchant-first</button>
+      <button type="button" data-variant-set="hybrid" class="active">Hybrid</button>
+      <button type="button" data-variant-set="a">A density</button>
+      <button type="button" data-variant-set="b">B density</button>
     </div>
     <div class="chrome-group">
       View
@@ -29,11 +30,12 @@
       <button type="button" data-open="drawer">Product drawer</button>
       <button type="button" data-open="filters">Category filter</button>
       <button type="button" data-open="link-review">Link review</button>
+      <button type="button" data-open="select-products">Select products</button>
       <button type="button" data-empty>Empty scan</button>
       <button type="button" data-toggle="annotation">Annotation</button>
       <button type="button" data-toggle="chrome">Hide chrome</button>
     </div>
-    <span class="hint">Non-runtime · frozen A+B semantics · no CREATE</span>
+    <span class="hint">Non-runtime · Hybrid freeze · no CREATE</span>
   </div>
 
   <div class="app">
@@ -108,7 +110,6 @@
                   <th class="only-v2">Категорія</th>
                   <th>Стан у Magento</th>
                   <th>Зв'язок</th>
-                  <th class="only-v2">Проблеми</th>
                   <th>Оновлено</th>
                   <th></th>
                 </tr>
@@ -132,11 +133,14 @@
             <button class="btn" type="button">Колонки</button>
             <button class="btn primary" type="button" data-open="select-products">Вибрати товари</button>
           </div>
+          <div class="causal-bar">
+            <p class="muted">Остання перевірка 16.09.2026, 09:14 · потрібно повторити перед передачею змін.</p>
+            <button class="btn primary" type="button" id="publication-causal">Перевірити знову</button>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th class="check"><input type="checkbox" aria-label="Select all"></th>
                   <th>Фото</th>
                   <th>SKU</th>
                   <th>Назва</th>
@@ -152,7 +156,7 @@
             </table>
           </div>
           <div class="pager">
-            <span>4 товари в підготовці · вибрано 0</span>
+            <span>4 товари в підготовці</span>
             <div class="pager-btns"><button class="btn" type="button" disabled>Назад</button></div>
           </div>
         </section>
@@ -172,7 +176,6 @@
                   <th>Magento назва</th>
                   <th>Стан зв'язку</th>
                   <th>Товар у каталозі</th>
-                  <th>Підказка</th>
                   <th></th>
                 </tr>
               </thead>
@@ -205,18 +208,14 @@
       <div class="drawer-tabs" id="drawer-tabs">
         <button type="button" class="active" data-pane="basic">Основне</button>
         <button type="button" data-pane="magento">Magento</button>
-        <button type="button" data-pane="content">Контент</button>
-        <button type="button" data-pane="seo">SEO</button>
-        <button type="button" data-pane="media">Медіа</button>
-        <button type="button" data-pane="history">Історія</button>
       </div>
       <div class="drawer-body">
         <div id="pane-basic">
-          <div class="field"><label>SKU</label><div class="value">BP-PRIAM-4</div></div>
-          <div class="field"><label>Назва</label><input value="Коляска Cybex Priam 4"></div>
-          <div class="field"><label>Бренд</label><div class="value">Cybex</div></div>
-          <div class="field"><label>Тип товару</label><div class="value">Коляски</div></div>
-          <p class="muted">Редагування основного каталогу лишається джерелом правди. Magento-поля — окремо.</p>
+          <div class="field"><label>SKU</label><div class="value readonly">BP-PRIAM-4</div></div>
+          <div class="field"><label>Назва</label><div class="value readonly">Коляска Cybex Priam 4</div></div>
+          <div class="field"><label>Бренд</label><div class="value readonly">Cybex</div></div>
+          <div class="field"><label>Тип товару</label><div class="value readonly">Коляски</div></div>
+          <p class="muted">SKU, назва, бренд і тип приходять з каталогу і тут не редагуються. Magento-класифікація — на сусідній вкладці.</p>
         </div>
         <div id="pane-magento" hidden>
           <div class="field">
@@ -250,24 +249,6 @@
           <div class="callout">
             Рекомендація за типом товару: «Baby Strollers». Для вже існуючого товару Magento набір не змінюється мовчки. Зміна набору — окрема дія і зараз недоступна.
           </div>
-        </div>
-        <div id="pane-content" hidden>
-          <div class="field">
-            <label>Опис</label>
-            <textarea rows="5">Прогулянкова коляска Cybex Priam 4. Довгий текст не показується колонкою таблиці — лише тут.</textarea>
-          </div>
-        </div>
-        <div id="pane-seo" hidden>
-          <p class="muted">Поля мета-назви вже є в каталозі. Окремих AI/SEO-дій у цьому прототипі немає.</p>
-          <div class="field"><label>Мета-назва</label><input value="Коляска Cybex Priam 4 купити"></div>
-          <div class="field"><label>Мета-опис</label><textarea rows="3">Не є колонкою сітки. Редагується в картці товару.</textarea></div>
-        </div>
-        <div id="pane-media" hidden>
-          <p class="muted">Медіа-кампанія ще не входить у цей Workbench-зріз. Тут лише місце секції.</p>
-        </div>
-        <div id="pane-history" hidden>
-          <p class="muted">18.09.2026 11:20 — зміни передано в Magento (оновлення існуючого товару).</p>
-          <p class="muted">18.09.2026 10:02 — перевірку повторено.</p>
         </div>
       </div>
     </aside>
@@ -311,7 +292,7 @@
   <div class="panel-backdrop" id="link-review">
     <div class="modal" role="dialog" aria-labelledby="link-title">
       <h2 id="link-title" style="margin:0 0 .4rem;font-size:1.05rem">Перевірте зв'язок</h2>
-      <p class="muted" style="margin:0 0 1rem">Схожість сама по собі не створює довірений зв'язок. Потрібне ваше підтвердження.</p>
+      <p class="muted" style="margin:0 0 1rem">Зв'язок створюється лише після вашого підтвердження. Автоматичний підрахунок схожості тут не використовується.</p>
       <div class="candidate">
         <div>
           <div class="muted">У Magento</div>
@@ -319,12 +300,25 @@
           <div>Пляшечка Philips Avent Natural 240 мл</div>
         </div>
         <div>
-          <div class="muted">У вашому каталозі</div>
-          <strong>AVT-240-NAT</strong>
-          <div>Philips Avent Natural 240 мл</div>
+          <div class="muted">Пошук у каталозі</div>
+          <input class="search" style="margin-top:0.35rem;min-width:16rem" value="BP-AVENT-240" aria-label="Пошук товару в каталозі">
         </div>
       </div>
-      <p class="muted">Підказка: збіг SKU частковий, назва близька. Це ще не підтверджений зв'язок.</p>
+      <div class="table-wrap" style="margin-top:0.75rem">
+        <table>
+          <thead>
+            <tr><th>SKU</th><th>Назва</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="sku">BP-AVENT-240</td>
+              <td>Пляшечка Philips Avent Natural 240 мл</td>
+              <td class="action-cell"><button class="btn link" type="button">Обрати</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="muted" style="margin-top:0.75rem">Результат пошуку за точним SKU. Це ще не підтверджений зв'язок.</p>
       <div style="display:flex;gap:.5rem;margin-top:1rem;justify-content:flex-end">
         <button class="btn" type="button" data-close="link-review">Скасувати</button>
         <button class="btn primary" type="button" data-close="link-review">Підтвердити зв'язок</button>
@@ -333,15 +327,86 @@
   </div>
 
   <div class="panel-backdrop" id="select-products">
-    <div class="modal" role="dialog" aria-labelledby="select-title">
+    <div class="modal wide" role="dialog" aria-labelledby="select-title">
       <h2 id="select-title" style="margin:0 0 .35rem;font-size:1.05rem">Вибрати товари для Magento</h2>
-      <p class="muted">Немає окремої кнопки «Основний каталог». Каталог відкривається тут, у контексті публікації.</p>
-      <input class="search" style="margin:0.8rem 0;background-position: 0.65rem 50%" placeholder="Знайти в каталозі">
-      <div class="candidate"><div><strong>BP-WALKER-01</strong><div>Ходунки Chicco Baby Walker</div></div><button class="btn" type="button">Додати</button></div>
-      <div class="candidate"><div><strong>BP-N2ME</strong><div>Ліжечко Chicco Next2Me</div></div><button class="btn" type="button">Додати</button></div>
+      <p class="muted">Членство в публікації. Перша реалізація може відкривати поточну сітку товарів у контексті каналу.</p>
+      <div class="toolbar" style="margin-top:0.75rem">
+        <input class="search" type="search" placeholder="Пошук за SKU або назвою" aria-label="Пошук у каталозі">
+        <button class="btn" type="button">Фільтри</button>
+        <button class="btn" type="button">Колонки</button>
+      </div>
+      <div class="filter-chips">
+        <span class="chip">Категорія: Дитячі товари <button type="button" aria-label="Remove">×</button></span>
+        <span class="chip">Тип товару: Коляски <button type="button" aria-label="Remove">×</button></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="check"><input type="checkbox" aria-label="Select visible products"></th>
+              <th>Фото</th>
+              <th>SKU</th>
+              <th>Назва</th>
+              <th>Бренд</th>
+              <th>Категорія</th>
+              <th>Тип товару</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="check"><input type="checkbox" checked aria-label="Select BP-WALKER-01"></td>
+              <td><span class="thumb" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.4"/><path d="m21 16-5.2-5.2a1 1 0 0 0-1.4 0L7 18"/></svg></span></td>
+              <td class="sku">BP-WALKER-01</td>
+              <td class="name">Ходунки Chicco Baby Walker</td>
+              <td>Chicco</td>
+              <td><span class="breadcrumb">Дитячі товари › Ходунки</span></td>
+              <td>Ходунки</td>
+            </tr>
+            <tr>
+              <td class="check"><input type="checkbox" checked aria-label="Select BP-N2ME"></td>
+              <td><span class="thumb" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.4"/><path d="m21 16-5.2-5.2a1 1 0 0 0-1.4 0L7 18"/></svg></span></td>
+              <td class="sku">BP-N2ME</td>
+              <td class="name">Ліжечко Chicco Next2Me</td>
+              <td>Chicco</td>
+              <td><span class="breadcrumb">Дитячі товари › Ліжечка</span></td>
+              <td>Ліжечка</td>
+            </tr>
+            <tr>
+              <td class="check"><input type="checkbox" aria-label="Select BP-PRIAM-4"></td>
+              <td><span class="thumb" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.4"/><path d="m21 16-5.2-5.2a1 1 0 0 0-1.4 0L7 18"/></svg></span></td>
+              <td class="sku">BP-PRIAM-4</td>
+              <td class="name">Коляска Cybex Priam 4</td>
+              <td>Cybex</td>
+              <td><span class="breadcrumb">Дитячі товари › Коляски › Прогулянкові</span></td>
+              <td>Коляски</td>
+            </tr>
+            <tr>
+              <td class="check"><input type="checkbox" aria-label="Select BP-ATON-B2"></td>
+              <td><span class="thumb" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.4"/><path d="m21 16-5.2-5.2a1 1 0 0 0-1.4 0L7 18"/></svg></span></td>
+              <td class="sku">BP-ATON-B2</td>
+              <td class="name">Автокрісло Cybex Aton B2 i-Size</td>
+              <td>Cybex</td>
+              <td><span class="breadcrumb">Дитячі товари › Автокрісла</span></td>
+              <td>Автокрісла</td>
+            </tr>
+            <tr>
+              <td class="check"><input type="checkbox" aria-label="Select BP-OMNI-360"></td>
+              <td><span class="thumb" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.4"/><path d="m21 16-5.2-5.2a1 1 0 0 0-1.4 0L7 18"/></svg></span></td>
+              <td class="sku">BP-OMNI-360</td>
+              <td class="name">Слінгорюкзак Ergobaby Omni 360</td>
+              <td>Ergobaby</td>
+              <td><span class="breadcrumb">Дитячі товари › Слінги</span></td>
+              <td>Слінги</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="pager">
+        <span>2 з 5 на цій сторінці вибрано · 1–5 з 248</span>
+      </div>
       <div style="display:flex;gap:.5rem;margin-top:1rem;justify-content:flex-end">
-        <button class="btn" type="button" data-close="select-products">Закрити</button>
-        <button class="btn primary" type="button" data-close="select-products">Готово</button>
+        <button class="btn" type="button" data-close="select-products">Скасувати</button>
+        <button class="btn primary" type="button" data-close="select-products">Додати до публікації</button>
       </div>
     </div>
   </div>

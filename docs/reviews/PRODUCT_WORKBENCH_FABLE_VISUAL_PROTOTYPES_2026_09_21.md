@@ -1,110 +1,78 @@
-# Product Workbench — Fable visual prototypes — 2026-09-21
+# Product Workbench — Hybrid visual prototype — 2026-09-21
 
-> **Status: NON-RUNTIME VISUAL STUDY — does not reopen the [Resolved] structural contract.**
+> **Status: NON-RUNTIME VISUAL CORRECTION — does not reopen the [Resolved] structural contract.**
 >
+> Corrected according to `docs/reviews/PRODUCT_WORKBENCH_GROK_VISUAL_ARBITRATION_2026_09_21.md`.
 > Renderable screens: `docs/prototypes/product-workbench-visual-ux/index.html`
 >
-> Frozen base:
-> - `docs/reviews/PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_2026_09_21.md`
-> - `docs/reviews/PRODUCT_WORKBENCH_LEAD_VISUAL_UX_STUDY_2026_09_21.md`
-> - `docs/reviews/PRODUCT_WORKBENCH_FABLE_PROTOTYPE_TASK_2026_09_21.md`
+> Historical A/B screenshots remain in `screenshots/` (`a_*.png`, `b_*.png`).
+> Corrected Hybrid screenshots: `hybrid_*.png`.
 
-This note records **visual hierarchy only**. It does not add persistence, status enums, CREATE, import, or mixed default tables.
+This note records **visual hierarchy only**. It does not add persistence, status enums, CREATE, import, mixed default tables, bulk review, or similarity scoring.
 
-Both variants share the same shell:
+## Hybrid freeze
+
+Do not choose Variant A or B wholesale.
+
+- **B hierarchy:** clearer `Magento` title, one-line View purpose, wider drawer.
+- **A operational table:** Filament-like density, about 14px body text and 40–44px rows.
+- Search remains visually primary. Filters/Columns stay secondary.
+- `Огляд / Публікація / Зв'язки` remain separate row universes.
 
 ```text
 Magento
 Adobe Commerce · Babypark UA Store                    [Оновити каталог]
 Підключено · Каталог оновлено 18 хв тому · 1 026 товарів
 [ Огляд ]  [ Публікація ]  [ Зв'язки ]
+Товари, які зараз є у вашому магазині Magento.
 [ search ................................ ]  Фільтри  Колонки
 ```
 
 ## Shared placement rules
 
-1. **Channel title first.** `Magento` is the page name; the account is secondary. The merchant should recognise “this is my store” before reading any row.
-2. **Connection/freshness is a status line, not a product status.** It never sits in the table and is not mixed with readiness.
-3. **`Оновити каталог` is secondary.** Gray utility, top-right, never a row of peer primaries.
-4. **Tabs are universe switchers.** They are not filters. Огляд, Публікація and Зв'язки keep separate row sets.
-5. **Search is visually primary** in the toolbar. Filters and columns are labeled, discoverable, and quieter.
-6. **No decorative checkboxes.** Overview and Links have none. Publication has them because a bulk review action is real there.
-7. **Statuses stay split.** Magento/provider state, link state, readiness, problem count and last publication result are adjacent badges/columns, never one chip.
+1. **Channel title first.** Account name is secondary.
+2. **Connection/freshness is a status line**, not a product status.
+3. **`Оновити каталог` is secondary.**
+4. **Tabs switch row universes**, not filters.
+5. **No decorative checkboxes.** Overview, Publication and Links have none in first scope. Multi-select exists only in `Вибрати товари`, because publication membership is a real operation.
+6. **Statuses stay split.** Magento/provider state, link state, readiness and last publication result are not one chip.
+7. **No Overview Problems column** until independent remote/problem evidence exists. Unlinked is already `Зв'язок`.
 
 ---
 
-## Variant A — dense operational
+## Hybrid · Огляд
 
-Closer to a mature PIM grid: compact rows, more of a 1 026-row catalogue on one screen.
+Remote Magento catalogue. Phase-1 columns: SKU, name, type, Magento state, link, updated. Projection V2 adds thumbnail, brand and category breadcrumb only.
 
-### A1. Огляд
+`Пов'язати` remains a row action for unlinked rows.
 
-**Hierarchy.** Title + freshness consume little vertical space. Tabs are tight. Search is the longest control. Rows stay ~36px so SKU scanning feels like a spreadsheet.
+## Hybrid · Публікація
 
-**Phase-1 columns.** SKU, name, type, Magento state, link, updated. Thumbnail/Brand/Category are omitted so the grid does not lie about Projection V2.
+Local Master Products selected/linked for outbound preparation.
 
-**Phase V2.** Thumbnail, brand and category breadcrumb appear only in the target state. Category filter uses a tree (Дитячі товари → Коляски → Прогулянкові), not two fixed domain levels.
+- Principal membership action: `Вибрати товари`.
+- Configuration-level causal action above the table: `Перевірити` / `Перевірити знову` / `Передати зміни` from current run state. Demonstrated default: stale evidence → `Перевірити знову`.
+- Row `Наступна дія` is remediation only (`Вказати категорію`). Ready rows have no `Передати зміни`.
+- `Ще немає в Magento` is a quiet state with no CREATE control.
 
-**Why controls sit here.** `Пов'язати` is a row action on the one unlinked Avent bottle. Nothing in the header asks the merchant to “go to remote catalogue” — Overview already is that catalogue.
+The selector is a table with search, Category/Brand/ProductType-style filters and multi-select. First implementation may route to the current ProductResource channel-context grid.
 
-### A2. Публікація
+## Hybrid · Зв'язки
 
-**Hierarchy.** Same shell. The only header-level primary is `Вибрати товари`. Classification, readiness, next action and last result are table columns, not a second toolbar.
+Factual trust only: `Пов'язано` / `Не пов'язано`, Master Product when trusted, row action `Пов'язати` or `Відкрити`.
 
-**Row stories shown.**
+No grid copy such as `Є схожий товар` or `Близька назва, інший SKU`. After `Пов'язати`, the merchant may search the catalogue (exact SKU). Similarity score is not claimed.
 
-- Ready Cybex Priam → `Передати зміни` (supported Update).
-- Avent missing Magento category → `Вказати категорію`.
-- Pampers with stale check → `Перевірити знову`.
-- LEGO not in Magento → disabled `Створення недоступне` (V1 has no CREATE).
+## Hybrid · Product drawer
 
-**Why.** Causal action lives in the row. Dense Variant A uses a text link so many rows stay comparable.
+First-scope tabs: `Основне` and `Magento`.
 
-### A3. Зв'язки
+- **Основне:** SKU, name, brand, product type read-only.
+- **Magento:** Category tree, `Набір характеристик`, `Повернути автоматичний вибір`. Existing Magento Attribute Set mismatch remains advisory.
 
-**Hierarchy.** Magento identity first, then link state, then Master Product, then a hint. No bulk checkbox strip.
+Future `Контент / SEO / Медіа / Історія` stay in the roadmap, not as empty merchant tabs.
 
-**Why.** First-scope work is review/confirmation. “Є схожий товар” is evidence, not trust. `Пов'язати` opens a confirmation dialog.
-
-### A4. Product drawer
-
-**Hierarchy.** Identity header, then section tabs. First visual focuses Основне + Magento.
-
-**Why Magento fields are in the drawer.** Category tree and `Набір характеристик` are product/account exceptions, not a permanent Workbench settings button. `Повернути автоматичний вибір` sits on the override itself. A ProductType recommendation that disagrees with the existing Magento set is a warning, not an implicit change.
-
----
-
-## Variant B — calmer merchant-first
-
-Same frozen semantics, more air and stronger page voice for a non-technical merchandiser.
-
-### B1. Огляд
-
-**Hierarchy.** Larger `Magento` title. A one-line purpose under the tabs: “Товари, які зараз є у вашому магазині Magento.” Names are heavier than SKUs. Badges are larger. Rows are taller so type, state and link can be read without decoding a dense PIM.
-
-**Why.** The merchant still gets a table, not hero cards. Extra copy only explains *which universe* they are in.
-
-### B2. Публікація
-
-**Hierarchy.** Purpose line: preparing this Magento. Next actions are real buttons in the row so “what do I do now?” is the loudest cell after the product name.
-
-**Why.** Whitespace separates readiness from last result. Disabled CREATE stays a calm sentence, not a hidden capability.
-
-### B3. Зв'язки
-
-**Hierarchy.** Master column labelled `Товар у каталозі`. Hint column uses plain evidence (“Близька назва, інший SKU”). Row action is a labeled button.
-
-**Why.** Calmer type still forbids auto-linking. Confirmation remains mandatory.
-
-### B4. Product drawer
-
-**Hierarchy.** Wider panel, larger section tabs, helper text that the grid stays open. Override callout and reset are grouped. SEO/Media/History are empty-capable sections without invented AI.
-
----
-
-## Evaluation check (both variants)
-
-A new merchant can answer, from the default Overview and the two sibling tabs:
+## Evaluation check
 
 | Question | Where it is answered |
 |---|---|
@@ -112,8 +80,8 @@ A new merchant can answer, from the default Overview and the two sibling tabs:
 | Какие товары уже есть там? | Огляд |
 | Какие товары я готовлю к публикации? | Публікація |
 | Что связано с моим Master Catalogue? | Зв'язки + link column on Огляд |
-| Что сейчас требует моего действия? | Row-level `Пов'язати` / classification / `Перевірити знову` / disabled CREATE |
+| Что сейчас требует моего действия? | Config-level `Перевірити знову`; row `Пов'язати` / `Вказати категорію` |
 
 ## Out of scope (unchanged)
 
-Remote Catalogue Projection V2 implementation, Decision-B persistence, planner migration, Magento CREATE, remote-only import.
+Remote Catalogue Projection V2 implementation, Decision-B persistence, planner migration, Magento CREATE, remote-only import, similarity/candidate ranking, per-Product Live.

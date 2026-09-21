@@ -6,33 +6,46 @@ Static Filament-language prototype for the Magento Product Workbench.
 
 - `docs/reviews/PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_2026_09_21.md` `[Resolved]`
 - `docs/reviews/PRODUCT_WORKBENCH_LEAD_VISUAL_UX_STUDY_2026_09_21.md`
-- `docs/reviews/PRODUCT_WORKBENCH_FABLE_PROTOTYPE_TASK_2026_09_21.md`
+- `docs/reviews/PRODUCT_WORKBENCH_GROK_VISUAL_ARBITRATION_2026_09_21.md`
 
 Open `index.html` in a browser (or serve this folder). Prototype chrome at the top is **not** merchant UI.
 
-Deep links also work with query strings, for example `?capture=1&variant=b&view=publication` (hides chrome). Hash form: `#a/overview/p1`.
+Default visual is **Hybrid**. Deep links: `?capture=1&variant=hybrid&view=publication`. Hash form: `#hybrid/overview/p1`.
 
-## Variants
+Corrected Hybrid screenshots:
 
-| Chrome control | Meaning |
+- `screenshots/hybrid_overview_current_projection.png`
+- `screenshots/hybrid_overview_projection_v2.png`
+- `screenshots/hybrid_publication.png`
+- `screenshots/hybrid_links.png`
+- `screenshots/hybrid_product_drawer.png`
+- `screenshots/hybrid_select_products.png`
+
+Historical A/B screenshots remain (`a_*.png`, `b_*.png`).
+
+## Chrome
+
+| Control | Meaning |
 |---|---|
-| Variant A | Dense operational PIM/table productivity |
-| Variant B | Calmer merchant-first hierarchy and spacing |
+| Hybrid | Corrected freeze: B hierarchy + Filament table density |
+| A / B density | Historical density only; semantic corrections still apply |
 | Огляд / Публікація / Зв'язки | Frozen system Views / row universes |
 | Current projection | Phase-1 Overview columns only |
 | After Projection V2 | Target Overview after scalable thumbnail/brand/category |
-| Product drawer | Side panel over the grid |
-| Category filter | Hierarchical tree, not two hard-coded levels |
-| Link review | Confirmation before trusted correspondence |
-| Empty scan | Overview with no successful catalogue read yet |
+| Product drawer | Side panel: Основне + Magento |
+| Select products | Table-oriented publication membership |
+| Link review | Confirmation after merchant search, no similarity score |
 
 ## What is intentionally absent
 
-- Enabled `Створити в Magento`
+- Enabled `Створити в Magento` or a disabled per-row CREATE button
 - Peer `Основний каталог` next to `Вибрати товари`
+- Decorative Publication checkboxes / Select-all
+- Per-row `Передати зміни`
 - Fake Thumbnail/Brand/Category columns in Phase 1
+- Overview Problems column filled from link state
+- Invented similarity / candidate ranking in Зв'язки
+- First-scope drawer tabs for Контент / SEO / Медіа / Історія
 - One mega-status combining Magento state, link, readiness and last run
-- AI/SEO invented actions
-- Raw `attribute_set_id`, `entity_id`, snapshot, projection, HTTP codes
 
 Short visual-hierarchy notes: `docs/reviews/PRODUCT_WORKBENCH_FABLE_VISUAL_PROTOTYPES_2026_09_21.md`.

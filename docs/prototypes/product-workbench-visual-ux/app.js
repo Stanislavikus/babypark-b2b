@@ -33,7 +33,6 @@ const overviewRows = [
     category: "Харчування › Пляшечки",
     magento: { label: "Увімкнено", tone: "ok" },
     link: { label: "Не пов'язано", tone: "warn" },
-    problems: "1",
     updated: "2 год тому",
     action: "Пов'язати",
     linkReview: true,
@@ -169,8 +168,7 @@ const publicationRows = [
     attrSet: "Default",
     ready: { label: "Готово", tone: "ok" },
     problems: "0",
-    next: { label: "Передати зміни", kind: "link", note: "only-a" },
-    nextB: { label: "Передати зміни", kind: "link" },
+    next: null,
     result: "Оновлено сьогодні, 11:20",
     openDrawer: true,
   },
@@ -182,7 +180,6 @@ const publicationRows = [
     ready: { label: "Не готово", tone: "danger" },
     problems: "1",
     next: { label: "Вказати категорію", kind: "link" },
-    nextB: { label: "Вказати категорію", kind: "primary" },
     result: "Ще не передавався",
     openDrawer: true,
   },
@@ -193,8 +190,7 @@ const publicationRows = [
     attrSet: "Default",
     ready: { label: "Перевірка застаріла", tone: "warn" },
     problems: "0",
-    next: { label: "Перевірити знову", kind: "link" },
-    nextB: { label: "Перевірити знову", kind: "primary" },
+    next: null,
     result: "Перевірено 16.09, 09:14",
   },
   {
@@ -203,10 +199,9 @@ const publicationRows = [
     category: "Іграшки › Конструктори",
     attrSet: "Автоматично · Toys",
     ready: { label: "Ще немає в Magento", tone: "neutral" },
-    problems: "1",
-    next: { label: "Створення недоступне", kind: "disabled" },
-    nextB: { label: "Недоступно", kind: "disabled" },
-    result: "Лише оновлення існуючих",
+    problems: "0",
+    next: null,
+    result: "—",
   },
 ];
 
@@ -216,7 +211,6 @@ const linkRows = [
     name: "Коляска Cybex Priam 4",
     state: { label: "Пов'язано", tone: "ok" },
     master: "Коляска Cybex Priam 4",
-    hint: "Підтверджено",
     action: "Відкрити",
     openDrawer: true,
   },
@@ -225,17 +219,15 @@ const linkRows = [
     name: "Пляшечка Philips Avent Natural 240 мл",
     state: { label: "Не пов'язано", tone: "warn" },
     master: "—",
-    hint: "Є схожий товар",
     action: "Пов'язати",
     linkReview: true,
   },
   {
     sku: "BP-PAMPERS-4",
     name: "Підгузки Pampers Premium Care 4",
-    state: { label: "Потрібна перевірка", tone: "info" },
-    master: "Pampers Premium Care 4 (кандидат)",
-    hint: "Близька назва, інший SKU",
-    action: "Переглянути",
+    state: { label: "Не пов'язано", tone: "warn" },
+    master: "—",
+    action: "Пов'язати",
     linkReview: true,
   },
   {
@@ -243,31 +235,46 @@ const linkRows = [
     name: "Автокрісло Cybex Aton B2 i-Size",
     state: { label: "Пов'язано", tone: "ok" },
     master: "Автокрісло Cybex Aton B2 i-Size",
-    hint: "Підтверджено",
     action: "Відкрити",
   },
 ];
 
 const annotations = {
+  hybrid: {
+    overview:
+      "<ol><li>Hybrid: B-style title + one-line View purpose; Filament-like ~14px / 42px rows.</li><li>Огляд is the remote Magento catalogue. Search is primary; refresh is secondary.</li><li>Phase 1 has no Thumbnail/Brand/Category. V2 adds them only as future projection.</li><li>Magento state and link state stay separate. No Problems column: unlinked is already Зв'язок.</li></ol>",
+    publication:
+      "<ol><li>No row checkboxes: first-scope Publication has no safe bulk action.</li><li>Вибрати товари remains the membership action. Execution sits above the table as Перевірити / Перевірити знову / Передати зміни.</li><li>Row Наступна дія is remediation only. Ready rows have no Передати зміни.</li><li>Ще немає в Magento is a quiet state, not a disabled CREATE button.</li></ol>",
+    links:
+      "<ol><li>Factual trust only: Пов'язано or Не пов'язано. No similarity scores or pre-ranked candidates.</li><li>Пов'язати opens review with merchant search. Exact SKU lookup may appear after the action, not as auto-evidence in the grid.</li></ol>",
+    drawer:
+      "<ol><li>First-scope tabs: Основне and Magento only.</li><li>Basic fields are read-only 1C/catalogue ownership.</li><li>Magento tab keeps Category tree + Набір характеристик and Повернути автоматичний вибір.</li></ol>",
+    select:
+      "<ol><li>Product selector is a table with search, filters and multi-select because publication membership is a real operation.</li><li>First implementation may route to the current ProductResource channel-context grid.</li></ol>",
+  },
   a: {
     overview:
-      "<ol><li>Title <em>Magento</em> + account line prove the connected store before any local selection.</li><li>Search is the only visually primary control; refresh stays secondary gray.</li><li>Tabs switch row universes; Overview shows remote observation only.</li><li>Phase 1 hides Thumbnail/Brand/Category so empty columns are not promised.</li><li>Statuses stay separate: Magento state ≠ link state.</li><li>One unlinked row gets contextual Пов'язати, not a decorative checkbox column.</li></ol>",
+      "<ol><li>Historical A density only. Hybrid is the freeze target.</li></ol>",
     publication:
-      "<ol><li>Same shell, different universe: local Master Products in outbound preparation.</li><li>Single principal action: Вибрати товари. Основний каталог is not a peer button.</li><li>Checkboxes exist because bulk review is a real action here.</li><li>Готовність, Проблеми and Останній результат are adjacent but not merged.</li><li>Ready / blocked classification / stale check / unsupported CREATE are four honest row stories.</li><li>CREATE is visible as unavailable, never as an enabled Створити в Magento.</li></ol>",
+      "<ol><li>Historical A density. Semantic corrections still apply: no decorative checkboxes, no per-row Live.</li></ol>",
     links:
-      "<ol><li>Correspondence view, not a product editor and not Overview in disguise.</li><li>No selection checkboxes: first-scope action is row review, not bulk trust.</li><li>Candidate similarity is a hint, never an automatic trusted link.</li><li>Пов'язати opens a confirmation dialog that preserves ExternalRecordLink as authority.</li></ol>",
+      "<ol><li>Historical A density. No invented similarity.</li></ol>",
     drawer:
-      "<ol><li>Slide-over keeps the grid. Dense Variant A uses a narrower drawer and compact fields.</li><li>Magento tab owns Category tree + Набір характеристик, not a settings page.</li><li>Повернути автоматичний вибір is the sparse-override reset, adjacent to the override.</li><li>Existing Magento Attribute Set mismatch is informational, not a silent change.</li></ol>",
+      "<ol><li>Historical A density. Hybrid drawer is wider.</li></ol>",
+    select:
+      "<ol><li>Selector is shared across densities.</li></ol>",
   },
   b: {
     overview:
-      "<ol><li>Larger title and a one-line view purpose: this is the Magento store, not your local list.</li><li>More row height and stronger name weight help a non-technical merchandiser scan.</li><li>Search remains primary; filters/columns stay labeled secondary buttons.</li><li>Badges are larger but still semantically split.</li><li>V2 adds thumbnail/brand/category only when those fields can actually be filled.</li></ol>",
+      "<ol><li>Historical B density only. Hybrid is the freeze target.</li></ol>",
     publication:
-      "<ol><li>View hint names the job: preparing catalogue for this Magento.</li><li>Causal next action is a real button in the row, not a text-only utility.</li><li>Whitespace separates classification from readiness from last result.</li><li>Unsupported CREATE stays a calm disabled control with an honest sentence.</li></ol>",
+      "<ol><li>Historical B density. Semantic corrections still apply.</li></ol>",
     links:
-      "<ol><li>Master Product column is written as Товар у каталозі — merchant language.</li><li>Hint column explains evidence without implying auto-link.</li><li>Row action is a labeled button for review/confirmation only.</li></ol>",
+      "<ol><li>Historical B density. No invented similarity.</li></ol>",
     drawer:
-      "<ol><li>Wider drawer, larger section tabs, helper copy under identity.</li><li>Override callout and reset sit together so the merchant can reverse a sparse exception.</li><li>SEO/Media/History exist as places, without invented AI actions.</li></ol>",
+      "<ol><li>Historical B density. First-scope tabs remain Основне / Magento.</li></ol>",
+    select:
+      "<ol><li>Selector is shared across densities.</li></ol>",
   },
 };
 
@@ -303,7 +310,6 @@ function renderOverview() {
         <td class="only-v2"><span class="breadcrumb">${row.category}</span></td>
         <td>${badge(row.magento)}</td>
         <td>${badge(row.link)}</td>
-        <td class="only-v2">${row.problems}</td>
         <td class="muted nowrap">${row.updated}</td>
         <td class="action-cell">${action}</td>
       </tr>`;
@@ -315,10 +321,10 @@ function renderPublication() {
   const body = document.getElementById("publication-body");
   body.innerHTML = publicationRows
     .map((row) => {
-      const nextA = actionButton(row.next.label, row.next.kind, row.openDrawer ? 'data-open="drawer"' : "");
-      const nextB = actionButton(row.nextB.label, row.nextB.kind, row.openDrawer ? 'data-open="drawer"' : "");
+      const next = row.next
+        ? actionButton(row.next.label, row.next.kind, row.openDrawer ? 'data-open="drawer"' : "")
+        : '<span class="muted">—</span>';
       return `<tr>
-        <td class="check"><input type="checkbox" aria-label="Select ${row.sku}"></td>
         <td>${thumbSvg}</td>
         <td class="sku">${row.sku}</td>
         <td class="name">${row.name}</td>
@@ -326,7 +332,7 @@ function renderPublication() {
         <td>${row.attrSet}</td>
         <td>${badge(row.ready)}</td>
         <td>${row.problems}</td>
-        <td class="action-cell"><span class="only-a">${nextA}</span><span class="only-b">${nextB}</span></td>
+        <td class="action-cell">${next}</td>
         <td class="muted">${row.result}</td>
       </tr>`;
     })
@@ -343,7 +349,6 @@ function renderLinks() {
         <td class="name">${row.name}</td>
         <td>${badge(row.state)}</td>
         <td>${row.master}</td>
-        <td class="muted">${row.hint}</td>
         <td class="action-cell">${actionButton(row.action, "link", extra)}</td>
       </tr>`;
     })
@@ -401,15 +406,18 @@ function updateAnnotation() {
   const variant = document.documentElement.dataset.variant;
   const view = activeView === "empty" ? "overview" : activeView;
   const drawerOpen = document.getElementById("drawer").classList.contains("open");
-  const key = drawerOpen ? "drawer" : view;
+  const selectOpen = document.getElementById("select-products").classList.contains("open");
+  const key = selectOpen ? "select" : drawerOpen ? "drawer" : view;
   const titleMap = {
     overview: "Огляд",
     publication: "Публікація",
     links: "Зв'язки",
     drawer: "Product drawer",
+    select: "Вибрати товари",
   };
+  const variantLabel = variant === "hybrid" ? "Hybrid" : `Variant ${variant.toUpperCase()}`;
   document.getElementById("annotation-title").textContent =
-    `Variant ${variant.toUpperCase()} · ${titleMap[key]}`;
+    `${variantLabel} · ${titleMap[key]}`;
   document.getElementById("annotation-body").innerHTML = annotations[variant][key];
   syncHash();
 }
@@ -431,42 +439,43 @@ function syncHash() {
 }
 
 function applyHash() {
+  applyingHash = true;
   const q = new URLSearchParams(location.search);
   if (q.get("capture") === "1") {
     document.body.classList.add("capture");
   }
-  if (q.get("variant") === "a" || q.get("variant") === "b") {
+
+  const raw = location.hash.replace(/^#/, "");
+  if (raw) {
+    const [variant, view, phase, extra] = raw.split("/");
+    if (variant === "a" || variant === "b" || variant === "hybrid") setVariant(variant);
+    if (view) setView(view);
+    if (phase === "p1" || phase === "v2") setPhase(phase);
+    const extras = new Set((extra || "").split(",").filter(Boolean));
+    ["drawer", "filters", "link-review", "select-products"].forEach((id) => {
+      const token = id === "link-review" ? "link" : id === "select-products" ? "select" : id;
+      document.getElementById(id).classList.toggle("open", extras.has(token));
+    });
+  }
+
+  if (q.get("variant") === "a" || q.get("variant") === "b" || q.get("variant") === "hybrid") {
     setVariant(q.get("variant"));
   }
   if (q.get("view")) setView(q.get("view"));
   if (q.get("phase") === "p1" || q.get("phase") === "v2") setPhase(q.get("phase"));
   if (q.get("drawer") === "1") document.getElementById("drawer").classList.add("open");
+  if (q.get("select") === "1") document.getElementById("select-products").classList.add("open");
   if (q.get("pane")) {
     const name = q.get("pane");
     document.querySelectorAll("#drawer-tabs button").forEach((btn) => {
       btn.classList.toggle("active", btn.getAttribute("data-pane") === name);
     });
-    ["basic", "magento", "content", "seo", "media", "history"].forEach((id) => {
+    ["basic", "magento"].forEach((id) => {
       const pane = document.getElementById(`pane-${id}`);
       if (pane) pane.hidden = id !== name;
     });
   }
 
-  const raw = location.hash.replace(/^#/, "");
-  if (!raw) {
-    updateAnnotation();
-    return;
-  }
-  applyingHash = true;
-  const [variant, view, phase, extra] = raw.split("/");
-  if (variant === "a" || variant === "b") setVariant(variant);
-  if (view) setView(view);
-  if (phase === "p1" || phase === "v2") setPhase(phase);
-  const extras = new Set((extra || "").split(",").filter(Boolean));
-  ["drawer", "filters", "link-review", "select-products"].forEach((id) => {
-    const token = id === "link-review" ? "link" : id === "select-products" ? "select" : id;
-    document.getElementById(id).classList.toggle("open", extras.has(token));
-  });
   applyingHash = false;
   updateAnnotation();
 }
@@ -522,8 +531,9 @@ document.addEventListener("click", (event) => {
     document.querySelectorAll("#drawer-tabs button").forEach((btn) => {
       btn.classList.toggle("active", btn === pane);
     });
-    ["basic", "magento", "content", "seo", "media", "history"].forEach((id) => {
-      document.getElementById(`pane-${id}`).hidden = id !== name;
+    ["basic", "magento"].forEach((id) => {
+      const pane = document.getElementById(`pane-${id}`);
+      if (pane) pane.hidden = id !== name;
     });
   }
 });
@@ -531,7 +541,7 @@ document.addEventListener("click", (event) => {
 renderOverview();
 renderPublication();
 renderLinks();
-setVariant("a");
+setVariant("hybrid");
 setPhase("p1");
 setView("overview");
 applyHash();
