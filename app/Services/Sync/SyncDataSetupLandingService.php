@@ -2,7 +2,7 @@
 
 namespace App\Services\Sync;
 
-use App\Filament\Pages\Sync\ManageAdobeProductsChannel;
+use App\Filament\Pages\Sync\ManageAdobeRemoteCatalog;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceAuthorization;
@@ -119,7 +119,7 @@ final class SyncDataSetupLandingService
                 setupUsable: $eligibilityProjection->isSetupUsable(),
                 targetKind: SyncDataSetupTargetKind::AdobeProductsExport,
                 channelActionVisible: true,
-                channelUrl: ManageAdobeProductsChannel::getUrl(['account' => $eligibilityProjection->id]),
+                channelUrl: ManageAdobeRemoteCatalog::getUrl(['account' => $eligibilityProjection->id]),
             );
         }
 

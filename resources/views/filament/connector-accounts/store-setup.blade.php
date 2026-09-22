@@ -33,7 +33,7 @@
         <div class="space-y-3 rounded-xl border border-gray-200 p-4 dark:border-white/10">
             <p class="text-sm font-medium text-gray-950 dark:text-white">{{ __('connectors.ui.layer_a.next_step.heading') }}</p>
             @if ($canConfigureSync || ($syncConfigurationId !== null && ($canManageSyncConfiguration || $canRunPreview)))
-                <x-filament::button tag="a" :href="\App\Filament\Pages\Sync\ManageAdobeProductsChannel::getUrl(['account' => $record->getKey()])">
+                <x-filament::button tag="a" :href="\App\Filament\Pages\Sync\ManageAdobeRemoteCatalog::getUrl(['account' => $record->getKey()])">
                     {{ __('connectors.ui.layer_a.next_step.open_channel') }}
                 </x-filament::button>
             @elseif ($syncConfigurationId === null && ! $canManageSyncConfiguration)

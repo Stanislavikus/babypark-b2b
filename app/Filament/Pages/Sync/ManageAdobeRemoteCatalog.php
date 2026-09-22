@@ -2,24 +2,32 @@
 
 namespace App\Filament\Pages\Sync;
 
+use App\Filament\Resources\ProductResource;
+use App\Models\AdobeProductAttributeSet;
 use App\Models\ConnectorAccount;
 use App\Models\Product;
 use App\Models\RemoteCatalogSnapshot;
 use App\Models\RemoteCatalogSnapshotItem;
+use App\Models\RemoteCatalogSnapshotItemCategory;
 use App\Models\User;
 use App\Services\Connectors\AdobeRemoteCatalogProjectionService;
+use App\Services\Connectors\AdobeRemoteCatalogScanDispatchService;
 use App\Services\Sync\EntityTrust\AdobeProductEntityTrustAuthorizationService;
 use App\Services\Sync\EntityTrust\AdobeRemoteCatalogEntityTrustService;
 use App\Services\Sync\EntityTrust\EntityTrustFailureReasonPresenter;
 use App\Services\Sync\EntityTrust\EntityTrustMerchantOrchestrator;
 use App\Services\Sync\SyncDataSetupLandingService;
+use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Sync\EntityTrust\EntityTrustMerchantOutcome;
 use App\Support\Sync\EntityTrust\Exceptions\EntityTrustException;
 use App\Support\Workspace\Rbac\Concerns\RequiresFreshWorkspaceSyncDataSetupLandingPermission;
 use App\Support\Workspace\WorkspaceContext;
+use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -51,6 +59,13 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
     public string $platformName = '';
 
     public string $accountName = '';
+
+    #[Locked]
+    public string $accountBaseUrl = '';
+
+    public bool $canRefreshRemoteCatalog = false;
+
+    public bool $remoteCatalogScanRunning = false;
 
     public int $remoteCatalogTotal = 0;
 
@@ -118,10 +133,7 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
 
     public function getTitle(): string|Htmlable
     {
-        return __('product_channels.remote_catalog.title', [
-            'platform' => $this->platformName,
-            'account' => $this->accountName,
-        ]);
+        return __('product_channels.workbench.title');
     }
 
     public function mount(string $account): void
@@ -131,48 +143,82 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
         $this->accountId = (string) $record->id;
         $this->platformName = __('connectors.ui.layer_a.magento_name');
         $this->accountName = (string) $record->name;
+        $this->accountBaseUrl = (string) $record->base_url;
         $this->refreshProjectionState($record);
     }
 
     public function hydrate(): void
     {
-        $this->refreshProjectionState($this->resolveAccount($this->accountId));
+        $record = $this->resolveAccount($this->accountId);
+        $this->accountName = (string) $record->name;
+        $this->accountBaseUrl = (string) $record->base_url;
+        $this->refreshProjectionState($record);
     }
 
     public function table(Table $table): Table
     {
         return $table
             ->query(fn (): Builder => $this->catalogItemsQuery())
-            ->heading(__('product_channels.remote_catalog.table_heading'))
-            ->description(__('product_channels.remote_catalog.table_description'))
+            ->heading(__('product_channels.workbench.tabs.overview'))
+            ->description(__('product_channels.workbench.overview.purpose'))
             ->columns([
-                TextColumn::make('name')
-                    ->label(__('product_channels.remote_catalog.columns.product'))
-                    ->searchable(['name', 'sku', 'remote_identifier'])
+                ImageColumn::make('thumbnail_locator')
+                    ->label(__('product_channels.workbench.columns.image'))
+                    ->state(fn (RemoteCatalogSnapshotItem $record): ?string => $this->thumbnailUrl($record))
+                    ->size(44)
+                    ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(44)))
+                    ->toggleable(),
+                TextColumn::make('sku')
+                    ->label(__('product_channels.workbench.columns.sku'))
+                    ->searchable()
                     ->sortable()
-                    ->description(fn (RemoteCatalogSnapshotItem $record): string => __('product_channels.remote_catalog.identity', [
-                        'sku' => $record->sku ?: '—',
-                    ])),
+                    ->placeholder('—'),
+                TextColumn::make('name')
+                    ->label(__('product_channels.workbench.columns.name'))
+                    ->searchable(['name', 'remote_identifier'])
+                    ->sortable()
+                    ->wrap(),
+                TextColumn::make('provider_brand_label')
+                    ->label(__('product_channels.workbench.columns.provider_brand'))
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('—')
+                    ->toggleable(),
+                TextColumn::make('category_paths')
+                    ->label(__('product_channels.workbench.columns.category'))
+                    ->state(fn (RemoteCatalogSnapshotItem $record): ?string => $this->categoryPaths($record))
+                    ->placeholder('—')
+                    ->wrap()
+                    ->toggleable(),
+                TextColumn::make('attribute_set_name')
+                    ->label(__('product_channels.workbench.columns.attribute_set'))
+                    ->placeholder('—')
+                    ->toggleable(),
                 TextColumn::make('remote_type')
-                    ->label(__('product_channels.remote_catalog.columns.type'))
-                    ->badge(),
+                    ->label(__('product_channels.workbench.columns.type'))
+                    ->badge()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('remote_status')
+                    ->label(__('product_channels.workbench.columns.magento_status'))
+                    ->formatStateUsing(fn (mixed $state): string => $this->remoteStatusLabel($state))
+                    ->badge()
+                    ->color(fn (mixed $state): string => (string) $state === '1' ? 'success' : ((string) $state === '2' ? 'gray' : 'warning')),
                 TextColumn::make('is_linked')
-                    ->label(__('product_channels.remote_catalog.columns.link_status'))
+                    ->label(__('product_channels.workbench.columns.link_status'))
                     ->formatStateUsing(fn (mixed $state): string => $state
                         ? __('product_channels.remote_catalog.link_status.linked')
                         : __('product_channels.remote_catalog.link_status.unlinked'))
                     ->badge()
                     ->color(fn (mixed $state): string => $state ? 'success' : 'warning'),
-                TextColumn::make('remote_status')
-                    ->label(__('product_channels.remote_catalog.columns.status'))
-                    ->badge(),
                 TextColumn::make('remote_updated_at')
-                    ->label(__('product_channels.remote_catalog.columns.updated'))
-                    ->dateTime(),
+                    ->label(__('product_channels.workbench.columns.updated'))
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(),
             ])
             ->filters([
                 SelectFilter::make('link_status')
-                    ->label(__('product_channels.remote_catalog.filters.link_status'))
+                    ->label(__('product_channels.workbench.columns.link_status'))
                     ->options([
                         'linked' => __('product_channels.remote_catalog.link_status.linked'),
                         'unlinked' => __('product_channels.remote_catalog.link_status.unlinked'),
@@ -186,10 +232,50 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
                             is_string($status) ? $status : null,
                         );
                     }),
+                SelectFilter::make('provider_brand_label')
+                    ->label(__('product_channels.workbench.columns.provider_brand'))
+                    ->options(fn (): array => $this->brandFilterOptions()),
+                SelectFilter::make('remote_type')
+                    ->label(__('product_channels.workbench.columns.type'))
+                    ->options(fn (): array => $this->remoteTypeFilterOptions()),
+                SelectFilter::make('remote_status')
+                    ->label(__('product_channels.workbench.columns.magento_status'))
+                    ->options([
+                        '1' => __('product_channels.workbench.magento_status.enabled'),
+                        '2' => __('product_channels.workbench.magento_status.disabled'),
+                    ]),
+                SelectFilter::make('external_attribute_set_id')
+                    ->label(__('product_channels.workbench.columns.attribute_set'))
+                    ->options(fn (): array => $this->attributeSetFilterOptions()),
+                SelectFilter::make('category')
+                    ->label(__('product_channels.workbench.columns.category'))
+                    ->options(fn (): array => $this->categoryFilterOptions())
+                    ->query(function (Builder $query, array $data): Builder {
+                        $categoryId = $data['value'] ?? null;
+
+                        if (! is_string($categoryId) || $categoryId === '') {
+                            return $query;
+                        }
+
+                        return $query->whereHas(
+                            'categories',
+                            fn (Builder $categories): Builder => $categories
+                                ->withoutGlobalScopes()
+                                ->where('external_category_id', $categoryId),
+                        );
+                    }),
             ])
             ->recordActions([
+                Action::make('openMasterProduct')
+                    ->label(__('product_channels.workbench.actions.open'))
+                    ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->visible(fn (RemoteCatalogSnapshotItem $record): bool => filled($record->getAttribute('linked_product_id')))
+                    ->url(fn (RemoteCatalogSnapshotItem $record): string => ProductResource::getUrl('view', [
+                        'record' => $record->getAttribute('linked_product_id'),
+                    ]))
+                    ->openUrlInNewTab(),
                 Action::make('linkMasterProduct')
-                    ->label(__('product_channels.remote_catalog.link.action'))
+                    ->label(__('product_channels.workbench.actions.link'))
                     ->icon('heroicon-o-link')
                     ->visible(fn (RemoteCatalogSnapshotItem $record): bool => $this->canReviewOrConfirm() && ! (bool) $record->getAttribute('is_linked'))
                     ->modalHeading(__('product_channels.remote_catalog.link.heading'))
@@ -211,6 +297,7 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
                         $this->startEntityTrustReview($record, (string) ($data['product_id'] ?? ''));
                     }),
             ])
+            ->recordActionsColumnLabel(__('product_channels.workbench.columns.action'))
             ->paginated([20, 50, 100])
             ->defaultPaginationPageOption(20)
             ->defaultSort('name');
@@ -421,6 +508,185 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
         }
     }
 
+    public function refreshRemoteCatalog(): void
+    {
+        $user = Auth::user();
+        abort_unless($user instanceof User, 403);
+        $workspace = $this->resolveSyncDataSetupLandingWorkspace();
+
+        app(AdobeRemoteCatalogScanDispatchService::class)->dispatch(
+            $user,
+            $workspace,
+            $this->accountId,
+        );
+
+        $this->remoteCatalogScanRunning = true;
+
+        Notification::make()
+            ->success()
+            ->title(__('product_channels.remote_catalog.scan_queued'))
+            ->send();
+    }
+
+    public function applyWorkbenchLinkView(string $status): void
+    {
+        $value = match ($status) {
+            'linked', 'unlinked' => $status,
+            default => null,
+        };
+
+        $filters = $this->tableFilters ?? [];
+        $filters['link_status']['value'] = $value;
+        $this->tableFilters = $filters;
+        $this->updatedTableFilters();
+    }
+
+    public function currentWorkbenchLinkView(): string
+    {
+        $value = data_get($this->tableFilters, 'link_status.value');
+
+        return in_array($value, ['linked', 'unlinked'], true) ? $value : 'all';
+    }
+
+    private function thumbnailUrl(RemoteCatalogSnapshotItem $record): ?string
+    {
+        $locator = trim((string) $record->thumbnail_locator);
+
+        if ($locator === '') {
+            return null;
+        }
+
+        if (filter_var($locator, FILTER_VALIDATE_URL) !== false) {
+            return $locator;
+        }
+
+        $baseUrl = rtrim($this->accountBaseUrl, '/');
+
+        if ($baseUrl === '') {
+            return null;
+        }
+
+        return $baseUrl.'/media/catalog/product/'.ltrim($locator, '/');
+    }
+
+    private function categoryPaths(RemoteCatalogSnapshotItem $record): ?string
+    {
+        $paths = $record->categories
+            ->pluck('category_path')
+            ->filter(static fn (mixed $path): bool => is_string($path) && trim($path) !== '')
+            ->unique()
+            ->values();
+
+        return $paths->isEmpty() ? null : $paths->implode(' · ');
+    }
+
+    private function remoteStatusLabel(mixed $state): string
+    {
+        return match ((string) $state) {
+            '1' => __('product_channels.workbench.magento_status.enabled'),
+            '2' => __('product_channels.workbench.magento_status.disabled'),
+            default => __('product_channels.workbench.magento_status.unknown'),
+        };
+    }
+
+    /** @return array<string, string> */
+    private function brandFilterOptions(): array
+    {
+        if ($this->snapshotId === null) {
+            return [];
+        }
+
+        return RemoteCatalogSnapshotItem::withoutWorkspaceScope()
+            ->where('workspace_id', $this->resolveSyncDataSetupLandingWorkspace()->id)
+            ->where('snapshot_id', $this->snapshotId)
+            ->whereNotNull('provider_brand_label')
+            ->where('provider_brand_label', '!=', '')
+            ->distinct()
+            ->orderBy('provider_brand_label')
+            ->pluck('provider_brand_label', 'provider_brand_label')
+            ->all();
+    }
+
+    /** @return array<string, string> */
+    private function remoteTypeFilterOptions(): array
+    {
+        if ($this->snapshotId === null) {
+            return [];
+        }
+
+        return RemoteCatalogSnapshotItem::withoutWorkspaceScope()
+            ->where('workspace_id', $this->resolveSyncDataSetupLandingWorkspace()->id)
+            ->where('snapshot_id', $this->snapshotId)
+            ->whereNotNull('remote_type')
+            ->where('remote_type', '!=', '')
+            ->distinct()
+            ->orderBy('remote_type')
+            ->pluck('remote_type', 'remote_type')
+            ->all();
+    }
+
+    /** @return array<int|string, string> */
+    private function attributeSetFilterOptions(): array
+    {
+        if ($this->snapshotId === null) {
+            return [];
+        }
+
+        $workspace = $this->resolveSyncDataSetupLandingWorkspace();
+        $attributeSetIds = RemoteCatalogSnapshotItem::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
+            ->where('snapshot_id', $this->snapshotId)
+            ->whereNotNull('external_attribute_set_id')
+            ->distinct()
+            ->orderBy('external_attribute_set_id')
+            ->pluck('external_attribute_set_id')
+            ->map(static fn (mixed $value): int => (int) $value)
+            ->filter(static fn (int $value): bool => $value > 0)
+            ->values();
+
+        if ($attributeSetIds->isEmpty()) {
+            return [];
+        }
+
+        $labels = AdobeProductAttributeSet::withoutWorkspaceScope()
+            ->where('workspace_id', $workspace->id)
+            ->where('connector_account_id', $this->accountId)
+            ->whereNull('missing_since')
+            ->whereIn('provider_attribute_set_id', $attributeSetIds->all())
+            ->pluck('name', 'provider_attribute_set_id')
+            ->all();
+
+        $options = [];
+        foreach ($attributeSetIds as $attributeSetId) {
+            $options[$attributeSetId] = $labels[$attributeSetId] ?? '#'.$attributeSetId;
+        }
+
+        return $options;
+    }
+
+    /** @return array<string, string> */
+    private function categoryFilterOptions(): array
+    {
+        if ($this->snapshotId === null) {
+            return [];
+        }
+
+        $workspaceId = $this->resolveSyncDataSetupLandingWorkspace()->id;
+        $itemIds = RemoteCatalogSnapshotItem::withoutWorkspaceScope()
+            ->select('id')
+            ->where('workspace_id', $workspaceId)
+            ->where('snapshot_id', $this->snapshotId);
+
+        return RemoteCatalogSnapshotItemCategory::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->whereIn('snapshot_item_id', $itemIds)
+            ->whereNotNull('category_path')
+            ->where('category_path', '!=', '')
+            ->orderBy('category_path')
+            ->pluck('category_path', 'external_category_id')
+            ->all();
+    }
+
     private function catalogItemsQuery(): Builder
     {
         $workspace = $this->resolveSyncDataSetupLandingWorkspace();
@@ -470,6 +736,14 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
         $this->linkedRemoteCount = $summary->linkedCount;
         $this->remoteOnlyCount = $summary->remoteOnlyCount;
         $this->capturedAt = $summary->snapshot?->captured_at?->toIso8601String();
+        $this->remoteCatalogScanRunning = $summary->scanRunning;
+        $user = Auth::user();
+        $this->canRefreshRemoteCatalog = $user instanceof User
+            && app(WorkspaceAuthorization::class)->allows(
+                $user,
+                $this->resolveSyncDataSetupLandingWorkspace(),
+                WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+            );
         $this->entityTrustCanReviewOrConfirm = $this->canReviewOrConfirm();
     }
 }

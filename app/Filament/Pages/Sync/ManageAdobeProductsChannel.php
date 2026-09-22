@@ -2,13 +2,13 @@
 
 namespace App\Filament\Pages\Sync;
 
+use App\Enums\ExternalRecordLinkTrustOrigin;
 use App\Filament\Resources\ProductResource;
 use App\Models\ConnectorAccount;
+use App\Models\ExternalRecordLink;
 use App\Models\Product;
 use App\Models\SyncConfigurationProductSelection;
 use App\Models\User;
-use App\Services\Connectors\AdobeRemoteCatalogProjectionService;
-use App\Services\Connectors\AdobeRemoteCatalogScanDispatchService;
 use App\Services\Sync\AdobeProductExportSetupAuthorizationService;
 use App\Services\Sync\AdobeProductsExportLiveAuthorizationService;
 use App\Services\Sync\AdobeProductsExportPreviewAuthorizationService;
@@ -19,7 +19,6 @@ use App\Services\Sync\SyncDataSetupLandingService;
 use App\Support\Workspace\Rbac\Concerns\RequiresFreshWorkspaceSyncDataSetupLandingPermission;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
-use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -61,16 +60,6 @@ class ManageAdobeProductsChannel extends Page implements HasTable
 
     public bool $canOpenExecution = false;
 
-    public int $remoteCatalogTotal = 0;
-
-    public int $linkedRemoteCount = 0;
-
-    public int $remoteOnlyCount = 0;
-
-    public bool $hasRemoteCatalogSnapshot = false;
-
-    public bool $remoteCatalogScanRunning = false;
-
     public static function canAccess(array $parameters = []): bool
     {
         $user = Auth::user();
@@ -89,10 +78,7 @@ class ManageAdobeProductsChannel extends Page implements HasTable
 
     public function getTitle(): string|Htmlable
     {
-        return __('product_channels.channel.title', [
-            'platform' => $this->platformName,
-            'account' => $this->accountName,
-        ]);
+        return __('product_channels.workbench.title');
     }
 
     public function mount(string $account): void
@@ -124,19 +110,31 @@ class ManageAdobeProductsChannel extends Page implements HasTable
     {
         return $table
             ->query(fn (): Builder => $this->selectedProductsQuery())
-            ->heading(__('product_channels.channel.products_heading'))
-            ->description(__('product_channels.channel.products_description'))
+            ->heading(__('product_channels.workbench.tabs.publication'))
+            ->description(__('product_channels.workbench.publication.purpose'))
             ->columns([
                 ImageColumn::make('channel_image')
-                    ->label(__('product_channels.columns.image'))
+                    ->label(__('product_channels.workbench.columns.image'))
                     ->state(fn (Product $record): ?string => ProductResource::firstImage($record))
-                    ->size(48)
-                    ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(48))),
-                TextColumn::make('name')
-                    ->label(__('product_channels.columns.product'))
+                    ->size(44)
+                    ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(44))),
+                TextColumn::make('sku')
+                    ->label(__('product_channels.workbench.columns.sku'))
                     ->searchable()
                     ->sortable()
-                    ->description(fn (Product $record): string => $this->productIdentityDescription($record)),
+                    ->placeholder('—'),
+                TextColumn::make('name')
+                    ->label(__('product_channels.workbench.columns.name'))
+                    ->searchable()
+                    ->sortable()
+                    ->wrap(),
+                TextColumn::make('is_linked')
+                    ->label(__('product_channels.workbench.columns.link_status'))
+                    ->formatStateUsing(fn (mixed $state): string => $state
+                        ? __('product_channels.remote_catalog.link_status.linked')
+                        : __('product_channels.workbench.publication.not_in_magento'))
+                    ->badge()
+                    ->color(fn (mixed $state): string => $state ? 'success' : 'gray'),
                 TextColumn::make('is_active')
                     ->label(__('product_channels.columns.status'))
                     ->formatStateUsing(fn (bool $state): string => $state
@@ -147,9 +145,9 @@ class ManageAdobeProductsChannel extends Page implements HasTable
             ])
             ->recordActions([
                 Action::make('openProduct')
-                    ->label(__('product_channels.actions.open_product'))
+                    ->label(__('product_channels.workbench.actions.open'))
                     ->icon('heroicon-o-arrow-top-right-on-square')
-                    ->url(fn (Product $record): string => ProductResource::getUrl('edit', ['record' => $record]))
+                    ->url(fn (Product $record): string => ProductResource::getUrl('view', ['record' => $record]))
                     ->openUrlInNewTab(),
                 Action::make('removeFromChannel')
                     ->label(__('product_channels.actions.remove_single'))
@@ -159,29 +157,10 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                     ->requiresConfirmation()
                     ->action(fn (Product $record) => $this->removeProduct($record)),
             ])
+            ->recordActionsColumnLabel(__('product_channels.workbench.columns.action'))
             ->paginated([20, 50, 100])
             ->defaultPaginationPageOption(20)
             ->defaultSort('name');
-    }
-
-    public function refreshRemoteCatalog(): void
-    {
-        $user = Auth::user();
-        abort_unless($user instanceof User, 403);
-        $workspace = $this->resolveSyncDataSetupLandingWorkspace();
-
-        app(AdobeRemoteCatalogScanDispatchService::class)->dispatch(
-            $user,
-            $workspace,
-            $this->accountId,
-        );
-
-        $this->remoteCatalogScanRunning = true;
-
-        Notification::make()
-            ->success()
-            ->title(__('product_channels.remote_catalog.scan_queued'))
-            ->send();
     }
 
     public function selectProducts(): void
@@ -249,13 +228,27 @@ class ManageAdobeProductsChannel extends Page implements HasTable
             return $query->whereRaw('1 = 0');
         }
 
-        return $query->whereIn(
-            'products.id',
-            SyncConfigurationProductSelection::withoutWorkspaceScope()
-                ->select('product_id')
-                ->where('workspace_id', $workspaceId)
-                ->where('sync_configuration_id', $this->configurationId),
-        );
+        return $query
+            ->select('products.*')
+            ->whereIn(
+                'products.id',
+                SyncConfigurationProductSelection::withoutWorkspaceScope()
+                    ->select('product_id')
+                    ->where('workspace_id', $workspaceId)
+                    ->where('sync_configuration_id', $this->configurationId),
+            )
+            ->addSelect([
+                'is_linked' => ExternalRecordLink::withoutWorkspaceScope()
+                    ->selectRaw('COUNT(*) > 0')
+                    ->where('workspace_id', $workspaceId)
+                    ->where('connector_account_id', $this->accountId)
+                    ->where('trust_origin', ExternalRecordLinkTrustOrigin::MerchantConfirmed->value)
+                    ->whereNotNull('external_record_discriminator')
+                    ->whereNotNull('established_by_workspace_user_id')
+                    ->whereNotNull('established_at')
+                    ->whereColumn('product_id', 'products.id')
+                    ->limit(1),
+            ]);
     }
 
     private function refreshChannelState(User $user): void
@@ -294,23 +287,5 @@ class ManageAdobeProductsChannel extends Page implements HasTable
             && ($this->canRunPreview
                 || app(AdobeProductsExportLiveAuthorizationService::class)
                     ->isEligibleLiveTarget($user, $workspace, $this->accountId));
-
-        $remoteCatalog = app(AdobeRemoteCatalogProjectionService::class)->summary($account);
-        $this->remoteCatalogTotal = $remoteCatalog->totalCount;
-        $this->linkedRemoteCount = $remoteCatalog->linkedCount;
-        $this->remoteOnlyCount = $remoteCatalog->remoteOnlyCount;
-        $this->hasRemoteCatalogSnapshot = $remoteCatalog->snapshot !== null;
-        $this->remoteCatalogScanRunning = $remoteCatalog->scanRunning;
-    }
-
-    private function productIdentityDescription(Product $product): string
-    {
-        $parts = [__('product_channels.identity.sku', ['sku' => $product->sku ?: '—'])];
-
-        if (filled($product->barcode_ean)) {
-            $parts[] = __('product_channels.identity.gtin', ['gtin' => $product->barcode_ean]);
-        }
-
-        return implode(' · ', $parts);
     }
 }

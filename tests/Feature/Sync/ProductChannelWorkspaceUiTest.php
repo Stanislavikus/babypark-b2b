@@ -9,6 +9,7 @@ use App\Enums\SyncSemanticOperation;
 use App\Enums\UserRole;
 use App\Filament\Pages\Sync\ManageAdobeProductsChannel;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportPreview;
+use App\Filament\Pages\Sync\ManageAdobeRemoteCatalog;
 use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Models\Product;
@@ -16,6 +17,7 @@ use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Sync\ProductChannelSelectionService;
+use App\Services\Sync\SyncDataSetupLandingService;
 use App\Services\Sync\SyncProductSelectionService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
@@ -81,9 +83,31 @@ class ProductChannelWorkspaceUiTest extends TestCase
             ->assertSee('data-testid="product-channel-empty-selection"', false)
             ->assertSee(__('product_channels.channel.empty_title'))
             ->assertSee(__('product_channels.channel.select_products'))
-            ->assertSee('data-testid="product-channel-open-master-catalog"', false)
-            ->assertSee(__('product_channels.channel.open_master_catalog'))
+            ->assertSee('data-testid="product-workbench-shell"', false)
+            ->assertSee('data-testid="product-workbench-tab-overview"', false)
+            ->assertSee('data-testid="product-workbench-tab-publication"', false)
+            ->assertDontSee('data-testid="product-channel-open-master-catalog"', false)
             ->assertDontSee('data-testid="product-channel-open-preview"', false);
+    }
+
+    #[Test]
+    public function channel_entry_url_lands_on_overview_not_publication(): void
+    {
+        $account = $this->createConnectorAccount();
+
+        $target = collect(app(SyncDataSetupLandingService::class)
+            ->listLandingTargets($this->actor, $this->workspace))
+            ->firstWhere('accountId', $account->id);
+
+        $this->assertNotNull($target);
+        $this->assertSame(
+            ManageAdobeRemoteCatalog::getUrl(['account' => $account->id]),
+            $target->channelUrl,
+        );
+        $this->assertNotSame(
+            ManageAdobeProductsChannel::getUrl(['account' => $account->id]),
+            $target->channelUrl,
+        );
     }
 
     #[Test]
@@ -132,7 +156,10 @@ class ProductChannelWorkspaceUiTest extends TestCase
             ->assertSet('selectedProductCount', 1)
             ->assertSet('masterProductCount', 2)
             ->assertSee($selected->name)
-            ->assertDontSee($unselected->name);
+            ->assertSee(__('product_channels.workbench.publication.not_in_magento'))
+            ->assertDontSee($unselected->name)
+            ->assertSee('data-testid="product-workbench-tab-overview"', false)
+            ->assertSee('data-testid="product-workbench-tab-publication"', false);
     }
 
     #[Test]
