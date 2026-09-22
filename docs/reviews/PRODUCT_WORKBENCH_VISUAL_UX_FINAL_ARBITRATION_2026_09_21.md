@@ -1,9 +1,10 @@
 # Product Workbench — Hybrid Visual UX Final Arbitration — 2026-09-21
 
-> **Status: Lead final review — Hybrid is ready for product-owner approval.**
+> **Status: HISTORICAL VISUAL ARBITRATION — superseded for navigation/data-state details by the [Resolved — 2026-09-22] visual contract.**
 >
 > Corrected prototype reviewed at `7df5fce9b08d20ad3f96f9b5c202fbd1016c8882`.
-> Structural authority remains `PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_2026_09_21.md` [Resolved].
+> Current visual authority: `PRODUCT_WORKBENCH_VISUAL_UX_CONTRACT_2026_09_22.md`.
+> Structural authority remains `PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_2026_09_21.md` [Resolved; A3 amended 2026-09-22].
 
 ## Verdict
 

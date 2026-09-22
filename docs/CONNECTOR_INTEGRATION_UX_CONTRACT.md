@@ -157,7 +157,7 @@ For Magento Product work, keep distinct row universes:
 
 - **`Огляд`** defaults to the current successful Magento Remote Catalogue snapshot — what actually exists in the connected store;
 - **`Публікація`** shows local Master Products selected/linked for outbound preparation;
-- **`Зв'язки`** shows remote↔Master correspondence/matching;
+- correspondence/matching is handled inside `Огляд` through `Зв'язок`, link-state filters/system views and the governed row-level `Пов'язати` flow rather than a permanent third top-level tab;
 - never merge remote-only rows and local-not-yet-created Products into one ambiguous default table.
 
 Ownership remains explicit even when the views are visually adjacent: Remote Catalogue is provider observation, Master Product is platform truth, `ExternalRecordLink` is trusted correspondence, and selection is outbound intent.

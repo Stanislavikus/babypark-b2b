@@ -5020,11 +5020,12 @@ successful **Remote Catalogue Projection** owned by Workspace + ConnectorAccount
 applicable remote context. It is read-only navigation/matching evidence, not Master
 Product truth, not SyncConfiguration selection, and not `ExternalRecordLink` trust.
 
-[Resolved — 2026-09-21] Magento daily-work presentation uses distinct row universes:
+[Resolved — 2026-09-21; A3 presentation amended 2026-09-22] Magento daily-work presentation uses distinct row universes:
 
 - `Огляд` = current successful Magento Remote Catalogue snapshot;
-- `Публікація` = local Master Products selected/linked for outbound preparation;
-- `Зв'язки` = correspondence/matching between remote and Master Product universes.
+- `Публікація` = local Master Products selected/linked for outbound preparation.
+
+Correspondence remains a first-class concern but is not a permanent third top-level tab in the first Workbench UX. `Огляд` shows trusted-link state, exposes link-state filters/system views, and opens the governed Entity Trust confirmation flow from row actions.
 
 This does not merge the two truths. Remote-only rows shown in `Огляд` do not become Master Products or trusted links merely by appearing there.
 

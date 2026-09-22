@@ -48,13 +48,17 @@ It is the place for:
 - current supported Update;
 - governed publication result.
 
-### A3. Links View
+### A3. Correspondence / linking surface
 
-**`Зв'язки`** is the correspondence/matching View between remote Magento records and Master
-Products.
+**Original 2026-09-21 decision:** `Зв'язки` was a separate top-level View between remote Magento records and Master Products.
 
-It supports bulk confirmation and row-level correction while preserving ExternalRecordLink as
-the trusted identity authority.
+**[Resolved — 2026-09-22] Stop-and-Amend:** correspondence remains a first-class domain concern, but it is **not a permanent top-level Workbench tab in the first product UX**.
+
+- top-level Workbench Views are `Огляд` and `Публікація`;
+- `Огляд` exposes link state as a normal column/filter and provides a system view/filter such as `Потребують зв'язку` / `Зв'язок = Не пов'язано`;
+- row-level `Пов'язати` opens the existing Entity Trust review/confirmation flow;
+- when a real candidate-ranking/bulk-confirmation capability exists, the linking workload may be promoted into a dedicated system View again without changing ExternalRecordLink authority;
+- this amendment changes presentation/navigation only. ExternalRecordLink remains the trusted identity authority and no automatic similarity result becomes trust.
 
 ### A4. Ownership invariants remain unchanged
 
@@ -318,6 +322,6 @@ Separate campaigns remain:
 This document is now `[Resolved — 2026-09-21]`. The documentation-freeze campaign must:
 
 1. amend the presentation-order wording in `PRODUCT_CHANNEL_SELECTION_REMOTE_CATALOGUE_CONTRACT.md`;
-2. amend relevant Domain/UX/UI summary sections so `Огляд / Публікація / Зв'язки` and Decision-B classification semantics are authoritative;
+2. amend relevant Domain/UX/UI summary sections so remote `Огляд` vs local `Публікація`, correspondence inside Overview, and Decision-B classification semantics are authoritative;
 3. update documentation-contract tests for the frozen truth;
 4. make **no runtime code changes** in the documentation freeze commit.

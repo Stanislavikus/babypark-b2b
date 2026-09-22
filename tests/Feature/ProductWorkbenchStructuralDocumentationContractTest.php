@@ -51,7 +51,7 @@ class ProductWorkbenchStructuralDocumentationContractTest extends TestCase
         $map = File::get(base_path('docs/Project_Documentation_Map.md'));
 
         $this->assertStringContainsString('PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_2026_09_21.md', $map);
-        $this->assertStringContainsString('[Resolved — 2026-09-21]', $map);
+        $this->assertStringContainsString('[Resolved — 2026-09-21; A3 amended 2026-09-22]', $map);
         $this->assertStringNotContainsString('PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_FREEZE_CANDIDATE_2026_09_21.md', $map);
     }
 }

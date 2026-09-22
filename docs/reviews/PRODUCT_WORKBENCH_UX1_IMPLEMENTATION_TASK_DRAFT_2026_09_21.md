@@ -1,25 +1,25 @@
-# TASK FOR EXECUTOR — UX-1 Product Workbench shell + Remote Overview
+# TASK FOR EXECUTOR — UX-1 Product Workbench shell after Projection V2
 
-> **Status: DRAFT until visual UX freeze is [Resolved] and merged.**
+> **Status: DRAFT — execute only after the visual/data-state freeze is merged and Remote Catalogue Projection V2 is implemented/verified.**
 
 ## ROUTING DECISION
 
-**Goal:** Opening the Magento channel lands on the real current remote catalogue and exposes stable `Огляд / Публікація / Зв'язки` Views without mixing row universes or inventing unsupported capabilities.
+**Goal:** Opening the Magento channel lands on the useful real remote catalogue and exposes stable `Огляд / Публікація` Views without mixing row universes or inventing unsupported capabilities.
 **Risk:** YELLOW
-**Why:** substantial Filament/Livewire navigation/runtime composition on frozen architecture; no new persistence, auth, isolation or transaction semantics.
-**Architecture:** existing/frozen. Reuse current Remote Catalogue, Product selection, Entity Trust and Preview/Live services.
-**Executor:** Codex or Composer 2.5.
+**Why:** substantial Filament/Livewire navigation/runtime composition on frozen architecture; no new persistence/auth/isolation/transaction semantics in this slice.
+**Architecture:** existing/frozen. Reuse Projection V2, Product selection, Entity Trust and Preview/Live services.
+**Executor:** Codex / Composer 2.5.
 **Post-review:** Lead AI verifies actual HEAD/diff/tests and merchant flow.
 **Escalation:** only for a new unresolved DB/workspace/auth/security/concurrency/identity/transaction decision or proven blocker.
-**Cost rationale:** no frontier architecture model needed for this slice.
+**Cost rationale:** no frontier architecture model needed.
 
 ## Goal
 
-Implement the first Product Workbench shell so the Magento daily-work entry follows the resolved structural/visual contracts using only capabilities that exist today.
+Implement the first Product Workbench shell so the Magento daily-work entry follows the resolved structural/visual contracts on top of a verified useful Remote Catalogue Projection V2.
 
 ## Authoritative Base
 
-`origin/develop` **after** the visual UX freeze PR is merged. Record exact base SHA before work.
+Fresh `origin/develop` **after** Projection V2 is merged. Record exact base SHA.
 
 ## Mandatory reading
 
@@ -28,98 +28,103 @@ Implement the first Product Workbench shell so the Magento daily-work entry foll
 3. `docs/PRODUCT_CHANNEL_SELECTION_REMOTE_CATALOGUE_CONTRACT.md`
 4. `docs/CONNECTOR_INTEGRATION_UX_CONTRACT.md`
 5. `docs/reviews/PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_2026_09_21.md`
-6. final `[Resolved]` Product Workbench Visual UX Contract
-7. `docs/reviews/PRODUCT_WORKBENCH_VISUAL_UX_FINAL_ARBITRATION_2026_09_21.md`
+6. `docs/reviews/PRODUCT_WORKBENCH_VISUAL_UX_CONTRACT_2026_09_22.md`
+7. Projection V2 implementation contract/evidence.
 
 Inspect current:
 
 - `ManageAdobeProductsChannel`;
 - `ManageAdobeRemoteCatalog`;
-- Remote Catalogue projection/query services;
-- current Entity Trust merchant flow;
+- Projection V2 query/read services;
+- Entity Trust merchant flow;
 - ProductChannelSelectionService/ProductResource channel context;
-- Preview/Live merchant read services and pages.
+- Preview/Live merchant read services/pages.
 
 ## NON-NEGOTIABLE
 
 1. `git fetch origin develop`; record base SHA.
-2. Work in one feature/campaign branch and one Draft PR.
-3. Reuse proven runtime/services; do not rewrite Remote Catalogue, Entity Trust or Preview/Live just to fit the new shell.
-4. No new DB tables/migrations in UX-1.
+2. One campaign branch + one Draft PR.
+3. Reuse proven runtime/services; do not rewrite Remote Catalogue, Entity Trust or Preview/Live merely to fit the shell.
+4. No new DB architecture in UX-1.
 5. No Magento CREATE/import capability.
-6. No Projection V2 fields in initial Overview.
-7. No fuzzy similarity/confidence UI.
-8. No per-Product Live action.
-9. Do not implement Decision-B persistence/planner migration in this slice.
-10. After each slice: run tests, inspect diff, fix and continue without user approval.
+6. No fuzzy similarity/confidence UI.
+7. No per-Product Live action.
+8. Do not implement Decision-B persistence/planner migration here.
+9. `Зв'язки` is not a permanent third top-level tab in first scope.
+10. After each slice: test, inspect diff, fix, continue.
 11. No Fake Tests.
 12. Do not merge/deploy.
 
 ## Expected behavior
 
-### A. Channel entry / shell
+### A. Focus shell
 
-- Existing Magento daily-work entry opens the Workbench shell.
-- Stable Views: `Огляд / Публікація / Зв'язки`.
-- View state is URL/deep-linkable where practical using existing Filament/Livewire patterns; no Saved View persistence.
-- Header shows account identity, connection/catalogue freshness, secondary refresh action.
-- Remove the current duplicate top-level action maze from the merchant path; services/pages may remain internally reachable/reused.
+- Magento daily-work entry opens Workbench.
+- Top-level Views: `Огляд / Публікація`.
+- Global SaaS navigation collapses/reduces to a compact back/menu affordance in Workbench Focus Mode.
+- Workbench-local collapsible filter rail uses freed horizontal space.
+- Search remains primary; Filters/Columns secondary.
+- Header shows account/store, connection/catalogue freshness, remote count, secondary refresh.
 
 ### B. Огляд
 
 - Default View.
 - Row universe = current successful Remote Catalogue snapshot.
-- Reuse current remote query/search/link-state/status/freshness behavior.
-- Initial columns only: SKU, name, type, provider state, trusted-link state, updated/freshness and current safe row action.
-- Preserve current successful snapshot while a refresh job is running.
-- Empty/no-snapshot states follow visual contract.
+- Use Projection V2 fields that are actually verified: thumbnail/media locator, SKU, name, resolved provider Category path, Attribute Set context, provider state, link state, freshness, resolved brand-like field only when semantics are proved.
+- Action column is explicit when text actions are rendered.
+- linked row -> open/details action; unlinked row -> `Пов'язати`.
+- Correspondence workload is filter/system-view state inside Overview.
+- Do not duplicate unlinked state as a generic Problem.
+- Data state may be displayed only when its derived profile inputs/runtime exist; otherwise omit rather than fake a percentage.
 
 ### C. Публікація
 
-- Row universe = current selected/linked local Master Products for the account/configuration.
-- No first-scope row checkboxes unless an actually implemented bulk action is visible.
-- Keep current selection membership operation through `Вибрати товари`.
-- Use the existing ProductResource channel-context grid as fallback if building an in-shell selector would enlarge scope materially.
-- Do not expose Decision-B Category/Attribute Set correction controls as editable until runtime exists; legacy setup remediation may remain behind current safe path where required by runtime.
-- Show current causal Preview/Live entry at configuration level using existing merchant read models; do not duplicate admission logic in the UI.
+- Row universe = selected/linked local Master Products.
+- `Вибрати товари` remains the real membership operation.
+- Scalable selector or current ProductResource channel-context grid as shortest safe fallback.
+- No decorative row checkboxes without a real bulk action.
+- Preview/Live causal action is configuration-level.
+- Row `Дія` is remediation/detail only.
+- Do not expose Decision-B Category/Attribute Set correction controls as editable until runtime exists.
+- `Ще немає в Magento` is quiet state; no CREATE action.
 
-### D. Зв'язки
+### D. Linking inside Overview
 
 - Reuse Remote Catalogue + ExternalRecordLink truth.
-- Show factual linked/unlinked state.
-- Row action opens current Entity Trust merchant review/confirmation flow.
-- No similarity scoring/ranking.
+- Filter `Зв'язок = Не пов'язано` / system view `Потребують зв'язку`.
+- Row `Пов'язати` opens current governed review/confirmation flow.
+- No automatic similarity/ranking/bulk trust.
 
 ### E. Drawer/detail
 
-- Reuse ProductResource slide-over pattern where it reduces navigation churn.
-- First scope may provide read-only Product identity + current Magento/link context.
-- Do not fake classification edit controls before Decision-B runtime.
+- Reuse slide-over pattern to preserve table context.
+- First scope: `Основне / Magento`.
+- Core source-owned fields remain read-only where current authority says so.
+- Do not fake future AI/SEO/Decision-B edits.
 
 ## Acceptance evidence
 
-Must include literal automated test output proving at least:
+Must include literal test output proving at least:
 
-- Magento channel opens to `Огляд` and remote snapshot rows are visible;
-- remote-only rows do not appear as local Publication rows;
-- Publication selected local rows remain the local row universe;
-- Links View keeps current Entity Trust confirmation semantics;
-- refresh preserves/uses current-successful snapshot behavior;
-- no unsupported CREATE/import action is rendered;
-- no Projection V2-only fields are rendered in first-scope Overview;
-- Preview/Live action remains configuration-level and authorization/admission is delegated to existing services;
-- revoked permissions/target-change guards remain covered where touched;
-- old direct pages/routes, if retained, do not create conflicting merchant truth.
+- opening Magento lands on `Огляд` and Projection V2 remote rows render;
+- only `Огляд / Публікація` are permanent top-level Workbench Views;
+- link filtering/action works inside Overview and preserves Entity Trust confirmation;
+- remote-only rows never appear as Master Products in Publication;
+- Publication membership stays local-selection truth;
+- refresh keeps latest successful snapshot while scan is running;
+- no unsupported CREATE/import/fuzzy matching action is rendered;
+- Preview/Live stays configuration-level and delegates admission to existing services;
+- revoked permissions/target-change guards remain covered where touched.
 
-Run the smallest relevant focused suite during development, then the appropriate broader MySQL/CI gate before merge readiness.
+Run focused suites during development, then the appropriate broader MySQL/CI gate.
 
 ## STOP conditions
 
 STOP only for:
 
 - new unresolved DB/workspace/pricing/auth/security/concurrency/identity/transaction decision;
-- missing required external access;
-- a proven conflict between the [Resolved] structural/visual contract and existing runtime that cannot be solved by composition/reuse;
+- missing external access;
+- proven conflict with [Resolved] contracts that cannot be solved by composition/reuse;
 - critical blocker after meaningful correction attempts;
 - final merge/deploy approval.
 
@@ -127,12 +132,4 @@ Do not STOP for normal Filament composition/refactoring choices.
 
 ## Executor report
 
-Report:
-
-- base SHA;
-- final HEAD;
-- changed files;
-- exact tests/output;
-- any runtime behavior intentionally left behind a legacy page and why;
-- clean tree;
-- Draft PR.
+Report base SHA, final HEAD, changed files, literal tests/output, any retained legacy page and why, clean tree, Draft PR.
