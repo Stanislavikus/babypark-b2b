@@ -6,7 +6,7 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 
 final class AdobeRemoteCatalogEnumerator
 {
-    public const int PAGE_SIZE = 200;
+    public const int PAGE_SIZE = 100;
 
     public function __construct(
         private readonly AdobeRemoteCatalogReadClient $readClient,

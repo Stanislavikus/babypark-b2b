@@ -9,6 +9,7 @@ use App\Models\RemoteCatalogCurrentSnapshot;
 use App\Models\RemoteCatalogScan;
 use App\Models\RemoteCatalogSnapshot;
 use App\Models\RemoteCatalogSnapshotItem;
+use App\Models\RemoteCatalogSnapshotItemCategory;
 use App\Services\Connectors\Exceptions\RemoteCatalogScanIncompleteException;
 use App\Services\Connectors\Exceptions\RemoteCatalogScanStateException;
 use App\Services\Connectors\Exceptions\StaleRemoteCatalogScanException;
@@ -111,8 +112,12 @@ final class RemoteCatalogScanService
                 'name' => $candidate->name,
                 'remote_type' => $candidate->remoteType,
                 'remote_status' => $candidate->remoteStatus,
+                'external_attribute_set_id' => $candidate->externalAttributeSetId,
                 'remote_updated_at' => $candidate->remoteUpdatedAt,
                 'thumbnail_locator' => $candidate->thumbnailLocator,
+                'provider_brand_field_key' => $candidate->providerBrandFieldKey,
+                'provider_brand_value' => $candidate->providerBrandValue,
+                'provider_brand_label' => $candidate->providerBrandLabel,
                 'storefront_locator' => $candidate->storefrontLocator === null
                     ? null
                     : json_encode($candidate->storefrontLocator, JSON_THROW_ON_ERROR),
@@ -121,6 +126,42 @@ final class RemoteCatalogScanService
             ], $candidates);
 
             RemoteCatalogSnapshotItem::withoutWorkspaceScope()->insert($rows);
+
+            $remoteIdentifiers = array_map(
+                static fn (RemoteCatalogItemCandidate $candidate): string => $candidate->remoteIdentifier,
+                $candidates,
+            );
+            $itemIdsByRemoteIdentifier = RemoteCatalogSnapshotItem::withoutWorkspaceScope()
+                ->where('workspace_id', $lockedScan->workspace_id)
+                ->where('snapshot_id', $snapshot->id)
+                ->whereIn('remote_identifier', $remoteIdentifiers)
+                ->pluck('id', 'remote_identifier');
+
+            $categoryRows = [];
+            foreach ($candidates as $candidate) {
+                $snapshotItemId = $itemIdsByRemoteIdentifier->get($candidate->remoteIdentifier);
+                if ($snapshotItemId === null || ! is_numeric($snapshotItemId)) {
+                    throw new RemoteCatalogScanStateException('Persisted remote catalogue item could not be resolved for category projection.');
+                }
+                $snapshotItemId = (int) $snapshotItemId;
+
+                foreach ($candidate->categories as $category) {
+                    $categoryRows[] = [
+                        'workspace_id' => $lockedScan->workspace_id,
+                        'snapshot_item_id' => $snapshotItemId,
+                        'external_category_id' => $category->externalCategoryId,
+                        'category_path' => $category->categoryPath,
+                        'position' => $category->position,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+            }
+
+            if ($categoryRows !== []) {
+                RemoteCatalogSnapshotItemCategory::withoutWorkspaceScope()->insert($categoryRows);
+            }
+
             $lockedScan->increment('received_item_count', count($rows));
         });
     }

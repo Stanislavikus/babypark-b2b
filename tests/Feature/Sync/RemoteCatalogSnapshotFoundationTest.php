@@ -8,12 +8,14 @@ use App\Models\ExternalRecordLink;
 use App\Models\Product;
 use App\Models\RemoteCatalogCurrentSnapshot;
 use App\Models\RemoteCatalogSnapshotItem;
+use App\Models\RemoteCatalogSnapshotItemCategory;
 use App\Services\Connectors\Exceptions\RemoteCatalogScanIncompleteException;
 use App\Services\Connectors\Exceptions\StaleRemoteCatalogScanException;
 use App\Services\Connectors\RemoteCatalogCurrentSnapshotResolver;
 use App\Services\Connectors\RemoteCatalogScanService;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshotResolver;
 use App\Support\Connectors\RemoteCatalog\RemoteCatalogItemCandidate;
+use App\Support\Connectors\RemoteCatalog\RemoteCatalogItemCategoryCandidate;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -161,6 +163,29 @@ class RemoteCatalogSnapshotFoundationTest extends TestCase
 
         $this->expectException(LogicException::class);
         $item->update(['name' => 'Mutated']);
+    }
+
+    public function test_categories_in_published_snapshot_are_immutable(): void
+    {
+        $account = $this->createConnectorAccount();
+        $scan = $this->scans->begin($account, SyncDataDomain::Products, $this->target($account), 1);
+        $this->scans->append($scan, [
+            new RemoteCatalogItemCandidate(
+                remoteIdentifier: '302',
+                sku: 'REMOTE-302',
+                categories: [
+                    new RemoteCatalogItemCategoryCandidate('6', 'Strollers', 1),
+                ],
+            ),
+        ]);
+        $snapshot = $this->scans->publish($scan);
+        $item = RemoteCatalogSnapshotItem::withoutWorkspaceScope()->where('snapshot_id', $snapshot->id)->sole();
+        $category = RemoteCatalogSnapshotItemCategory::withoutWorkspaceScope()
+            ->where('snapshot_item_id', $item->id)
+            ->sole();
+
+        $this->expectException(LogicException::class);
+        $category->update(['category_path' => 'Mutated']);
     }
 
     private function target($account): array

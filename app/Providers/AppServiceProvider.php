@@ -19,6 +19,8 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeProductOwnershipTrustPolicy;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandExecutor;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductStockSimpleWriteExecutor;
 use App\Support\Connectors\AdobePaaS\Command\ConservativeAdobeProductOwnershipTrustPolicy;
+use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogCategoryDictionaryReader;
+use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogHttpCategoryDictionaryReader;
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogHttpReadClient;
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogReadClient;
 use App\Support\Connectors\AdobePaaS\SafeSync\AdobeSafeSyncHandshakeProbe;
@@ -57,6 +59,11 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(
             AdobeRemoteCatalogReadClient::class,
             AdobeRemoteCatalogHttpReadClient::class,
+        );
+
+        $this->app->bind(
+            AdobeRemoteCatalogCategoryDictionaryReader::class,
+            AdobeRemoteCatalogHttpCategoryDictionaryReader::class,
         );
 
         $this->app->bind(

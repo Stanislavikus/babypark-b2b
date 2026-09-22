@@ -13,9 +13,13 @@ use Psr\Http\Message\RequestInterface;
 
 final class AdobeRemoteCatalogRequestFactory
 {
-    private const string ITEM_FIELDS = 'items[id,sku,name,type_id,status,updated_at],search_criteria,total_count';
+    private const string ITEM_FIELDS = 'items[id,sku,name,attribute_set_id,type_id,status,updated_at,extension_attributes[category_links[category_id,position]],media_gallery_entries[file,media_type,disabled,types],custom_attributes[attribute_code,value]],search_criteria,total_count';
+
+    private const string BOUNDARY_FIELDS = 'items[id],search_criteria,total_count';
 
     private const string COUNT_FIELDS = 'items[id],search_criteria,total_count';
+
+    private const string CATEGORY_FIELDS = 'items[id,parent_id,name,is_active,position,level,path],search_criteria,total_count';
 
     public function __construct(
         private readonly OAuth1RequestSigner $signer,
@@ -30,7 +34,7 @@ final class AdobeRemoteCatalogRequestFactory
                 'field' => 'entity_id',
                 'direction' => 'DESC',
             ]],
-        ], self::ITEM_FIELDS);
+        ], self::BOUNDARY_FIELDS);
     }
 
     public function page(
@@ -69,6 +73,29 @@ final class AdobeRemoteCatalogRequestFactory
         ], self::ITEM_FIELDS);
     }
 
+    public function categoryPage(
+        AdobePaaSRequestContext $context,
+        int $pageSize,
+        int $currentPage,
+    ): RequestInterface {
+        if ($pageSize < 1 || $pageSize > 100) {
+            throw new InvalidArgumentException('Adobe remote category page size must be between 1 and 100.');
+        }
+
+        if ($currentPage < 1) {
+            throw new InvalidArgumentException('Adobe remote category current page must be positive.');
+        }
+
+        return $this->build($context, [
+            'pageSize' => $pageSize,
+            'currentPage' => $currentPage,
+            'sortOrders' => [[
+                'field' => 'entity_id',
+                'direction' => 'ASC',
+            ]],
+        ], self::CATEGORY_FIELDS, '/V1/categories/list');
+    }
+
     public function boundedCount(AdobePaaSRequestContext $context, int $maxEntityId): RequestInterface
     {
         if ($maxEntityId < 1) {
@@ -93,12 +120,13 @@ final class AdobeRemoteCatalogRequestFactory
         AdobePaaSRequestContext $context,
         array $searchCriteria,
         string $fields,
+        string $endpointPath = '/V1/products',
     ): RequestInterface {
         if ($context->storeCode === '') {
             throw new InvalidAdobePaaSRequestContextException('Adobe PaaS store code must not be empty.');
         }
 
-        $url = $this->endpoint($context).'?'.http_build_query(
+        $url = $this->endpoint($context, $endpointPath).'?'.http_build_query(
             ['searchCriteria' => $searchCriteria, 'fields' => $fields],
             '',
             '&',
@@ -116,7 +144,7 @@ final class AdobeRemoteCatalogRequestFactory
         ));
     }
 
-    private function endpoint(AdobePaaSRequestContext $context): string
+    private function endpoint(AdobePaaSRequestContext $context, string $endpointPath): string
     {
         $baseUrl = AdobePaaSBaseUrl::parse($context->baseUrl);
         $parsed = parse_url($baseUrl->value);
@@ -125,7 +153,7 @@ final class AdobeRemoteCatalogRequestFactory
             throw new InvalidAdobePaaSRequestContextException('Adobe PaaS base URL must be an absolute URL.');
         }
 
-        $path = rtrim($parsed['path'] ?? '', '/').'/rest/'.rawurlencode($context->storeCode).'/V1/products';
+        $path = rtrim($parsed['path'] ?? '', '/').'/rest/'.rawurlencode($context->storeCode).$endpointPath;
         $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
 
         return $parsed['scheme'].'://'.$parsed['host'].$port.$path;

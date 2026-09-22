@@ -5,6 +5,7 @@ namespace App\Services\Connectors;
 use App\Enums\ExternalRecordLinkTrustOrigin;
 use App\Enums\RemoteCatalogScanStatus;
 use App\Enums\SyncDataDomain;
+use App\Models\AdobeProductAttributeSet;
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
 use App\Models\RemoteCatalogScan;
@@ -12,6 +13,7 @@ use App\Models\RemoteCatalogSnapshot;
 use App\Models\RemoteCatalogSnapshotItem;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshotResolver;
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogSummary;
+use App\Support\Workspace\WorkspaceScope;
 use Illuminate\Database\Eloquent\Builder;
 
 final class AdobeRemoteCatalogProjectionService
@@ -64,7 +66,21 @@ final class AdobeRemoteCatalogProjectionService
         return $query
             ->select('remote_catalog_snapshot_items.*')
             ->where('snapshot_id', $snapshot->id)
+            ->with(['categories' => static fn ($categories) => $categories
+                ->withoutGlobalScope(WorkspaceScope::class)
+                ->orderByRaw('position is null, position')
+                ->orderBy('external_category_id')])
             ->addSelect([
+                'attribute_set_name' => AdobeProductAttributeSet::withoutWorkspaceScope()
+                    ->select('name')
+                    ->where('workspace_id', $account->workspace_id)
+                    ->where('connector_account_id', $account->id)
+                    ->whereNull('missing_since')
+                    ->whereColumn(
+                        'provider_attribute_set_id',
+                        'remote_catalog_snapshot_items.external_attribute_set_id',
+                    )
+                    ->limit(1),
                 'is_linked' => ExternalRecordLink::withoutWorkspaceScope()
                     ->selectRaw('1')
                     ->where('workspace_id', $account->workspace_id)

@@ -49,9 +49,9 @@ class AdobeRemoteCatalogEnumeratorTest extends TestCase
 
         $this->assertSame($total, $received);
         $this->assertSame($total, $consumed);
-        $this->assertSame(51, $pageCount);
-        $this->assertSame(51, $client->pageCalls);
-        $this->assertSame(200, $maxChunk);
+        $this->assertSame(101, $pageCount);
+        $this->assertSame(101, $client->pageCalls);
+        $this->assertSame(100, $maxChunk);
         $this->assertSame(1, $client->boundedCountCalls);
     }
 
