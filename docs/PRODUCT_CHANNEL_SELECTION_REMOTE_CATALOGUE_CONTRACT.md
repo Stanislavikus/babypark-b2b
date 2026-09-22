@@ -1,8 +1,8 @@
 # Product → Channel Selection + Remote Catalogue Projection Contract
 
-**Status:** FROZEN — STOP-AND-AMEND 2026-09-21
+**Status:** FROZEN — STOP-AND-AMEND 2026-09-22
 **Date:** 2026-09-15
-**Last amended:** 2026-09-21 — Product Workbench structural ordering
+**Last amended:** 2026-09-22 — Product Workbench visual/data-state refinement
 **Scope:** universal Product-to-destination selection, merchant channel workspaces,
 remote-catalogue projection, Preview→Live selection evidence, and future SEO/AI/media
 compatibility. Magento / Adobe Commerce V1 is the first concrete implementation target.
@@ -29,16 +29,18 @@ The current runtime may continue to execute `all_products` until the implementat
 for this contract lands. That is an implementation gap, not permission to reinterpret this
 contract as optional.
 
-## [Resolved — 2026-09-21] Product Workbench presentation-order amendment
+## [Resolved — 2026-09-21; amended 2026-09-22] Product Workbench presentation-order amendment
 
-Normative structural detail: `docs/reviews/PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_2026_09_21.md`.
+Normative structural/visual detail:
+- `docs/reviews/PRODUCT_WORKBENCH_STRUCTURAL_CONTRACT_2026_09_21.md`;
+- `docs/reviews/PRODUCT_WORKBENCH_VISUAL_UX_CONTRACT_2026_09_22.md`.
 
 The 2026-09-15 contract correctly separated local Master Product selection from Remote Catalogue
 observation, but its presentation order is superseded for the Magento daily workspace:
 
 - **`Огляд`** uses the current successful Magento Remote Catalogue snapshot as its row universe;
 - **`Публікація`** uses local Master Products selected/linked for outbound preparation;
-- **`Зв'язки`** presents correspondence/matching between the remote and Master Product universes;
+- correspondence/linking remains first-class but is handled inside `Огляд` through `Зв'язок`, filters/system views and governed row actions rather than a permanent third top-level tab;
 - no default UNION table may merge remote-only rows with local-not-yet-created Products as one ambiguous product list.
 
 This amendment changes information architecture only. Ownership remains unchanged:
@@ -48,7 +50,7 @@ This amendment changes information architecture only. Ownership remains unchange
 - `ExternalRecordLink` = trusted remote correspondence;
 - Sync Product selection = outbound intent.
 
-The current Remote Catalogue projection does not yet provide brand/category fields and current Adobe scanning does not yet supply the target thumbnail experience. Those default-visible/filterable columns require the separately named **Remote Catalogue Projection V2** and must not be implied by the initial `Огляд` implementation.
+The current Remote Catalogue persistence does not yet store the full useful Overview projection. Real-target READ research on 2026-09-22 proved that the normal paged Magento Product response already carries Attribute Set ID, category links, media/thumbnail evidence and provider attributes needed for Projection V2 without per-Product GET N+1. Projection V2 is therefore the next implementation dependency before the target `Огляд` is built. See `docs/reviews/PRODUCT_WORKBENCH_REMOTE_CATALOGUE_PROJECTION_V2_REAL_MAGENTO_STUDY_2026_09_22.md`.
 
 ## Product goal
 
@@ -208,11 +210,13 @@ The merchant may manage the same selection from either:
 
 Both are lenses over the same membership relation.
 
-### View-aware channel worklists [Resolved — 2026-09-21]
+### View-aware channel worklists [Resolved — 2026-09-21; amended 2026-09-22]
 
 The channel workspace has distinct row universes instead of one ambiguous primary table.
 
-**`Огляд`** is remote-catalogue-first for Magento: it shows the current successful provider snapshot. The first implementation may show only fields the projection actually owns today (SKU, remote name, type, provider status, freshness, plus platform-derived link state). Thumbnail/brand/category become default-visible only after Remote Catalogue Projection V2 supplies them at catalogue scale.
+**`Огляд`** is remote-catalogue-first for Magento: it shows the current successful provider snapshot. The target implementation waits for Remote Catalogue Projection V2 so the merchant receives the useful remote columns (thumbnail/media locator, Category path, Attribute Set context and resolved provider brand-like field where available) instead of freezing a disposable minimal grid.
+
+`Огляд` also carries correspondence as a normal truth dimension: `Зв'язок` column/filter + governed `Пов'язати`/open row action. A dedicated top-level `Зв'язки` tab is not required in first scope; a system filter/view may isolate unlinked/candidate work when that workload exists.
 
 **`Публікація`** shows local Master Products selected/linked for this channel. Recommended identity cluster:
 
@@ -223,13 +227,16 @@ The channel workspace has distinct row universes instead of one ambiguous primar
 
 For local publication rows, preserve separate merchant-visible truth dimensions at least for:
 
-- remote correspondence (`Пов'язано`, `Потрібно підтвердити`, `Не знайдено` or equivalent);
-- readiness (`Готово`, blocker/recommendation counts);
-- one causal next action.
+- remote correspondence;
+- `Стан даних` (derived data-quality/completeness profile);
+- readiness;
+- problems/findings;
+- last governed run result;
+- row-owned remediation/action.
 
-**`Зв'язки`** shows remote↔Master correspondence/matching and may support bulk confirmation plus row-level correction. Candidate similarity does not become trusted identity without the existing Entity Trust confirmation boundary.
+`Стан даних`, readiness and problems are not interchangeable. Data state answers whether monitored/applicable data is filled; readiness answers whether goal X can execute safely; problems identify concrete causes.
 
-Do not persist one generic mega-status that merges membership, identity, readiness, provider state, and run result.
+Do not persist one generic mega-status that merges membership, identity, data state, readiness, provider state, problems, and run result.
 
 A Product row may summarize findings as, for example:
 

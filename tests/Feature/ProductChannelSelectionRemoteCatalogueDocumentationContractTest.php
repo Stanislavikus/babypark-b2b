@@ -13,7 +13,7 @@ class ProductChannelSelectionRemoteCatalogueDocumentationContractTest extends Te
     {
         $content = File::get(base_path('docs/PRODUCT_CHANNEL_SELECTION_REMOTE_CATALOGUE_CONTRACT.md'));
 
-        $this->assertStringContainsString('**Status:** FROZEN — STOP-AND-AMEND 2026-09-21', $content);
+        $this->assertStringContainsString('**Status:** FROZEN — STOP-AND-AMEND 2026-09-22', $content);
         $this->assertStringContainsString('Product Workbench presentation-order amendment', $content);
         $this->assertStringContainsString('selection.mode = explicit_products', $content);
         $this->assertStringContainsString('`SyncConfiguration`', $content);
@@ -58,11 +58,12 @@ class ProductChannelSelectionRemoteCatalogueDocumentationContractTest extends Te
 
         $this->assertStringContainsString('### Product → Channel Selection + Remote Catalogue Projection', $domain);
         $this->assertStringContainsString('[Resolved — 2026-09-15; presentation ordering amended 2026-09-21]', $domain);
+        $this->assertStringContainsString('A3 presentation amended 2026-09-22', $domain);
         $this->assertStringContainsString('is no longer the target merchant-selection model', $domain);
         $this->assertStringContainsString('### Product Workbench + channel work surface (Resolved — 2026-09-21)', $ux);
         $this->assertStringContainsString('**`Огляд`** defaults to the current successful Magento Remote Catalogue snapshot', $ux);
         $this->assertStringContainsString('Remote-only records in `Огляд` may be browsed/searched/filtered and linked', $ux);
-        $this->assertStringContainsString('**Product Workbench / channel workspace (Resolved 2026-09-21):**', $ui);
+        $this->assertStringContainsString('**Product Workbench / channel workspace (Resolved 2026-09-21; visual amendment 2026-09-22):**', $ui);
     }
 
     #[Test]
