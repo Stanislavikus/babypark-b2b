@@ -10,6 +10,7 @@ use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshot;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshotResolver;
 use App\Support\Connectors\RemoteCatalog\RemoteCatalogItemCandidate;
+use App\Support\Connectors\RemoteCatalog\RemoteCatalogItemCategoryCandidate;
 use Throwable;
 
 final class AdobeRemoteCatalogScanner
@@ -18,6 +19,8 @@ final class AdobeRemoteCatalogScanner
         private readonly AdobePaaSRequestContextFactory $contextFactory,
         private readonly AdobeConnectorAccountTargetSnapshotResolver $targetResolver,
         private readonly AdobeRemoteCatalogEnumerator $enumerator,
+        private readonly AdobeRemoteCatalogCategoryDictionaryReader $categoryDictionaryReader,
+        private readonly AdobeRemoteCatalogBrandProjectionResolver $brandProjectionResolver,
         private readonly RemoteCatalogScanService $scanService,
     ) {}
 
@@ -36,21 +39,51 @@ final class AdobeRemoteCatalogScanner
         );
 
         try {
+            $categoryPaths = [];
+            $brandProjection = null;
+
+            if ($boundary->totalCount > 0) {
+                try {
+                    $categoryPaths = $this->categoryDictionaryReader->read($context);
+                } catch (AdobeRemoteCatalogReadException) {
+                    $categoryPaths = [];
+                }
+
+                $brandProjection = $this->brandProjectionResolver->resolve($account);
+            }
+
             $received = $this->enumerator->enumerateWithinBoundary(
                 $context,
                 $boundary,
-                function (array $items) use ($scan): void {
+                function (array $items) use ($scan, $categoryPaths, $brandProjection): void {
                     $this->scanService->append(
                         $scan,
                         array_map(
-                            static fn (AdobeRemoteCatalogItem $item): RemoteCatalogItemCandidate => new RemoteCatalogItemCandidate(
-                                remoteIdentifier: (string) $item->entityId,
-                                sku: $item->sku,
-                                name: $item->name,
-                                remoteType: $item->typeId,
-                                remoteStatus: $item->status,
-                                remoteUpdatedAt: $item->updatedAt,
-                            ),
+                            static function (AdobeRemoteCatalogItem $item) use ($categoryPaths, $brandProjection): RemoteCatalogItemCandidate {
+                                $brand = $brandProjection?->project($item->customAttributes);
+
+                                return new RemoteCatalogItemCandidate(
+                                    remoteIdentifier: (string) $item->entityId,
+                                    sku: $item->sku,
+                                    name: $item->name,
+                                    remoteType: $item->typeId,
+                                    remoteStatus: $item->status,
+                                    externalAttributeSetId: $item->attributeSetId,
+                                    remoteUpdatedAt: $item->updatedAt,
+                                    thumbnailLocator: $item->thumbnailLocator,
+                                    providerBrandFieldKey: $brand['field_key'] ?? null,
+                                    providerBrandValue: $brand['value'] ?? null,
+                                    providerBrandLabel: $brand['label'] ?? null,
+                                    categories: array_map(
+                                        static fn (AdobeRemoteCatalogCategoryLink $link): RemoteCatalogItemCategoryCandidate => new RemoteCatalogItemCategoryCandidate(
+                                            externalCategoryId: $link->categoryId,
+                                            categoryPath: $categoryPaths[$link->categoryId] ?? null,
+                                            position: $link->position,
+                                        ),
+                                        $item->categoryLinks,
+                                    ),
+                                );
+                            },
                             $items,
                         ),
                     );

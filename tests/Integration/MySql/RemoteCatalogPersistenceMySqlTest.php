@@ -8,6 +8,8 @@ use App\Models\RemoteCatalogCurrentSnapshot;
 use App\Models\Workspace;
 use App\Services\Connectors\RemoteCatalogScanService;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshotResolver;
+use App\Support\Connectors\RemoteCatalog\RemoteCatalogItemCandidate;
+use App\Support\Connectors\RemoteCatalog\RemoteCatalogItemCategoryCandidate;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Database\QueryException;
@@ -42,6 +44,13 @@ class RemoteCatalogPersistenceMySqlTest extends TestCase
         $this->assertTrue(Schema::hasTable('remote_catalog_snapshots'));
         $this->assertTrue(Schema::hasTable('remote_catalog_snapshot_items'));
         $this->assertTrue(Schema::hasTable('remote_catalog_current_snapshots'));
+        $this->assertTrue(Schema::hasTable('remote_catalog_snapshot_item_categories'));
+
+        Artisan::call('migrate:rollback', [
+            '--path' => 'database/migrations/2026_09_22_160000_remote_catalog_projection_v2.php',
+        ]);
+
+        $this->assertFalse(Schema::hasTable('remote_catalog_snapshot_item_categories'));
 
         Artisan::call('migrate:rollback', [
             '--path' => 'database/migrations/2026_09_16_100000_remote_catalog_foundation.php',
@@ -56,6 +65,37 @@ class RemoteCatalogPersistenceMySqlTest extends TestCase
 
         $this->assertTrue(Schema::hasTable('remote_catalog_scans'));
         $this->assertTrue(Schema::hasTable('remote_catalog_current_snapshots'));
+        $this->assertTrue(Schema::hasTable('remote_catalog_snapshot_item_categories'));
+    }
+
+    public function test_mysql_rejects_cross_workspace_snapshot_item_category_reference(): void
+    {
+        $account = $this->createConnectorAccount();
+        $service = app(RemoteCatalogScanService::class);
+        $target = app(AdobeConnectorAccountTargetSnapshotResolver::class)->resolve($account)->toEnvelopeArray();
+        $scan = $service->begin($account, SyncDataDomain::Products, $target, 1);
+        $service->append($scan, [
+            new RemoteCatalogItemCandidate(
+                remoteIdentifier: 'category-fk',
+                categories: [new RemoteCatalogItemCategoryCandidate('6', 'Strollers')],
+            ),
+        ]);
+        $snapshot = $scan->snapshot()->withoutGlobalScopes()->firstOrFail();
+        $item = $snapshot->items()->withoutGlobalScopes()->firstOrFail();
+        $otherWorkspace = Workspace::query()->create([
+            'name' => 'Other workspace '.Str::random(6),
+            'is_default' => false,
+        ]);
+
+        $this->expectException(QueryException::class);
+        DB::table('remote_catalog_snapshot_item_categories')->insert([
+            'workspace_id' => $otherWorkspace->id,
+            'snapshot_item_id' => $item->id,
+            'external_category_id' => '7',
+            'category_path' => 'Other',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     public function test_mysql_rejects_cross_workspace_scan_account_reference(): void

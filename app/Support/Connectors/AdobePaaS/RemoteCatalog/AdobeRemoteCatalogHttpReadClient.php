@@ -149,13 +149,19 @@ final class AdobeRemoteCatalogHttpReadClient implements AdobeRemoteCatalogReadCl
             throw new AdobeRemoteCatalogReadException('Adobe remote catalogue Product status is invalid.');
         }
 
+        $customAttributes = $this->customAttributes($item);
+
         return new AdobeRemoteCatalogItem(
             entityId: $this->entityId($item),
             sku: $this->optionalString($item, 'sku'),
             name: $this->optionalString($item, 'name'),
             typeId: $this->optionalString($item, 'type_id'),
             status: $status === null ? null : (string) $status,
+            attributeSetId: $this->optionalPositiveInt($item, 'attribute_set_id'),
             updatedAt: $this->optionalDateTime($item, 'updated_at'),
+            thumbnailLocator: $this->thumbnailLocator($item, $customAttributes),
+            categoryLinks: $this->categoryLinks($item, $customAttributes),
+            customAttributes: $customAttributes,
         );
     }
 
@@ -169,6 +175,174 @@ final class AdobeRemoteCatalogHttpReadClient implements AdobeRemoteCatalogReadCl
         }
 
         return $entityId;
+    }
+
+    /** @param array<string, mixed> $item */
+    private function optionalPositiveInt(array $item, string $key): ?int
+    {
+        $value = $item[$key] ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_string($value) && ctype_digit($value)) {
+            $value = (int) $value;
+        }
+
+        if (! is_int($value) || $value < 1) {
+            throw new AdobeRemoteCatalogReadException(sprintf('Adobe remote catalogue %s is invalid.', $key));
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @return array<string, mixed>
+     */
+    private function customAttributes(array $item): array
+    {
+        $raw = $item['custom_attributes'] ?? [];
+        if (! is_array($raw) || ! array_is_list($raw)) {
+            throw new AdobeRemoteCatalogReadException('Adobe remote catalogue custom_attributes are invalid.');
+        }
+
+        $attributes = [];
+        foreach ($raw as $entry) {
+            if (! is_array($entry) || array_is_list($entry)) {
+                throw new AdobeRemoteCatalogReadException('Adobe remote catalogue custom attribute has an invalid shape.');
+            }
+
+            $code = $entry['attribute_code'] ?? null;
+            if (! is_string($code) || trim($code) === '') {
+                throw new AdobeRemoteCatalogReadException('Adobe remote catalogue custom attribute code is invalid.');
+            }
+
+            $attributes[$code] = $entry['value'] ?? null;
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @param  array<string, mixed>  $customAttributes
+     * @return list<AdobeRemoteCatalogCategoryLink>
+     */
+    private function categoryLinks(array $item, array $customAttributes): array
+    {
+        $raw = $item['extension_attributes']['category_links'] ?? null;
+        $links = [];
+        $seen = [];
+
+        if ($raw !== null) {
+            if (! is_array($raw) || ! array_is_list($raw)) {
+                throw new AdobeRemoteCatalogReadException('Adobe remote catalogue category_links are invalid.');
+            }
+
+            foreach ($raw as $entry) {
+                if (! is_array($entry) || array_is_list($entry)) {
+                    throw new AdobeRemoteCatalogReadException('Adobe remote catalogue category link has an invalid shape.');
+                }
+
+                $categoryId = $this->stringIdentifier($entry['category_id'] ?? null, 'category id');
+                if (isset($seen[$categoryId])) {
+                    continue;
+                }
+
+                $seen[$categoryId] = true;
+                $position = $entry['position'] ?? null;
+                if (is_string($position) && preg_match('/^-?\\d+$/', $position) === 1) {
+                    $position = (int) $position;
+                }
+                if ($position !== null && ! is_int($position)) {
+                    throw new AdobeRemoteCatalogReadException('Adobe remote catalogue category position is invalid.');
+                }
+
+                $links[] = new AdobeRemoteCatalogCategoryLink($categoryId, $position);
+            }
+
+            return $links;
+        }
+
+        $fallback = $customAttributes['category_ids'] ?? [];
+        if (! is_array($fallback) || ! array_is_list($fallback)) {
+            return [];
+        }
+
+        foreach ($fallback as $value) {
+            $categoryId = $this->stringIdentifier($value, 'category id');
+            if (! isset($seen[$categoryId])) {
+                $seen[$categoryId] = true;
+                $links[] = new AdobeRemoteCatalogCategoryLink($categoryId);
+            }
+        }
+
+        return $links;
+    }
+
+    /**
+     * @param  array<string, mixed>  $item
+     * @param  array<string, mixed>  $customAttributes
+     */
+    private function thumbnailLocator(array $item, array $customAttributes): ?string
+    {
+        foreach (['thumbnail', 'small_image', 'image'] as $key) {
+            $value = $customAttributes[$key] ?? null;
+            if (is_string($value)) {
+                $value = trim($value);
+                if ($value !== '' && $value !== 'no_selection') {
+                    return $value;
+                }
+            }
+        }
+
+        $entries = $item['media_gallery_entries'] ?? [];
+        if (! is_array($entries) || ! array_is_list($entries)) {
+            throw new AdobeRemoteCatalogReadException('Adobe remote catalogue media_gallery_entries are invalid.');
+        }
+
+        $fallback = null;
+        foreach ($entries as $entry) {
+            if (! is_array($entry) || array_is_list($entry)) {
+                throw new AdobeRemoteCatalogReadException('Adobe remote catalogue media gallery entry has an invalid shape.');
+            }
+
+            $disabled = $entry['disabled'] ?? false;
+            if ($disabled === true || $disabled === 1 || $disabled === '1') {
+                continue;
+            }
+
+            $file = $entry['file'] ?? null;
+            if (! is_string($file) || trim($file) === '') {
+                continue;
+            }
+
+            $file = trim($file);
+            $types = $entry['types'] ?? [];
+            if (is_array($types) && array_is_list($types) && in_array('thumbnail', $types, true)) {
+                return $file;
+            }
+
+            $fallback ??= $file;
+        }
+
+        return $fallback;
+    }
+
+    private function stringIdentifier(mixed $value, string $subject): string
+    {
+        if (! is_string($value) && ! is_int($value)) {
+            throw new AdobeRemoteCatalogReadException(sprintf('Adobe remote catalogue %s is invalid.', $subject));
+        }
+
+        $identifier = trim((string) $value);
+        if ($identifier === '') {
+            throw new AdobeRemoteCatalogReadException(sprintf('Adobe remote catalogue %s is invalid.', $subject));
+        }
+
+        return $identifier;
     }
 
     /** @param array<string, mixed> $item */

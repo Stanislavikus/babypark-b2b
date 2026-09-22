@@ -3,20 +3,29 @@
 namespace Tests\Feature\Sync;
 
 use App\Enums\RemoteCatalogScanStatus;
+use App\Enums\SyncDataDomain;
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
 use App\Models\Product;
 use App\Models\RemoteCatalogScan;
+use App\Models\RemoteCatalogSnapshotItemCategory;
+use App\Services\Connectors\AdobeRemoteCatalogProjectionService;
+use App\Services\Connectors\RemoteCatalogScanService;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
+use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshotResolver;
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogBoundary;
+use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogCategoryDictionaryReader;
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogItem;
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogPage;
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogReadClient;
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogScanner;
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogTargetChangedException;
+use App\Support\Connectors\RemoteCatalog\RemoteCatalogItemCandidate;
 use App\Support\Connectors\Transport\ConnectorHttpResult;
 use App\Support\Connectors\Transport\ConnectorHttpTransport;
 use App\Support\Connectors\Transport\ConnectorOutboundRequest;
+use App\Support\Connectors\Transport\ConnectorTransportException;
+use App\Support\Connectors\Transport\TransportFailureReason;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -45,25 +54,66 @@ class AdobeRemoteCatalogScannerTest extends TestCase
         $transport = new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request, int $count): ConnectorHttpResult {
             return match ($count) {
                 1 => $this->jsonResult([
-                    'items' => [[
-                        'id' => 3,
-                        'sku' => 'SKU-3',
-                        'name' => 'Three',
-                        'type_id' => 'simple',
-                        'status' => 1,
-                        'updated_at' => '2026-09-16 09:00:00',
-                    ]],
+                    'items' => [['id' => 3]],
                     'total_count' => 3,
                 ]),
                 2 => $this->jsonResult([
+                    'items' => [[
+                        'id' => 6,
+                        'parent_id' => 3,
+                        'name' => 'Strollers',
+                        'is_active' => true,
+                        'position' => 1,
+                        'level' => 2,
+                        'path' => '6',
+                    ]],
+                    'total_count' => 1,
+                ]),
+                3 => $this->jsonResult([
                     'items' => [
-                        ['id' => 1, 'sku' => 'SKU-1', 'name' => 'One', 'type_id' => 'simple', 'status' => 1, 'updated_at' => '2026-09-16 08:00:00'],
-                        ['id' => 2, 'sku' => 'SKU-2', 'name' => 'Two', 'type_id' => 'simple', 'status' => 1, 'updated_at' => '2026-09-16 08:30:00'],
-                        ['id' => 3, 'sku' => 'SKU-3', 'name' => 'Three', 'type_id' => 'simple', 'status' => 1, 'updated_at' => '2026-09-16 09:00:00'],
+                        [
+                            'id' => 1,
+                            'sku' => 'SKU-1',
+                            'name' => 'One',
+                            'attribute_set_id' => 10,
+                            'type_id' => 'simple',
+                            'status' => 1,
+                            'updated_at' => '2026-09-16 08:00:00',
+                            'extension_attributes' => ['category_links' => [['category_id' => '6', 'position' => 1]]],
+                            'custom_attributes' => [
+                                ['attribute_code' => 'thumbnail', 'value' => '/o/n/one.jpg'],
+                                ['attribute_code' => 'manufacturer', 'value' => '991'],
+                            ],
+                            'media_gallery_entries' => [],
+                        ],
+                        [
+                            'id' => 2,
+                            'sku' => 'SKU-2',
+                            'name' => 'Two',
+                            'attribute_set_id' => 10,
+                            'type_id' => 'simple',
+                            'status' => 1,
+                            'updated_at' => '2026-09-16 08:30:00',
+                            'extension_attributes' => ['category_links' => [['category_id' => '6', 'position' => 2]]],
+                            'custom_attributes' => [],
+                            'media_gallery_entries' => [['file' => '/t/w/two.jpg', 'disabled' => false, 'types' => ['thumbnail']]],
+                        ],
+                        [
+                            'id' => 3,
+                            'sku' => 'SKU-3',
+                            'name' => 'Three',
+                            'attribute_set_id' => 4,
+                            'type_id' => 'simple',
+                            'status' => 1,
+                            'updated_at' => '2026-09-16 09:00:00',
+                            'extension_attributes' => ['category_links' => []],
+                            'custom_attributes' => [],
+                            'media_gallery_entries' => [],
+                        ],
                     ],
                     'total_count' => 3,
                 ]),
-                3 => $this->jsonResult(['items' => [['id' => 1]], 'total_count' => 3]),
+                4 => $this->jsonResult(['items' => [['id' => 1]], 'total_count' => 3]),
                 default => throw new \RuntimeException('Unexpected remote catalogue request.'),
             };
         });
@@ -75,19 +125,32 @@ class AdobeRemoteCatalogScannerTest extends TestCase
         $this->assertNotNull($snapshot->published_at);
         $this->assertSame(['1', '2', '3'], $snapshot->items()->orderBy('remote_identifier')->pluck('remote_identifier')->all());
         $this->assertSame(['SKU-1', 'SKU-2', 'SKU-3'], $snapshot->items()->orderBy('remote_identifier')->pluck('sku')->all());
+        $first = $snapshot->items()->where('remote_identifier', '1')->firstOrFail();
+        $second = $snapshot->items()->where('remote_identifier', '2')->firstOrFail();
+        $this->assertSame(10, $first->external_attribute_set_id);
+        $this->assertSame('/o/n/one.jpg', $first->thumbnail_locator);
+        $this->assertSame('/t/w/two.jpg', $second->thumbnail_locator);
+        $this->assertNull($first->provider_brand_field_key);
+        $category = RemoteCatalogSnapshotItemCategory::withoutWorkspaceScope()
+            ->where('snapshot_item_id', $first->id)
+            ->sole();
+        $this->assertSame('Strollers', $category->category_path);
+        $this->assertSame('6', $category->external_category_id);
         $this->assertSame($productCount, Product::withoutWorkspaceScope()->count());
         $this->assertSame($linkCount, ExternalRecordLink::withoutWorkspaceScope()->count());
         $this->assertSame(RemoteCatalogScanStatus::Succeeded, RemoteCatalogScan::withoutWorkspaceScope()->sole()->status);
-        $this->assertSame(3, $transport->sendCount);
+        $this->assertSame(4, $transport->sendCount);
 
         $uris = array_map(
             static fn (ConnectorOutboundRequest $outbound): string => (string) $outbound->request->getUri(),
             $transport->recordedRequests,
         );
         $this->assertTrue(collect($uris)->every(static fn (string $uri): bool => str_contains($uri, 'currentPage%5D=1')));
-        $this->assertStringContainsString('condition_type%5D=gt', $uris[1]);
-        $this->assertStringContainsString('condition_type%5D=lteq', $uris[1]);
-        $this->assertStringContainsString('direction%5D=ASC', $uris[1]);
+        $this->assertStringContainsString('/V1/categories/list', $uris[1]);
+        $this->assertStringContainsString('condition_type%5D=gt', $uris[2]);
+        $this->assertStringContainsString('condition_type%5D=lteq', $uris[2]);
+        $this->assertStringContainsString('direction%5D=ASC', $uris[2]);
+        $this->assertStringContainsString('pageSize%5D=100', $uris[2]);
     }
 
     public function test_read_failure_marks_candidate_scan_failed_and_never_publishes_it(): void
@@ -116,6 +179,57 @@ class AdobeRemoteCatalogScannerTest extends TestCase
         $this->assertSame(RemoteCatalogScanStatus::Failed, $scan->status);
         $this->assertSame('remote_catalog_enumeration_failed', $scan->failure_code);
         $this->assertNull($scan->snapshot->published_at);
+    }
+
+    public function test_response_size_failure_never_replaces_previous_successful_snapshot(): void
+    {
+        $account = $this->createConnectorAccount();
+        $scans = app(RemoteCatalogScanService::class);
+        $target = app(AdobeConnectorAccountTargetSnapshotResolver::class)
+            ->resolve($account)
+            ->toEnvelopeArray();
+
+        $previousScan = $scans->begin($account, SyncDataDomain::Products, $target, 1);
+        $scans->append($previousScan, [
+            new RemoteCatalogItemCandidate('700', 'OLD-700', 'Previous'),
+        ]);
+        $previous = $scans->publish($previousScan);
+
+        $transport = new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request, int $count): ConnectorHttpResult {
+            return match ($count) {
+                1 => $this->jsonResult([
+                    'items' => [['id' => 701]],
+                    'total_count' => 1,
+                ]),
+                2 => $this->jsonResult([
+                    'items' => [],
+                    'total_count' => 0,
+                ]),
+                3 => throw new ConnectorTransportException(TransportFailureReason::ResponseSizeExceeded),
+                default => throw new \RuntimeException('Unexpected remote catalogue request.'),
+            };
+        });
+        $this->app->instance(ConnectorHttpTransport::class, $transport);
+
+        try {
+            app(AdobeRemoteCatalogScanner::class)->scan($account);
+            $this->fail('Expected response-size failure.');
+        } catch (\Throwable) {
+            // expected
+        }
+
+        $this->assertSame(
+            $previous->id,
+            app(AdobeRemoteCatalogProjectionService::class)->currentSnapshot($account)?->id,
+        );
+
+        $failed = RemoteCatalogScan::withoutWorkspaceScope()
+            ->orderByDesc('generation')
+            ->firstOrFail();
+        $this->assertSame(RemoteCatalogScanStatus::Failed, $failed->status);
+        $this->assertSame('remote_catalog_enumeration_failed', $failed->failure_code);
+        $this->assertNull($failed->snapshot->published_at);
+        $this->assertSame(3, $transport->sendCount);
     }
 
     public function test_target_change_during_scan_fails_without_publishing_old_target_data(): void
@@ -151,6 +265,13 @@ class AdobeRemoteCatalogScannerTest extends TestCase
             }
         };
         $this->app->instance(AdobeRemoteCatalogReadClient::class, $client);
+        $this->app->instance(AdobeRemoteCatalogCategoryDictionaryReader::class, new class implements AdobeRemoteCatalogCategoryDictionaryReader
+        {
+            public function read(AdobePaaSRequestContext $context): array
+            {
+                return [];
+            }
+        });
 
         try {
             app(AdobeRemoteCatalogScanner::class)->scan($account);
