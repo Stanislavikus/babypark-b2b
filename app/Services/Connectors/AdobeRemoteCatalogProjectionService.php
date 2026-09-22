@@ -82,7 +82,20 @@ final class AdobeRemoteCatalogProjectionService
                     )
                     ->limit(1),
                 'is_linked' => ExternalRecordLink::withoutWorkspaceScope()
-                    ->selectRaw('1')
+                    ->selectRaw('COUNT(*) > 0')
+                    ->where('workspace_id', $account->workspace_id)
+                    ->where('connector_account_id', $account->id)
+                    ->where('trust_origin', ExternalRecordLinkTrustOrigin::MerchantConfirmed->value)
+                    ->whereNotNull('external_record_discriminator')
+                    ->whereNotNull('established_by_workspace_user_id')
+                    ->whereNotNull('established_at')
+                    ->whereColumn(
+                        'external_record_discriminator',
+                        'remote_catalog_snapshot_items.remote_identifier',
+                    )
+                    ->limit(1),
+                'linked_product_id' => ExternalRecordLink::withoutWorkspaceScope()
+                    ->select('product_id')
                     ->where('workspace_id', $account->workspace_id)
                     ->where('connector_account_id', $account->id)
                     ->where('trust_origin', ExternalRecordLinkTrustOrigin::MerchantConfirmed->value)

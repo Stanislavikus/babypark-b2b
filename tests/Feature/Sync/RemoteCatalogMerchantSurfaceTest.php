@@ -7,11 +7,11 @@ use App\Enums\RemoteCatalogScanStatus;
 use App\Enums\SyncDataDomain;
 use App\Enums\SyncSemanticOperation;
 use App\Enums\UserRole;
-use App\Filament\Pages\Sync\ManageAdobeProductsChannel;
 use App\Filament\Pages\Sync\ManageAdobeRemoteCatalog;
 use App\Jobs\Connectors\AdobeRemoteCatalogScanJob;
 use App\Models\ExternalRecordLink;
 use App\Models\Product;
+use App\Models\RemoteCatalogSnapshotItem;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceUser;
@@ -23,6 +23,7 @@ use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogPage;
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogReadClient;
 use App\Support\Connectors\ConnectorAccountOperationLock;
 use App\Support\Connectors\RemoteCatalog\RemoteCatalogItemCandidate;
+use App\Support\Connectors\RemoteCatalog\RemoteCatalogItemCategoryCandidate;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
@@ -75,14 +76,21 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
     }
 
     #[Test]
-    public function channel_summary_and_full_remote_catalogue_use_current_snapshot_and_trusted_links(): void
+    public function workbench_overview_uses_current_remote_snapshot_and_keeps_linking_inside_overview(): void
     {
         $account = $this->createConnectorAccount();
-        $linkedProduct = Product::withoutWorkspaceScope()->create([
+        $linkedProductA = Product::withoutWorkspaceScope()->create([
             'workspace_id' => $this->workspace->id,
             'onec_guid' => (string) Str::uuid(),
-            'sku' => 'LOCAL-LINKED',
-            'name' => 'Local linked',
+            'sku' => 'LOCAL-LINKED-A',
+            'name' => 'Local linked A',
+            'is_active' => true,
+        ]);
+        $linkedProductB = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'LOCAL-LINKED-B',
+            'name' => 'Local linked B',
             'is_active' => true,
         ]);
 
@@ -93,70 +101,128 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
             3,
         );
         app(RemoteCatalogScanService::class)->append($scan, [
-            new RemoteCatalogItemCandidate('501', 'REMOTE-501', 'Remote linked'),
-            new RemoteCatalogItemCandidate('502', 'REMOTE-502', 'Remote only A'),
-            new RemoteCatalogItemCandidate('503', 'REMOTE-503', 'Remote only B'),
+            new RemoteCatalogItemCandidate(
+                remoteIdentifier: '501',
+                sku: 'REMOTE-501',
+                name: 'Remote linked A',
+                remoteType: 'simple',
+                remoteStatus: '1',
+                externalAttributeSetId: 10,
+                thumbnailLocator: '/r/e/linked-a.jpg',
+                providerBrandFieldKey: 'manufacturer',
+                providerBrandValue: '991',
+                providerBrandLabel: 'Maxi-Cosi',
+                categories: [new RemoteCatalogItemCategoryCandidate('6', 'Strollers', 1)],
+            ),
+            new RemoteCatalogItemCandidate(
+                remoteIdentifier: '502',
+                sku: 'REMOTE-502',
+                name: 'Remote linked B',
+                remoteType: 'simple',
+                remoteStatus: '1',
+                thumbnailLocator: '/r/e/linked-b.jpg',
+                providerBrandFieldKey: 'manufacturer',
+                providerBrandValue: '992',
+                providerBrandLabel: 'CYBEX',
+                categories: [new RemoteCatalogItemCategoryCandidate('7', 'Car Seats', 1)],
+            ),
+            new RemoteCatalogItemCandidate(
+                remoteIdentifier: '503',
+                sku: 'REMOTE-503',
+                name: 'Remote unlinked',
+                remoteType: 'simple',
+                remoteStatus: '2',
+                thumbnailLocator: '/r/e/unlinked.jpg',
+                categories: [new RemoteCatalogItemCategoryCandidate('8', 'Sale', 1)],
+            ),
         ]);
-        app(RemoteCatalogScanService::class)->publish($scan);
+        $snapshot = app(RemoteCatalogScanService::class)->publish($scan);
 
         $membership = WorkspaceUser::query()
             ->where('workspace_id', $this->workspace->id)
             ->where('user_id', $this->actor->id)
             ->firstOrFail();
 
-        ExternalRecordLink::withoutWorkspaceScope()->create([
-            'workspace_id' => $this->workspace->id,
-            'connector_account_id' => $account->id,
-            'product_id' => $linkedProduct->id,
-            'product_variant_id' => null,
-            'external_identifier' => 'REMOTE-501',
-            'trust_origin' => ExternalRecordLinkTrustOrigin::MerchantConfirmed->value,
-            'external_record_discriminator' => '501',
-            'established_by_workspace_user_id' => $membership->id,
-            'established_at' => now(),
-        ]);
+        foreach ([
+            ['remote' => '501', 'sku' => 'REMOTE-501', 'product' => $linkedProductA],
+            ['remote' => '502', 'sku' => 'REMOTE-502', 'product' => $linkedProductB],
+        ] as $link) {
+            ExternalRecordLink::withoutWorkspaceScope()->create([
+                'workspace_id' => $this->workspace->id,
+                'connector_account_id' => $account->id,
+                'product_id' => $link['product']->id,
+                'product_variant_id' => null,
+                'external_identifier' => $link['sku'],
+                'trust_origin' => ExternalRecordLinkTrustOrigin::MerchantConfirmed->value,
+                'external_record_discriminator' => $link['remote'],
+                'established_by_workspace_user_id' => $membership->id,
+                'established_at' => now(),
+            ]);
+        }
 
-        Livewire::actingAs($this->actor)
-            ->test(ManageAdobeProductsChannel::class, ['account' => $account->id])
-            ->assertSet('hasRemoteCatalogSnapshot', true)
-            ->assertSet('remoteCatalogTotal', 3)
-            ->assertSet('linkedRemoteCount', 1)
-            ->assertSet('remoteOnlyCount', 2)
-            ->assertSee(__('product_channels.remote_catalog.summary', [
-                'remote' => 3,
-                'linked' => 1,
-                'unlinked' => 2,
-            ]))
-            ->assertSee(__('product_channels.remote_catalog.open_catalog'));
+        $items = RemoteCatalogSnapshotItem::withoutWorkspaceScope()
+            ->where('snapshot_id', $snapshot->id)
+            ->get()
+            ->keyBy('remote_identifier');
+
         $remoteCatalog = Livewire::actingAs($this->actor)
             ->test(ManageAdobeRemoteCatalog::class, ['account' => $account->id])
             ->assertSet('remoteCatalogTotal', 3)
-            ->assertSet('linkedRemoteCount', 1)
-            ->assertSet('remoteOnlyCount', 2)
-            ->assertSee('Remote linked')
-            ->assertSee('Remote only A')
-            ->assertSee('Remote only B');
+            ->assertSet('linkedRemoteCount', 2)
+            ->assertSet('remoteOnlyCount', 1)
+            ->assertSee('data-testid="product-workbench-focus-mode"', false)
+            ->assertSee('data-testid="product-workbench-tab-overview"', false)
+            ->assertSee('data-testid="product-workbench-tab-publication"', false)
+            ->assertDontSee('product-workbench-tab-links', false)
+            ->assertSee(__('product_channels.workbench.overview.purpose'))
+            ->assertSee('Remote linked A')
+            ->assertSee('Remote linked B')
+            ->assertSee('Remote unlinked')
+            ->assertSee('Maxi-Cosi')
+            ->assertSee('CYBEX')
+            ->assertSee('Strollers')
+            ->assertSee('Car Seats')
+            ->assertSee('Sale')
+            ->assertSee('shop.example.com/media/catalog/product/r/e/linked-a.jpg', false)
+            ->assertTableActionVisible('openMasterProduct', $items['501'])
+            ->assertTableActionVisible('openMasterProduct', $items['502'])
+            ->assertTableActionHidden('openMasterProduct', $items['503']);
 
         $remoteCatalog
-            ->filterTable('link_status', 'linked')
-            ->assertSee('Remote linked')
-            ->assertDontSee('Remote only A')
-            ->assertDontSee('Remote only B');
+            ->call('applyWorkbenchLinkView', 'linked')
+            ->assertSee('Remote linked A')
+            ->assertSee('Remote linked B')
+            ->assertDontSee('Remote unlinked')
+            ->call('applyWorkbenchLinkView', 'unlinked')
+            ->assertDontSee('Remote linked A')
+            ->assertDontSee('Remote linked B')
+            ->assertSee('Remote unlinked')
+            ->call('applyWorkbenchLinkView', 'all')
+            ->assertSee('Remote linked A')
+            ->assertSee('Remote linked B')
+            ->assertSee('Remote unlinked');
+
         $remoteCatalog
-            ->resetTableFilters()
-            ->filterTable('link_status', 'unlinked')
-            ->assertDontSee('Remote linked')
-            ->assertSee('Remote only A')
-            ->assertSee('Remote only B');
-        $remoteCatalog
-            ->resetTableFilters()
             ->searchTable('REMOTE-502')
-            ->assertSee('Remote only A')
-            ->assertDontSee('Remote only B');
-        $remoteCatalog
-            ->searchTable('503')
-            ->assertSee('Remote only B')
-            ->assertDontSee('Remote only A');
+            ->assertSee('Remote linked B')
+            ->assertDontSee('Remote linked A')
+            ->assertDontSee('Remote unlinked')
+            ->set('tableSearch', '')
+            ->filterTable('provider_brand_label', 'Maxi-Cosi')
+            ->assertSee('Remote linked A')
+            ->assertDontSee('Remote linked B')
+            ->resetTableFilters()
+            ->filterTable('category', '8')
+            ->assertSee('Remote unlinked')
+            ->assertDontSee('Remote linked A')
+            ->resetTableFilters()
+            ->filterTable('remote_status', '2')
+            ->assertSee('Remote unlinked')
+            ->assertDontSee('Remote linked B')
+            ->resetTableFilters()
+            ->filterTable('external_attribute_set_id', 10)
+            ->assertSee('Remote linked A')
+            ->assertDontSee('Remote linked B');
     }
 
     #[Test]
@@ -231,7 +297,7 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
         $account = $this->createConnectorAccount();
 
         Livewire::actingAs($this->actor)
-            ->test(ManageAdobeProductsChannel::class, ['account' => $account->id])
+            ->test(ManageAdobeRemoteCatalog::class, ['account' => $account->id])
             ->call('refreshRemoteCatalog')
             ->assertSet('remoteCatalogScanRunning', true)
             ->assertNotified();
