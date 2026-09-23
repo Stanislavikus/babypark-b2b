@@ -64,6 +64,23 @@ class UiDesignSystemDocumentationTest extends TestCase
         $this->assertStringContainsString('counts active filter dimensions', $content);
         $this->assertStringContainsString('Do not combine row-filter count and comparison/column count into one', $content);
         $this->assertStringContainsString('Порівняти канали [4]', $content);
+        $this->assertStringContainsString('native Filament', $content);
+        $this->assertStringContainsString('top-right edge', $content);
+        $this->assertStringContainsString('not an inline count after the button label', $content);
+    }
+
+    #[Test]
+    public function ui_design_system_freezes_provider_mark_and_action_column_standards(): void
+    {
+        $content = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
+
+        $this->assertStringContainsString('## Integration / Provider Identity Mark Standard', $content);
+        $this->assertStringContainsString('32 × 32 px', $content);
+        $this->assertStringContainsString('never rely on the', $content);
+        $this->assertStringContainsString("source image's intrinsic dimensions", $content);
+        $this->assertStringContainsString('## Record Action Column Alignment and Priority Sort', $content);
+        $this->assertStringContainsString('same left/start alignment', $content);
+        $this->assertStringContainsString('priority sort', $content);
     }
 
     #[Test]

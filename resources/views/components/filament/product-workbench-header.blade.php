@@ -13,7 +13,10 @@
         <img
             src="{{ asset('images/connectors/magento-mark.png') }}"
             alt=""
-            class="h-8 w-8 shrink-0 object-contain"
+            width="32"
+            height="32"
+            style="width: 32px; height: 32px;"
+            class="shrink-0 object-contain"
             aria-hidden="true"
         >
 

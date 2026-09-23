@@ -235,6 +235,7 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                     ->action(fn (Product $record) => $this->removeProduct($record)),
             ])
             ->recordActionsColumnLabel(__('product_channels.workbench.columns.action'))
+            ->recordActionsAlignment('start')
             ->paginated([20, 50, 100])
             ->defaultPaginationPageOption(20)
             ->defaultSort('name');

@@ -834,6 +834,7 @@
     "product_channels.workbench.toolbar.filters": "Фильтры",
     "product_channels.workbench.toolbar.columns": "Столбцы",
     "product_channels.workbench.search_placeholder": "Поиск по SKU, названию или бренду",
+    "product_channels.workbench.actions.sort_link_needed": "Сортировать по необходимости связать",
     "product_channels.workbench.actions.open": "Открыть",
     "product_channels.workbench.actions.open_full": "Открыть полную карточку",
     "product_channels.workbench.image_zoom": "Нажмите для увеличения",

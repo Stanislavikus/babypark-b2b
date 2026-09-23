@@ -347,7 +347,11 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
                         $this->startEntityTrustReview($record, (string) ($data['product_id'] ?? ''));
                     }),
             ])
-            ->recordActionsColumnLabel(__('product_channels.workbench.columns.action'))
+            ->recordActionsColumnLabel(fn () => view('filament.pages.sync.partials.product-workbench-action-sort-header', [
+                'active' => $this->getTableSortColumn() === 'is_linked',
+                'direction' => $this->getTableSortDirection(),
+            ]))
+            ->recordActionsAlignment('start')
             ->paginated([20, 50, 100])
             ->defaultPaginationPageOption(20)
             ->defaultSort('name');

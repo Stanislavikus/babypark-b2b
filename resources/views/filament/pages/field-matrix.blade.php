@@ -23,17 +23,11 @@
         <x-filament::button
           color="gray"
           icon="heroicon-m-view-columns"
+          :badge="$this->selectedComparisonColumnCount() > 0 ? $this->selectedComparisonColumnCount() : null"
           data-testid="compare-channels-trigger"
           x-on:click="panelFocus = 'compare'; $dispatch('open-modal', { id: 'field-matrix-toolbar-panel' })"
         >
-          <span class="flex items-center gap-2">
-            <span>{{ __('field_matrix.compare_channels') }}</span>
-            @if ($this->selectedComparisonColumnCount() > 0)
-              <x-filament::badge color="primary" size="sm">
-                {{ $this->selectedComparisonColumnCount() }}
-              </x-filament::badge>
-            @endif
-          </span>
+          {{ __('field_matrix.compare_channels') }}
         </x-filament::button>
       </x-slot>
 

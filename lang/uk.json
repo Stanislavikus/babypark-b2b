@@ -852,6 +852,7 @@
     "product_channels.workbench.toolbar.filters": "Фільтри",
     "product_channels.workbench.toolbar.columns": "Стовпці",
     "product_channels.workbench.search_placeholder": "Пошук за SKU, назвою або брендом",
+    "product_channels.workbench.actions.sort_link_needed": "Сортувати за потребою пов’язати",
     "product_channels.workbench.actions.open": "Відкрити",
     "product_channels.workbench.actions.open_full": "Відкрити повну картку",
     "product_channels.workbench.image_zoom": "Натисніть для збільшення",

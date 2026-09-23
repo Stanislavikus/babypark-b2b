@@ -169,6 +169,17 @@ class DataListToolbarTest extends TestCase
     }
 
     #[Test]
+    public function data_list_toolbar_uses_native_corner_badges_for_desktop_counts(): void
+    {
+        $toolbar = File::get(resource_path('views/components/filament/data-list-toolbar.blade.php'));
+        $fieldMatrix = File::get(resource_path('views/filament/pages/field-matrix.blade.php'));
+
+        $this->assertStringContainsString(':badge="$filtersCount > 0 ? $filtersCount : null"', $toolbar);
+        $this->assertStringContainsString(':badge="$this->selectedComparisonColumnCount() > 0 ? $this->selectedComparisonColumnCount() : null"', $fieldMatrix);
+        $this->assertStringNotContainsString('<span>{{ $filtersLabel }}</span>', $toolbar);
+    }
+
+    #[Test]
     public function data_list_toolbar_active_filters_are_individually_removable(): void
     {
         Livewire::actingAs($this->platformAdmin)

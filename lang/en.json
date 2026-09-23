@@ -852,6 +852,7 @@
     "product_channels.workbench.toolbar.filters": "Filters",
     "product_channels.workbench.toolbar.columns": "Columns",
     "product_channels.workbench.search_placeholder": "Search by SKU, name or brand",
+    "product_channels.workbench.actions.sort_link_needed": "Sort by linking required",
     "product_channels.workbench.actions.open": "Open",
     "product_channels.workbench.actions.open_full": "Open full product",
     "product_channels.workbench.image_zoom": "Click to enlarge",

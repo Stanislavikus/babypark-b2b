@@ -231,6 +231,7 @@ class ProductChannelWorkspaceUiTest extends TestCase
         $this->assertTrue($table->getFiltersTriggerAction()->isModalSlideOver());
         $this->assertTrue($table->getColumnManagerTriggerAction()->isModalSlideOver());
         $this->assertNotNull($table->getColumnManagerTriggerAction()->getBadge());
+        $this->assertSame('start', $table->getRecordActionsAlignment());
 
         $component
             ->filterTable('brand', 'Brand A')

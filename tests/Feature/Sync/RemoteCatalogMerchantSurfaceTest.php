@@ -183,6 +183,7 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
             ->assertSee(__('product_channels.workbench.overview.unlinked_tooltip', ['count' => 1]))
             ->assertSee(__('product_channels.workbench.toolbar.filters'))
             ->assertSee(__('product_channels.workbench.toolbar.columns'))
+            ->assertSee(__('product_channels.workbench.actions.sort_link_needed'))
             ->assertDontSee(__('product_channels.workbench.overview.purpose'))
             ->assertSee('Remote linked A')
             ->assertSee('Remote linked B')
@@ -238,7 +239,12 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
             ->sortTable('is_linked', 'asc')
             ->assertSee('Remote linked A')
             ->assertSee('Remote linked B')
-            ->assertSee('Remote unlinked')
+            ->assertSee('Remote unlinked');
+
+        $this->assertSame('503', (string) $remoteCatalog->instance()->getTableRecords()->first()->remote_identifier);
+        $this->assertSame('start', $remoteCatalog->instance()->getTable()->getRecordActionsAlignment());
+
+        $remoteCatalog
             ->sortTable('attribute_set_name', 'asc')
             ->assertSee('Remote linked A')
             ->sortTable('category_paths', 'asc')
