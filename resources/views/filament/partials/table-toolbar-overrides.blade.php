@@ -50,6 +50,31 @@
     }
 
 
+    /*
+     * Project toolbar count badge: compact trailing badge stays inside the button,
+     * after the label, with the button's normal right padding still visible.
+     * This is the approved Workbench / Field Matrix placement.
+     */
+    .bp-toolbar-count-trigger .fi-btn-badge-ctn {
+        position: static !important;
+        inset: auto !important;
+        transform: none !important;
+        width: auto !important;
+        background: transparent !important;
+    }
+
+    /*
+     * Filament hardcodes the record-actions header to end alignment. Workbench
+     * uses an action-priority sort header, so align that cell like normal columns.
+     */
+    .fi-ta-header-cell.fi-align-end:has(.bp-workbench-action-sort-header) {
+        text-align: start !important;
+    }
+
+    .fi-ta-header-cell.fi-align-end:has(.bp-workbench-action-sort-header) .fi-ta-header-cell-sort-btn {
+        justify-content: flex-start !important;
+    }
+
     /* Cart toolbar children participate in the parent icon-group flex gap. */
     .bp-cart-toolbar {
         display: contents;

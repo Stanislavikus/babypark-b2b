@@ -64,9 +64,9 @@ class UiDesignSystemDocumentationTest extends TestCase
         $this->assertStringContainsString('counts active filter dimensions', $content);
         $this->assertStringContainsString('Do not combine row-filter count and comparison/column count into one', $content);
         $this->assertStringContainsString('Порівняти канали [4]', $content);
-        $this->assertStringContainsString('native Filament', $content);
-        $this->assertStringContainsString('top-right edge', $content);
-        $this->assertStringContainsString('not an inline count after the button label', $content);
+        $this->assertStringContainsString('inside the trigger after the label', $content);
+        $this->assertStringContainsString('must not intersect the button outline', $content);
+        $this->assertStringContainsString('bp-toolbar-count-trigger', $content);
     }
 
     #[Test]
@@ -75,12 +75,14 @@ class UiDesignSystemDocumentationTest extends TestCase
         $content = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
 
         $this->assertStringContainsString('## Integration / Provider Identity Mark Standard', $content);
-        $this->assertStringContainsString('32 × 32 px', $content);
+        $this->assertStringContainsString('28 × 28 px', $content);
         $this->assertStringContainsString('never rely on the', $content);
         $this->assertStringContainsString("source image's intrinsic dimensions", $content);
         $this->assertStringContainsString('## Record Action Column Alignment and Priority Sort', $content);
         $this->assertStringContainsString('same left/start alignment', $content);
         $this->assertStringContainsString('priority sort', $content);
+        $this->assertStringContainsString('same Filament header-sort visual grammar', $content);
+        $this->assertStringContainsString('exactly **one** sort chevron', $content);
     }
 
     #[Test]

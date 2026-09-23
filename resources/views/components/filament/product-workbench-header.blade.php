@@ -13,9 +13,9 @@
         <img
             src="{{ asset('images/connectors/magento-mark.png') }}"
             alt=""
-            width="32"
-            height="32"
-            style="width: 32px; height: 32px;"
+            width="28"
+            height="28"
+            style="width: 28px; height: 28px;"
             class="shrink-0 object-contain"
             aria-hidden="true"
         >

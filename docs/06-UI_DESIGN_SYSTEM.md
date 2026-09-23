@@ -600,13 +600,15 @@ segmented single-choice control.
   of selected values.
 - A dedicated bounded-selection action such as `Compare channels` or
   `Columns` shows the number of selected items on its own trigger.
-- **Toolbar count-badge placement standard:** use the native Filament
-  corner badge attached to the trigger (small badge at the top-right edge),
-  not an inline count after the button label and not a detached badge in a
-  surrounding container. This applies to `Filters`, `Columns`, comparison
-  selectors and equivalent bounded toolbar actions.
-- Shared non-Eloquent toolbar components must use the same native-looking
-  corner-badge grammar so Eloquent and non-Eloquent lists do not diverge.
+- **Toolbar count-badge placement standard:** use the Filament button badge
+  primitive, but keep the compact badge **inside the trigger after the label**.
+  The badge must not intersect the button outline or hang outside the control;
+  normal right padding remains visible after the badge. This applies to
+  `Filters`, `Columns`, comparison selectors and equivalent bounded toolbar
+  actions.
+- Shared Eloquent and non-Eloquent toolbar controls use the shared
+  `bp-toolbar-count-trigger` presentation so the badge stays in the same
+  approved in-button trailing position across the product.
 - Existing screens are not mass-rewritten merely for this visual rule;
   shared components adopt it centrally, and standalone legacy screens align
   when next materially touched.
@@ -990,6 +992,12 @@ deterministic projection of an underlying row state and sorting materially helps
 action header may expose a **priority sort**. That sort must delegate to the real sortable state
 (for example `needs linking` / `is_linked`), not to button labels or DOM order. The first sort
 direction should put rows requiring merchant attention first when that is the stated workflow.
+
+When an action header is sortable, it must use the **same Filament header-sort visual grammar**
+as ordinary sortable columns: the same `fi-ta-header-cell-sort-btn` control, the same spacing,
+and exactly **one** sort chevron. Inactive uses the standard downward chevron; active uses up/down
+only to reflect the current direction. Do not introduce a two-arrow icon or a one-off sort symbol
+inside the same table.
 
 ## Row Action Zones
 
@@ -1663,8 +1671,9 @@ Shopify, Google or Amazon), but branding must never dominate the work surface.
 
 - Use the official provider mark when a stable official asset is available; do not fabricate
   letter tiles as a substitute once the real mark is known.
-- In a compact operational header, the mark fits inside a **32 × 32 px** box, matching the
-  outer height of the standard small utility button (`size=sm`).
+- In a compact operational header, the provider mark renders inside a **28 × 28 px** box and
+  must remain visually smaller than the outer height of the standard small utility button
+  (`size=sm`). The utility-button box, not its text glyph height, is the size reference.
 - Always constrain raster/SVG assets explicitly by rendered width and height; never rely on the
   source image's intrinsic dimensions or on a newly introduced Tailwind utility being present in
   a previously compiled theme.

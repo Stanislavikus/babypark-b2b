@@ -24,6 +24,7 @@
           color="gray"
           icon="heroicon-m-view-columns"
           :badge="$this->selectedComparisonColumnCount() > 0 ? $this->selectedComparisonColumnCount() : null"
+          class="bp-toolbar-count-trigger"
           data-testid="compare-channels-trigger"
           x-on:click="panelFocus = 'compare'; $dispatch('open-modal', { id: 'field-matrix-toolbar-panel' })"
         >

@@ -297,7 +297,7 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
                     ->button()
                     ->label(__('product_channels.workbench.toolbar.filters'))
                     ->tooltip(__('product_channels.workbench.toolbar.filters'))
-                    ->extraAttributes(['class' => 'bp-workbench-toolbar-trigger'])
+                    ->extraAttributes(['class' => 'bp-workbench-toolbar-trigger bp-toolbar-count-trigger'])
                     ->slideOver()
             )
             ->columnManagerTriggerAction(
@@ -306,7 +306,7 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
                     ->label(__('product_channels.workbench.toolbar.columns'))
                     ->tooltip(__('product_channels.workbench.toolbar.columns'))
                     ->badge(fn (): ?string => $this->visibleToggleableColumnCount())
-                    ->extraAttributes(['class' => 'bp-workbench-toolbar-trigger'])
+                    ->extraAttributes(['class' => 'bp-workbench-toolbar-trigger bp-toolbar-count-trigger'])
                     ->slideOver()
             )
             ->searchPlaceholder(__('product_channels.workbench.search_placeholder'))

@@ -25,8 +25,20 @@ class ProductWorkbenchVisualUxDocumentationContractTest extends TestCase
         $this->assertStringContainsString('browser-like tab strip', $content);
         $this->assertStringContainsString('Матриця полів', $content);
         $this->assertStringContainsString('same right-side slide-over interaction', $content);
-        $this->assertStringContainsString('official Magento mark', $content);
-        $this->assertFileExists(public_path('images/connectors/magento-mark.png'));
+        $this->assertStringContainsString('official Magento PNG mark', $content);
+        $logoPath = public_path('images/connectors/magento-mark.png');
+        $this->assertFileExists($logoPath);
+        $this->assertSame(IMAGETYPE_PNG, getimagesize($logoPath)[2]);
+
+        $header = File::get(resource_path('views/components/filament/product-workbench-header.blade.php'));
+        $this->assertStringContainsString('width="28"', $header);
+        $this->assertStringContainsString('height="28"', $header);
+
+        $actionSortHeader = File::get(resource_path('views/filament/pages/sync/partials/product-workbench-action-sort-header.blade.php'));
+        $this->assertStringContainsString('fi-ta-header-cell-sort-btn', $actionSortHeader);
+        $this->assertStringContainsString('heroicon-m-chevron-down', $actionSortHeader);
+        $this->assertStringNotContainsString('heroicon-m-chevron-up-down', $actionSortHeader);
+        $this->assertSame(1, substr_count($actionSortHeader, '<x-filament::icon'));
         $this->assertStringContainsString('Row / photo interaction — 2026-09-23 clarification', $content);
         $this->assertStringContainsString('shared image lightbox', $content);
         $this->assertStringContainsString('Відкрити повну картку', $content);

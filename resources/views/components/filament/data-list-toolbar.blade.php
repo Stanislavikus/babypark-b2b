@@ -35,6 +35,7 @@
                             color="gray"
                             icon="heroicon-m-funnel"
                             :badge="$filtersCount > 0 ? $filtersCount : null"
+                            class="bp-toolbar-count-trigger"
                             data-testid="data-list-filter-trigger"
                             x-on:click="panelFocus = 'filters'; $dispatch('open-modal', { id: '{{ $panelId }}' })"
                         >
@@ -45,6 +46,7 @@
                             color="gray"
                             icon="heroicon-m-funnel"
                             :badge="$filtersCount > 0 ? $filtersCount : null"
+                            class="bp-toolbar-count-trigger"
                             data-testid="data-list-filter-trigger"
                         >
                             {{ $filtersLabel }}
