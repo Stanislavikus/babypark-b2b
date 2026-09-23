@@ -27,6 +27,7 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -47,6 +48,8 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
     protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $slug = 'sync-data-setup/{account}/products/remote-catalog';
+
+    protected Width|string|null $maxContentWidth = Width::Full;
 
     protected string $view = 'filament.pages.sync.manage-adobe-remote-catalog';
 
@@ -136,6 +139,11 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
         return __('product_channels.workbench.title');
     }
 
+    public function getHeading(): string|Htmlable|null
+    {
+        return null;
+    }
+
     public function mount(string $account): void
     {
         $record = $this->resolveAccount($account);
@@ -159,8 +167,6 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
     {
         return $table
             ->query(fn (): Builder => $this->catalogItemsQuery())
-            ->heading(__('product_channels.workbench.tabs.overview'))
-            ->description(__('product_channels.workbench.overview.purpose'))
             ->columns([
                 ImageColumn::make('thumbnail_locator')
                     ->label(__('product_channels.workbench.columns.image'))
@@ -193,15 +199,19 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
                 TextColumn::make('attribute_set_name')
                     ->label(__('product_channels.workbench.columns.attribute_set'))
                     ->placeholder('—')
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query
+                        ->orderBy('external_attribute_set_id', $direction))
                     ->toggleable(),
                 TextColumn::make('remote_type')
                     ->label(__('product_channels.workbench.columns.type'))
                     ->badge()
+                    ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('remote_status')
                     ->label(__('product_channels.workbench.columns.magento_status'))
                     ->formatStateUsing(fn (mixed $state): string => $this->remoteStatusLabel($state))
                     ->badge()
+                    ->sortable()
                     ->color(fn (mixed $state): string => (string) $state === '1' ? 'success' : ((string) $state === '2' ? 'gray' : 'warning')),
                 TextColumn::make('is_linked')
                     ->label(__('product_channels.workbench.columns.link_status'))
@@ -209,6 +219,7 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
                         ? __('product_channels.remote_catalog.link_status.linked')
                         : __('product_channels.remote_catalog.link_status.unlinked'))
                     ->badge()
+                    ->sortable()
                     ->color(fn (mixed $state): string => $state ? 'success' : 'warning'),
                 TextColumn::make('remote_updated_at')
                     ->label(__('product_channels.workbench.columns.updated'))
@@ -269,6 +280,8 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
                 Action::make('openMasterProduct')
                     ->label(__('product_channels.workbench.actions.open'))
                     ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->iconButton()
+                    ->tooltip(__('product_channels.workbench.actions.open'))
                     ->visible(fn (RemoteCatalogSnapshotItem $record): bool => filled($record->getAttribute('linked_product_id')))
                     ->url(fn (RemoteCatalogSnapshotItem $record): string => ProductResource::getUrl('view', [
                         'record' => $record->getAttribute('linked_product_id'),
@@ -277,6 +290,8 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
                 Action::make('linkMasterProduct')
                     ->label(__('product_channels.workbench.actions.link'))
                     ->icon('heroicon-o-link')
+                    ->iconButton()
+                    ->tooltip(__('product_channels.workbench.actions.link'))
                     ->visible(fn (RemoteCatalogSnapshotItem $record): bool => $this->canReviewOrConfirm() && ! (bool) $record->getAttribute('is_linked'))
                     ->modalHeading(__('product_channels.remote_catalog.link.heading'))
                     ->modalDescription(fn (RemoteCatalogSnapshotItem $record): string => __(
@@ -735,7 +750,7 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
         $this->remoteCatalogTotal = $summary->totalCount;
         $this->linkedRemoteCount = $summary->linkedCount;
         $this->remoteOnlyCount = $summary->remoteOnlyCount;
-        $this->capturedAt = $summary->snapshot?->captured_at?->toIso8601String();
+        $this->capturedAt = $summary->snapshot?->captured_at?->format('d.m.Y H:i');
         $this->remoteCatalogScanRunning = $summary->scanRunning;
         $user = Auth::user();
         $this->canRefreshRemoteCatalog = $user instanceof User

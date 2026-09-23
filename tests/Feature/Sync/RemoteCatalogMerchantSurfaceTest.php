@@ -173,8 +173,12 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
             ->assertSee('data-testid="product-workbench-focus-mode"', false)
             ->assertSee('data-testid="product-workbench-tab-overview"', false)
             ->assertSee('data-testid="product-workbench-tab-publication"', false)
+            ->assertSee('data-testid="product-workbench-open-navigation"', false)
+            ->assertSee('data-testid="product-workbench-system-filters"', false)
             ->assertDontSee('product-workbench-tab-links', false)
-            ->assertSee(__('product_channels.workbench.overview.purpose'))
+            ->assertSee(__('product_channels.workbench.overview.products_count', ['count' => 3]))
+            ->assertSee(__('product_channels.workbench.overview.unlinked_count', ['count' => 1]))
+            ->assertDontSee(__('product_channels.workbench.overview.purpose'))
             ->assertSee('Remote linked A')
             ->assertSee('Remote linked B')
             ->assertSee('Remote unlinked')
@@ -222,7 +226,14 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
             ->resetTableFilters()
             ->filterTable('external_attribute_set_id', 10)
             ->assertSee('Remote linked A')
-            ->assertDontSee('Remote linked B');
+            ->assertDontSee('Remote linked B')
+            ->resetTableFilters()
+            ->sortTable('is_linked', 'asc')
+            ->assertSee('Remote linked A')
+            ->assertSee('Remote linked B')
+            ->assertSee('Remote unlinked')
+            ->sortTable('attribute_set_name', 'asc')
+            ->assertSee('Remote linked A');
     }
 
     #[Test]

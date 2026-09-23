@@ -3,6 +3,7 @@
 namespace Tests\Feature\Sync;
 
 use App\Enums\ConnectorAccountConnectionStatus;
+use App\Enums\ExternalRecordLinkTrustOrigin;
 use App\Enums\SyncConfigurationOperationalState;
 use App\Enums\SyncDataDomain;
 use App\Enums\SyncSemanticOperation;
@@ -12,10 +13,12 @@ use App\Filament\Pages\Sync\ManageAdobeProductsExportPreview;
 use App\Filament\Pages\Sync\ManageAdobeRemoteCatalog;
 use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
+use App\Models\ExternalRecordLink;
 use App\Models\Product;
 use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Models\WorkspaceUser;
 use App\Services\Sync\ProductChannelSelectionService;
 use App\Services\Sync\SyncDataSetupLandingService;
 use App\Services\Sync\SyncProductSelectionService;
@@ -160,6 +163,79 @@ class ProductChannelWorkspaceUiTest extends TestCase
             ->assertDontSee($unselected->name)
             ->assertSee('data-testid="product-workbench-tab-overview"', false)
             ->assertSee('data-testid="product-workbench-tab-publication"', false);
+    }
+
+    #[Test]
+    public function publication_filters_selected_products_by_brand_status_and_product_type(): void
+    {
+        $account = $this->createConnectorAccount();
+        $configuration = $this->createProductsExportConfiguration($account->id);
+        $active = $this->createProduct('CHANNEL-FILTER-A', [
+            'brand' => 'Brand A',
+            'merchant_type' => 'Type A',
+            'is_active' => true,
+        ]);
+        $inactive = $this->createProduct('CHANNEL-FILTER-B', [
+            'brand' => 'Brand B',
+            'merchant_type' => 'Type B',
+            'is_active' => false,
+        ]);
+
+        app(ProductChannelSelectionService::class)->add(
+            $this->actor,
+            $this->workspace,
+            $configuration->id,
+            [$active->id, $inactive->id],
+        );
+
+        $membership = WorkspaceUser::query()
+            ->where('workspace_id', $this->workspace->id)
+            ->where('user_id', $this->actor->id)
+            ->firstOrFail();
+
+        ExternalRecordLink::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $active->id,
+            'product_variant_id' => null,
+            'external_identifier' => 'REMOTE-FILTER-A',
+            'trust_origin' => ExternalRecordLinkTrustOrigin::MerchantConfirmed->value,
+            'external_record_discriminator' => 'remote-filter-a',
+            'established_by_workspace_user_id' => $membership->id,
+            'established_at' => now(),
+        ]);
+
+        $component = Livewire::actingAs($this->actor)
+            ->test(ManageAdobeProductsChannel::class, ['account' => $account->id])
+            ->assertSee('data-testid="product-workbench-open-navigation"', false)
+            ->filterTable('brand', 'Brand A')
+            ->assertSee($active->name)
+            ->assertDontSee($inactive->name)
+            ->resetTableFilters()
+            ->filterTable('is_active', '0')
+            ->assertDontSee($active->name)
+            ->assertSee($inactive->name)
+            ->resetTableFilters()
+            ->filterTable('merchant_type', 'Type B')
+            ->assertDontSee($active->name)
+            ->assertSee($inactive->name)
+            ->resetTableFilters()
+            ->filterTable('link_status', 'linked')
+            ->assertSee($active->name)
+            ->assertDontSee($inactive->name)
+            ->resetTableFilters()
+            ->filterTable('link_status', 'unlinked')
+            ->assertDontSee($active->name)
+            ->assertSee($inactive->name)
+            ->resetTableFilters()
+            ->sortTable('is_linked', 'asc')
+            ->assertSee($active->name)
+            ->assertSee($inactive->name)
+            ->sortTable('is_active', 'desc')
+            ->assertSee($active->name)
+            ->assertSee($inactive->name);
+
+        $component->assertTableActionVisible('openProduct', $inactive);
     }
 
     #[Test]
@@ -327,7 +403,8 @@ class ProductChannelWorkspaceUiTest extends TestCase
         ]);
     }
 
-    private function createProduct(string $sku): Product
+    /** @param array<string, mixed> $attributes */
+    private function createProduct(string $sku, array $attributes = []): Product
     {
         return Product::withoutWorkspaceScope()->create([
             'workspace_id' => $this->workspace->id,
@@ -335,6 +412,7 @@ class ProductChannelWorkspaceUiTest extends TestCase
             'sku' => $sku,
             'name' => 'Product '.$sku,
             'is_active' => true,
+            ...$attributes,
         ]);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Filament\Pages\Sync;
 
 use App\Enums\ExternalRecordLinkTrustOrigin;
 use App\Filament\Resources\ProductResource;
+use App\Models\Category;
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
 use App\Models\Product;
@@ -20,10 +21,12 @@ use App\Support\Workspace\Rbac\Concerns\RequiresFreshWorkspaceSyncDataSetupLandi
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
@@ -38,6 +41,8 @@ class ManageAdobeProductsChannel extends Page implements HasTable
     protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $slug = 'sync-data-setup/{account}/products/channel';
+
+    protected Width|string|null $maxContentWidth = Width::Full;
 
     protected string $view = 'filament.pages.sync.manage-adobe-products-channel';
 
@@ -81,6 +86,11 @@ class ManageAdobeProductsChannel extends Page implements HasTable
         return __('product_channels.workbench.title');
     }
 
+    public function getHeading(): string|Htmlable|null
+    {
+        return null;
+    }
+
     public function mount(string $account): void
     {
         $workspace = $this->resolveSyncDataSetupLandingWorkspace();
@@ -110,8 +120,6 @@ class ManageAdobeProductsChannel extends Page implements HasTable
     {
         return $table
             ->query(fn (): Builder => $this->selectedProductsQuery())
-            ->heading(__('product_channels.workbench.tabs.publication'))
-            ->description(__('product_channels.workbench.publication.purpose'))
             ->columns([
                 ImageColumn::make('channel_image')
                     ->label(__('product_channels.workbench.columns.image'))
@@ -134,6 +142,7 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                         ? __('product_channels.remote_catalog.link_status.linked')
                         : __('product_channels.workbench.publication.not_in_magento'))
                     ->badge()
+                    ->sortable()
                     ->color(fn (mixed $state): string => $state ? 'success' : 'gray'),
                 TextColumn::make('is_active')
                     ->label(__('product_channels.columns.status'))
@@ -141,17 +150,49 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                         ? __('product_channels.product_status.active')
                         : __('product_channels.product_status.inactive'))
                     ->badge()
+                    ->sortable()
                     ->color(fn (bool $state): string => $state ? 'success' : 'gray'),
+            ])
+            ->filters([
+                SelectFilter::make('link_status')
+                    ->label(__('product_channels.workbench.columns.link_status'))
+                    ->options([
+                        'linked' => __('product_channels.remote_catalog.link_status.linked'),
+                        'unlinked' => __('product_channels.workbench.publication.not_in_magento'),
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => $this->filterByLinkStatus(
+                        $query,
+                        is_string($data['value'] ?? null) ? $data['value'] : null,
+                    )),
+                SelectFilter::make('is_active')
+                    ->label(__('product_channels.columns.status'))
+                    ->options([
+                        '1' => __('product_channels.product_status.active'),
+                        '0' => __('product_channels.product_status.inactive'),
+                    ]),
+                SelectFilter::make('brand')
+                    ->label(__('product_channels.workbench.columns.provider_brand'))
+                    ->options(fn (): array => $this->publicationBrandFilterOptions()),
+                SelectFilter::make('category_id')
+                    ->label(__('product_channels.workbench.columns.category'))
+                    ->options(fn (): array => $this->publicationCategoryFilterOptions()),
+                SelectFilter::make('merchant_type')
+                    ->label(__('product_channels.workbench.columns.product_type'))
+                    ->options(fn (): array => $this->publicationProductTypeFilterOptions()),
             ])
             ->recordActions([
                 Action::make('openProduct')
                     ->label(__('product_channels.workbench.actions.open'))
                     ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->iconButton()
+                    ->tooltip(__('product_channels.workbench.actions.open'))
                     ->url(fn (Product $record): string => ProductResource::getUrl('view', ['record' => $record]))
                     ->openUrlInNewTab(),
                 Action::make('removeFromChannel')
                     ->label(__('product_channels.actions.remove_single'))
                     ->icon('heroicon-o-minus-circle')
+                    ->iconButton()
+                    ->tooltip(__('product_channels.actions.remove_single'))
                     ->color('gray')
                     ->visible(fn (): bool => $this->canManageSelection)
                     ->requiresConfirmation()
@@ -194,6 +235,91 @@ class ManageAdobeProductsChannel extends Page implements HasTable
         $this->redirect(ProductResource::getUrl('index', [
             'channel' => $this->configurationId,
         ]));
+    }
+
+    private function filterByLinkStatus(Builder $query, ?string $status): Builder
+    {
+        if (! in_array($status, ['linked', 'unlinked'], true)) {
+            return $query;
+        }
+
+        $workspaceId = $this->resolveSyncDataSetupLandingWorkspace()->id;
+        $linkedProductIds = ExternalRecordLink::withoutWorkspaceScope()
+            ->select('product_id')
+            ->where('workspace_id', $workspaceId)
+            ->where('connector_account_id', $this->accountId)
+            ->where('trust_origin', ExternalRecordLinkTrustOrigin::MerchantConfirmed->value)
+            ->whereNotNull('external_record_discriminator')
+            ->whereNotNull('established_by_workspace_user_id')
+            ->whereNotNull('established_at');
+
+        return $status === 'linked'
+            ? $query->whereIn('products.id', $linkedProductIds)
+            : $query->whereNotIn('products.id', $linkedProductIds);
+    }
+
+    /** @return array<string, string> */
+    private function publicationBrandFilterOptions(): array
+    {
+        return $this->publicationFilterProductsQuery()
+            ->whereNotNull('brand')
+            ->where('brand', '!=', '')
+            ->distinct()
+            ->orderBy('brand')
+            ->pluck('brand', 'brand')
+            ->all();
+    }
+
+    /** @return array<string, string> */
+    private function publicationCategoryFilterOptions(): array
+    {
+        $workspaceId = $this->resolveSyncDataSetupLandingWorkspace()->id;
+        $categoryIds = $this->publicationFilterProductsQuery()
+            ->whereNotNull('category_id')
+            ->distinct()
+            ->pluck('category_id')
+            ->all();
+
+        if ($categoryIds === []) {
+            return [];
+        }
+
+        return Category::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->whereIn('id', $categoryIds)
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+    }
+
+    /** @return array<string, string> */
+    private function publicationProductTypeFilterOptions(): array
+    {
+        return $this->publicationFilterProductsQuery()
+            ->whereNotNull('merchant_type')
+            ->where('merchant_type', '!=', '')
+            ->distinct()
+            ->orderBy('merchant_type')
+            ->pluck('merchant_type', 'merchant_type')
+            ->all();
+    }
+
+    private function publicationFilterProductsQuery(): Builder
+    {
+        $workspaceId = $this->resolveSyncDataSetupLandingWorkspace()->id;
+        $query = Product::withoutWorkspaceScope()->where('workspace_id', $workspaceId);
+
+        if ($this->configurationId === null) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereIn(
+            'products.id',
+            SyncConfigurationProductSelection::withoutWorkspaceScope()
+                ->select('product_id')
+                ->where('workspace_id', $workspaceId)
+                ->where('sync_configuration_id', $this->configurationId),
+        );
     }
 
     private function removeProduct(Product $product): void
