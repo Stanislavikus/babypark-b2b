@@ -9,6 +9,12 @@
 >
 > Visual research evidence remains under:
 > `docs/prototypes/product-workbench-visual-ux/`.
+>
+> **2026-09-23 visual Stop-and-Amend — PRODUCT OWNER APPROVED**
+>
+> Real-screen review replaces the first-scope local filter rail with the standard table filter
+> surface, requires native compact SaaS navigation in Focus Mode, and compacts the Workbench
+> header/tabs as specified below. Domain/row-universe semantics are unchanged.
 
 ## Goal
 
@@ -49,33 +55,47 @@ Reason:
 
 - connector work needs horizontal catalogue space;
 - the global menu does not need to consume a permanent wide column during product operations;
-- the freed width may be used by the local filter rail + product table.
+- the freed width belongs primarily to the product table.
+
+For the admin panel, Focus Mode uses Filament's native desktop-collapsible sidebar: the wide SaaS
+navigation collapses to the normal icon rail with the native expand affordance. Do not create a
+second bespoke connector navigation rail.
 
 This is a presentation rule, not permission to remove normal SaaS navigation entirely.
 
 ### Header
 
+Desktop first scope uses one compact horizontal header line, not stacked information cards.
+
 Show:
 
 - `Magento`;
 - connected account/store as secondary identity;
-- connection health;
-- last successful catalogue refresh;
-- remote Product count;
-- secondary `Оновити каталог` action.
+- compact View-relevant evidence in the same line (for Overview: remote Product count, unlinked
+  count, last successful catalogue refresh; for Publication: selected/total count);
+- View-relevant utility actions on the right (for example `Оновити`, `Вибрати товари`,
+  `Перевірити готовність`).
+
+Connection health may be added compactly when it is useful, but must not create another tall
+header block.
+
+The `Огляд / Публікація` controls render as a compact tab strip attached visually to the table
+area rather than inside a separate large card.
 
 While refresh is running, retain the latest successful catalogue and show progress/status;
 never blank the working grid.
 
 ---
 
-## 2. Local filter rail
+## 2. Workbench filters — 2026-09-23 Stop-and-Amend
 
-Use a collapsible left-side Workbench filter rail inspired by mature PIM grids.
+Do **not** reserve a permanent second left rail for first-scope Workbench filters.
 
-The rail is Workbench-local, not the global SaaS sidebar.
+Use the standard Filament table filter surface next to search/column controls. The system
+correspondence presets `Усі товари / Потребують зв'язку / Пов'язані` are represented by the
+same trusted-link table filter rather than duplicated in a separate rail.
 
-Visible high-value filters may include:
+High-value filters may include:
 
 - Category hierarchy/tree;
 - Brand/brand-like provider field when resolved;
@@ -89,9 +109,10 @@ Visible high-value filters may include:
 
 Filters must be capability-driven: do not expose one until its data source exists.
 
-Search remains visually primary.
+Search remains visually primary. Columns remain configurable/discoverable.
 
-Columns remain configurable/discoverable.
+A dedicated local rail may return later only if a materially larger filter set proves that the
+standard table filter surface no longer scales; that is not part of first scope.
 
 ---
 
@@ -139,6 +160,19 @@ Do not render `Відкрити` for only an arbitrary sample row: every row wit
 state receives the same action semantics.
 
 If later the row owns several actions, a compact action menu may replace text buttons.
+
+### Row / photo interaction — 2026-09-23 clarification
+
+Reuse the established BabyPark B2B table interaction:
+
+- clicking a normal row surface opens the same slide-over detail action as `Відкрити`;
+- clicking the Product photo does **not** open the row action; it opens the shared image lightbox;
+- cells with their own drill-down/action (for example future `Стан даних`, `Проблеми`, or `Дія`)
+  keep their own click behavior and must not accidentally trigger the row drawer;
+- the drawer owns the secondary `Відкрити повну картку` navigation when a Master Product identity exists.
+
+For an unlinked remote Magento row, row click may show remote Product detail, but must not invent a
+Master Product full-card action before trusted correspondence exists.
 
 ### Problems
 

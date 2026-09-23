@@ -846,6 +846,8 @@
     "product_channels.workbench.columns.updated": "Оновлено",
     "product_channels.workbench.columns.action": "Дія",
     "product_channels.workbench.actions.open": "Відкрити",
+    "product_channels.workbench.actions.open_full": "Відкрити повну картку",
+    "product_channels.workbench.image_zoom": "Натисніть для збільшення",
     "product_channels.workbench.actions.link": "Пов’язати",
     "product_channels.workbench.magento_status.enabled": "Увімкнено",
     "product_channels.workbench.magento_status.disabled": "Вимкнено",

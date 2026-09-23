@@ -111,6 +111,7 @@ class ProductChannelWorkspaceUiTest extends TestCase
             ManageAdobeProductsChannel::getUrl(['account' => $account->id]),
             $target->channelUrl,
         );
+        $this->assertTrue(Filament::getPanel('admin')->isSidebarCollapsibleOnDesktop());
     }
 
     #[Test]
@@ -179,6 +180,7 @@ class ProductChannelWorkspaceUiTest extends TestCase
             'brand' => 'Brand B',
             'merchant_type' => 'Type B',
             'is_active' => false,
+            'images' => ['https://example.test/product.jpg'],
         ]);
 
         app(ProductChannelSelectionService::class)->add(
@@ -207,7 +209,9 @@ class ProductChannelWorkspaceUiTest extends TestCase
 
         $component = Livewire::actingAs($this->actor)
             ->test(ManageAdobeProductsChannel::class, ['account' => $account->id])
-            ->assertSee('data-testid="product-workbench-open-navigation"', false)
+            ->assertSee('data-testid="product-workbench-compact-header"', false)
+            ->assertDontSee('product-workbench-open-navigation', false)
+            ->assertSee('bpOpenLightbox', false)
             ->filterTable('brand', 'Brand A')
             ->assertSee($active->name)
             ->assertDontSee($inactive->name)
@@ -235,7 +239,14 @@ class ProductChannelWorkspaceUiTest extends TestCase
             ->assertSee($active->name)
             ->assertSee($inactive->name);
 
-        $component->assertTableActionVisible('openProduct', $inactive);
+        $component
+            ->assertTableActionVisible('openProduct', $inactive)
+            ->mountTableAction('openProduct', $inactive);
+
+        $mountedView = $component->instance()->getMountedAction();
+        $this->assertNotNull($mountedView);
+        $this->assertTrue($mountedView->isModalSlideOver());
+        $this->assertArrayHasKey('open_full_page_footer', $mountedView->getExtraModalFooterActions());
     }
 
     #[Test]

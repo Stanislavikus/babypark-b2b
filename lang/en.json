@@ -846,6 +846,8 @@
     "product_channels.workbench.columns.updated": "Updated",
     "product_channels.workbench.columns.action": "Action",
     "product_channels.workbench.actions.open": "Open",
+    "product_channels.workbench.actions.open_full": "Open full product",
+    "product_channels.workbench.image_zoom": "Click to enlarge",
     "product_channels.workbench.actions.link": "Link",
     "product_channels.workbench.magento_status.enabled": "Enabled",
     "product_channels.workbench.magento_status.disabled": "Disabled",

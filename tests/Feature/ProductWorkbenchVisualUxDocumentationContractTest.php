@@ -17,6 +17,14 @@ class ProductWorkbenchVisualUxDocumentationContractTest extends TestCase
         $this->assertStringContainsString('[ Огляд ]   [ Публікація ]', $content);
         $this->assertStringContainsString('No permanent top-level `Зв\'язки` tab in first scope.', $content);
         $this->assertStringContainsString('Focus mode', $content);
+        $this->assertStringContainsString('2026-09-23 visual Stop-and-Amend', $content);
+        $this->assertStringContainsString("Filament's native desktop-collapsible sidebar", $content);
+        $this->assertStringContainsString('standard Filament table filter surface', $content);
+        $this->assertStringContainsString('one compact horizontal header line', $content);
+        $this->assertStringContainsString('compact tab strip attached visually to the table', $content);
+        $this->assertStringContainsString('Row / photo interaction — 2026-09-23 clarification', $content);
+        $this->assertStringContainsString('shared image lightbox', $content);
+        $this->assertStringContainsString('Відкрити повну картку', $content);
     }
 
     #[Test]

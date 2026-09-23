@@ -50,7 +50,8 @@
     }
 
     /* Product list: hide ViewAction icon visually; row click uses recordAction('view'). */
-    .bp-admin-row-view-action-hidden {
+    .bp-admin-row-view-action-hidden,
+    .bp-workbench-row-view-action-hidden {
         display: none !important;
     }
 

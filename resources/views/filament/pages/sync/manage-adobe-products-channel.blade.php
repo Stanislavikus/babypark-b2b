@@ -1,23 +1,30 @@
 <x-filament-panels::page>
   <div
     x-data
-    x-init="$nextTick(() => $store.sidebar.close())"
+    x-init="
+      const restoreSidebar = () => $store.sidebar.open();
+      $nextTick(() => $store.sidebar.close());
+      document.addEventListener('livewire:navigating', restoreSidebar, { once: true });
+      window.addEventListener('pagehide', restoreSidebar, { once: true });
+    "
     class="space-y-2"
     data-testid="product-workbench-focus-mode"
   >
-    @include('filament.pages.sync.partials.product-workbench-shell', [
-      'activeView' => 'publication',
-      'accountId' => $accountId,
-      'accountName' => $accountName,
-    ])
-
-    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2 dark:border-white/10">
-      <p class="text-xs text-gray-600 dark:text-gray-300">
-        {{ __('product_channels.workbench.publication.summary', [
-          'selected' => $selectedProductCount,
-          'total' => $masterProductCount,
-        ]) }}
-      </p>
+    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-1" data-testid="product-workbench-compact-header">
+      <div class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span class="text-xl font-semibold text-gray-950 dark:text-white">
+          {{ __('product_channels.workbench.title') }}
+        </span>
+        <span class="truncate text-sm text-gray-500 dark:text-gray-400">
+          {{ $accountName }}
+        </span>
+        <span class="text-xs text-gray-500 dark:text-gray-400">
+          · {{ __('product_channels.workbench.publication.summary', [
+            'selected' => $selectedProductCount,
+            'total' => $masterProductCount,
+          ]) }}
+        </span>
+      </div>
 
       <div class="flex flex-wrap items-center gap-2">
         @if ($canManageSelection)
@@ -44,6 +51,11 @@
         @endif
       </div>
     </div>
+
+    @include('filament.pages.sync.partials.product-workbench-shell', [
+      'activeView' => 'publication',
+      'accountId' => $accountId,
+    ])
 
     @if ($selectedProductCount === 0)
       <div class="rounded-xl border border-gray-200 px-3 py-2 dark:border-white/10" data-testid="product-channel-empty-selection">

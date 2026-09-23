@@ -173,8 +173,9 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
             ->assertSee('data-testid="product-workbench-focus-mode"', false)
             ->assertSee('data-testid="product-workbench-tab-overview"', false)
             ->assertSee('data-testid="product-workbench-tab-publication"', false)
-            ->assertSee('data-testid="product-workbench-open-navigation"', false)
-            ->assertSee('data-testid="product-workbench-system-filters"', false)
+            ->assertSee('data-testid="product-workbench-compact-header"', false)
+            ->assertDontSee('product-workbench-open-navigation', false)
+            ->assertDontSee('product-workbench-system-filters', false)
             ->assertDontSee('product-workbench-tab-links', false)
             ->assertSee(__('product_channels.workbench.overview.products_count', ['count' => 3]))
             ->assertSee(__('product_channels.workbench.overview.unlinked_count', ['count' => 1]))
@@ -188,20 +189,24 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
             ->assertSee('Car Seats')
             ->assertSee('Sale')
             ->assertSee('shop.example.com/media/catalog/product/r/e/linked-a.jpg', false)
+            ->assertSee('bpOpenLightbox', false)
+            ->assertTableActionVisible('viewRemoteProduct', $items['501'])
+            ->assertTableActionVisible('viewRemoteProduct', $items['503'])
             ->assertTableActionVisible('openMasterProduct', $items['501'])
             ->assertTableActionVisible('openMasterProduct', $items['502'])
             ->assertTableActionHidden('openMasterProduct', $items['503']);
 
         $remoteCatalog
-            ->call('applyWorkbenchLinkView', 'linked')
+            ->filterTable('link_status', 'linked')
             ->assertSee('Remote linked A')
             ->assertSee('Remote linked B')
             ->assertDontSee('Remote unlinked')
-            ->call('applyWorkbenchLinkView', 'unlinked')
+            ->resetTableFilters()
+            ->filterTable('link_status', 'unlinked')
             ->assertDontSee('Remote linked A')
             ->assertDontSee('Remote linked B')
             ->assertSee('Remote unlinked')
-            ->call('applyWorkbenchLinkView', 'all')
+            ->resetTableFilters()
             ->assertSee('Remote linked A')
             ->assertSee('Remote linked B')
             ->assertSee('Remote unlinked');
@@ -233,7 +238,31 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
             ->assertSee('Remote linked B')
             ->assertSee('Remote unlinked')
             ->sortTable('attribute_set_name', 'asc')
-            ->assertSee('Remote linked A');
+            ->assertSee('Remote linked A')
+            ->sortTable('category_paths', 'asc')
+            ->assertSee('Remote unlinked')
+            ->mountTableAction('viewRemoteProduct', $items['501']);
+
+        $mountedRemoteView = $remoteCatalog->instance()->getMountedAction();
+        $this->assertNotNull($mountedRemoteView);
+        $this->assertTrue($mountedRemoteView->isModalSlideOver());
+        $this->assertArrayHasKey('open_full_page_footer', $mountedRemoteView->getExtraModalFooterActions());
+
+        $remoteCatalog->unmountTableAction()
+            ->mountTableAction('openMasterProduct', $items['501']);
+
+        $mountedOpenView = $remoteCatalog->instance()->getMountedAction();
+        $this->assertNotNull($mountedOpenView);
+        $this->assertTrue($mountedOpenView->isModalSlideOver());
+        $this->assertArrayHasKey('open_full_page_footer', $mountedOpenView->getExtraModalFooterActions());
+
+        $remoteCatalog->unmountTableAction()
+            ->mountTableAction('viewRemoteProduct', $items['503']);
+
+        $mountedUnlinkedView = $remoteCatalog->instance()->getMountedAction();
+        $this->assertNotNull($mountedUnlinkedView);
+        $this->assertTrue($mountedUnlinkedView->isModalSlideOver());
+        $this->assertSame([], $mountedUnlinkedView->getExtraModalFooterActions());
     }
 
     #[Test]

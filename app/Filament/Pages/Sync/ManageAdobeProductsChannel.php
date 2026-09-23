@@ -20,7 +20,9 @@ use App\Services\Sync\SyncDataSetupLandingService;
 use App\Support\Workspace\Rbac\Concerns\RequiresFreshWorkspaceSyncDataSetupLandingPermission;
 use App\Support\Workspace\WorkspaceContext;
 use Filament\Actions\Action;
+use Filament\Actions\ViewAction;
 use Filament\Pages\Page;
+use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -125,7 +127,8 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                     ->label(__('product_channels.workbench.columns.image'))
                     ->state(fn (Product $record): ?string => ProductResource::firstImage($record))
                     ->size(44)
-                    ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(44))),
+                    ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(44)))
+                    ->extraImgAttributes(fn (Product $record): array => ProductResource::lightboxImgAttributes($record)),
                 TextColumn::make('sku')
                     ->label(__('product_channels.workbench.columns.sku'))
                     ->searchable()
@@ -180,14 +183,23 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                     ->label(__('product_channels.workbench.columns.product_type'))
                     ->options(fn (): array => $this->publicationProductTypeFilterOptions()),
             ])
+            ->recordUrl(null)
+            ->recordAction('openProduct')
             ->recordActions([
-                Action::make('openProduct')
+                ViewAction::make('openProduct')
                     ->label(__('product_channels.workbench.actions.open'))
                     ->icon('heroicon-o-arrow-top-right-on-square')
                     ->iconButton()
                     ->tooltip(__('product_channels.workbench.actions.open'))
-                    ->url(fn (Product $record): string => ProductResource::getUrl('view', ['record' => $record]))
-                    ->openUrlInNewTab(),
+                    ->slideOver()
+                    ->schema(fn (Schema $schema): Schema => ProductResource::infolist($schema))
+                    ->extraModalFooterActions(fn (Product $record): array => [
+                        Action::make('open_full_page_footer')
+                            ->label(__('product_channels.workbench.actions.open_full'))
+                            ->icon('heroicon-m-arrow-top-right-on-square')
+                            ->color('gray')
+                            ->url(ProductResource::getUrl('view', ['record' => $record])),
+                    ]),
                 Action::make('removeFromChannel')
                     ->label(__('product_channels.actions.remove_single'))
                     ->icon('heroicon-o-minus-circle')
