@@ -10,12 +10,12 @@
     data-testid="product-workbench-compact-header"
 >
     <div class="flex min-w-0 items-center gap-2" data-testid="product-workbench-identity">
-        <span
-            class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-orange-600 text-xs font-bold text-white shadow-sm"
+        <img
+            src="{{ asset('images/connectors/magento-mark.png') }}"
+            alt=""
+            class="h-8 w-8 shrink-0 object-contain"
             aria-hidden="true"
         >
-            M
-        </span>
 
         <div class="flex min-w-0 items-baseline gap-2 whitespace-nowrap">
             <span class="text-xl font-semibold text-gray-950 dark:text-white">

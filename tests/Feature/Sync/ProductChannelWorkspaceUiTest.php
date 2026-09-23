@@ -225,7 +225,14 @@ class ProductChannelWorkspaceUiTest extends TestCase
             ->assertSee(__('product_channels.workbench.toolbar.filters'))
             ->assertSee(__('product_channels.workbench.toolbar.columns'))
             ->assertDontSee('product-workbench-open-navigation', false)
-            ->assertSee('bpOpenLightbox', false)
+            ->assertSee('bpOpenLightbox', false);
+
+        $table = $component->instance()->getTable();
+        $this->assertTrue($table->getFiltersTriggerAction()->isModalSlideOver());
+        $this->assertTrue($table->getColumnManagerTriggerAction()->isModalSlideOver());
+        $this->assertNotNull($table->getColumnManagerTriggerAction()->getBadge());
+
+        $component
             ->filterTable('brand', 'Brand A')
             ->assertSee($active->name)
             ->assertDontSee($inactive->name)

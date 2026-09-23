@@ -24,6 +24,9 @@ class ProductWorkbenchVisualUxDocumentationContractTest extends TestCase
         $this->assertStringContainsString('status board', $content);
         $this->assertStringContainsString('browser-like tab strip', $content);
         $this->assertStringContainsString('Матриця полів', $content);
+        $this->assertStringContainsString('same right-side slide-over interaction', $content);
+        $this->assertStringContainsString('official Magento mark', $content);
+        $this->assertFileExists(public_path('images/connectors/magento-mark.png'));
         $this->assertStringContainsString('Row / photo interaction — 2026-09-23 clarification', $content);
         $this->assertStringContainsString('shared image lightbox', $content);
         $this->assertStringContainsString('Відкрити повну картку', $content);

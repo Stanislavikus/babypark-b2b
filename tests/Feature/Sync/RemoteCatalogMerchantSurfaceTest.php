@@ -195,10 +195,8 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
             ->assertSee('shop.example.com/media/catalog/product/r/e/linked-a.jpg', false)
             ->assertSee('bpOpenLightbox', false)
             ->assertTableActionVisible('viewRemoteProduct', $items['501'])
-            ->assertTableActionVisible('viewRemoteProduct', $items['503'])
-            ->assertTableActionVisible('openMasterProduct', $items['501'])
-            ->assertTableActionVisible('openMasterProduct', $items['502'])
-            ->assertTableActionHidden('openMasterProduct', $items['503']);
+            ->assertTableActionVisible('viewRemoteProduct', $items['502'])
+            ->assertTableActionVisible('viewRemoteProduct', $items['503']);
 
         $remoteCatalog
             ->filterTable('link_status', 'linked')
@@ -252,13 +250,10 @@ class RemoteCatalogMerchantSurfaceTest extends TestCase
         $this->assertTrue($mountedRemoteView->isModalSlideOver());
         $this->assertArrayHasKey('open_full_page_footer', $mountedRemoteView->getExtraModalFooterActions());
 
-        $remoteCatalog->unmountTableAction()
-            ->mountTableAction('openMasterProduct', $items['501']);
-
-        $mountedOpenView = $remoteCatalog->instance()->getMountedAction();
-        $this->assertNotNull($mountedOpenView);
-        $this->assertTrue($mountedOpenView->isModalSlideOver());
-        $this->assertArrayHasKey('open_full_page_footer', $mountedOpenView->getExtraModalFooterActions());
+        $table = $remoteCatalog->instance()->getTable();
+        $this->assertTrue($table->getFiltersTriggerAction()->isModalSlideOver());
+        $this->assertTrue($table->getColumnManagerTriggerAction()->isModalSlideOver());
+        $this->assertNotNull($table->getColumnManagerTriggerAction()->getBadge());
 
         $remoteCatalog->unmountTableAction()
             ->mountTableAction('viewRemoteProduct', $items['503']);

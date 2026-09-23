@@ -44,6 +44,20 @@
         display: none;
     }
 
+    /* Filament always renders the leading toolbar action region, even when it has no controls. */
+    .fi-ta-header-toolbar > .fi-ta-actions:not(:has(*)) {
+        display: none;
+    }
+
+    /* Workbench badges match the shared Data List grammar: count lives inside the trigger button. */
+    .bp-workbench-toolbar-trigger .fi-btn-badge-ctn {
+        position: static !important;
+        inset: auto !important;
+        transform: none !important;
+        width: auto !important;
+        background: transparent !important;
+    }
+
     /* Cart toolbar children participate in the parent icon-group flex gap. */
     .bp-cart-toolbar {
         display: contents;

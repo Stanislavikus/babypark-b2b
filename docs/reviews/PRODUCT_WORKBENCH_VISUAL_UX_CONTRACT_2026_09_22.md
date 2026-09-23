@@ -109,6 +109,8 @@ Filters must be capability-driven: do not expose one until its data source exist
 
 Search remains visually primary. The Workbench toolbar follows the shared Data List pattern from `docs/06-UI_DESIGN_SYSTEM.md`, with `Матриця полів` as the proven visual reference: search aligned to the list grid on the left, and persistent labelled `Фільтри` / `Стовпці` controls with count badges where applicable on the right. Columns remain configurable/discoverable.
 
+2026-09-23 product-owner clarification: `Фільтри` and `Стовпці` use the same right-side slide-over interaction; their count badges render inline inside the trigger buttons, matching `Матриця полів`, and the search field aligns to the same left grid inset as the table content. The Workbench connector identity uses the official Magento mark rather than a fabricated letter tile.
+
 A dedicated local rail may return later only if a materially larger filter set proves that the
 standard table filter surface no longer scales; that is not part of first scope.
 

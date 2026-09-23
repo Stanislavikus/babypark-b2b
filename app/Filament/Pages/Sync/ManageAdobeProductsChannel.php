@@ -194,6 +194,7 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                     ->button()
                     ->label(__('product_channels.workbench.toolbar.filters'))
                     ->tooltip(__('product_channels.workbench.toolbar.filters'))
+                    ->extraAttributes(['class' => 'bp-workbench-toolbar-trigger'])
                     ->slideOver()
             )
             ->columnManagerTriggerAction(
@@ -201,6 +202,9 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                     ->button()
                     ->label(__('product_channels.workbench.toolbar.columns'))
                     ->tooltip(__('product_channels.workbench.toolbar.columns'))
+                    ->badge(fn (): ?string => $this->visibleToggleableColumnCount())
+                    ->extraAttributes(['class' => 'bp-workbench-toolbar-trigger'])
+                    ->slideOver()
             )
             ->searchPlaceholder(__('product_channels.workbench.search_placeholder'))
             ->recordUrl(null)
@@ -222,7 +226,7 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                     ]),
                 Action::make('removeFromChannel')
                     ->label(__('product_channels.actions.remove_single'))
-                    ->icon('heroicon-o-minus-circle')
+                    ->icon('heroicon-o-trash')
                     ->iconButton()
                     ->tooltip(__('product_channels.actions.remove_single'))
                     ->color('gray')
@@ -234,6 +238,29 @@ class ManageAdobeProductsChannel extends Page implements HasTable
             ->paginated([20, 50, 100])
             ->defaultPaginationPageOption(20)
             ->defaultSort('name');
+    }
+
+    private function visibleToggleableColumnCount(): ?string
+    {
+        $count = 0;
+
+        foreach ($this->tableColumns as $item) {
+            if (($item['type'] ?? null) === self::TABLE_COLUMN_MANAGER_COLUMN_TYPE) {
+                if (($item['isToggleable'] ?? false) && ($item['isToggled'] ?? false) && ! ($item['isHidden'] ?? false)) {
+                    $count++;
+                }
+
+                continue;
+            }
+
+            foreach ($item['columns'] ?? [] as $column) {
+                if (($column['isToggleable'] ?? false) && ($column['isToggled'] ?? false) && ! ($column['isHidden'] ?? false)) {
+                    $count++;
+                }
+            }
+        }
+
+        return $count > 0 ? (string) $count : null;
     }
 
     public function selectProducts(): void
