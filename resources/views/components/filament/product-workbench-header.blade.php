@@ -11,7 +11,7 @@
 >
     <div class="flex min-w-0 items-center gap-2" data-testid="product-workbench-identity">
         <img
-            src="{{ asset('images/connectors/magento-mark.png') }}"
+            src="{{ asset('images/connectors/magento-mark.png') }}?v={{ filemtime(public_path('images/connectors/magento-mark.png')) }}"
             alt=""
             width="28"
             height="28"

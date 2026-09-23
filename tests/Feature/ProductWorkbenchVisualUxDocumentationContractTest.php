@@ -34,6 +34,7 @@ class ProductWorkbenchVisualUxDocumentationContractTest extends TestCase
         $header = File::get(resource_path('views/components/filament/product-workbench-header.blade.php'));
         $this->assertStringContainsString('width="28"', $header);
         $this->assertStringContainsString('height="28"', $header);
+        $this->assertStringContainsString("filemtime(public_path('images/connectors/magento-mark.png'))", $header);
 
         $actionSortHeader = File::get(resource_path('views/filament/pages/sync/partials/product-workbench-action-sort-header.blade.php'));
         $this->assertStringContainsString('fi-ta-header-cell-sort-btn', $actionSortHeader);
