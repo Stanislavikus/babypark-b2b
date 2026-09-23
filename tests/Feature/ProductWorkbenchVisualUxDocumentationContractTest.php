@@ -29,6 +29,7 @@ class ProductWorkbenchVisualUxDocumentationContractTest extends TestCase
         $logoPath = public_path('images/connectors/magento-mark.png');
         $this->assertFileExists($logoPath);
         $this->assertSame(IMAGETYPE_PNG, getimagesize($logoPath)[2]);
+        $this->assertSame(6, ord(file_get_contents($logoPath)[25]), 'Magento PNG must keep RGBA alpha channel.');
 
         $header = File::get(resource_path('views/components/filament/product-workbench-header.blade.php'));
         $this->assertStringContainsString('width="28"', $header);
@@ -39,6 +40,12 @@ class ProductWorkbenchVisualUxDocumentationContractTest extends TestCase
         $this->assertStringContainsString('heroicon-m-chevron-down', $actionSortHeader);
         $this->assertStringNotContainsString('heroicon-m-chevron-up-down', $actionSortHeader);
         $this->assertSame(1, substr_count($actionSortHeader, '<x-filament::icon'));
+        $this->assertStringContainsString('Publication `Дія` is **not sortable**', $content);
+
+        $publicationActionLabel = File::get(resource_path('views/filament/pages/sync/partials/product-workbench-action-column-label.blade.php'));
+        $this->assertStringContainsString('bp-workbench-action-column-label', $publicationActionLabel);
+        $this->assertStringNotContainsString('sortTable', $publicationActionLabel);
+
         $this->assertStringContainsString('Row / photo interaction — 2026-09-23 clarification', $content);
         $this->assertStringContainsString('shared image lightbox', $content);
         $this->assertStringContainsString('Відкрити повну картку', $content);

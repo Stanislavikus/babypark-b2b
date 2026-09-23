@@ -318,6 +318,10 @@ Examples:
 - `Виправити зіставлення`;
 - `Відкрити`.
 
+The `Дія` header and action cells use the same left/start alignment as the rest of the operational
+table. Unlike `Огляд`, Publication `Дія` is **not sortable**: there is no single remediation
+state represented by the mixed open/remove actions that would justify an action-priority sort.
+
 A ready row does not launch Live by itself.
 
 ### Configuration-level execution action

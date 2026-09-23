@@ -225,7 +225,9 @@ class ProductChannelWorkspaceUiTest extends TestCase
             ->assertSee(__('product_channels.workbench.toolbar.filters'))
             ->assertSee(__('product_channels.workbench.toolbar.columns'))
             ->assertDontSee('product-workbench-open-navigation', false)
-            ->assertSee('bpOpenLightbox', false);
+            ->assertSee('bpOpenLightbox', false)
+            ->assertSee('bp-workbench-action-column-label', false)
+            ->assertDontSee('bp-workbench-action-sort-header', false);
 
         $table = $component->instance()->getTable();
         $this->assertTrue($table->getFiltersTriggerAction()->isModalSlideOver());

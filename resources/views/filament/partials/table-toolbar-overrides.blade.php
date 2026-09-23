@@ -67,7 +67,8 @@
      * Filament hardcodes the record-actions header to end alignment. Workbench
      * uses an action-priority sort header, so align that cell like normal columns.
      */
-    .fi-ta-header-cell.fi-align-end:has(.bp-workbench-action-sort-header) {
+    .fi-ta-header-cell.fi-align-end:has(.bp-workbench-action-sort-header),
+    .fi-ta-header-cell.fi-align-end:has(.bp-workbench-action-column-label) {
         text-align: start !important;
     }
 

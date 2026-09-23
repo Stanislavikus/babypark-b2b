@@ -234,7 +234,7 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                     ->requiresConfirmation()
                     ->action(fn (Product $record) => $this->removeProduct($record)),
             ])
-            ->recordActionsColumnLabel(__('product_channels.workbench.columns.action'))
+            ->recordActionsColumnLabel(view('filament.pages.sync.partials.product-workbench-action-column-label'))
             ->recordActionsAlignment('start')
             ->paginated([20, 50, 100])
             ->defaultPaginationPageOption(20)
