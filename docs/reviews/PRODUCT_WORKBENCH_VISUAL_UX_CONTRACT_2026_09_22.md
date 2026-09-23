@@ -65,22 +65,20 @@ This is a presentation rule, not permission to remove normal SaaS navigation ent
 
 ### Header
 
-Desktop first scope uses one compact horizontal header line, not stacked information cards.
+Desktop first scope uses **one compact horizontal header line**, not stacked information cards.
 
-Show:
+Show three visually distinct zones in that same row:
 
-- `Magento`;
-- connected account/store as secondary identity;
-- compact View-relevant evidence in the same line (for Overview: remote Product count, unlinked
-  count, last successful catalogue refresh; for Publication: selected/total count);
-- View-relevant utility actions on the right (for example `Оновити`, `Вибрати товари`,
-  `Перевірити готовність`).
+- **connector identity** on the left — compact provider badge/icon + `Magento` + connected account/store as secondary identity; do not stack provider/account into another row;
+- **status board** in the middle — icon-first compact evidence with concise values and full meaning available through accessible tooltip/label (Overview: remote Product count, unlinked count, last successful catalogue refresh; Publication: selected/total count explicitly meaning `selected for Magento`);
+- **View-relevant utility actions** on the right (for example `Оновити`, `Вибрати товари`, `Перевірити готовність`).
+
+Do not turn the status board into prose. Prefer familiar icons plus short values when the tooltip/accessible label can carry the full explanation.
 
 Connection health may be added compactly when it is useful, but must not create another tall
 header block.
 
-The `Огляд / Публікація` controls render as a compact tab strip attached visually to the table
-area rather than inside a separate large card.
+The `Огляд / Публікація` controls render as a compact **browser-like tab strip** attached visually to the table area rather than inside a separate large card. Use familiar rounded-top page-tab affordance: the active tab visually joins the content surface and the inactive tab recedes.
 
 While refresh is running, retain the latest successful catalogue and show progress/status;
 never blank the working grid.
@@ -109,7 +107,7 @@ High-value filters may include:
 
 Filters must be capability-driven: do not expose one until its data source exists.
 
-Search remains visually primary. Columns remain configurable/discoverable.
+Search remains visually primary. The Workbench toolbar follows the shared Data List pattern from `docs/06-UI_DESIGN_SYSTEM.md`, with `Матриця полів` as the proven visual reference: search aligned to the list grid on the left, and persistent labelled `Фільтри` / `Стовпці` controls with count badges where applicable on the right. Columns remain configurable/discoverable.
 
 A dedicated local rail may return later only if a materially larger filter set proves that the
 standard table filter surface no longer scales; that is not part of first scope.

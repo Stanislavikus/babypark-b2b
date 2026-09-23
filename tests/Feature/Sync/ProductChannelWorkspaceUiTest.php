@@ -29,6 +29,7 @@ use Database\Seeders\WorkspaceSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Test;
@@ -112,6 +113,11 @@ class ProductChannelWorkspaceUiTest extends TestCase
             $target->channelUrl,
         );
         $this->assertTrue(Filament::getPanel('admin')->isSidebarCollapsibleOnDesktop());
+
+        $sidebarStyles = File::get(resource_path('views/filament/partials/table-toolbar-overrides.blade.php'));
+        $this->assertStringContainsString('fi-sidebar-open-collapse-sidebar-btn', $sidebarStyles);
+        $this->assertStringContainsString('fi-sidebar-close-collapse-sidebar-btn', $sidebarStyles);
+        $this->assertStringContainsString("content: '☰'", $sidebarStyles);
     }
 
     #[Test]
@@ -210,6 +216,14 @@ class ProductChannelWorkspaceUiTest extends TestCase
         $component = Livewire::actingAs($this->actor)
             ->test(ManageAdobeProductsChannel::class, ['account' => $account->id])
             ->assertSee('data-testid="product-workbench-compact-header"', false)
+            ->assertSee('data-testid="product-workbench-identity"', false)
+            ->assertSee('data-testid="product-workbench-status-board"', false)
+            ->assertSee(__('product_channels.workbench.publication.selected_tooltip', [
+                'selected' => 2,
+                'total' => 2,
+            ]))
+            ->assertSee(__('product_channels.workbench.toolbar.filters'))
+            ->assertSee(__('product_channels.workbench.toolbar.columns'))
             ->assertDontSee('product-workbench-open-navigation', false)
             ->assertSee('bpOpenLightbox', false)
             ->filterTable('brand', 'Brand A')

@@ -35,6 +35,7 @@ use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -289,6 +290,22 @@ class ManageAdobeRemoteCatalog extends Page implements HasTable
                         );
                     }),
             ])
+            ->filtersLayout(FiltersLayout::Modal)
+            ->filtersFormWidth('md')
+            ->filtersTriggerAction(
+                fn (Action $action): Action => $action
+                    ->button()
+                    ->label(__('product_channels.workbench.toolbar.filters'))
+                    ->tooltip(__('product_channels.workbench.toolbar.filters'))
+                    ->slideOver()
+            )
+            ->columnManagerTriggerAction(
+                fn (Action $action): Action => $action
+                    ->button()
+                    ->label(__('product_channels.workbench.toolbar.columns'))
+                    ->tooltip(__('product_channels.workbench.toolbar.columns'))
+            )
+            ->searchPlaceholder(__('product_channels.workbench.search_placeholder'))
             ->recordUrl(null)
             ->recordAction('viewRemoteProduct')
             ->recordActions([

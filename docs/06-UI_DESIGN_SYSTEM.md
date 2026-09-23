@@ -469,6 +469,8 @@ mutable list screens alike.
 
 ### Universal Search and Filter Interaction
 
+**Canonical project reference:** the current `Матриця полів` (`FieldMatrix`) toolbar is the proven visual/interaction reference for data-list header composition: visible search aligned with the list grid, then labelled filter/action controls with count badges in the same toolbar surface. Eloquent-backed pages must achieve the same grammar through native `Filament\Tables\Table` controls rather than copying the non-Eloquent component or creating a one-off toolbar.
+
 Recommended layout:
 
 Left / main area:

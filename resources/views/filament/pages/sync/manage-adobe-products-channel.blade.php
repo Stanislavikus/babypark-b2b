@@ -10,23 +10,21 @@
     class="space-y-2"
     data-testid="product-workbench-focus-mode"
   >
-    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-1" data-testid="product-workbench-compact-header">
-      <div class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-        <span class="text-xl font-semibold text-gray-950 dark:text-white">
-          {{ __('product_channels.workbench.title') }}
-        </span>
-        <span class="truncate text-sm text-gray-500 dark:text-gray-400">
-          {{ $accountName }}
-        </span>
-        <span class="text-xs text-gray-500 dark:text-gray-400">
-          · {{ __('product_channels.workbench.publication.summary', [
+    <x-filament.product-workbench-header
+      :account-name="$accountName"
+      :status-items="[
+        [
+          'icon' => 'heroicon-o-check-badge',
+          'value' => $selectedProductCount.' / '.$masterProductCount,
+          'tooltip' => __('product_channels.workbench.publication.selected_tooltip', [
             'selected' => $selectedProductCount,
             'total' => $masterProductCount,
-          ]) }}
-        </span>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-2">
+          ]),
+          'tone' => $selectedProductCount < $masterProductCount ? 'warning' : null,
+        ],
+      ]"
+    >
+      <x-slot name="actions">
         @if ($canManageSelection)
           <x-filament::button
             size="sm"
@@ -49,8 +47,8 @@
             {{ __('product_channels.channel.open_preview') }}
           </x-filament::button>
         @endif
-      </div>
-    </div>
+      </x-slot>
+    </x-filament.product-workbench-header>
 
     @include('filament.pages.sync.partials.product-workbench-shell', [
       'activeView' => 'publication',

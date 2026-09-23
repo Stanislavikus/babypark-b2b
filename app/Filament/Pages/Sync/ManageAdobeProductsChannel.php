@@ -28,6 +28,7 @@ use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
@@ -128,7 +129,8 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                     ->state(fn (Product $record): ?string => ProductResource::firstImage($record))
                     ->size(44)
                     ->defaultImageUrl(fn (): string => 'data:image/svg+xml,'.rawurlencode(ProductResource::placeholderSvg(44)))
-                    ->extraImgAttributes(fn (Product $record): array => ProductResource::lightboxImgAttributes($record)),
+                    ->extraImgAttributes(fn (Product $record): array => ProductResource::lightboxImgAttributes($record))
+                    ->toggleable(),
                 TextColumn::make('sku')
                     ->label(__('product_channels.workbench.columns.sku'))
                     ->searchable()
@@ -146,7 +148,8 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                         : __('product_channels.workbench.publication.not_in_magento'))
                     ->badge()
                     ->sortable()
-                    ->color(fn (mixed $state): string => $state ? 'success' : 'gray'),
+                    ->color(fn (mixed $state): string => $state ? 'success' : 'gray')
+                    ->toggleable(),
                 TextColumn::make('is_active')
                     ->label(__('product_channels.columns.status'))
                     ->formatStateUsing(fn (bool $state): string => $state
@@ -154,7 +157,8 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                         : __('product_channels.product_status.inactive'))
                     ->badge()
                     ->sortable()
-                    ->color(fn (bool $state): string => $state ? 'success' : 'gray'),
+                    ->color(fn (bool $state): string => $state ? 'success' : 'gray')
+                    ->toggleable(),
             ])
             ->filters([
                 SelectFilter::make('link_status')
@@ -183,6 +187,22 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                     ->label(__('product_channels.workbench.columns.product_type'))
                     ->options(fn (): array => $this->publicationProductTypeFilterOptions()),
             ])
+            ->filtersLayout(FiltersLayout::Modal)
+            ->filtersFormWidth('md')
+            ->filtersTriggerAction(
+                fn (Action $action): Action => $action
+                    ->button()
+                    ->label(__('product_channels.workbench.toolbar.filters'))
+                    ->tooltip(__('product_channels.workbench.toolbar.filters'))
+                    ->slideOver()
+            )
+            ->columnManagerTriggerAction(
+                fn (Action $action): Action => $action
+                    ->button()
+                    ->label(__('product_channels.workbench.toolbar.columns'))
+                    ->tooltip(__('product_channels.workbench.toolbar.columns'))
+            )
+            ->searchPlaceholder(__('product_channels.workbench.search_placeholder'))
             ->recordUrl(null)
             ->recordAction('openProduct')
             ->recordActions([

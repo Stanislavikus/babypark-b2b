@@ -31,7 +31,7 @@
 
     .fi-ta-header-toolbar-search .fi-ta-search-field {
         width: 100%;
-        padding-inline-start: var(--table-cell-inset);
+        padding-inline-start: 0;
         box-sizing: border-box;
     }
 
@@ -59,5 +59,33 @@
         padding: 0;
         width: 0;
         overflow: hidden;
+    }
+
+    /*
+     * Desktop SaaS navigation affordance: keep Filament's native sidebar state and
+     * chevrons, but add the familiar hamburger glyph so collapse/expand intent is
+     * immediately recognizable in both open and compact icon-rail states.
+     */
+    @media (min-width: 1024px) {
+        #fi-main-sidebar .fi-sidebar-open-collapse-sidebar-btn,
+        #fi-main-sidebar .fi-sidebar-close-collapse-sidebar-btn,
+        .fi-topbar .fi-topbar-open-collapse-sidebar-btn,
+        .fi-topbar .fi-topbar-close-collapse-sidebar-btn {
+            width: auto !important;
+            min-width: 2.5rem;
+            gap: 0.2rem;
+            padding-inline: 0.4rem !important;
+        }
+
+        #fi-main-sidebar .fi-sidebar-open-collapse-sidebar-btn::before,
+        #fi-main-sidebar .fi-sidebar-close-collapse-sidebar-btn::before,
+        .fi-topbar .fi-topbar-open-collapse-sidebar-btn::before,
+        .fi-topbar .fi-topbar-close-collapse-sidebar-btn::before {
+            content: '☰';
+            display: inline-block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            line-height: 1;
+        }
     }
 </style>
