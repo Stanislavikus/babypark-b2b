@@ -39,6 +39,11 @@ final class AdobeProductEntityTrustIntentResolver
         bool $explicitRelink = false,
     ): EntityTrustResolvedIntent {
         $snapshot = $this->snapshotBuilder->build($configuration, SyncSemanticOperation::Export);
+        unset(
+            $snapshot['adobe_product_classifications'],
+            $snapshot['adobe_product_classification_revision'],
+        );
+
         $aggregates = $this->aggregateBuilder->buildForProductIds(
             $configuration->workspace_id,
             [(string) $product->id],

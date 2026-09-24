@@ -115,7 +115,7 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
                 connectorAccountId: $runContext->connectorAccountId,
                 semanticResult: $semanticResult,
                 adobeBaseCurrency: $runContext->adobeBaseCurrency,
-                metadata: $runContext->metadata,
+                metadata: $this->metadataForSemanticResult($runContext->metadata, $semanticResult),
                 consequentialWriteGate: $consequentialWriteGate,
             );
 
@@ -405,6 +405,29 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
             outcome: $outcome,
             findings: $findings,
         );
+    }
+
+    private function metadataForSemanticResult(
+        AdobeProductExportExecutionMetadata $metadata,
+        AdobeProductExportSemanticResult $semanticResult,
+    ): AdobeProductExportExecutionMetadata {
+        foreach ($semanticResult->operations as $operation) {
+            if (! in_array($operation->operation, ['configurable_parent', 'simple_product'], true)) {
+                continue;
+            }
+
+            $attributeSetId = $operation->context['attribute_set_id'] ?? null;
+
+            if (is_int($attributeSetId) && $attributeSetId > 0) {
+                return $metadata->forAttributeSetId($attributeSetId);
+            }
+
+            if (is_string($attributeSetId) && ctype_digit($attributeSetId) && (int) $attributeSetId > 0) {
+                return $metadata->forAttributeSetId((int) $attributeSetId);
+            }
+        }
+
+        return $metadata;
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Services\Sync;
 
 use App\Enums\SyncSemanticOperation;
+use App\Models\ConnectorAccount;
 use App\Models\SyncConfiguration;
 use App\Support\Sync\FieldMappingRevisionEntry;
 use App\Support\Sync\FieldOptionMappingRevisionEntry;
@@ -13,6 +14,7 @@ final class SyncPreviewConfigurationSnapshotBuilder
         private readonly SyncConfigurationMutationCoordinator $mutationCoordinator,
         private readonly SyncProductSelectionStore $selectionStore,
         private readonly ConnectorCategoryMappingSnapshotService $categoryMappingSnapshotService,
+        private readonly AdobeProductClassificationSnapshotService $classificationSnapshotService,
     ) {}
 
     /**
@@ -38,8 +40,20 @@ final class SyncPreviewConfigurationSnapshotBuilder
             $configuration->workspace_id,
             $configuration->connector_account_id,
         );
+        $selectedProductIds = $this->selectionStore->selectedProductIds($configuration);
+        $account = ConnectorAccount::withoutWorkspaceScope()
+            ->where('workspace_id', $configuration->workspace_id)
+            ->whereKey($configuration->connector_account_id)
+            ->with('connectorDefinition')
+            ->firstOrFail();
+        $classificationPayload = $this->classificationSnapshotService->payload(
+            $account,
+            $configuration,
+            $semanticOperation,
+            $selectedProductIds,
+        );
 
-        return [
+        $snapshot = [
             'version' => 'platform.sync-run-input.v1',
             'data_domain' => $configuration->data_domain->value,
             'semantic_operation' => $semanticOperation->value,
@@ -50,5 +64,13 @@ final class SyncPreviewConfigurationSnapshotBuilder
             'category_mapping_revision' => $this->categoryMappingSnapshotService->revisionFromPayload($categoryMappings),
             'connector_execution_configuration' => $configuration->connectorExecutionConfiguration()->payload(),
         ];
+
+        if ($classificationPayload !== null) {
+            $snapshot['adobe_product_classifications'] = $classificationPayload;
+            $snapshot['adobe_product_classification_revision'] = $this->classificationSnapshotService
+                ->revisionFromPayload($classificationPayload);
+        }
+
+        return $snapshot;
     }
 }

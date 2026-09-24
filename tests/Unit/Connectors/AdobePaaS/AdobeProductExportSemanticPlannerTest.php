@@ -373,6 +373,41 @@ class AdobeProductExportSemanticPlannerTest extends TestCase
         $this->assertTrue($result->hasFindingCode('no_configurable_dimension'));
     }
 
+    #[Test]
+    public function frozen_product_classification_outranks_legacy_global_attribute_set(): void
+    {
+        $aggregate = $this->simpleAggregate();
+        $snapshot = $this->snapshotWithCoreMappings();
+        $snapshot['adobe_product_classifications'] = [[
+            'product_id' => 'product-1',
+            'category_source' => 'product_override',
+            'external_category_ids' => ['7', '8'],
+            'attribute_set_source' => 'product_override',
+            'provider_attribute_set_id' => 9,
+            'has_trusted_remote_subject' => false,
+            'blockers' => [],
+            'advisories' => [],
+        ]];
+        $base = $this->metadataFixture();
+        $metadata = new AdobeProductExportExecutionMetadata(
+            selectedAttributeSetId: 4,
+            attributeSets: [
+                ['attribute_set_id' => 4, 'attribute_set_name' => 'Legacy'],
+                ['attribute_set_id' => 9, 'attribute_set_name' => 'Product-specific'],
+            ],
+            attributes: [],
+            attributesByAttributeSetId: [9 => $base->attributes],
+        );
+
+        $result = $this->planner->evaluate($aggregate, $snapshot, $metadata);
+
+        $this->assertFalse($result->hasBlockingFindings());
+        $this->assertCount(1, $result->operations);
+        $this->assertSame(9, $result->operations[0]->context['attribute_set_id']);
+        $this->assertFalse($result->hasFindingCode('missing_category_mapping'));
+        $this->assertFalse($result->hasFindingCode('attribute_set_unconfigured'));
+    }
+
     private function makeResolvedPrice(): ResolvedPrice
     {
         return new ResolvedPrice(

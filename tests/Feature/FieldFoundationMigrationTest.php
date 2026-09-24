@@ -338,6 +338,15 @@ class FieldFoundationMigrationTest extends TestCase
     {
         Artisan::call('migrate:fresh');
 
+        if (Schema::hasTable('adobe_product_type_attribute_set_defaults')) {
+            $classificationMigration = require database_path('migrations/2026_09_24_060000_magento_product_classification_runtime.php');
+            $classificationMigration->down();
+
+            $this->assertFalse(Schema::hasTable('adobe_product_type_attribute_set_defaults'));
+            $this->assertFalse(Schema::hasTable('adobe_product_attribute_set_overrides'));
+            $this->assertFalse(Schema::hasTable('adobe_product_category_overrides'));
+        }
+
         if (Schema::hasTable('adobe_product_attribute_materializations')) {
             $adobeMaterializationsMigration = require database_path('migrations/2026_09_13_070000_adobe_product_attribute_materializations.php');
             $adobeMaterializationsMigration->down();

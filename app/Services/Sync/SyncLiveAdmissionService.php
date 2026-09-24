@@ -33,6 +33,8 @@ final class SyncLiveAdmissionService
         private readonly SyncRunActiveRecoveryService $activeRecoveryService,
         private readonly SyncRuntimeTimingResolver $timingResolver,
         private readonly ConnectorCategoryMappingSnapshotService $categoryMappingSnapshotService,
+        private readonly AdobeProductClassificationSnapshotService $classificationSnapshotService,
+        private readonly SyncProductSelectionStore $selectionStore,
         private readonly ConnectorLiveRuntimeReadinessResolver $liveRuntimeReadinessResolver,
     ) {}
 
@@ -152,6 +154,27 @@ final class SyncLiveAdmissionService
                 || ! hash_equals($currentCategoryMappingRevision, $snapshotCategoryMappingRevision)
             ) {
                 throw SyncLiveAdmissionException::previewEvidenceMissing();
+            }
+
+            if ($this->classificationSnapshotService->isApplicable(
+                $freshAccount,
+                $configuration,
+                SyncSemanticOperation::Export,
+            )) {
+                $snapshotClassificationRevision = $snapshot['adobe_product_classification_revision'] ?? null;
+                $currentClassificationRevision = $this->classificationSnapshotService->revision(
+                    $freshAccount,
+                    $configuration,
+                    SyncSemanticOperation::Export,
+                    $this->selectionStore->selectedProductIds($configuration),
+                );
+
+                if (! is_string($snapshotClassificationRevision)
+                    || ! is_string($currentClassificationRevision)
+                    || ! hash_equals($currentClassificationRevision, $snapshotClassificationRevision)
+                ) {
+                    throw SyncLiveAdmissionException::previewEvidenceMissing();
+                }
             }
 
             $run = SyncRun::withoutWorkspaceScope()->create([

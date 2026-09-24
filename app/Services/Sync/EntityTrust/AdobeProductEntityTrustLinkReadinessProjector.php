@@ -65,6 +65,11 @@ final class AdobeProductEntityTrustLinkReadinessProjector
             ->get();
 
         $snapshot = $this->snapshotBuilder->build($configuration, SyncSemanticOperation::Export);
+        unset(
+            $snapshot['adobe_product_classifications'],
+            $snapshot['adobe_product_classification_revision'],
+        );
+
         $metadata = $this->metadataPreparer->prepareMetadata(
             $workspace->id,
             $account->id,
