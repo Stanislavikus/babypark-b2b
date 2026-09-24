@@ -64,7 +64,46 @@
   ],
   "follow_on": {
     "certification_product_retained_temporarily": true,
-    "reason": "follow-on real-target category/media validation",
-    "configurable_product_create": "not_yet_certified"
+    "reason": "follow-on configurable Product CREATE validation",
+    "configurable_product_create": "not_yet_certified",
+    "category_media_after_create": "certified"
+  },
+  "post_create_follow_on": {
+    "result": "PASS",
+    "category_relation": {
+      "provider_category_id": "7",
+      "baseline_category_ids": [],
+      "add_outcome": "synchronized",
+      "after_add_category_ids": [
+        "7"
+      ],
+      "remove_outcome": "synchronized",
+      "final_category_ids": [],
+      "exact_restore": true,
+      "runtime": "AdobeProductCategoryRelationExecutor"
+    },
+    "media": {
+      "baseline_entry_ids": [],
+      "outcome": "synchronized",
+      "created_entry_id": 58,
+      "label": "B2B Moduleless CREATE Certification 2026-09-24 19:13:55 UTC",
+      "position": 1,
+      "types": [
+        "image",
+        "small_image",
+        "thumbnail"
+      ],
+      "content_sha256": "337699db3f3e7d4e76bf5ebb7fe3d1292e77ff693bcd34341b9db85b99a01a44",
+      "mime_type": "image/jpeg",
+      "cleanup_http_status": 200,
+      "final_entry_ids": [],
+      "exact_restore": true,
+      "runtime": "AdobeProductMediaLiveExecutor"
+    },
+    "architecture": {
+      "existing_production_executors_reused": true,
+      "standard_adobe_magento_rest_only": true,
+      "safe_sync_used": false
+    }
   }
 }
