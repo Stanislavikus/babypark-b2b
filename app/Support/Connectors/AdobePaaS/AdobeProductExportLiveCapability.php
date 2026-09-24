@@ -9,6 +9,7 @@ use App\Support\Connectors\AdobePaaS\Command\AdobeConfigurableProductExecutionRe
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductAppliedStateKnowledge;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductCommandSafeEvidence;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductExternalRecordLinkGuard;
+use App\Support\Connectors\AdobePaaS\Command\AdobeProductModulelessSimpleCreateExecutor;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandExecutor;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandInput;
 use App\Support\Connectors\AdobePaaS\Command\AdobeProductSimpleCommandResult;
@@ -36,6 +37,7 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
         private readonly AdobeStoreConfigReader $storeConfigReader,
         private readonly AdobeProductExportSemanticPlanner $semanticPlanner,
         private readonly AdobeProductSimpleCommandExecutor $commandExecutor,
+        private readonly AdobeProductModulelessSimpleCreateExecutor $createExecutor,
         private readonly AdobeConfigurableProductCommandCoordinator $configurableCoordinator,
         private readonly AdobeProductExternalRecordLinkGuard $linkGuard,
         private readonly AdobeProductMediaLiveExecutor $mediaLiveExecutor,
@@ -153,13 +155,25 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
             );
         }
 
-        $commandResult = $this->commandExecutor->execute(new AdobeProductSimpleCommandInput(
+        $simpleInput = new AdobeProductSimpleCommandInput(
             workspaceId: $runContext->workspaceId,
             connectorAccountId: $runContext->connectorAccountId,
             semanticResult: $semanticResult,
             adobeBaseCurrency: $runContext->adobeBaseCurrency,
             consequentialWriteGate: $consequentialWriteGate,
-        ));
+        );
+        $variantId = $this->simpleVariantId($semanticResult);
+        $trustedVariant = $variantId !== null
+            ? $this->linkGuard->resolveTrustedVariantLinkBySubject(
+                $runContext->workspaceId,
+                $runContext->connectorAccountId,
+                $variantId,
+            )
+            : null;
+
+        $commandResult = $trustedVariant?->isTrusted() === true
+            ? $this->commandExecutor->execute($simpleInput)
+            : $this->createExecutor->execute($simpleInput);
 
         $coreResult = $this->mapCommandResult($commandResult, $semanticResult);
 
@@ -181,6 +195,23 @@ final class AdobeProductExportLiveCapability implements SyncLiveConnectorCapabil
             $consequentialWriteGate,
             isConfigurablePath: false,
         );
+    }
+
+    private function simpleVariantId(AdobeProductExportSemanticResult $semanticResult): ?string
+    {
+        foreach ($semanticResult->operations as $operation) {
+            if ($operation->operation !== 'simple_product') {
+                continue;
+            }
+
+            $value = $operation->context['variant_id'] ?? null;
+
+            if ((is_string($value) || is_int($value)) && (string) $value !== '') {
+                return (string) $value;
+            }
+        }
+
+        return null;
     }
 
     private function isStage3BSimplePath(AdobeProductExportSemanticResult $semanticResult): bool

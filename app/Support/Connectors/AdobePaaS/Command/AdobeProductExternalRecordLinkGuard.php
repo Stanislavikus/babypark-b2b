@@ -37,6 +37,23 @@ final class AdobeProductExternalRecordLinkGuard
         return $this->resolveTrustedParentLinkLookup($links);
     }
 
+    public function hasAnyVariantLinkBySubject(
+        string $workspaceId,
+        string $connectorAccountId,
+        string $productVariantId,
+    ): bool {
+        if (! ctype_digit($productVariantId) || (int) $productVariantId <= 0) {
+            return false;
+        }
+
+        return ExternalRecordLink::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->where('connector_account_id', $connectorAccountId)
+            ->where('product_variant_id', (int) $productVariantId)
+            ->whereNotNull('product_variant_id')
+            ->exists();
+    }
+
     public function hasCrossSubjectCollision(
         string $workspaceId,
         string $connectorAccountId,
@@ -142,7 +159,7 @@ final class AdobeProductExternalRecordLinkGuard
 
         $link = $links->first();
 
-        if ($link !== null && $link->hasMerchantConfirmedTrust()) {
+        if ($link !== null && $link->hasTrustedIdentity()) {
             return AdobeProductTrustedVariantLinkLookup::trusted($link);
         }
 
@@ -164,7 +181,7 @@ final class AdobeProductExternalRecordLinkGuard
 
         $link = $links->first();
 
-        if ($link !== null && $link->hasMerchantConfirmedTrust()) {
+        if ($link !== null && $link->hasTrustedIdentity()) {
             return AdobeProductTrustedParentLinkLookup::trusted($link);
         }
 

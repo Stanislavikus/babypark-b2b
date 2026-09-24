@@ -15,5 +15,7 @@ final readonly class AdobeAttributeMetadata
         public array $options,
         public ?string $defaultFrontendLabel = null,
         public ?bool $isRequired = null,
+        public mixed $defaultValue = null,
+        public array $applyTo = [],
     ) {}
 }

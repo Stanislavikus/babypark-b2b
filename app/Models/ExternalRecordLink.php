@@ -84,6 +84,28 @@ class ExternalRecordLink extends Model
         return true;
     }
 
+    public function hasPlatformCreatedTrust(): bool
+    {
+        if ($this->trust_origin !== ExternalRecordLinkTrustOrigin::PlatformCreated->value) {
+            return false;
+        }
+
+        if (! is_string($this->external_record_discriminator) || preg_match('/^[1-9][0-9]*$/', $this->external_record_discriminator) !== 1) {
+            return false;
+        }
+
+        if ($this->established_by_workspace_user_id !== null || $this->established_at === null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function hasTrustedIdentity(): bool
+    {
+        return $this->hasMerchantConfirmedTrust() || $this->hasPlatformCreatedTrust();
+    }
+
     private function assertValidSubject(): void
     {
         $hasProduct = $this->product_id !== null;
