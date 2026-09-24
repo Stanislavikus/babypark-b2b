@@ -2,8 +2,10 @@
 
 namespace App\Support\Connectors\AdobePaaS\Command;
 
+use App\Models\AdobeProductAttributeLineage;
 use App\Models\AdobeProductAttributeSet;
 use App\Models\AdobeProductAttributeSetMembership;
+use App\Models\ConnectorSchemaFieldClassification;
 use App\Support\Connectors\AdobePaaS\AdobeAttributeMetadata;
 use App\Support\Connectors\AdobePaaS\AdobeProductExportPersistedMetadataReader;
 
@@ -18,6 +20,12 @@ final class AdobeSimpleProductCreateAttributeValidator
         'status',
         'type_id',
         'visibility',
+    ];
+
+    /** Magento-managed output fields that are not merchant-supplied on Product CREATE. */
+    private const PROVIDER_MANAGED_FIELDS = [
+        'created_at',
+        'updated_at',
     ];
 
     public function __construct(
@@ -59,7 +67,14 @@ final class AdobeSimpleProductCreateAttributeValidator
             return AdobeSimpleProductCreateValidationResult::blocked('adobe_create_attribute_set_unavailable');
         }
 
-        if ($membershipCount !== count($metadata->attributes)) {
+        if ($membershipCount !== count($metadata->attributes)
+            && $this->hasPotentialRequiredSimpleMetadataGap(
+                $workspaceId,
+                $connectorAccountId,
+                $set->id,
+                array_keys($metadata->attributes),
+            )
+        ) {
             return AdobeSimpleProductCreateValidationResult::blocked('adobe_create_attribute_metadata_incomplete');
         }
 
@@ -67,7 +82,11 @@ final class AdobeSimpleProductCreateAttributeValidator
         $invalidOptions = [];
 
         foreach ($metadata->attributes as $code => $attribute) {
-            if (! $attribute instanceof AdobeAttributeMetadata || ! $this->appliesToSimple($attribute)) {
+            if (
+                ! $attribute instanceof AdobeAttributeMetadata
+                || ! $this->appliesToSimple($attribute)
+                || in_array($code, self::PROVIDER_MANAGED_FIELDS, true)
+            ) {
                 continue;
             }
 
@@ -115,6 +134,105 @@ final class AdobeSimpleProductCreateAttributeValidator
         }
 
         return AdobeSimpleProductCreateValidationResult::ready();
+    }
+
+    /**
+     * @param  list<string>  $knownCodes
+     */
+    private function hasPotentialRequiredSimpleMetadataGap(
+        string $workspaceId,
+        string $connectorAccountId,
+        string $attributeSetId,
+        array $knownCodes,
+    ): bool {
+        $known = array_fill_keys($knownCodes, true);
+
+        $memberships = AdobeProductAttributeSetMembership::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->where('connector_account_id', $connectorAccountId)
+            ->where('adobe_product_attribute_set_id', $attributeSetId)
+            ->whereNull('missing_since')
+            ->get();
+
+        $lineageIds = $memberships
+            ->pluck('adobe_product_attribute_lineage_id')
+            ->unique()
+            ->values()
+            ->all();
+
+        $lineages = AdobeProductAttributeLineage::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->where('connector_account_id', $connectorAccountId)
+            ->whereIn('id', $lineageIds)
+            ->whereNull('missing_since')
+            ->get()
+            ->keyBy('id');
+
+        $sourceIds = $lineages
+            ->pluck('connector_schema_source_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        $externalKeys = $lineages
+            ->pluck('last_external_field_key')
+            ->filter(static fn ($value): bool => is_string($value) && $value !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        $classifications = ConnectorSchemaFieldClassification::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->where('connector_account_id', $connectorAccountId)
+            ->when($sourceIds !== [], static fn ($query) => $query->whereIn('connector_schema_source_id', $sourceIds))
+            ->whereIn('external_field_key', $externalKeys)
+            ->with('latestSnapshotField')
+            ->get()
+            ->keyBy(static fn (ConnectorSchemaFieldClassification $classification): string => $classification->connector_schema_source_id.':'.$classification->external_field_key);
+
+        foreach ($memberships as $membership) {
+            $lineage = $lineages->get($membership->adobe_product_attribute_lineage_id);
+
+            if (! $lineage instanceof AdobeProductAttributeLineage) {
+                return true;
+            }
+
+            $code = (string) $lineage->last_external_field_key;
+
+            if ($code === '' || isset($known[$code])) {
+                continue;
+            }
+
+            $classification = $classifications->get(
+                $lineage->connector_schema_source_id.':'.$code,
+            );
+            $behavior = is_array($classification?->behavior_signature)
+                ? $classification->behavior_signature
+                : [];
+            $applyTo = $behavior['apply_to'] ?? [];
+            $applyTo = is_array($applyTo)
+                ? array_values(array_filter($applyTo, static fn ($value): bool => is_string($value) && $value !== ''))
+                : [];
+
+            if ($applyTo !== [] && ! in_array('simple', $applyTo, true)) {
+                continue;
+            }
+
+            $fieldRequired = $classification?->latestSnapshotField?->is_required;
+            $behaviorRequired = $behavior['required'] ?? null;
+            $required = is_bool($fieldRequired)
+                ? $fieldRequired
+                : (is_bool($behaviorRequired) ? $behaviorRequired : null);
+
+            if ($required === false) {
+                continue;
+            }
+
+            // Required=true or unknown on a Simple-applicable membership must fail closed.
+            return true;
+        }
+
+        return false;
     }
 
     private function appliesToSimple(AdobeAttributeMetadata $attribute): bool

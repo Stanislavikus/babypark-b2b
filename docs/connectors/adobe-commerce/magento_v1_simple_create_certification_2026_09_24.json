@@ -1,0 +1,70 @@
+{
+  "schema": "magento_v1_simple_create_certification.v1",
+  "certified_at_utc": "2026-09-24T19:13:55Z",
+  "result": "PASS",
+  "architecture": {
+    "path": "standard_moduleless_adobe_magento_rest",
+    "safe_sync_used": false,
+    "custom_magento_module_required": false
+  },
+  "target": {
+    "store_code": "default",
+    "attribute_set_id": 11,
+    "product_type": "simple"
+  },
+  "product": {
+    "sku": "B2B-CERT-20260924-191355",
+    "name": "B2B Moduleless CREATE Certification 2026-09-24 19:13:55 UTC",
+    "status": 2,
+    "visibility": 1,
+    "price": 1.0,
+    "magento_entity_id": 26
+  },
+  "create_execution": {
+    "initial_get": {
+      "http_status": 404,
+      "trusted_missing_shape": "exact_standard_catalog_product_missing_message"
+    },
+    "product_post_attempts": 1,
+    "reconciliation_get_attempts": 1,
+    "applied_state": "known_applied",
+    "reason_code": "adobe_create_post_reconciled",
+    "external_record_link_persisted": true,
+    "ownership_trust_satisfied": true
+  },
+  "external_record_link": {
+    "trust_origin": "platform_created",
+    "external_identifier": "B2B-CERT-20260924-191355",
+    "external_record_discriminator": "26",
+    "trusted_for_standard_export_identity": true
+  },
+  "second_execution": {
+    "applied_state": "known_applied",
+    "reason_code": "stock_state_already_matches",
+    "consequential_write_attempts": 0,
+    "reconciliation_get_attempts": 0,
+    "ownership_trust_satisfied": true
+  },
+  "real_target_blockers_fixed": [
+    {
+      "code": "message_only_product_missing_404",
+      "evidence": "Magento returned HTTP 404 with exact Catalog message and no parameters array; classifier now accepts only this exact standard Product-missing message in addition to exact-SKU parameters evidence while generic route 404 remains untrusted."
+    },
+    {
+      "code": "attribute_set_required_metadata",
+      "evidence": "Attribute Set 11 contains Magento-managed required created_at/updated_at and four downloadable-only memberships lacking full runtime field semantics. CREATE validation now ignores provider-managed timestamps and permits incomplete metadata only when classification evidence proves the missing membership does not apply to Simple; potentially required/unknown Simple memberships remain fail-closed."
+    }
+  ],
+  "safety_assertions": [
+    "existing remote SKU without trusted correspondence performs zero Product POST",
+    "ambiguous Product POST is never blindly retried",
+    "ambiguous evidence never creates platform_created trust",
+    "successful CREATE requires exact POST response SKU and logical entity_id plus reconciliation controlled-state match",
+    "subsequent execution consumes trusted correspondence and performs no second CREATE"
+  ],
+  "follow_on": {
+    "certification_product_retained_temporarily": true,
+    "reason": "follow-on real-target category/media validation",
+    "configurable_product_create": "not_yet_certified"
+  }
+}

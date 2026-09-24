@@ -109,6 +109,25 @@ final class MagentoV1ModulelessArchitectureInvariantTest extends TestCase
     }
 
     #[Test]
+    public function simple_create_real_target_evidence_is_durable_and_safe_sync_free(): void
+    {
+        $path = base_path('docs/connectors/adobe-commerce/magento_v1_simple_create_certification_2026_09_24.json');
+        $this->assertFileExists($path);
+
+        $evidence = json_decode(File::get($path), true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame('PASS', $evidence['result'] ?? null);
+        $this->assertSame('standard_moduleless_adobe_magento_rest', $evidence['architecture']['path'] ?? null);
+        $this->assertFalse($evidence['architecture']['safe_sync_used'] ?? true);
+        $this->assertFalse($evidence['architecture']['custom_magento_module_required'] ?? true);
+        $this->assertSame(1, $evidence['create_execution']['product_post_attempts'] ?? null);
+        $this->assertSame(1, $evidence['create_execution']['reconciliation_get_attempts'] ?? null);
+        $this->assertSame('platform_created', $evidence['external_record_link']['trust_origin'] ?? null);
+        $this->assertSame(0, $evidence['second_execution']['consequential_write_attempts'] ?? null);
+        $this->assertSame('not_yet_certified', $evidence['follow_on']['configurable_product_create'] ?? null);
+    }
+
+    #[Test]
     public function moduleless_create_uses_existing_stock_product_transport(): void
     {
         $content = File::get(base_path(

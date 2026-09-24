@@ -177,16 +177,14 @@ final class AdobeProductRemoteGetClassifier
             return false;
         }
 
-        if (! is_array($parameters)) {
-            return false;
-        }
-
-        foreach ($parameters as $parameter) {
-            if (is_string($parameter) && $parameter === $requestedSku) {
-                return true;
+        if (is_array($parameters)) {
+            foreach ($parameters as $parameter) {
+                if (is_string($parameter) && $parameter === $requestedSku) {
+                    return true;
+                }
             }
         }
 
-        return false;
+        return $message === "The product that was requested doesn't exist. Verify the product and try again.";
     }
 }
