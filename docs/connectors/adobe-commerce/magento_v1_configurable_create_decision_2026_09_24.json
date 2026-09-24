@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0.0",
+  "decision_date": "2026-09-24",
+  "connector": "adobe-commerce",
+  "capability": "moduleless_configurable_product_create",
+  "status": "architecture_frozen_implementation_and_certification_pending",
+  "campaign_head": "65b83f468659a391a0fde198936e06c50cfedf95",
+  "public_support_changed": false,
+  "safe_sync_used": false,
+  "architecture": {
+    "moduleless": true,
+    "standard_rest_only": true,
+    "saga_table_required": false,
+    "automatic_destructive_rollback": false,
+    "product_identity_checkpoint": "ExternalRecordLink",
+    "option_and_link_recovery": "fresh_provider_state",
+    "parent_initial_status": 2,
+    "option_create_parent_origin": "platform_created",
+    "trusted_child_origins": [
+      "platform_created",
+      "merchant_confirmed"
+    ]
+  },
+  "real_target_probes": {
+    "configurable_parent_required_eav": {
+      "attribute_set_id": 10,
+      "result": "PASS_WITH_REQUIRED_EAV",
+      "first_missing_required_field": "c_strollers_type",
+      "second_missing_required_field": "c_strollers_color",
+      "interpretation": "provider Attribute Set required fields must be satisfied before Product POST"
+    },
+    "configurable_parent_without_price": {
+      "result": "PASS",
+      "product_post_status": 200,
+      "price_sent": false,
+      "observed_provider_price": 0,
+      "type_id": "configurable",
+      "initial_status": 2,
+      "cleanup_status": 200,
+      "exact_cleanup": true
+    },
+    "required_dimension_bootstrap": {
+      "result": "PASS",
+      "attribute_code": "c_strollers_color",
+      "bootstrap_value": "79",
+      "first_linked_child_sku": "524000027bbg-1",
+      "first_linked_child_value": "63",
+      "bootstrap_matches_first_child": false,
+      "option_post_status": 200,
+      "child_link_post_status": 200,
+      "parent_value_after_create": "79",
+      "parent_value_after_child_link": null,
+      "cleanup_status": 200,
+      "exact_cleanup": true
+    },
+    "child_multi_parent_membership": {
+      "result": "PASS",
+      "child_sku": "524000027bbg-1",
+      "second_parent_product_post_status": 200,
+      "second_parent_option_post_status": 200,
+      "second_parent_child_link_post_status": 200,
+      "original_parent_children_unchanged": true,
+      "second_parent_cleanup_status": 200,
+      "original_parent_exact_after_cleanup": true,
+      "child_still_exists_entity_id": 12
+    }
+  },
+  "review_synthesis": {
+    "gpt_5_6": "resumable ERL + provider-state model supported; no saga/rollback",
+    "sonnet": "confirmed model against campaign HEAD; identified parent ERL, child create reuse, type-aware validator, lock and activation seams",
+    "lead_decision": "proceed without Opus escalation; real-target probes resolved remaining runtime questions"
+  },
+  "implementation_contract": [
+    "whole-family preflight before first write",
+    "account lock around create/resume core",
+    "children first",
+    "parent create disabled with Product-subject platform_created ERL",
+    "option provider-read convergence",
+    "trusted child-link provider-read convergence",
+    "post-link option repair and bootstrap-parent reread",
+    "final parent status only after exact structure",
+    "release lock before media/category",
+    "no production rollback delete"
+  ]
+}
