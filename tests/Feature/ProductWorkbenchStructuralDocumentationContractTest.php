@@ -33,6 +33,13 @@ class ProductWorkbenchStructuralDocumentationContractTest extends TestCase
         $this->assertStringContainsString('AdobeProductClassificationSnapshotService', $content);
         $this->assertStringContainsString('not** the final semantic-planner owner', $content);
         $this->assertStringContainsString('desired category **set**', $content);
+        $this->assertStringContainsString('### B13. Provider classification catalogues — [Resolved addendum 2026-09-24]', $content);
+        $this->assertStringContainsString('complete provider catalogues', $content);
+        $this->assertStringContainsString('stable provider identity is `workspace + connector_account + external_category_id`', $content);
+        $this->assertStringContainsString('failed/incomplete Category enumeration MUST NOT mark previously successful catalogue rows missing', $content);
+        $this->assertStringContainsString('catalogue state records the connector target context', $content);
+        $this->assertStringContainsString('active Categories remain selectable even when no Product currently references them', $content);
+        $this->assertStringContainsString('standard Magento REST does not expose authoritative existing Attribute→Group placement', $content);
     }
 
     #[Test]

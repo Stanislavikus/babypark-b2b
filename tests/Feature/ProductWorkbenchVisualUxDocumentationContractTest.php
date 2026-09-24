@@ -50,6 +50,12 @@ class ProductWorkbenchVisualUxDocumentationContractTest extends TestCase
         $this->assertStringContainsString('Row / photo interaction — 2026-09-23 clarification', $content);
         $this->assertStringContainsString('shared image lightbox', $content);
         $this->assertStringContainsString('Відкрити повну картку', $content);
+        $this->assertStringContainsString('Classification catalogue behavior — [Resolved addendum 2026-09-24]', $content);
+        $this->assertStringContainsString('active empty Categories are selectable and show `0 товарів у Magento`', $content);
+        $this->assertStringContainsString('Батьківська категорія неактивна', $content);
+        $this->assertStringContainsString('all current persisted Magento Product Attribute Sets are eligible for lookup', $content);
+        $this->assertStringContainsString('Attribute Groups organize fields inside the selected Attribute Set; the UI does not invent a', $content);
+        $this->assertStringContainsString('separate Product-level `Group` selection.', $content);
 
         $designSystem = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
         $this->assertStringContainsString('Canonical project reference', $designSystem);
