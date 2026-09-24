@@ -17,6 +17,44 @@ class ProductWorkbenchVisualUxDocumentationContractTest extends TestCase
         $this->assertStringContainsString('[ Огляд ]   [ Публікація ]', $content);
         $this->assertStringContainsString('No permanent top-level `Зв\'язки` tab in first scope.', $content);
         $this->assertStringContainsString('Focus mode', $content);
+        $this->assertStringContainsString('2026-09-23 visual Stop-and-Amend', $content);
+        $this->assertStringContainsString("Filament's native desktop-collapsible sidebar", $content);
+        $this->assertStringContainsString('standard Filament table filter surface', $content);
+        $this->assertStringContainsString('one compact horizontal header line', $content);
+        $this->assertStringContainsString('status board', $content);
+        $this->assertStringContainsString('browser-like tab strip', $content);
+        $this->assertStringContainsString('Матриця полів', $content);
+        $this->assertStringContainsString('same right-side slide-over interaction', $content);
+        $this->assertStringContainsString('official Magento PNG mark', $content);
+        $logoPath = public_path('images/connectors/magento-mark.png');
+        $this->assertFileExists($logoPath);
+        $this->assertSame(IMAGETYPE_PNG, getimagesize($logoPath)[2]);
+        $this->assertSame(6, ord(file_get_contents($logoPath)[25]), 'Magento PNG must keep RGBA alpha channel.');
+
+        $header = File::get(resource_path('views/components/filament/product-workbench-header.blade.php'));
+        $this->assertStringContainsString('width="28"', $header);
+        $this->assertStringContainsString('height="28"', $header);
+        $this->assertStringContainsString("filemtime(public_path('images/connectors/magento-mark.png'))", $header);
+
+        $actionSortHeader = File::get(resource_path('views/filament/pages/sync/partials/product-workbench-action-sort-header.blade.php'));
+        $this->assertStringContainsString('fi-ta-header-cell-sort-btn', $actionSortHeader);
+        $this->assertStringContainsString('heroicon-m-chevron-down', $actionSortHeader);
+        $this->assertStringNotContainsString('heroicon-m-chevron-up-down', $actionSortHeader);
+        $this->assertSame(1, substr_count($actionSortHeader, '<x-filament::icon'));
+        $this->assertStringContainsString('Publication `Дія` is **not sortable**', $content);
+
+        $publicationActionLabel = File::get(resource_path('views/filament/pages/sync/partials/product-workbench-action-column-label.blade.php'));
+        $this->assertStringContainsString('bp-workbench-action-column-label', $publicationActionLabel);
+        $this->assertStringNotContainsString('sortTable', $publicationActionLabel);
+
+        $this->assertStringContainsString('Row / photo interaction — 2026-09-23 clarification', $content);
+        $this->assertStringContainsString('shared image lightbox', $content);
+        $this->assertStringContainsString('Відкрити повну картку', $content);
+
+        $designSystem = File::get(base_path('docs/06-UI_DESIGN_SYSTEM.md'));
+        $this->assertStringContainsString('Canonical project reference', $designSystem);
+        $this->assertStringContainsString('Матриця полів', $designSystem);
+        $this->assertStringContainsString('native `Filament\\Tables\\Table` controls', $designSystem);
     }
 
     #[Test]

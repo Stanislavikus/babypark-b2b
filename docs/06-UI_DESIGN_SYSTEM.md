@@ -469,6 +469,8 @@ mutable list screens alike.
 
 ### Universal Search and Filter Interaction
 
+**Canonical project reference:** the current `Матриця полів` (`FieldMatrix`) toolbar is the proven visual/interaction reference for data-list header composition: visible search aligned with the list grid, then labelled filter/action controls with count badges in the same toolbar surface. Eloquent-backed pages must achieve the same grammar through native `Filament\Tables\Table` controls rather than copying the non-Eloquent component or creating a one-off toolbar.
+
 Recommended layout:
 
 Left / main area:
@@ -598,6 +600,18 @@ segmented single-choice control.
   of selected values.
 - A dedicated bounded-selection action such as `Compare channels` or
   `Columns` shows the number of selected items on its own trigger.
+- **Toolbar count-badge placement standard:** use the Filament button badge
+  primitive, but keep the compact badge **inside the trigger after the label**.
+  The badge must not intersect the button outline or hang outside the control;
+  normal right padding remains visible after the badge. This applies to
+  `Filters`, `Columns`, comparison selectors and equivalent bounded toolbar
+  actions.
+- Shared Eloquent and non-Eloquent toolbar controls use the shared
+  `bp-toolbar-count-trigger` presentation so the badge stays in the same
+  approved in-button trailing position across the product.
+- Existing screens are not mass-rewritten merely for this visual rule;
+  shared components adopt it centrally, and standalone legacy screens align
+  when next materially touched.
 - Do not combine row-filter count and comparison/column count into one
   badge.
 - A required scope filter with no neutral state counts as one active
@@ -966,6 +980,24 @@ something this convention dictates. Do not treat `.webp` delivery as a marketpla
 requirement.
 
 This decision is closed and must not be reopened without a documentation-level decision.
+
+## Record Action Column Alignment and Priority Sort
+
+Record-action columns use the same left/start alignment as ordinary textual table headers and
+row content unless a specific directional layout requires otherwise. Do not right-align `Дія`
+merely because it is the last column.
+
+An action column itself is not arbitrary sortable data. However, when the visible action set is a
+deterministic projection of an underlying row state and sorting materially helps remediation, the
+action header may expose a **priority sort**. That sort must delegate to the real sortable state
+(for example `needs linking` / `is_linked`), not to button labels or DOM order. The first sort
+direction should put rows requiring merchant attention first when that is the stated workflow.
+
+When an action header is sortable, it must use the **same Filament header-sort visual grammar**
+as ordinary sortable columns: the same `fi-ta-header-cell-sort-btn` control, the same spacing,
+and exactly **one** sort chevron. Inactive uses the standard downward chevron; active uses up/down
+only to reflect the current direction. Do not introduce a two-arrow icon or a one-off sort symbol
+inside the same table.
 
 ## Row Action Zones
 
@@ -1631,6 +1663,23 @@ disabled by connector
 The UI must not allow ordinary editing of externally controlled fields unless the domain/connector rules explicitly allow it.
 
 If an override is allowed, it must be clearly marked as an override and must not silently break sync behavior.
+
+## Integration / Provider Identity Mark Standard
+
+Compact operational headers may show the external provider identity (for example Magento,
+Shopify, Google or Amazon), but branding must never dominate the work surface.
+
+- Use the official provider mark when a stable official asset is available; do not fabricate
+  letter tiles as a substitute once the real mark is known.
+- In a compact operational header, the provider mark renders inside a **28 × 28 px** box and
+  must remain visually smaller than the outer height of the standard small utility button
+  (`size=sm`). The utility-button box, not its text glyph height, is the size reference.
+- Always constrain raster/SVG assets explicitly by rendered width and height; never rely on the
+  source image's intrinsic dimensions or on a newly introduced Tailwind utility being present in
+  a previously compiled theme.
+- Keep the provider name as adjacent text; the mark is an identity cue, not the page title.
+- Larger brand artwork is reserved for onboarding/marketing/empty-state contexts that explicitly
+  need it, not table-first operational workspaces.
 
 ## Connector Mapping UI Pattern
 

@@ -34,32 +34,22 @@
                         <x-filament::button
                             color="gray"
                             icon="heroicon-m-funnel"
+                            :badge="$filtersCount > 0 ? $filtersCount : null"
+                            class="bp-toolbar-count-trigger"
                             data-testid="data-list-filter-trigger"
                             x-on:click="panelFocus = 'filters'; $dispatch('open-modal', { id: '{{ $panelId }}' })"
                         >
-                            <span class="flex items-center gap-2">
-                                <span>{{ $filtersLabel }}</span>
-                                @if ($filtersCount > 0)
-                                    <x-filament::badge color="primary" size="sm">
-                                        {{ $filtersCount }}
-                                    </x-filament::badge>
-                                @endif
-                            </span>
+                            {{ $filtersLabel }}
                         </x-filament::button>
                     @else
                         <x-filament::button
                             color="gray"
                             icon="heroicon-m-funnel"
+                            :badge="$filtersCount > 0 ? $filtersCount : null"
+                            class="bp-toolbar-count-trigger"
                             data-testid="data-list-filter-trigger"
                         >
-                            <span class="flex items-center gap-2">
-                                <span>{{ $filtersLabel }}</span>
-                                @if ($filtersCount > 0)
-                                    <x-filament::badge color="primary" size="sm">
-                                        {{ $filtersCount }}
-                                    </x-filament::badge>
-                                @endif
-                            </span>
+                            {{ $filtersLabel }}
                         </x-filament::button>
                     @endif
                 </div>

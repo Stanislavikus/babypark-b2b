@@ -9,6 +9,12 @@
 >
 > Visual research evidence remains under:
 > `docs/prototypes/product-workbench-visual-ux/`.
+>
+> **2026-09-23 visual Stop-and-Amend — PRODUCT OWNER APPROVED**
+>
+> Real-screen review replaces the first-scope local filter rail with the standard table filter
+> surface, requires native compact SaaS navigation in Focus Mode, and compacts the Workbench
+> header/tabs as specified below. Domain/row-universe semantics are unchanged.
 
 ## Goal
 
@@ -49,33 +55,45 @@ Reason:
 
 - connector work needs horizontal catalogue space;
 - the global menu does not need to consume a permanent wide column during product operations;
-- the freed width may be used by the local filter rail + product table.
+- the freed width belongs primarily to the product table.
+
+For the admin panel, Focus Mode uses Filament's native desktop-collapsible sidebar: the wide SaaS
+navigation collapses to the normal icon rail with the native expand affordance. Do not create a
+second bespoke connector navigation rail.
 
 This is a presentation rule, not permission to remove normal SaaS navigation entirely.
 
 ### Header
 
-Show:
+Desktop first scope uses **one compact horizontal header line**, not stacked information cards.
 
-- `Magento`;
-- connected account/store as secondary identity;
-- connection health;
-- last successful catalogue refresh;
-- remote Product count;
-- secondary `Оновити каталог` action.
+Show three visually distinct zones in that same row:
+
+- **connector identity** on the left — compact provider badge/icon + `Magento` + connected account/store as secondary identity; do not stack provider/account into another row;
+- **status board** in the middle — icon-first compact evidence with concise values and full meaning available through accessible tooltip/label (Overview: remote Product count, unlinked count, last successful catalogue refresh; Publication: selected/total count explicitly meaning `selected for Magento`);
+- **View-relevant utility actions** on the right (for example `Оновити`, `Вибрати товари`, `Перевірити готовність`).
+
+Do not turn the status board into prose. Prefer familiar icons plus short values when the tooltip/accessible label can carry the full explanation.
+
+Connection health may be added compactly when it is useful, but must not create another tall
+header block.
+
+The `Огляд / Публікація` controls render as a compact **browser-like tab strip** attached visually to the table area rather than inside a separate large card. Use familiar rounded-top page-tab affordance: the active tab visually joins the content surface and the inactive tab recedes.
 
 While refresh is running, retain the latest successful catalogue and show progress/status;
 never blank the working grid.
 
 ---
 
-## 2. Local filter rail
+## 2. Workbench filters — 2026-09-23 Stop-and-Amend
 
-Use a collapsible left-side Workbench filter rail inspired by mature PIM grids.
+Do **not** reserve a permanent second left rail for first-scope Workbench filters.
 
-The rail is Workbench-local, not the global SaaS sidebar.
+Use the standard Filament table filter surface next to search/column controls. The system
+correspondence presets `Усі товари / Потребують зв'язку / Пов'язані` are represented by the
+same trusted-link table filter rather than duplicated in a separate rail.
 
-Visible high-value filters may include:
+High-value filters may include:
 
 - Category hierarchy/tree;
 - Brand/brand-like provider field when resolved;
@@ -89,9 +107,12 @@ Visible high-value filters may include:
 
 Filters must be capability-driven: do not expose one until its data source exists.
 
-Search remains visually primary.
+Search remains visually primary. The Workbench toolbar follows the shared Data List pattern from `docs/06-UI_DESIGN_SYSTEM.md`, with `Матриця полів` as the proven visual reference: search aligned to the list grid on the left, and persistent labelled `Фільтри` / `Стовпці` controls with count badges where applicable on the right. Columns remain configurable/discoverable.
 
-Columns remain configurable/discoverable.
+2026-09-23 product-owner clarification: `Фільтри` and `Стовпці` use the same right-side slide-over interaction; their count badges stay inside each trigger immediately after the label, with visible right padding and without intersecting the button outline. The search field aligns to the same left grid inset as the table content. The Workbench connector identity uses the official Magento PNG mark rather than a fabricated letter tile; in the compact operational header it renders at 28 × 28 px so it remains smaller than the outer `Оновити` button box. Sortable `Дія` follows the same single-chevron Filament header grammar as every other sortable column while delegating its priority sort to the real `is_linked` state.
+
+A dedicated local rail may return later only if a materially larger filter set proves that the
+standard table filter surface no longer scales; that is not part of first scope.
 
 ---
 
@@ -139,6 +160,19 @@ Do not render `Відкрити` for only an arbitrary sample row: every row wit
 state receives the same action semantics.
 
 If later the row owns several actions, a compact action menu may replace text buttons.
+
+### Row / photo interaction — 2026-09-23 clarification
+
+Reuse the established BabyPark B2B table interaction:
+
+- clicking a normal row surface opens the same slide-over detail action as `Відкрити`;
+- clicking the Product photo does **not** open the row action; it opens the shared image lightbox;
+- cells with their own drill-down/action (for example future `Стан даних`, `Проблеми`, or `Дія`)
+  keep their own click behavior and must not accidentally trigger the row drawer;
+- the drawer owns the secondary `Відкрити повну картку` navigation when a Master Product identity exists.
+
+For an unlinked remote Magento row, row click may show remote Product detail, but must not invent a
+Master Product full-card action before trusted correspondence exists.
 
 ### Problems
 
@@ -283,6 +317,10 @@ Examples:
 - `Вказати категорію`;
 - `Виправити зіставлення`;
 - `Відкрити`.
+
+The `Дія` header and action cells use the same left/start alignment as the rest of the operational
+table. Unlike `Огляд`, Publication `Дія` is **not sortable**: there is no single remediation
+state represented by the mixed open/remove actions that would justify an action-priority sort.
 
 A ready row does not launch Live by itself.
 

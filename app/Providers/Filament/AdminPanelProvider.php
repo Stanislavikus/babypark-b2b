@@ -35,6 +35,7 @@ class AdminPanelProvider extends PanelProvider
                 'primary' => Brand::primaryColor(),
             ])
             ->viteTheme('resources/css/filament/theme.css')
+            ->sidebarCollapsibleOnDesktop()
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn () => ProductLightbox::bodyEndHook()
