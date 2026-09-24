@@ -716,6 +716,7 @@ cross-platform vocabulary or define runtime/storage behavior.
 - IMPLEMENTATION_GAPS.md — open gaps affecting the field or mapping in question
 - 08-CONNECTOR_SYNC_RUNTIME_ATLAS.md — current-state locator only; verify owners in code
 - 09-CONNECTOR_DELIVERY_PROTOCOL.md — mandatory for connector/import/export delivery sequencing and certification
+- `docs/connectors/adobe-commerce/MAGENTO_V1_MODULELESS_CONNECTOR_CONTRACT.md` — **[Resolved Product Decision; mandatory pre-read for every Magento/Adobe Commerce task]**; freezes standard Magento V1 as a universal zero-install connector over the stock Adobe/Magento Admin REST API, makes Safe Sync optional Enhanced Safety only, and supersedes conflicting historical Stage 3E prerequisites for the standard V1 path
 - `docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md` — authoritative
   current-base Magento V1 Product field/capability inventory; cluster summaries are
   classification only, not field certification

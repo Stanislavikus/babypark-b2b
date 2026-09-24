@@ -7330,6 +7330,25 @@ without separate explicit approval.
 
 ##### Stage 3E Stop-and-Amend — Magento ownership and entity-bound Safe Sync runtime contract
 
+> **[SUPERSEDED FOR STANDARD MAGENTO V1 — Resolved Product Decision 2026-09-24]**
+>
+> This historical Stage 3E section remains authoritative only as risk analysis and
+> as the design/certification basis for a future **optional Enhanced-Safety profile**.
+> It MUST NOT be interpreted as making Safe Sync, a custom Magento endpoint, an
+> installed first-party Magento component, or any other BabyPark target-side code
+> a prerequisite for the standard Magento V1 connector.
+>
+> Standard Magento V1 is a universal **moduleless / zero-install connector over the
+> stock Adobe Commerce / Magento Admin REST API**. The normative contract is
+> `docs/connectors/adobe-commerce/MAGENTO_V1_MODULELESS_CONNECTOR_CONTRACT.md`.
+> Where this historical Stage 3E text conflicts with that contract for the standard
+> V1 path, the moduleless contract wins.
+>
+> Safe Sync remains a durable repository asset for future work, but further
+> productization is deferred until standard Magento V1 is complete. It may later
+> be distributed only as an opt-in Enhanced-Safety profile after separate maturity,
+> compatibility, lifecycle, and real-target certification.
+
 [Resolved — Stage 3E docs contract] This section freezes the final entity-bound
 Safe Sync runtime contract after Magento primary-source research and
 Security/Concurrency arbitration. The original contract landed as a
@@ -8360,20 +8379,17 @@ The existing rules stand and are not weakened by this amendment:
   current Magento V1 Product Field Matrix and the
   `MagentoV1ProductFieldMatrixTest` mechanical contract.
 
-##### Narrow distinction for the current runtime owner
+##### Current runtime owner — standard moduleless path
 
-The current runtime still consumes the entity-bound Safe Sync primitive
-for trusted simple Product WRITE in some internal seams. That is the
-**current runtime truth** and is recorded as such in
-`08-CONNECTOR_SYNC_RUNTIME_ATLAS.md`. It is not contradicted by this
-amendment, because this amendment describes the **approved target
-architecture** for the standard merchant path, not a claim that
-moduleless code already exists in production.
+The standard Magento V1 runtime uses the stock Adobe/Magento REST API as its
+production-intended boundary. Trusted Simple Product UPDATE is already certified
+on the moduleless stock path; standard-V1 runtime work must continue to reuse that
+boundary rather than re-introducing Safe Sync as a prerequisite.
 
-This intentionally creates a current-runtime-vs-new-contract gap that
-must be closed by a later, separately designed runtime migration. That
-later migration is **out of scope** for this docs amendment and is
-**not** authorised by it.
+Safe Sync remains separate repository evidence and a future **optional
+Enhanced-Safety profile**. Its further productization is intentionally deferred
+until the standard Magento V1 connector is complete, after which it may be matured,
+certified, and offered only by explicit merchant choice.
 
 ##### What this amendment does NOT do
 
