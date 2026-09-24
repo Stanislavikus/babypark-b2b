@@ -6,6 +6,7 @@ use App\Enums\AdobeProductCategoryAssignmentState;
 use App\Enums\SyncLiveOutcome;
 use App\Models\AdobeProductCategoryAssignment;
 use App\Models\ExternalRecordLink;
+use App\Services\Sync\AdobeProductClassificationSnapshotService;
 use App\Services\Sync\ConnectorCategoryMappingSnapshotService;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
@@ -30,6 +31,7 @@ final class AdobeProductCategoryRelationExecutor
 {
     public function __construct(
         private readonly ConnectorCategoryMappingSnapshotService $mappingSnapshotService,
+        private readonly AdobeProductClassificationSnapshotService $classificationSnapshotService,
         private readonly AdobeProductExternalRecordLinkGuard $linkGuard,
         private readonly AdobePaaSRequestContextFactory $contextFactory,
         private readonly AdobeProductDocumentReader $documentReader,
@@ -56,12 +58,23 @@ final class AdobeProductCategoryRelationExecutor
             throw new \RuntimeException('Adobe category relation execution must not run inside a database transaction.');
         }
 
-        $desiredExternalCategoryId = $this->mappingSnapshotService->externalCategoryIdFor(
-            $aggregate->categoryId,
-            $snapshot,
-        );
+        $desiredExternalCategoryIds = $this->desiredExternalCategoryIds($aggregate, $snapshot);
 
-        if ($aggregate->categoryId !== null && $desiredExternalCategoryId === null) {
+        if (array_key_exists('adobe_product_classifications', $snapshot)
+            && $desiredExternalCategoryIds === []
+        ) {
+            return $this->compose(
+                $currentResult,
+                SyncLiveOutcome::Partial,
+                'category_mapping_missing',
+                $aggregate->productId,
+            );
+        }
+
+        if (! array_key_exists('adobe_product_classifications', $snapshot)
+            && $aggregate->categoryId !== null
+            && $desiredExternalCategoryIds === []
+        ) {
             return $this->compose(
                 $currentResult,
                 SyncLiveOutcome::Partial,
@@ -70,14 +83,16 @@ final class AdobeProductCategoryRelationExecutor
             );
         }
 
-        if ($desiredExternalCategoryId !== null
-            && preg_match('/^[1-9][0-9]*$/', $desiredExternalCategoryId) !== 1
-        ) {
+        foreach ($desiredExternalCategoryIds as $desiredExternalCategoryId) {
+            if (preg_match('/^[1-9][0-9]*$/', $desiredExternalCategoryId) === 1) {
+                continue;
+            }
+
             return $this->compose(
                 $currentResult,
                 SyncLiveOutcome::Partial,
                 'category_mapping_invalid_external_id',
-                (string) $aggregate->categoryId,
+                $aggregate->productId,
             );
         }
 
@@ -112,7 +127,7 @@ final class AdobeProductCategoryRelationExecutor
             );
         }
 
-        if ($desiredExternalCategoryId === null
+        if ($desiredExternalCategoryIds === []
             && ! AdobeProductCategoryAssignment::withoutWorkspaceScope()
                 ->where('workspace_id', $runContext->workspaceId)
                 ->where('connector_account_id', $runContext->connectorAccountId)
@@ -128,7 +143,7 @@ final class AdobeProductCategoryRelationExecutor
                 $this->operationLockSeconds(),
             )->block(5, fn (): SyncLiveProductExecutionResult => $this->executeLocked(
                 $aggregate,
-                $desiredExternalCategoryId,
+                $desiredExternalCategoryIds,
                 $link,
                 $sku,
                 $entityId,
@@ -144,6 +159,53 @@ final class AdobeProductCategoryRelationExecutor
                 $sku,
             );
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $snapshot
+     * @return list<string>
+     */
+    private function desiredExternalCategoryIds(
+        ProductExecutionAggregate $aggregate,
+        array $snapshot,
+    ): array {
+        if (array_key_exists('adobe_product_classifications', $snapshot)) {
+            if (! ctype_digit($aggregate->productId)) {
+                return [];
+            }
+
+            $classification = $this->classificationSnapshotService->classificationForProduct(
+                (int) $aggregate->productId,
+                $snapshot,
+            );
+            $values = $classification['external_category_ids'] ?? null;
+
+            if (! is_array($values) || ! array_is_list($values)) {
+                return [];
+            }
+
+            $normalized = [];
+
+            foreach ($values as $value) {
+                $categoryId = trim((string) $value);
+
+                if ($categoryId !== '') {
+                    $normalized[] = $categoryId;
+                }
+            }
+
+            $ids = array_values(array_unique($normalized, SORT_STRING));
+            sort($ids, SORT_STRING);
+
+            return $ids;
+        }
+
+        $legacy = $this->mappingSnapshotService->externalCategoryIdFor(
+            $aggregate->categoryId,
+            $snapshot,
+        );
+
+        return $legacy === null ? [] : [$legacy];
     }
 
     /**
@@ -212,9 +274,12 @@ final class AdobeProductCategoryRelationExecutor
         return null;
     }
 
+    /**
+     * @param  list<string>  $desiredExternalCategoryIds
+     */
     private function executeLocked(
         ProductExecutionAggregate $aggregate,
-        ?string $desiredExternalCategoryId,
+        array $desiredExternalCategoryIds,
         ExternalRecordLink $link,
         string $sku,
         string $entityId,
@@ -309,7 +374,7 @@ final class AdobeProductCategoryRelationExecutor
             if ($state === AdobeProductCategoryAssignmentState::AddAmbiguous) {
                 if (! $present) {
                     $this->deleteAssignmentLocally($assignment->id);
-                } elseif ($assignment->external_category_id === $desiredExternalCategoryId) {
+                } elseif (in_array($assignment->external_category_id, $desiredExternalCategoryIds, true)) {
                     $findings[] = $this->finding(
                         'category_relation_add_ownership_unproven',
                         $sku,
@@ -330,7 +395,7 @@ final class AdobeProductCategoryRelationExecutor
                     continue;
                 }
 
-                if ($assignment->external_category_id === $desiredExternalCategoryId) {
+                if (in_array($assignment->external_category_id, $desiredExternalCategoryIds, true)) {
                     $this->markManaged($assignment->id, $entityId);
                 }
             }
@@ -348,10 +413,12 @@ final class AdobeProductCategoryRelationExecutor
         }
 
         $remoteCategoryIds = $document->categoryIds();
-        $desiredPresent = $desiredExternalCategoryId === null
-            || in_array($desiredExternalCategoryId, $remoteCategoryIds, true);
 
-        if (! $desiredPresent && $desiredExternalCategoryId !== null) {
+        foreach ($desiredExternalCategoryIds as $desiredExternalCategoryId) {
+            if (in_array($desiredExternalCategoryId, $remoteCategoryIds, true)) {
+                continue;
+            }
+
             if (! $writeGate->permitsConsequentialWrite() || ! $writeGate->permitsProductExecution()) {
                 return $this->composeWithFindings(
                     $currentResult,
@@ -395,7 +462,7 @@ final class AdobeProductCategoryRelationExecutor
             ->get();
 
         foreach ($managed as $assignment) {
-            if ($assignment->external_category_id === $desiredExternalCategoryId) {
+            if (in_array($assignment->external_category_id, $desiredExternalCategoryIds, true)) {
                 continue;
             }
 

@@ -279,12 +279,12 @@ final class AdobeProductClassificationMutationService
                 throw AdobeProductClassificationException::categoriesRequired();
             }
 
-            $normalized[$value] = true;
+            $normalized[] = $value;
         }
 
-        $values = array_keys($normalized);
+        $values = array_values(array_unique($normalized, SORT_STRING));
         sort($values, SORT_STRING);
 
-        return array_values($values);
+        return $values;
     }
 }

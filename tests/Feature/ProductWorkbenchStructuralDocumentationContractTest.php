@@ -29,6 +29,10 @@ class ProductWorkbenchStructuralDocumentationContractTest extends TestCase
         $this->assertStringContainsString('current observed remote `attribute_set_id` is the structural context', $content);
         $this->assertStringContainsString('Per-Product effective Attribute Set therefore requires a named planner/metadata migration', $content);
         $this->assertStringContainsString('Do not add a stored ConnectorAccount classification counter', $content);
+        $this->assertStringContainsString('### B11a. Implementation evidence — 2026-09-24', $content);
+        $this->assertStringContainsString('AdobeProductClassificationSnapshotService', $content);
+        $this->assertStringContainsString('not** the final semantic-planner owner', $content);
+        $this->assertStringContainsString('desired category **set**', $content);
     }
 
     #[Test]

@@ -13,19 +13,24 @@ use App\Enums\UserRole;
 use App\Jobs\Connectors\SyncLiveRunJob;
 use App\Jobs\Connectors\SyncLiveRunJobExecutionException;
 use App\Jobs\Connectors\SyncPreviewRunJob;
+use App\Models\AdobeProductAttributeSet;
+use App\Models\AdobeProductAttributeSetOverride;
 use App\Models\Category;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorCategoryMapping;
+use App\Models\Product;
 use App\Models\SyncConfiguration;
 use App\Models\SyncRun;
 use App\Models\SyncRunItem;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Connectors\ConnectorDiscoverySourceResolver;
 use App\Services\Sync\FieldMappingMutationService;
 use App\Services\Sync\SyncConfigurationService;
 use App\Services\Sync\SyncLiveAdmissionService;
 use App\Services\Sync\SyncPreviewAdmissionService;
 use App\Services\Sync\SyncPreviewConfigurationSnapshotBuilder;
+use App\Services\Sync\SyncProductSelectionService;
 use App\Services\Sync\SyncProductSelectionStore;
 use App\Services\Sync\SyncRunActiveRecoveryService;
 use App\Services\Sync\SyncRuntimeTimingResolver;
@@ -659,6 +664,58 @@ class Stage3ALiveSafetyFoundationTest extends TestCase
         $this->expectException(SyncLiveAdmissionException::class);
 
         app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+    }
+
+    #[Test]
+    public function live_admission_rejects_preview_when_selected_product_classification_changed(): void
+    {
+        Bus::fake();
+
+        $account = $this->createSyncSupportAccount();
+        $configuration = $this->prepareReadyConfiguration($account);
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $account->workspace_id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'STALE-CLASSIFICATION-'.Str::random(6),
+            'name' => 'Stale classification product',
+            'is_active' => true,
+        ]);
+        $configuration = app(SyncProductSelectionService::class)->replace(
+            $account,
+            $configuration->id,
+            [$product->id],
+        );
+
+        $actor = $this->grantLivePermission($account->workspace);
+        $this->seedCompletedPreview($account, $configuration);
+
+        $source = app(ConnectorDiscoverySourceResolver::class)->resolve($account);
+        $attributeSet = AdobeProductAttributeSet::withoutWorkspaceScope()->create([
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'connector_schema_source_id' => $source->id,
+            'provider_attribute_set_id' => 9,
+            'name' => 'Changed after Preview',
+            'first_seen_at' => now(),
+            'last_seen_at' => now(),
+            'missing_since' => null,
+        ]);
+        AdobeProductAttributeSetOverride::withoutWorkspaceScope()->create([
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'adobe_product_attribute_set_id' => $attributeSet->id,
+        ]);
+
+        try {
+            app(SyncLiveAdmissionService::class)->admit($actor, $account, $configuration->id);
+            $this->fail('Expected stale Product classification to invalidate Preview evidence.');
+        } catch (SyncLiveAdmissionException) {
+            // expected
+        }
+
+        $this->assertZeroLiveRunsForConfiguration($configuration->id);
+        Bus::assertNotDispatched(SyncLiveRunJob::class);
     }
 
     #[Test]

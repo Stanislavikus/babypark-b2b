@@ -32,19 +32,18 @@ final class AdobeProductExportSemanticPlanner
         /** @var list<AdobeProductExportSemanticFinding> $findings */
         $findings = [];
 
-        $attributeSetId = $this->resolveAttributeSetId($configurationSnapshot, $findings);
+        $classification = $this->classificationForProduct($aggregate, $configurationSnapshot);
+        $attributeSetId = $this->resolveAttributeSetId(
+            $aggregate,
+            $configurationSnapshot,
+            $classification,
+            $findings,
+        );
 
         if ($metadata !== null && $attributeSetId !== null) {
-            $attributeSetExists = false;
+            $metadata = $metadata->forAttributeSetId($attributeSetId);
 
-            foreach ($metadata->attributeSets as $attributeSet) {
-                if (($attributeSet['attribute_set_id'] ?? null) === $attributeSetId) {
-                    $attributeSetExists = true;
-                    break;
-                }
-            }
-
-            if (! $attributeSetExists) {
+            if (! $metadata->hasAttributeSet($attributeSetId)) {
                 $findings[] = $this->finding(
                     'attribute_set_invalid',
                     subject: (string) $attributeSetId,
@@ -105,26 +104,10 @@ final class AdobeProductExportSemanticPlanner
 
         $findings = array_merge($findings, $this->evaluateRequiredProductMappedValues($aggregate));
 
-        if ($aggregate->categoryId !== null) {
-            $externalCategoryId = $this->categoryMappingValue($configurationSnapshot, $aggregate->categoryId);
-
-            if ($externalCategoryId === null) {
-                $findings[] = $this->finding(
-                    'missing_category_mapping',
-                    subject: (string) $aggregate->categoryId,
-                    context: ['category_id' => $aggregate->categoryId],
-                );
-            } elseif (preg_match('/^[1-9][0-9]*$/', $externalCategoryId) !== 1) {
-                $findings[] = $this->finding(
-                    'invalid_category_mapping',
-                    subject: (string) $aggregate->categoryId,
-                    context: [
-                        'category_id' => $aggregate->categoryId,
-                        'external_category_id' => $externalCategoryId,
-                    ],
-                );
-            }
-        }
+        $findings = array_merge(
+            $findings,
+            $this->evaluateCategories($aggregate, $configurationSnapshot, $classification),
+        );
 
         if ($nameBindingId !== null) {
             $nameMapped = $aggregate->productValues[$nameBindingId] ?? null;
@@ -179,10 +162,48 @@ final class AdobeProductExportSemanticPlanner
 
     /**
      * @param  array<string, mixed>  $configurationSnapshot
+     * @param  array<string, mixed>|null  $classification
      * @param  list<AdobeProductExportSemanticFinding>  $findings
      */
-    private function resolveAttributeSetId(array $configurationSnapshot, array &$findings): ?int
-    {
+    private function resolveAttributeSetId(
+        ProductExecutionAggregate $aggregate,
+        array $configurationSnapshot,
+        ?array $classification,
+        array &$findings,
+    ): ?int {
+        if (array_key_exists('adobe_product_classifications', $configurationSnapshot)) {
+            if ($classification === null) {
+                $findings[] = $this->finding('attribute_set_unconfigured', subject: $aggregate->productId);
+
+                return null;
+            }
+
+            $rawAttributeSetId = $classification['provider_attribute_set_id'] ?? null;
+
+            if (is_int($rawAttributeSetId) && $rawAttributeSetId > 0) {
+                return $rawAttributeSetId;
+            }
+
+            if (is_string($rawAttributeSetId) && ctype_digit($rawAttributeSetId) && (int) $rawAttributeSetId > 0) {
+                return (int) $rawAttributeSetId;
+            }
+
+            $blockers = $classification['blockers'] ?? [];
+            $hasInvalidRemoteSet = is_array($blockers) && array_intersect($blockers, [
+                'trusted_remote_attribute_set_unresolved',
+                'trusted_remote_attribute_set_conflict',
+                'product_attribute_set_override_unavailable',
+                'product_type_attribute_set_default_unavailable',
+            ]) !== [];
+
+            $findings[] = $this->finding(
+                $hasInvalidRemoteSet ? 'attribute_set_invalid' : 'attribute_set_unconfigured',
+                subject: $aggregate->productId,
+            );
+
+            return null;
+        }
+
         $connectorConfig = $configurationSnapshot['connector_execution_configuration'] ?? [];
 
         if (! is_array($connectorConfig) || ! isset($connectorConfig['attribute_set_id'])) {
@@ -842,6 +863,99 @@ final class AdobeProductExportSemanticPlanner
             'vat_rate' => $resolvedPrice->vatRate,
             'source' => $resolvedPrice->source,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $configurationSnapshot
+     * @return array<string, mixed>|null
+     */
+    private function classificationForProduct(
+        ProductExecutionAggregate $aggregate,
+        array $configurationSnapshot,
+    ): ?array {
+        $classifications = $configurationSnapshot['adobe_product_classifications'] ?? null;
+
+        if (! is_array($classifications) || ! array_is_list($classifications)) {
+            return null;
+        }
+
+        foreach ($classifications as $classification) {
+            if (! is_array($classification)) {
+                continue;
+            }
+
+            if ((string) ($classification['product_id'] ?? '') === (string) $aggregate->productId) {
+                return $classification;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $configurationSnapshot
+     * @param  array<string, mixed>|null  $classification
+     * @return list<AdobeProductExportSemanticFinding>
+     */
+    private function evaluateCategories(
+        ProductExecutionAggregate $aggregate,
+        array $configurationSnapshot,
+        ?array $classification,
+    ): array {
+        if (array_key_exists('adobe_product_classifications', $configurationSnapshot)) {
+            if ($classification === null) {
+                return [$this->finding('missing_category_mapping', subject: $aggregate->productId)];
+            }
+
+            $categoryIds = $classification['external_category_ids'] ?? null;
+
+            if (! is_array($categoryIds) || ! array_is_list($categoryIds) || $categoryIds === []) {
+                return [$this->finding('missing_category_mapping', subject: $aggregate->productId)];
+            }
+
+            $findings = [];
+
+            foreach ($categoryIds as $categoryId) {
+                $value = is_int($categoryId) ? (string) $categoryId : trim((string) $categoryId);
+
+                if (preg_match('/^[1-9][0-9]*$/', $value) !== 1) {
+                    $findings[] = $this->finding(
+                        'invalid_category_mapping',
+                        subject: $aggregate->productId,
+                        context: ['external_category_id' => $value],
+                    );
+                }
+            }
+
+            return $findings;
+        }
+
+        if ($aggregate->categoryId === null) {
+            return [];
+        }
+
+        $externalCategoryId = $this->categoryMappingValue($configurationSnapshot, $aggregate->categoryId);
+
+        if ($externalCategoryId === null) {
+            return [$this->finding(
+                'missing_category_mapping',
+                subject: (string) $aggregate->categoryId,
+                context: ['category_id' => $aggregate->categoryId],
+            )];
+        }
+
+        if (preg_match('/^[1-9][0-9]*$/', $externalCategoryId) !== 1) {
+            return [$this->finding(
+                'invalid_category_mapping',
+                subject: (string) $aggregate->categoryId,
+                context: [
+                    'category_id' => $aggregate->categoryId,
+                    'external_category_id' => $externalCategoryId,
+                ],
+            )];
+        }
+
+        return [];
     }
 
     /**

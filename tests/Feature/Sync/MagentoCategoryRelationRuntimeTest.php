@@ -323,6 +323,53 @@ final class MagentoCategoryRelationRuntimeTest extends TestCase
     }
 
     #[Test]
+    public function decision_b_category_set_adds_all_desired_and_removes_only_owned_relations(): void
+    {
+        [$account, $product, $variant, $link] = $this->trustedSimple('501');
+        $remoteCategories = ['99'];
+        $transport = $this->bindCategoryTransport($variant->sku, 501, $remoteCategories);
+
+        $first = $this->executeSimpleWithClassification(
+            $account->workspace_id,
+            $account->id,
+            $product->id,
+            $variant->id,
+            ['7', '8'],
+        );
+
+        $this->assertSame(SyncLiveOutcome::Synchronized, $first->outcome);
+        $this->assertSame(['POST', 'POST'], $this->writeMethods($transport));
+        $this->assertSame(['7', '8', '99'], $remoteCategories);
+        $this->assertSame(
+            ['7', '8'],
+            AdobeProductCategoryAssignment::withoutWorkspaceScope()
+                ->orderBy('external_category_id')
+                ->pluck('external_category_id')
+                ->all(),
+        );
+
+        $second = $this->executeSimpleWithClassification(
+            $account->workspace_id,
+            $account->id,
+            $product->id,
+            $variant->id,
+            ['8'],
+        );
+
+        $this->assertSame(SyncLiveOutcome::Synchronized, $second->outcome);
+        $this->assertSame(['POST', 'POST', 'DELETE'], $this->writeMethods($transport));
+        $this->assertSame(['8', '99'], $remoteCategories);
+        $this->assertSame(
+            ['8'],
+            AdobeProductCategoryAssignment::withoutWorkspaceScope()
+                ->orderBy('external_category_id')
+                ->pluck('external_category_id')
+                ->all(),
+        );
+        $this->assertSame($link->id, AdobeProductCategoryAssignment::withoutWorkspaceScope()->sole()->external_record_link_id);
+    }
+
+    #[Test]
     public function null_local_category_removes_only_proven_managed_relation(): void
     {
         [$account, $product, $variant, $link] = $this->trustedSimple('501');
@@ -458,6 +505,52 @@ final class MagentoCategoryRelationRuntimeTest extends TestCase
                 categoryId: $categoryId,
             ),
             snapshot: $snapshot,
+            semanticResult: new AdobeProductExportSemanticResult(
+                findings: [],
+                operations: [
+                    new AdobeProductExportSemanticOperation('simple_product', [
+                        'product_id' => (string) $productId,
+                        'variant_id' => (string) $variantId,
+                    ]),
+                ],
+            ),
+            currentResult: new SyncLiveProductExecutionResult(SyncLiveOutcome::Synchronized, []),
+            runContext: new AdobeProductExportLiveRunContext(
+                workspaceId: $workspaceId,
+                connectorAccountId: $accountId,
+                metadata: new AdobeProductExportExecutionMetadata(4, []),
+                adobeBaseCurrency: 'UAH',
+            ),
+            writeGate: $this->gate(true),
+            isConfigurablePath: false,
+        );
+    }
+
+    /**
+     * @param  list<string>  $externalCategoryIds
+     */
+    private function executeSimpleWithClassification(
+        string $workspaceId,
+        string $accountId,
+        int $productId,
+        int $variantId,
+        array $externalCategoryIds,
+    ): SyncLiveProductExecutionResult {
+        return app(AdobeProductCategoryRelationExecutor::class)->executeAfterProduct(
+            aggregate: new ProductExecutionAggregate(
+                productId: (string) $productId,
+                productValues: [],
+                variants: [],
+                sellableVariantCount: 1,
+                imageInput: new ProductExecutionImageInput(ProductExecutionImageStructuralState::Valid, []),
+                categoryId: null,
+            ),
+            snapshot: [
+                'adobe_product_classifications' => [[
+                    'product_id' => (string) $productId,
+                    'external_category_ids' => $externalCategoryIds,
+                ]],
+            ],
             semanticResult: new AdobeProductExportSemanticResult(
                 findings: [],
                 operations: [

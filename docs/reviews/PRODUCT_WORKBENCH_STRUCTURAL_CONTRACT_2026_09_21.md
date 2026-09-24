@@ -281,6 +281,24 @@ Do not reuse:
 - ExternalRecordLink for pre-create classification intent;
 - AdobeProductCategoryAssignment for desired pre-publication category configuration.
 
+### B11a. Implementation evidence — 2026-09-24
+
+Decision B runtime is implemented on the campaign branch with the frozen semantic split preserved:
+
+- `adobe_product_type_attribute_set_defaults` owns account-scoped `ProductType -> AdobeProductAttributeSet` defaults;
+- `adobe_product_attribute_set_overrides` owns sparse Product/account Attribute Set overrides;
+- `adobe_product_category_overrides` owns sparse normalized Product/account desired category sets;
+- `AdobeProductClassificationReadService` resolves effective classification and treats current observed trusted-remote Attribute Set as structural truth for existing Magento Products;
+- `AdobeProductClassificationSnapshotService` snapshots only selected Product classification payloads and derives a deterministic SHA revision;
+- Preview stores payload + revision; Live admission recomputes the selected Product revision under the existing Workspace lock and rejects stale Preview evidence;
+- `AdobeProductExportSemanticPlanner` consumes the frozen per-Product classification and evaluates field/configurable metadata against that Product's effective Attribute Set;
+- run metadata for Decision-B snapshots is assembled from the reconciled persisted Adobe/schema catalogue for all represented Attribute Sets, with zero provider metadata HTTP on that path;
+- `AdobeProductCategoryRelationExecutor` reconciles a desired category **set**, while preserving provider-only relations and removing only platform-owned relations no longer desired.
+
+The legacy `connector_execution_configuration.attribute_set_id` remains only as backward-compatible setup/fallback for snapshots that do not yet carry Decision-B classification. It is **not** the final semantic-planner owner when `adobe_product_classifications` is present.
+
+This implementation does **not** authorize changing the Attribute Set of an existing trusted Magento Product and does **not** implement Magento Product CREATE; those boundaries remain exactly as frozen above.
+
 ### B12. AI/manual semantics
 
 AI may recommend:
