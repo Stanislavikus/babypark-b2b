@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # Cursor Cloud Agent — Environment Setup Script
-# Project: b2b.babypark.ua  (Laravel 11, PHP 8.3, SQLite dev / MySQL 8 prod)
+# Project: b2b.babypark.ua  (Laravel 13, Filament 5, Livewire 4, PHP 8.3, SQLite dev / MySQL 8 prod)
 #
 # USAGE:  Paste this script into Cursor Cloud → Environment Settings →
 #         "Startup script" field at cursor.com/onboard, OR run manually.

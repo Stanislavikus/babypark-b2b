@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="uk" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stage 2A-2 — Merchant Preview Work Surface (NON-RUNTIME)</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-header-inner">
+      <div class="brand-row">
+        <div>
+          <div class="contract-badge">Non-runtime visual contract</div>
+          <h1>Перевірка експорту товарів — Stage 2A-2</h1>
+        </div>
+        <button class="btn" id="theme-toggle" type="button">Тема</button>
+      </div>
+      <nav class="nav-tabs" aria-label="Стани Preview">
+        <button type="button" data-screen="not-ready">Setup not ready</button>
+        <button type="button" data-screen="ready" class="active">Готово до перевірки</button>
+        <button type="button" data-screen="setup-manage">Setup + права</button>
+        <button type="button" data-screen="setup-view">Setup без прав</button>
+        <button type="button" data-screen="queued">Queued</button>
+        <button type="button" data-screen="running">Running</button>
+        <button type="button" data-screen="failed">Failed</button>
+        <button type="button" data-screen="completed-all">Completed all-ready</button>
+        <button type="button" data-screen="completed-attn">Completed needs-attention</button>
+        <button type="button" data-screen="config-changed">Configuration changed</button>
+        <button type="button" data-screen="mapping">Mapping remediation</button>
+        <button type="button" data-screen="identity">Product identity</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page">
+    <section id="screen-not-ready" class="screen">
+      <div class="card">
+        <p class="context-line">Платформа: Adobe Commerce · Акаунт: Babypark UA Store</p>
+      </div>
+      <div class="card">
+        <p data-testid="sync-preview-configuration-not-ready">Потрібно завершити налаштування перед перевіркою.</p>
+        <p class="hint">Стан: configuration_not_ready — конфігурація існує, але поточна readiness=false.</p>
+        <p style="margin-top:0.75rem"><a class="btn primary" href="#">Відкрити налаштування</a> <span class="hint">(manage_sync_configurations)</span></p>
+      </div>
+      <div class="card">
+        <p>Той самий setup notice на Completed/Failed, коли readiness стала false після запуску:</p>
+        <p data-testid="sync-preview-current-setup-required" style="margin-top:0.5rem">Потрібно завершити налаштування перед перевіркою.</p>
+        <p class="hint">Історичний результат (summary/worklist) лишається видимим; rerun/retry приховані до відновлення readiness.</p>
+      </div>
+    </section>
+
+    <section id="screen-ready" class="screen active">
+      <div class="card">
+        <p class="context-line">Платформа: Adobe Commerce · Акаунт: Babypark UA Store</p>
+      </div>
+      <div class="card">
+        <button class="btn primary" type="button">Перевірити товари</button>
+        <p class="hint" style="margin-top:0.75rem">Стан: ready_to_preview, попередніх запусків немає.</p>
+      </div>
+    </section>
+
+    <section id="screen-setup-manage" class="screen">
+      <div class="card">
+        <p class="context-line">Платформа: Adobe Commerce · Акаунт: Babypark UA Store</p>
+      </div>
+      <div class="card">
+        <p>Потрібно завершити налаштування перед перевіркою.</p>
+        <p style="margin-top:0.75rem"><a class="btn primary" href="#">Відкрити налаштування</a></p>
+      </div>
+    </section>
+
+    <section id="screen-setup-view" class="screen">
+      <div class="card">
+        <p class="context-line">Платформа: Adobe Commerce · Акаунт: Babypark UA Store</p>
+      </div>
+      <div class="card">
+        <p>Потрібно завершити налаштування перед перевіркою.</p>
+        <p class="hint" style="margin-top:0.5rem">У вас немає доступу до цієї настройки.</p>
+      </div>
+      <div class="card">
+        <p>Експорт товарів зараз недоступний для перевірки.</p>
+        <p class="hint">Окремий стан export_unavailable (Export не увімкнено).</p>
+      </div>
+    </section>
+
+    <section id="screen-queued" class="screen">
+      <div class="card">
+        <p class="context-line">Платформа: Adobe Commerce · Акаунт: Babypark UA Store</p>
+      </div>
+      <div class="card">
+        <p><strong>Перевірка готується</strong></p>
+        <p class="hint">pollActive=true, кнопки запуску приховані.</p>
+      </div>
+    </section>
+
+    <section id="screen-running" class="screen">
+      <div class="card">
+        <p class="context-line">Платформа: Adobe Commerce · Акаунт: Babypark UA Store</p>
+      </div>
+      <div class="card">
+        <p><strong>Перевірка виконується</strong></p>
+        <p class="hint">pollActive=true, worklist не рендериться.</p>
+      </div>
+    </section>
+
+    <section id="screen-failed" class="screen">
+      <div class="card">
+        <p class="context-line">Платформа: Adobe Commerce · Акаунт: Babypark UA Store</p>
+      </div>
+      <div class="card banner danger">
+        <p>Не вдалося завершити перевірку.</p>
+        <p style="margin-top:0.75rem"><button class="btn primary" type="button">Перевірити ще раз</button></p>
+        <p class="hint">Жодних product rows, навіть якщо partial items існують у БД.</p>
+      </div>
+    </section>
+
+    <section id="screen-completed-all" class="screen">
+      <div class="card">
+        <p class="context-line">Платформа: Adobe Commerce · Акаунт: Babypark UA Store</p>
+      </div>
+      <div class="card">
+        <p><strong>Усі товари готові до експорту.</strong></p>
+        <div class="stats" style="margin-top:0.75rem">
+          <p>Готові: 12</p>
+          <p>Попередження: 0</p>
+          <p>Заблоковані: 0</p>
+        </div>
+        <p class="hint">Завершено: 18.08.2026 14:00</p>
+        <button class="btn" type="button" style="margin-top:0.75rem">Перевірити ще раз</button>
+      </div>
+    </section>
+
+    <section id="screen-completed-attn" class="screen">
+      <div class="card">
+        <p class="context-line">Платформа: Adobe Commerce · Акаунт: Babypark UA Store</p>
+      </div>
+      <div class="card">
+        <p><strong>3 товарів потребують уваги</strong></p>
+        <div class="stats" style="margin-top:0.75rem">
+          <p>Готові: 9</p>
+          <p>Попередження: 1</p>
+          <p>Заблоковані: 2</p>
+        </div>
+        <p class="hint">Завершено: 18.08.2026 14:00</p>
+      </div>
+      <div class="card">
+        <div class="filters">
+          <button class="active" type="button">Потребують уваги</button>
+          <button type="button">Заблоковані</button>
+          <button type="button">Попередження</button>
+          <button type="button">Готові</button>
+          <button type="button">Усі</button>
+        </div>
+        <input type="search" placeholder="Пошук за назвою, брендом або артикулом" style="width:100%;padding:0.5rem;border-radius:8px;border:1px solid var(--border);margin-bottom:1rem">
+        <table>
+          <thead>
+            <tr>
+              <th>Товар</th>
+              <th>Результат</th>
+              <th>Що потребує уваги</th>
+              <th>Дії</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <div class="product-name">Cybex Balios S Lux</div>
+                <div class="product-meta">2 артикулів · CYBEX</div>
+              </td>
+              <td><span class="badge danger">Заблокований</span></td>
+              <td>
+                <div class="finding">
+                  <div class="meta">Варіант · SKU BALIOS-BLK</div>
+                  <div>Відсутнє значення поля варіанту</div>
+                </div>
+                <div class="finding">
+                  <div class="meta">Варіант · SKU BALIOS-BEI</div>
+                  <div>Відсутнє значення поля варіанту</div>
+                </div>
+              </td>
+              <td>
+                <div class="destinations">
+                  <div class="destination">Дані варіанту<br><span class="status">Зараз немає доступного редактора</span></div>
+                  <div class="destination">Контекст товару<br><a class="btn link" href="#">Відкрити товар</a></div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td>
+                <div class="product-name">No SKU Product</div>
+                <div class="product-meta">Артикул не вказано · Brand</div>
+              </td>
+              <td><span class="badge danger">Заблокований</span></td>
+              <td>
+                <div class="finding">
+                  <div class="meta">Варіант · Артикул не вказано</div>
+                  <div>Відсутній SKU</div>
+                </div>
+              </td>
+              <td>
+                <div class="destinations">
+                  <div class="destination">Дані варіанту<br><span class="status">Зараз немає доступного редактора</span></div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="screen-config-changed" class="screen">
+      <div class="card">
+        <p class="context-line">Платформа: Adobe Commerce · Акаунт: Babypark UA Store</p>
+      </div>
+      <div class="banner warning">Налаштування змінилися після цієї перевірки. Запустіть перевірку ще раз.</div>
+      <div class="card">
+        <p><strong>2 товарів потребують уваги</strong></p>
+        <button class="btn" type="button" style="margin-top:0.75rem">Перевірити ще раз</button>
+      </div>
+    </section>
+
+    <section id="screen-mapping" class="screen">
+      <div class="card">
+        <p class="context-line">Платформа: Adobe Commerce · Акаунт: Babypark UA Store</p>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>Field Mapping — ACTION_AVAILABLE</h3>
+          <div class="destination">Зіставлення полів<br><a class="btn link" href="#">Налаштувати зіставлення</a></div>
+        </div>
+        <div class="card">
+          <h3>Field Mapping — VIEW_ONLY</h3>
+          <div class="destination">Зіставлення полів<br><a class="btn link" href="#">Переглянути зіставлення</a></div>
+        </div>
+        <div class="card">
+          <h3>Field Mapping — PERMISSION_REQUIRED</h3>
+          <div class="destination">Зіставлення полів<br><span class="status">Недостатньо прав для цієї дії</span></div>
+        </div>
+        <div class="card">
+          <h3>Option Mapping — NO_EDIT_SURFACE</h3>
+          <div class="destination">Зіставлення опцій<br><span class="status">Зараз немає доступного редактора</span></div>
+        </div>
+        <div class="card">
+          <h3>Connector Setup — actionable / permission</h3>
+          <div class="destination">Налаштування Adobe Commerce<br><a class="btn link" href="#">Налаштувати Adobe Commerce</a></div>
+          <div class="destination" style="margin-top:0.5rem">Налаштування Adobe Commerce<br><span class="status">Недостатньо прав для цієї дії</span></div>
+        </div>
+        <div class="card">
+          <h3>Per-destination stale</h3>
+          <div class="destination">Зіставлення полів<br><span class="status">Налаштування змінилися після цієї перевірки. Запустіть перевірку ще раз.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-identity" class="screen">
+      <div class="card">
+        <h3>Single-variant identity</h3>
+        <div class="product-name">Peg Perego Book</div>
+        <div class="product-meta">Артикул: BOOK-2024 · Peg Perego</div>
+        <p class="hint">Canonical SKU from ProductVariant, not products.sku.</p>
+      </div>
+      <div class="card">
+        <h3>Multi-variant identity</h3>
+        <div class="product-name">Cybex Balios S Lux</div>
+        <div class="product-meta">2 артикулів · CYBEX</div>
+        <p class="hint">Finding-level SKU context: BALIOS-BLK / BALIOS-BEI on separate rows.</p>
+      </div>
+      <div class="card">
+        <h3>MissingSku</h3>
+        <div class="product-name">No SKU Product</div>
+        <div class="product-meta">Артикул не вказано · Brand</div>
+        <div class="finding" style="margin-top:0.75rem">
+          <div class="meta">Варіант · Артикул не вказано</div>
+          <div>Відсутній SKU</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const tabs = document.querySelectorAll('[data-screen]');
+    const screens = document.querySelectorAll('.screen');
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const id = tab.dataset.screen;
+        tabs.forEach((t) => t.classList.toggle('active', t === tab));
+        screens.forEach((s) => s.classList.toggle('active', s.id === `screen-${id}`));
+      });
+    });
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+      const html = document.documentElement;
+      html.dataset.theme = html.dataset.theme === 'dark' ? 'light' : 'dark';
+    });
+  </script>
+</body>
+</html>

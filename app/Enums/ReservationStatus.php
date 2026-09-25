@@ -4,7 +4,7 @@ namespace App\Enums;
 
 enum ReservationStatus: string
 {
-    case Active = 'active';
+    case Pending = 'pending';
     case Confirmed = 'confirmed';
     case Cancelled = 'cancelled';
     case Expired = 'expired';
@@ -12,7 +12,7 @@ enum ReservationStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Active => 'Активна',
+            self::Pending => 'Очікує',
             self::Confirmed => 'Підтверджено',
             self::Cancelled => 'Скасовано',
             self::Expired => 'Протерміновано',

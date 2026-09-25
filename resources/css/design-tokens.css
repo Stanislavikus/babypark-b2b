@@ -5,4 +5,34 @@
     --color-primary-500: #f59e0b;
     --color-primary-600: #d97706;
     --color-primary-700: #b45309;
+
+    /* Muted control surfaces — light mode (Tailwind gray-200/300/600 equivalents). */
+    --bp-muted-bg: #e5e7eb;
+    --bp-muted-border: #d1d5db;
+    --bp-muted-text: #4b5563;
+}
+
+.dark {
+    /* Clearly visible on Filament's near-black panel background. */
+    --bp-muted-bg: rgba(255, 255, 255, 0.14);
+    --bp-muted-border: rgba(255, 255, 255, 0.28);
+    --bp-muted-text: #e5e7eb;
+}
+
+.bp-muted-badge {
+    background-color: var(--bp-muted-bg);
+    color: var(--bp-muted-text);
+}
+
+.bp-muted-border {
+    border-color: var(--bp-muted-border) !important;
+}
+
+.bp-muted-control {
+    border-color: var(--bp-muted-border) !important;
+    color: var(--bp-muted-text);
+}
+
+.bp-muted-control:hover {
+    background-color: var(--bp-muted-bg);
 }

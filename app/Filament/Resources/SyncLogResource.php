@@ -4,20 +4,25 @@ namespace App\Filament\Resources;
 
 use App\Enums\SyncLogStatus;
 use App\Enums\SyncLogType;
-use App\Filament\Resources\SyncLogResource\Pages;
+use App\Filament\Resources\SyncLogResource\Pages\ListSyncLogs;
+use App\Filament\Resources\SyncLogResource\Pages\ViewSyncLog;
 use App\Models\SyncLog;
-use Filament\Forms\Form;
+use Filament\Actions\ViewAction;
 use Filament\Resources\Resource;
-use Filament\Tables;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
+use Illuminate\Database\Eloquent\Model;
 
 class SyncLogResource extends Resource
 {
     protected static ?string $model = SyncLog::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-arrow-path';
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-arrow-path';
 
-    protected static ?string $navigationGroup = 'Система';
+    protected static string|\UnitEnum|null $navigationGroup = 'Система';
 
     protected static ?string $modelLabel = 'синхронізація';
 
@@ -25,76 +30,76 @@ class SyncLogResource extends Resource
 
     protected static ?int $navigationSort = 10;
 
-    public static function form(Form $form): Form
+    public static function form(Schema $schema): Schema
     {
-        return $form->schema([]);
+        return $schema->components([]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('type')
+                TextColumn::make('type')
                     ->label('Тип')
                     ->badge()
                     ->formatStateUsing(fn ($state): string => $state instanceof SyncLogType ? $state->label() : (string) $state),
-                Tables\Columns\TextColumn::make('status')
+                TextColumn::make('status')
                     ->label('Статус')
                     ->badge()
                     ->color(fn ($state): string => $state === SyncLogStatus::Success ? 'success' : 'danger')
                     ->formatStateUsing(fn ($state): string => $state instanceof SyncLogStatus ? $state->label() : (string) $state),
-                Tables\Columns\TextColumn::make('records_processed')
+                TextColumn::make('records_processed')
                     ->label('Записів')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('error_message')
+                TextColumn::make('error_message')
                     ->label('Помилка')
                     ->limit(50)
                     ->placeholder('—')
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('started_at')
+                TextColumn::make('started_at')
                     ->label('Початок')
                     ->dateTime('d.m.Y H:i')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('finished_at')
+                TextColumn::make('finished_at')
                     ->label('Кінець')
                     ->dateTime('d.m.Y H:i')
                     ->sortable(),
             ])
             ->defaultSort('started_at', 'desc')
             ->filters([
-                Tables\Filters\SelectFilter::make('type')
+                SelectFilter::make('type')
                     ->label('Тип')
                     ->options(collect(SyncLogType::cases())->mapWithKeys(fn (SyncLogType $t) => [$t->value => $t->label()])->all()),
-                Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->label('Статус')
                     ->options(collect(SyncLogStatus::cases())->mapWithKeys(fn (SyncLogStatus $s) => [$s->value => $s->label()])->all()),
             ])
-            ->actions([
-                Tables\Actions\ViewAction::make(),
+            ->recordActions([
+                ViewAction::make(),
             ])
-            ->bulkActions([]);
+            ->toolbarActions([]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListSyncLogs::route('/'),
-            'view' => Pages\ViewSyncLog::route('/{record}'),
+            'index' => ListSyncLogs::route('/'),
+            'view' => ViewSyncLog::route('/{record}'),
         ];
     }
 
-    public static function canCreate(): bool
+    public static function getCreateAuthorizationResponse(): Response
     {
-        return false;
+        return Response::deny();
     }
 
-    public static function canEdit($record): bool
+    public static function getEditAuthorizationResponse(Model $record): Response
     {
-        return false;
+        return Response::deny();
     }
 
-    public static function canDelete($record): bool
+    public static function getDeleteAuthorizationResponse(Model $record): Response
     {
-        return false;
+        return Response::deny();
     }
 }
