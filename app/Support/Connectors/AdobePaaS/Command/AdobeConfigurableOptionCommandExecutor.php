@@ -24,6 +24,21 @@ final class AdobeConfigurableOptionCommandExecutor
         AdobeConfigurableCommandInput $input,
         AdobeConfigurableOptionDesiredState $desiredOption,
     ): AdobeConfigurableCommandEvidence {
+        return $this->executeInternal($input, $desiredOption, allowPreLinkValueSubset: false);
+    }
+
+    public function executePreLink(
+        AdobeConfigurableCommandInput $input,
+        AdobeConfigurableOptionDesiredState $desiredOption,
+    ): AdobeConfigurableCommandEvidence {
+        return $this->executeInternal($input, $desiredOption, allowPreLinkValueSubset: true);
+    }
+
+    private function executeInternal(
+        AdobeConfigurableCommandInput $input,
+        AdobeConfigurableOptionDesiredState $desiredOption,
+        bool $allowPreLinkValueSubset,
+    ): AdobeConfigurableCommandEvidence {
         $context = $this->contextFactory->create($input->workspaceId, $input->connectorAccountId);
         $parentSku = $input->desiredState->parentSku;
 
@@ -47,6 +62,18 @@ final class AdobeConfigurableOptionCommandExecutor
 
         if ($existing !== null && $this->controlledStateMatches($desiredOption, $existing)) {
             return $this->knownApplied('configurable_option_no_op', $parentSku, $desiredOption, $existing->optionId);
+        }
+
+        if ($existing !== null
+            && $allowPreLinkValueSubset
+            && $this->preLinkStateMatches($desiredOption, $existing)
+        ) {
+            return $this->knownApplied(
+                'configurable_option_pre_link_state_ready',
+                $parentSku,
+                $desiredOption,
+                $existing->optionId,
+            );
         }
 
         if ($existing !== null && $this->requiresDestructiveValueRemoval($desiredOption, $existing)) {
@@ -92,6 +119,7 @@ final class AdobeConfigurableOptionCommandExecutor
                 $postTransportException,
                 consequentialWriteAttempts: 1,
                 reasonCode: 'configurable_option_post',
+                allowPreLinkValueSubset: $allowPreLinkValueSubset,
             );
         }
 
@@ -301,6 +329,7 @@ final class AdobeConfigurableOptionCommandExecutor
         ?ConnectorTransportException $transportException,
         int $consequentialWriteAttempts,
         string $reasonCode,
+        bool $allowPreLinkValueSubset = false,
     ): AdobeConfigurableCommandEvidence {
         [$optionsGetResult] = $this->remoteStateClient->getConfigurableOptions($context, $parentSku);
         $remoteOptions = $this->optionStateReader->read($optionsGetResult);
@@ -337,6 +366,17 @@ final class AdobeConfigurableOptionCommandExecutor
         if ($this->controlledStateMatches($desiredOption, $observed)) {
             return $this->knownApplied(
                 $reasonCode.'_reconciled',
+                $parentSku,
+                $desiredOption,
+                $observed->optionId,
+                consequentialWriteAttempts: $consequentialWriteAttempts,
+                reconciliationGetAttempts: 1,
+            );
+        }
+
+        if ($allowPreLinkValueSubset && $this->preLinkStateMatches($desiredOption, $observed)) {
+            return $this->knownApplied(
+                $reasonCode.'_reconciled_pre_link',
                 $parentSku,
                 $desiredOption,
                 $observed->optionId,
@@ -382,6 +422,31 @@ final class AdobeConfigurableOptionCommandExecutor
         sort($observedIndexes);
 
         return $desiredIndexes === $observedIndexes;
+    }
+
+    private function preLinkStateMatches(
+        AdobeConfigurableOptionDesiredState $desired,
+        AdobeConfigurableRemoteOptionState $observed,
+    ): bool {
+        if ($desired->attributeId !== $observed->attributeId
+            || $desired->label !== $observed->label
+            || $desired->position !== $observed->position
+        ) {
+            return false;
+        }
+
+        $desiredIndexes = array_map(
+            static fn (AdobeConfigurableOptionValueDesiredState $value): int => $value->valueIndex,
+            $desired->values,
+        );
+
+        foreach ($observed->values as $observedIndex) {
+            if (! in_array($observedIndex, $desiredIndexes, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function preserveObservedValues(

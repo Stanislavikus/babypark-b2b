@@ -163,7 +163,10 @@ final class AdobeConfigurableProductCommandCoordinator
         );
         $platformCreatedFamily = ! $parentLookup->isTrusted()
             || $parentLookup->link?->hasPlatformCreatedTrust() === true;
-        $coreInput = $platformCreatedFamily ? $this->disabledCoreInput($input) : $input;
+        $createResumeMode = ! $parentLookup->isTrusted()
+            || ($parentLookup->link?->hasPlatformCreatedTrust() === true
+                && ! $this->platformCreatedFamilyReadyForOrdinaryExecution($input));
+        $coreInput = $createResumeMode ? $this->disabledCoreInput($input) : $input;
 
         if ($input->consequentialWriteGate === null
             || ! $input->consequentialWriteGate->permitsConsequentialWrite()
@@ -231,7 +234,7 @@ final class AdobeConfigurableProductCommandCoordinator
             }
         } else {
             foreach ($desiredState->options as $option) {
-                $optionEvidence = $this->optionExecutor->execute($coreInput, $option);
+                $optionEvidence = $this->optionExecutor->executePreLink($coreInput, $option);
                 $evidence[] = $optionEvidence;
                 if ($optionEvidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
                     return $this->evidenceResult($evidence);
@@ -273,12 +276,45 @@ final class AdobeConfigurableProductCommandCoordinator
             }
         }
 
-        if ($platformCreatedFamily) {
+        if ($createResumeMode) {
             $finalParent = $this->parentExecutor->execute($input);
             $evidence[] = $finalParent;
         }
 
         return $this->evidenceResult($evidence);
+    }
+
+    private function platformCreatedFamilyReadyForOrdinaryExecution(AdobeConfigurableCommandInput $input): bool
+    {
+        foreach ($input->desiredState->options as $option) {
+            if ($this->optionExecutor->executeNoOpOnly($input, $option)->appliedStateKnowledge
+                !== AdobeProductAppliedStateKnowledge::KnownApplied
+            ) {
+                return false;
+            }
+        }
+
+        foreach ($input->desiredState->childLinks as $link) {
+            if ($this->childLinkExecutor->executeNoOpOnly($input, $link)->appliedStateKnowledge
+                !== AdobeProductAppliedStateKnowledge::KnownApplied
+            ) {
+                return false;
+            }
+        }
+
+        if ($this->parentExecutor->verifyBootstrapNormalized($input)->appliedStateKnowledge
+            !== AdobeProductAppliedStateKnowledge::KnownApplied
+        ) {
+            return false;
+        }
+
+        foreach ($this->inactiveLifecycleExecutor->executeNoOpOnly($input) as $evidence) {
+            if ($evidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function disabledCoreInput(AdobeConfigurableCommandInput $input): AdobeConfigurableCommandInput
