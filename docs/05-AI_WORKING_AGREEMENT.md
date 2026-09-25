@@ -561,9 +561,9 @@ review, or correction work, the AI MUST read:
 Standard Magento V1 is a **moduleless, zero-install connector over the stock
 Adobe/Magento Admin REST API**.
 
-If a proposed standard-V1 implementation requires a BabyPark / B2B Platform
+If a proposed standard-V1 implementation requires a platform-specific
 Magento module, plugin, custom endpoint, core modification, direct Magento DB
-access, sidecar agent, or other target-side BabyPark software, the AI MUST STOP
+access, sidecar agent, or other first-party target-side software, the AI MUST STOP
 before implementation.
 
 The AI MUST NOT make Safe Sync or another first-party Magento component a

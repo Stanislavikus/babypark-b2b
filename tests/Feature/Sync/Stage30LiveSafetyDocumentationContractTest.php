@@ -398,7 +398,7 @@ class Stage30LiveSafetyDocumentationContractTest extends TestCase
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
 
         $this->assertStringContainsString('Products / Export / Live = **true**', $section);
-        $this->assertStringContainsString('| Adobe Products/Export/Live support truth | SUPPORTED (public) — [Resolved 2026-09-19] |', $atlas);
+        $this->assertStringContainsString('| Adobe Products/Export/Live support truth | SUPPORTED (public) — [Resolved 2026-09-19; Simple CREATE extended 2026-09-24; Configurable CREATE/resume extended 2026-09-25] |', $atlas);
     }
 
     #[Test]
