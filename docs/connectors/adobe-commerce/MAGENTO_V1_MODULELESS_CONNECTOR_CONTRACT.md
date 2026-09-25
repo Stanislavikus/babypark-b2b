@@ -126,9 +126,10 @@ make a BabyPark Magento module mandatory.
 
 > **[Resolved Product Decision — 2026-09-24]**
 >
-> Status: architecture frozen; implementation and real-target certification pending.
-> Public/support truth MUST remain unsupported until the production path and
-> certification evidence pass.
+> Status: **implemented and real-target certified 2026-09-25** on the bounded
+> standard moduleless CREATE/resume path.
+> Durable evidence:
+> `docs/connectors/adobe-commerce/magento_v1_configurable_create_certification_2026_09_25.json`.
 
 Configurable Product CREATE extends the standard moduleless Product CREATE
 contract as a **resumable, non-destructive convergence sequence**. It does not

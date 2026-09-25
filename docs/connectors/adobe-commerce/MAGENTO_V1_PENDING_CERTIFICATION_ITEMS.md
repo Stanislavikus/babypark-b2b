@@ -1,8 +1,8 @@
 # Magento V1 Pending Certification Items
 
 **Status:** bounded follow-up certification ledger
-**Updated:** 2026-09-19
-**Branch:** `campaign/magento-v1-production-live`
+**Updated:** 2026-09-25
+**Branch:** `codex/implement-moduleless-configurable-product-create`
 
 This file is the durable queue for Magento V1 issues deliberately deferred during certification. An item stays here until it is implemented/certified or explicitly closed with evidence. **[Resolved 2026-09-19] Adobe Products / Export / Live is now supported for the certified standard moduleless V1 scope**; evidence is `docs/connectors/adobe-commerce/magento_v1_products_export_live_certification_2026_09_19.json`. Open items below are bounded follow-ups and are not blockers for that advertised Export Live scope unless a future scope expansion makes them relevant. Adobe Products / Import / Live remains false.
 
@@ -122,3 +122,17 @@ This file is the durable queue for Magento V1 issues deliberately deferred durin
 - Historical support state at P-11 closure: Adobe Products / Export / Live was still false; the later 2026-09-19 bounded truth flip supersedes only that support-status statement and does not broaden P-11 structure ownership.
 - Evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_structure_certification_2026_09_18.json`.
 - Reviewer candidate: no further architecture review required unless a future scope expands into option CREATE/value removal, remote unlink/removal, or new identity/transaction semantics.
+
+### P-12 — Moduleless Configurable Product CREATE / resume — CLOSED 2026-09-25 [Resolved]
+
+- Surface: new Configurable family creation through stock Adobe/Magento REST only: active Simple children, disabled Configurable parent, configurable option, child links, post-link option reconciliation, bootstrap normalization, final parent activation, then the existing Media and Category stages.
+- Identity/recovery: successful Product POST + exact reconciliation mints `platform_created` ERLs for Variant-subject children and the Product-subject parent. Configurable option and child-link state remains provider-authoritative; no family/saga table and no production rollback DELETE were introduced.
+- Real-target core proof on runtime HEAD `6885394ee0078f7eb9ea8d09761e6c2f50614063`: two absent Simple children plus an absent parent were created with standard Product POST; a missing option was created, both child links were created, post-link option semantics reconciled to exact values `[63,79]`, required parent bootstrap state normalized away, and the parent reached desired active status only after exact structure. All three ERLs were `platform_created`.
+- Idempotency proof: an immediate second production-coordinator execution returned `synchronized` with **zero non-GET requests** — no Product POST, option POST, child-link POST, option PUT, or parent status PUT.
+- Stock Magento correction discovered during certification: a just-created configurable option may initially read back with a provider-materialized value subset (including `[]`) before child links exist. The production path now accepts only exact option identity/label/position plus a subset of already validated desired values pre-link; post-link reconciliation remains strict and exact.
+- Completed-family correction: `platform_created` provenance is not treated as permanent CREATE/resume mode. A fresh exact option/link/bootstrap/lifecycle read sends an already-complete family through the ordinary linked no-write path, preventing repeated `1→2→1` parent status toggles.
+- Post-core proof: production Media on a newly created Configurable parent added one verified JPEG and removed it back to an empty baseline; production Category relation execution completed category `7` ADD → READ → REMOVE → exact empty restore.
+- Cleanup: both disposable certification families were removed through validation-only cleanup; every remote Product returned `trusted_known_missing`, and temporary local Product/Variants/ERLs/category assignments were zero.
+- Remaining boundaries: existing `merchant_confirmed` families remain missing-option CREATE fail-closed; destructive option-value removal and remote child unlink/removal remain unexposed; Product POST ambiguity still never mints trust or blind-retries; Adobe Products / Import / Live remains false.
+- Evidence: `docs/connectors/adobe-commerce/magento_v1_configurable_create_certification_2026_09_25.json`.
+- Reviewer candidate: no further architecture review required unless scope expands destructive option/link ownership, Product POST ambiguity semantics, or new cross-account/distributed transaction guarantees.

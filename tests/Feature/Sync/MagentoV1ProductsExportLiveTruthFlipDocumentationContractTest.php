@@ -41,14 +41,31 @@ final class MagentoV1ProductsExportLiveTruthFlipDocumentationContractTest extend
         $this->assertStringContainsString('Products / Export / Live = **true**', $domain);
         $this->assertStringContainsString('Products / Import / Live = **false**', $domain);
         $this->assertStringContainsString('Magento Simple Product CREATE = **true — standard moduleless path; real-target verified 2026-09-24**', $domain);
-        $this->assertStringContainsString('Magento Configurable Product CREATE = **unsupported; next capability**', $domain);
+        $this->assertStringContainsString('Magento Configurable Product CREATE = **true — bounded standard moduleless CREATE/resume path; real-target verified 2026-09-25**', $domain);
 
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
         $this->assertStringContainsString(
-            'Adobe Products/Export/Live support truth | SUPPORTED (public) — [Resolved 2026-09-19; Simple CREATE extended 2026-09-24]',
+            'Adobe Products/Export/Live support truth | SUPPORTED (public) — [Resolved 2026-09-19; Simple CREATE extended 2026-09-24; Configurable CREATE/resume extended 2026-09-25]',
             $atlas,
         );
         $this->assertStringContainsString('Live runtime readiness | IMPLEMENTED + REAL-TARGET VERIFIED', $atlas);
+
+        $configurableCreateEvidence = json_decode(
+            File::get(base_path(
+                'docs/connectors/adobe-commerce/magento_v1_configurable_create_certification_2026_09_25.json'
+            )),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+        $this->assertSame('PASS', $configurableCreateEvidence['result']);
+        $this->assertTrue($configurableCreateEvidence['standard_rest_only']);
+        $this->assertFalse($configurableCreateEvidence['safe_sync']);
+        $this->assertTrue($configurableCreateEvidence['public_scope']['configurable_product_create']);
+        $this->assertSame([], $configurableCreateEvidence['core_family_certification']['second_execution']['consequential_requests']);
+        $this->assertTrue($configurableCreateEvidence['core_family_certification']['cleanup']['exact']);
+        $this->assertTrue($configurableCreateEvidence['post_core_certification']['media']['restored_exactly']);
+        $this->assertTrue($configurableCreateEvidence['post_core_certification']['category']['restored_exactly']);
+        $this->assertTrue($configurableCreateEvidence['post_core_certification']['cleanup']['exact']);
     }
 
     #[Test]
@@ -72,8 +89,8 @@ final class MagentoV1ProductsExportLiveTruthFlipDocumentationContractTest extend
         $this->assertStringContainsString('Products / Export / Live = **true**', $ux);
         $this->assertStringContainsString('Products / Import / Live = **false**', $ux);
         $this->assertStringContainsString('Magento Simple Product CREATE = **true on the standard moduleless path**', $ux);
-        $this->assertStringContainsString('Magento Configurable Product CREATE', $ux);
-        $this->assertStringContainsString('remains **unsupported** as the next capability', $ux);
+        $this->assertStringContainsString('bounded Magento Configurable Product', $ux);
+        $this->assertStringContainsString('CREATE/resume = **true on the standard moduleless path**', $ux);
         $this->assertStringContainsString('Safe Sync is optional Enhanced Safety', $ux);
 
         $this->assertStringContainsString('**Truth-flip status: COMPLETED 2026-09-19.**', $ux);

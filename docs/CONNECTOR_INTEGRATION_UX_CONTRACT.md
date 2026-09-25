@@ -449,8 +449,9 @@ merchant Live work surface and `startLive()` delegates to the existing admission
 contract. Current public truth is: Products / Export / Preview = **true**,
 Products / Export / Live = **true**, Products / Import / Live = **false**,
 Magento Simple Product CREATE = **true on the standard moduleless path** after
-2026-09-24 real-target certification, and Magento Configurable Product CREATE
-remains **unsupported** as the next capability. Consequential Live remains
+2026-09-24 real-target certification, and bounded Magento Configurable Product
+CREATE/resume = **true on the standard moduleless path** after 2026-09-25
+real-target certification. Consequential Live remains
 Preview-first and is actionable only when current authorization, configuration
 revision, runtime readiness, trusted remote identity (merchant-confirmed or
 platform-created where the standard CREATE contract permits it), writer-gate, and

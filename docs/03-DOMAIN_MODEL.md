@@ -6933,7 +6933,7 @@ allowing `Product A → external X` and `Product A → external Y`. Do **not** m
 
 Legacy rows with NULL provenance are **not** grandfathered trusted. For Adobe Export, `merchant_confirmed` is trusted only when the complete merchant-confirmation tuple is valid. `platform_created` is trusted only for a Product created by the standard moduleless CREATE path after one successful stock Product POST returns the exact SKU + logical `entity_id` and an exact reconciliation GET proves the controlled state; it never substitutes for merchant confirmation of a pre-existing remote Product. Receive/Import semantics remain separately governed and do not automatically inherit `platform_created` acceptance. There is **no** generic DB `UNIQUE(workspace_id, connector_account_id, external_record_discriminator)` constraint; Adobe discriminator collision remains connector-aware in application guards. Existing exact-association unique constraints are unchanged.
 
-**Current standard-path status supersedes the historical Stage 3E status that follows:** Adobe Products/Export/Live is public for the certified bounded moduleless scope since 2026-09-19. Standard moduleless **Simple Product CREATE is implemented and real-target verified on 2026-09-24**; Safe Sync is not part of that path. Configurable-family CREATE remains a separate follow-on capability.
+**Current standard-path status supersedes the historical Stage 3E status that follows:** Adobe Products/Export/Live is public for the certified bounded moduleless scope since 2026-09-19. Standard moduleless **Simple Product CREATE is implemented and real-target verified on 2026-09-24**, and bounded **Configurable-family CREATE/resume is implemented and real-target verified on 2026-09-25**; Safe Sync is not part of either path.
 
 **Stage 3E-R2b-1 (implemented — backend only):** merchant-confirmed ENTITY TRUST review/confirm backend exists for Adobe Products. Current/prospective link readiness projection, tamper-resistant review envelope, Safe Sync entity-bound verification, and dedicated `AdobeProductMerchantConfirmedLinkPersister` are implemented. Existing configurable parent uses confirmed merchant Magento SKU (not `cfg-*` substitution). Merchant Filament/Livewire UI remains **R2b-2** follow-on. The R2b-1 trust backend itself performs **no** consequential writes; trusted simple Product WRITE consumption now exists internally, while configurable/media completion and public Live support remain pending.
 
@@ -8899,15 +8899,17 @@ Current Adobe support truth is:
 - Products / Export / Live = **true**
 - Products / Import / Live = **false**
 - Magento Simple Product CREATE = **true — standard moduleless path; real-target verified 2026-09-24**
-- Magento Configurable Product CREATE = **unsupported; next capability**
+- Magento Configurable Product CREATE = **true — bounded standard moduleless CREATE/resume path; real-target verified 2026-09-25**
 
 The standard path is moduleless. Existing linked Products use the certified stock
 REST linked-UPDATE runtime; no-link Simple Products may now use the standard stock
 Product CREATE path under the bounded moduleless CREATE contract. The 2026-09-19
 truth flip is backed by
 `docs/connectors/adobe-commerce/magento_v1_products_export_live_certification_2026_09_19.json`,
-and Simple CREATE certification by
-`docs/connectors/adobe-commerce/magento_v1_simple_create_certification_2026_09_24.json`.
+Simple CREATE certification by
+`docs/connectors/adobe-commerce/magento_v1_simple_create_certification_2026_09_24.json`,
+and Configurable CREATE/resume certification by
+`docs/connectors/adobe-commerce/magento_v1_configurable_create_certification_2026_09_25.json`.
 
 The final real-target smoke used one existing MerchantConfirmed linked Simple
 Product in configured Store View `default` and proved the whole merchant path:
