@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Connectors;
 
+use App\Enums\ExternalRecordLinkTrustOrigin;
 use App\Enums\UserRole;
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
@@ -769,6 +770,39 @@ class ConnectorAccountSettingsServiceTest extends TestCase
                 $this->createWorkspaceActor($this->workspace),
             ),
         );
+
+        $this->expectException(ConnectorAccountTargetFrozenException::class);
+
+        $this->service->update(
+            $admin,
+            $this->workspace,
+            $account->id,
+            UpdateConnectorAccountInput::adobePaas(
+                baseUrl: 'https://new-target.example.com',
+                storeCode: 'default',
+                tenantContext: null,
+                credentialMutation: CredentialMutation::keep(),
+            ),
+        );
+    }
+
+    #[Test]
+    public function target_change_is_rejected_when_trusted_platform_created_links_exist(): void
+    {
+        $admin = $this->createStaffUserWithConnectorManage(UserRole::Admin);
+        $account = $this->createConnectorAccount($this->workspace);
+        [$product, $variant] = $this->createSimpleEntityTrustProduct($this->workspace, 'PLATFORM-FREEZE-SKU');
+
+        ExternalRecordLink::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'product_variant_id' => $variant->id,
+            'external_identifier' => 'PLATFORM-FREEZE-SKU',
+            'trust_origin' => ExternalRecordLinkTrustOrigin::PlatformCreated->value,
+            'external_record_discriminator' => '6001',
+            'established_by_workspace_user_id' => null,
+            'established_at' => now(),
+        ]);
 
         $this->expectException(ConnectorAccountTargetFrozenException::class);
 

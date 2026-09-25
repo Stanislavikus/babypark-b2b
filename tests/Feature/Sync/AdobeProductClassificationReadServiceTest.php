@@ -167,6 +167,48 @@ class AdobeProductClassificationReadServiceTest extends TestCase
     }
 
     #[Test]
+    public function platform_created_parent_is_trusted_remote_structural_truth(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        $category = $this->category($workspace, 'Strollers');
+        $product = $this->product($workspace, $category);
+        $configuredSet = $this->attributeSet($account, 9, 'Configured');
+        $this->attributeSet($account, 10, 'Observed');
+
+        $this->configureDefaults($workspace, $account, $product, $category, $configuredSet);
+
+        ExternalRecordLink::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'product_variant_id' => null,
+            'external_identifier' => 'PLATFORM-CFG-601',
+            'trust_origin' => ExternalRecordLinkTrustOrigin::PlatformCreated->value,
+            'external_record_discriminator' => '601',
+            'established_by_workspace_user_id' => null,
+            'established_at' => now(),
+        ]);
+        $this->publishRemoteItems($account, [
+            new RemoteCatalogItemCandidate(
+                remoteIdentifier: '601',
+                sku: 'PLATFORM-CFG-601',
+                name: 'Platform-created configurable',
+                remoteType: 'configurable',
+                remoteStatus: '1',
+                externalAttributeSetId: 10,
+            ),
+        ]);
+
+        $result = $this->service->resolve($account, $product);
+
+        $this->assertSame(10, $result->providerAttributeSetId);
+        $this->assertSame('observed_remote', $result->attributeSetSource);
+        $this->assertTrue($result->hasTrustedRemoteSubject);
+        $this->assertTrue($result->isReady());
+    }
+
+    #[Test]
     public function trusted_simple_variant_observed_attribute_set_is_product_structural_truth(): void
     {
         $workspace = $this->defaultWorkspace();
