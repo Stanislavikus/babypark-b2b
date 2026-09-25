@@ -15,6 +15,7 @@ use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Models\ExternalRecordLink;
 use App\Models\Product;
+use App\Models\ProductVariant;
 use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
@@ -271,6 +272,48 @@ class ProductChannelWorkspaceUiTest extends TestCase
         $this->assertNotNull($mountedView);
         $this->assertTrue($mountedView->isModalSlideOver());
         $this->assertArrayHasKey('open_full_page_footer', $mountedView->getExtraModalFooterActions());
+    }
+
+    #[Test]
+    public function publication_treats_platform_created_variant_identity_as_linked_product(): void
+    {
+        $account = $this->createConnectorAccount();
+        $configuration = $this->createProductsExportConfiguration($account->id);
+        $product = $this->createProduct('PLATFORM-LINKED-PRODUCT');
+        $variant = ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'PLATFORM-LINKED-SKU',
+            'is_active' => true,
+        ]);
+
+        app(ProductChannelSelectionService::class)->add(
+            $this->actor,
+            $this->workspace,
+            $configuration->id,
+            [$product->id],
+        );
+
+        ExternalRecordLink::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => null,
+            'product_variant_id' => $variant->id,
+            'external_identifier' => $variant->sku,
+            'trust_origin' => ExternalRecordLinkTrustOrigin::PlatformCreated->value,
+            'external_record_discriminator' => '7001',
+            'established_by_workspace_user_id' => null,
+            'established_at' => now(),
+        ]);
+
+        Livewire::actingAs($this->actor)
+            ->test(ManageAdobeProductsChannel::class, ['account' => $account->id])
+            ->filterTable('link_status', 'linked')
+            ->assertSee($product->name)
+            ->resetTableFilters()
+            ->filterTable('link_status', 'unlinked')
+            ->assertDontSee($product->name);
     }
 
     #[Test]

@@ -2,7 +2,6 @@
 
 namespace App\Services\Connectors;
 
-use App\Enums\ExternalRecordLinkTrustOrigin;
 use App\Enums\FieldObjectType;
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
@@ -22,13 +21,10 @@ final class AdobeProductAttributeEntityEvidenceResolver
         $links = ExternalRecordLink::withoutWorkspaceScope()
             ->where('workspace_id', $account->workspace_id)
             ->where('connector_account_id', $account->id)
-            ->where('trust_origin', ExternalRecordLinkTrustOrigin::MerchantConfirmed->value)
-            ->get();
+            ->get()
+            ->filter(static fn (ExternalRecordLink $link): bool => $link->hasTrustedIdentity());
 
         foreach ($links as $link) {
-            if (! $link->hasMerchantConfirmedTrust()) {
-                continue;
-            }
 
             $sku = $link->external_identifier;
             if (! is_string($sku) || $sku === '' || trim($sku) !== $sku) {

@@ -2,7 +2,6 @@
 
 namespace App\Filament\Pages\Sync;
 
-use App\Enums\ExternalRecordLinkTrustOrigin;
 use App\Filament\Resources\ProductResource;
 use App\Models\Category;
 use App\Models\ConnectorAccount;
@@ -304,14 +303,7 @@ class ManageAdobeProductsChannel extends Page implements HasTable
         }
 
         $workspaceId = $this->resolveSyncDataSetupLandingWorkspace()->id;
-        $linkedProductIds = ExternalRecordLink::withoutWorkspaceScope()
-            ->select('product_id')
-            ->where('workspace_id', $workspaceId)
-            ->where('connector_account_id', $this->accountId)
-            ->where('trust_origin', ExternalRecordLinkTrustOrigin::MerchantConfirmed->value)
-            ->whereNotNull('external_record_discriminator')
-            ->whereNotNull('established_by_workspace_user_id')
-            ->whereNotNull('established_at');
+        $linkedProductIds = $this->trustedLinkedProductIds($workspaceId);
 
         return $status === 'linked'
             ? $query->whereIn('products.id', $linkedProductIds)
@@ -414,7 +406,9 @@ class ManageAdobeProductsChannel extends Page implements HasTable
             return $query->whereRaw('1 = 0');
         }
 
-        return $query
+        $trustedLinkedProductIds = $this->trustedLinkedProductIds($workspaceId);
+
+        $query = $query
             ->select('products.*')
             ->whereIn(
                 'products.id',
@@ -422,19 +416,33 @@ class ManageAdobeProductsChannel extends Page implements HasTable
                     ->select('product_id')
                     ->where('workspace_id', $workspaceId)
                     ->where('sync_configuration_id', $this->configurationId),
-            )
-            ->addSelect([
-                'is_linked' => ExternalRecordLink::withoutWorkspaceScope()
-                    ->selectRaw('COUNT(*) > 0')
-                    ->where('workspace_id', $workspaceId)
-                    ->where('connector_account_id', $this->accountId)
-                    ->where('trust_origin', ExternalRecordLinkTrustOrigin::MerchantConfirmed->value)
-                    ->whereNotNull('external_record_discriminator')
-                    ->whereNotNull('established_by_workspace_user_id')
-                    ->whereNotNull('established_at')
-                    ->whereColumn('product_id', 'products.id')
-                    ->limit(1),
-            ]);
+            );
+
+        if ($trustedLinkedProductIds === []) {
+            return $query->selectRaw('0 AS is_linked');
+        }
+
+        return $query->selectRaw(
+            'CASE WHEN products.id IN ('.implode(',', array_fill(0, count($trustedLinkedProductIds), '?')).') THEN 1 ELSE 0 END AS is_linked',
+            $trustedLinkedProductIds,
+        );
+    }
+
+    /** @return list<int|string> */
+    private function trustedLinkedProductIds(string $workspaceId): array
+    {
+        return ExternalRecordLink::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->where('connector_account_id', $this->accountId)
+            ->with('productVariant:id,product_id')
+            ->get()
+            ->filter(static fn (ExternalRecordLink $link): bool => $link->hasTrustedIdentity())
+            ->map(static fn (ExternalRecordLink $link): int|string|null => $link->product_id
+                ?? $link->productVariant?->product_id)
+            ->filter(static fn ($productId): bool => is_int($productId) || (is_string($productId) && $productId !== ''))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function refreshChannelState(User $user): void
