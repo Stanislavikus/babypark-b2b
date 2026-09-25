@@ -40,14 +40,46 @@ final class MagentoV1ProductsExportLiveTruthFlipDocumentationContractTest extend
         );
         $this->assertStringContainsString('Products / Export / Live = **true**', $domain);
         $this->assertStringContainsString('Products / Import / Live = **false**', $domain);
-        $this->assertStringContainsString('Magento Product CREATE = **unsupported in V1**', $domain);
+        $this->assertStringContainsString('Magento Simple Product CREATE = **true — standard moduleless path; real-target verified 2026-09-24**', $domain);
+        $this->assertStringContainsString('Magento Configurable Product CREATE = **true — bounded standard moduleless CREATE/resume path; real-target verified 2026-09-25**', $domain);
 
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
         $this->assertStringContainsString(
-            'Adobe Products/Export/Live support truth | SUPPORTED (public) — [Resolved 2026-09-19]',
+            'Adobe Products/Export/Live support truth | SUPPORTED (public) — [Resolved 2026-09-19; Simple CREATE extended 2026-09-24; Configurable CREATE/resume extended 2026-09-25]',
             $atlas,
         );
         $this->assertStringContainsString('Live runtime readiness | IMPLEMENTED + REAL-TARGET VERIFIED', $atlas);
+
+        $configurableCreateEvidence = json_decode(
+            File::get(base_path(
+                'docs/connectors/adobe-commerce/magento_v1_configurable_create_certification_2026_09_25.json'
+            )),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+        $this->assertSame('PASS', $configurableCreateEvidence['result']);
+        $this->assertTrue($configurableCreateEvidence['standard_rest_only']);
+        $this->assertFalse($configurableCreateEvidence['safe_sync']);
+        $this->assertTrue($configurableCreateEvidence['public_scope']['configurable_product_create']);
+        $this->assertSame([], $configurableCreateEvidence['core_family_certification']['second_execution']['consequential_requests']);
+        $this->assertTrue($configurableCreateEvidence['core_family_certification']['cleanup']['exact']);
+        $this->assertTrue($configurableCreateEvidence['post_core_certification']['media']['restored_exactly']);
+        $this->assertTrue($configurableCreateEvidence['post_core_certification']['category']['restored_exactly']);
+        $this->assertTrue($configurableCreateEvidence['post_core_certification']['cleanup']['exact']);
+        $this->assertSame(2, $configurableCreateEvidence['partial_resume_certification']['durable_checkpoint_before_resume']['parent_status']);
+        $this->assertSame([], $configurableCreateEvidence['partial_resume_certification']['durable_checkpoint_before_resume']['options']);
+        $this->assertSame([], $configurableCreateEvidence['partial_resume_certification']['durable_checkpoint_before_resume']['children']);
+        $this->assertSame(0, $configurableCreateEvidence['partial_resume_certification']['resume_execution']['product_posts']);
+        $this->assertTrue($configurableCreateEvidence['partial_resume_certification']['second_execution']['all_command_writes_zero']);
+        $this->assertTrue($configurableCreateEvidence['partial_resume_certification']['cleanup']['exact']);
+        $this->assertSame('merchant_confirmed', $configurableCreateEvidence['mixed_origin_child_certification']['preexisting_trusted_child']['converted_trust_origin']);
+        $this->assertTrue($configurableCreateEvidence['mixed_origin_child_certification']['preexisting_trusted_child']['merchant_confirmed_trust_valid']);
+        $this->assertSame(
+            ['merchant_confirmed', 'platform_created', 'platform_created'],
+            array_column($configurableCreateEvidence['mixed_origin_child_certification']['family_execution']['trusted_links_after'], 'trust_origin'),
+        );
+        $this->assertTrue($configurableCreateEvidence['mixed_origin_child_certification']['second_execution']['all_command_writes_zero']);
+        $this->assertTrue($configurableCreateEvidence['mixed_origin_child_certification']['cleanup']['exact']);
     }
 
     #[Test]
@@ -70,7 +102,9 @@ final class MagentoV1ProductsExportLiveTruthFlipDocumentationContractTest extend
         $this->assertStringNotContainsString('advertised Live support remains **false**', $firstLive);
         $this->assertStringContainsString('Products / Export / Live = **true**', $ux);
         $this->assertStringContainsString('Products / Import / Live = **false**', $ux);
-        $this->assertStringContainsString('Magento Product CREATE = **unsupported in V1**', $ux);
+        $this->assertStringContainsString('Magento Simple Product CREATE = **true on the standard moduleless path**', $ux);
+        $this->assertStringContainsString('bounded Magento Configurable Product', $ux);
+        $this->assertStringContainsString('CREATE/resume = **true on the standard moduleless path**', $ux);
         $this->assertStringContainsString('Safe Sync is optional Enhanced Safety', $ux);
 
         $this->assertStringContainsString('**Truth-flip status: COMPLETED 2026-09-19.**', $ux);
@@ -91,19 +125,21 @@ final class MagentoV1ProductsExportLiveTruthFlipDocumentationContractTest extend
     }
 
     #[Test]
-    public function product_create_primitive_has_no_production_command_caller(): void
+    public function product_create_primitive_has_exactly_one_production_command_caller(): void
     {
+        $callers = [];
+
         foreach (File::allFiles(app_path('Support/Connectors/AdobePaaS/Command')) as $file) {
             if ($file->getFilename() === 'AdobeProductRemoteStateClient.php') {
                 continue;
             }
 
-            $this->assertStringNotContainsString(
-                'postProduct(',
-                File::get($file->getPathname()),
-                $file->getPathname(),
-            );
+            if (str_contains(File::get($file->getPathname()), 'postProduct(')) {
+                $callers[] = $file->getFilename();
+            }
         }
+
+        $this->assertSame(['AdobeProductModulelessSimpleCreateExecutor.php'], $callers);
     }
 
     #[Test]

@@ -551,6 +551,47 @@ A connector that requires merchant-side custom code as a precondition
 for basic read, mapping, preview, or ordinary operation fails this
 rule and triggers the Stop and Amend Rule.
 
+### Magento V1 Special Guardrail — Resolved Product Decision 2026-09-24
+
+For **every** Magento / Adobe Commerce task, before architecture, implementation,
+review, or correction work, the AI MUST read:
+
+`docs/connectors/adobe-commerce/MAGENTO_V1_MODULELESS_CONNECTOR_CONTRACT.md`.
+
+Standard Magento V1 is a **moduleless, zero-install connector over the stock
+Adobe/Magento Admin REST API**.
+
+If a proposed standard-V1 implementation requires a platform-specific
+Magento module, plugin, custom endpoint, core modification, direct Magento DB
+access, sidecar agent, or other first-party target-side software, the AI MUST STOP
+before implementation.
+
+The AI MUST NOT make Safe Sync or another first-party Magento component a
+standard-V1 prerequisite merely because it provides stronger safety semantics
+than stock Magento.
+
+Before designing new Magento runtime, the AI MUST inspect current
+`origin/develop`, existing Magento transport/runtime code, current certification
+evidence, and Git history. Reusing/restoring an existing stock-API seam takes
+precedence over inventing a new connector architecture.
+
+Any proposal to change standard Magento V1 from the stock Adobe API boundary to
+a mandatory target-side component requires a **newer explicit `[Resolved Product
+Decision]` approved by the Product Owner**.
+
+Historical Stage 3E Safe Sync/entity-bound statements remain useful for risk
+analysis and optional Enhanced Safety, but they do not override the current
+moduleless standard-V1 product contract.
+
+Safe Sync productization is intentionally **deferred until the standard moduleless
+Magento V1 connector is complete**. Do not spend standard-V1 delivery time on
+expanding, polishing, packaging, or deploying Safe Sync unless a concrete blocker
+proves the stock API path cannot deliver the approved V1 capability and a newer
+Product Decision authorizes that change. When revisited later, Safe Sync is an
+**opt-in Enhanced-Safety profile** distributed only by explicit merchant choice and
+only after its compatibility, installation/upgrade/rollback lifecycle, and
+real-target safety benefit are separately certified.
+
 ---
 
 ## User Interface and Terminology Rules

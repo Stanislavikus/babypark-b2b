@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Sync;
 
+use App\Enums\ExternalRecordLinkTrustOrigin;
 use App\Enums\PriceListItemStatus;
 use App\Enums\PriceListStatus;
 use App\Enums\SyncLiveOutcome;
@@ -522,7 +523,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
     }
 
     #[Test]
-    public function parent_create_without_trusted_link_is_fail_closed_with_zero_write(): void
+    public function parent_create_without_current_attribute_metadata_is_fail_closed_with_zero_write(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
@@ -533,7 +534,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
         $result = $parentExecutor->execute($this->configurableInput($workspace, $account, $product));
 
         $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
-        $this->assertSame('link_required', $result->reasonCode);
+        $this->assertSame('adobe_create_attribute_set_unavailable', $result->reasonCode);
         $this->assertSame(0, ExternalRecordLink::query()->where('product_id', $product->id)->count());
         $this->assertSame(0, $transport->sendCount);
     }
@@ -699,7 +700,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
         $this->assertSame(SyncLiveOutcome::NotApplied, $result->outcome);
         $this->assertTrue(collect($result->commandEvidence)->contains(
             fn ($entry) => $entry->commandKind === 'simple_child'
-                && $entry->reasonCode === 'link_required',
+                && $entry->reasonCode === 'adobe_create_attribute_set_unavailable',
         ));
         $this->assertSame(0, $transport->sendCount);
     }
@@ -800,7 +801,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
         $this->assertSame(SyncLiveOutcome::NotApplied, $result->outcome);
         $this->assertTrue(collect($result->commandEvidence)->contains(
             fn ($entry) => $entry->commandKind === 'simple_child'
-                && $entry->reasonCode === 'trusted_link_discriminator_invalid',
+                && $entry->reasonCode === 'trusted_child_identity_invalid',
         ));
         $this->assertSame(['GET'], array_map(
             static fn ($entry): string => $entry->request->getMethod(),
@@ -924,6 +925,118 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
         $this->assertSame(0, collect($transport->recordedRequests)->filter(
             fn ($entry) => $entry->request->getMethod() !== 'GET',
         )->count());
+    }
+
+    #[Test]
+    public function completed_platform_created_family_stays_on_no_write_linked_path(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product, $variants] = $this->createConfigurableProduct($workspace, 'CFG-PLATFORM-COMPLETE');
+        $parentSku = 'PLATFORM-PARENT-SKU';
+
+        ExternalRecordLink::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_identifier' => $parentSku,
+            'trust_origin' => ExternalRecordLinkTrustOrigin::PlatformCreated->value,
+            'external_record_discriminator' => '100',
+            'established_at' => now(),
+        ]);
+
+        foreach ($variants as $index => $variant) {
+            ExternalRecordLink::withoutWorkspaceScope()->create([
+                'workspace_id' => $workspace->id,
+                'connector_account_id' => $account->id,
+                'product_variant_id' => $variant->id,
+                'external_identifier' => $variant->sku,
+                'trust_origin' => ExternalRecordLinkTrustOrigin::PlatformCreated->value,
+                'external_record_discriminator' => (string) (101 + $index),
+                'established_at' => now(),
+            ]);
+        }
+
+        $childIds = [
+            $variants[0]->sku => [101, 93],
+            $variants[1]->sku => [102, 94],
+        ];
+
+        $transport = new RecordingConnectorHttpTransport(function ($outbound) use ($parentSku, $childIds, $variants): ConnectorHttpResult {
+            $request = $outbound->request;
+            $uri = (string) $request->getUri();
+
+            if ($request->getMethod() !== 'GET') {
+                return new ConnectorHttpResult(500, [], '{}');
+            }
+
+            foreach ($childIds as $sku => [$entityId, $colorIndex]) {
+                if (str_ends_with($uri, '/V1/products/'.rawurlencode($sku))) {
+                    return new ConnectorHttpResult(200, [], json_encode([
+                        'id' => $entityId,
+                        'sku' => $sku,
+                        'name' => 'Configurable Product',
+                        'attribute_set_id' => 4,
+                        'type_id' => 'simple',
+                        'status' => 1,
+                        'visibility' => 1,
+                        'price' => 100.0,
+                        'custom_attributes' => [
+                            ['attribute_code' => 'color', 'value' => $colorIndex],
+                        ],
+                        'media_gallery_entries' => [],
+                    ], JSON_THROW_ON_ERROR));
+                }
+            }
+
+            if (str_ends_with($uri, '/V1/products/'.rawurlencode($parentSku))) {
+                return new ConnectorHttpResult(200, [], json_encode(
+                    AdobeConfigurableCommandTestFixtures::remoteParentPayload($parentSku, ['id' => 100]),
+                    JSON_THROW_ON_ERROR,
+                ));
+            }
+
+            if (str_contains($uri, '/V1/configurable-products/'.rawurlencode($parentSku).'/options/all')) {
+                return new ConnectorHttpResult(200, [], json_encode(
+                    AdobeConfigurableCommandTestFixtures::remoteOptionsPayload(),
+                    JSON_THROW_ON_ERROR,
+                ));
+            }
+
+            if (str_contains($uri, '/V1/configurable-products/'.rawurlencode($parentSku).'/children')) {
+                return new ConnectorHttpResult(200, [], json_encode([
+                    ['sku' => $variants[0]->sku],
+                    ['sku' => $variants[1]->sku],
+                ], JSON_THROW_ON_ERROR));
+            }
+
+            return new ConnectorHttpResult(404, [], '{}');
+        });
+        $this->app->instance(ConnectorHttpTransport::class, $transport);
+
+        $result = app(AdobeConfigurableProductCommandCoordinator::class)->execute(
+            $workspace->id,
+            $account->id,
+            AdobeConfigurableCommandTestFixtures::configurableSemanticResult(
+                $product->id,
+                [
+                    ['variant_id' => (string) $variants[0]->id, 'sku' => $variants[0]->sku, 'color' => 'blue', 'color_index' => '93'],
+                    ['variant_id' => (string) $variants[1]->id, 'sku' => $variants[1]->sku, 'color' => 'red', 'color_index' => '94'],
+                ],
+            ),
+            'UAH',
+            $this->metadataFixture(),
+            new SyncLiveConsequentialWriteGateStub(true),
+        );
+
+        $this->assertSame(SyncLiveOutcome::Synchronized, $result->outcome);
+        $this->assertSame(0, collect($transport->recordedRequests)->filter(
+            fn ($entry) => $entry->request->getMethod() !== 'GET',
+        )->count());
+        $this->assertTrue(collect($result->commandEvidence)->contains(
+            fn ($entry) => $entry->commandKind === 'configurable_parent'
+                && $entry->reasonCode === 'configurable_parent_state_already_matches',
+        ));
     }
 
     #[Test]
@@ -1401,13 +1514,12 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
             new SyncLiveConsequentialWriteGateStub(true),
         );
 
-        $this->assertSame(SyncLiveOutcome::Partial, $result->outcome);
-        $this->assertCount(2, $result->commandEvidence);
-        $this->assertSame('stock_write_verified', $result->commandEvidence[0]->reasonCode);
-        $this->assertSame('trusted_link_discriminator_invalid', $result->commandEvidence[1]->reasonCode);
-        $this->assertSame($refusedVariant->sku, $result->commandEvidence[1]->subjectSku);
+        $this->assertSame(SyncLiveOutcome::NotApplied, $result->outcome);
+        $this->assertCount(1, $result->commandEvidence);
+        $this->assertSame('trusted_child_identity_invalid', $result->commandEvidence[0]->reasonCode);
+        $this->assertSame($refusedVariant->sku, $result->commandEvidence[0]->subjectSku);
 
-        $this->assertSame(1, collect($transport->recordedRequests)->filter(
+        $this->assertSame(0, collect($transport->recordedRequests)->filter(
             fn ($entry) => $entry->request->getMethod() === 'PUT',
         )->count());
         $this->assertFalse(collect($transport->recordedRequests)->contains(
@@ -2511,11 +2623,82 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
     }
 
     #[Test]
+    public function platform_created_option_pre_link_accepts_stock_magento_pending_values(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $account = $this->createConnectorAccount($workspace);
+        [$product] = $this->createConfigurableProduct($workspace, 'CFG-OPTION-PRE-LINK');
+        $parentSku = (new AdobeConfigurableParentSkuGenerator)->generate($workspace->id, $product->id);
+
+        ExternalRecordLink::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_identifier' => $parentSku,
+            'trust_origin' => ExternalRecordLinkTrustOrigin::PlatformCreated->value,
+            'external_record_discriminator' => '100',
+            'established_at' => now(),
+        ]);
+
+        $input = $this->configurableInput($workspace, $account, $product);
+        $desiredOption = $input->desiredState->options[0];
+
+        $transport = new RecordingConnectorHttpTransport(function () use ($desiredOption): ConnectorHttpResult {
+            static $count = 0;
+            $count++;
+
+            return match ($count) {
+                1 => new ConnectorHttpResult(200, [], '[]'),
+                2 => new ConnectorHttpResult(200, [], '201'),
+                3 => new ConnectorHttpResult(200, [], json_encode([[
+                    'id' => 201,
+                    'attribute_id' => (string) $desiredOption->attributeId,
+                    'label' => $desiredOption->label,
+                    'position' => $desiredOption->position,
+                    'values' => [],
+                ]], JSON_THROW_ON_ERROR)),
+                default => new ConnectorHttpResult(500, [], '{}'),
+            };
+        });
+
+        $executor = new AdobeConfigurableOptionCommandExecutor(
+            app(AdobePaaSRequestContextFactory::class),
+            new AdobeProductRemoteStateClient(
+                app(AdobePaaSRequestContextFactory::class),
+                new AdobeProductCommandRequestFactory(new OAuth1RequestSigner),
+                $transport,
+                new AdobeProductRemoteGetClassifier(new AdobeProductRemoteStateNormalizer),
+            ),
+            new AdobeConfigurableRemoteOptionStateReader,
+        );
+
+        $result = $executor->executePreLink($input, $desiredOption);
+
+        $this->assertSame(AdobeProductAppliedStateKnowledge::KnownApplied, $result->appliedStateKnowledge);
+        $this->assertSame('configurable_option_post_reconciled_pre_link', $result->reasonCode);
+        $this->assertSame(1, $result->consequentialWriteAttempts);
+        $this->assertSame(1, $result->reconciliationGetAttempts);
+        $this->assertSame(['GET', 'POST', 'GET'], array_map(
+            static fn ($entry): string => $entry->request->getMethod(),
+            $transport->recordedRequests,
+        ));
+    }
+
+    #[Test]
     public function option_write_transport_failure_reconciles_to_known_applied(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
         [$product] = $this->createConfigurableProduct($workspace, 'CFG-OPTION-RECON');
+        ExternalRecordLink::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_identifier' => (new AdobeConfigurableParentSkuGenerator)->generate($workspace->id, $product->id),
+            'trust_origin' => ExternalRecordLinkTrustOrigin::PlatformCreated->value,
+            'external_record_discriminator' => '100',
+            'established_at' => now(),
+        ]);
 
         $transport = new RecordingConnectorHttpTransport(function (): ConnectorHttpResult {
             static $count = 0;
@@ -2809,6 +2992,38 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
         );
 
         $this->assertSame('color', $desired->options[0]->label);
+    }
+
+    #[Test]
+    public function required_configurable_dimension_bootstrap_is_deterministic_and_parent_starts_disabled(): void
+    {
+        $metadata = new AdobeProductExportExecutionMetadata(
+            selectedAttributeSetId: 4,
+            attributeSets: [['attribute_set_id' => 4, 'attribute_set_name' => 'Default']],
+            attributes: [
+                'color' => new AdobeAttributeMetadata(
+                    attributeId: 100,
+                    code: 'color',
+                    frontendInput: 'select',
+                    scope: 'global',
+                    options: ['93' => 'Blue', '94' => 'Red'],
+                    isRequired: true,
+                    applyTo: ['configurable'],
+                ),
+            ],
+        );
+
+        $desired = (new AdobeConfigurableDesiredStateCompiler(new AdobeConfigurableParentSkuGenerator))->compile(
+            AdobeConfigurableCommandTestFixtures::configurableSemanticResult(),
+            (string) Str::uuid(),
+            $metadata,
+        );
+
+        $this->assertSame(1, $desired->parent->status);
+        $this->assertArrayNotHasKey('color', $desired->parent->customAttributes);
+        $this->assertSame(2, $desired->createParent?->status);
+        $this->assertSame(93, $desired->createParent?->customAttributes['color']);
+        $this->assertSame(['color'], $desired->bootstrapAttributeCodes);
     }
 
     /**

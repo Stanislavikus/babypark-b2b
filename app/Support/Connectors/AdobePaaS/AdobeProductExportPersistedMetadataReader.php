@@ -254,6 +254,8 @@ final class AdobeProductExportPersistedMetadataReader
                 options: $options,
                 defaultFrontendLabel: is_string($field->external_label) ? $field->external_label : null,
                 isRequired: is_bool($field->is_required) ? $field->is_required : null,
+                defaultValue: $providerMetadata['default_value'] ?? null,
+                applyTo: $this->normalizeApplyTo($providerMetadata['apply_to'] ?? null),
             );
         }
 
@@ -308,6 +310,24 @@ final class AdobeProductExportPersistedMetadataReader
         sort($values, SORT_STRING);
 
         return $values;
+    }
+
+    /** @return list<string> */
+    private function normalizeApplyTo(mixed $value): array
+    {
+        if (! is_array($value) || ! array_is_list($value)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($value as $item) {
+            if (is_string($item) && $item !== '') {
+                $normalized[] = $item;
+            }
+        }
+
+        return array_values(array_unique($normalized));
     }
 
     private function firstString(mixed ...$values): ?string

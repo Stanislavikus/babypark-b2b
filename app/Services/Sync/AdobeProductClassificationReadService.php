@@ -114,14 +114,14 @@ final class AdobeProductClassificationReadService
             ->get();
 
         $trustedByProduct = $links
-            ->filter(static fn (ExternalRecordLink $link): bool => $link->hasMerchantConfirmedTrust())
+            ->filter(static fn (ExternalRecordLink $link): bool => $link->hasTrustedIdentity())
             ->groupBy('product_id');
         $trustedByVariant = $links
-            ->filter(static fn (ExternalRecordLink $link): bool => $link->hasMerchantConfirmedTrust())
+            ->filter(static fn (ExternalRecordLink $link): bool => $link->hasTrustedIdentity())
             ->groupBy('product_variant_id');
 
         $trustedDiscriminators = $links
-            ->filter(static fn (ExternalRecordLink $link): bool => $link->hasMerchantConfirmedTrust())
+            ->filter(static fn (ExternalRecordLink $link): bool => $link->hasTrustedIdentity())
             ->pluck('external_record_discriminator')
             ->filter(static fn ($value): bool => is_string($value) && $value !== '')
             ->unique()

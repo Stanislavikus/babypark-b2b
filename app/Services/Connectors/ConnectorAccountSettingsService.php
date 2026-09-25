@@ -3,7 +3,6 @@
 namespace App\Services\Connectors;
 
 use App\Enums\ConnectorAccountConnectionStatus;
-use App\Enums\ExternalRecordLinkTrustOrigin;
 use App\Models\ConnectorAccount;
 use App\Models\ConnectorDefinition;
 use App\Models\ExternalRecordLink;
@@ -145,7 +144,7 @@ final class ConnectorAccountSettingsService implements ConnectorAccountPersisten
                     $lockedAccount,
                     $validatedState->baseUrl,
                     $validatedState->storeCode,
-                ) && $this->hasTrustedMerchantConfirmedLinks($workspace->id, $lockedAccount->id)
+                ) && $this->hasTrustedIdentityLinks($workspace->id, $lockedAccount->id)
                 ) {
                     throw new ConnectorAccountTargetFrozenException;
                 }
@@ -179,17 +178,18 @@ final class ConnectorAccountSettingsService implements ConnectorAccountPersisten
         return $this->toResult($account);
     }
 
-    private function hasTrustedMerchantConfirmedLinks(string $workspaceId, string $connectorAccountId): bool
+    private function hasTrustedIdentityLinks(string $workspaceId, string $connectorAccountId): bool
     {
         return ExternalRecordLink::withoutWorkspaceScope()
             ->where('workspace_id', $workspaceId)
             ->where('connector_account_id', $connectorAccountId)
-            ->where('trust_origin', ExternalRecordLinkTrustOrigin::MerchantConfirmed->value)
-            ->whereNotNull('external_record_discriminator')
-            ->where('external_record_discriminator', '!=', '')
-            ->whereNotNull('established_by_workspace_user_id')
-            ->whereNotNull('established_at')
-            ->exists();
+            ->get([
+                'trust_origin',
+                'external_record_discriminator',
+                'established_by_workspace_user_id',
+                'established_at',
+            ])
+            ->contains(static fn (ExternalRecordLink $link): bool => $link->hasTrustedIdentity());
     }
 
     private function authorizeUpdate(User $actor, ConnectorAccount $account, CredentialMutation $credentialMutation): void

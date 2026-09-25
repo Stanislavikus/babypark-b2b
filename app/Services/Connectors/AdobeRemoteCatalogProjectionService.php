@@ -2,7 +2,6 @@
 
 namespace App\Services\Connectors;
 
-use App\Enums\ExternalRecordLinkTrustOrigin;
 use App\Enums\RemoteCatalogScanStatus;
 use App\Enums\SyncDataDomain;
 use App\Models\AdobeProductAttributeSet;
@@ -15,6 +14,7 @@ use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnap
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogSummary;
 use App\Support\Workspace\WorkspaceScope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 final class AdobeRemoteCatalogProjectionService
 {
@@ -40,7 +40,7 @@ final class AdobeRemoteCatalogProjectionService
         $linkedCount = RemoteCatalogSnapshotItem::withoutWorkspaceScope()
             ->where('workspace_id', $account->workspace_id)
             ->where('snapshot_id', $snapshot->id)
-            ->whereIn('remote_identifier', $this->trustedRemoteIdentifiersQuery($account))
+            ->whereIn('remote_identifier', $this->trustedRemoteIdentifiers($account))
             ->count();
 
         return new AdobeRemoteCatalogSummary(
@@ -62,6 +62,8 @@ final class AdobeRemoteCatalogProjectionService
         if (! $snapshot instanceof RemoteCatalogSnapshot) {
             return $query->whereRaw('1 = 0');
         }
+
+        $trustedLinkIds = $this->trustedLinks($account)->pluck('id')->all();
 
         return $query
             ->select('remote_catalog_snapshot_items.*')
@@ -85,10 +87,7 @@ final class AdobeRemoteCatalogProjectionService
                     ->selectRaw('COUNT(*) > 0')
                     ->where('workspace_id', $account->workspace_id)
                     ->where('connector_account_id', $account->id)
-                    ->where('trust_origin', ExternalRecordLinkTrustOrigin::MerchantConfirmed->value)
-                    ->whereNotNull('external_record_discriminator')
-                    ->whereNotNull('established_by_workspace_user_id')
-                    ->whereNotNull('established_at')
+                    ->whereIn('id', $trustedLinkIds)
                     ->whereColumn(
                         'external_record_discriminator',
                         'remote_catalog_snapshot_items.remote_identifier',
@@ -98,10 +97,7 @@ final class AdobeRemoteCatalogProjectionService
                     ->select('product_id')
                     ->where('workspace_id', $account->workspace_id)
                     ->where('connector_account_id', $account->id)
-                    ->where('trust_origin', ExternalRecordLinkTrustOrigin::MerchantConfirmed->value)
-                    ->whereNotNull('external_record_discriminator')
-                    ->whereNotNull('established_by_workspace_user_id')
-                    ->whereNotNull('established_at')
+                    ->whereIn('id', $trustedLinkIds)
                     ->whereColumn(
                         'external_record_discriminator',
                         'remote_catalog_snapshot_items.remote_identifier',
@@ -124,8 +120,8 @@ final class AdobeRemoteCatalogProjectionService
     public function filterItemsByLinkStatus(Builder $query, ConnectorAccount $account, ?string $status): Builder
     {
         return match ($status) {
-            'linked' => $query->whereIn('remote_identifier', $this->trustedRemoteIdentifiersQuery($account)),
-            'unlinked' => $query->whereNotIn('remote_identifier', $this->trustedRemoteIdentifiersQuery($account)),
+            'linked' => $query->whereIn('remote_identifier', $this->trustedRemoteIdentifiers($account)),
+            'unlinked' => $query->whereNotIn('remote_identifier', $this->trustedRemoteIdentifiers($account)),
             default => $query,
         };
     }
@@ -139,16 +135,25 @@ final class AdobeRemoteCatalogProjectionService
         );
     }
 
-    /** @return Builder<ExternalRecordLink> */
-    private function trustedRemoteIdentifiersQuery(ConnectorAccount $account): Builder
+    /** @return list<string> */
+    private function trustedRemoteIdentifiers(ConnectorAccount $account): array
+    {
+        return $this->trustedLinks($account)
+            ->pluck('external_record_discriminator')
+            ->filter(static fn ($value): bool => is_string($value) && $value !== '')
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /** @return Collection<int, ExternalRecordLink> */
+    private function trustedLinks(ConnectorAccount $account): Collection
     {
         return ExternalRecordLink::withoutWorkspaceScope()
-            ->select('external_record_discriminator')
             ->where('workspace_id', $account->workspace_id)
             ->where('connector_account_id', $account->id)
-            ->where('trust_origin', ExternalRecordLinkTrustOrigin::MerchantConfirmed->value)
-            ->whereNotNull('external_record_discriminator')
-            ->whereNotNull('established_by_workspace_user_id')
-            ->whereNotNull('established_at');
+            ->get()
+            ->filter(static fn (ExternalRecordLink $link): bool => $link->hasTrustedIdentity())
+            ->values();
     }
 }

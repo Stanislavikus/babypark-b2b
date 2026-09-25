@@ -2,10 +2,13 @@
 
 namespace Tests\Feature\Sync;
 
+use App\Enums\ExternalRecordLinkTrustOrigin;
 use App\Enums\SyncDataDomain;
 use App\Models\AdobeProductAttributeLineage;
 use App\Models\AdobeProductAttributeOptionLineage;
 use App\Models\AdobeProductAttributeSet;
+use App\Models\ExternalRecordLink;
+use App\Models\Product;
 use App\Services\Connectors\AdobeRemoteCatalogProjectionService;
 use App\Services\Connectors\ConnectorDiscoverySourceResolver;
 use App\Services\Connectors\RemoteCatalogScanService;
@@ -16,6 +19,7 @@ use App\Support\Connectors\RemoteCatalog\RemoteCatalogItemCategoryCandidate;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\CreatesConnectorAccountFixtures;
 use Tests\TestCase;
@@ -74,6 +78,60 @@ class RemoteCatalogProjectionV2Test extends TestCase
             'label' => 'Carrello',
         ], $context->project(['manufacturer' => '991']));
 
+    }
+
+    #[Test]
+    public function platform_created_product_is_projected_as_linked(): void
+    {
+        $account = $this->createConnectorAccount();
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $account->workspace_id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'LOCAL-PLATFORM-701',
+            'name' => 'Local platform-created product',
+            'is_active' => true,
+        ]);
+
+        ExternalRecordLink::withoutWorkspaceScope()->create([
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_identifier' => 'REMOTE-PLATFORM-701',
+            'trust_origin' => ExternalRecordLinkTrustOrigin::PlatformCreated->value,
+            'external_record_discriminator' => '701',
+            'established_by_workspace_user_id' => null,
+            'established_at' => now(),
+        ]);
+
+        $scans = app(RemoteCatalogScanService::class);
+        $scan = $scans->begin(
+            $account,
+            SyncDataDomain::Products,
+            app(AdobeConnectorAccountTargetSnapshotResolver::class)->resolve($account)->toEnvelopeArray(),
+            1,
+        );
+        $scans->append($scan, [
+            new RemoteCatalogItemCandidate(
+                remoteIdentifier: '701',
+                sku: 'REMOTE-PLATFORM-701',
+                name: 'Remote platform-created product',
+                remoteType: 'simple',
+                remoteStatus: '1',
+                externalAttributeSetId: 10,
+            ),
+        ]);
+        $scans->publish($scan);
+
+        $projection = app(AdobeRemoteCatalogProjectionService::class);
+        $summary = $projection->summary($account);
+        $item = $projection->itemsQuery($account)->firstOrFail();
+
+        $this->assertSame(1, $summary->linkedCount);
+        $this->assertSame(0, $summary->remoteOnlyCount);
+        $this->assertTrue((bool) $item->is_linked);
+        $this->assertSame((int) $product->id, (int) $item->linked_product_id);
+        $this->assertSame(1, $projection->filterItemsByLinkStatus($projection->itemsQuery($account), $account, 'linked')->count());
+        $this->assertSame(0, $projection->remoteOnlyItemsQuery($account)->count());
     }
 
     #[Test]

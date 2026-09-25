@@ -4,17 +4,20 @@ namespace Tests\Feature\Sync;
 
 use App\Enums\RemoteCatalogScanStatus;
 use App\Enums\SyncDataDomain;
+use App\Models\AdobeProductCategoryCatalogueState;
 use App\Models\ConnectorAccount;
 use App\Models\ExternalRecordLink;
 use App\Models\Product;
 use App\Models\RemoteCatalogScan;
 use App\Models\RemoteCatalogSnapshotItemCategory;
+use App\Services\Connectors\AdobeProductCategoryCatalogueReconciler;
 use App\Services\Connectors\AdobeRemoteCatalogProjectionService;
 use App\Services\Connectors\RemoteCatalogScanService;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContext;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshotResolver;
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogBoundary;
-use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogCategoryDictionaryReader;
+use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogCategoryCatalogue;
+use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogCategoryCatalogueReader;
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogItem;
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogPage;
 use App\Support\Connectors\AdobePaaS\RemoteCatalog\AdobeRemoteCatalogReadClient;
@@ -153,6 +156,103 @@ class AdobeRemoteCatalogScannerTest extends TestCase
         $this->assertStringContainsString('pageSize%5D=100', $uris[2]);
     }
 
+    public function test_zero_product_target_still_reconciles_full_category_catalogue(): void
+    {
+        $account = $this->createConnectorAccount();
+        $transport = new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request, int $count): ConnectorHttpResult {
+            return match ($count) {
+                1 => $this->jsonResult([
+                    'items' => [],
+                    'total_count' => 0,
+                ]),
+                2 => $this->jsonResult([
+                    'items' => [
+                        ['id' => 1, 'parent_id' => 0, 'name' => 'Root', 'is_active' => true, 'position' => 0, 'level' => 0, 'path' => '1'],
+                        ['id' => 3, 'parent_id' => 1, 'name' => 'Store Root', 'is_active' => true, 'position' => 1, 'level' => 1, 'path' => '1/3'],
+                        ['id' => 15, 'parent_id' => 3, 'name' => 'Prepared empty category', 'is_active' => true, 'position' => 7, 'level' => 2, 'path' => '1/3/15'],
+                    ],
+                    'total_count' => 3,
+                ]),
+                default => throw new \RuntimeException('Unexpected remote catalogue request.'),
+            };
+        });
+        $this->app->instance(ConnectorHttpTransport::class, $transport);
+
+        $snapshot = app(AdobeRemoteCatalogScanner::class)->scan($account);
+
+        $this->assertSame(0, $snapshot->item_count);
+        $this->assertNotNull($snapshot->published_at);
+        $this->assertSame(2, $transport->sendCount);
+        $this->assertDatabaseHas('adobe_product_categories', [
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'external_category_id' => '15',
+            'parent_external_category_id' => '3',
+            'name' => 'Prepared empty category',
+            'level' => 2,
+            'position' => 7,
+            'is_active' => 1,
+            'missing_since' => null,
+        ]);
+        $this->assertDatabaseHas('adobe_product_category_catalogue_states', [
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'category_count' => 3,
+        ]);
+    }
+
+    public function test_failed_category_read_preserves_last_successful_category_catalogue(): void
+    {
+        $account = $this->createConnectorAccount();
+        $target = app(AdobeConnectorAccountTargetSnapshotResolver::class)->resolve($account);
+        $capturedAt = now()->subHour()->toImmutable();
+
+        app(AdobeProductCategoryCatalogueReconciler::class)->reconcile(
+            $account,
+            $target,
+            new AdobeRemoteCatalogCategoryCatalogue($capturedAt, [[
+                'external_category_id' => '15',
+                'parent_external_category_id' => '3',
+                'name' => 'Previously synced',
+                'provider_path' => '1/3/15',
+                'breadcrumb' => 'Previously synced',
+                'level' => 2,
+                'position' => 1,
+                'is_active' => true,
+            ]]),
+        );
+
+        $originalSyncedAt = AdobeProductCategoryCatalogueState::withoutWorkspaceScope()
+            ->where('workspace_id', $account->workspace_id)
+            ->where('connector_account_id', $account->id)
+            ->sole()
+            ->last_successful_synced_at;
+
+        $transport = new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request, int $count): ConnectorHttpResult {
+            return $count === 1
+                ? $this->jsonResult(['items' => [], 'total_count' => 0])
+                : new ConnectorHttpResult(500, [], '{}');
+        });
+        $this->app->instance(ConnectorHttpTransport::class, $transport);
+
+        $snapshot = app(AdobeRemoteCatalogScanner::class)->scan($account);
+
+        $this->assertSame(0, $snapshot->item_count);
+        $this->assertSame(2, $transport->sendCount);
+        $this->assertDatabaseHas('adobe_product_categories', [
+            'workspace_id' => $account->workspace_id,
+            'connector_account_id' => $account->id,
+            'external_category_id' => '15',
+            'name' => 'Previously synced',
+            'missing_since' => null,
+        ]);
+        $state = AdobeProductCategoryCatalogueState::withoutWorkspaceScope()
+            ->where('workspace_id', $account->workspace_id)
+            ->where('connector_account_id', $account->id)
+            ->sole();
+        $this->assertTrue($state->last_successful_synced_at->equalTo($originalSyncedAt));
+    }
+
     public function test_read_failure_marks_candidate_scan_failed_and_never_publishes_it(): void
     {
         $account = $this->createConnectorAccount();
@@ -265,11 +365,11 @@ class AdobeRemoteCatalogScannerTest extends TestCase
             }
         };
         $this->app->instance(AdobeRemoteCatalogReadClient::class, $client);
-        $this->app->instance(AdobeRemoteCatalogCategoryDictionaryReader::class, new class implements AdobeRemoteCatalogCategoryDictionaryReader
+        $this->app->instance(AdobeRemoteCatalogCategoryCatalogueReader::class, new class implements AdobeRemoteCatalogCategoryCatalogueReader
         {
-            public function read(AdobePaaSRequestContext $context): array
+            public function readCatalogue(AdobePaaSRequestContext $context): AdobeRemoteCatalogCategoryCatalogue
             {
-                return [];
+                return new AdobeRemoteCatalogCategoryCatalogue(now()->toImmutable(), []);
             }
         });
 

@@ -52,6 +52,16 @@ final class AdobeConfigurableDesiredStateCompiler
         $status = $this->requireInt($parentContext, 'status', 'status');
         $visibilityNumeric = $this->requireInt($parentContext, 'visibility_numeric', 'visibility_numeric');
 
+        $ordinaryCustomAttributes = $this->compileMappedCustomAttributes($parentContext['mapped_product_values'] ?? []);
+        $attributeOperations = $this->operationsOfType($semanticResult, 'configurable_attribute');
+        $optionAssignments = $this->operationsOfType($semanticResult, 'option_assignment');
+        $options = $this->compileOptions($attributeOperations, $optionAssignments, $metadata);
+        [$createCustomAttributes, $bootstrapAttributeCodes] = $this->withRequiredDimensionBootstrap(
+            $ordinaryCustomAttributes,
+            $options,
+            $metadata,
+        );
+
         $parent = new AdobeProductParentDesiredState(
             productId: $productId,
             sku: $parentSku,
@@ -60,21 +70,37 @@ final class AdobeConfigurableDesiredStateCompiler
             typeId: 'configurable',
             status: $status,
             visibility: $visibilityNumeric,
-            customAttributes: $this->compileMappedCustomAttributes($parentContext['mapped_product_values'] ?? []),
+            customAttributes: $ordinaryCustomAttributes,
         );
-
-        $attributeOperations = $this->operationsOfType($semanticResult, 'configurable_attribute');
-        $optionAssignments = $this->operationsOfType($semanticResult, 'option_assignment');
-        $options = $this->compileOptions($attributeOperations, $optionAssignments, $metadata);
+        $createParent = new AdobeProductParentDesiredState(
+            productId: $productId,
+            sku: $parentSku,
+            name: $name,
+            attributeSetId: $attributeSetId,
+            typeId: 'configurable',
+            status: 2,
+            visibility: $visibilityNumeric,
+            customAttributes: $createCustomAttributes,
+        );
 
         $childOperations = $this->operationsOfType($semanticResult, 'simple_child');
         $linkOperations = $this->operationsOfType($semanticResult, 'child_link');
 
         $activeChildVariantIds = [];
         $childLinks = [];
+        $activeChildSkus = [];
+        $seenVariantIds = [];
 
         foreach ($childOperations as $childOperation) {
             $variantId = $this->requireString($childOperation->context, 'variant_id');
+            $childSku = $this->requireString($childOperation->context, 'sku');
+
+            if ($childSku === $parentSku || isset($activeChildSkus[$childSku]) || isset($seenVariantIds[$variantId])) {
+                throw AdobeProductCommandCompilationException::unsupportedOperation('configurable_family_sku_collision');
+            }
+
+            $activeChildSkus[$childSku] = true;
+            $seenVariantIds[$variantId] = true;
             $activeChildVariantIds[] = $variantId;
         }
 
@@ -103,7 +129,43 @@ final class AdobeConfigurableDesiredStateCompiler
             options: $options,
             activeChildVariantIds: $activeChildVariantIds,
             childLinks: $childLinks,
+            createParent: $createParent,
+            bootstrapAttributeCodes: $bootstrapAttributeCodes,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $ordinary
+     * @param  list<AdobeConfigurableOptionDesiredState>  $options
+     * @return array{0:array<string, mixed>,1:list<string>}
+     */
+    private function withRequiredDimensionBootstrap(
+        array $ordinary,
+        array $options,
+        ?AdobeProductExportExecutionMetadata $metadata,
+    ): array {
+        $create = $ordinary;
+        $bootstrapCodes = [];
+
+        foreach ($options as $option) {
+            $attribute = $metadata?->attributeByCode($option->externalFieldKey);
+
+            if (! $attribute instanceof AdobeAttributeMetadata
+                || $attribute->isRequired !== true
+                || array_key_exists($option->externalFieldKey, $ordinary)
+                || $option->values === []
+            ) {
+                continue;
+            }
+
+            $create[$option->externalFieldKey] = $option->values[0]->valueIndex;
+            $bootstrapCodes[] = $option->externalFieldKey;
+        }
+
+        ksort($create);
+        sort($bootstrapCodes, SORT_STRING);
+
+        return [$create, $bootstrapCodes];
     }
 
     /**
@@ -149,6 +211,22 @@ final class AdobeConfigurableDesiredStateCompiler
                 $values,
                 static fn (AdobeConfigurableOptionValueDesiredState $left, AdobeConfigurableOptionValueDesiredState $right): int => $left->valueIndex <=> $right->valueIndex,
             );
+
+            $attribute = $metadata?->attributeByCode($externalFieldKey);
+            if ($metadata !== null) {
+                if (! $attribute instanceof AdobeAttributeMetadata
+                    || $attribute->attributeId !== $attributeId
+                    || ($attribute->applyTo !== [] && ! in_array('configurable', $attribute->applyTo, true))
+                ) {
+                    throw AdobeProductCommandCompilationException::unsupportedOperation('configurable_attribute_metadata_invalid');
+                }
+
+                foreach ($values as $value) {
+                    if (! array_key_exists((string) $value->valueIndex, $attribute->options)) {
+                        throw AdobeProductCommandCompilationException::unsupportedOperation('configurable_option_value_invalid');
+                    }
+                }
+            }
 
             $options[] = new AdobeConfigurableOptionDesiredState(
                 externalFieldKey: $externalFieldKey,

@@ -4,10 +4,15 @@ namespace App\Support\Connectors\AdobePaaS\Command;
 
 use App\Support\Connectors\AdobePaaS\AdobeProductExportExecutionMetadata;
 use App\Support\Connectors\AdobePaaS\Semantic\AdobeProductExportSemanticResult;
+use App\Support\Connectors\ConnectorAccountOperationLock;
 use App\Support\Sync\Live\SyncLiveConsequentialWriteGate;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Support\Facades\Cache;
 
 final class AdobeConfigurableProductCommandCoordinator
 {
+    private readonly AdobeProductModulelessSimpleCreateExecutor $simpleChildCreateExecutor;
+
     public function __construct(
         private readonly AdobeConfigurableDesiredStateCompiler $desiredStateCompiler,
         private readonly AdobeProductSimpleCommandExecutor $simpleChildExecutor,
@@ -17,7 +22,11 @@ final class AdobeConfigurableProductCommandCoordinator
         private readonly AdobeConfigurableInactiveLinkedVariantLifecycleExecutor $inactiveLifecycleExecutor,
         private readonly AdobeConfigurableAppliedStateAggregator $aggregator,
         private readonly AdobeProductExternalRecordLinkGuard $linkGuard,
-    ) {}
+        ?AdobeProductModulelessSimpleCreateExecutor $simpleChildCreateExecutor = null,
+    ) {
+        $this->simpleChildCreateExecutor = $simpleChildCreateExecutor
+            ?? app(AdobeProductModulelessSimpleCreateExecutor::class);
+    }
 
     public function execute(
         string $workspaceId,
@@ -77,6 +86,18 @@ final class AdobeConfigurableProductCommandCoordinator
         );
 
         if ($consequentialWriteGate !== null
+            && (! $consequentialWriteGate->permitsConsequentialWrite()
+                || ! $consequentialWriteGate->permitsProductExecution())
+        ) {
+            return $this->singleEvidenceResult(new AdobeConfigurableCommandEvidence(
+                commandKind: 'configurable_family',
+                appliedStateKnowledge: AdobeProductAppliedStateKnowledge::KnownNotApplied,
+                reasonCode: 'consequential_write_gate_closed',
+                subjectSku: $desiredState->parentSku,
+            ));
+        }
+
+        if ($consequentialWriteGate !== null
             && $consequentialWriteGate->permitsConsequentialWrite()
             && $consequentialWriteGate->permitsProductExecution()
         ) {
@@ -90,12 +111,8 @@ final class AdobeConfigurableProductCommandCoordinator
             }
         }
 
-        /** @var list<AdobeConfigurableCommandEvidence> $evidence */
-        $evidence = [];
-
-        $stopWrites = false;
-
         foreach ($desiredState->activeChildVariantIds as $variantId) {
+            $lookup = $this->linkGuard->resolveTrustedVariantLinkBySubject($workspaceId, $connectorAccountId, $variantId);
             $simpleInput = new AdobeProductSimpleCommandInput(
                 workspaceId: $workspaceId,
                 connectorAccountId: $connectorAccountId,
@@ -103,94 +120,269 @@ final class AdobeConfigurableProductCommandCoordinator
                 adobeBaseCurrency: $adobeBaseCurrency,
                 consequentialWriteGate: $consequentialWriteGate,
             );
+            $childPreflight = $lookup->isTrusted()
+                ? $this->simpleChildExecutor->preflightSimpleChild($simpleInput, $variantId)
+                : $this->simpleChildCreateExecutor->preflightSimpleChild($simpleInput, $variantId);
+            if ($childPreflight !== null) {
+                $mapped = $this->mapSimpleChildEvidence($childPreflight, $variantId);
 
-            $childResult = $this->simpleChildExecutor->executeSimpleChild($simpleInput, $variantId);
+                return new AdobeConfigurableProductExecutionResult(
+                    outcome: $this->aggregator->aggregate([$mapped]),
+                    commandEvidence: [$mapped],
+                );
+            }
+        }
+
+        try {
+            return Cache::lock(
+                ConnectorAccountOperationLock::cacheKey($connectorAccountId),
+                $this->operationLockSeconds(),
+            )->block(5, fn (): AdobeConfigurableProductExecutionResult => $this->executeLocked($input));
+        } catch (LockTimeoutException) {
+            $lockEvidence = new AdobeConfigurableCommandEvidence(
+                commandKind: 'configurable_family',
+                appliedStateKnowledge: AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous,
+                reasonCode: 'configurable_family_account_lock_timeout',
+                subjectSku: $desiredState->parentSku,
+            );
+
+            return new AdobeConfigurableProductExecutionResult(
+                outcome: $this->aggregator->aggregate([$lockEvidence]),
+                commandEvidence: [$lockEvidence],
+            );
+        }
+    }
+
+    private function executeLocked(AdobeConfigurableCommandInput $input): AdobeConfigurableProductExecutionResult
+    {
+        $desiredState = $input->desiredState;
+        $parentLookup = $this->linkGuard->resolveTrustedParentLinkBySubject(
+            $input->workspaceId,
+            $input->connectorAccountId,
+            $desiredState->productId,
+        );
+        $platformCreatedFamily = ! $parentLookup->isTrusted()
+            || $parentLookup->link?->hasPlatformCreatedTrust() === true;
+        $createResumeMode = ! $parentLookup->isTrusted()
+            || ($parentLookup->link?->hasPlatformCreatedTrust() === true
+                && ! $this->platformCreatedFamilyReadyForOrdinaryExecution($input));
+        $coreInput = $createResumeMode ? $this->disabledCoreInput($input) : $input;
+
+        if ($input->consequentialWriteGate === null
+            || ! $input->consequentialWriteGate->permitsConsequentialWrite()
+            || ! $input->consequentialWriteGate->permitsProductExecution()
+        ) {
+            return $this->singleEvidenceResult(new AdobeConfigurableCommandEvidence(
+                commandKind: 'configurable_family',
+                appliedStateKnowledge: AdobeProductAppliedStateKnowledge::KnownNotApplied,
+                reasonCode: 'consequential_write_gate_closed',
+                subjectSku: $desiredState->parentSku,
+            ));
+        }
+
+        $parentRecheck = $this->parentExecutor->preflight($coreInput);
+        if ($parentRecheck !== null) {
+            return $this->singleEvidenceResult($parentRecheck);
+        }
+
+        foreach ($desiredState->activeChildVariantIds as $variantId) {
+            $lookup = $this->linkGuard->resolveTrustedVariantLinkBySubject(
+                $input->workspaceId,
+                $input->connectorAccountId,
+                $variantId,
+            );
+            $preflight = $lookup->isTrusted()
+                ? $this->simpleChildExecutor->preflightSimpleChild($this->simpleInput($input), $variantId)
+                : $this->simpleChildCreateExecutor->preflightSimpleChild($this->simpleInput($input), $variantId);
+            if ($preflight !== null) {
+                return $this->singleEvidenceResult($this->mapSimpleChildEvidence($preflight, $variantId));
+            }
+        }
+
+        $evidence = [];
+        foreach ($desiredState->activeChildVariantIds as $variantId) {
+            $trusted = $this->linkGuard->resolveTrustedVariantLinkBySubject(
+                $input->workspaceId,
+                $input->connectorAccountId,
+                $variantId,
+            );
+            $childResult = $trusted->isTrusted()
+                ? $this->simpleChildExecutor->executeSimpleChild($this->simpleInput($input), $variantId)
+                : $this->simpleChildCreateExecutor->executeSimpleChild($this->simpleInput($input), $variantId);
             $childEvidence = $this->mapSimpleChildEvidence($childResult, $variantId);
             $evidence[] = $childEvidence;
 
             if ($childEvidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
-                $stopWrites = true;
-
-                break;
+                return $this->evidenceResult($evidence);
             }
         }
 
-        if ($stopWrites) {
-            return new AdobeConfigurableProductExecutionResult(
-                outcome: $this->aggregator->aggregate($evidence),
-                commandEvidence: $evidence,
-            );
-        }
-
-        if (! $this->allChildrenKnownApplied($evidence, $desiredState->activeChildVariantIds)) {
-            return new AdobeConfigurableProductExecutionResult(
-                outcome: $this->aggregator->aggregate($evidence),
-                commandEvidence: $evidence,
-            );
-        }
-
-        $parentEvidence = $this->parentExecutor->execute($input);
+        $parentEvidence = $this->parentExecutor->execute($coreInput);
         $evidence[] = $parentEvidence;
-
-        if ($parentEvidence->appliedStateKnowledge === AdobeProductAppliedStateKnowledge::UnknownOrAmbiguous) {
-            return new AdobeConfigurableProductExecutionResult(
-                outcome: $this->aggregator->aggregate($evidence),
-                commandEvidence: $evidence,
-            );
-        }
-
         if ($parentEvidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
-            return new AdobeConfigurableProductExecutionResult(
-                outcome: $this->aggregator->aggregate($evidence),
-                commandEvidence: $evidence,
-            );
+            return $this->evidenceResult($evidence);
         }
 
-        foreach ($desiredState->options as $desiredOption) {
-            $optionPreflightEvidence = $this->optionExecutor->preflightExistingUpdateOnly($input, $desiredOption);
+        if (! $platformCreatedFamily) {
+            foreach ($desiredState->options as $option) {
+                $blocked = $this->optionExecutor->preflightExistingUpdateOnly($input, $option);
+                if ($blocked !== null) {
+                    $evidence[] = $blocked;
 
-            if ($optionPreflightEvidence !== null) {
-                $evidence[] = $optionPreflightEvidence;
-
-                return new AdobeConfigurableProductExecutionResult(
-                    outcome: $this->aggregator->aggregate($evidence),
-                    commandEvidence: $evidence,
-                );
+                    return $this->evidenceResult($evidence);
+                }
+            }
+        } else {
+            foreach ($desiredState->options as $option) {
+                $optionEvidence = $this->optionExecutor->executePreLink($coreInput, $option);
+                $evidence[] = $optionEvidence;
+                if ($optionEvidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
+                    return $this->evidenceResult($evidence);
+                }
             }
         }
 
-        foreach ($desiredState->childLinks as $desiredLink) {
-            $linkEvidence = $this->childLinkExecutor->executeTrustedRelinkOnly($input, $desiredLink);
+        foreach ($desiredState->childLinks as $link) {
+            $linkEvidence = $this->childLinkExecutor->executeTrustedRelinkOnly($coreInput, $link);
             $evidence[] = $linkEvidence;
-
             if ($linkEvidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
-                return new AdobeConfigurableProductExecutionResult(
-                    outcome: $this->aggregator->aggregate($evidence),
-                    commandEvidence: $evidence,
-                );
+                return $this->evidenceResult($evidence);
             }
         }
 
-        foreach ($desiredState->options as $desiredOption) {
-            $optionEvidence = $this->optionExecutor->executeExistingUpdateOnly($input, $desiredOption);
+        foreach ($desiredState->options as $option) {
+            $optionEvidence = $platformCreatedFamily
+                ? $this->optionExecutor->execute($coreInput, $option)
+                : $this->optionExecutor->executeExistingUpdateOnly($input, $option);
             $evidence[] = $optionEvidence;
-
             if ($optionEvidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
-                return new AdobeConfigurableProductExecutionResult(
-                    outcome: $this->aggregator->aggregate($evidence),
-                    commandEvidence: $evidence,
-                );
+                return $this->evidenceResult($evidence);
             }
         }
 
-        if ($this->allChildLinksKnownApplied($evidence, $desiredState->childLinks)) {
-            $lifecycleEvidence = $this->inactiveLifecycleExecutor->execute($input);
-            $evidence = array_merge($evidence, $lifecycleEvidence);
+        if ($platformCreatedFamily) {
+            $bootstrapEvidence = $this->parentExecutor->verifyBootstrapNormalized($input);
+            $evidence[] = $bootstrapEvidence;
+            if ($bootstrapEvidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
+                return $this->evidenceResult($evidence);
+            }
         }
 
+        $lifecycle = $this->inactiveLifecycleExecutor->execute($coreInput);
+        $evidence = array_merge($evidence, $lifecycle);
+        foreach ($lifecycle as $entry) {
+            if ($entry->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
+                return $this->evidenceResult($evidence);
+            }
+        }
+
+        if ($createResumeMode) {
+            $finalParent = $this->parentExecutor->execute($input);
+            $evidence[] = $finalParent;
+        }
+
+        return $this->evidenceResult($evidence);
+    }
+
+    private function platformCreatedFamilyReadyForOrdinaryExecution(AdobeConfigurableCommandInput $input): bool
+    {
+        foreach ($input->desiredState->options as $option) {
+            if ($this->optionExecutor->executeNoOpOnly($input, $option)->appliedStateKnowledge
+                !== AdobeProductAppliedStateKnowledge::KnownApplied
+            ) {
+                return false;
+            }
+        }
+
+        foreach ($input->desiredState->childLinks as $link) {
+            if ($this->childLinkExecutor->executeNoOpOnly($input, $link)->appliedStateKnowledge
+                !== AdobeProductAppliedStateKnowledge::KnownApplied
+            ) {
+                return false;
+            }
+        }
+
+        if ($this->parentExecutor->verifyBootstrapNormalized($input)->appliedStateKnowledge
+            !== AdobeProductAppliedStateKnowledge::KnownApplied
+        ) {
+            return false;
+        }
+
+        foreach ($this->inactiveLifecycleExecutor->executeNoOpOnly($input) as $evidence) {
+            if ($evidence->appliedStateKnowledge !== AdobeProductAppliedStateKnowledge::KnownApplied) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function disabledCoreInput(AdobeConfigurableCommandInput $input): AdobeConfigurableCommandInput
+    {
+        $parent = $input->desiredState->parent;
+        $disabledParent = new AdobeProductParentDesiredState(
+            productId: $parent->productId,
+            sku: $parent->sku,
+            name: $parent->name,
+            attributeSetId: $parent->attributeSetId,
+            typeId: $parent->typeId,
+            status: 2,
+            visibility: $parent->visibility,
+            customAttributes: $parent->customAttributes,
+        );
+        $state = new AdobeConfigurableDesiredState(
+            productId: $input->desiredState->productId,
+            parentSku: $input->desiredState->parentSku,
+            parent: $disabledParent,
+            options: $input->desiredState->options,
+            activeChildVariantIds: $input->desiredState->activeChildVariantIds,
+            childLinks: $input->desiredState->childLinks,
+            createParent: $input->desiredState->createParent,
+            bootstrapAttributeCodes: $input->desiredState->bootstrapAttributeCodes,
+        );
+
+        return new AdobeConfigurableCommandInput(
+            workspaceId: $input->workspaceId,
+            connectorAccountId: $input->connectorAccountId,
+            semanticResult: $input->semanticResult,
+            desiredState: $state,
+            adobeBaseCurrency: $input->adobeBaseCurrency,
+            metadata: $input->metadata,
+            consequentialWriteGate: $input->consequentialWriteGate,
+        );
+    }
+
+    private function simpleInput(AdobeConfigurableCommandInput $input): AdobeProductSimpleCommandInput
+    {
+        return new AdobeProductSimpleCommandInput(
+            workspaceId: $input->workspaceId,
+            connectorAccountId: $input->connectorAccountId,
+            semanticResult: $input->semanticResult,
+            adobeBaseCurrency: $input->adobeBaseCurrency,
+            consequentialWriteGate: $input->consequentialWriteGate,
+        );
+    }
+
+    /** @param list<AdobeConfigurableCommandEvidence> $evidence */
+    private function evidenceResult(array $evidence): AdobeConfigurableProductExecutionResult
+    {
         return new AdobeConfigurableProductExecutionResult(
             outcome: $this->aggregator->aggregate($evidence),
             commandEvidence: $evidence,
+        );
+    }
+
+    private function singleEvidenceResult(AdobeConfigurableCommandEvidence $evidence): AdobeConfigurableProductExecutionResult
+    {
+        return $this->evidenceResult([$evidence]);
+    }
+
+    private function operationLockSeconds(): int
+    {
+        return max(
+            180,
+            (int) config('sync_runtime.live_job_timeout_seconds')
+                + (int) config('sync_runtime.max_inflight_external_request_seconds'),
         );
     }
 

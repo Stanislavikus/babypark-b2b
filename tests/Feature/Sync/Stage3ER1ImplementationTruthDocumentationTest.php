@@ -62,7 +62,7 @@ class Stage3ER1ImplementationTruthDocumentationTest extends TestCase
         $this->assertStringContainsString('integrations/magento-safe-sync/', $content);
         $this->assertStringContainsString('AdobeSafeSyncClient.php', $content);
         $this->assertStringContainsString(
-            'Adobe Products/Export/Live support truth | SUPPORTED (public) — [Resolved 2026-09-19]',
+            'Adobe Products/Export/Live support truth | SUPPORTED (public) — [Resolved 2026-09-19; Simple CREATE extended 2026-09-24; Configurable CREATE/resume extended 2026-09-25]',
             $content,
         );
         $this->assertStringContainsString(
