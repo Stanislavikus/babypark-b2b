@@ -296,5 +296,326 @@
     "Remote configurable child unlink/removal remains unexposed.",
     "Adobe Products / Import / Live remains unsupported.",
     "Product POST ambiguity never mints trust and is not blindly retried."
-  ]
+  ],
+  "partial_resume_certification": {
+    "runtime_head": "de08fcd97af1a920d21b2c54cc3c3a09413be5d0",
+    "fixture": {
+      "parent_sku": "cfg-a7e613a00c378012d6e03effa0194a7d07e02386fdeec1f105d1c9814a33",
+      "parent_entity_id": 51,
+      "child_skus": [
+        "B2B-CFG-CERT-20260925-064321-BLUE",
+        "B2B-CFG-CERT-20260925-064321-BLACK"
+      ]
+    },
+    "durable_checkpoint_before_resume": {
+      "child_create_reasons": [
+        "adobe_create_post_reconciled",
+        "adobe_create_post_reconciled"
+      ],
+      "parent_create_reason": "configurable_parent_create_post_reconciled",
+      "parent_status": 2,
+      "options": [],
+      "children": [],
+      "product_posts": 3
+    },
+    "resume_execution": {
+      "outcome": "synchronized",
+      "evidence": [
+        {
+          "kind": "simple_child",
+          "reason": "stock_state_already_matches",
+          "writes": 0,
+          "reconciliation_gets": 0
+        },
+        {
+          "kind": "simple_child",
+          "reason": "stock_state_already_matches",
+          "writes": 0,
+          "reconciliation_gets": 0
+        },
+        {
+          "kind": "configurable_parent",
+          "reason": "configurable_parent_state_already_matches",
+          "writes": 0,
+          "reconciliation_gets": 0
+        },
+        {
+          "kind": "configurable_option",
+          "reason": "configurable_option_post_reconciled_pre_link",
+          "writes": 1,
+          "reconciliation_gets": 1
+        },
+        {
+          "kind": "child_link",
+          "reason": "configurable_child_link_reconciled",
+          "writes": 1,
+          "reconciliation_gets": 1
+        },
+        {
+          "kind": "child_link",
+          "reason": "configurable_child_link_reconciled",
+          "writes": 1,
+          "reconciliation_gets": 1
+        },
+        {
+          "kind": "configurable_option",
+          "reason": "configurable_option_put_reconciled",
+          "writes": 1,
+          "reconciliation_gets": 1
+        },
+        {
+          "kind": "configurable_parent",
+          "reason": "configurable_parent_bootstrap_normalized",
+          "writes": 0,
+          "reconciliation_gets": 0
+        },
+        {
+          "kind": "configurable_parent",
+          "reason": "stock_write_verified",
+          "writes": 1,
+          "reconciliation_gets": 1
+        }
+      ],
+      "product_posts": 0,
+      "consequential_requests": [
+        {
+          "method": "POST",
+          "path": "/rest/default/V1/configurable-products/cfg-a7e613a00c378012d6e03effa0194a7d07e02386fdeec1f105d1c9814a33/options",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/rest/default/V1/configurable-products/cfg-a7e613a00c378012d6e03effa0194a7d07e02386fdeec1f105d1c9814a33/child",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/rest/default/V1/configurable-products/cfg-a7e613a00c378012d6e03effa0194a7d07e02386fdeec1f105d1c9814a33/child",
+          "status": 200
+        },
+        {
+          "method": "PUT",
+          "path": "/rest/default/V1/configurable-products/cfg-a7e613a00c378012d6e03effa0194a7d07e02386fdeec1f105d1c9814a33/options/29",
+          "status": 200
+        },
+        {
+          "method": "PUT",
+          "path": "/rest/default/V1/products/cfg-a7e613a00c378012d6e03effa0194a7d07e02386fdeec1f105d1c9814a33",
+          "status": 200
+        }
+      ]
+    },
+    "post_resume_read": {
+      "parent_classification": "found",
+      "parent_entity_id": 51,
+      "parent_status": 1,
+      "options": [
+        {
+          "option_id": 29,
+          "attribute_id": 138,
+          "label": "Коляски - Колір",
+          "position": 0,
+          "values": [
+            63,
+            79
+          ]
+        }
+      ],
+      "children": [
+        "B2B-CFG-CERT-20260925-064321-BLACK",
+        "B2B-CFG-CERT-20260925-064321-BLUE"
+      ]
+    },
+    "second_execution": {
+      "outcome": "synchronized",
+      "consequential_requests": [],
+      "all_command_writes_zero": true
+    },
+    "cleanup": {
+      "delete_statuses": {
+        "cfg-a7e613a00c378012d6e03effa0194a7d07e02386fdeec1f105d1c9814a33": 200,
+        "B2B-CFG-CERT-20260925-064321-BLUE": 200,
+        "B2B-CFG-CERT-20260925-064321-BLACK": 200
+      },
+      "post_delete_classifications": {
+        "cfg-a7e613a00c378012d6e03effa0194a7d07e02386fdeec1f105d1c9814a33": "trusted_known_missing",
+        "B2B-CFG-CERT-20260925-064321-BLUE": "trusted_known_missing",
+        "B2B-CFG-CERT-20260925-064321-BLACK": "trusted_known_missing"
+      },
+      "exact": true
+    }
+  },
+  "mixed_origin_child_certification": {
+    "runtime_head": "de08fcd97af1a920d21b2c54cc3c3a09413be5d0",
+    "fixture": {
+      "parent_sku": "cfg-ab39e512a8a3cdaf65849ad552b74b4fa4c06df939b230270fa88c08aa05",
+      "parent_entity_id": 54,
+      "child_skus": [
+        "B2B-CFG-CERT-20260925-064455-BLUE",
+        "B2B-CFG-CERT-20260925-064455-BLACK"
+      ]
+    },
+    "preexisting_trusted_child": {
+      "sku": "B2B-CFG-CERT-20260925-064455-BLUE",
+      "create_reason": "adobe_create_post_reconciled",
+      "converted_trust_origin": "merchant_confirmed",
+      "merchant_confirmed_trust_valid": true
+    },
+    "family_execution": {
+      "outcome": "synchronized",
+      "evidence": [
+        {
+          "kind": "simple_child",
+          "reason": "stock_state_already_matches",
+          "writes": 0,
+          "reconciliation_gets": 0
+        },
+        {
+          "kind": "simple_child",
+          "reason": "adobe_create_post_reconciled",
+          "writes": 1,
+          "reconciliation_gets": 1
+        },
+        {
+          "kind": "configurable_parent",
+          "reason": "configurable_parent_create_post_reconciled",
+          "writes": 1,
+          "reconciliation_gets": 1
+        },
+        {
+          "kind": "configurable_option",
+          "reason": "configurable_option_post_reconciled_pre_link",
+          "writes": 1,
+          "reconciliation_gets": 1
+        },
+        {
+          "kind": "child_link",
+          "reason": "configurable_child_link_reconciled",
+          "writes": 1,
+          "reconciliation_gets": 1
+        },
+        {
+          "kind": "child_link",
+          "reason": "configurable_child_link_reconciled",
+          "writes": 1,
+          "reconciliation_gets": 1
+        },
+        {
+          "kind": "configurable_option",
+          "reason": "configurable_option_put_reconciled",
+          "writes": 1,
+          "reconciliation_gets": 1
+        },
+        {
+          "kind": "configurable_parent",
+          "reason": "configurable_parent_bootstrap_normalized",
+          "writes": 0,
+          "reconciliation_gets": 0
+        },
+        {
+          "kind": "configurable_parent",
+          "reason": "stock_write_verified",
+          "writes": 1,
+          "reconciliation_gets": 1
+        }
+      ],
+      "product_posts": 2,
+      "consequential_requests": [
+        {
+          "method": "POST",
+          "path": "/rest/default/V1/products",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/rest/default/V1/products",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/rest/default/V1/configurable-products/cfg-ab39e512a8a3cdaf65849ad552b74b4fa4c06df939b230270fa88c08aa05/options",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/rest/default/V1/configurable-products/cfg-ab39e512a8a3cdaf65849ad552b74b4fa4c06df939b230270fa88c08aa05/child",
+          "status": 200
+        },
+        {
+          "method": "POST",
+          "path": "/rest/default/V1/configurable-products/cfg-ab39e512a8a3cdaf65849ad552b74b4fa4c06df939b230270fa88c08aa05/child",
+          "status": 200
+        },
+        {
+          "method": "PUT",
+          "path": "/rest/default/V1/configurable-products/cfg-ab39e512a8a3cdaf65849ad552b74b4fa4c06df939b230270fa88c08aa05/options/31",
+          "status": 200
+        },
+        {
+          "method": "PUT",
+          "path": "/rest/default/V1/products/cfg-ab39e512a8a3cdaf65849ad552b74b4fa4c06df939b230270fa88c08aa05",
+          "status": 200
+        }
+      ],
+      "trusted_links_after": [
+        {
+          "subject": "variant",
+          "external_identifier": "B2B-CFG-CERT-20260925-064455-BLUE",
+          "discriminator": "52",
+          "trust_origin": "merchant_confirmed"
+        },
+        {
+          "subject": "variant",
+          "external_identifier": "B2B-CFG-CERT-20260925-064455-BLACK",
+          "discriminator": "53",
+          "trust_origin": "platform_created"
+        },
+        {
+          "subject": "product",
+          "external_identifier": "cfg-ab39e512a8a3cdaf65849ad552b74b4fa4c06df939b230270fa88c08aa05",
+          "discriminator": "54",
+          "trust_origin": "platform_created"
+        }
+      ]
+    },
+    "post_family_read": {
+      "parent_classification": "found",
+      "parent_entity_id": 54,
+      "parent_status": 1,
+      "options": [
+        {
+          "option_id": 31,
+          "attribute_id": 138,
+          "label": "Коляски - Колір",
+          "position": 0,
+          "values": [
+            63,
+            79
+          ]
+        }
+      ],
+      "children": [
+        "B2B-CFG-CERT-20260925-064455-BLACK",
+        "B2B-CFG-CERT-20260925-064455-BLUE"
+      ]
+    },
+    "second_execution": {
+      "outcome": "synchronized",
+      "consequential_requests": [],
+      "all_command_writes_zero": true
+    },
+    "cleanup": {
+      "delete_statuses": {
+        "cfg-ab39e512a8a3cdaf65849ad552b74b4fa4c06df939b230270fa88c08aa05": 200,
+        "B2B-CFG-CERT-20260925-064455-BLUE": 200,
+        "B2B-CFG-CERT-20260925-064455-BLACK": 200
+      },
+      "post_delete_classifications": {
+        "cfg-ab39e512a8a3cdaf65849ad552b74b4fa4c06df939b230270fa88c08aa05": "trusted_known_missing",
+        "B2B-CFG-CERT-20260925-064455-BLUE": "trusted_known_missing",
+        "B2B-CFG-CERT-20260925-064455-BLACK": "trusted_known_missing"
+      },
+      "exact": true
+    }
+  }
 }

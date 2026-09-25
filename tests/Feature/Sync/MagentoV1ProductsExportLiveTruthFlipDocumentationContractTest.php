@@ -66,6 +66,20 @@ final class MagentoV1ProductsExportLiveTruthFlipDocumentationContractTest extend
         $this->assertTrue($configurableCreateEvidence['post_core_certification']['media']['restored_exactly']);
         $this->assertTrue($configurableCreateEvidence['post_core_certification']['category']['restored_exactly']);
         $this->assertTrue($configurableCreateEvidence['post_core_certification']['cleanup']['exact']);
+        $this->assertSame(2, $configurableCreateEvidence['partial_resume_certification']['durable_checkpoint_before_resume']['parent_status']);
+        $this->assertSame([], $configurableCreateEvidence['partial_resume_certification']['durable_checkpoint_before_resume']['options']);
+        $this->assertSame([], $configurableCreateEvidence['partial_resume_certification']['durable_checkpoint_before_resume']['children']);
+        $this->assertSame(0, $configurableCreateEvidence['partial_resume_certification']['resume_execution']['product_posts']);
+        $this->assertTrue($configurableCreateEvidence['partial_resume_certification']['second_execution']['all_command_writes_zero']);
+        $this->assertTrue($configurableCreateEvidence['partial_resume_certification']['cleanup']['exact']);
+        $this->assertSame('merchant_confirmed', $configurableCreateEvidence['mixed_origin_child_certification']['preexisting_trusted_child']['converted_trust_origin']);
+        $this->assertTrue($configurableCreateEvidence['mixed_origin_child_certification']['preexisting_trusted_child']['merchant_confirmed_trust_valid']);
+        $this->assertSame(
+            ['merchant_confirmed', 'platform_created', 'platform_created'],
+            array_column($configurableCreateEvidence['mixed_origin_child_certification']['family_execution']['trusted_links_after'], 'trust_origin'),
+        );
+        $this->assertTrue($configurableCreateEvidence['mixed_origin_child_certification']['second_execution']['all_command_writes_zero']);
+        $this->assertTrue($configurableCreateEvidence['mixed_origin_child_certification']['cleanup']['exact']);
     }
 
     #[Test]
