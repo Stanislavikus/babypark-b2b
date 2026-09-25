@@ -47,6 +47,42 @@ final class AdobeProductStockSimpleWriteExecutor
         );
     }
 
+    public function preflightConfigurableChild(
+        string $workspaceId,
+        string $connectorAccountId,
+        int $trustedEntityId,
+        AdobeProductDesiredState $desiredState,
+    ): ?AdobeProductSimpleCommandResult {
+        $context = $this->contextFactory->create($workspaceId, $connectorAccountId);
+        $read = $this->remoteStateClient->getProductWithContext($context, $desiredState->sku);
+
+        if ($read->classification === AdobeProductRemoteGetClassification::TrustedKnownMissing) {
+            return $this->knownNotApplied('linked_remote_product_missing', $desiredState->sku, $read->classification);
+        }
+
+        if ($read->classification !== AdobeProductRemoteGetClassification::Found || $read->observedState === null) {
+            return $this->unknownOrAmbiguous('stock_pre_read_untrusted_or_failed', $desiredState->sku, $read->classification);
+        }
+
+        if ($read->observedState->entityId !== $trustedEntityId) {
+            return $this->knownNotApplied('identity_mismatch', $desiredState->sku, $read->classification);
+        }
+
+        if ($read->observedState->typeId !== 'simple') {
+            return $this->knownNotApplied('remote_product_type_mismatch', $desiredState->sku, $read->classification);
+        }
+
+        if ($read->mediaRoleLabelMaterializationSafe !== true) {
+            return $this->knownNotApplied(
+                'configurable_child_media_role_label_side_effect_not_safe',
+                $desiredState->sku,
+                $read->classification,
+            );
+        }
+
+        return null;
+    }
+
     private function executeWithPolicy(
         string $workspaceId,
         string $connectorAccountId,

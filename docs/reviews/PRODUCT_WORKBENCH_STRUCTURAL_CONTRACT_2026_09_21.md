@@ -313,6 +313,50 @@ accepts it.
 An authorized user must be able to correct Category and Attribute Set manually and reset an
 override back to automatic/default behavior.
 
+### B13. Provider classification catalogues — [Resolved addendum 2026-09-24]
+
+Merchant classification and future AI recommendations must consume **complete provider catalogues**,
+not only provider structures already referenced by existing Products.
+
+For Magento Categories:
+
+- read and persist the complete account/target Category catalogue even when Magento currently has
+  zero Products;
+- stable provider identity is `workspace + connector_account + external_category_id`;
+- `parent`, `path`, `name`, `position`, `is_active` are mutable provider metadata and MUST NOT be
+  part of identity;
+- a Category missing from a later complete successful enumeration is retained with `missing_since`
+  (`Видалена в Magento` in merchant UI), never silently hard-deleted;
+- failed/incomplete Category enumeration MUST NOT mark previously successful catalogue rows missing
+  and MUST NOT advance catalogue freshness;
+- Category catalogue freshness is tracked independently from Product Remote Catalogue freshness;
+- catalogue state records the connector target context; after a target change, rows from the previous
+  target are not eligible for merchant selection until a new successful catalogue sync completes;
+- active Categories remain selectable even when no Product currently references them;
+- an active Category with zero current Magento Products is valid, but manual selection must show a
+  clear `0 товарів` warning and require merchant confirmation;
+- inactive Categories are not valid new manual targets;
+- an active Category below an inactive ancestor remains selectable for first scope but must surface
+  a warning that a parent Category is inactive;
+- root/store-root structural nodes are not Product classification targets;
+- future AI Category proposals use this same governed catalogue and remain proposals until normal
+  merchant/policy acceptance.
+
+For Magento Attribute Structure:
+
+- the existing persisted `AdobeProductAttributeSet`, `AdobeProductAttributeGroup`, attribute lineage,
+  set-membership and option lineage catalogues remain the authoritative provider read-model;
+- Attribute Sets / Groups / Attributes are discovered independently of Product usage and therefore
+  may be used for Products that do not yet exist in Magento;
+- catalogue rows remain scoped to Workspace + ConnectorAccount; equal provider IDs across accounts
+  never imply shared identity;
+- provider disappearance remains soft (`missing_since`) rather than hard deletion;
+- Attribute Structure freshness is presented independently from Category/Product catalogue freshness;
+- the Product classification target is the **Attribute Set**, not an Attribute Group;
+- standard Magento REST does not expose authoritative existing Attribute→Group placement in the
+  frozen read contract; do not infer that placement from labels/order and do not block first-scope
+  Product classification on that provider limitation.
+
 ---
 
 ## Explicit implementation boundaries after freeze

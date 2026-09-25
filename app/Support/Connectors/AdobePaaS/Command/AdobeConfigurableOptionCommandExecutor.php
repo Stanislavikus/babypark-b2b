@@ -9,11 +9,16 @@ use App\Support\Connectors\Transport\ConnectorTransportException;
 
 final class AdobeConfigurableOptionCommandExecutor
 {
+    private readonly AdobeProductExternalRecordLinkGuard $linkGuard;
+
     public function __construct(
         private readonly AdobePaaSRequestContextFactory $contextFactory,
         private readonly AdobeProductRemoteStateClient $remoteStateClient,
         private readonly AdobeConfigurableRemoteOptionStateReader $optionStateReader,
-    ) {}
+        ?AdobeProductExternalRecordLinkGuard $linkGuard = null,
+    ) {
+        $this->linkGuard = $linkGuard ?? app(AdobeProductExternalRecordLinkGuard::class);
+    }
 
     public function execute(
         AdobeConfigurableCommandInput $input,
@@ -54,6 +59,19 @@ final class AdobeConfigurableOptionCommandExecutor
         }
 
         if ($existing === null) {
+            $parent = $this->linkGuard->resolveTrustedParentLinkBySubject(
+                $input->workspaceId,
+                $input->connectorAccountId,
+                $input->desiredState->productId,
+            );
+            if (! $parent->isTrusted() || $parent->link?->hasPlatformCreatedTrust() !== true) {
+                return $this->knownNotApplied(
+                    'configurable_option_create_not_certified',
+                    $parentSku,
+                    $desiredOption,
+                );
+            }
+
             if (! $this->permitsConsequentialWrite($input)) {
                 return $this->knownNotApplied('writer_lease_expired_before_consequential_write', $parentSku, $desiredOption);
             }

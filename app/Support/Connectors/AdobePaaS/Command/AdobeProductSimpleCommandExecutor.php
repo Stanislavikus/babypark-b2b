@@ -57,6 +57,38 @@ final class AdobeProductSimpleCommandExecutor
         );
     }
 
+    public function preflightSimpleChild(
+        AdobeProductSimpleCommandInput $input,
+        string $variantId,
+    ): ?AdobeProductSimpleCommandResult {
+        try {
+            $desired = $this->compiler->compileSimpleChildFromSemanticResult($input->semanticResult, $variantId);
+        } catch (AdobeProductCommandCompilationException) {
+            return $this->knownNotApplied('semantic_compilation_failed');
+        }
+
+        $lookup = $this->linkGuard->resolveTrustedVariantLinkBySubject(
+            $input->workspaceId,
+            $input->connectorAccountId,
+            $variantId,
+        );
+        if (! $lookup->isTrusted() || $lookup->link === null) {
+            return $this->knownNotApplied('link_required', $desired->sku);
+        }
+
+        $entityId = $this->parseLogicalEntityId((string) $lookup->link->external_record_discriminator);
+        if ($lookup->link->external_identifier !== $desired->sku || $entityId === null) {
+            return $this->knownNotApplied('trusted_child_identity_invalid', $desired->sku);
+        }
+
+        return $this->stockWriteExecutor->preflightConfigurableChild(
+            $input->workspaceId,
+            $input->connectorAccountId,
+            $entityId,
+            $desired,
+        );
+    }
+
     private function executeDesiredState(
         AdobeProductSimpleCommandInput $input,
         AdobeProductDesiredState $desiredState,

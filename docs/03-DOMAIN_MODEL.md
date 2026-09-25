@@ -6926,14 +6926,14 @@ allowing `Product A → external X` and `Product A → external Y`. Do **not** m
 **Follow-on provenance fields (Stage 3E-R2a — implemented):**
 `external_record_links` now persists connector-neutral ENTITY TRUST provenance:
 
-- `trust_origin` — first recognized value: `merchant_confirmed`
+- `trust_origin` — recognized Adobe values: `merchant_confirmed` and `platform_created`
 - `external_record_discriminator` — for Adobe: Magento logical Product `entity_id`
-- `established_by_workspace_user_id` — attributable confirmation actor (`WorkspaceUser`)
-- `established_at` — fresh confirmation timestamp
+- `established_by_workspace_user_id` — attributable confirmation actor for `merchant_confirmed`; NULL for machine-proven `platform_created`
+- `established_at` — trust-establishment timestamp
 
-Legacy rows with NULL provenance are **not** grandfathered trusted. A link is trusted for Adobe `merchant_confirmed` only when the complete provenance tuple is valid. There is **no** generic DB `UNIQUE(workspace_id, connector_account_id, external_record_discriminator)` constraint; Adobe discriminator collision remains connector-aware in application guards. Existing exact-association unique constraints are unchanged.
+Legacy rows with NULL provenance are **not** grandfathered trusted. For Adobe Export, `merchant_confirmed` is trusted only when the complete merchant-confirmation tuple is valid. `platform_created` is trusted only for a Product created by the standard moduleless CREATE path after one successful stock Product POST returns the exact SKU + logical `entity_id` and an exact reconciliation GET proves the controlled state; it never substitutes for merchant confirmation of a pre-existing remote Product. Receive/Import semantics remain separately governed and do not automatically inherit `platform_created` acceptance. There is **no** generic DB `UNIQUE(workspace_id, connector_account_id, external_record_discriminator)` constraint; Adobe discriminator collision remains connector-aware in application guards. Existing exact-association unique constraints are unchanged.
 
-Adobe Product Live support remains **FALSE** until real-target certification and the final truth-flip gate complete. Trusted simple Product execution now consumes the entity-bound Safe Sync WRITE bridge after trusted-link, discriminator, exact-SKU, and consequential-write gate checks; automatic ERL trust establishment from execution remains impossible. Configurable/media expansion and public support remain pending.
+**Current standard-path status supersedes the historical Stage 3E status that follows:** Adobe Products/Export/Live is public for the certified bounded moduleless scope since 2026-09-19. Standard moduleless **Simple Product CREATE is implemented and real-target verified on 2026-09-24**; Safe Sync is not part of that path. Configurable-family CREATE remains a separate follow-on capability.
 
 **Stage 3E-R2b-1 (implemented — backend only):** merchant-confirmed ENTITY TRUST review/confirm backend exists for Adobe Products. Current/prospective link readiness projection, tamper-resistant review envelope, Safe Sync entity-bound verification, and dedicated `AdobeProductMerchantConfirmedLinkPersister` are implemented. Existing configurable parent uses confirmed merchant Magento SKU (not `cfg-*` substitution). Merchant Filament/Livewire UI remains **R2b-2** follow-on. The R2b-1 trust backend itself performs **no** consequential writes; trusted simple Product WRITE consumption now exists internally, while configurable/media completion and public Live support remain pending.
 
@@ -7329,6 +7329,25 @@ completes real-target validation with explicit human authorization. No deploymen
 without separate explicit approval.
 
 ##### Stage 3E Stop-and-Amend — Magento ownership and entity-bound Safe Sync runtime contract
+
+> **[SUPERSEDED FOR STANDARD MAGENTO V1 — Resolved Product Decision 2026-09-24]**
+>
+> This historical Stage 3E section remains authoritative only as risk analysis and
+> as the design/certification basis for a future **optional Enhanced-Safety profile**.
+> It MUST NOT be interpreted as making Safe Sync, a custom Magento endpoint, an
+> installed first-party Magento component, or any other BabyPark target-side code
+> a prerequisite for the standard Magento V1 connector.
+>
+> Standard Magento V1 is a universal **moduleless / zero-install connector over the
+> stock Adobe Commerce / Magento Admin REST API**. The normative contract is
+> `docs/connectors/adobe-commerce/MAGENTO_V1_MODULELESS_CONNECTOR_CONTRACT.md`.
+> Where this historical Stage 3E text conflicts with that contract for the standard
+> V1 path, the moduleless contract wins.
+>
+> Safe Sync remains a durable repository asset for future work, but further
+> productization is deferred until standard Magento V1 is complete. It may later
+> be distributed only as an opt-in Enhanced-Safety profile after separate maturity,
+> compatibility, lifecycle, and real-target certification.
 
 [Resolved — Stage 3E docs contract] This section freezes the final entity-bound
 Safe Sync runtime contract after Magento primary-source research and
@@ -8360,20 +8379,17 @@ The existing rules stand and are not weakened by this amendment:
   current Magento V1 Product Field Matrix and the
   `MagentoV1ProductFieldMatrixTest` mechanical contract.
 
-##### Narrow distinction for the current runtime owner
+##### Current runtime owner — standard moduleless path
 
-The current runtime still consumes the entity-bound Safe Sync primitive
-for trusted simple Product WRITE in some internal seams. That is the
-**current runtime truth** and is recorded as such in
-`08-CONNECTOR_SYNC_RUNTIME_ATLAS.md`. It is not contradicted by this
-amendment, because this amendment describes the **approved target
-architecture** for the standard merchant path, not a claim that
-moduleless code already exists in production.
+The standard Magento V1 runtime uses the stock Adobe/Magento REST API as its
+production-intended boundary. Trusted Simple Product UPDATE is already certified
+on the moduleless stock path; standard-V1 runtime work must continue to reuse that
+boundary rather than re-introducing Safe Sync as a prerequisite.
 
-This intentionally creates a current-runtime-vs-new-contract gap that
-must be closed by a later, separately designed runtime migration. That
-later migration is **out of scope** for this docs amendment and is
-**not** authorised by it.
+Safe Sync remains separate repository evidence and a future **optional
+Enhanced-Safety profile**. Its further productization is intentionally deferred
+until the standard Magento V1 connector is complete, after which it may be matured,
+certified, and offered only by explicit merchant choice.
 
 ##### What this amendment does NOT do
 
@@ -8867,9 +8883,12 @@ Preview permission never implies Live authority. No request-access subsystem.
 
 "Retry failed only" is explicitly **out** of Stage 3 V1. Current run snapshot
 freezes `selection.mode = all_products`. V1 recovery: remediate/verify → Preview
-when required → new all-products Live execution. Trusted `ExternalRecordLink`,
-entity-bound verification, and ambiguous-outcome rules prevent a blind repeat against
-an unverified remote identity; no Product CREATE path exists in V1.
+when required → new all-products Live execution. Trusted `ExternalRecordLink`, fresh identity verification, and ambiguous-outcome
+rules prevent a blind repeat against an unverified remote identity. For standard
+moduleless Simple Product CREATE, an ambiguous Product POST is never blindly
+retried; if a later fresh read finds a remote Product without trusted
+correspondence, the flow stops for Entity Trust/remediation instead of issuing
+another CREATE.
 
 ##### Live support truth
 [Resolved — 2026-09-19 — standard moduleless Magento V1 truth flip]
@@ -8879,11 +8898,16 @@ Current Adobe support truth is:
 - Products / Export / Preview = **true**
 - Products / Export / Live = **true**
 - Products / Import / Live = **false**
-- Magento Product CREATE = **unsupported in V1**
+- Magento Simple Product CREATE = **true — standard moduleless path; real-target verified 2026-09-24**
+- Magento Configurable Product CREATE = **unsupported; next capability**
 
-The standard path is moduleless and uses the certified stock REST linked-UPDATE
-runtime. The truth flip is backed by
-`docs/connectors/adobe-commerce/magento_v1_products_export_live_certification_2026_09_19.json`.
+The standard path is moduleless. Existing linked Products use the certified stock
+REST linked-UPDATE runtime; no-link Simple Products may now use the standard stock
+Product CREATE path under the bounded moduleless CREATE contract. The 2026-09-19
+truth flip is backed by
+`docs/connectors/adobe-commerce/magento_v1_products_export_live_certification_2026_09_19.json`,
+and Simple CREATE certification by
+`docs/connectors/adobe-commerce/magento_v1_simple_create_certification_2026_09_24.json`.
 
 The final real-target smoke used one existing MerchantConfirmed linked Simple
 Product in configured Store View `default` and proved the whole merchant path:

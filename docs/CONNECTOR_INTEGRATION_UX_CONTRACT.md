@@ -447,10 +447,13 @@ the Stage 3E bounded real-target certification are complete for the advertised
 standard moduleless Magento V1 scope. `ManageAdobeProductsExportPreview` owns the
 merchant Live work surface and `startLive()` delegates to the existing admission
 contract. Current public truth is: Products / Export / Preview = **true**,
-Products / Export / Live = **true**, Products / Import / Live = **false**, and
-Magento Product CREATE = **unsupported in V1**. Consequential Live remains
+Products / Export / Live = **true**, Products / Import / Live = **false**,
+Magento Simple Product CREATE = **true on the standard moduleless path** after
+2026-09-24 real-target certification, and Magento Configurable Product CREATE
+remains **unsupported** as the next capability. Consequential Live remains
 Preview-first and is actionable only when current authorization, configuration
-revision, runtime readiness, MerchantConfirmed identity trust, writer-gate, and
+revision, runtime readiness, trusted remote identity (merchant-confirmed or
+platform-created where the standard CREATE contract permits it), writer-gate, and
 reconciliation requirements all pass. Safe Sync is optional Enhanced Safety, not
 a prerequisite for the standard path.
 

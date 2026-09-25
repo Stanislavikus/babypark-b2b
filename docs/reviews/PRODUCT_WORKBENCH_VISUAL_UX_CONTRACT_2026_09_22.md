@@ -390,6 +390,36 @@ this Workbench when current authority says so.
 - sparse override state;
 - `Повернути автоматичний вибір`.
 
+### Classification catalogue behavior — [Resolved addendum 2026-09-24]
+
+The Category tree and Attribute Set selector use complete persisted provider catalogues for the
+current Workspace + ConnectorAccount. They must not be limited to values already used by remote
+Products.
+
+Category selection behavior:
+
+- active empty Categories are selectable and show `0 товарів у Magento`;
+- choosing an active empty Category requires explicit confirmation before saving the override;
+- inactive Categories remain visible as provider context when referenced, but cannot be selected as
+  a new target;
+- a Category missing from Magento is shown as `Видалена в Magento` when referenced and cannot be
+  selected as a new target;
+- an active Category under an inactive ancestor remains selectable but shows
+  `Батьківська категорія неактивна`;
+- root/store-root nodes are structural only and are not selectable Product targets;
+- Category catalogue freshness is shown independently from Product catalogue freshness.
+
+Attribute Set selection behavior:
+
+- all current persisted Magento Product Attribute Sets are eligible for lookup regardless of current
+  Product usage;
+- usage count such as `0 товарів` is informative and must not hide the Attribute Set;
+- missing/deleted provider sets remain visible when needed to explain an existing reference but are
+  not selectable as new targets;
+- Attribute Structure freshness is shown independently from Category freshness;
+- Attribute Groups organize fields inside the selected Attribute Set; the UI does not invent a
+  separate Product-level `Group` selection.
+
 Do not show future Content/SEO/Media tabs as empty shipped UI.
 
 Those domains may be added once their actual editing/proposal workflows exist.

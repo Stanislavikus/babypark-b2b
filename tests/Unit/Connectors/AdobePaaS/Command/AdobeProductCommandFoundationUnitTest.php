@@ -208,6 +208,23 @@ class AdobeProductCommandFoundationUnitTest extends TestCase
     }
 
     #[Test]
+    public function real_magento_product_missing_message_is_trusted_known_missing(): void
+    {
+        $result = $this->classifier->classify(
+            'SKU-MISSING',
+            new ConnectorHttpResult(
+                404,
+                [],
+                json_encode([
+                    'message' => "The product that was requested doesn't exist. Verify the product and try again.",
+                ], JSON_THROW_ON_ERROR),
+            ),
+        );
+
+        $this->assertSame(AdobeProductRemoteGetClassification::TrustedKnownMissing, $result->classification);
+    }
+
+    #[Test]
     public function generic_404_is_not_trusted_missing(): void
     {
         $result = $this->classifier->classify(

@@ -18,10 +18,11 @@ use Tests\TestCase;
  *     in `09-CONNECTOR_DELIVERY_PROTOCOL.md`.
  *   - Connector Account Overview verify-to-preview journey freeze
  *     in `CONNECTOR_INTEGRATION_UX_CONTRACT.md` (new section 19).
- *   - Intentional current-runtime vs new contract gap recorded in
+ *   - Standard moduleless runtime ownership recorded in
  *     `08-CONNECTOR_SYNC_RUNTIME_ATLAS.md`.
- *   - Narrow distinction between current runtime owner and newly
- *     approved target architecture in
+ *   - Safe Sync remains optional Enhanced Safety, never standard-V1 prerequisite.
+ *   - Narrow distinction between standard runtime owner and optional
+ *     Enhanced-Safety architecture in
  *     `docs/connectors/adobe-commerce/MAGENTO_V1_PRODUCT_FIELD_MATRIX.md`.
  *
  * The pre-existing Stage 3E entity-bound Safe Sync contract, the
@@ -118,7 +119,7 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
         $this->assertStringContainsString('Re-scope of Decision 6 (PHP / Adobe certification matrix)', $content);
         $this->assertStringContainsString('Connection truth (re-statement)', $content);
         $this->assertStringContainsString('Inventory presence does not mean support', $content);
-        $this->assertStringContainsString('Narrow distinction for the current runtime owner', $content);
+        $this->assertStringContainsString('Current runtime owner — standard moduleless path', $content);
     }
 
     #[Test]
@@ -155,13 +156,16 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
     }
 
     #[Test]
-    public function domain_model_moduleless_rebaseline_records_intentional_runtime_gap(): void
+    public function domain_model_freezes_standard_moduleless_runtime_and_defers_safe_sync_productization(): void
     {
         $content = File::get(base_path('docs/03-DOMAIN_MODEL.md'));
 
-        $this->assertStringContainsString('current runtime still consumes the entity-bound Safe Sync primitive', $content);
-        $this->assertStringContainsString('This intentionally creates a current-runtime-vs-new-contract gap', $content);
-        $this->assertStringContainsString('not** authorised by it', $content);
+        $this->assertStringContainsString('##### Current runtime owner — standard moduleless path', $content);
+        $this->assertStringContainsString('stock Adobe/Magento REST API as its', $content);
+        $this->assertStringContainsString('Trusted Simple Product UPDATE is already certified', $content);
+        $this->assertStringContainsString('future **optional', $content);
+        $this->assertStringContainsString('Enhanced-Safety profile', $content);
+        $this->assertStringContainsString('further productization is intentionally deferred', $content);
     }
 
     #[Test]
@@ -179,6 +183,8 @@ class MagentoV1ModulelessRebaselineDocumentationContractTest extends TestCase
         $this->assertStringContainsString('materially affects the Product Goal', $content);
         $this->assertStringContainsString('smallest possible deployment surface', $content);
         $this->assertStringContainsString('re-position the first-party component', $content);
+        $this->assertStringContainsString('defers further Safe Sync productization until the', $content);
+        $this->assertStringContainsString('explicitly chooses the Enhanced-Safety profile', $content);
     }
 
     #[Test]

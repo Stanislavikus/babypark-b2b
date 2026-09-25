@@ -7,9 +7,10 @@ use App\Support\Connectors\Transport\ConnectorHttpTransport;
 use App\Support\Connectors\Transport\ConnectorOutboundRequest;
 use App\Support\Connectors\Transport\ConnectorTransportException;
 use App\Support\Connectors\Transport\ConnectorTransportLimits;
+use Carbon\CarbonImmutable;
 use JsonException;
 
-final class AdobeRemoteCatalogHttpCategoryDictionaryReader implements AdobeRemoteCatalogCategoryDictionaryReader
+final class AdobeRemoteCatalogHttpCategoryDictionaryReader implements AdobeRemoteCatalogCategoryCatalogueReader, AdobeRemoteCatalogCategoryDictionaryReader
 {
     private const int PAGE_SIZE = 100;
 
@@ -21,6 +22,11 @@ final class AdobeRemoteCatalogHttpCategoryDictionaryReader implements AdobeRemot
     ) {}
 
     public function read(AdobePaaSRequestContext $context): array
+    {
+        return $this->readCatalogue($context)->paths();
+    }
+
+    public function readCatalogue(AdobePaaSRequestContext $context): AdobeRemoteCatalogCategoryCatalogue
     {
         $currentPage = 1;
         $expectedTotal = null;
@@ -55,6 +61,8 @@ final class AdobeRemoteCatalogHttpCategoryDictionaryReader implements AdobeRemot
                     'name' => $this->optionalString($item, 'name'),
                     'level' => $this->nonNegativeInt($item, 'level'),
                     'path' => $this->optionalString($item, 'path'),
+                    'position' => $this->optionalNonNegativeInt($item, 'position'),
+                    'is_active' => $this->optionalBoolean($item, 'is_active'),
                 ];
             }
 
@@ -65,12 +73,26 @@ final class AdobeRemoteCatalogHttpCategoryDictionaryReader implements AdobeRemot
             $currentPage++;
         } while (count($records) < $expectedTotal);
 
-        $paths = [];
-        foreach ($records as $id => $record) {
-            $paths[$id] = $this->breadcrumb($record, $records);
+        $categories = [];
+        foreach ($records as $record) {
+            $categories[] = [
+                'external_category_id' => (string) $record['id'],
+                'parent_external_category_id' => $record['parent_id'] === 0 ? null : (string) $record['parent_id'],
+                'name' => $record['name'],
+                'provider_path' => $record['path'],
+                'breadcrumb' => $this->breadcrumb($record, $records),
+                'level' => $record['level'],
+                'position' => $record['position'],
+                'is_active' => $record['is_active'],
+            ];
         }
 
-        return $paths;
+        usort(
+            $categories,
+            static fn (array $left, array $right): int => (int) $left['external_category_id'] <=> (int) $right['external_category_id'],
+        );
+
+        return new AdobeRemoteCatalogCategoryCatalogue(CarbonImmutable::now(), $categories);
     }
 
     /** @return array<string, mixed> */
@@ -174,6 +196,46 @@ final class AdobeRemoteCatalogHttpCategoryDictionaryReader implements AdobeRemot
     }
 
     /** @param array<string, mixed> $item */
+    private function optionalNonNegativeInt(array $item, string $key): ?int
+    {
+        $value = $item[$key] ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_string($value) && ctype_digit($value)) {
+            $value = (int) $value;
+        }
+
+        if (! is_int($value) || $value < 0) {
+            throw new AdobeRemoteCatalogReadException(sprintf('Adobe remote category %s is invalid.', $key));
+        }
+
+        return $value;
+    }
+
+    /** @param array<string, mixed> $item */
+    private function optionalBoolean(array $item, string $key): ?bool
+    {
+        if (! array_key_exists($key, $item) || $item[$key] === null) {
+            return null;
+        }
+
+        $value = $item[$key];
+
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if ($value === 0 || $value === 1 || $value === '0' || $value === '1') {
+            return (bool) (int) $value;
+        }
+
+        throw new AdobeRemoteCatalogReadException(sprintf('Adobe remote category %s is invalid.', $key));
+    }
+
+    /** @param array<string, mixed> $item */
     private function optionalString(array $item, string $key): ?string
     {
         $value = $item[$key] ?? null;
@@ -192,8 +254,8 @@ final class AdobeRemoteCatalogHttpCategoryDictionaryReader implements AdobeRemot
     }
 
     /**
-     * @param  array{id:int,parent_id:int,name:?string,level:int,path:?string}  $record
-     * @param  array<string, array{id:int,parent_id:int,name:?string,level:int,path:?string}>  $records
+     * @param  array{id:int,parent_id:int,name:?string,level:int,path:?string,position:?int,is_active:?bool}  $record
+     * @param  array<string, array{id:int,parent_id:int,name:?string,level:int,path:?string,position:?int,is_active:?bool}>  $records
      */
     private function breadcrumb(array $record, array $records): string
     {

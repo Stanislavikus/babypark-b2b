@@ -23,14 +23,14 @@ class AdobeRemoteCatalogCategoryDictionaryReaderTest extends TestCase
             return match ($count) {
                 1 => $this->json([
                     'items' => [
-                        ['id' => 1, 'parent_id' => 0, 'name' => 'Root', 'level' => 0, 'path' => '1'],
-                        ['id' => 3, 'parent_id' => 1, 'name' => 'Store Root', 'level' => 1, 'path' => '1/3'],
+                        ['id' => 1, 'parent_id' => 0, 'name' => 'Root', 'level' => 0, 'path' => '1', 'position' => 0],
+                        ['id' => 3, 'parent_id' => 1, 'name' => 'Store Root', 'level' => 1, 'path' => '1/3', 'position' => 1, 'is_active' => true],
                     ],
                     'total_count' => 3,
                 ]),
                 2 => $this->json([
                     'items' => [
-                        ['id' => 6, 'parent_id' => 3, 'name' => 'Strollers', 'level' => 2, 'path' => '1/3/6'],
+                        ['id' => 6, 'parent_id' => 3, 'name' => 'Strollers', 'level' => 2, 'path' => '1/3/6', 'position' => 4, 'is_active' => false],
                     ],
                     'total_count' => 3,
                 ]),
@@ -54,16 +54,50 @@ class AdobeRemoteCatalogCategoryDictionaryReaderTest extends TestCase
     }
 
     #[Test]
+    public function it_exposes_full_category_catalogue_metadata(): void
+    {
+        $transport = new RecordingConnectorHttpTransport(fn (): ConnectorHttpResult => $this->json([
+            'items' => [
+                ['id' => 1, 'parent_id' => 0, 'name' => 'Root', 'level' => 0, 'path' => '1', 'position' => 0],
+                ['id' => 3, 'parent_id' => 1, 'name' => 'Store Root', 'level' => 1, 'path' => '1/3', 'position' => 1, 'is_active' => true],
+                ['id' => 6, 'parent_id' => 3, 'name' => 'Strollers', 'level' => 2, 'path' => '1/3/6', 'position' => 4, 'is_active' => false],
+            ],
+            'total_count' => 3,
+        ]));
+
+        $reader = new AdobeRemoteCatalogHttpCategoryDictionaryReader(
+            new AdobeRemoteCatalogRequestFactory(new OAuth1RequestSigner),
+            $transport,
+        );
+
+        $catalogue = $reader->readCatalogue($this->context());
+
+        $this->assertCount(3, $catalogue->categories);
+        $this->assertNull($catalogue->categories[0]['is_active']);
+        $this->assertSame('Strollers', $catalogue->paths()['6']);
+        $this->assertSame([
+            'external_category_id' => '6',
+            'parent_external_category_id' => '3',
+            'name' => 'Strollers',
+            'provider_path' => '1/3/6',
+            'breadcrumb' => 'Strollers',
+            'level' => 2,
+            'position' => 4,
+            'is_active' => false,
+        ], $catalogue->categories[2]);
+    }
+
+    #[Test]
     public function it_fails_if_category_total_changes_between_pages(): void
     {
         $transport = new RecordingConnectorHttpTransport(function (ConnectorOutboundRequest $request, int $count): ConnectorHttpResult {
             return $count === 1
                 ? $this->json([
-                    'items' => [['id' => 1, 'parent_id' => 0, 'name' => 'Root', 'level' => 0, 'path' => '1']],
+                    'items' => [['id' => 1, 'parent_id' => 0, 'name' => 'Root', 'level' => 0, 'path' => '1', 'position' => 0]],
                     'total_count' => 2,
                 ])
                 : $this->json([
-                    'items' => [['id' => 2, 'parent_id' => 1, 'name' => 'Changed', 'level' => 1, 'path' => '1/2']],
+                    'items' => [['id' => 2, 'parent_id' => 1, 'name' => 'Changed', 'level' => 1, 'path' => '1/2', 'position' => 1, 'is_active' => true]],
                     'total_count' => 3,
                 ]);
         });

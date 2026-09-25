@@ -5,6 +5,7 @@ namespace App\Support\Connectors\AdobePaaS\RemoteCatalog;
 use App\Enums\SyncDataDomain;
 use App\Models\ConnectorAccount;
 use App\Models\RemoteCatalogSnapshot;
+use App\Services\Connectors\AdobeProductCategoryCatalogueReconciler;
 use App\Services\Connectors\RemoteCatalogScanService;
 use App\Support\Connectors\AdobePaaS\AdobePaaSRequestContextFactory;
 use App\Support\Connectors\AdobePaaS\EntityTrust\AdobeConnectorAccountTargetSnapshot;
@@ -19,7 +20,8 @@ final class AdobeRemoteCatalogScanner
         private readonly AdobePaaSRequestContextFactory $contextFactory,
         private readonly AdobeConnectorAccountTargetSnapshotResolver $targetResolver,
         private readonly AdobeRemoteCatalogEnumerator $enumerator,
-        private readonly AdobeRemoteCatalogCategoryDictionaryReader $categoryDictionaryReader,
+        private readonly AdobeRemoteCatalogCategoryCatalogueReader $categoryCatalogueReader,
+        private readonly AdobeProductCategoryCatalogueReconciler $categoryCatalogueReconciler,
         private readonly AdobeRemoteCatalogBrandProjectionResolver $brandProjectionResolver,
         private readonly RemoteCatalogScanService $scanService,
     ) {}
@@ -42,13 +44,17 @@ final class AdobeRemoteCatalogScanner
             $categoryPaths = [];
             $brandProjection = null;
 
-            if ($boundary->totalCount > 0) {
-                try {
-                    $categoryPaths = $this->categoryDictionaryReader->read($context);
-                } catch (AdobeRemoteCatalogReadException) {
-                    $categoryPaths = [];
-                }
+            try {
+                $categoryCatalogue = $this->categoryCatalogueReader->readCatalogue($context);
+                $this->categoryCatalogueReconciler->reconcile($account, $target, $categoryCatalogue);
+                $categoryPaths = $categoryCatalogue->paths();
+            } catch (AdobeRemoteCatalogReadException) {
+                // Category catalogue is independently fail-soft for Product scan projection.
+                // The last successful persisted catalogue remains authoritative for merchant selection.
+                $categoryPaths = [];
+            }
 
+            if ($boundary->totalCount > 0) {
                 $brandProjection = $this->brandProjectionResolver->resolve($account);
             }
 

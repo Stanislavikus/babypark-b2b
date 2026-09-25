@@ -27,6 +27,10 @@ final class AdobeConfigurableChildLinkCommandExecutor
             return $this->unknownOrAmbiguous('configurable_children_get_untrusted', $parentSku, $desiredLink);
         }
 
+        if (count(array_keys($childSkus, $desiredLink->childSku, true)) > 1) {
+            return $this->unknownOrAmbiguous('configurable_child_link_duplicate_remote_sku', $parentSku, $desiredLink);
+        }
+
         if (in_array($desiredLink->childSku, $childSkus, true)) {
             return $this->knownApplied('configurable_child_link_no_op', $parentSku, $desiredLink);
         }
@@ -47,6 +51,16 @@ final class AdobeConfigurableChildLinkCommandExecutor
         if ($reconciledChildSkus === null) {
             return $this->unknownOrAmbiguous(
                 'configurable_child_link_reconciliation_inconclusive',
+                $parentSku,
+                $desiredLink,
+                consequentialWriteAttempts: 1,
+                reconciliationGetAttempts: 1,
+            );
+        }
+
+        if (count(array_keys($reconciledChildSkus, $desiredLink->childSku, true)) > 1) {
+            return $this->unknownOrAmbiguous(
+                'configurable_child_link_duplicate_remote_sku',
                 $parentSku,
                 $desiredLink,
                 consequentialWriteAttempts: 1,
@@ -87,10 +101,11 @@ final class AdobeConfigurableChildLinkCommandExecutor
             return $this->unknownOrAmbiguous('configurable_children_get_untrusted', $parentSku, $desiredLink);
         }
 
-        if (in_array($desiredLink->childSku, $childSkus, true)) {
-            return $this->knownApplied('configurable_child_link_no_op', $parentSku, $desiredLink);
+        if (count(array_keys($childSkus, $desiredLink->childSku, true)) > 1) {
+            return $this->unknownOrAmbiguous('configurable_child_link_duplicate_remote_sku', $parentSku, $desiredLink);
         }
 
+        $alreadyPresent = in_array($desiredLink->childSku, $childSkus, true);
         $parentLookup = $this->linkGuard->resolveTrustedParentLinkBySubject(
             $input->workspaceId,
             $input->connectorAccountId,
@@ -193,11 +208,19 @@ final class AdobeConfigurableChildLinkCommandExecutor
             return $this->knownNotApplied('configurable_child_pre_relink_identity_mismatch', $parentSku, $desiredLink);
         }
 
+        if ($alreadyPresent) {
+            return $this->knownApplied('configurable_child_link_no_op', $parentSku, $desiredLink);
+        }
+
         [$freshChildrenGetResult] = $this->remoteStateClient->getConfigurableChildren($context, $parentSku);
         $freshChildSkus = $this->optionStateReader->readChildSkus($freshChildrenGetResult);
 
         if ($freshChildSkus === null) {
             return $this->unknownOrAmbiguous('configurable_children_pre_relink_recheck_untrusted', $parentSku, $desiredLink);
+        }
+
+        if (count(array_keys($freshChildSkus, $desiredLink->childSku, true)) > 1) {
+            return $this->unknownOrAmbiguous('configurable_child_link_duplicate_remote_sku', $parentSku, $desiredLink);
         }
 
         if (in_array($desiredLink->childSku, $freshChildSkus, true)) {
@@ -220,6 +243,16 @@ final class AdobeConfigurableChildLinkCommandExecutor
         if ($reconciledChildSkus === null) {
             return $this->unknownOrAmbiguous(
                 'configurable_child_link_reconciliation_inconclusive',
+                $parentSku,
+                $desiredLink,
+                consequentialWriteAttempts: 1,
+                reconciliationGetAttempts: 1,
+            );
+        }
+
+        if (count(array_keys($reconciledChildSkus, $desiredLink->childSku, true)) > 1) {
+            return $this->unknownOrAmbiguous(
+                'configurable_child_link_duplicate_remote_sku',
                 $parentSku,
                 $desiredLink,
                 consequentialWriteAttempts: 1,
@@ -258,6 +291,10 @@ final class AdobeConfigurableChildLinkCommandExecutor
 
         if ($childSkus === null) {
             return $this->unknownOrAmbiguous('configurable_children_get_untrusted', $parentSku, $desiredLink);
+        }
+
+        if (count(array_keys($childSkus, $desiredLink->childSku, true)) > 1) {
+            return $this->unknownOrAmbiguous('configurable_child_link_duplicate_remote_sku', $parentSku, $desiredLink);
         }
 
         if (in_array($desiredLink->childSku, $childSkus, true)) {

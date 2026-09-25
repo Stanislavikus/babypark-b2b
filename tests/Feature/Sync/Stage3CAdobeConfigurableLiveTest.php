@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Sync;
 
+use App\Enums\ExternalRecordLinkTrustOrigin;
 use App\Enums\PriceListItemStatus;
 use App\Enums\PriceListStatus;
 use App\Enums\SyncLiveOutcome;
@@ -522,7 +523,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
     }
 
     #[Test]
-    public function parent_create_without_trusted_link_is_fail_closed_with_zero_write(): void
+    public function parent_create_without_current_attribute_metadata_is_fail_closed_with_zero_write(): void
     {
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
@@ -533,7 +534,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
         $result = $parentExecutor->execute($this->configurableInput($workspace, $account, $product));
 
         $this->assertSame(AdobeProductAppliedStateKnowledge::KnownNotApplied, $result->appliedStateKnowledge);
-        $this->assertSame('link_required', $result->reasonCode);
+        $this->assertSame('adobe_create_attribute_set_unavailable', $result->reasonCode);
         $this->assertSame(0, ExternalRecordLink::query()->where('product_id', $product->id)->count());
         $this->assertSame(0, $transport->sendCount);
     }
@@ -699,7 +700,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
         $this->assertSame(SyncLiveOutcome::NotApplied, $result->outcome);
         $this->assertTrue(collect($result->commandEvidence)->contains(
             fn ($entry) => $entry->commandKind === 'simple_child'
-                && $entry->reasonCode === 'link_required',
+                && $entry->reasonCode === 'adobe_create_attribute_set_unavailable',
         ));
         $this->assertSame(0, $transport->sendCount);
     }
@@ -800,7 +801,7 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
         $this->assertSame(SyncLiveOutcome::NotApplied, $result->outcome);
         $this->assertTrue(collect($result->commandEvidence)->contains(
             fn ($entry) => $entry->commandKind === 'simple_child'
-                && $entry->reasonCode === 'trusted_link_discriminator_invalid',
+                && $entry->reasonCode === 'trusted_child_identity_invalid',
         ));
         $this->assertSame(['GET'], array_map(
             static fn ($entry): string => $entry->request->getMethod(),
@@ -1401,13 +1402,12 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
             new SyncLiveConsequentialWriteGateStub(true),
         );
 
-        $this->assertSame(SyncLiveOutcome::Partial, $result->outcome);
-        $this->assertCount(2, $result->commandEvidence);
-        $this->assertSame('stock_write_verified', $result->commandEvidence[0]->reasonCode);
-        $this->assertSame('trusted_link_discriminator_invalid', $result->commandEvidence[1]->reasonCode);
-        $this->assertSame($refusedVariant->sku, $result->commandEvidence[1]->subjectSku);
+        $this->assertSame(SyncLiveOutcome::NotApplied, $result->outcome);
+        $this->assertCount(1, $result->commandEvidence);
+        $this->assertSame('trusted_child_identity_invalid', $result->commandEvidence[0]->reasonCode);
+        $this->assertSame($refusedVariant->sku, $result->commandEvidence[0]->subjectSku);
 
-        $this->assertSame(1, collect($transport->recordedRequests)->filter(
+        $this->assertSame(0, collect($transport->recordedRequests)->filter(
             fn ($entry) => $entry->request->getMethod() === 'PUT',
         )->count());
         $this->assertFalse(collect($transport->recordedRequests)->contains(
@@ -2516,6 +2516,15 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
         $workspace = $this->defaultWorkspace();
         $account = $this->createConnectorAccount($workspace);
         [$product] = $this->createConfigurableProduct($workspace, 'CFG-OPTION-RECON');
+        ExternalRecordLink::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'connector_account_id' => $account->id,
+            'product_id' => $product->id,
+            'external_identifier' => (new AdobeConfigurableParentSkuGenerator)->generate($workspace->id, $product->id),
+            'trust_origin' => ExternalRecordLinkTrustOrigin::PlatformCreated->value,
+            'external_record_discriminator' => '100',
+            'established_at' => now(),
+        ]);
 
         $transport = new RecordingConnectorHttpTransport(function (): ConnectorHttpResult {
             static $count = 0;
@@ -2809,6 +2818,38 @@ class Stage3CAdobeConfigurableLiveTest extends TestCase
         );
 
         $this->assertSame('color', $desired->options[0]->label);
+    }
+
+    #[Test]
+    public function required_configurable_dimension_bootstrap_is_deterministic_and_parent_starts_disabled(): void
+    {
+        $metadata = new AdobeProductExportExecutionMetadata(
+            selectedAttributeSetId: 4,
+            attributeSets: [['attribute_set_id' => 4, 'attribute_set_name' => 'Default']],
+            attributes: [
+                'color' => new AdobeAttributeMetadata(
+                    attributeId: 100,
+                    code: 'color',
+                    frontendInput: 'select',
+                    scope: 'global',
+                    options: ['93' => 'Blue', '94' => 'Red'],
+                    isRequired: true,
+                    applyTo: ['configurable'],
+                ),
+            ],
+        );
+
+        $desired = (new AdobeConfigurableDesiredStateCompiler(new AdobeConfigurableParentSkuGenerator))->compile(
+            AdobeConfigurableCommandTestFixtures::configurableSemanticResult(),
+            (string) Str::uuid(),
+            $metadata,
+        );
+
+        $this->assertSame(1, $desired->parent->status);
+        $this->assertArrayNotHasKey('color', $desired->parent->customAttributes);
+        $this->assertSame(2, $desired->createParent?->status);
+        $this->assertSame(93, $desired->createParent?->customAttributes['color']);
+        $this->assertSame(['color'], $desired->bootstrapAttributeCodes);
     }
 
     /**

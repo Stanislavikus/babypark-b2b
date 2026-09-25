@@ -40,11 +40,12 @@ final class MagentoV1ProductsExportLiveTruthFlipDocumentationContractTest extend
         );
         $this->assertStringContainsString('Products / Export / Live = **true**', $domain);
         $this->assertStringContainsString('Products / Import / Live = **false**', $domain);
-        $this->assertStringContainsString('Magento Product CREATE = **unsupported in V1**', $domain);
+        $this->assertStringContainsString('Magento Simple Product CREATE = **true — standard moduleless path; real-target verified 2026-09-24**', $domain);
+        $this->assertStringContainsString('Magento Configurable Product CREATE = **unsupported; next capability**', $domain);
 
         $atlas = File::get(base_path('docs/08-CONNECTOR_SYNC_RUNTIME_ATLAS.md'));
         $this->assertStringContainsString(
-            'Adobe Products/Export/Live support truth | SUPPORTED (public) — [Resolved 2026-09-19]',
+            'Adobe Products/Export/Live support truth | SUPPORTED (public) — [Resolved 2026-09-19; Simple CREATE extended 2026-09-24]',
             $atlas,
         );
         $this->assertStringContainsString('Live runtime readiness | IMPLEMENTED + REAL-TARGET VERIFIED', $atlas);
@@ -70,7 +71,9 @@ final class MagentoV1ProductsExportLiveTruthFlipDocumentationContractTest extend
         $this->assertStringNotContainsString('advertised Live support remains **false**', $firstLive);
         $this->assertStringContainsString('Products / Export / Live = **true**', $ux);
         $this->assertStringContainsString('Products / Import / Live = **false**', $ux);
-        $this->assertStringContainsString('Magento Product CREATE = **unsupported in V1**', $ux);
+        $this->assertStringContainsString('Magento Simple Product CREATE = **true on the standard moduleless path**', $ux);
+        $this->assertStringContainsString('Magento Configurable Product CREATE', $ux);
+        $this->assertStringContainsString('remains **unsupported** as the next capability', $ux);
         $this->assertStringContainsString('Safe Sync is optional Enhanced Safety', $ux);
 
         $this->assertStringContainsString('**Truth-flip status: COMPLETED 2026-09-19.**', $ux);
@@ -91,19 +94,21 @@ final class MagentoV1ProductsExportLiveTruthFlipDocumentationContractTest extend
     }
 
     #[Test]
-    public function product_create_primitive_has_no_production_command_caller(): void
+    public function product_create_primitive_has_exactly_one_production_command_caller(): void
     {
+        $callers = [];
+
         foreach (File::allFiles(app_path('Support/Connectors/AdobePaaS/Command')) as $file) {
             if ($file->getFilename() === 'AdobeProductRemoteStateClient.php') {
                 continue;
             }
 
-            $this->assertStringNotContainsString(
-                'postProduct(',
-                File::get($file->getPathname()),
-                $file->getPathname(),
-            );
+            if (str_contains(File::get($file->getPathname()), 'postProduct(')) {
+                $callers[] = $file->getFilename();
+            }
         }
+
+        $this->assertSame(['AdobeProductModulelessSimpleCreateExecutor.php'], $callers);
     }
 
     #[Test]

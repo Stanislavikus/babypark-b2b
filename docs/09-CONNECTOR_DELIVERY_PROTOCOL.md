@@ -305,15 +305,22 @@ re-classified as:
 
 - **Optional "Enhanced Safety" candidate**, not a baseline connector
   prerequisite;
-- an opt-in component, installed and certified separately only when
-  Enhanced Safety is selected;
+- an opt-in component, developed, installed, upgraded, and certified
+  separately only when Enhanced Safety is explicitly selected;
 - an implementation-true, legitimate primitive whose entity-bound
   read + write boundary remains a durable repository artifact.
 
-It is **not** required for connection, standard Product READ, field
-discovery, mapping, Preview, or normal Magento V1 operation once the
-stock public REST path is separately certified for the relevant
-operation.
+The project intentionally defers further Safe Sync productization until the
+standard moduleless Magento V1 connector is complete. Only after that may a
+separate Safe Sync campaign mature and certify the component's supported target
+matrix, installation/upgrade/rollback lifecycle, and real-target safety benefit.
+Only a merchant who explicitly chooses the Enhanced-Safety profile should receive
+or install it.
+
+It is **not** required for connection, standard Product READ, standard Product
+CREATE, standard linked Product UPDATE, field discovery, mapping, Preview, or
+normal Magento V1 operation once the stock public REST path is certified for the
+relevant operation.
 
 ### 12.2 Future certification contract
 
