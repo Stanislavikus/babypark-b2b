@@ -25,6 +25,7 @@ final class MasterProductDraftCreator
         $categoryId = $input['category_id'] ?? null;
         $merchantType = $this->nullableTrimmedString($input['merchant_type'] ?? null);
         $description = $this->nullableTrimmedString($input['description'] ?? null);
+        $url = $this->nullableTrimmedString($input['url'] ?? null);
 
         if ($categoryId !== null && $categoryId !== '') {
             $categoryExists = Category::withoutWorkspaceScope()
@@ -48,6 +49,7 @@ final class MasterProductDraftCreator
             $categoryId,
             $merchantType,
             $description,
+            $url,
         ): Product {
             $product = Product::withoutWorkspaceScope()->create([
                 'workspace_id' => $workspace->id,
@@ -59,6 +61,7 @@ final class MasterProductDraftCreator
                 'brand' => $brand,
                 'merchant_type' => $merchantType,
                 'description' => $description,
+                'url' => $url,
                 'is_active' => true,
             ]);
 
