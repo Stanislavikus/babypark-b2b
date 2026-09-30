@@ -117,7 +117,8 @@ class ProductResource extends Resource
                             Placeholder::make('workspace_media')
                                 ->hiddenLabel()
                                 ->content(fn (?Product $record): HtmlString => self::buildMediaWorkspaceHtml($record)),
-                        ]),
+                        ])
+                        ->visible(fn (?Product $record): bool => $record !== null),
 
                     Section::make('Ціна')
                         ->schema([
@@ -191,7 +192,8 @@ class ProductResource extends Resource
                         ])
                         ->columns(3)
                         ->collapsible()
-                        ->collapsed(),
+                        ->collapsed()
+                        ->visible(fn (?Product $record): bool => $record !== null),
 
                     Section::make('Варіанти')
                         ->schema([
@@ -234,7 +236,8 @@ class ProductResource extends Resource
                                 )
                                 ->columnSpanFull(),
                         ])
-                        ->collapsible(),
+                        ->collapsible()
+                        ->visible(fn (?Product $record): bool => $record !== null),
                 ])->columnSpan(2),
 
                 Group::make([
