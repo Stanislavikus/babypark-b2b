@@ -932,6 +932,205 @@ class ProductResource extends Resource
     // Internal helpers
     // -------------------------------------------------------------------------
 
+    private static function isSourceOwned(?Product $record): bool
+    {
+        return $record !== null && filled($record->onec_guid);
+    }
+
+    private static function inventoryScopeLabel(Product $record): string
+    {
+        $record->loadMissing('variants.stocks');
+
+        $variants = $record->variants->where('is_active', true);
+        $locations = $variants
+            ->flatMap(fn ($variant) => $variant->stocks)
+            ->pluck('inventory_location_id')
+            ->filter()
+            ->unique()
+            ->count();
+
+        return $variants->count().' вар. · '.$locations.' локац.';
+    }
+
+    private static function buildMediaWorkspaceHtml(?Product $record): HtmlString
+    {
+        if ($record === null) {
+            return new HtmlString(
+                '<div style="padding:20px;border:1px dashed #d1d5db;border-radius:10px;color:#6b7280;">'.
+                'Медіа можна додати після створення товару.'.
+                '</div>'
+            );
+        }
+
+        $urls = app(ProductWorkspaceSummaryService::class)->mediaUrls($record);
+
+        if ($urls === []) {
+            return new HtmlString(
+                '<div style="padding:24px;border:1px dashed #d1d5db;border-radius:10px;text-align:center;color:#6b7280;">'.
+                '<strong style="display:block;color:#374151;margin-bottom:4px;">Медіа ще не додано</strong>'.
+                '<span>У Workspace буде один логічний кадр без технічних копій для каналів.</span>'.
+                '</div>'
+            );
+        }
+
+        $main = e($urls[0]);
+        $alt = e((string) $record->name);
+        $thumbs = collect(array_slice($urls, 1, 5))
+            ->map(function (string $url) use ($alt): string {
+                $safe = e($url);
+
+                return '<img src="'.$safe.'" alt="'.$alt.'" '.
+                    'style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #e5e7eb;background:#f9fafb;">';
+            })
+            ->implode('');
+
+        $remaining = count($urls) - 6;
+        $more = $remaining > 0
+            ? '<div style="width:72px;height:72px;border-radius:8px;border:1px dashed #d1d5db;display:flex;align-items:center;justify-content:center;color:#6b7280;">+'.
+                $remaining.'</div>'
+            : '';
+
+        return new HtmlString(
+            '<div style="display:flex;gap:12px;align-items:flex-start;">'.
+                '<img src="'.$main.'" alt="'.$alt.'" '.
+                    'style="width:220px;height:220px;object-fit:contain;border-radius:10px;border:1px solid #e5e7eb;background:#f9fafb;">'.
+                '<div style="display:flex;gap:8px;flex-wrap:wrap;align-content:flex-start;">'.$thumbs.$more.'</div>'.
+            '</div>'.
+            '<div style="margin-top:10px;font-size:12px;color:#6b7280;">'.count($urls).' медіа · поточний Master-набір</div>'
+        );
+    }
+
+    private static function buildVariantWorkspaceHtml(?Product $record): HtmlString
+    {
+        if ($record === null) {
+            return new HtmlString('—');
+        }
+
+        $summary = app(ProductWorkspaceSummaryService::class)->variants($record);
+        $label = e($summary['label']);
+
+        if ($summary['count'] <= 1) {
+            $sku = $summary['skus'][0] ?? null;
+            $skuHtml = $sku
+                ? '<span style="margin-left:8px;color:#6b7280;">SKU '.e($sku).'</span>'
+                : '<span style="margin-left:8px;color:#9ca3af;">SKU не задано</span>';
+
+            return new HtmlString(
+                '<div><strong>'.$label.'</strong>'.$skuHtml.'</div>'.
+                '<div style="margin-top:4px;font-size:12px;color:#6b7280;">Варіанти не показуються, доки товар не має осей варіації.</div>'
+            );
+        }
+
+        $chips = collect($summary['skus'])
+            ->map(fn (string $sku): string => '<span style="display:inline-flex;padding:3px 7px;border-radius:999px;background:#f3f4f6;margin:3px 4px 0 0;font-size:12px;">'.e($sku).'</span>')
+            ->implode('');
+
+        return new HtmlString(
+            '<div><strong>'.$label.'</strong></div>'.
+            '<div style="margin-top:6px;">'.$chips.'</div>'
+        );
+    }
+
+    private static function buildAttributeGroupsHtml(?Product $record): HtmlString
+    {
+        if ($record === null) {
+            return new HtmlString('—');
+        }
+
+        $groups = app(ProductWorkspaceSummaryService::class)->attributeGroups($record);
+
+        if ($groups === []) {
+            return new HtmlString(
+                '<div style="color:#6b7280;">Для поточного типу товару активні групи характеристик не визначені.</div>'
+            );
+        }
+
+        $rows = collect($groups)
+            ->map(function (array $group): string {
+                $label = e($group['label']);
+
+                return '<div style="display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid #f3f4f6;">'.
+                    '<span>'.$label.'</span>'.
+                    '<span style="color:#6b7280;white-space:nowrap;">'.$group['total'].' полів · '.$group['required'].' обов’язкових</span>'.
+                    '</div>';
+            })
+            ->implode('');
+
+        return new HtmlString($rows);
+    }
+
+    private static function buildBasicQualityHtml(?Product $record): HtmlString
+    {
+        if ($record === null) {
+            return new HtmlString('—');
+        }
+
+        $summary = app(ProductWorkspaceSummaryService::class)->basicCompleteness($record);
+        $percentage = $summary['percentage'];
+
+        return new HtmlString(
+            '<div style="display:flex;align-items:baseline;gap:8px;">'.
+                '<strong style="font-size:20px;">'.$percentage.'%</strong>'.
+                '<span style="color:#6b7280;">'.$summary['filled'].'/'.$summary['total'].' базових сигналів</span>'.
+            '</div>'.
+            '<div style="height:6px;border-radius:999px;background:#e5e7eb;margin-top:8px;overflow:hidden;">'.
+                '<div style="height:100%;width:'.$percentage.'%;background:currentColor;border-radius:999px;"></div>'.
+            '</div>'.
+            '<div style="margin-top:8px;font-size:11px;color:#6b7280;">Інформаційно · не є готовністю конкретного каналу.</div>'
+        );
+    }
+
+    private static function buildChannelWorkspaceHtml(?Product $record): HtmlString
+    {
+        if ($record === null) {
+            return new HtmlString('—');
+        }
+
+        $labels = app(ProductWorkspaceSummaryService::class)->channelLabels($record);
+
+        if ($labels === []) {
+            return new HtmlString(
+                '<div style="color:#6b7280;">Товар ще не додано до жодного каналу публікації.</div>'
+            );
+        }
+
+        $rows = collect($labels)
+            ->map(fn (string $label): string =>
+                '<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #f3f4f6;">'.
+                    '<span>'.e($label).'</span>'.
+                    '<span style="font-size:11px;color:#6b7280;white-space:nowrap;">Додано</span>'.
+                '</div>'
+            )
+            ->implode('');
+
+        return new HtmlString($rows);
+    }
+
+    private static function buildAttentionHtml(?Product $record): HtmlString
+    {
+        if ($record === null) {
+            return new HtmlString('—');
+        }
+
+        $missing = app(ProductWorkspaceSummaryService::class)->basicCompleteness($record)['missing'];
+
+        if ($missing === []) {
+            return new HtmlString(
+                '<div style="color:#166534;">Базові дані заповнені.</div>'.
+                '<div style="margin-top:4px;font-size:11px;color:#6b7280;">Канальні вимоги перевіряються окремо.</div>'
+            );
+        }
+
+        $items = collect($missing)
+            ->map(fn (string $label): string => '<li style="margin:4px 0;">'.e($label).'</li>')
+            ->implode('');
+
+        return new HtmlString(
+            '<div style="margin-bottom:6px;color:#92400e;">'.count($missing).' базових пунктів</div>'.
+            '<ul style="margin:0;padding-left:18px;color:#6b7280;">'.$items.'</ul>'
+        );
+    }
+
     /** SVG placeholder icon at a given pixel size. */
     public static function placeholderSvg(int $size = 48): string
     {
