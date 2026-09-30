@@ -12,6 +12,16 @@ class CreateProduct extends CreateRecord
 {
     protected static string $resource = ProductResource::class;
 
+    public function getTitle(): string
+    {
+        return 'Новий товар';
+    }
+
+    public function getSubheading(): ?string
+    {
+        return 'Створіть Master Product. SKU та канал публікації можна додати пізніше.';
+    }
+
     protected function handleRecordCreation(array $data): Model
     {
         return app(MasterProductDraftCreator::class)->create(
