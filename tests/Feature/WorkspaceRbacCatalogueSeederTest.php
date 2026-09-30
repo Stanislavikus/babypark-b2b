@@ -130,7 +130,7 @@ class WorkspaceRbacCatalogueSeederTest extends TestCase
         $this->seed(WorkspacePermissionSeeder::class);
         $this->seed(WorkspaceRbacPermissionSeeder::class);
 
-        $this->assertSame(11, WorkspacePermission::query()->count());
+        $this->assertSame(12, WorkspacePermission::query()->count());
         $this->assertGreaterThanOrEqual(2, Permission::query()->count());
     }
 }
