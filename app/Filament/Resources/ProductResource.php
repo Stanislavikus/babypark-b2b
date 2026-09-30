@@ -6,6 +6,7 @@ use App\Enums\TagBulkOperation;
 use App\Exceptions\Catalog\InvalidTagBulkSelectionException;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Resources\ProductResource\Pages;
+use App\Filament\Resources\ProductResource\Pages\CreateProduct;
 use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Filament\Resources\ProductResource\Pages\ViewProduct;
@@ -18,17 +19,20 @@ use App\Services\Catalog\TagManager;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Services\Pricing\ProductPricingSummary;
 use App\Services\Sync\ProductChannelSelectionService;
+use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\AdminAvailabilityPresenter;
 use App\Support\ProductFields\AdminProductMargin;
 use App\Support\ProductFields\MarginToggle;
 use App\Support\ProductFields\ProductColumnVisibility;
 use App\Support\ProductTableLink;
 use App\Support\Workspace\WorkspaceContext;
+use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
@@ -76,25 +80,47 @@ class ProductResource extends Resource
     {
         return $schema
             ->components([
-                Section::make('Основне (з 1С)')->schema([
+                Section::make(fn (?Product $record): string => filled($record?->onec_guid)
+                    ? 'Основне (з 1С)'
+                    : 'Основна інформація')->schema([
                     TextInput::make('sku')
-                        ->label('Артикул')
-                        ->disabled(),
+                        ->label('Артикул / SKU')
+                        ->maxLength(255)
+                        ->disabled(fn (?Product $record): bool => filled($record?->onec_guid))
+                        ->helperText(fn (?Product $record): ?string => $record === null
+                            ? 'Необов’язково. Системна ідентичність товару не залежить від SKU.'
+                            : null),
                     TextInput::make('name')
                         ->label('Назва')
-                        ->disabled(),
+                        ->required()
+                        ->maxLength(255)
+                        ->disabled(fn (?Product $record): bool => filled($record?->onec_guid)),
                     TextInput::make('brand')
                         ->label('Бренд')
-                        ->disabled(),
-                    TextInput::make('category.name')
-                        ->label('Категорія')
-                        ->disabled(),
+                        ->maxLength(255)
+                        ->disabled(fn (?Product $record): bool => filled($record?->onec_guid)),
+                    TextInput::make('barcode_ean')
+                        ->label('EAN / GTIN')
+                        ->maxLength(255)
+                        ->disabled(fn (?Product $record): bool => filled($record?->onec_guid)),
+                    Select::make('category_id')
+                        ->label('Внутрішня категорія')
+                        ->relationship(name: 'category', titleAttribute: 'name')
+                        ->searchable()
+                        ->preload(),
                     Placeholder::make('cost_price_summary')
                         ->label('Вхідна ціна')
                         ->content(fn (?Product $record): string => $record
                             ? (app(ProductPricingSummary::class)->formatCostPrice($record) ?? '—')
-                            : '—'),
+                            : '—')
+                        ->visible(fn (?Product $record): bool => $record !== null),
                 ])->columns(2),
+
+                Section::make('Контент')->schema([
+                    RichEditor::make('description')
+                        ->label('Опис')
+                        ->columnSpanFull(),
+                ]),
 
                 Section::make('Класифікація')->schema([
                     TextInput::make('merchant_type')
@@ -594,6 +620,7 @@ class ProductResource extends Resource
     {
         return [
             'index' => ListProducts::route('/'),
+            'create' => CreateProduct::route('/create'),
             'view' => ViewProduct::route('/{record}'),
             'edit' => EditProduct::route('/{record}/edit'),
         ];
@@ -843,7 +870,19 @@ HTML;
 
     public static function getCreateAuthorizationResponse(): Response
     {
-        return Response::deny();
+        $actor = auth()->user();
+
+        if (! $actor instanceof User) {
+            return Response::deny();
+        }
+
+        return app(WorkspaceAuthorization::class)->allows(
+            $actor,
+            app(WorkspaceContext::class)->current(),
+            WorkspacePermissions::MANAGE_PRODUCTS,
+        )
+            ? Response::allow()
+            : Response::deny();
     }
 
     public static function getDeleteAuthorizationResponse(Model $record): Response
