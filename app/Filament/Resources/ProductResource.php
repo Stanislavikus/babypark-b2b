@@ -15,6 +15,7 @@ use App\Models\Product;
 use App\Models\SyncConfigurationProductSelection;
 use App\Models\Tag;
 use App\Models\User;
+use App\Services\Catalog\ProductWorkspaceSummaryService;
 use App\Services\Catalog\TagManager;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Services\Pricing\ProductPricingSummary;
@@ -79,108 +80,258 @@ class ProductResource extends Resource
     public static function form(Schema $schema): Schema
     {
         return $schema
+            ->columns(3)
             ->components([
-                Section::make(fn (?Product $record): string => filled($record?->onec_guid) ? 'Основне (з 1С)' : 'Основна інформація')->schema([
-                    TextInput::make('sku')
-                        ->label('Артикул / SKU')
-                        ->maxLength(255)
-                        ->disabled(fn (?Product $record): bool => filled($record?->onec_guid))
-                        ->helperText(fn (?Product $record): ?string => $record === null ? 'Необов’язково. Системна ідентичність товару не залежить від SKU.' : null),
-                    TextInput::make('name')
-                        ->label('Назва')
-                        ->required()
-                        ->maxLength(255)
-                        ->disabled(fn (?Product $record): bool => filled($record?->onec_guid)),
-                    TextInput::make('brand')
-                        ->label('Бренд')
-                        ->maxLength(255)
-                        ->disabled(fn (?Product $record): bool => filled($record?->onec_guid)),
-                    TextInput::make('barcode_ean')
-                        ->label('EAN / GTIN')
-                        ->maxLength(255)
-                        ->disabled(fn (?Product $record): bool => filled($record?->onec_guid)),
-                    Select::make('category_id')
-                        ->label('Внутрішня категорія')
-                        ->relationship(name: 'category', titleAttribute: 'name')
-                        ->searchable()
-                        ->preload(),
-                    Placeholder::make('cost_price_summary')
-                        ->label('Вхідна ціна')
-                        ->content(fn (?Product $record): string => $record
-                            ? (app(ProductPricingSummary::class)->formatCostPrice($record) ?? '—')
-                            : '—')
-                        ->visible(fn (?Product $record): bool => $record !== null),
-                ])->columns(2),
-
-                Section::make('Контент')->schema([
-                    RichEditor::make('description')
-                        ->label('Опис')
-                        ->columnSpanFull(),
-                ]),
-
-                Section::make('Класифікація')->schema([
-                    TextInput::make('merchant_type')
-                        ->label('Внутрішній тип товару')
-                        ->maxLength(255)
-                        ->datalist(fn (): array => Product::query()
-                            ->distinct()
-                            ->orderBy('merchant_type')
-                            ->whereNotNull('merchant_type')
-                            ->where('merchant_type', '!=', '')
-                            ->pluck('merchant_type')
-                            ->all())
-                        ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? trim($state) : null),
-                    Select::make('tags')
-                        ->label('Теги')
-                        ->multiple()
-                        ->relationship(titleAttribute: 'name')
-                        ->createOptionForm([
+                Group::make([
+                    Section::make('Основна інформація')
+                        ->description(fn (?Product $record): string => self::isSourceOwned($record)
+                            ? 'Основні ідентифікаційні дані надходять з 1С. Контент і внутрішня організація редагуються окремо.'
+                            : 'Master-дані товару. SKU та GTIN необов’язкові для чернетки.')
+                        ->schema([
                             TextInput::make('name')
                                 ->label('Назва')
                                 ->required()
-                                ->maxLength(255),
+                                ->maxLength(255)
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record))
+                                ->columnSpanFull(),
+                            RichEditor::make('description')
+                                ->label('Опис')
+                                ->columnSpanFull(),
+                            TextInput::make('sku')
+                                ->label('Артикул / SKU')
+                                ->maxLength(255)
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record))
+                                ->helperText(fn (?Product $record): ?string => $record === null
+                                    ? 'Необов’язково. Внутрішня ідентичність товару не залежить від SKU.'
+                                    : null),
+                            TextInput::make('barcode_ean')
+                                ->label('EAN / GTIN')
+                                ->maxLength(255)
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
                         ])
-                        ->createOptionUsing(function (array $data, ?Product $record): string {
-                            if ($record === null) {
-                                throw new LogicException('A persisted Product is required for inline tag creation.');
-                            }
+                        ->columns(2),
 
-                            return app(TagManager::class)
-                                ->create($record->workspace_id, $data['name'])
-                                ->getKey();
-                        })
-                        ->preload()
-                        ->searchable(),
-                ])->columns(2),
+                    Section::make('Медіа')
+                        ->description('Один логічний кадр у Workspace; технічні версії для каналів не дублюються в галереї.')
+                        ->schema([
+                            Placeholder::make('workspace_media')
+                                ->hiddenLabel()
+                                ->content(fn (?Product $record): HtmlString => self::buildMediaWorkspaceHtml($record)),
+                        ]),
 
-                Section::make('Сайт')->schema([
-                    // Left column: URL field
-                    Group::make([
-                        TextInput::make('url')
-                            ->label('URL товару на сайті')
-                            ->url()
-                            ->placeholder('https://babypark.ua/product/...')
-                            ->maxLength(2048)
-                            ->suffixAction(
-                                Action::make('open_url')
-                                    ->icon('heroicon-m-arrow-top-right-on-square')
-                                    ->url(fn (?string $state) => $state)
-                                    ->openUrlInNewTab()
-                                    ->visible(fn (?string $state) => filled($state))
-                            ),
-                    ]),
+                    Section::make('Ціна')
+                        ->schema([
+                            Placeholder::make('workspace_sale_price')
+                                ->label('Поточна ціна')
+                                ->content(fn (?Product $record): string => $record
+                                    ? (app(ProductPricingSummary::class)->formatDefaultSalePrice($record) ?? '—')
+                                    : '—'),
+                            Placeholder::make('workspace_rrp')
+                                ->label('РРЦ')
+                                ->content(fn (?Product $record): string => $record
+                                    ? (app(ProductPricingSummary::class)->formatRrp($record) ?? '—')
+                                    : '—'),
+                            Placeholder::make('workspace_cost')
+                                ->label('Вхідна ціна')
+                                ->content(fn (?Product $record): string => $record
+                                    ? (app(ProductPricingSummary::class)->formatCostPrice($record) ?? '—')
+                                    : '—'),
+                        ])
+                        ->columns(3)
+                        ->visible(fn (?Product $record): bool => $record !== null),
 
-                    // Right column: photo preview
-                    Group::make([
-                        Placeholder::make('photo_preview')
-                            ->label('Фото товару')
-                            ->content(fn (Get $get, ?Product $record) => new HtmlString(
-                                $record
-                                    ? self::buildPhotoPreviewHtml($record)
-                                    : self::buildPhotoPlaceholderHtml()
-                            )),
-                    ]),
-                ])->columns(2),
+                    Section::make('Залишки')
+                        ->schema([
+                            Placeholder::make('workspace_availability')
+                                ->label('Наявність')
+                                ->content(fn (?Product $record): string => $record
+                                    ? AdminAvailabilityPresenter::adminLabel($record)
+                                    : '—'),
+                            Placeholder::make('workspace_inventory_scope')
+                                ->label('Облік')
+                                ->content(fn (?Product $record): string => $record
+                                    ? self::inventoryScopeLabel($record)
+                                    : '—'),
+                        ])
+                        ->columns(2)
+                        ->visible(fn (?Product $record): bool => $record !== null),
+
+                    Section::make('Доставка та фізичні дані')
+                        ->schema([
+                            TextInput::make('net_weight')
+                                ->label('Вага нетто')
+                                ->numeric()
+                                ->suffix('кг')
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('gross_weight')
+                                ->label('Вага брутто')
+                                ->numeric()
+                                ->suffix('кг')
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('width_mm')
+                                ->label('Ширина')
+                                ->numeric()
+                                ->suffix('мм')
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('height_mm')
+                                ->label('Висота')
+                                ->numeric()
+                                ->suffix('мм')
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('depth_mm')
+                                ->label('Глибина')
+                                ->numeric()
+                                ->suffix('мм')
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('volume_m3')
+                                ->label('Об’єм')
+                                ->numeric()
+                                ->suffix('м³')
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                        ])
+                        ->columns(3)
+                        ->collapsible()
+                        ->collapsed(),
+
+                    Section::make('Варіанти')
+                        ->schema([
+                            Placeholder::make('workspace_variants')
+                                ->hiddenLabel()
+                                ->content(fn (?Product $record): HtmlString => self::buildVariantWorkspaceHtml($record)),
+                        ])
+                        ->visible(fn (?Product $record): bool => $record !== null),
+
+                    Section::make('Характеристики')
+                        ->description('Групи визначаються типом товару. Тут показується Master-структура, а не поля конкретного каналу.')
+                        ->schema([
+                            Placeholder::make('workspace_attributes')
+                                ->hiddenLabel()
+                                ->content(fn (?Product $record): HtmlString => self::buildAttributeGroupsHtml($record)),
+                        ])
+                        ->visible(fn (?Product $record): bool => $record !== null),
+
+                    Section::make('SEO та пошук')
+                        ->schema([
+                            TextInput::make('meta_title')
+                                ->label('SEO title')
+                                ->maxLength(255)
+                                ->columnSpanFull(),
+                            TextInput::make('meta_description')
+                                ->label('Meta description')
+                                ->maxLength(500)
+                                ->columnSpanFull(),
+                            TextInput::make('url')
+                                ->label('URL товару на сайті')
+                                ->url()
+                                ->placeholder('https://babypark.ua/product/...')
+                                ->maxLength(2048)
+                                ->suffixAction(
+                                    Action::make('open_url')
+                                        ->icon('heroicon-m-arrow-top-right-on-square')
+                                        ->url(fn (?string $state) => $state)
+                                        ->openUrlInNewTab()
+                                        ->visible(fn (?string $state) => filled($state))
+                                )
+                                ->columnSpanFull(),
+                        ])
+                        ->collapsible(),
+                ])->columnSpan(2),
+
+                Group::make([
+                    Section::make('Статус')
+                        ->schema([
+                            Placeholder::make('workspace_lifecycle')
+                                ->label('Master')
+                                ->content(fn (?Product $record): string => $record
+                                    ? ($record->is_active ? 'Активний' : 'Неактивний')
+                                    : 'Нова чернетка'),
+                            Placeholder::make('workspace_source')
+                                ->label('Джерело')
+                                ->content(fn (?Product $record): string => self::isSourceOwned($record)
+                                    ? '1С · авторитетне джерело'
+                                    : 'Master Workspace'),
+                        ])
+                        ->columns(1),
+
+                    Section::make('Організація')
+                        ->schema([
+                            Select::make('category_id')
+                                ->label('Внутрішня категорія')
+                                ->relationship(name: 'category', titleAttribute: 'name')
+                                ->searchable()
+                                ->preload(),
+                            TextInput::make('brand')
+                                ->label('Бренд')
+                                ->maxLength(255)
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            Placeholder::make('workspace_product_type')
+                                ->label('Тип товару')
+                                ->content(fn (?Product $record): string => $record
+                                    ? app(ProductWorkspaceSummaryService::class)->productTypeLabel($record)
+                                    : 'Базовий товар буде призначено автоматично'),
+                            TextInput::make('merchant_type')
+                                ->label('Внутрішній тип')
+                                ->maxLength(255)
+                                ->datalist(fn (): array => Product::query()
+                                    ->distinct()
+                                    ->orderBy('merchant_type')
+                                    ->whereNotNull('merchant_type')
+                                    ->where('merchant_type', '!=', '')
+                                    ->pluck('merchant_type')
+                                    ->all())
+                                ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? trim($state) : null),
+                            Select::make('tags')
+                                ->label('Теги')
+                                ->multiple()
+                                ->relationship(titleAttribute: 'name')
+                                ->createOptionForm([
+                                    TextInput::make('name')
+                                        ->label('Назва')
+                                        ->required()
+                                        ->maxLength(255),
+                                ])
+                                ->createOptionUsing(function (array $data, ?Product $record): string {
+                                    if ($record === null) {
+                                        throw new LogicException('A persisted Product is required for inline tag creation.');
+                                    }
+
+                                    return app(TagManager::class)
+                                        ->create($record->workspace_id, $data['name'])
+                                        ->getKey();
+                                })
+                                ->preload()
+                                ->searchable()
+                                ->visible(fn (?Product $record): bool => $record !== null),
+                            Placeholder::make('workspace_tags_after_create')
+                                ->label('Теги')
+                                ->content('Можна додати після першого створення товару.')
+                                ->visible(fn (?Product $record): bool => $record === null),
+                        ]),
+
+                    Section::make('Якість даних')
+                        ->schema([
+                            Placeholder::make('workspace_quality')
+                                ->hiddenLabel()
+                                ->content(fn (?Product $record): HtmlString => self::buildBasicQualityHtml($record)),
+                        ])
+                        ->visible(fn (?Product $record): bool => $record !== null),
+
+                    Section::make('Канали публікації')
+                        ->schema([
+                            Placeholder::make('workspace_channels')
+                                ->hiddenLabel()
+                                ->content(fn (?Product $record): HtmlString => self::buildChannelWorkspaceHtml($record)),
+                        ])
+                        ->visible(fn (?Product $record): bool => $record !== null),
+
+                    Section::make('Потребує уваги')
+                        ->schema([
+                            Placeholder::make('workspace_attention')
+                                ->hiddenLabel()
+                                ->content(fn (?Product $record): HtmlString => self::buildAttentionHtml($record)),
+                        ])
+                        ->visible(fn (?Product $record): bool => $record !== null),
+                ])->columnSpan(1),
             ]);
     }
 
