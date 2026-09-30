@@ -80,16 +80,12 @@ class ProductResource extends Resource
     {
         return $schema
             ->components([
-                Section::make(fn (?Product $record): string => filled($record?->onec_guid)
-                    ? 'Основне (з 1С)'
-                    : 'Основна інформація')->schema([
+                Section::make(fn (?Product $record): string => filled($record?->onec_guid) ? 'Основне (з 1С)' : 'Основна інформація')->schema([
                     TextInput::make('sku')
                         ->label('Артикул / SKU')
                         ->maxLength(255)
                         ->disabled(fn (?Product $record): bool => filled($record?->onec_guid))
-                        ->helperText(fn (?Product $record): ?string => $record === null
-                            ? 'Необов’язково. Системна ідентичність товару не залежить від SKU.'
-                            : null),
+                        ->helperText(fn (?Product $record): ?string => $record === null ? 'Необов’язково. Системна ідентичність товару не залежить від SKU.' : null),
                     TextInput::make('name')
                         ->label('Назва')
                         ->required()
@@ -872,17 +868,17 @@ HTML;
     {
         $actor = auth()->user();
 
-        if (! $actor instanceof User) {
-            return Response::deny();
+        if ($actor instanceof User) {
+            $allowed = app(WorkspaceAuthorization::class)->allows(
+                $actor,
+                app(WorkspaceContext::class)->current(),
+                WorkspacePermissions::MANAGE_PRODUCTS,
+            );
+
+            return $allowed ? Response::allow() : Response::deny();
         }
 
-        return app(WorkspaceAuthorization::class)->allows(
-            $actor,
-            app(WorkspaceContext::class)->current(),
-            WorkspacePermissions::MANAGE_PRODUCTS,
-        )
-            ? Response::allow()
-            : Response::deny();
+        return Response::deny();
     }
 
     public static function getDeleteAuthorizationResponse(Model $record): Response
