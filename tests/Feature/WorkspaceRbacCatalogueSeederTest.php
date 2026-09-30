@@ -28,7 +28,7 @@ class WorkspaceRbacCatalogueSeederTest extends TestCase
 
         $codes = WorkspacePermission::query()->orderBy('code')->pluck('code')->all();
 
-        $this->assertCount(11, $codes);
+        $this->assertCount(12, $codes);
         $this->assertEqualsCanonicalizing(WorkspacePermissions::catalogue(), $codes);
     }
 
@@ -73,7 +73,7 @@ class WorkspaceRbacCatalogueSeederTest extends TestCase
         $this->seed(WorkspaceRbacPermissionSeeder::class);
         $this->seed(WorkspaceRbacPermissionSeeder::class);
 
-        $this->assertSame(11, WorkspacePermission::query()->count());
+        $this->assertSame(12, WorkspacePermission::query()->count());
         $this->assertEqualsCanonicalizing(
             WorkspacePermissions::catalogue(),
             WorkspacePermission::query()->pluck('code')->all(),
@@ -116,7 +116,7 @@ class WorkspaceRbacCatalogueSeederTest extends TestCase
     {
         $this->seed(DatabaseSeeder::class);
 
-        $this->assertSame(11, WorkspacePermission::query()->count());
+        $this->assertSame(12, WorkspacePermission::query()->count());
         $this->assertSame(0, WorkspaceUser::query()->count());
         $this->assertSame(0, WorkspaceRole::query()->count());
         $this->assertDatabaseCount('workspace_user_roles', 0);
