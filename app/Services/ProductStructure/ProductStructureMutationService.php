@@ -6,12 +6,15 @@ use App\Enums\AttributeStatus;
 use App\Enums\FieldObjectType;
 use App\Models\AttributeGroup;
 use App\Models\FieldBinding;
+use App\Models\Product;
 use App\Models\ProductType;
 use App\Models\ProductTypeFieldPlacement;
 use App\Models\ProductTypeGroupPlacement;
+use App\Models\ProductVariantAxis;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceAuthorization;
+use App\Support\Catalog\Exceptions\ProductVariantStructureException;
 use App\Support\ProductStructure\Exceptions\ProductStructureInvariantException;
 use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -72,6 +75,12 @@ final class ProductStructureMutationService
                 ->lockForUpdate()
                 ->first() ?? new ProductTypeGroupPlacement;
 
+            if ($placement->exists
+                && ((bool) $placement->is_optional !== $optional || (bool) $placement->default_active !== $defaultActive)
+                && $this->axisInUseForGroup($workspace->id, $lockedType->id, $placement->id)) {
+                throw ProductVariantStructureException::declaredAxisBlocksStructureChange();
+            }
+
             $placement->fill([
                 'workspace_id' => $workspace->id,
                 'product_type_id' => $lockedType->id,
@@ -117,6 +126,12 @@ final class ProductStructureMutationService
                 ->lockForUpdate()
                 ->first() ?? new ProductTypeFieldPlacement;
 
+            if ($placement->exists
+                && (string) $placement->product_type_group_placement_id !== (string) $lockedGroupPlacement->id
+                && $this->axisInUseForBinding($workspace->id, $lockedType->id, (string) $lockedBinding->id)) {
+                throw ProductVariantStructureException::declaredAxisBlocksStructureChange();
+            }
+
             $placement->fill([
                 'workspace_id' => $workspace->id,
                 'product_type_id' => $lockedType->id,
@@ -145,6 +160,10 @@ final class ProductStructureMutationService
                 ->lockForUpdate()
                 ->firstOrFail();
             $type = $this->lockedType($workspace, $locked->product_type_id);
+            if ($this->axisInUseForGroup($workspace->id, $type->id, $locked->id)) {
+                throw ProductVariantStructureException::declaredAxisBlocksStructureChange();
+            }
+
             $locked->delete();
             $this->bumpRevision($type);
         });
@@ -156,9 +175,48 @@ final class ProductStructureMutationService
             $this->lockedWorkspace($actor, $workspace);
             $locked = ProductTypeFieldPlacement::withoutWorkspaceScope()->where('workspace_id', $workspace->id)->whereKey($placement->id)->lockForUpdate()->firstOrFail();
             $type = $this->lockedType($workspace, $locked->product_type_id);
+
+            if ($this->axisInUseForBinding($workspace->id, $type->id, (string) $locked->field_binding_id)) {
+                throw ProductVariantStructureException::declaredAxisBlocksStructureChange();
+            }
+
             $locked->delete();
             $this->bumpRevision($type);
         });
+    }
+
+    private function axisInUseForGroup(string $workspaceId, string $productTypeId, string $groupPlacementId): bool
+    {
+        $bindingIds = ProductTypeFieldPlacement::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->where('product_type_id', $productTypeId)
+            ->where('product_type_group_placement_id', $groupPlacementId)
+            ->pluck('field_binding_id');
+
+        if ($bindingIds->isEmpty()) {
+            return false;
+        }
+
+        return ProductVariantAxis::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->whereIn('field_binding_id', $bindingIds)
+            ->whereIn('product_id', Product::withoutWorkspaceScope()
+                ->where('workspace_id', $workspaceId)
+                ->where('product_type_id', $productTypeId)
+                ->select('id'))
+            ->exists();
+    }
+
+    private function axisInUseForBinding(string $workspaceId, string $productTypeId, string $bindingId): bool
+    {
+        return ProductVariantAxis::withoutWorkspaceScope()
+            ->where('workspace_id', $workspaceId)
+            ->where('field_binding_id', $bindingId)
+            ->whereIn('product_id', Product::withoutWorkspaceScope()
+                ->where('workspace_id', $workspaceId)
+                ->where('product_type_id', $productTypeId)
+                ->select('id'))
+            ->exists();
     }
 
     private function lockedWorkspace(User $actor, Workspace $workspace): Workspace

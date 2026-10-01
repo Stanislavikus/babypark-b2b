@@ -338,6 +338,13 @@ class FieldFoundationMigrationTest extends TestCase
     {
         Artisan::call('migrate:fresh');
 
+        if (Schema::hasTable('product_variant_axes')) {
+            $variantAxesMigration = require database_path('migrations/2026_10_01_180000_create_product_variant_axes_table.php');
+            $variantAxesMigration->down();
+
+            $this->assertFalse(Schema::hasTable('product_variant_axes'));
+        }
+
         if (Schema::hasTable('adobe_product_type_attribute_set_defaults')) {
             $classificationMigration = require database_path('migrations/2026_09_24_060000_magento_product_classification_runtime.php');
             $classificationMigration->down();

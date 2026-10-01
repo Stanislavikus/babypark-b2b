@@ -101,6 +101,11 @@ class Product extends Model
         return $this->hasMany(ProductVariant::class);
     }
 
+    public function variantAxes(): HasMany
+    {
+        return $this->hasMany(ProductVariantAxis::class)->orderBy('sort_order');
+    }
+
     public function syncChannelSelections(): HasMany
     {
         return $this->hasMany(SyncConfigurationProductSelection::class, 'product_id');

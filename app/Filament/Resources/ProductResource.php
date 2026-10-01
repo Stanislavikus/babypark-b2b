@@ -1012,7 +1012,7 @@ class ProductResource extends Resource
         $summary = app(ProductWorkspaceSummaryService::class)->variants($record);
         $label = e($summary['label']);
 
-        if ($summary['count'] <= 1) {
+        if ($summary['axes'] === [] && $summary['count'] <= 1) {
             $sku = $summary['skus'][0] ?? null;
             $skuHtml = $sku
                 ? '<span style="margin-left:8px;color:#6b7280;">SKU '.e($sku).'</span>'
@@ -1020,17 +1020,58 @@ class ProductResource extends Resource
 
             return new HtmlString(
                 '<div><strong>'.$label.'</strong>'.$skuHtml.'</div>'.
-                '<div style="margin-top:4px;font-size:12px;color:#6b7280;">Варіанти не показуються, доки товар не має осей варіації.</div>'
+                '<div style="margin-top:4px;font-size:12px;color:#6b7280;">Додайте варіанти, щоб оголосити першу опцію — наприклад, колір або розмір.</div>'
             );
         }
 
-        $chips = collect($summary['skus'])
-            ->map(fn (string $sku): string => '<span style="display:inline-flex;padding:3px 7px;border-radius:999px;background:#f3f4f6;margin:3px 4px 0 0;font-size:12px;">'.e($sku).'</span>')
+        if ($summary['axes'] === []) {
+            $chips = collect($summary['skus'])
+                ->map(fn (string $sku): string => '<span style="display:inline-flex;padding:3px 7px;border-radius:999px;background:#f3f4f6;margin:3px 4px 0 0;font-size:12px;">'.e($sku).'</span>')
+                ->implode('');
+
+            return new HtmlString(
+                '<div><strong>'.$label.'</strong></div>'.
+                '<div style="margin-top:6px;">'.$chips.'</div>'.
+                '<div style="margin-top:6px;font-size:11px;color:#92400e;">Master-опції для цієї сім’ї ще не оголошені. Для товару із зовнішнім джерелом структура залишається read-only.</div>'
+            );
+        }
+
+        $headers = collect($summary['axes'])
+            ->map(fn (array $axis): string => '<th style="text-align:left;padding:7px 9px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;font-weight:600;">'.e($axis['label']).'</th>')
+            ->implode('');
+        $rows = collect($summary['rows'])
+            ->map(function (array $row): string {
+                $optionCells = collect($row['options'])
+                    ->map(fn (string $value): string => '<td style="padding:8px 9px;border-bottom:1px solid #f3f4f6;">'.e($value).'</td>')
+                    ->implode('');
+
+                return '<tr>'.
+                    $optionCells.
+                    '<td style="padding:8px 9px;border-bottom:1px solid #f3f4f6;">'.e($row['sku'] ?? '—').'</td>'.
+                    '<td style="padding:8px 9px;border-bottom:1px solid #f3f4f6;">'.e($row['gtin'] ?? '—').'</td>'.
+                    '<td style="padding:8px 9px;border-bottom:1px solid #f3f4f6;white-space:nowrap;">'.e($row['price'] ?? '—').'</td>'.
+                    '<td style="padding:8px 9px;border-bottom:1px solid #f3f4f6;text-align:right;">'.e((string) $row['stock']).'</td>'.
+                    '</tr>';
+            })
             ->implode('');
 
         return new HtmlString(
-            '<div><strong>'.$label.'</strong></div>'.
-            '<div style="margin-top:6px;">'.$chips.'</div>'
+            '<div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin-bottom:8px;">'.
+                '<strong>'.$label.'</strong>'.
+                '<span style="font-size:11px;color:#6b7280;">'.count($summary['axes']).' опц.</span>'.
+            '</div>'.
+            '<div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:8px;">'.
+                '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:620px;">'.
+                    '<thead><tr>'.$headers.
+                        '<th style="text-align:left;padding:7px 9px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">SKU</th>'.
+                        '<th style="text-align:left;padding:7px 9px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">GTIN</th>'.
+                        '<th style="text-align:left;padding:7px 9px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">Ціна</th>'.
+                        '<th style="text-align:right;padding:7px 9px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">Залишок</th>'.
+                    '</tr></thead>'.
+                    '<tbody>'.$rows.'</tbody>'.
+                '</table>'.
+            '</div>'.
+            '<div style="margin-top:6px;font-size:11px;color:#9ca3af;">Ціна та залишок лише відображаються зі своїх доменів; створення варіанта їх не копіює.</div>'
         );
     }
 

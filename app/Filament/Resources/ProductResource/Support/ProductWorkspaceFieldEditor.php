@@ -14,6 +14,7 @@ use App\Models\ProductType;
 use App\Models\ProductTypeFieldPlacement;
 use App\Models\ProductTypeGroupPlacement;
 use App\Models\ProductVariant;
+use App\Models\ProductVariantAxis;
 use App\Models\VariantFieldValue;
 use App\Services\Fields\FieldValueWriteResult;
 use App\Services\Fields\GovernedDynamicFieldValueWriter;
@@ -275,6 +276,12 @@ final class ProductWorkspaceFieldEditor
             ->where('is_active', true)
             ->orderBy('id')
             ->get();
+        $declaredAxisBindingIds = ProductVariantAxis::withoutWorkspaceScope()
+            ->where('workspace_id', $product->workspace_id)
+            ->where('product_id', $product->id)
+            ->pluck('field_binding_id')
+            ->map(fn ($id): string => (string) $id)
+            ->all();
         $groupPlacements = ProductTypeGroupPlacement::withoutWorkspaceScope()
             ->where('workspace_id', $product->workspace_id)
             ->where('product_type_id', $productType->id)
@@ -301,6 +308,11 @@ final class ProductWorkspaceFieldEditor
             }
 
             $placements = $groupPlacement->fieldPlacements
+                ->filter(fn (ProductTypeFieldPlacement $placement): bool => ! in_array(
+                    (string) $placement->field_binding_id,
+                    $declaredAxisBindingIds,
+                    true,
+                ))
                 ->filter(fn (ProductTypeFieldPlacement $placement): bool => $this->placementIsEditable(
                     (string) $product->workspace_id,
                     $placement,

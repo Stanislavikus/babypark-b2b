@@ -4,10 +4,13 @@ namespace App\Services\ProductStructure;
 
 use App\Models\Product;
 use App\Models\ProductActiveOptionalGroup;
+use App\Models\ProductTypeFieldPlacement;
 use App\Models\ProductTypeGroupPlacement;
+use App\Models\ProductVariantAxis;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceAuthorization;
+use App\Support\Catalog\Exceptions\ProductVariantStructureException;
 use App\Support\ProductStructure\Exceptions\ProductStructureInvariantException;
 use App\Support\Workspace\WorkspacePermissions;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -46,6 +49,22 @@ final class ProductOptionalGroupMutationService
             }
             if (! $lockedPlacement->is_optional) {
                 throw new ProductStructureInvariantException('Required ProductType groups cannot be activated or deactivated per Product.');
+            }
+
+            if (! $active) {
+                $bindingIds = ProductTypeFieldPlacement::withoutWorkspaceScope()
+                    ->where('workspace_id', $workspace->id)
+                    ->where('product_type_id', $lockedProduct->product_type_id)
+                    ->where('product_type_group_placement_id', $lockedPlacement->id)
+                    ->pluck('field_binding_id');
+
+                if ($bindingIds->isNotEmpty() && ProductVariantAxis::withoutWorkspaceScope()
+                    ->where('workspace_id', $workspace->id)
+                    ->where('product_id', $lockedProduct->id)
+                    ->whereIn('field_binding_id', $bindingIds)
+                    ->exists()) {
+                    throw ProductVariantStructureException::declaredAxisBlocksStructureChange();
+                }
             }
 
             $query = ProductActiveOptionalGroup::withoutWorkspaceScope()
