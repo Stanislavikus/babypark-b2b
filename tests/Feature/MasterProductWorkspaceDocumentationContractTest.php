@@ -35,4 +35,32 @@ class MasterProductWorkspaceDocumentationContractTest extends TestCase
         $this->assertStringContainsString('Catalog Change & Publication v0.3', $map);
         $this->assertStringContainsString('Media Policy v1', $map);
     }
+
+    #[Test]
+    public function delivery_matrix_keeps_approved_master_product_capabilities_visible_until_completed(): void
+    {
+        $matrix = File::get(base_path('docs/reviews/MASTER_PRODUCT_WORKSPACE_DELIVERY_MATRIX_2026_10_01.md'));
+
+        $this->assertStringContainsString('Rows are never deleted because implementation is incomplete.', $matrix);
+        $this->assertStringContainsString('Media gallery', $matrix);
+        $this->assertStringContainsString('Perceptual-quality optimization', $matrix);
+        $this->assertStringContainsString('360 as one logical media presentation', $matrix);
+        $this->assertStringContainsString('Search Brief / keyword research', $matrix);
+        $this->assertStringContainsString('Publication ChangeSet / Projection Plan', $matrix);
+        $this->assertStringContainsString('Create with AI entry point converging on Master', $matrix);
+        $this->assertStringContainsString('Final visual/design acceptance', $matrix);
+    }
+
+    #[Test]
+    public function media_persistence_alignment_is_resolved_and_mapped(): void
+    {
+        $alignment = File::get(base_path('docs/reviews/MASTER_PRODUCT_MEDIA_PERSISTENCE_ALIGNMENT_2026_10_01.md'));
+        $map = File::get(base_path('docs/Project_Documentation_Map.md'));
+
+        $this->assertStringContainsString('STATUS: [Resolved — 2026-10-01] — PRODUCT OWNER APPROVED', $alignment);
+        $this->assertStringContainsString('parent_media_asset_id', $alignment);
+        $this->assertStringContainsString('products.images', $alignment);
+        $this->assertStringContainsString('MASTER_PRODUCT_MEDIA_PERSISTENCE_ALIGNMENT_2026_10_01.md', $map);
+        $this->assertStringContainsString('[Resolved — 2026-10-01]', $map);
+    }
 }
