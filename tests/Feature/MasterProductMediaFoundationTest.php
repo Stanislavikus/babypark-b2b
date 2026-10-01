@@ -19,6 +19,7 @@ use App\Support\Catalog\Exceptions\ProductMediaException;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -141,6 +142,74 @@ class MasterProductMediaFoundationTest extends TestCase
         $this->assertSame(0, $remaining->sort_order);
         $this->assertDatabaseHas('media_assets', ['id' => $second->id]);
         $this->assertSame(['https://cdn.example.test/ui-first.jpg'], $product->fresh()->images);
+    }
+
+    #[Test]
+    public function media_mutation_requires_manage_products_permission(): void
+    {
+        Storage::fake('public');
+        $product = $this->product();
+        $other = User::factory()->create();
+        $this->makeWorkspaceMembership($this->workspace, $other);
+
+        $this->expectException(AuthorizationException::class);
+
+        app(ProductMediaMutationService::class)->addUploadedImages(
+            $other,
+            $this->workspace,
+            $product,
+            [UploadedFile::fake()->image('unauthorized.jpg', 640, 480)],
+        );
+    }
+
+    #[Test]
+    public function stale_reorder_is_rejected_without_partial_mutation(): void
+    {
+        $product = $this->product();
+        $first = $this->externalAsset('https://cdn.example.test/stale-first.jpg');
+        $second = $this->externalAsset('https://cdn.example.test/stale-second.jpg');
+
+        $firstLink = ProductMedia::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'media_asset_id' => $first->id,
+            'role' => MediaRole::Primary,
+            'sort_order' => 0,
+            'locale' => null,
+        ]);
+        $secondLink = ProductMedia::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'media_asset_id' => $second->id,
+            'role' => MediaRole::Gallery,
+            'sort_order' => 1,
+            'locale' => null,
+        ]);
+
+        try {
+            app(ProductMediaMutationService::class)->reorder(
+                $this->actor,
+                $this->workspace,
+                $product,
+                [(string) $secondLink->id],
+            );
+            $this->fail('Expected incomplete reorder to fail closed.');
+        } catch (ProductMediaException $e) {
+            $this->assertStringContainsString('застарів або неповний', $e->getMessage());
+        }
+
+        $current = ProductMedia::withoutWorkspaceScope()
+            ->where('product_id', $product->id)
+            ->whereNull('locale')
+            ->orderBy('sort_order')
+            ->get();
+
+        $this->assertSame((string) $firstLink->id, (string) $current[0]->id);
+        $this->assertSame(MediaRole::Primary, $current[0]->role);
+        $this->assertSame(0, $current[0]->sort_order);
+        $this->assertSame((string) $secondLink->id, (string) $current[1]->id);
+        $this->assertSame(MediaRole::Gallery, $current[1]->role);
+        $this->assertSame(1, $current[1]->sort_order);
     }
 
     #[Test]
