@@ -60,7 +60,8 @@ final class ProductWorkspaceSummaryService
      *   filled:int,
      *   percentage:int,
      *   optional:bool,
-     *   active:bool
+     *   active:bool,
+     *   missing:list<string>
      * }>
      */
     public function attributeGroups(Product $product): array
@@ -68,6 +69,7 @@ final class ProductWorkspaceSummaryService
         $product->loadMissing([
             'productType.groupPlacements.attributeGroup',
             'productType.groupPlacements.fieldPlacements',
+            'productType.groupPlacements.fieldPlacements.fieldBinding.fieldDefinition',
         ]);
 
         if ($product->productType === null) {
@@ -90,6 +92,27 @@ final class ProductWorkspaceSummaryService
                     ?? 'Група'
                 );
 
+                $missingBindingIds = collect($groupProjection?->missingProductBindingIds ?? [])
+                    ->merge(collect($groupProjection?->missingVariantCells ?? [])->pluck('field_binding_id'))
+                    ->unique()
+                    ->values();
+
+                $missingLabels = $placement->fieldPlacements
+                    ->filter(fn ($fieldPlacement): bool => $missingBindingIds->contains((string) $fieldPlacement->field_binding_id))
+                    ->map(function ($fieldPlacement): string {
+                        $definition = $fieldPlacement->fieldBinding?->fieldDefinition;
+
+                        return (string) (
+                            $definition?->localized_labels['uk']
+                            ?? $definition?->localized_labels['en']
+                            ?? $definition?->code
+                            ?? $fieldPlacement->field_binding_id
+                        );
+                    })
+                    ->unique()
+                    ->values()
+                    ->all();
+
                 return [
                     'label' => $label,
                     'total' => $placement->fieldPlacements->count(),
@@ -98,6 +121,7 @@ final class ProductWorkspaceSummaryService
                     'percentage' => $groupProjection?->percentage ?? 100,
                     'optional' => (bool) $placement->is_optional,
                     'active' => $groupProjection?->isActive ?? ! $placement->is_optional,
+                    'missing' => $missingLabels,
                 ];
             })
             ->values()
