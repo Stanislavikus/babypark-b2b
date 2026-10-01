@@ -24,6 +24,7 @@ use App\Models\WorkspacePermission;
 use App\Models\WorkspaceRole;
 use App\Models\WorkspaceUser;
 use App\Services\Catalog\ProductWorkspaceSummaryService;
+use App\Services\ProductStructure\ProductStructureMutationService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Filament\Facades\Filament;
@@ -268,6 +269,66 @@ class MasterProductWorkspaceShellTest extends TestCase
             ->assertNotified();
 
         $this->assertSame((string) $target->id, (string) $product->fresh()->product_type_id);
+    }
+
+    #[Test]
+    public function product_type_confirmation_rejects_structure_changes_after_reviewed_preview(): void
+    {
+        $this->grantWorkspacePermission(WorkspacePermissions::MANAGE_PRODUCT_STRUCTURE);
+
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'STALE-PREVIEW-P',
+            'name' => 'Stale preview product',
+            'is_active' => true,
+        ]);
+        ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'STALE-PREVIEW-V',
+            'attributes' => [],
+            'is_active' => true,
+        ]);
+        $target = ProductType::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'code' => 'stale-preview-target',
+            'localized_labels' => ['uk' => 'Цільовий тип'],
+            'status' => 'active',
+            'is_default' => false,
+            'structure_revision' => 1,
+        ]);
+
+        $component = Livewire::actingAs($this->admin)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->mountAction('change_product_type')
+            ->setActionData(['product_type_id' => $target->id])
+            ->assertActionDataSet(fn (array $data): bool => filled($data['reviewed_impact_token'] ?? null));
+
+        $structure = app(ProductStructureMutationService::class);
+        $group = $structure->createAttributeGroup(
+            $this->admin,
+            $this->workspace,
+            'late-preview-group',
+            ['uk' => 'Пізня група'],
+        );
+        $structure->putGroupPlacement(
+            $this->admin,
+            $this->workspace,
+            $target,
+            $group,
+            100,
+            false,
+            true,
+        );
+
+        $component
+            ->callMountedAction()
+            ->assertHasNoActionErrors()
+            ->assertActionNotMounted();
+
+        $this->assertNotSame((string) $target->id, (string) $product->fresh()->product_type_id);
     }
 
     #[Test]

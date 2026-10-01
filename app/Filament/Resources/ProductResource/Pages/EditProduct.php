@@ -12,15 +12,19 @@ use App\Services\ProductStructure\ProductTypeChangeImpactService;
 use App\Services\ProductStructure\ProductTypeMutationService;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\ProductStructure\Exceptions\ProductTypeChangeStaleException;
+use App\Support\ProductStructure\ProductTypeChangeImpact;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Illuminate\Support\Facades\Crypt;
 
 class EditProduct extends EditRecord
 {
@@ -74,7 +78,31 @@ class EditProduct extends EditRecord
                     ->default(fn (): ?string => $this->record->product_type_id)
                     ->required()
                     ->searchable()
-                    ->live(),
+                    ->live()
+                    ->afterStateUpdated(function (?string $state, Set $set): void {
+                        $set('reviewed_impact_token', null);
+
+                        if (! filled($state) || (string) $state === (string) $this->record->product_type_id) {
+                            return;
+                        }
+
+                        $target = ProductType::withoutWorkspaceScope()
+                            ->where('workspace_id', $this->record->workspace_id)
+                            ->where('status', 'active')
+                            ->find($state);
+
+                        if (! $target instanceof ProductType) {
+                            return;
+                        }
+
+                        try {
+                            $impact = app(ProductTypeChangeImpactService::class)->preview($this->record, $target);
+                            $set('reviewed_impact_token', $this->encodeReviewedImpact($impact));
+                        } catch (\Throwable) {
+                            $set('reviewed_impact_token', null);
+                        }
+                    }),
+                Hidden::make('reviewed_impact_token'),
                 Placeholder::make('impact_notice')
                     ->label('Що зміниться')
                     ->content(function (Get $get): string {
@@ -84,18 +112,9 @@ class EditProduct extends EditRecord
                             return 'Оберіть інший тип товару, щоб побачити вплив до підтвердження.';
                         }
 
-                        $target = ProductType::withoutWorkspaceScope()
-                            ->where('workspace_id', $this->record->workspace_id)
-                            ->find($targetId);
-
-                        if (! $target instanceof ProductType) {
-                            return 'Обраний тип товару недоступний.';
-                        }
-
-                        try {
-                            $impact = app(ProductTypeChangeImpactService::class)->preview($this->record, $target);
-                        } catch (\Throwable) {
-                            return 'Не вдалося побудувати попередній перегляд. Зміну не слід підтверджувати.';
+                        $impact = $this->decodeReviewedImpact($get('reviewed_impact_token'));
+                        if (! $impact instanceof ProductTypeChangeImpact || $impact->toProductTypeId !== (string) $targetId) {
+                            return 'Не вдалося зафіксувати попередній перегляд. Оберіть тип товару ще раз.';
                         }
 
                         return sprintf(
@@ -122,7 +141,17 @@ class EditProduct extends EditRecord
                     return;
                 }
 
-                $impact = app(ProductTypeChangeImpactService::class)->preview($this->record, $target);
+                $reviewedImpact = $this->decodeReviewedImpact($data['reviewed_impact_token'] ?? null);
+                if (! $reviewedImpact instanceof ProductTypeChangeImpact
+                    || $reviewedImpact->toProductTypeId !== (string) $target->id) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Попередній перегляд недоступний')
+                        ->body('Оберіть тип товару ще раз і перегляньте актуальний вплив перед підтвердженням.')
+                        ->send();
+
+                    return;
+                }
 
                 try {
                     app(ProductTypeMutationService::class)->change(
@@ -130,7 +159,7 @@ class EditProduct extends EditRecord
                         $workspace,
                         $this->record,
                         $target,
-                        $impact,
+                        $reviewedImpact,
                     );
 
                     $this->record->refresh();
@@ -147,6 +176,29 @@ class EditProduct extends EditRecord
                         ->send();
                 }
             });
+    }
+
+    private function encodeReviewedImpact(ProductTypeChangeImpact $impact): string
+    {
+        return Crypt::encryptString(serialize($impact));
+    }
+
+    private function decodeReviewedImpact(mixed $token): ?ProductTypeChangeImpact
+    {
+        if (! is_string($token) || $token === '') {
+            return null;
+        }
+
+        try {
+            $impact = unserialize(
+                Crypt::decryptString($token),
+                ['allowed_classes' => [ProductTypeChangeImpact::class]],
+            );
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return $impact instanceof ProductTypeChangeImpact ? $impact : null;
     }
 
     private function optionalGroupsAction(): Action
