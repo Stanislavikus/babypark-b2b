@@ -204,7 +204,7 @@ class ProductResource extends Resource
                         ->visible(fn (?Product $record): bool => $record !== null),
 
                     Section::make('Характеристики')
-                        ->description('Групи визначаються типом товару. Тут показується Master-структура, а не поля конкретного каналу.')
+                        ->description('Групи визначаються типом товару. Обов’язкові поля показуються першими; поля каналу сюди не дублюються.')
                         ->schema([
                             Placeholder::make('workspace_attributes')
                                 ->hiddenLabel()

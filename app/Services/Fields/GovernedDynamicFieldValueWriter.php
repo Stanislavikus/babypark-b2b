@@ -202,6 +202,32 @@ final class GovernedDynamicFieldValueWriter
         );
     }
 
+    public function clearIfCurrentValue(
+        string $workspaceId,
+        FieldObjectType $targetType,
+        int|string $targetId,
+        string $fieldBindingId,
+        mixed $expectedCurrentValue,
+        ?string $locale = null,
+    ): FieldValueWriteResult {
+        $context = $this->resolveContext(
+            workspaceId: $workspaceId,
+            targetType: $targetType,
+            targetId: $targetId,
+            fieldBindingId: $fieldBindingId,
+            locale: $locale,
+        );
+
+        return $this->mutateWithRetry(
+            context: $context,
+            operation: 'clear',
+            value: null,
+            locale: $locale,
+            compareCurrent: true,
+            expectedCurrentValue: $expectedCurrentValue,
+        );
+    }
+
     public function clear(
         string $workspaceId,
         FieldObjectType $targetType,

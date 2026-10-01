@@ -3,10 +3,14 @@
 namespace App\Filament\Resources\ProductResource\Pages;
 
 use App\Filament\Resources\ProductResource;
+use App\Filament\Resources\ProductResource\Support\ProductWorkspaceFieldEditor;
+use App\Filament\Resources\ProductResource\Support\ProductWorkspaceFieldEditStaleException;
 use App\Models\ProductType;
 use App\Models\ProductTypeGroupPlacement;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Fields\Exceptions\DynamicFieldCurrentValueMismatchException;
+use App\Services\Fields\Exceptions\FieldValueWriterException;
 use App\Services\ProductStructure\ProductOptionalGroupMutationService;
 use App\Services\ProductStructure\ProductTypeChangeImpactService;
 use App\Services\ProductStructure\ProductTypeMutationService;
@@ -24,6 +28,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Support\Enums\Width;
 use Illuminate\Support\Facades\Crypt;
 
 class EditProduct extends EditRecord
@@ -46,10 +51,57 @@ class EditProduct extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            $this->editProductFieldsAction(),
             $this->changeProductTypeAction(),
             $this->optionalGroupsAction(),
             ViewAction::make()->label('Перегляд'),
         ];
+    }
+
+    private function editProductFieldsAction(): Action
+    {
+        return Action::make('edit_product_fields')
+            ->label('Поля товару')
+            ->icon('heroicon-o-pencil-square')
+            ->visible(fn (): bool => $this->canManageProducts()
+                && app(ProductWorkspaceFieldEditor::class)->hasEditableFields($this->record))
+            ->modalHeading('Поля товару')
+            ->modalDescription('Master-поля поточного типу товару. Незавершений товар можна зберігати: обов’язковість тут впливає на повноту даних, а не блокує чернетку.')
+            ->modalWidth(Width::SevenExtraLarge)
+            ->modalSubmitActionLabel('Зберегти поля')
+            ->fillForm(fn (): array => app(ProductWorkspaceFieldEditor::class)->formState($this->record))
+            ->schema(fn (): array => app(ProductWorkspaceFieldEditor::class)->schema($this->record))
+            ->action(function (array $data): void {
+                if (! $this->canManageProducts()) {
+                    abort(403);
+                }
+
+                try {
+                    $result = app(ProductWorkspaceFieldEditor::class)->apply($this->record, $data);
+                    $this->record->refresh();
+
+                    $mutations = $result['changed'] + $result['cleared'];
+                    Notification::make()
+                        ->success()
+                        ->title($mutations > 0 ? 'Поля товару збережено' : 'Змін немає')
+                        ->body($mutations > 0
+                            ? 'Оновлено: '.$result['changed'].', очищено: '.$result['cleared'].'.'
+                            : null)
+                        ->send();
+                } catch (ProductWorkspaceFieldEditStaleException|DynamicFieldCurrentValueMismatchException $exception) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Дані вже змінилися')
+                        ->body($exception->getMessage())
+                        ->send();
+                } catch (FieldValueWriterException) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Не вдалося зберегти поле')
+                        ->body('Перевірте значення поля та спробуйте ще раз.')
+                        ->send();
+                }
+            });
     }
 
     private function changeProductTypeAction(): Action
@@ -258,6 +310,24 @@ class EditProduct extends EditRecord
                     ->title('Стан групи характеристик змінено')
                     ->send();
             });
+    }
+
+    private function canManageProducts(): bool
+    {
+        $actor = auth()->user();
+
+        if (! $actor instanceof User) {
+            return false;
+        }
+
+        $workspace = app(WorkspaceContext::class)->current();
+
+        return (string) $workspace->id === (string) $this->record->workspace_id
+            && app(WorkspaceAuthorization::class)->allows(
+                $actor,
+                $workspace,
+                WorkspacePermissions::MANAGE_PRODUCTS,
+            );
     }
 
     private function canManageProductStructure(): bool
