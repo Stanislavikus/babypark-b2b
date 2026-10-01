@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\ProductStructure\BasicProductStructureReconciler;
+use App\Support\Catalog\Exceptions\ProductMediaException;
 use App\Support\Workspace\BelongsToWorkspace;
 use App\Support\Workspace\WorkspaceContext;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Schema;
 
 class Product extends Model
 {
@@ -65,6 +67,19 @@ class Product extends Model
             $workspaceId = (string) ($product->getAttribute('workspace_id') ?? app(WorkspaceContext::class)->id());
             $product->setAttribute('product_type_id', $reconciler->ensureWorkspace($workspaceId)->id);
         });
+
+        static::updating(function (Product $product): void {
+            if (! $product->isDirty('images') || ! Schema::hasTable('product_media')) {
+                return;
+            }
+
+            if (ProductMedia::withoutWorkspaceScope()
+                ->where('workspace_id', $product->workspace_id)
+                ->where('product_id', $product->id)
+                ->exists()) {
+                throw ProductMediaException::legacyWriteForbidden();
+            }
+        });
     }
 
     protected function casts(): array
@@ -104,6 +119,11 @@ class Product extends Model
     public function variantAxes(): HasMany
     {
         return $this->hasMany(ProductVariantAxis::class)->orderBy('sort_order');
+    }
+
+    public function media(): HasMany
+    {
+        return $this->hasMany(ProductMedia::class)->orderBy('sort_order');
     }
 
     public function syncChannelSelections(): HasMany

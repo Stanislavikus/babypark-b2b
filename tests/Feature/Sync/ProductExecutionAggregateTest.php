@@ -2,9 +2,15 @@
 
 namespace Tests\Feature\Sync;
 
+use App\Enums\MediaAssetType;
+use App\Enums\MediaDiagnosisStatus;
+use App\Enums\MediaRole;
+use App\Models\MediaAsset;
 use App\Models\Product;
+use App\Models\ProductMedia;
 use App\Models\ProductVariant;
 use App\Models\VariantFieldValue;
+use App\Models\VariantMedia;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
 use App\Support\Sync\Preview\ProductExecutionImageStructuralState;
 use Database\Seeders\ConnectorFoundationSeeder;
@@ -257,6 +263,133 @@ class ProductExecutionAggregateTest extends TestCase
         $this->assertSame('https://cdn.example.test/primary.jpg', $aggregate->imageInput->entries[0]->sourceReference);
         $this->assertSame(1, $aggregate->imageInput->entries[1]->declarationIndex);
         $this->assertSame('https://cdn.example.test/gallery.jpg', $aggregate->imageInput->entries[1]->sourceReference);
+    }
+
+    #[Test]
+    public function builder_prefers_first_class_product_media_and_preserves_its_order(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'FIRST-CLASS-MEDIA',
+            'name' => 'First Class Media Product',
+            'is_active' => true,
+            'images' => ['https://legacy.example.test/ignored.jpg'],
+        ]);
+
+        $urls = [
+            'https://cdn.example.test/new-primary.jpg',
+            'https://cdn.example.test/new-gallery.jpg',
+        ];
+
+        foreach ($urls as $index => $url) {
+            $asset = MediaAsset::withoutWorkspaceScope()->create([
+                'workspace_id' => $workspace->id,
+                'asset_type' => MediaAssetType::Image,
+                'source_url' => $url,
+                'diagnosis_status' => MediaDiagnosisStatus::Pending,
+            ]);
+            ProductMedia::withoutWorkspaceScope()->create([
+                'workspace_id' => $workspace->id,
+                'product_id' => $product->id,
+                'media_asset_id' => $asset->id,
+                'role' => $index === 0 ? MediaRole::Primary : MediaRole::Gallery,
+                'sort_order' => $index,
+            ]);
+        }
+
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            ['field_mappings' => []],
+        )[0];
+
+        $this->assertSame(ProductExecutionImageStructuralState::Valid, $aggregate->imageInput->structuralState);
+        $this->assertSame($urls, array_map(
+            fn ($entry): ?string => $entry->sourceReference,
+            $aggregate->imageInput->entries,
+        ));
+        $this->assertSame([0, 1], array_map(
+            fn ($entry): int => $entry->declarationIndex,
+            $aggregate->imageInput->entries,
+        ));
+    }
+
+    #[Test]
+    public function builder_uses_only_common_product_media_and_never_mixes_variant_media(): void
+    {
+        $workspace = $this->defaultWorkspace();
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'MEDIA-SCOPE',
+            'name' => 'Media Scope Product',
+            'is_active' => true,
+            'images' => ['https://legacy.example.test/ignored.jpg'],
+        ]);
+        $variant = ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'MEDIA-SCOPE-CHILD',
+            'is_active' => true,
+        ]);
+
+        $common = MediaAsset::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'asset_type' => MediaAssetType::Image,
+            'source_url' => 'https://cdn.example.test/common.jpg',
+            'diagnosis_status' => MediaDiagnosisStatus::Pending,
+        ]);
+        $localized = MediaAsset::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'asset_type' => MediaAssetType::Image,
+            'source_url' => 'https://cdn.example.test/de.jpg',
+            'diagnosis_status' => MediaDiagnosisStatus::Pending,
+        ]);
+        $variantAsset = MediaAsset::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'asset_type' => MediaAssetType::Image,
+            'source_url' => 'https://cdn.example.test/variant.jpg',
+            'diagnosis_status' => MediaDiagnosisStatus::Pending,
+        ]);
+
+        ProductMedia::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'product_id' => $product->id,
+            'media_asset_id' => $common->id,
+            'role' => MediaRole::Primary,
+            'sort_order' => 0,
+            'locale' => null,
+        ]);
+        ProductMedia::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'product_id' => $product->id,
+            'media_asset_id' => $localized->id,
+            'role' => MediaRole::Gallery,
+            'sort_order' => 1,
+            'locale' => 'de-DE',
+        ]);
+        VariantMedia::withoutWorkspaceScope()->create([
+            'workspace_id' => $workspace->id,
+            'variant_id' => $variant->id,
+            'media_asset_id' => $variantAsset->id,
+            'role' => MediaRole::Primary,
+            'sort_order' => 0,
+            'locale' => null,
+        ]);
+
+        $aggregate = app(ProductExecutionAggregateBuilder::class)->buildForProductIds(
+            (string) $workspace->id,
+            [(string) $product->id],
+            ['field_mappings' => []],
+        )[0];
+
+        $this->assertSame(
+            ['https://cdn.example.test/common.jpg'],
+            array_map(fn ($entry): ?string => $entry->sourceReference, $aggregate->imageInput->entries),
+        );
     }
 
     #[Test]

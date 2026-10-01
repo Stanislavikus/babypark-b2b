@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Models\ProductFieldValue;
 use App\Models\ProductVariant;
 use App\Models\VariantFieldValue;
+use App\Services\Catalog\ProductMediaReadService;
 use App\Services\Pricing\PriceResolver;
 use App\Services\Pricing\Resolution\PriceResolutionStatus;
 use App\Services\Pricing\ResolvedPrice;
@@ -20,6 +21,7 @@ class ProductExecutionAggregateBuilder
 {
     public function __construct(
         private readonly PriceResolver $priceResolver,
+        private readonly ProductMediaReadService $mediaReadService,
     ) {}
 
     /**
@@ -169,6 +171,23 @@ class ProductExecutionAggregateBuilder
 
     private function buildImageInput(Product $product): ProductExecutionImageInput
     {
+        $firstClassReferences = $this->mediaReadService->firstClassSourceReferences($product);
+
+        if ($firstClassReferences !== null) {
+            $entries = [];
+
+            foreach ($firstClassReferences as $index => $reference) {
+                $valid = is_string($reference) && trim($reference) !== '';
+                $entries[] = new ProductExecutionImageSourceEntry(
+                    declarationIndex: (int) $index,
+                    sourceReference: $valid ? trim($reference) : null,
+                    isMalformed: ! $valid,
+                );
+            }
+
+            return new ProductExecutionImageInput(ProductExecutionImageStructuralState::Valid, $entries);
+        }
+
         $rawImages = $product->images;
 
         if ($rawImages === null) {

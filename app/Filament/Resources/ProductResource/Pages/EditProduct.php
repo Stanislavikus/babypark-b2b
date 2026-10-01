@@ -5,11 +5,14 @@ namespace App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Support\ProductWorkspaceFieldEditor;
 use App\Filament\Resources\ProductResource\Support\ProductWorkspaceFieldEditStaleException;
+use App\Models\ProductMedia;
 use App\Models\ProductType;
 use App\Models\ProductTypeGroupPlacement;
 use App\Models\ProductVariant;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Catalog\ProductMediaMutationService;
+use App\Services\Catalog\ProductMediaReadService;
 use App\Services\Catalog\ProductVariantStructureService;
 use App\Services\Fields\Exceptions\DynamicFieldCurrentValueMismatchException;
 use App\Services\Fields\Exceptions\FieldValueWriterException;
@@ -17,15 +20,19 @@ use App\Services\ProductStructure\ProductOptionalGroupMutationService;
 use App\Services\ProductStructure\ProductTypeChangeImpactService;
 use App\Services\ProductStructure\ProductTypeMutationService;
 use App\Services\Workspace\WorkspaceAuthorization;
+use App\Support\Catalog\Exceptions\ProductMediaException;
 use App\Support\Catalog\Exceptions\ProductVariantStructureException;
 use App\Support\ProductStructure\Exceptions\ProductTypeChangeStaleException;
 use App\Support\ProductStructure\ProductTypeChangeImpact;
 use App\Support\Workspace\WorkspaceContext;
 use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -33,6 +40,7 @@ use Filament\Resources\Pages\EditRecord;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\Width;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
 
@@ -59,11 +67,179 @@ class EditProduct extends EditRecord
             $this->promoteVariantsAction(),
             $this->addVariantAxisAction(),
             $this->addVariantAction(),
+            $this->mediaActions(),
             $this->editProductFieldsAction(),
             $this->changeProductTypeAction(),
             $this->optionalGroupsAction(),
             ViewAction::make()->label('Перегляд'),
         ];
+    }
+
+    private function mediaActions(): ActionGroup
+    {
+        return ActionGroup::make([
+            $this->addMediaAction(),
+            $this->reorderMediaAction(),
+            $this->removeMediaAction(),
+        ])
+            ->label('Медіа')
+            ->icon('heroicon-o-photo')
+            ->button()
+            ->visible(fn (): bool => $this->canManageProducts());
+    }
+
+    private function addMediaAction(): Action
+    {
+        return Action::make('add_media')
+            ->label('Додати медіа')
+            ->icon('heroicon-o-arrow-up-tray')
+            ->modalHeading('Додати зображення')
+            ->modalDescription('Original зберігається без resize або повторного кодування. Перший кадр порожньої галереї стає основним.')
+            ->schema([
+                FileUpload::make('files')
+                    ->label('Зображення')
+                    ->image()
+                    ->multiple()
+                    ->storeFiles(false)
+                    ->appendFiles()
+                    ->required()
+                    ->helperText('Можна вибрати кілька файлів. Технічні версії для каналів тут не створюються.'),
+            ])
+            ->action(function (array $data): void {
+                $files = array_values(array_filter(
+                    $data['files'] ?? [],
+                    fn ($file): bool => $file instanceof UploadedFile,
+                ));
+
+                $this->runMediaMutation(
+                    fn (User $actor, Workspace $workspace) => app(ProductMediaMutationService::class)
+                        ->addUploadedImages($actor, $workspace, $this->record, $files),
+                    'Медіа додано',
+                );
+            });
+    }
+
+    private function reorderMediaAction(): Action
+    {
+        return Action::make('reorder_media')
+            ->label('Впорядкувати')
+            ->icon('heroicon-o-bars-3')
+            ->visible(fn (): bool => $this->productMedia()->count() > 1)
+            ->modalHeading('Порядок медіа')
+            ->modalDescription('Перший кадр є основним Master-зображенням. Перетягніть рядки у потрібний порядок.')
+            ->schema([
+                Repeater::make('items')
+                    ->hiddenLabel()
+                    ->schema([
+                        Hidden::make('id'),
+                        Placeholder::make('media_label')
+                            ->hiddenLabel()
+                            ->content(fn (Get $get): string => $this->mediaLabel((string) $get('id'))),
+                    ])
+                    ->default(fn (): array => $this->productMedia()
+                        ->map(fn (ProductMedia $media): array => ['id' => (string) $media->id])
+                        ->all())
+                    ->addable(false)
+                    ->deletable(false)
+                    ->reorderable()
+                    ->reorderableWithButtons(),
+            ])
+            ->action(function (array $data): void {
+                $ids = collect($data['items'] ?? [])
+                    ->pluck('id')
+                    ->filter(fn ($id): bool => is_string($id) && $id !== '')
+                    ->values()
+                    ->all();
+
+                $this->runMediaMutation(
+                    fn (User $actor, Workspace $workspace) => app(ProductMediaMutationService::class)
+                        ->reorder($actor, $workspace, $this->record, $ids),
+                    'Порядок медіа оновлено',
+                );
+            });
+    }
+
+    private function removeMediaAction(): Action
+    {
+        return Action::make('remove_media')
+            ->label('Видалити з товару')
+            ->icon('heroicon-o-trash')
+            ->color('danger')
+            ->visible(fn (): bool => $this->productMedia()->isNotEmpty())
+            ->modalHeading('Видалити медіа з товару')
+            ->modalDescription('Видаляється лише зв’язок із цим товаром. Reusable Original не видаляється автоматично.')
+            ->schema([
+                Select::make('media_id')
+                    ->label('Медіа')
+                    ->options(fn (): array => $this->productMediaOptions())
+                    ->required(),
+            ])
+            ->requiresConfirmation()
+            ->action(function (array $data): void {
+                $this->runMediaMutation(
+                    fn (User $actor, Workspace $workspace) => app(ProductMediaMutationService::class)
+                        ->remove($actor, $workspace, $this->record, (string) $data['media_id']),
+                    'Медіа видалено з товару',
+                );
+            });
+    }
+
+    /** @return Collection<int, ProductMedia> */
+    private function productMedia(): Collection
+    {
+        return app(ProductMediaReadService::class)->productMedia($this->record);
+    }
+
+    /** @return array<string,string> */
+    private function productMediaOptions(): array
+    {
+        return $this->productMedia()
+            ->mapWithKeys(fn (ProductMedia $media, int $index): array => [
+                (string) $media->id => $this->mediaLabel((string) $media->id, $index),
+            ])
+            ->all();
+    }
+
+    private function mediaLabel(string $mediaId, ?int $knownIndex = null): string
+    {
+        $media = $this->productMedia()->values();
+        $item = $media->firstWhere('id', $mediaId);
+
+        if (! $item instanceof ProductMedia) {
+            return 'Медіа';
+        }
+
+        $index = $knownIndex ?? $media->search(fn (ProductMedia $candidate): bool => (string) $candidate->id === $mediaId);
+        $position = is_int($index) ? $index + 1 : ((int) $item->sort_order) + 1;
+        $asset = $item->asset;
+        $name = filled($asset?->original_filename)
+            ? (string) $asset->original_filename
+            : (filled($asset?->source_url) ? basename(parse_url((string) $asset->source_url, PHP_URL_PATH) ?: (string) $asset->source_url) : 'Original');
+
+        return ($position === 1 ? 'Основне · ' : 'Кадр '.$position.' · ').$name;
+    }
+
+    private function runMediaMutation(\Closure $mutation, string $successTitle): void
+    {
+        $actor = auth()->user();
+        abort_unless($actor instanceof User && $this->canManageProducts(), 403);
+        $workspace = Workspace::withoutGlobalScopes()->findOrFail($this->record->workspace_id);
+
+        try {
+            $mutation($actor, $workspace);
+            $this->record->refresh();
+
+            Notification::make()
+                ->success()
+                ->title($successTitle)
+                ->send();
+        } catch (ProductMediaException $e) {
+            Notification::make()
+                ->danger()
+                ->title('Не вдалося змінити медіа')
+                ->body($e->getMessage())
+                ->send();
+        }
     }
 
     private function promoteVariantsAction(): Action
