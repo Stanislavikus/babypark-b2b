@@ -85,18 +85,68 @@ class MasterProductMediaFoundationTest extends TestCase
     }
 
     #[Test]
-    public function direct_legacy_image_write_is_blocked_after_first_class_cutover(): void
+    public function workspace_media_actions_reorder_and_remove_primary_without_deleting_asset(): void
     {
         $product = $this->product();
-        $asset = $this->externalAsset('https://cdn.example.test/cutover.jpg');
-
-        ProductMedia::withoutWorkspaceScope()->create([
+        ProductVariant::withoutWorkspaceScope()->create([
             'workspace_id' => $this->workspace->id,
             'product_id' => $product->id,
-            'media_asset_id' => $asset->id,
+            'onec_guid' => null,
+            'sku' => null,
+            'attributes' => [],
+            'is_active' => true,
+        ]);
+
+        $first = $this->externalAsset('https://cdn.example.test/ui-first.jpg');
+        $second = $this->externalAsset('https://cdn.example.test/ui-second.jpg');
+
+        $firstLink = ProductMedia::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'media_asset_id' => $first->id,
             'role' => MediaRole::Primary,
             'sort_order' => 0,
+            'locale' => null,
         ]);
+        $secondLink = ProductMedia::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'media_asset_id' => $second->id,
+            'role' => MediaRole::Gallery,
+            'sort_order' => 1,
+            'locale' => null,
+        ]);
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->assertActionVisible('reorder_media')
+            ->callAction('reorder_media', [
+                'items' => [
+                    ['id' => (string) $secondLink->id],
+                    ['id' => (string) $firstLink->id],
+                ],
+            ])
+            ->assertNotified()
+            ->assertActionVisible('remove_media')
+            ->callAction('remove_media', ['media_id' => (string) $secondLink->id])
+            ->assertNotified();
+
+        $remaining = ProductMedia::withoutWorkspaceScope()
+            ->where('product_id', $product->id)
+            ->whereNull('locale')
+            ->sole();
+
+        $this->assertSame((string) $firstLink->id, (string) $remaining->id);
+        $this->assertSame(MediaRole::Primary, $remaining->role);
+        $this->assertSame(0, $remaining->sort_order);
+        $this->assertDatabaseHas('media_assets', ['id' => $second->id]);
+        $this->assertSame(['https://cdn.example.test/ui-first.jpg'], $product->fresh()->images);
+    }
+
+    #[Test]
+    public function direct_legacy_image_write_is_blocked_once_master_media_schema_exists(): void
+    {
+        $product = $this->product();
 
         $this->expectException(ProductMediaException::class);
         $this->expectExceptionMessage('compatibility projection');

@@ -69,14 +69,7 @@ class Product extends Model
         });
 
         static::updating(function (Product $product): void {
-            if (! $product->isDirty('images') || ! Schema::hasTable('product_media')) {
-                return;
-            }
-
-            if (ProductMedia::withoutWorkspaceScope()
-                ->where('workspace_id', $product->workspace_id)
-                ->where('product_id', $product->id)
-                ->exists()) {
+            if ($product->isDirty('images') && Schema::hasTable('product_media')) {
                 throw ProductMediaException::legacyWriteForbidden();
             }
         });

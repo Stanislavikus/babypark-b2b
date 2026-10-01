@@ -172,6 +172,7 @@ final class ProductMediaMutationService
             ProductMedia::withoutWorkspaceScope()
                 ->where('workspace_id', $lockedProduct->workspace_id)
                 ->where('product_id', $lockedProduct->id)
+                ->whereNull('locale')
                 ->update([
                     'role' => MediaRole::Gallery->value,
                     'sort_order' => DB::raw('sort_order + 1000000'),
@@ -181,6 +182,7 @@ final class ProductMediaMutationService
                 ProductMedia::withoutWorkspaceScope()
                     ->where('workspace_id', $lockedProduct->workspace_id)
                     ->where('product_id', $lockedProduct->id)
+                    ->whereNull('locale')
                     ->whereKey($mediaId)
                     ->update([
                         'role' => $index === 0 ? MediaRole::Primary->value : MediaRole::Gallery->value,
@@ -240,6 +242,7 @@ final class ProductMediaMutationService
             $remaining = ProductMedia::withoutWorkspaceScope()
                 ->where('workspace_id', $lockedProduct->workspace_id)
                 ->where('product_id', $lockedProduct->id)
+                ->whereNull('locale')
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->lockForUpdate()
@@ -325,6 +328,7 @@ final class ProductMediaMutationService
         return ProductMedia::withoutWorkspaceScope()
             ->where('workspace_id', $product->workspace_id)
             ->where('product_id', $product->id)
+            ->whereNull('locale')
             ->orderBy('sort_order')
             ->orderBy('id')
             ->lockForUpdate()
@@ -337,6 +341,7 @@ final class ProductMediaMutationService
         ProductMedia::withoutWorkspaceScope()
             ->where('workspace_id', $product->workspace_id)
             ->where('product_id', $product->id)
+            ->whereNull('locale')
             ->update([
                 'role' => MediaRole::Gallery->value,
                 'sort_order' => DB::raw('sort_order + 1000000'),
@@ -346,6 +351,7 @@ final class ProductMediaMutationService
             ProductMedia::withoutWorkspaceScope()
                 ->where('workspace_id', $product->workspace_id)
                 ->where('product_id', $product->id)
+                ->whereNull('locale')
                 ->whereKey($mediaId)
                 ->update([
                     'role' => $index === 0 ? MediaRole::Primary->value : MediaRole::Gallery->value,

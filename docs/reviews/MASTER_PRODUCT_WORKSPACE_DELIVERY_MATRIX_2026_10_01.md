@@ -28,12 +28,22 @@ between implementation campaigns.
 | Offer presentation | Offer | PriceResolver / ProductPricingSummary | Price section read-only | pricing suite | PARTIAL; Master editing workflow remains |
 | Inventory presentation | Inventory & Fulfillment | AvailabilityResolver | Inventory section read-only | availability suite | PARTIAL; Master editing/location workflow remains |
 | Physical/shipping facts | Product Core / Fulfillment | current governed columns | collapsible section | current Product tests | PARTIAL; applicability/policy remains |
-| Media gallery | Content & Assets | legacy products.images only | read-only gallery placeholder | Magento V1 media tests use legacy JSON | NOT STARTED as first-class domain |
-| Media Original + diagnosis | Content & Assets / Media Policy v1 | absent | absent | absent | NOT STARTED |
-| Product-specific media associations/order/primary | Content & Assets | absent | absent | absent | NOT STARTED |
-| Variant-specific media | Content & Assets | absent | absent | absent | NOT STARTED |
-| Media provenance / AI provenance | Content & Assets | absent | absent | absent | NOT STARTED |
-| Channel media artifacts/renditions | Channel Overlay | Magento runtime output exists; generic Master artifact model absent | channel-owned | Magento Stage 3D evidence | PARTIAL |
+| Media gallery | Content & Assets | #249 first-class read model + legacy compatibility projection | gallery + Add / Reorder / Remove actions | Livewire + read-path regression; MySQL pending | PARTIAL; final visual/media UX still pending |
+| Media Original preservation | Media Policy v1 | #249 stores uploaded Original bytes without resize/re-encode; reusable workspace asset identity | Add media | upload/storage/hash tests; MySQL pending | PARTIAL; external ingest and real-target validation remain |
+| Media ingest diagnosis | Media Policy v1 | #249 records MIME, bytes, dimensions, hash and diagnosis envelope | normal gallery hides engineering details | focused tests | PARTIAL; weak-source/effective-quality diagnosis remains |
+| Product media associations / order / primary | Content & Assets | #249 ProductMedia, explicit sort, primary=position 0, common locale fallback | gallery + reorder/remove | Livewire + stale/order tests; MySQL pending | PARTIAL until MySQL/real verification |
+| Variant-specific media | Content & Assets | #249 VariantMedia persistence + isolation; not mixed into Magento Product media | no authoring UI yet | connector regression | PARTIAL; variant authoring/presentation remains |
+| Semantic derivative lineage | Media Policy v1 | #249 parent_media_asset_id; gallery rejects derivative rows | not merchant-facing yet | lineage/original guard tests | PARTIAL; Improve/processing pipeline not implemented |
+| Transform only on destination or explicit intent | Media Policy v1 | no transform is performed on ingest | no transform UI yet | Original upload regression | PARTIAL; destination/Improve transforms remain |
+| Perceptual-quality optimization | Media Policy v1 | policy frozen; no optimizer runtime yet | absent | absent | NOT STARTED |
+| Destination profiles: format/dimensions/background/color/metadata | Media Policy v1 / Channel Overlay | absent generic profile | absent | absent | NOT STARTED |
+| Background manipulation | Media Policy v1 | defined as pixel transform; runtime absent | absent | absent | NOT STARTED |
+| Merchant Improve action | Media Policy v1 | absent; reserved for weak/restoration/creative cases | absent | absent | NOT STARTED |
+| Media provenance / AI provenance | Content & Assets | #249 basic source/upload provenance envelope | hidden technical detail | focused tests | PARTIAL; AI/edit lineage consumers remain |
+| Stable/versioned channel media artifacts | Channel Overlay / Publication | Magento runtime output exists; generic Master artifact model absent | channel-owned | Magento Stage 3D evidence | PARTIAL |
+| No technical-output duplicates in Master gallery | Media Policy v1 | #249 Master gallery associations accept Originals only; channel artifacts remain separate | Master gallery | derivative guard tests | PARTIAL; generic channel-artifact model remains |
+| 360 as one logical media presentation | Media Policy v1 | architecture rule frozen; runtime absent | absent | absent | NOT STARTED |
+| Responsive widths/formats remain delivery/cache concerns | Media Policy v1 | architecture rule frozen; no Product rendition rows created | not merchant-facing | structural review | DONE as boundary; delivery implementation belongs elsewhere |
 | SEO fields | Intelligence / Content | meta_title/meta_description/url columns | SEO section | existing form tests | PARTIAL |
 | Search Brief / keyword research | Intelligence | absent | absent | absent | NOT STARTED |
 | AI proposals with stale revision/provenance | Intelligence | architecture resolved; runtime absent | absent | absent | NOT STARTED |
@@ -52,6 +62,6 @@ between implementation campaigns.
 
 ## Current campaign pointer
 
-Next campaign: first-class Media / Assets foundation and ingest diagnosis.
-The implementation must preserve current certified Magento REST V1 media behavior while moving
-Master ownership away from `products.images` JSON.
+Current campaign: PR #249 — first-class Media / Assets foundation and ingest diagnosis.
+Current HEAD implements the first-class persistence/read/write foundation, common Product gallery actions, legacy compatibility, and Magento input compatibility.
+Remaining campaign gates: authoritative GitHub MySQL CI, Lead diff review, Delivery Matrix reconciliation, and bounded real-target compatibility evidence before merge readiness.
