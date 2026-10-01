@@ -1052,9 +1052,23 @@ class ProductResource extends Resource
             ->map(function (array $group): string {
                 $label = e($group['label']);
 
-                return '<div style="display:flex;justify-content:space-between;gap:16px;padding:8px 0;border-bottom:1px solid #f3f4f6;">'.
-                    '<span>'.$label.'</span>'.
-                    '<span style="color:#6b7280;white-space:nowrap;">'.$group['total'].' полів · '.$group['required'].' обов’язкових</span>'.
+                if (! $group['active']) {
+                    return '<div style="display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid #f3f4f6;">'.
+                        '<span>'.$label.'</span>'.
+                        '<span style="color:#9ca3af;white-space:nowrap;">Опційна · неактивна</span>'.
+                        '</div>';
+                }
+
+                $progress = $group['required'] > 0
+                    ? $group['filled'].'/'.$group['required'].' обов’язкових · '.$group['percentage'].'%'
+                    : 'Обов’язкових полів немає';
+
+                return '<div style="padding:10px 0;border-bottom:1px solid #f3f4f6;">'.
+                    '<div style="display:flex;justify-content:space-between;gap:16px;">'.
+                        '<span>'.$label.'</span>'.
+                        '<span style="color:#6b7280;white-space:nowrap;">'.$progress.'</span>'.
+                    '</div>'.
+                    '<div style="margin-top:4px;font-size:11px;color:#9ca3af;">'.$group['total'].' полів у групі</div>'.
                     '</div>';
             })
             ->implode('');
@@ -1068,16 +1082,24 @@ class ProductResource extends Resource
             return new HtmlString('—');
         }
 
-        $summary = app(ProductWorkspaceSummaryService::class)->basicCompleteness($record);
-        $percentage = $summary['percentage'];
+        $service = app(ProductWorkspaceSummaryService::class);
+        $basic = $service->basicCompleteness($record);
+        $structure = $service->structureCompleteness($record);
 
         return new HtmlString(
-            '<div style="display:flex;align-items:baseline;gap:8px;">'.
-                '<strong style="font-size:20px;">'.$percentage.'%</strong>'.
-                '<span style="color:#6b7280;">'.$summary['filled'].'/'.$summary['total'].' базових сигналів</span>'.
+            '<div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;">'.
+                '<span>Базові дані</span>'.
+                '<strong>'.$basic['percentage'].'%</strong>'.
             '</div>'.
-            '<div style="height:6px;border-radius:999px;background:#e5e7eb;margin-top:8px;overflow:hidden;">'.
-                '<div style="height:100%;width:'.$percentage.'%;background:currentColor;border-radius:999px;"></div>'.
+            '<div style="height:6px;border-radius:999px;background:#e5e7eb;margin-top:5px;overflow:hidden;">'.
+                '<div style="height:100%;width:'.$basic['percentage'].'%;background:currentColor;border-radius:999px;"></div>'.
+            '</div>'.
+            '<div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin-top:12px;">'.
+                '<span>Характеристики</span>'.
+                '<strong>'.$structure['percentage'].'%</strong>'.
+            '</div>'.
+            '<div style="height:6px;border-radius:999px;background:#e5e7eb;margin-top:5px;overflow:hidden;">'.
+                '<div style="height:100%;width:'.$structure['percentage'].'%;background:currentColor;border-radius:999px;"></div>'.
             '</div>'.
             '<div style="margin-top:8px;font-size:11px;color:#6b7280;">Інформаційно · не є готовністю конкретного каналу.</div>'
         );
@@ -1115,11 +1137,14 @@ class ProductResource extends Resource
             return new HtmlString('—');
         }
 
-        $missing = app(ProductWorkspaceSummaryService::class)->basicCompleteness($record)['missing'];
+        $service = app(ProductWorkspaceSummaryService::class);
+        $missing = $service->basicCompleteness($record)['missing'];
+        $structure = $service->structureCompleteness($record);
+        $missingStructure = $structure['missing_product'] + $structure['missing_variant'];
 
-        if ($missing === []) {
+        if ($missing === [] && $missingStructure === 0) {
             return new HtmlString(
-                '<div style="color:#166534;">Базові дані заповнені.</div>'.
+                '<div style="color:#166534;">Базові дані та обов’язкові характеристики заповнені.</div>'.
                 '<div style="margin-top:4px;font-size:11px;color:#6b7280;">Канальні вимоги перевіряються окремо.</div>'
             );
         }
@@ -1128,9 +1153,14 @@ class ProductResource extends Resource
             ->map(fn (string $label): string => '<li style="margin:4px 0;">'.e($label).'</li>')
             ->implode('');
 
+        $structureItem = $missingStructure > 0
+            ? '<li style="margin:4px 0;">Обов’язкові характеристики: '.$missingStructure.' незаповнених</li>'
+            : '';
+
         return new HtmlString(
-            '<div style="margin-bottom:6px;color:#92400e;">'.count($missing).' базових пунктів</div>'.
-            '<ul style="margin:0;padding-left:18px;color:#6b7280;">'.$items.'</ul>'
+            '<div style="margin-bottom:6px;color:#92400e;">Потрібна увага до Master-даних</div>'.
+            '<ul style="margin:0;padding-left:18px;color:#6b7280;">'.$items.$structureItem.'</ul>'.
+            '<div style="margin-top:6px;font-size:11px;color:#9ca3af;">Канальні помилки та readiness відображаються окремо.</div>'
         );
     }
 
