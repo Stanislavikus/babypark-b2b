@@ -6,6 +6,7 @@ use App\Enums\AttributeDataType;
 use App\Enums\AttributeScope;
 use App\Enums\AttributeStatus;
 use App\Enums\FieldObjectType;
+use App\Support\Catalog\Exceptions\ProductVariantStructureException;
 use App\Support\Sync\Exceptions\FieldDefinitionReferencedByFieldMappingException;
 use App\Support\Workspace\BelongsToWorkspaceOrGlobal;
 use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids;
@@ -33,6 +34,16 @@ class FieldDefinition extends Model
 
     protected static function booted(): void
     {
+        static::updating(function (FieldDefinition $definition): void {
+            if (! $definition->isDirty(['workspace_id', 'data_type', 'validation_rules', 'is_localizable', 'is_multi_value', 'status'])) {
+                return;
+            }
+
+            if ($definition->referencedByVariantAxis()) {
+                throw ProductVariantStructureException::declaredAxisBlocksStructureChange();
+            }
+        });
+
         static::deleting(function (FieldDefinition $definition): void {
             $bindingIds = FieldBinding::withoutWorkspaceScope()
                 ->where('field_definition_id', $definition->id)
@@ -42,10 +53,24 @@ class FieldDefinition extends Model
                 return;
             }
 
+            if (ProductVariantAxis::withoutWorkspaceScope()->whereIn('field_binding_id', $bindingIds)->exists()) {
+                throw ProductVariantStructureException::declaredAxisBlocksStructureChange();
+            }
+
             if (FieldMapping::withoutWorkspaceScope()->whereIn('field_binding_id', $bindingIds)->exists()) {
                 throw FieldDefinitionReferencedByFieldMappingException::forDefinition($definition->id);
             }
         });
+    }
+
+    private function referencedByVariantAxis(): bool
+    {
+        $bindingIds = FieldBinding::withoutWorkspaceScope()
+            ->where('field_definition_id', $this->id)
+            ->pluck('id');
+
+        return $bindingIds->isNotEmpty()
+            && ProductVariantAxis::withoutWorkspaceScope()->whereIn('field_binding_id', $bindingIds)->exists();
     }
 
     protected function casts(): array

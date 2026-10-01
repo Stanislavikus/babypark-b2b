@@ -5,9 +5,11 @@ namespace App\Services\ProductStructure;
 use App\Models\Product;
 use App\Models\ProductActiveOptionalGroup;
 use App\Models\ProductType;
+use App\Models\ProductVariantAxis;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Workspace\WorkspaceAuthorization;
+use App\Support\Catalog\Exceptions\ProductVariantStructureException;
 use App\Support\ProductStructure\Exceptions\ProductStructureInvariantException;
 use App\Support\ProductStructure\Exceptions\ProductTypeChangeStaleException;
 use App\Support\ProductStructure\ProductTypeChangeImpact;
@@ -62,6 +64,13 @@ final class ProductTypeMutationService
 
             if ((string) $lockedProduct->product_type_id !== $reviewedImpact->fromProductTypeId) {
                 throw ProductTypeChangeStaleException::previewIsStale();
+            }
+
+            if (ProductVariantAxis::withoutWorkspaceScope()
+                ->where('workspace_id', $workspace->id)
+                ->where('product_id', $lockedProduct->id)
+                ->exists()) {
+                throw ProductVariantStructureException::declaredAxesBlockTypeChange();
             }
 
             $freshImpact = $this->impactService->preview($lockedProduct, $lockedTarget);

@@ -4,6 +4,10 @@ namespace App\Services\Catalog;
 
 use App\Models\Product;
 use App\Models\ProductTypeGroupPlacement;
+use App\Models\VariantFieldValue;
+use App\Services\Availability\AvailabilityResolver;
+use App\Services\Pricing\MoneyFormatter;
+use App\Services\Pricing\ProductPricingSummary;
 use App\Services\ProductStructure\ProductCompletenessService;
 use App\Services\Sync\ProductChannelSelectionService;
 
@@ -12,6 +16,10 @@ final class ProductWorkspaceSummaryService
     public function __construct(
         private readonly ProductChannelSelectionService $channelSelectionService,
         private readonly ProductCompletenessService $productCompletenessService,
+        private readonly ProductVariantStructureService $productVariantStructureService,
+        private readonly AvailabilityResolver $availabilityResolver,
+        private readonly ProductPricingSummary $productPricingSummary,
+        private readonly MoneyFormatter $moneyFormatter,
     ) {}
 
     /**
@@ -151,7 +159,13 @@ final class ProductWorkspaceSummaryService
     }
 
     /**
-     * @return array{count:int,label:string,skus:list<string>}
+     * @return array{
+     *   count:int,
+     *   label:string,
+     *   skus:list<string>,
+     *   axes:list<array{binding_id:string,label:string}>,
+     *   rows:list<array{id:int,sku:?string,gtin:?string,options:list<string>,price:?string,stock:int}>
+     * }
      */
     public function variants(Product $product): array
     {
@@ -159,11 +173,59 @@ final class ProductWorkspaceSummaryService
 
         $active = $product->variants->where('is_active', true)->values();
         $count = $active->count();
+        $declaredAxes = $this->productVariantStructureService->declaredAxes($product);
+        $candidates = $this->productVariantStructureService->axisCandidates($product);
+        $axisBindingIds = $declaredAxes->pluck('field_binding_id')->map(fn ($id): string => (string) $id)->all();
+        $values = $axisBindingIds === [] || $active->isEmpty()
+            ? collect()
+            : VariantFieldValue::withoutWorkspaceScope()
+                ->where('workspace_id', $product->workspace_id)
+                ->whereIn('variant_id', $active->pluck('id'))
+                ->whereIn('field_binding_id', $axisBindingIds)
+                ->get()
+                ->keyBy(fn (VariantFieldValue $row): string => $row->variant_id.':'.$row->field_binding_id);
 
-        $label = match (true) {
-            $count <= 1 => 'Простий товар',
-            default => $count.' варіантів',
-        };
+        $axes = $declaredAxes->map(function ($axis) use ($candidates): array {
+            $bindingId = (string) $axis->field_binding_id;
+            $candidate = $candidates->get($bindingId);
+
+            return [
+                'binding_id' => $bindingId,
+                'label' => is_array($candidate)
+                    ? (string) $candidate['label']
+                    : (string) ($axis->fieldBinding?->fieldDefinition?->code ?? $bindingId),
+            ];
+        })->values()->all();
+
+        $rows = $active->map(function ($variant) use ($declaredAxes, $candidates, $values): array {
+            $options = [];
+            foreach ($declaredAxes as $axis) {
+                $bindingId = (string) $axis->field_binding_id;
+                $code = $values->get($variant->id.':'.$bindingId)?->value_text;
+                $candidate = $candidates->get($bindingId);
+                $options[] = is_array($candidate) && is_string($code)
+                    ? (string) ($candidate['options'][$code] ?? $code)
+                    : (is_string($code) ? $code : '—');
+            }
+
+            $priceDisplay = $this->productPricingSummary->resolveDefaultDisplay($variant);
+            $price = $priceDisplay->available && $priceDisplay->resolvedPrice !== null
+                ? $this->moneyFormatter->format($priceDisplay->grossPrice, $priceDisplay->resolvedPrice->currency)
+                : null;
+
+            return [
+                'id' => (int) $variant->id,
+                'sku' => filled($variant->sku) ? (string) $variant->sku : null,
+                'gtin' => filled($variant->barcode_ean) ? (string) $variant->barcode_ean : null,
+                'options' => $options,
+                'price' => $price,
+                'stock' => $this->availabilityResolver->netAvailable($variant),
+            ];
+        })->values()->all();
+
+        $label = $declaredAxes->isEmpty() && $count <= 1
+            ? 'Простий товар'
+            : $count.' варіантів';
 
         return [
             'count' => $count,
@@ -174,6 +236,8 @@ final class ProductWorkspaceSummaryService
                 ->take(6)
                 ->values()
                 ->all(),
+            'axes' => $axes,
+            'rows' => $rows,
         ];
     }
 

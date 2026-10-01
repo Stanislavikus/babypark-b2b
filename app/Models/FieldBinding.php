@@ -6,6 +6,7 @@ use App\Enums\AttributeStatus;
 use App\Enums\AttributeStorageType;
 use App\Enums\FieldObjectType;
 use App\Services\ProductStructure\BasicProductStructureReconciler;
+use App\Support\Catalog\Exceptions\ProductVariantStructureException;
 use App\Support\Sync\Exceptions\FieldBindingReferencedByFieldMappingException;
 use App\Support\Workspace\BelongsToWorkspaceOrGlobal;
 use Illuminate\Database\Eloquent\Concerns\HasVersion4Uuids as HasUuids;
@@ -35,7 +36,21 @@ class FieldBinding extends Model
 
     protected static function booted(): void
     {
+        static::updating(function (FieldBinding $binding): void {
+            if (! $binding->isDirty(['workspace_id', 'field_definition_id', 'object_type', 'storage_type', 'field_group', 'visibility_settings', 'status'])) {
+                return;
+            }
+
+            if (ProductVariantAxis::withoutWorkspaceScope()->where('field_binding_id', $binding->id)->exists()) {
+                throw ProductVariantStructureException::declaredAxisBlocksStructureChange();
+            }
+        });
+
         static::deleting(function (FieldBinding $binding): void {
+            if (ProductVariantAxis::withoutWorkspaceScope()->where('field_binding_id', $binding->id)->exists()) {
+                throw ProductVariantStructureException::declaredAxisBlocksStructureChange();
+            }
+
             if (FieldMapping::withoutWorkspaceScope()->where('field_binding_id', $binding->id)->exists()) {
                 throw FieldBindingReferencedByFieldMappingException::forBinding($binding->id);
             }
