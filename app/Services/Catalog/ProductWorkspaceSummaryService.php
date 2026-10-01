@@ -4,12 +4,14 @@ namespace App\Services\Catalog;
 
 use App\Models\Product;
 use App\Models\ProductTypeGroupPlacement;
+use App\Services\ProductStructure\ProductCompletenessService;
 use App\Services\Sync\ProductChannelSelectionService;
 
 final class ProductWorkspaceSummaryService
 {
     public function __construct(
         private readonly ProductChannelSelectionService $channelSelectionService,
+        private readonly ProductCompletenessService $productCompletenessService,
     ) {}
 
     /**
@@ -51,7 +53,15 @@ final class ProductWorkspaceSummaryService
     }
 
     /**
-     * @return list<array{label:string,total:int,required:int}>
+     * @return list<array{
+     *   label:string,
+     *   total:int,
+     *   required:int,
+     *   filled:int,
+     *   percentage:int,
+     *   optional:bool,
+     *   active:bool
+     * }>
      */
     public function attributeGroups(Product $product): array
     {
@@ -64,11 +74,15 @@ final class ProductWorkspaceSummaryService
             return [];
         }
 
+        $projection = $this->productCompletenessService->project($product, 'uk');
+        $projectionByPlacement = collect($projection->groups)->keyBy('groupPlacementId');
+
         return $product->productType->groupPlacements
             ->sortBy('sort_order')
             ->filter(fn (ProductTypeGroupPlacement $placement): bool => $placement->attributeGroup?->status === 'active')
-            ->map(function (ProductTypeGroupPlacement $placement): array {
+            ->map(function (ProductTypeGroupPlacement $placement) use ($projectionByPlacement): array {
                 $group = $placement->attributeGroup;
+                $groupProjection = $projectionByPlacement->get((string) $placement->id);
                 $label = (string) (
                     $group?->localized_labels['uk']
                     ?? $group?->localized_labels['en']
@@ -79,13 +93,37 @@ final class ProductWorkspaceSummaryService
                 return [
                     'label' => $label,
                     'total' => $placement->fieldPlacements->count(),
-                    'required' => $placement->fieldPlacements
-                        ->where('required_for_completeness', true)
-                        ->count(),
+                    'required' => $groupProjection?->requiredCount ?? 0,
+                    'filled' => $groupProjection?->filledCount ?? 0,
+                    'percentage' => $groupProjection?->percentage ?? 100,
+                    'optional' => (bool) $placement->is_optional,
+                    'active' => $groupProjection?->isActive ?? ! $placement->is_optional,
                 ];
             })
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array{
+     *   filled:int,
+     *   total:int,
+     *   percentage:int,
+     *   missing_product:int,
+     *   missing_variant:int
+     * }
+     */
+    public function structureCompleteness(Product $product): array
+    {
+        $projection = $this->productCompletenessService->project($product, 'uk');
+
+        return [
+            'filled' => $projection->filledCount,
+            'total' => $projection->requiredCount,
+            'percentage' => $projection->percentage,
+            'missing_product' => count($projection->missingProductBindingIds),
+            'missing_variant' => count($projection->missingVariantCells),
+        ];
     }
 
     /**
