@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\ProductResource\Pages;
 
 use App\Filament\Resources\ProductResource;
-use App\Models\Product;
 use App\Models\ProductType;
 use App\Models\ProductTypeGroupPlacement;
 use App\Models\User;
