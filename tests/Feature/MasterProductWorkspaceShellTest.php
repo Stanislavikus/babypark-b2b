@@ -177,7 +177,7 @@ class MasterProductWorkspaceShellTest extends TestCase
             'object_type' => FieldObjectType::Product,
             'storage_type' => AttributeStorageType::Dynamic,
             'storage_path' => null,
-            'field_group' => 'materials',
+            'field_group' => 'characteristics',
             'is_required' => false,
             'is_filterable' => false,
             'is_sortable' => false,
