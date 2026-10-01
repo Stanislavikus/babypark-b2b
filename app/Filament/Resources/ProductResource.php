@@ -1098,12 +1098,12 @@ class ProductResource extends Resource
         }
 
         $rows = collect($labels)
-            ->map(fn (string $label): string =>
-                '<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #f3f4f6;">'.
+            ->map(function (string $label): string {
+                return '<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #f3f4f6;">'.
                     '<span>'.e($label).'</span>'.
                     '<span style="font-size:11px;color:#6b7280;white-space:nowrap;">Додано</span>'.
-                '</div>'
-            )
+                '</div>';
+            })
             ->implode('');
 
         return new HtmlString($rows);
