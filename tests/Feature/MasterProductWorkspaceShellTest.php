@@ -323,5 +323,4 @@ class MasterProductWorkspaceShellTest extends TestCase
             'workspace_permission_id' => $permission->id,
         ]);
     }
-
 }
