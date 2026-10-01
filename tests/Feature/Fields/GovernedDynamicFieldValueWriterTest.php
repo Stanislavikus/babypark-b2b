@@ -423,6 +423,81 @@ class GovernedDynamicFieldValueWriterTest extends TestCase
         $this->assertSame(FieldValueWriteResult::Created, $result->status);
     }
 
+    public function test_clear_if_current_value_deletes_when_expected_value_matches(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'cas_clear_color',
+            dataType: AttributeDataType::Select,
+            objectType: FieldObjectType::ProductVariant,
+            validationRules: ['options' => [
+                ['code' => 'blue', 'labels' => ['uk' => 'Синій']],
+            ]],
+            workspaceId: $this->workspace->id,
+        );
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            'blue',
+        );
+
+        $result = $this->writer->clearIfCurrentValue(
+            workspaceId: $this->workspace->id,
+            targetType: FieldObjectType::ProductVariant,
+            targetId: $this->variant->id,
+            fieldBindingId: $binding->id,
+            expectedCurrentValue: 'blue',
+        );
+
+        $this->assertSame(FieldValueWriteResult::Deleted, $result->status);
+        $this->assertDatabaseMissing('variant_field_values', [
+            'variant_id' => $this->variant->id,
+            'field_binding_id' => $binding->id,
+        ]);
+    }
+
+    public function test_clear_if_current_value_rejects_stale_value_and_preserves_current_slot(): void
+    {
+        [, $binding] = $this->createDefinitionAndBinding(
+            code: 'cas_clear_color_stale',
+            dataType: AttributeDataType::Select,
+            objectType: FieldObjectType::ProductVariant,
+            validationRules: ['options' => [
+                ['code' => 'blue', 'labels' => ['uk' => 'Синій']],
+                ['code' => 'red', 'labels' => ['uk' => 'Червоний']],
+            ]],
+            workspaceId: $this->workspace->id,
+        );
+
+        $this->writer->set(
+            $this->workspace->id,
+            FieldObjectType::ProductVariant,
+            $this->variant->id,
+            $binding->id,
+            'blue',
+        );
+
+        $this->expectException(DynamicFieldCurrentValueMismatchException::class);
+
+        try {
+            $this->writer->clearIfCurrentValue(
+                workspaceId: $this->workspace->id,
+                targetType: FieldObjectType::ProductVariant,
+                targetId: $this->variant->id,
+                fieldBindingId: $binding->id,
+                expectedCurrentValue: 'red',
+            );
+        } finally {
+            $this->assertDatabaseHas('variant_field_values', [
+                'variant_id' => $this->variant->id,
+                'field_binding_id' => $binding->id,
+                'value_text' => 'blue',
+            ]);
+        }
+    }
+
     public function test_set_select_rejects_undeclared_option(): void
     {
         $variant = $this->variant;
