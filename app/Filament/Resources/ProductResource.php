@@ -1063,12 +1063,24 @@ class ProductResource extends Resource
                     ? $group['filled'].'/'.$group['required'].' обов’язкових · '.$group['percentage'].'%'
                     : 'Обов’язкових полів немає';
 
+                $missing = collect($group['missing'])
+                    ->take(4)
+                    ->map(fn (string $item): string => e($item))
+                    ->implode(', ');
+                $missingMore = count($group['missing']) > 4
+                    ? ' +'.(count($group['missing']) - 4)
+                    : '';
+                $missingLine = $missing !== ''
+                    ? '<div style="margin-top:4px;font-size:11px;color:#92400e;">Потрібно заповнити: '.$missing.$missingMore.'</div>'
+                    : '';
+
                 return '<div style="padding:10px 0;border-bottom:1px solid #f3f4f6;">'.
                     '<div style="display:flex;justify-content:space-between;gap:16px;">'.
                         '<span>'.$label.'</span>'.
                         '<span style="color:#6b7280;white-space:nowrap;">'.$progress.'</span>'.
                     '</div>'.
                     '<div style="margin-top:4px;font-size:11px;color:#9ca3af;">'.$group['total'].' полів у групі</div>'.
+                    $missingLine.
                     '</div>';
             })
             ->implode('');
