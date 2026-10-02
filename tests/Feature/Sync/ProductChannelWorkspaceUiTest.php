@@ -12,6 +12,7 @@ use App\Filament\Pages\Sync\ManageAdobeProductsChannel;
 use App\Filament\Pages\Sync\ManageAdobeProductsExportPreview;
 use App\Filament\Pages\Sync\ManageAdobeRemoteCatalog;
 use App\Filament\Resources\ProductResource;
+use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
 use App\Models\ExternalRecordLink;
 use App\Models\Product;
@@ -27,6 +28,7 @@ use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\ConnectorFoundationSeeder;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Database\Seeders\WorkspaceSeeder;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -171,6 +173,52 @@ class ProductChannelWorkspaceUiTest extends TestCase
             ->assertDontSee($unselected->name)
             ->assertSee('data-testid="product-workbench-tab-overview"', false)
             ->assertSee('data-testid="product-workbench-tab-publication"', false);
+    }
+
+    #[Test]
+    public function selected_master_product_exposes_direct_magento_v1_workbench_link(): void
+    {
+        $this->grantExactWorkspacePermissions($this->workspace, $this->actor, [
+            WorkspacePermissions::MANAGE_PRODUCTS,
+            WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+            WorkspacePermissions::RUN_SYNC_PREVIEW,
+        ]);
+
+        $account = $this->createConnectorAccount(overrides: [
+            'connection_status' => ConnectorAccountConnectionStatus::Connected,
+        ]);
+        $configuration = $this->createProductsExportConfiguration($account->id);
+        $product = $this->createProduct('MASTER-TO-MAGENTO-V1');
+
+        ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => (string) Str::uuid(),
+            'sku' => 'MASTER-TO-MAGENTO-V1',
+            'attributes' => [],
+            'is_active' => true,
+        ]);
+
+        app(ProductChannelSelectionService::class)->add(
+            $this->actor,
+            $this->workspace,
+            $configuration->id,
+            [$product->id],
+        );
+
+        $action = TestAction::make('open_magento_v1')
+            ->schemaComponent('channel_capability_actions');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->assertSee('Відкрити Magento V1')
+            ->assertActionVisible($action)
+            ->assertActionHasUrl(
+                $action,
+                ManageAdobeProductsChannel::getUrl(['account' => $account->id]),
+            )
+            ->assertActionShouldOpenUrlInNewTab($action);
     }
 
     #[Test]
