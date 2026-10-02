@@ -71,6 +71,11 @@ class ProductVariant extends Model
         return $this->hasMany(PriceListItem::class);
     }
 
+    public function media(): HasMany
+    {
+        return $this->hasMany(VariantMedia::class, 'variant_id')->orderBy('sort_order');
+    }
+
     /**
      * Shared badge computation from raw availability data.
      *

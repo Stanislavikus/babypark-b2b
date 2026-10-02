@@ -267,21 +267,6 @@ final class ProductWorkspaceSummaryService
      */
     public function mediaUrls(Product $product): array
     {
-        $images = $product->images;
-
-        if (is_string($images)) {
-            $images = json_decode($images, true);
-        }
-
-        if (! is_array($images)) {
-            return [];
-        }
-
-        return collect($images)
-            ->filter(fn ($url): bool => is_string($url) && trim($url) !== '')
-            ->map(fn (string $url): string => trim($url))
-            ->unique()
-            ->values()
-            ->all();
+        return app(ProductMediaReadService::class)->orderedUrls($product);
     }
 }

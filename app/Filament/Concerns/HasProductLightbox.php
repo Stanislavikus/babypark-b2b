@@ -3,6 +3,7 @@
 namespace App\Filament\Concerns;
 
 use App\Models\Product;
+use App\Services\Catalog\ProductMediaReadService;
 
 trait HasProductLightbox
 {
@@ -34,15 +35,9 @@ trait HasProductLightbox
         ];
     }
 
-    /** Returns the first image URL from a product's images JSON, or null. */
+    /** Returns the first Master Product media URL, with legacy JSON fallback. */
     public static function firstImage(Product $record): ?string
     {
-        $images = $record->images;
-
-        if (is_string($images)) {
-            $images = json_decode($images, true);
-        }
-
-        return is_array($images) && count($images) > 0 ? $images[0] : null;
+        return app(ProductMediaReadService::class)->firstImageUrl($record);
     }
 }
