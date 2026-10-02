@@ -27,6 +27,7 @@ use App\Services\Catalog\ProductWorkspaceSummaryService;
 use App\Services\ProductStructure\ProductStructureMutationService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -99,10 +100,115 @@ class MasterProductWorkspaceShellTest extends TestCase
             ->assertSee('Якість даних')
             ->assertSee('Канали публікації')
             ->assertSee('Потребує уваги')
+            ->assertSee('Імпортувати Excel / CSV')
+            ->assertSee('Заповнити з файлу')
+            ->assertSee('Покращити')
+            ->assertSee('Видалити фон')
+            ->assertSee('Підготувати для каналу')
+            ->assertSee('Редагувати ціни')
+            ->assertSee('Редагувати залишки')
+            ->assertSee('Медіа варіантів')
+            ->assertSee('Заповнити характеристики з файлу')
+            ->assertSee('Чекає на підключення')
+            ->assertSee('Отримати ключові слова')
+            ->assertSee('Створити опис з AI')
+            ->assertSee('Аналіз пошуку')
+            ->assertSee('Related / Upsell / Cross-sell')
             ->assertSee('Master Product · 1С · SKU WORKSPACE-001')
             ->assertSee('Простий товар')
             ->assertSee('2 медіа · поточний Master-набір')
             ->assertSee('Інформаційно · не є готовністю конкретного каналу.');
+    }
+
+    #[Test]
+    public function pending_capability_modal_is_visible_and_does_not_mutate_product(): void
+    {
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'onec_guid' => null,
+            'sku' => 'PENDING-UI-001',
+            'name' => 'Pending capability product',
+            'description' => '<p>Original description</p>',
+            'meta_title' => 'Original SEO title',
+            'meta_description' => 'Original SEO description',
+            'url' => 'https://example.test/original',
+            'is_active' => true,
+        ]);
+
+        ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => null,
+            'sku' => 'PENDING-UI-001',
+            'attributes' => [],
+            'is_active' => true,
+        ]);
+
+        $before = $product->fresh()->only([
+            'name',
+            'description',
+            'meta_title',
+            'meta_description',
+            'url',
+        ]);
+
+        Livewire::actingAs($this->admin)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->mountAction(
+                TestAction::make('import_spreadsheet')
+                    ->schemaComponent('basic_capability_actions'),
+            )
+            ->assertActionMounted(
+                TestAction::make('import_spreadsheet')
+                    ->schemaComponent('basic_capability_actions'),
+            )
+            ->assertSee('Чекає на підключення')
+            ->unmountAction();
+
+        $this->assertSame($before, $product->fresh()->only(array_keys($before)));
+    }
+
+    #[Test]
+    public function deferred_seo_fields_are_not_saved_from_master_workspace(): void
+    {
+        $product = Product::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'onec_guid' => null,
+            'sku' => 'SEO-DEFERRED-001',
+            'name' => 'SEO deferred product',
+            'description' => '<p>Description</p>',
+            'meta_title' => 'Keep title',
+            'meta_description' => 'Keep description',
+            'url' => 'https://example.test/keep',
+            'is_active' => true,
+        ]);
+
+        ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => null,
+            'sku' => 'SEO-DEFERRED-001',
+            'attributes' => [],
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($this->admin)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->fillForm([
+                'name' => 'SEO deferred product updated',
+                'meta_title' => 'Must not save',
+                'meta_description' => 'Must not save',
+                'url' => 'https://example.test/must-not-save',
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $fresh = $product->fresh();
+
+        $this->assertSame('SEO deferred product updated', $fresh->name);
+        $this->assertSame('Keep title', $fresh->meta_title);
+        $this->assertSame('Keep description', $fresh->meta_description);
+        $this->assertSame('https://example.test/keep', $fresh->url);
     }
 
     #[Test]

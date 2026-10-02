@@ -28,10 +28,10 @@ between implementation campaigns.
 | Offer presentation | Offer | PriceResolver / ProductPricingSummary | Price section read-only | pricing suite | PARTIAL; Master editing workflow remains |
 | Inventory presentation | Inventory & Fulfillment | AvailabilityResolver | Inventory section read-only | availability suite | PARTIAL; Master editing/location workflow remains |
 | Physical/shipping facts | Product Core / Fulfillment | current governed columns | collapsible section | current Product tests | PARTIAL; applicability/policy remains |
-| Media gallery | Content & Assets | #249 first-class read model + legacy compatibility projection | gallery + Add / Reorder / Remove actions | Livewire + read-path regression; MySQL pending | PARTIAL; final visual/media UX still pending |
-| Media Original preservation | Media Policy v1 | #249 stores uploaded Original bytes without resize/re-encode; reusable workspace asset identity | Add media | upload/storage/hash tests; MySQL pending | PARTIAL; external ingest and real-target validation remain |
+| Media gallery | Content & Assets | #249 first-class read model + legacy compatibility projection | gallery + Add / Reorder / Remove; #251 also exposes pending Enhance/Remove background/Prepare for channel | MySQL #536 + Livewire/read-path regression PASS | PARTIAL; media processing/final visual UX remain |
+| Media Original preservation | Media Policy v1 | #249 stores uploaded Original bytes without resize/re-encode; reusable workspace asset identity | Add media | MySQL #536 + upload/storage/hash tests PASS | PARTIAL; external ingest and real-target validation remain |
 | Media ingest diagnosis | Media Policy v1 | #249 records MIME, bytes, dimensions, hash and diagnosis envelope | normal gallery hides engineering details | focused tests | PARTIAL; weak-source/effective-quality diagnosis remains |
-| Product media associations / order / primary | Content & Assets | #249 ProductMedia, explicit sort, primary=position 0, common locale fallback | gallery + reorder/remove | Livewire + stale/order tests; MySQL pending | PARTIAL until MySQL/real verification |
+| Product media associations / order / primary | Content & Assets | #249 ProductMedia, explicit sort, primary=position 0, common locale fallback | gallery + reorder/remove | MySQL #536 + Livewire/stale/order tests PASS | DONE for common Product gallery foundation |
 | Variant-specific media | Content & Assets | #249 VariantMedia persistence + isolation; not mixed into Magento Product media | no authoring UI yet | connector regression | PARTIAL; variant authoring/presentation remains |
 | Semantic derivative lineage | Media Policy v1 | #249 parent_media_asset_id; gallery rejects derivative rows | not merchant-facing yet | lineage/original guard tests | PARTIAL; Improve/processing pipeline not implemented |
 | Transform only on destination or explicit intent | Media Policy v1 | no transform is performed on ingest | no transform UI yet | Original upload regression | PARTIAL; destination/Improve transforms remain |
@@ -44,9 +44,9 @@ between implementation campaigns.
 | No technical-output duplicates in Master gallery | Media Policy v1 | #249 Master gallery associations accept Originals only; channel artifacts remain separate | Master gallery | derivative guard tests | PARTIAL; generic channel-artifact model remains |
 | 360 as one logical media presentation | Media Policy v1 | architecture rule frozen; runtime absent | absent | absent | NOT STARTED |
 | Responsive widths/formats remain delivery/cache concerns | Media Policy v1 | architecture rule frozen; no Product rendition rows created | not merchant-facing | structural review | DONE as boundary; delivery implementation belongs elsewhere |
-| SEO fields | Intelligence / Content | meta_title/meta_description/url columns | SEO section | existing form tests | PARTIAL |
-| Search Brief / keyword research | Intelligence | absent | absent | absent | NOT STARTED |
-| AI proposals with stale revision/provenance | Intelligence | architecture resolved; runtime absent | absent | absent | NOT STARTED |
+| SEO fields | Intelligence / Content | legacy meta_title/meta_description/url columns exist; governed SEO contract not connected | #251 visible read-only SEO section + pending actions | Workspace UI test proves deferred fields do not save | PARTIAL; intentionally deferred to final SEO module |
+| Search Brief / keyword research | Intelligence | absent | #251 visible «Отримати ключові слова» pending action | pending-action zero-mutation UI contract | NOT STARTED; intentionally deferred to final SEO module |
+| AI proposals with stale revision/provenance | Intelligence | architecture resolved; runtime absent | #251 visible AI-content/file-enrichment pending actions | pending-action UI contract | NOT STARTED; intentionally deferred to final AI/SEO module |
 | Right rail lifecycle/source | Product Core | current Product state/source projection | Status rail | shell tests | PARTIAL |
 | Right rail data quality | Intelligence / Derived | basic + structure completeness | Data quality rail | shell tests | PARTIAL; richer profiles remain |
 | Right rail attention items | Intelligence / Derived | basic/structure findings | Attention rail | shell tests | PARTIAL |
@@ -55,13 +55,12 @@ between implementation campaigns.
 | SAVE vs PUBLISH | Publication | connector Preview/Live separated; generic ChangeSet absent | separate channel actions | connector suites | PARTIAL |
 | Publication ChangeSet / Projection Plan | Publication | connector-specific foundations; generic Master layer absent | absent | absent | NOT STARTED |
 | Entity resolution before inbound authority | Identity / Authority | connector Entity Trust exists; universal inbound flow absent | connector-specific | certified Magento evidence | PARTIAL |
-| Import entry point converging on Master | Product creation | legacy/import seams exist; universal flow absent | incomplete | incomplete | NOT STARTED |
+| Import entry point converging on Master | Product creation | workspace_import_aliases exists; universal spreadsheet runtime absent | #251 visible Excel/CSV Smart Import pending action | pending modal + zero-mutation test | PARTIAL surface only; runtime remains a later non-AI import campaign |
 | Create with AI entry point converging on Master | Product creation / AI | absent | absent | absent | NOT STARTED |
 | Final integrated merchant E2E | Whole Workspace | individual slices only | incomplete | not yet run | NOT STARTED |
 | Final visual/design acceptance | UX | preliminary direction frozen | intentionally pending | product-owner visual review | INTENTIONALLY DEFERRED until functional coverage |
 
 ## Current campaign pointer
 
-Current campaign: PR #249 — first-class Media / Assets foundation and ingest diagnosis.
-Current HEAD implements the first-class persistence/read/write foundation, common Product gallery actions, legacy compatibility, and Magento input compatibility.
-Remaining campaign gates: authoritative GitHub MySQL CI, Lead diff review, Delivery Matrix reconciliation, and bounded real-target compatibility evidence before merge readiness.
+Completed campaign: PR #249 — first-class Media / Assets foundation and ingest diagnosis — merged at `0578629fd4880cf16022409eb9af2689a7b810ee`; MySQL #536 PASS (3678 tests / 83,856 assertions).
+Current campaign: PR #251 — expose and exercise the full non-SEO Master Product Workspace. Working capabilities remain live; missing runtimes stay visible as «Чекає на підключення». SEO/AI is intentionally deferred to the final module.

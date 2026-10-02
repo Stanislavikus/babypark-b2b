@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\TagBulkOperation;
 use App\Exceptions\Catalog\InvalidTagBulkSelectionException;
 use App\Filament\Concerns\HasProductLightbox;
+use App\Filament\Pages\Sync\ManageAdobeProductsChannel;
 use App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource\Pages\CreateProduct;
 use App\Filament\Resources\ProductResource\Pages\EditProduct;
@@ -39,6 +40,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Actions as SchemaActions;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
@@ -108,6 +110,20 @@ class ProductResource extends Resource
                                 ->label('EAN / GTIN')
                                 ->maxLength(255)
                                 ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            SchemaActions::make([
+                                self::pendingCapabilityAction(
+                                    'import_spreadsheet',
+                                    'Імпортувати Excel / CSV',
+                                    'Smart Import із нормалізацією заголовків та запам’ятовуванням mapping уже визначено в архітектурі, але runtime ще не підключено.',
+                                    'heroicon-o-table-cells',
+                                ),
+                                self::pendingCapabilityAction(
+                                    'fill_from_supplier_document',
+                                    'Заповнити з файлу',
+                                    'Автоматичне вилучення характеристик із PDF/документа постачальника буде підключено разом з AI enrichment після обкатки основного Workspace.',
+                                    'heroicon-o-document-arrow-up',
+                                ),
+                            ])->key('basic_capability_actions')->columnSpanFull(),
                         ])
                         ->columns(2),
 
@@ -117,6 +133,26 @@ class ProductResource extends Resource
                             Placeholder::make('workspace_media')
                                 ->hiddenLabel()
                                 ->content(fn (?Product $record): HtmlString => self::buildMediaWorkspaceHtml($record)),
+                            SchemaActions::make([
+                                self::pendingCapabilityAction(
+                                    'media_enhance',
+                                    'Покращити',
+                                    'Покращення буде доступне лише для слабкого Original або явної творчої обробки. Автоматичний pipeline ще не підключено.',
+                                    'heroicon-o-sparkles',
+                                ),
+                                self::pendingCapabilityAction(
+                                    'media_remove_background',
+                                    'Видалити фон',
+                                    'Обробка фону є pixel-transform і буде підключена окремим media-processing runtime.',
+                                    'heroicon-o-photo',
+                                ),
+                                self::pendingCapabilityAction(
+                                    'media_prepare_channel',
+                                    'Підготувати для каналу',
+                                    'Формат, розмір, фон і metadata повинні визначатися destination profile. Загальний channel-artifact runtime ще не підключено.',
+                                    'heroicon-o-paper-airplane',
+                                ),
+                            ])->key('media_pending_actions'),
                         ])
                         ->visible(fn (?Product $record): bool => $record !== null),
 
@@ -137,6 +173,14 @@ class ProductResource extends Resource
                                 ->content(fn (?Product $record): string => $record
                                     ? (app(ProductPricingSummary::class)->formatCostPrice($record) ?? '—')
                                     : '—'),
+                            SchemaActions::make([
+                                self::pendingCapabilityAction(
+                                    'edit_offer',
+                                    'Редагувати ціни',
+                                    'Master Offer уже має окремий runtime-власник, але merchant editing workflow ще не підключено до цієї картки.',
+                                    'heroicon-o-banknotes',
+                                ),
+                            ])->key('offer_pending_actions')->columnSpanFull(),
                         ])
                         ->columns(3)
                         ->visible(fn (?Product $record): bool => $record !== null),
@@ -153,6 +197,14 @@ class ProductResource extends Resource
                                 ->content(fn (?Product $record): string => $record
                                     ? self::inventoryScopeLabel($record)
                                     : '—'),
+                            SchemaActions::make([
+                                self::pendingCapabilityAction(
+                                    'edit_inventory',
+                                    'Редагувати залишки',
+                                    'Inventory runtime працює окремо за Variant + Location. Merchant editing/location workflow у Master Workspace ще не підключено.',
+                                    'heroicon-o-archive-box',
+                                ),
+                            ])->key('inventory_pending_actions')->columnSpanFull(),
                         ])
                         ->columns(2)
                         ->visible(fn (?Product $record): bool => $record !== null),
@@ -200,6 +252,14 @@ class ProductResource extends Resource
                             Placeholder::make('workspace_variants')
                                 ->hiddenLabel()
                                 ->content(fn (?Product $record): HtmlString => self::buildVariantWorkspaceHtml($record)),
+                            SchemaActions::make([
+                                self::pendingCapabilityAction(
+                                    'variant_media',
+                                    'Медіа варіантів',
+                                    'VariantMedia persistence уже є, але merchant authoring/presentation для окремих варіантів ще не підключено.',
+                                    'heroicon-o-photo',
+                                ),
+                            ])->key('variant_pending_actions'),
                         ])
                         ->visible(fn (?Product $record): bool => $record !== null),
 
@@ -209,24 +269,47 @@ class ProductResource extends Resource
                             Placeholder::make('workspace_attributes')
                                 ->hiddenLabel()
                                 ->content(fn (?Product $record): HtmlString => self::buildAttributeGroupsHtml($record)),
+                            SchemaActions::make([
+                                self::pendingCapabilityAction(
+                                    'enrich_characteristics_from_file',
+                                    'Заповнити характеристики з файлу',
+                                    'PDF/документ/зображення постачальника буде evidence для AI proposals. Автоматичне розкладання по полях підключимо разом з AI-модулем.',
+                                    'heroicon-o-document-text',
+                                ),
+                            ])->key('characteristics_pending_actions'),
                         ])
                         ->visible(fn (?Product $record): bool => $record !== null),
 
                     Section::make('SEO та пошук')
+                        ->description('Модуль показано для візуальної обкатки. Підключення keyword research, AI-content та SEO workflow виконаємо останнім.')
                         ->schema([
+                            Placeholder::make('seo_connection_state')
+                                ->hiddenLabel()
+                                ->content(new HtmlString(
+                                    '<div style="padding:10px 12px;border:1px solid #fde68a;background:#fffbeb;border-radius:8px;color:#92400e;">'.
+                                    '<strong>Чекає на підключення</strong>'.
+                                    '<div style="margin-top:3px;font-size:12px;">Поточні значення показані лише для орієнтації та не редагуються в цій кампанії.</div>'.
+                                    '</div>'
+                                )),
                             TextInput::make('meta_title')
                                 ->label('SEO title')
                                 ->maxLength(255)
+                                ->disabled()
+                                ->dehydrated(false)
                                 ->columnSpanFull(),
                             TextInput::make('meta_description')
                                 ->label('Meta description')
                                 ->maxLength(500)
+                                ->disabled()
+                                ->dehydrated(false)
                                 ->columnSpanFull(),
                             TextInput::make('url')
                                 ->label('URL товару на сайті')
                                 ->url()
                                 ->placeholder('https://babypark.ua/product/...')
                                 ->maxLength(2048)
+                                ->disabled()
+                                ->dehydrated(false)
                                 ->suffixAction(
                                     Action::make('open_url')
                                         ->icon('heroicon-m-arrow-top-right-on-square')
@@ -235,6 +318,26 @@ class ProductResource extends Resource
                                         ->visible(fn (?string $state) => filled($state))
                                 )
                                 ->columnSpanFull(),
+                            SchemaActions::make([
+                                self::pendingCapabilityAction(
+                                    'seo_keywords',
+                                    'Отримати ключові слова',
+                                    'Search Brief і keyword provider навмисно відкладені до фінального SEO-модуля.',
+                                    'heroicon-o-magnifying-glass',
+                                ),
+                                self::pendingCapabilityAction(
+                                    'seo_ai_description',
+                                    'Створити опис з AI',
+                                    'AI content proposal буде review-first і підключиться після обкатки основного Workspace.',
+                                    'heroicon-o-sparkles',
+                                ),
+                                self::pendingCapabilityAction(
+                                    'seo_performance',
+                                    'Аналіз пошуку',
+                                    'GSC / Merchant / marketplace performance agent буде окремим фінальним SEO workflow.',
+                                    'heroicon-o-chart-bar',
+                                ),
+                            ])->key('seo_pending_actions'),
                         ])
                         ->collapsible()
                         ->visible(fn (?Product $record): bool => $record !== null),
@@ -324,6 +427,20 @@ class ProductResource extends Resource
                             Placeholder::make('workspace_channels')
                                 ->hiddenLabel()
                                 ->content(fn (?Product $record): HtmlString => self::buildChannelWorkspaceHtml($record)),
+                            SchemaActions::make([
+                                Action::make('open_magento_v1')
+                                    ->label('Відкрити Magento V1')
+                                    ->icon('heroicon-o-arrow-top-right-on-square')
+                                    ->url(fn (?Product $record): ?string => self::magentoChannelUrl($record))
+                                    ->openUrlInNewTab()
+                                    ->visible(fn (?Product $record): bool => self::magentoChannelUrl($record) !== null),
+                                self::pendingCapabilityAction(
+                                    'product_associations',
+                                    'Related / Upsell / Cross-sell',
+                                    'Adobe V1 capability проінвентаризовано, але ProductAssociation runtime та merchant editor ще не підключені.',
+                                    'heroicon-o-link',
+                                ),
+                            ])->key('channel_capability_actions'),
                         ])
                         ->visible(fn (?Product $record): bool => $record !== null),
 
@@ -934,6 +1051,48 @@ class ProductResource extends Resource
     // -------------------------------------------------------------------------
     // Internal helpers
     // -------------------------------------------------------------------------
+
+    private static function pendingCapabilityAction(
+        string $name,
+        string $label,
+        string $description,
+        string $icon = 'heroicon-o-clock',
+    ): Action {
+        return Action::make($name)
+            ->label($label)
+            ->icon($icon)
+            ->color('gray')
+            ->modalIcon('heroicon-o-clock')
+            ->modalHeading('Чекає на підключення')
+            ->modalDescription($description)
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Закрити')
+            ->action(fn (): null => null);
+    }
+
+    private static function magentoChannelUrl(?Product $record): ?string
+    {
+        if ($record === null) {
+            return null;
+        }
+
+        $record->loadMissing('syncChannelSelections.syncConfiguration.connectorAccount.connectorDefinition');
+
+        $selection = $record->syncChannelSelections
+            ->first(fn ($selection): bool => $selection->syncConfiguration?->connectorAccount?->connectorDefinition?->code === 'adobe_commerce');
+
+        $accountId = $selection?->syncConfiguration?->connectorAccount?->id;
+
+        if (! is_string($accountId) || $accountId === '') {
+            return null;
+        }
+
+        if (! ManageAdobeProductsChannel::canAccess(['account' => $accountId])) {
+            return null;
+        }
+
+        return ManageAdobeProductsChannel::getUrl(['account' => $accountId]);
+    }
 
     private static function isSourceOwned(?Product $record): bool
     {
