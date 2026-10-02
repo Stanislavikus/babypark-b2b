@@ -1,0 +1,18 @@
+option_id,internal_code,option_code,en_label,uk_label,ru_label,sort_order,option_scope,applicability_id,option_source_strategy,value_domain_ref,verification_status,status,evidence_subject_key
+o001,condition,new,New,Новий,Новый,10,universal,a006,external_standard,google_merchant:condition,verified,active,option:o001
+o002,condition,used,Used,Вживаний,Б/у,20,universal,a006,external_standard,google_merchant:condition,verified,active,option:o002
+o003,condition,refurbished,Refurbished,Відновлений,Восстановленный,30,universal,a006,external_standard,google_merchant:condition,verified,active,option:o003
+o004,backorder_policy,deny,Deny,Не дозволяти,Не разрешать,10,platform_library,a015,static_registry,database/seeders/FieldDefinitionSeeder.php,verified,active,option:o004
+o005,backorder_policy,continue,Continue,Дозволяти,Разрешать,20,platform_library,a015,static_registry,database/seeders/FieldDefinitionSeeder.php,verified,active,option:o005
+o006,color,blue,Blue,Синій,Синий,10,platform_library,a013,static_registry,database/seeders/FieldDefinitionSeeder.php,verified,active,option:o006
+o007,color,pink,Pink,Рожевий,Розовый,20,platform_library,a013,static_registry,database/seeders/FieldDefinitionSeeder.php,verified,active,option:o007
+o008,size,m,M,M,M,10,platform_library,a014,static_registry,database/seeders/FieldDefinitionSeeder.php,verified,active,option:o008
+o009,age_group,newborn,Newborn,Новонароджені,Новорождённые,10,platform_library,a027,external_standard,google_merchant:age_group,verified,active,option:o009
+o010,age_group,infant,Infant,Немовлята,Младенцы,20,platform_library,a027,external_standard,google_merchant:age_group,verified,active,option:o010
+o011,age_group,toddler,Toddler,Малюки,Малыши,30,platform_library,a027,external_standard,google_merchant:age_group,verified,active,option:o011
+o012,age_group,kids,Kids,Діти,Дети,40,platform_library,a027,external_standard,google_merchant:age_group,verified,active,option:o012
+o013,age_group,adult,Adult,Дорослі,Взрослые,50,platform_library,a027,external_standard,google_merchant:age_group,verified,active,option:o013
+o014,gender,female,Female,Жіноча,Женский,10,platform_library,a028,external_standard,shopify:target_gender,verified,active,option:o014
+o015,gender,male,Male,Чоловіча,Мужской,20,platform_library,a028,external_standard,shopify:target_gender,verified,active,option:o015
+o016,gender,unisex,Unisex,Унісекс,Унисекс,30,platform_library,a028,external_standard,shopify:target_gender,verified,active,option:o016
+o017,gender,other,Other,Інше,Другое,40,platform_library,a028,external_standard,shopify:target_gender,verified,active,option:o017

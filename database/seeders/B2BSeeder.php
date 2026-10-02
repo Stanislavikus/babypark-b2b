@@ -3,21 +3,27 @@
 namespace Database\Seeders;
 
 use App\Enums\OrderStatus;
+use App\Enums\PriceListItemStatus;
+use App\Enums\PriceListStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\SyncLogStatus;
 use App\Enums\SyncLogType;
 use App\Enums\UserRole;
 use App\Models\Category;
-use App\Models\Contractor;
+use App\Models\Customer;
+use App\Models\InventoryLocation;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\Price;
+use App\Models\PriceList;
+use App\Models\PriceListItem;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Reservation;
 use App\Models\Stock;
 use App\Models\SyncLog;
 use App\Models\User;
+use App\Services\Pricing\PriceResolver;
+use App\Support\Workspace\WorkspaceContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -44,20 +50,20 @@ class B2BSeeder extends Seeder
             'is_active' => true,
         ]);
 
-        $contractors = $this->seedContractors();
+        $customers = $this->seedCustomers();
         $categories = $this->seedCategories();
         $variants = $this->seedProductsAndVariants($categories);
-        $this->seedPrices($contractors, $variants);
+        $this->seedPrices($customers, $variants);
         $this->seedStocks($variants);
-        $this->seedOrders($contractors, $variants, $admin);
-        $this->seedReservations($contractors, $variants);
+        $this->seedOrders($customers, $variants, $admin);
+        $this->seedReservations($customers, $variants);
         $this->seedSyncLogs();
     }
 
     /**
-     * @return Collection<int, Contractor>
+     * @return Collection<int, Customer>
      */
-    private function seedContractors()
+    private function seedCustomers()
     {
         $data = [
             [
@@ -87,7 +93,7 @@ class B2BSeeder extends Seeder
         ];
 
         return collect($data)->map(function (array $row, int $index) {
-            return Contractor::query()->create([
+            return Customer::query()->create([
                 'onec_guid' => (string) Str::uuid(),
                 'name' => $row['name'],
                 'short_name' => $row['short_name'],
@@ -137,6 +143,7 @@ class B2BSeeder extends Seeder
 
         for ($i = 1; $i <= 50; $i++) {
             $category = $categories->random();
+            $costPrice = round(25 + ($i % 20) * 3.5, 2);
             $product = Product::query()->create([
                 'onec_guid' => (string) Str::uuid(),
                 'sku' => sprintf('BP-%05d', $i),
@@ -165,6 +172,7 @@ class B2BSeeder extends Seeder
                 'barcode_ean' => $product->barcode_ean,
                 'attributes' => $i % 3 === 0 ? ['Колір' => 'Синій', 'Розмір' => 'M'] : null,
                 'is_active' => true,
+                'cost_price' => $costPrice,
                 'synced_at' => now(),
             ]);
 
@@ -176,6 +184,7 @@ class B2BSeeder extends Seeder
                     'barcode_ean' => sprintf('482%010d', 50000 + $i),
                     'attributes' => ['Колір' => 'Рожевий'],
                     'is_active' => true,
+                    'cost_price' => $costPrice,
                     'synced_at' => now(),
                 ]);
             }
@@ -187,29 +196,64 @@ class B2BSeeder extends Seeder
     }
 
     /**
-     * @param  Collection<int, Contractor>  $contractors
+     * @param  Collection<int, Customer>  $customers
      * @param  Collection<int, ProductVariant>  $variants
      */
-    private function seedPrices($contractors, $variants): void
+    private function seedPrices($customers, $variants): void
     {
-        foreach ($contractors as $contractor) {
+        $workspaceId = app(WorkspaceContext::class)->id();
+
+        PriceList::withoutWorkspaceScope()->firstOrCreate(
+            [
+                'workspace_id' => $workspaceId,
+                'is_default' => true,
+            ],
+            [
+                'name' => 'Workspace Default',
+                'currency' => 'UAH',
+                'priority' => 0,
+                'status' => PriceListStatus::Active,
+            ],
+        );
+
+        foreach ($customers as $customer) {
+            $priceList = PriceList::query()->create([
+                'name' => 'Legacy — '.$customer->name,
+                'currency' => 'UAH',
+                'is_default' => false,
+                'priority' => 0,
+                'status' => PriceListStatus::Active,
+            ]);
+
+            $customer->update(['default_price_list_id' => $priceList->id]);
+
             foreach ($variants as $index => $variant) {
-                $base = 50 + ($index % 40) * 12.5 + ($contractor->id * 3);
+                $base = 50 + ($index % 40) * 12.5 + ($customer->id * 3);
                 $vatRate = 20;
                 $price = round($base, 2);
                 $priceWithVat = round($price * (1 + $vatRate / 100), 2);
+                $rrp = round((50 + ($index % 40) * 12.5) * 1.2 * 1.35, 2);
 
-                Price::query()->create([
-                    'contractor_id' => $contractor->id,
-                    'variant_id' => $variant->id,
+                PriceListItem::query()->create([
+                    'price_list_id' => $priceList->id,
+                    'product_variant_id' => $variant->id,
+                    'quantity_min' => 1,
                     'price' => $price,
-                    'price_with_vat' => $priceWithVat,
+                    'sale_price' => null,
                     'vat_rate' => $vatRate,
-                    'recommended_retail_price' => round($priceWithVat * 1.35, 2),
-                    'min_quantity' => 1,
-                    'currency' => 'UAH',
+                    'status' => PriceListItemStatus::Active,
                 ]);
             }
+        }
+
+        foreach ($variants as $index => $variant) {
+            $demoNet = round(50 + ($index % 40) * 12.5, 2);
+            $demoGross = round($demoNet * 1.2, 2);
+
+            $variant->update([
+                'recommended_retail_price_cache' => round($demoGross * 1.35, 2),
+                'base_price_cache' => null,
+            ]);
         }
     }
 
@@ -218,32 +262,58 @@ class B2BSeeder extends Seeder
      */
     private function seedStocks($variants): void
     {
+        $workspaceId = app(WorkspaceContext::class)->id();
+        $locations = [];
+
+        foreach (self::WAREHOUSES as $warehouse) {
+            $locations[$warehouse] = InventoryLocation::withoutWorkspaceScope()->firstOrCreate(
+                [
+                    'workspace_id' => $workspaceId,
+                    'name' => $warehouse,
+                ],
+                [
+                    'type' => 'warehouse',
+                    'is_default' => $warehouse === self::WAREHOUSES[0],
+                    'is_active' => true,
+                ],
+            );
+        }
+
         foreach ($variants as $index => $variant) {
-            foreach (self::WAREHOUSES as $w => $warehouse) {
+            $totalQty = 0;
+
+            foreach (self::WAREHOUSES as $warehouse) {
                 $qty = match (true) {
                     $index % 7 === 0 => 0,
                     $index % 5 === 0 => rand(1, 8),
                     default => rand(20, 500),
                 };
 
+                $totalQty += $qty;
+
                 Stock::query()->create([
+                    'workspace_id' => $workspaceId,
                     'variant_id' => $variant->id,
-                    'warehouse_name' => $warehouse,
+                    'inventory_location_id' => $locations[$warehouse]->id,
                     'quantity' => $qty,
-                    'reserved' => $qty > 0 ? rand(0, min(5, $qty)) : 0,
                     'expected_date' => $qty === 0 ? now()->addDays(rand(3, 21))->toDateString() : null,
                     'expected_quantity' => $qty === 0 ? rand(10, 100) : null,
                     'updated_at' => now(),
                 ]);
             }
+
+            $variant->update([
+                'available_quantity_cache' => $totalQty,
+                'availability_status' => $totalQty > 0 ? 'in_stock' : 'out_of_stock',
+            ]);
         }
     }
 
     /**
-     * @param  Collection<int, Contractor>  $contractors
+     * @param  Collection<int, Customer>  $customers
      * @param  Collection<int, ProductVariant>  $variants
      */
-    private function seedOrders($contractors, $variants, User $admin): void
+    private function seedOrders($customers, $variants, User $admin): void
     {
         $statuses = [
             OrderStatus::New,
@@ -259,13 +329,13 @@ class B2BSeeder extends Seeder
         ];
 
         foreach ($statuses as $i => $status) {
-            $contractor = $contractors[$i % $contractors->count()];
+            $customer = $customers[$i % $customers->count()];
             $orderVariants = $variants->random(min(4, $variants->count()));
             $total = 0;
             $totalWithVat = 0;
 
             $order = Order::query()->create([
-                'contractor_id' => $contractor->id,
+                'customer_id' => $customer->id,
                 'user_id' => $admin->id,
                 'onec_number' => $status === OrderStatus::New ? null : '1C-'.(1000 + $i),
                 'status' => $status,
@@ -278,14 +348,10 @@ class B2BSeeder extends Seeder
             ]);
 
             foreach ($orderVariants as $variant) {
-                $price = Price::query()
-                    ->where('contractor_id', $contractor->id)
-                    ->where('variant_id', $variant->id)
-                    ->first();
-
                 $qty = rand(1, 10);
-                $lineTotal = $price->price_with_vat * $qty;
-                $total += $price->price * $qty;
+                $resolved = app(PriceResolver::class)->resolveForCustomer($variant, $customer, $qty);
+                $lineTotal = round($resolved->grossPrice * $qty, 2);
+                $total += round($resolved->effectiveNetPrice * $qty, 2);
                 $totalWithVat += $lineTotal;
 
                 OrderItem::query()->create([
@@ -295,8 +361,8 @@ class B2BSeeder extends Seeder
                     'name' => $variant->product->name,
                     'attributes' => $variant->attributes,
                     'quantity' => $qty,
-                    'price' => $price->price,
-                    'price_with_vat' => $price->price_with_vat,
+                    'price' => $resolved->effectiveNetPrice,
+                    'price_with_vat' => $resolved->grossPrice,
                     'total' => $lineTotal,
                 ]);
             }
@@ -309,17 +375,20 @@ class B2BSeeder extends Seeder
     }
 
     /**
-     * @param  Collection<int, Contractor>  $contractors
+     * @param  Collection<int, Customer>  $customers
      * @param  Collection<int, ProductVariant>  $variants
      */
-    private function seedReservations($contractors, $variants): void
+    private function seedReservations($customers, $variants): void
     {
-        foreach ($contractors as $contractor) {
+        $workspaceId = app(WorkspaceContext::class)->id();
+
+        foreach ($customers as $customer) {
             Reservation::query()->create([
-                'contractor_id' => $contractor->id,
+                'workspace_id' => $workspaceId,
+                'customer_id' => $customer->id,
                 'variant_id' => $variants->random()->id,
                 'quantity' => rand(5, 50),
-                'status' => ReservationStatus::Active,
+                'status' => ReservationStatus::Pending,
                 'expires_at' => now()->addDays(3),
             ]);
         }

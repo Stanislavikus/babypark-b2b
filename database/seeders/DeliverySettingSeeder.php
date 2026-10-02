@@ -21,10 +21,10 @@ class DeliverySettingSeeder extends Seeder
             DeliverySetting::firstOrCreate(
                 ['city' => $data['city']],
                 [
-                    'free_from'      => $data['free_from'],
+                    'free_from' => $data['free_from'],
                     'delivery_price' => $data['delivery_price'],
-                    'is_active'      => true,
-                    'sort_order'     => $data['sort_order'],
+                    'is_active' => true,
+                    'sort_order' => $data['sort_order'],
                 ]
             );
         }

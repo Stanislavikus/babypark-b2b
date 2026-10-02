@@ -1,0 +1,76 @@
+<?php
+
+namespace App\Services\Sync;
+
+use App\Enums\SyncSemanticOperation;
+use App\Models\ConnectorAccount;
+use App\Models\SyncConfiguration;
+use App\Support\Sync\FieldMappingRevisionEntry;
+use App\Support\Sync\FieldOptionMappingRevisionEntry;
+
+final class SyncPreviewConfigurationSnapshotBuilder
+{
+    public function __construct(
+        private readonly SyncConfigurationMutationCoordinator $mutationCoordinator,
+        private readonly SyncProductSelectionStore $selectionStore,
+        private readonly ConnectorCategoryMappingSnapshotService $categoryMappingSnapshotService,
+        private readonly AdobeProductClassificationSnapshotService $classificationSnapshotService,
+    ) {}
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function build(
+        SyncConfiguration $configuration,
+        SyncSemanticOperation $semanticOperation,
+    ): array {
+        $fieldMappings = array_map(
+            static fn (FieldMappingRevisionEntry $entry): array => [
+                'field_binding_id' => $entry->fieldBindingId,
+                'external_field_key' => $entry->externalFieldKey,
+                'option_mappings' => array_map(
+                    static fn (FieldOptionMappingRevisionEntry $option): array => $option->toRevisionArray(),
+                    $entry->optionMappings,
+                ),
+            ],
+            $this->mutationCoordinator->effectiveMappingPayload($configuration),
+        );
+
+        $categoryMappings = $this->categoryMappingSnapshotService->payload(
+            $configuration->workspace_id,
+            $configuration->connector_account_id,
+        );
+        $selectedProductIds = $this->selectionStore->selectedProductIds($configuration);
+        $account = ConnectorAccount::withoutWorkspaceScope()
+            ->where('workspace_id', $configuration->workspace_id)
+            ->whereKey($configuration->connector_account_id)
+            ->with('connectorDefinition')
+            ->firstOrFail();
+        $classificationPayload = $this->classificationSnapshotService->payload(
+            $account,
+            $configuration,
+            $semanticOperation,
+            $selectedProductIds,
+        );
+
+        $snapshot = [
+            'version' => 'platform.sync-run-input.v1',
+            'data_domain' => $configuration->data_domain->value,
+            'semantic_operation' => $semanticOperation->value,
+            'external_context' => $configuration->external_context ?? [],
+            'selection' => $this->selectionStore->descriptorForConfiguration($configuration)->toSnapshotArray(),
+            'field_mappings' => $fieldMappings,
+            'category_mappings' => $categoryMappings,
+            'category_mapping_revision' => $this->categoryMappingSnapshotService->revisionFromPayload($categoryMappings),
+            'connector_execution_configuration' => $configuration->connectorExecutionConfiguration()->payload(),
+        ];
+
+        if ($classificationPayload !== null) {
+            $snapshot['adobe_product_classifications'] = $classificationPayload;
+            $snapshot['adobe_product_classification_revision'] = $this->classificationSnapshotService
+                ->revisionFromPayload($classificationPayload);
+        }
+
+        return $snapshot;
+    }
+}

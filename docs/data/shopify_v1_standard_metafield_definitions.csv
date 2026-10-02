@@ -1,0 +1,16 @@
+template_id,name,namespace_key,type,allowed_resources,semantic_note,cluster_candidate,source_surface,review_status
+1,Product subtitle,descriptors.subtitle,single_line_text_field,PRODUCT;PRODUCTVARIANT,Concise product subtitle; max length 70,product_content,shopify_standard_metafields,INITIAL_RESEARCH
+2,Care guide,descriptors.care_guide,multi_line_text_field,PRODUCT;PRODUCTVARIANT,Care instructions; max length 500,product_content,shopify_standard_metafields,INITIAL_RESEARCH
+3,ISBN,facts.isbn,single_line_text_field,PRODUCT;PRODUCTVARIANT,ISBN identifier; 10 or 13 digits with optional hyphens,variant_identity,shopify_standard_metafields,INITIAL_RESEARCH
+4,UPC,facts.upc,single_line_text_field,PRODUCT;PRODUCTVARIANT,UPC identifier; 12-digit validation,variant_identity,shopify_standard_metafields,INITIAL_RESEARCH
+5,EAN,facts.ean,single_line_text_field,PRODUCT;PRODUCTVARIANT,EAN identifier; 13-digit validation,variant_identity,shopify_standard_metafields,INITIAL_RESEARCH
+6,Product rating,reviews.rating,rating,PRODUCT;PRODUCTVARIANT,Average product/variant rating,reviews_ratings,shopify_standard_metafields,INITIAL_RESEARCH
+7,Product rating count,reviews.rating_count,number_integer,PRODUCT;PRODUCTVARIANT,Number of ratings,reviews_ratings,shopify_standard_metafields,INITIAL_RESEARCH
+14,Related products,shopify--discovery--product_recommendation.related_products,list.product_reference,PRODUCT,Manual related product references,collections_relations,shopify_standard_metafields,INITIAL_RESEARCH
+15,Related products setting,shopify--discovery--product_recommendation.related_products_display,single_line_text_field,PRODUCT,Recommendation display policy,presentation_template,shopify_standard_metafields,INITIAL_RESEARCH
+16,Search product boosts,shopify--discovery--product_search_boost.queries,list.single_line_text_field,PRODUCT,Search terms used to boost a product,seo_routing,shopify_standard_metafields,INITIAL_RESEARCH
+17,Complementary products,shopify--discovery--product_recommendation.complementary_products,list.product_reference,PRODUCT,Complementary product references,collections_relations,shopify_standard_metafields,INITIAL_RESEARCH
+20,Trade item description,import_information.trade_item_description,multi_line_text_field,PRODUCT;PRODUCTVARIANT,Customs/import trade item description,shipping_customs,shopify_standard_metafields,INITIAL_RESEARCH
+21,Product transport declaration,import_information.product_transport_declaration,list.single_line_text_field,PRODUCT;PRODUCTVARIANT,Transport declarations such as batteries/hazardous materials/liquids,shipping_customs,shopify_standard_metafields,INITIAL_RESEARCH
+27,External URL,shopify.external_url,url,PRODUCTVARIANT,Variant-level external storefront URL used by global Catalog,seo_routing,shopify_standard_metafields,INITIAL_RESEARCH
+28,Unavailable reason,shopify.unavailable_reason,single_line_text_field,PRODUCT,Reason product is unavailable to sell,product_identity_lifecycle,shopify_standard_metafields,INITIAL_RESEARCH

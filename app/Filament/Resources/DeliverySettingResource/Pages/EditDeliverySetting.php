@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\DeliverySettingResource\Pages;
 
 use App\Filament\Resources\DeliverySettingResource;
-use Filament\Actions;
+use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
 
 class EditDeliverySetting extends EditRecord
@@ -13,7 +13,7 @@ class EditDeliverySetting extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            DeleteAction::make(),
         ];
     }
 
