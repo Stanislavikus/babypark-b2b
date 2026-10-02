@@ -28,10 +28,10 @@ between implementation campaigns.
 | Offer presentation | Offer | PriceResolver / ProductPricingSummary | Price section read-only | pricing suite | PARTIAL; Master editing workflow remains |
 | Inventory presentation | Inventory & Fulfillment | AvailabilityResolver | Inventory section read-only | availability suite | PARTIAL; Master editing/location workflow remains |
 | Physical/shipping facts | Product Core / Fulfillment | current governed columns | collapsible section | current Product tests | PARTIAL; applicability/policy remains |
-| Media gallery | Content & Assets | #249 first-class read model + legacy compatibility projection | gallery + Add / Reorder / Remove actions | Livewire + read-path regression; MySQL pending | PARTIAL; final visual/media UX still pending |
-| Media Original preservation | Media Policy v1 | #249 stores uploaded Original bytes without resize/re-encode; reusable workspace asset identity | Add media | upload/storage/hash tests; MySQL pending | PARTIAL; external ingest and real-target validation remain |
+| Media gallery | Content & Assets | #249 first-class read model + legacy compatibility projection | gallery + Add / Reorder / Remove actions | MySQL #536 + Livewire/read-path regression PASS | PARTIAL; final visual/media UX still pending |
+| Media Original preservation | Media Policy v1 | #249 stores uploaded Original bytes without resize/re-encode; reusable workspace asset identity | Add media | MySQL #536 + upload/storage/hash tests PASS | PARTIAL; external ingest and real-target validation remain |
 | Media ingest diagnosis | Media Policy v1 | #249 records MIME, bytes, dimensions, hash and diagnosis envelope | normal gallery hides engineering details | focused tests | PARTIAL; weak-source/effective-quality diagnosis remains |
-| Product media associations / order / primary | Content & Assets | #249 ProductMedia, explicit sort, primary=position 0, common locale fallback | gallery + reorder/remove | Livewire + stale/order tests; MySQL pending | PARTIAL until MySQL/real verification |
+| Product media associations / order / primary | Content & Assets | #249 ProductMedia, explicit sort, primary=position 0, common locale fallback | gallery + reorder/remove | MySQL #536 + Livewire/stale/order tests PASS | DONE for common Product gallery foundation; variant authoring/media transforms remain separate rows |
 | Variant-specific media | Content & Assets | #249 VariantMedia persistence + isolation; not mixed into Magento Product media | no authoring UI yet | connector regression | PARTIAL; variant authoring/presentation remains |
 | Semantic derivative lineage | Media Policy v1 | #249 parent_media_asset_id; gallery rejects derivative rows | not merchant-facing yet | lineage/original guard tests | PARTIAL; Improve/processing pipeline not implemented |
 | Transform only on destination or explicit intent | Media Policy v1 | no transform is performed on ingest | no transform UI yet | Original upload regression | PARTIAL; destination/Improve transforms remain |
@@ -62,6 +62,5 @@ between implementation campaigns.
 
 ## Current campaign pointer
 
-Current campaign: PR #249 — first-class Media / Assets foundation and ingest diagnosis.
-Current HEAD implements the first-class persistence/read/write foundation, common Product gallery actions, legacy compatibility, and Magento input compatibility.
-Remaining campaign gates: authoritative GitHub MySQL CI, Lead diff review, Delivery Matrix reconciliation, and bounded real-target compatibility evidence before merge readiness.
+Completed campaign: PR #249 — first-class Media / Assets foundation and ingest diagnosis — merged at `0578629fd4880cf16022409eb9af2689a7b810ee`; MySQL #536 PASS (3678 tests / 83,856 assertions).
+Current campaign: AI proposals + Search Brief. Physical persistence/provider alignment is proposed in `MASTER_PRODUCT_AI_SEARCH_BRIEF_ALIGNMENT_2026_10_02.md`; application code waits for Product Owner approval.
