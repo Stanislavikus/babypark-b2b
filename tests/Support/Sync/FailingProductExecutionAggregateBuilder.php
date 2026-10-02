@@ -2,6 +2,7 @@
 
 namespace Tests\Support\Sync;
 
+use App\Services\Catalog\ProductMediaReadService;
 use App\Services\Pricing\PriceResolver;
 use App\Support\Sync\Preview\ProductExecutionAggregate;
 use App\Support\Sync\Preview\ProductExecutionAggregateBuilder;
@@ -10,7 +11,10 @@ final class FailingProductExecutionAggregateBuilder extends ProductExecutionAggr
 {
     public function __construct()
     {
-        parent::__construct(app(PriceResolver::class));
+        parent::__construct(
+            app(PriceResolver::class),
+            app(ProductMediaReadService::class),
+        );
     }
 
     /**
