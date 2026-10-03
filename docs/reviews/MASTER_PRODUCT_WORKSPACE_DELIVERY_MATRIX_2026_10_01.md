@@ -63,4 +63,5 @@ between implementation campaigns.
 ## Current campaign pointer
 
 Completed campaign: PR #249 — first-class Media / Assets foundation and ingest diagnosis — merged at `0578629fd4880cf16022409eb9af2689a7b810ee`; MySQL #536 PASS (3678 tests / 83,856 assertions).
-Current campaign: PR #251 — expose and exercise the full non-SEO Master Product Workspace. Working capabilities remain live; missing runtimes stay visible as «Чекає на підключення». SEO/AI is intentionally deferred to the final module.
+Completed campaign: PR #251 — expose and exercise the full non-SEO Master Product Workspace — merged at `dfa9a44bacc86b58f881063f242fa871bb399238`; MySQL #540 PASS (3681 tests / 83,890 assertions).
+Current campaign: PR #252 — Master Variant Media authoring. Contract frozen in `MASTER_VARIANT_MEDIA_AUTHORING_IMPLEMENTATION_CONTRACT_2026_10_03.md`; implementation will add locale-aware association uniqueness, VariantMedia read/mutation services, and one reusable media-first assignment drawer while preserving current Magento Product media export.
