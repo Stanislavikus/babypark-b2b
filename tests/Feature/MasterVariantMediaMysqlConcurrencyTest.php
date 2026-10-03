@@ -57,51 +57,116 @@ final class MasterVariantMediaMysqlConcurrencyTest extends TestCase
         $serviceAsset = $this->asset((string) $workspace->id, 'concurrency-service.jpg');
         $directAsset = $this->asset((string) $workspace->id, 'concurrency-direct.jpg');
 
-        $serviceResults = $this->runWorkers(
-            mode: 'service',
-            workspaceId: (string) $workspace->id,
-            productId: (string) $product->id,
-            variantId: (string) $serviceVariant->id,
-            assetId: (string) $serviceAsset->id,
-            actorId: (string) $actor->id,
-            sortOrders: [0, 1],
-        );
+        try {
+            $serviceResults = $this->runWorkers(
+                mode: 'service',
+                workspaceId: (string) $workspace->id,
+                productId: (string) $product->id,
+                variantId: (string) $serviceVariant->id,
+                assetId: (string) $serviceAsset->id,
+                actorId: (string) $actor->id,
+                sortOrders: [0, 1],
+            );
 
-        $this->assertSame(['success', 'success'], collect($serviceResults)->pluck('status')->sort()->values()->all());
-        $this->assertSame(
-            1,
-            VariantMedia::withoutWorkspaceScope()
-                ->where('workspace_id', $workspace->id)
-                ->where('variant_id', $serviceVariant->id)
-                ->where('media_asset_id', $serviceAsset->id)
-                ->whereNull('locale')
-                ->count(),
-        );
+            $this->assertSame(['success', 'success'], collect($serviceResults)->pluck('status')->sort()->values()->all());
+            $this->assertSame(
+                1,
+                VariantMedia::withoutWorkspaceScope()
+                    ->where('workspace_id', $workspace->id)
+                    ->where('variant_id', $serviceVariant->id)
+                    ->where('media_asset_id', $serviceAsset->id)
+                    ->whereNull('locale')
+                    ->count(),
+            );
 
-        $directResults = $this->runWorkers(
-            mode: 'direct',
-            workspaceId: (string) $workspace->id,
-            productId: (string) $product->id,
-            variantId: (string) $directVariant->id,
-            assetId: (string) $directAsset->id,
-            actorId: (string) $actor->id,
-            sortOrders: [0, 1],
-        );
+            $directResults = $this->runWorkers(
+                mode: 'direct',
+                workspaceId: (string) $workspace->id,
+                productId: (string) $product->id,
+                variantId: (string) $directVariant->id,
+                assetId: (string) $directAsset->id,
+                actorId: (string) $actor->id,
+                sortOrders: [0, 1],
+            );
 
-        $this->assertSame(['duplicate', 'inserted'], collect($directResults)->pluck('status')->sort()->values()->all());
+            $this->assertSame(['duplicate', 'inserted'], collect($directResults)->pluck('status')->sort()->values()->all());
 
-        $duplicate = collect($directResults)->firstWhere('status', 'duplicate');
-        $this->assertSame('23000', $duplicate['sqlstate'] ?? null);
-        $this->assertSame(1062, $duplicate['driver_code'] ?? null);
-        $this->assertSame(
-            1,
-            VariantMedia::withoutWorkspaceScope()
-                ->where('workspace_id', $workspace->id)
-                ->where('variant_id', $directVariant->id)
-                ->where('media_asset_id', $directAsset->id)
-                ->whereNull('locale')
-                ->count(),
-        );
+            $duplicate = collect($directResults)->firstWhere('status', 'duplicate');
+            $this->assertSame('23000', $duplicate['sqlstate'] ?? null);
+            $this->assertSame(1062, $duplicate['driver_code'] ?? null);
+            $this->assertSame(
+                1,
+                VariantMedia::withoutWorkspaceScope()
+                    ->where('workspace_id', $workspace->id)
+                    ->where('variant_id', $directVariant->id)
+                    ->where('media_asset_id', $directAsset->id)
+                    ->whereNull('locale')
+                    ->count(),
+            );
+        } finally {
+            $this->cleanupCommittedFixtures(
+                workspaceId: (string) $workspace->id,
+                productId: (int) $product->id,
+                actorId: (int) $actor->id,
+                membershipId: (string) $membership->id,
+                roleId: (string) $role->id,
+                assetIds: [(string) $serviceAsset->id, (string) $directAsset->id],
+            );
+        }
+    }
+
+    /** @param list<string> $assetIds */
+    private function cleanupCommittedFixtures(
+        string $workspaceId,
+        int $productId,
+        int $actorId,
+        string $membershipId,
+        string $roleId,
+        array $assetIds,
+    ): void {
+        DB::transaction(function () use (
+            $workspaceId,
+            $productId,
+            $actorId,
+            $membershipId,
+            $roleId,
+            $assetIds,
+        ): void {
+            DB::table('products')
+                ->where('workspace_id', $workspaceId)
+                ->where('id', $productId)
+                ->delete();
+
+            DB::table('media_assets')
+                ->where('workspace_id', $workspaceId)
+                ->whereIn('id', $assetIds)
+                ->delete();
+
+            DB::table('workspace_user_roles')
+                ->where('workspace_id', $workspaceId)
+                ->where('workspace_user_id', $membershipId)
+                ->where('workspace_role_id', $roleId)
+                ->delete();
+
+            DB::table('workspace_role_permissions')
+                ->where('workspace_id', $workspaceId)
+                ->where('workspace_role_id', $roleId)
+                ->delete();
+
+            DB::table('workspace_roles')
+                ->where('workspace_id', $workspaceId)
+                ->where('id', $roleId)
+                ->delete();
+
+            DB::table('workspace_users')
+                ->where('workspace_id', $workspaceId)
+                ->where('id', $membershipId)
+                ->delete();
+
+            DB::table('users')
+                ->where('id', $actorId)
+                ->delete();
+        });
     }
 
     /**

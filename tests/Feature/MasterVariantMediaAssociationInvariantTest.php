@@ -29,7 +29,7 @@ final class MasterVariantMediaAssociationInvariantTest extends TestCase
     public function common_variant_asset_association_is_unique(): void
     {
         $this->assertTrue(DB::table('migrations')->where('migration', '2026_10_03_190000_enforce_media_association_uniqueness')->exists());
-        $indexes = collect(DB::select("PRAGMA index_list('variant_media')"))->pluck('name')->all();
+        $indexes = collect(Schema::getIndexes('variant_media'))->pluck('name')->all();
         $this->assertContains('variant_media_owner_asset_locale_unique', $indexes);
 
         [$product, $variant, $asset] = $this->context();
