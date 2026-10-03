@@ -25,7 +25,7 @@ class VariantMedia extends Model
         'locale',
     ];
 
-    protected $hidden = ['primary_marker'];
+    protected $hidden = ['primary_marker', 'locale_scope_key'];
 
     protected static function booted(): void
     {

@@ -5,15 +5,20 @@ namespace App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Support\ProductWorkspaceFieldEditor;
 use App\Filament\Resources\ProductResource\Support\ProductWorkspaceFieldEditStaleException;
+use App\Models\MediaAsset;
 use App\Models\ProductMedia;
 use App\Models\ProductType;
 use App\Models\ProductTypeGroupPlacement;
 use App\Models\ProductVariant;
 use App\Models\User;
+use App\Models\VariantFieldValue;
+use App\Models\VariantMedia;
 use App\Models\Workspace;
 use App\Services\Catalog\ProductMediaMutationService;
 use App\Services\Catalog\ProductMediaReadService;
 use App\Services\Catalog\ProductVariantStructureService;
+use App\Services\Catalog\ProductWorkspaceSummaryService;
+use App\Services\Catalog\VariantMediaMutationService;
 use App\Services\Fields\Exceptions\DynamicFieldCurrentValueMismatchException;
 use App\Services\Fields\Exceptions\FieldValueWriterException;
 use App\Services\ProductStructure\ProductOptionalGroupMutationService;
@@ -22,6 +27,7 @@ use App\Services\ProductStructure\ProductTypeMutationService;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\Catalog\Exceptions\ProductMediaException;
 use App\Support\Catalog\Exceptions\ProductVariantStructureException;
+use App\Support\Catalog\Exceptions\VariantMediaException;
 use App\Support\ProductStructure\Exceptions\ProductTypeChangeStaleException;
 use App\Support\ProductStructure\ProductTypeChangeImpact;
 use App\Support\Workspace\WorkspaceContext;
@@ -29,20 +35,27 @@ use App\Support\Workspace\WorkspacePermissions;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Enums\Width;
+use Filament\Support\Exceptions\Halt;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Validation\ValidationException;
 
 class EditProduct extends EditRecord
 {
@@ -79,6 +92,7 @@ class EditProduct extends EditRecord
     {
         return ActionGroup::make([
             $this->addMediaAction(),
+            $this->assignVariantMediaAction(),
             $this->reorderMediaAction(),
             $this->removeMediaAction(),
         ])
@@ -115,6 +129,147 @@ class EditProduct extends EditRecord
                     fn (User $actor, Workspace $workspace) => app(ProductMediaMutationService::class)
                         ->addUploadedImages($actor, $workspace, $this->record, $files),
                     'Медіа додано',
+                );
+            });
+    }
+
+    private function assignVariantMediaAction(): Action
+    {
+        return Action::make('assign_variant_media')
+            ->label('Призначити варіантам')
+            ->icon('heroicon-o-squares-2x2')
+            ->visible(fn (): bool => $this->canManageProducts() && $this->variantMediaAuthoringAvailable())
+            ->slideOver()
+            ->modalWidth(Width::SevenExtraLarge)
+            ->modalHeading('Медіа варіантів')
+            ->modalDescription('Власні фото варіанта показуються першими. Загальні фото товару залишаються окремо й не копіюються у VariantMedia.')
+            ->modalSubmitActionLabel('Застосувати')
+            ->fillForm(function (array $arguments): array {
+                $variantId = isset($arguments['variant_id']) ? (int) $arguments['variant_id'] : null;
+                $allowed = $this->activeVariants()->pluck('id')->map(fn ($id): int => (int) $id)->all();
+
+                return [
+                    'media_asset_ids' => [],
+                    'variant_ids' => $variantId !== null && in_array($variantId, $allowed, true) ? [$variantId] : [],
+                    'only_without_specific' => false,
+                    'axis_groups' => [],
+                    'operation' => 'add',
+                    'make_primary' => false,
+                    'confirm_replace' => false,
+                ];
+            })
+            ->schema(fn (): array => array_merge([
+                CheckboxList::make('media_asset_ids')
+                    ->label('Фото')
+                    ->options(fn (): array => $this->variantMediaAssetOptions())
+                    ->helperText('Використовуються існуючі Original assets цього товару. Файл не дублюється.')
+                    ->required()
+                    ->columns(1)
+                    ->bulkToggleable(),
+                Toggle::make('only_without_specific')
+                    ->label('Показати лише варіанти без власних фото')
+                    ->live(),
+                Select::make('variant_ids')
+                    ->label('Конкретні варіанти')
+                    ->multiple()
+                    ->searchable()
+                    ->preload()
+                    ->options(fn (Get $get): array => $this->variantMediaVariantOptions((bool) $get('only_without_specific')))
+                    ->helperText('Можна обрати конкретні SKU або скористатися групами за опціями нижче.'),
+                Placeholder::make('axis_group_hint')
+                    ->hiddenLabel()
+                    ->content('Групи нижче охоплюють лише поточні видимі варіанти. Вибір у різних групах об’єднується. Новий варіант, створений пізніше, фото автоматично не успадкує.'),
+            ], $this->variantMediaAxisSections(), [
+                Radio::make('operation')
+                    ->label('Дія')
+                    ->options([
+                        'add' => 'Додати до власних фото',
+                        'replace' => 'Замінити власні фото',
+                        'detach' => 'Зняти вибрані призначення',
+                    ])
+                    ->default('add')
+                    ->required()
+                    ->live(),
+                Toggle::make('make_primary')
+                    ->label('Перше вибране фото зробити головним')
+                    ->helperText('Головне фото варіанта змінюється лише цією явною дією.')
+                    ->visible(fn (Get $get): bool => in_array($get('operation'), ['add', 'replace'], true)),
+                Placeholder::make('replace_warning')
+                    ->label('Підтвердження заміни')
+                    ->content(fn (Get $get): string => sprintf(
+                        'Буде замінено власні фото для %d варіантів. Загальні фото товару не зміняться.',
+                        $this->variantMediaTargetCount($get('variant_ids'), $get('axis_groups'), (bool) $get('only_without_specific')),
+                    ))
+                    ->visible(fn (Get $get): bool => $get('operation') === 'replace'),
+                Checkbox::make('confirm_replace')
+                    ->label(fn (Get $get): string => sprintf(
+                        'Підтверджую заміну власних фото для %d варіантів',
+                        $this->variantMediaTargetCount($get('variant_ids'), $get('axis_groups'), (bool) $get('only_without_specific')),
+                    ))
+                    ->accepted()
+                    ->required()
+                    ->visible(fn (Get $get): bool => $get('operation') === 'replace'),
+            ]))
+            ->action(function (array $data): void {
+                $targetVariantIds = $this->resolveVariantMediaTargetIds($data);
+
+                if ($targetVariantIds === []) {
+                    throw ValidationException::withMessages([
+                        'variant_ids' => 'Оберіть хоча б один варіант або групу за опцією.',
+                    ]);
+                }
+
+                $assetIds = array_values(array_filter(
+                    array_map('strval', $data['media_asset_ids'] ?? []),
+                    fn (string $id): bool => $id !== '',
+                ));
+
+                $operation = (string) ($data['operation'] ?? 'add');
+                $makePrimary = (bool) ($data['make_primary'] ?? false);
+
+                $this->runVariantMediaMutation(
+                    function (User $actor, Workspace $workspace) use (
+                        $targetVariantIds,
+                        $assetIds,
+                        $operation,
+                        $makePrimary,
+                    ): void {
+                        $service = app(VariantMediaMutationService::class);
+
+                        match ($operation) {
+                            'add' => $service->assign(
+                                $actor,
+                                $workspace,
+                                $this->record,
+                                $targetVariantIds,
+                                $assetIds,
+                                $makePrimary,
+                            ),
+                            'replace' => $service->replace(
+                                $actor,
+                                $workspace,
+                                $this->record,
+                                $targetVariantIds,
+                                $assetIds,
+                                $makePrimary,
+                            ),
+                            'detach' => $service->detach(
+                                $actor,
+                                $workspace,
+                                $this->record,
+                                $targetVariantIds,
+                                $assetIds,
+                            ),
+                            default => throw ValidationException::withMessages([
+                                'operation' => 'Оберіть підтримувану дію.',
+                            ]),
+                        };
+                    },
+                    match ($operation) {
+                        'replace' => 'Власні фото варіантів замінено',
+                        'detach' => 'Призначення фото знято',
+                        default => 'Фото призначено варіантам',
+                    },
                 );
             });
     }
@@ -239,6 +394,298 @@ class EditProduct extends EditRecord
                 ->title('Не вдалося змінити медіа')
                 ->body($e->getMessage())
                 ->send();
+        }
+    }
+
+    private function variantMediaAuthoringAvailable(): bool
+    {
+        $activeVariantCount = ProductVariant::withoutWorkspaceScope()
+            ->where('workspace_id', $this->record->workspace_id)
+            ->where('product_id', $this->record->id)
+            ->where('is_active', true)
+            ->count();
+
+        return $activeVariantCount > 1
+            || app(ProductVariantStructureService::class)->declaredAxes($this->record)->isNotEmpty();
+    }
+
+    /** @return array<string,string> */
+    private function variantMediaAssetOptions(): array
+    {
+        $productAssetIds = ProductMedia::withoutWorkspaceScope()
+            ->where('workspace_id', $this->record->workspace_id)
+            ->where('product_id', $this->record->id)
+            ->whereNull('locale')
+            ->pluck('media_asset_id');
+
+        $variantIds = $this->activeVariants()->pluck('id');
+        $variantAssetIds = $variantIds->isEmpty()
+            ? collect()
+            : VariantMedia::withoutWorkspaceScope()
+                ->where('workspace_id', $this->record->workspace_id)
+                ->whereIn('variant_id', $variantIds)
+                ->whereNull('locale')
+                ->pluck('media_asset_id');
+
+        $assetIds = $productAssetIds
+            ->merge($variantAssetIds)
+            ->map(fn ($id): string => (string) $id)
+            ->unique()
+            ->values();
+
+        if ($assetIds->isEmpty()) {
+            return [];
+        }
+
+        $variantUsage = VariantMedia::withoutWorkspaceScope()
+            ->where('workspace_id', $this->record->workspace_id)
+            ->whereIn('variant_id', $variantIds)
+            ->whereNull('locale')
+            ->whereIn('media_asset_id', $assetIds)
+            ->selectRaw('media_asset_id, COUNT(DISTINCT variant_id) AS usage_count')
+            ->groupBy('media_asset_id')
+            ->pluck('usage_count', 'media_asset_id');
+
+        $commonAssetIds = $productAssetIds->map(fn ($id): string => (string) $id)->flip();
+
+        return MediaAsset::withoutWorkspaceScope()
+            ->where('workspace_id', $this->record->workspace_id)
+            ->whereNull('parent_media_asset_id')
+            ->whereIn('id', $assetIds)
+            ->get()
+            ->sortBy(fn (MediaAsset $asset): string => $this->variantMediaAssetLabel($asset))
+            ->mapWithKeys(function (MediaAsset $asset) use ($variantUsage, $commonAssetIds): array {
+                $parts = [$this->variantMediaAssetLabel($asset)];
+
+                if ($commonAssetIds->has((string) $asset->id)) {
+                    $parts[] = 'загальне фото';
+                }
+
+                $usageCount = (int) ($variantUsage[(string) $asset->id] ?? 0);
+                if ($usageCount > 0) {
+                    $parts[] = 'використовується: '.$usageCount.' вар.';
+                }
+
+                return [(string) $asset->id => implode(' · ', $parts)];
+            })
+            ->all();
+    }
+
+    private function variantMediaAssetLabel(MediaAsset $asset): string
+    {
+        if (filled($asset->original_filename)) {
+            return (string) $asset->original_filename;
+        }
+
+        if (filled($asset->source_url)) {
+            $path = parse_url((string) $asset->source_url, PHP_URL_PATH);
+            $basename = is_string($path) ? basename($path) : '';
+
+            return $basename !== '' ? $basename : 'Original';
+        }
+
+        return 'Original '.substr((string) $asset->id, 0, 8);
+    }
+
+    /** @return list<int> */
+    private function variantMediaEligibleVariantIds(bool $onlyWithoutSpecific = false): array
+    {
+        $ids = $this->activeVariants()
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->values();
+
+        if (! $onlyWithoutSpecific || $ids->isEmpty()) {
+            return $ids->all();
+        }
+
+        $specificVariantIds = VariantMedia::withoutWorkspaceScope()
+            ->where('workspace_id', $this->record->workspace_id)
+            ->whereIn('variant_id', $ids)
+            ->whereNull('locale')
+            ->distinct()
+            ->pluck('variant_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        return $ids
+            ->reject(fn (int $id): bool => in_array($id, $specificVariantIds, true))
+            ->values()
+            ->all();
+    }
+
+    /** @return array<int,string> */
+    private function variantMediaVariantOptions(bool $onlyWithoutSpecific = false): array
+    {
+        $eligibleIds = $this->variantMediaEligibleVariantIds($onlyWithoutSpecific);
+
+        return collect(app(ProductWorkspaceSummaryService::class)->variants($this->record)['rows'])
+            ->filter(fn (array $row): bool => in_array((int) $row['id'], $eligibleIds, true))
+            ->mapWithKeys(function (array $row): array {
+                $sku = filled($row['sku']) ? (string) $row['sku'] : 'Variant #'.$row['id'];
+                $options = collect($row['options'])
+                    ->filter(fn ($value): bool => is_string($value) && $value !== '' && $value !== '—')
+                    ->implode(' · ');
+
+                return [(int) $row['id'] => $options !== '' ? $sku.' · '.$options : $sku];
+            })
+            ->all();
+    }
+
+    /** @return list<Section> */
+    private function variantMediaAxisSections(): array
+    {
+        $service = app(ProductVariantStructureService::class);
+        $axes = $service->declaredAxes($this->record);
+        $candidates = $service->axisCandidates($this->record);
+
+        if ($axes->isEmpty() || $this->activeVariants()->isEmpty()) {
+            return [];
+        }
+
+        return $axes
+            ->values()
+            ->map(function ($axis, int $index) use ($candidates): Section {
+                $bindingId = (string) $axis->field_binding_id;
+                $candidate = $candidates->get($bindingId);
+                $label = is_array($candidate) ? (string) $candidate['label'] : $bindingId;
+                $optionLabels = is_array($candidate) ? ($candidate['options'] ?? []) : [];
+
+                return Section::make($label)
+                    ->description($index === 0
+                        ? 'Основна опція розгорнута. Вибір охоплює лише поточні видимі варіанти.'
+                        : 'Окрема група поточних видимих варіантів за цією опцією.')
+                    ->schema([
+                        CheckboxList::make('axis_groups.'.$bindingId)
+                            ->hiddenLabel()
+                            ->options(fn (Get $get): array => $this->variantMediaAxisGroupOptions(
+                                $bindingId,
+                                $optionLabels,
+                                (bool) $get('only_without_specific'),
+                            ))
+                            ->columns(2)
+                            ->bulkToggleable(),
+                    ])
+                    ->collapsible()
+                    ->collapsed($index > 0);
+            })
+            ->all();
+    }
+
+    /** @param array<string,string> $optionLabels */
+    private function variantMediaAxisGroupOptions(
+        string $bindingId,
+        array $optionLabels,
+        bool $onlyWithoutSpecific = false,
+    ): array {
+        $eligibleIds = $this->variantMediaEligibleVariantIds($onlyWithoutSpecific);
+
+        if ($eligibleIds === []) {
+            return [];
+        }
+
+        return VariantFieldValue::withoutWorkspaceScope()
+            ->where('workspace_id', $this->record->workspace_id)
+            ->whereIn('variant_id', $eligibleIds)
+            ->where('field_binding_id', $bindingId)
+            ->whereNotNull('value_text')
+            ->selectRaw('value_text, COUNT(DISTINCT variant_id) AS variant_count')
+            ->groupBy('value_text')
+            ->orderBy('value_text')
+            ->get()
+            ->mapWithKeys(function (VariantFieldValue $row) use ($optionLabels): array {
+                $code = (string) $row->value_text;
+                $optionLabel = (string) ($optionLabels[$code] ?? $code);
+
+                return [$code => $optionLabel.' · '.(int) $row->variant_count.' вар.'];
+            })
+            ->all();
+    }
+
+    /**
+     * @param  array<string,mixed>  $data
+     * @return list<int>
+     */
+    private function resolveVariantMediaTargetIds(array $data): array
+    {
+        $allowedIds = $this->variantMediaEligibleVariantIds((bool) ($data['only_without_specific'] ?? false));
+        $resolved = collect($data['variant_ids'] ?? [])
+            ->map(fn ($id): int => (int) $id)
+            ->filter(fn (int $id): bool => in_array($id, $allowedIds, true));
+
+        $declaredBindingIds = app(ProductVariantStructureService::class)
+            ->declaredAxes($this->record)
+            ->pluck('field_binding_id')
+            ->map(fn ($id): string => (string) $id)
+            ->all();
+
+        foreach ((array) ($data['axis_groups'] ?? []) as $bindingId => $codes) {
+            $bindingId = (string) $bindingId;
+            if (! in_array($bindingId, $declaredBindingIds, true)) {
+                continue;
+            }
+
+            $selectedCodes = array_values(array_unique(array_filter(
+                array_map('strval', (array) $codes),
+                fn (string $code): bool => $code !== '',
+            )));
+            if ($selectedCodes === []) {
+                continue;
+            }
+
+            $matchingVariantIds = VariantFieldValue::withoutWorkspaceScope()
+                ->where('workspace_id', $this->record->workspace_id)
+                ->whereIn('variant_id', $allowedIds)
+                ->where('field_binding_id', $bindingId)
+                ->whereIn('value_text', $selectedCodes)
+                ->pluck('variant_id')
+                ->map(fn ($id): int => (int) $id);
+
+            $resolved = $resolved->merge($matchingVariantIds);
+        }
+
+        return $resolved
+            ->filter(fn (int $id): bool => in_array($id, $allowedIds, true))
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    private function variantMediaTargetCount(
+        mixed $variantIds,
+        mixed $axisGroups,
+        bool $onlyWithoutSpecific = false,
+    ): int {
+        return count($this->resolveVariantMediaTargetIds([
+            'variant_ids' => is_array($variantIds) ? $variantIds : [],
+            'axis_groups' => is_array($axisGroups) ? $axisGroups : [],
+            'only_without_specific' => $onlyWithoutSpecific,
+        ]));
+    }
+
+    private function runVariantMediaMutation(\Closure $mutation, string $successTitle): void
+    {
+        $actor = auth()->user();
+        abort_unless($actor instanceof User && $this->canManageProducts(), 403);
+        $workspace = Workspace::withoutGlobalScopes()->findOrFail($this->record->workspace_id);
+
+        try {
+            $mutation($actor, $workspace);
+            $this->record->refresh();
+
+            Notification::make()
+                ->success()
+                ->title($successTitle)
+                ->send();
+        } catch (VariantMediaException $exception) {
+            Notification::make()
+                ->danger()
+                ->title('Не вдалося змінити медіа варіантів')
+                ->body($exception->getMessage())
+                ->send();
+
+            throw new Halt;
         }
     }
 
