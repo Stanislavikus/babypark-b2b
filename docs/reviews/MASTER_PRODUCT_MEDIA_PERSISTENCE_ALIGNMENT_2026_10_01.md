@@ -132,7 +132,28 @@ No new merchant concept is introduced. The merchant still sees a simple Media ga
 additional images, ordering, and contextual actions. Technical Original/diagnosis/provenance details stay hidden
 unless an asset needs attention.
 
+## 2026-10-03 association uniqueness clarification
+
+Variant Media authoring research exposed one missing structural guard without changing Media ownership.
+
+Within a single owner + normalized locale scope, the same MediaAsset may appear at most once.
+
+Normalized locale scope is:
+- trim;
+- empty -> common scope;
+- underscore converted to hyphen;
+- lowercase;
+- common scope represented by reserved non-BCP-47 key `#common`.
+
+The database must enforce:
+- ProductMedia unique by `workspace_id + product_id + media_asset_id + locale_scope_key`;
+- VariantMedia unique by `workspace_id + variant_id + media_asset_id + locale_scope_key`.
+
+This is additive integrity only. Existing global primary and sort-order semantics remain unchanged; this does not introduce per-locale primary/order semantics. Application mutation services must still provide idempotent retries and explicit merchant semantics rather than surfacing raw duplicate-key failures.
+
+The first Variant Media authoring slice remains `locale = NULL` only. Locale-specific creative is not promoted into the merchant UX by this clarification.
+
 ## Stop & Amend
 
 This Stop & Amend is resolved. Repository truth had left Media persistence explicitly unresolved, so the physical contract was frozen here before application code.
-Implementation now proceeds in #249 without another architecture review unless real evidence proves this contract insufficient.
+Implementation now proceeds under the original persistence contract plus the 2026-10-03 uniqueness clarification without another architecture review unless real evidence proves this contract insufficient.
