@@ -8,7 +8,7 @@ Turn the existing Variant Media capability from a visible pending action into a 
 
 Observable merchant result:
 
-Product Media → select one or more Original assets → **Назначити варіантам** → choose concrete variants or all current variants matching one or more axis values → Add / Replace / Detach → Variant-specific gallery and coverage update immediately.
+Product Media → select one or more Original assets → **Призначити варіантам** → choose concrete variants or all current variants matching one or more axis values → Add / Replace / Detach → Variant-specific gallery and coverage update immediately.
 
 ## Authoritative base
 
@@ -132,7 +132,7 @@ Do not create a permanent separate Variant Media page and do not create a persis
 
 Use one reusable assignment drawer with two entry points:
 
-1. Media section: select assets → **Назначити варіантам**.
+1. Media section: select assets → **Призначити варіантам**.
 2. Variants section: click the compact Photo state for one Variant → open the same drawer scoped to that Variant.
 
 ### Drawer — asset side

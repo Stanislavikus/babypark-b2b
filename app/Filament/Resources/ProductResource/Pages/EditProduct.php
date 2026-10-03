@@ -136,7 +136,7 @@ class EditProduct extends EditRecord
     private function assignVariantMediaAction(): Action
     {
         return Action::make('assign_variant_media')
-            ->label('Назначити варіантам')
+            ->label('Призначити варіантам')
             ->icon('heroicon-o-squares-2x2')
             ->visible(fn (): bool => $this->canManageProducts() && $this->variantMediaAuthoringAvailable())
             ->slideOver()

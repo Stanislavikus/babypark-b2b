@@ -108,7 +108,7 @@ class MasterProductWorkspaceShellTest extends TestCase
             ->assertSee('Редагувати ціни')
             ->assertSee('Редагувати залишки')
             ->assertDontSee('Медіа варіантів')
-            ->assertDontSee('Назначити варіантам')
+            ->assertDontSee('Призначити варіантам')
             ->assertSee('Заповнити характеристики з файлу')
             ->assertSee('Чекає на підключення')
             ->assertSee('Отримати ключові слова')
