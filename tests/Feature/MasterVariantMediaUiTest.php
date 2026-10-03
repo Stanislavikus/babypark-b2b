@@ -191,6 +191,91 @@ final class MasterVariantMediaUiTest extends TestCase
     }
 
     #[Test]
+    public function only_without_specific_filter_applies_to_axis_groups_and_replace_count(): void
+    {
+        [$product] = $this->manualProduct();
+        $color = $this->selectVariantBinding('media_color_filtered', 'Колір', [
+            'black' => 'Чорний',
+            'grey' => 'Сірий',
+        ]);
+        $size = $this->selectVariantBinding('media_size_filtered', 'Розмір', [
+            's' => 'S',
+            'm' => 'M',
+        ]);
+        $structure = app(ProductVariantStructureService::class);
+        $variants = $structure->promoteSimple(
+            $this->actor,
+            $this->workspace,
+            $product,
+            $color->id,
+            'black',
+            ['grey'],
+        );
+        $structure->addAxis($this->actor, $this->workspace, $product, $size->id, [
+            (string) $variants[0]->id => 's',
+            (string) $variants[1]->id => 's',
+        ]);
+        $greyM = $structure->addVariant($this->actor, $this->workspace, $product, [
+            $color->id => 'grey',
+            $size->id => 'm',
+        ], 'GREY-M-FILTERED');
+
+        $old = $this->asset('filtered-old.jpg');
+        $new = $this->asset('filtered-new.jpg');
+        $this->attachCommonMedia($product, $new);
+
+        app(VariantMediaMutationService::class)->assign(
+            $this->actor,
+            $this->workspace,
+            $product,
+            [$variants[1]->id],
+            [$old->id],
+            makeFirstSelectedPrimary: true,
+        );
+
+        $component = Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->mountAction('assign_variant_media')
+            ->setActionData([
+                'media_asset_ids' => [$new->id],
+                'variant_ids' => [],
+                'only_without_specific' => true,
+                'axis_groups' => [
+                    $color->id => ['grey'],
+                    $size->id => [],
+                ],
+                'operation' => 'replace',
+                'make_primary' => false,
+                'confirm_replace' => false,
+            ])
+            ->assertMountedActionModalSee('Сірий · 1 вар.')
+            ->assertMountedActionModalSee('1 варіантів');
+
+        $component
+            ->callMountedAction()
+            ->assertHasActionErrors(['confirm_replace']);
+
+        $component
+            ->setActionData(['confirm_replace' => true])
+            ->callMountedAction()
+            ->assertHasNoActionErrors()
+            ->assertNotified();
+
+        $this->assertDatabaseHas('variant_media', [
+            'variant_id' => $variants[1]->id,
+            'media_asset_id' => $old->id,
+        ]);
+        $this->assertDatabaseMissing('variant_media', [
+            'variant_id' => $variants[1]->id,
+            'media_asset_id' => $new->id,
+        ]);
+        $this->assertDatabaseHas('variant_media', [
+            'variant_id' => $greyM->id,
+            'media_asset_id' => $new->id,
+        ]);
+    }
+
+    #[Test]
     public function replace_requires_explicit_confirmation_with_target_count(): void
     {
         [$product] = $this->manualProduct();
