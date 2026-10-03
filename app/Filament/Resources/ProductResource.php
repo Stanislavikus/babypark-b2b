@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\MediaRole;
 use App\Enums\TagBulkOperation;
 use App\Exceptions\Catalog\InvalidTagBulkSelectionException;
 use App\Filament\Concerns\HasProductLightbox;
@@ -16,6 +17,8 @@ use App\Models\Product;
 use App\Models\SyncConfigurationProductSelection;
 use App\Models\Tag;
 use App\Models\User;
+use App\Models\VariantMedia;
+use App\Services\Catalog\ProductMediaReadService;
 use App\Services\Catalog\ProductWorkspaceSummaryService;
 use App\Services\Catalog\TagManager;
 use App\Services\Pricing\PricingSqlExpressions;
@@ -252,14 +255,6 @@ class ProductResource extends Resource
                             Placeholder::make('workspace_variants')
                                 ->hiddenLabel()
                                 ->content(fn (?Product $record): HtmlString => self::buildVariantWorkspaceHtml($record)),
-                            SchemaActions::make([
-                                self::pendingCapabilityAction(
-                                    'variant_media',
-                                    'Медіа варіантів',
-                                    'VariantMedia persistence уже є, але merchant authoring/presentation для окремих варіантів ще не підключено.',
-                                    'heroicon-o-photo',
-                                ),
-                            ])->key('variant_pending_actions'),
                         ])
                         ->visible(fn (?Product $record): bool => $record !== null),
 
@@ -1195,17 +1190,67 @@ class ProductResource extends Resource
             );
         }
 
+        $variantIds = collect($summary['rows'])
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+        $specificByVariant = $variantIds === []
+            ? collect()
+            : VariantMedia::withoutWorkspaceScope()
+                ->where('workspace_id', $record->workspace_id)
+                ->whereIn('variant_id', $variantIds)
+                ->whereNull('locale')
+                ->with(['asset' => fn ($query) => $query->withoutGlobalScopes()])
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get()
+                ->groupBy(fn (VariantMedia $media): int => (int) $media->variant_id);
+        $commonMediaCount = app(ProductMediaReadService::class)->productMedia($record)->count();
+        $canManageMedia = self::canManageVariantMedia($record);
+        $mediaReadService = app(ProductMediaReadService::class);
+
         $headers = collect($summary['axes'])
             ->map(fn (array $axis): string => '<th style="text-align:left;padding:7px 9px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;font-weight:600;">'.e($axis['label']).'</th>')
             ->implode('');
         $rows = collect($summary['rows'])
-            ->map(function (array $row): string {
+            ->map(function (array $row) use ($specificByVariant, $commonMediaCount, $canManageMedia, $mediaReadService): string {
                 $optionCells = collect($row['options'])
                     ->map(fn (string $value): string => '<td style="padding:8px 9px;border-bottom:1px solid #f3f4f6;">'.e($value).'</td>')
                     ->implode('');
 
+                /** @var Collection<int,VariantMedia> $specific */
+                $specific = $specificByVariant->get((int) $row['id'], collect())->values();
+                /** @var VariantMedia|null $primary */
+                $primary = $specific->first(fn (VariantMedia $media): bool => $media->role === MediaRole::Primary);
+                $photoState = '';
+
+                if ($primary instanceof VariantMedia) {
+                    $url = $mediaReadService->sourceReference($primary->asset);
+                    $thumb = is_string($url) && $url !== ''
+                        ? '<img src="'.e($url).'" alt="" style="width:34px;height:34px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb;">'
+                        : '<span style="display:inline-flex;width:34px;height:34px;align-items:center;justify-content:center;border-radius:6px;background:#f3f4f6;">Фото</span>';
+                    $more = $specific->count() > 1
+                        ? '<span style="font-size:10px;color:#6b7280;">+'.($specific->count() - 1).'</span>'
+                        : '';
+                    $photoState = '<span style="display:inline-flex;align-items:center;gap:5px;">'.$thumb.$more.'</span>';
+                } elseif ($specific->isNotEmpty()) {
+                    $photoState = '<span style="color:#92400e;white-space:nowrap;">Власні · '.$specific->count().' · без головного</span>';
+                } elseif ($commonMediaCount > 0) {
+                    $photoState = '<span style="color:#6b7280;white-space:nowrap;">Лише загальні</span>';
+                } else {
+                    $photoState = '<span style="color:#9ca3af;white-space:nowrap;">Немає фото</span>';
+                }
+
+                if ($canManageMedia) {
+                    $arguments = json_encode(['variant_id' => (int) $row['id']], JSON_THROW_ON_ERROR);
+                    $handler = e("mountAction('assign_variant_media', {$arguments})");
+                    $photoState = '<button type="button" wire:click="'.$handler.'" title="Редагувати власні фото варіанта" '.
+                        'style="border:0;background:transparent;padding:2px;cursor:pointer;text-align:left;">'.$photoState.'</button>';
+                }
+
                 return '<tr>'.
                     $optionCells.
+                    '<td style="padding:8px 9px;border-bottom:1px solid #f3f4f6;">'.$photoState.'</td>'.
                     '<td style="padding:8px 9px;border-bottom:1px solid #f3f4f6;">'.e($row['sku'] ?? '—').'</td>'.
                     '<td style="padding:8px 9px;border-bottom:1px solid #f3f4f6;">'.e($row['gtin'] ?? '—').'</td>'.
                     '<td style="padding:8px 9px;border-bottom:1px solid #f3f4f6;white-space:nowrap;">'.e($row['price'] ?? '—').'</td>'.
@@ -1220,8 +1265,9 @@ class ProductResource extends Resource
                 '<span style="font-size:11px;color:#6b7280;">'.count($summary['axes']).' опц.</span>'.
             '</div>'.
             '<div style="overflow-x:auto;border:1px solid #e5e7eb;border-radius:8px;">'.
-                '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:620px;">'.
+                '<table style="width:100%;border-collapse:collapse;font-size:12px;min-width:760px;">'.
                     '<thead><tr>'.$headers.
+                        '<th style="text-align:left;padding:7px 9px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">Фото</th>'.
                         '<th style="text-align:left;padding:7px 9px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">SKU</th>'.
                         '<th style="text-align:left;padding:7px 9px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">GTIN</th>'.
                         '<th style="text-align:left;padding:7px 9px;border-bottom:1px solid #e5e7eb;font-size:11px;color:#6b7280;">Ціна</th>'.
@@ -1230,8 +1276,25 @@ class ProductResource extends Resource
                     '<tbody>'.$rows.'</tbody>'.
                 '</table>'.
             '</div>'.
-            '<div style="margin-top:6px;font-size:11px;color:#9ca3af;">Ціна та залишок лише відображаються зі своїх доменів; створення варіанта їх не копіює.</div>'
+            '<div style="margin-top:6px;font-size:11px;color:#9ca3af;">Власні фото варіанта показуються перед загальними. Ціна та залишок лише відображаються зі своїх доменів.</div>'
         );
+    }
+
+    private static function canManageVariantMedia(Product $record): bool
+    {
+        $actor = auth()->user();
+        if (! $actor instanceof User) {
+            return false;
+        }
+
+        $workspace = app(WorkspaceContext::class)->current();
+
+        return (string) $workspace->id === (string) $record->workspace_id
+            && app(WorkspaceAuthorization::class)->allows(
+                $actor,
+                $workspace,
+                WorkspacePermissions::MANAGE_PRODUCTS,
+            );
     }
 
     private static function buildAttributeGroupsHtml(?Product $record): HtmlString
