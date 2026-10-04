@@ -334,3 +334,40 @@ Next exact work:
 - inspect Characteristics / Variants / Product Media / Variant Media composition for duplicate or misleading pending states; reuse existing writers/actions only;
 - continue whole-card composition while PRICE AMBIGUITY HALT awaits Sonnet 5 response;
 - after Price is resolved, finish Offer editor, remove the final false pending state, then run simple/configurable whole-card browser flows and visual correction.
+
+
+## Checkpoint — Slice 4 Master Offer SELL / COMPARE_AT
+
+Independent Sonnet 5 arbitration approved the existing Pricing Foundation as compatible with the Master contract. Lead resolved the merchant/storage adaptation explicitly:
+
+- merchant edits semantic **SELL** and optional **COMPARE_AT**;
+- no promotion: `PriceListItem.price = SELL`, `sale_price = null`;
+- promotion: `PriceListItem.price = COMPARE_AT`, `sale_price = SELL`;
+- clearing COMPARE_AT keeps the current SELL as the new regular price;
+- RRP remains `recommended_retail_price_cache` and is never COMPARE_AT;
+- `base_price_cache` remains fallback only and is never mirrored by Master;
+- Master owns only the active workspace default PriceList row for the concrete Variant at `quantity_min=1`;
+- customer price lists, higher tiers, scheduled/suspended rows and legacy-invalid sale rows are outside the simple Master writer and fail closed/read-only;
+- source-owned/1C Products remain read-only.
+
+Implemented locally:
+- Resolved alignment doc `MASTER_OFFER_PRICING_ALIGNMENT_2026_10_04.md` and Documentation Map entry.
+- `MasterOfferReadService`.
+- `MasterOfferMutationService` with workspace/product/variant/default-list/item locking, CAS protection, workspace ownership and GAP-014 writer-boundary validation.
+- real Product Card action `Редагувати ціни` replacing the pending placeholder;
+- simple Product hides its internal Variant;
+- configurable Product selects one concrete explicit Variant;
+- UI labels are merchant concepts `Ціна` and `Ціна до знижки`, not persistence column names;
+- gross price is a read-only preview from the existing workspace VAT default; writer stores canonical net values.
+
+Evidence:
+- initial domain writer + PriceResolver/order regression: 24 tests / 90 assertions PASS, 1 existing skip.
+- final Offer UI + domain + Master shell + PriceResolver/order regression: 37 tests / 215 assertions PASS, 1 existing skip.
+- Pint changed files PASS.
+- `git diff --check` PASS.
+
+Remaining Offer boundary:
+- `ProductVariant.cost_price` remains read-only in the card.
+- `docs/02-ATTRIBUTE_DICTIONARY.md` requires financial fields such as COST to be gated behind a specific managerial permission, but current workspace RBAC has no pricing/cost permission.
+- Product-owner decision required: introduce `manage_product_cost` with no automatic grant (recommended) versus auto-granting it to every role that currently has `manage_products`.
+- SELL / COMPARE_AT implementation does not depend on this choice and is complete.

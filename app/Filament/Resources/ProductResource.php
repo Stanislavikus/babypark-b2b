@@ -6,6 +6,7 @@ use App\Enums\MediaRole;
 use App\Enums\TagBulkOperation;
 use App\Exceptions\Availability\InventoryMutationException;
 use App\Exceptions\Catalog\InvalidTagBulkSelectionException;
+use App\Exceptions\Pricing\MasterOfferMutationException;
 use App\Filament\Concerns\HasProductLightbox;
 use App\Filament\Pages\Sync\ManageAdobeProductsChannel;
 use App\Filament\Resources\ProductResource\Pages;
@@ -28,6 +29,8 @@ use App\Services\Catalog\ProductCategoryTreeOptions;
 use App\Services\Catalog\ProductMediaReadService;
 use App\Services\Catalog\ProductWorkspaceSummaryService;
 use App\Services\Catalog\TagManager;
+use App\Services\Pricing\MasterOfferMutationService;
+use App\Services\Pricing\MasterOfferReadService;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Services\Pricing\ProductPricingSummary;
 use App\Services\Sync\ProductChannelReadinessReadService;
@@ -187,13 +190,8 @@ class ProductResource extends Resource
                                     ? (app(ProductPricingSummary::class)->formatCostPrice($record) ?? '—')
                                     : '—'),
                             SchemaActions::make([
-                                self::pendingCapabilityAction(
-                                    'edit_offer',
-                                    'Редагувати ціни',
-                                    'Master Offer уже має окремий runtime-власник, але merchant editing workflow ще не підключено до цієї картки.',
-                                    'heroicon-o-banknotes',
-                                ),
-                            ])->key('offer_pending_actions')->columnSpanFull(),
+                                self::offerEditorAction(),
+                            ])->key('offer_actions')->columnSpanFull(),
                         ])
                         ->columns(3)
                         ->visible(fn (?Product $record): bool => $record !== null),
@@ -1095,6 +1093,308 @@ class ProductResource extends Resource
     // -------------------------------------------------------------------------
     // Internal helpers
     // -------------------------------------------------------------------------
+
+    private static function offerEditorAction(): Action
+    {
+        return Action::make('edit_offer')
+            ->label('Редагувати ціни')
+            ->icon('heroicon-o-banknotes')
+            ->disabled(fn (?Product $record): bool => self::isSourceOwned($record))
+            ->tooltip(fn (?Product $record): ?string => self::isSourceOwned($record)
+                ? 'Для товару з джерелом 1С ціна в Master поки доступна лише для перегляду.'
+                : null)
+            ->modalHeading('Ціна товару')
+            ->modalDescription('Редагуйте поточну ціну та, за потреби, ціну до знижки. У Master ці значення зберігаються без ПДВ; сума з ПДВ розраховується автоматично.')
+            ->modalSubmitActionLabel('Зберегти ціну')
+            ->fillForm(fn (?Product $record): array => self::offerEditorFormState($record))
+            ->schema([
+                Select::make('variant_id')
+                    ->label('Варіант')
+                    ->options(fn (?Product $record): array => self::offerVariantOptions($record))
+                    ->required()
+                    ->live()
+                    ->hidden(fn (?Product $record): bool => count(self::offerVariantOptions($record)) <= 1)
+                    ->afterStateUpdated(function (mixed $state, Set $set, ?Product $record): void {
+                        $offer = self::offerVariantState($record, $state);
+                        $set('expected_item_id', $offer['expected_item_id']);
+                        $set('expected_regular_net', $offer['expected_regular_net']);
+                        $set('expected_sale_net', $offer['expected_sale_net']);
+                        $set('sell_net', $offer['sell_net']);
+                        $set('compare_at_net', $offer['compare_at_net']);
+                        $set('effective_vat_rate', $offer['effective_vat_rate']);
+                    }),
+                Hidden::make('expected_item_id'),
+                Hidden::make('expected_regular_net'),
+                Hidden::make('expected_sale_net'),
+                Hidden::make('effective_vat_rate'),
+                Placeholder::make('offer_editor_state')
+                    ->hiddenLabel()
+                    ->content(function (Get $get, ?Product $record): string {
+                        $offer = self::offerVariantState($record, $get('variant_id'));
+
+                        return $offer['message'];
+                    }),
+                TextInput::make('sell_net')
+                    ->label('Ціна')
+                    ->numeric()
+                    ->gt(0)
+                    ->required()
+                    ->prefix(fn (Get $get, ?Product $record): string => self::offerVariantState(
+                        $record,
+                        $get('variant_id'),
+                    )['currency'])
+                    ->helperText('Поточна ціна продажу без ПДВ.')
+                    ->live(onBlur: true)
+                    ->disabled(fn (Get $get, ?Product $record): bool => ! self::offerVariantState(
+                        $record,
+                        $get('variant_id'),
+                    )['editable']),
+                TextInput::make('compare_at_net')
+                    ->label('Ціна до знижки')
+                    ->numeric()
+                    ->nullable()
+                    ->gt('sell_net')
+                    ->prefix(fn (Get $get, ?Product $record): string => self::offerVariantState(
+                        $record,
+                        $get('variant_id'),
+                    )['currency'])
+                    ->helperText('Необов’язково. Для акції має бути вищою за поточну ціну.')
+                    ->live(onBlur: true)
+                    ->disabled(fn (Get $get, ?Product $record): bool => ! self::offerVariantState(
+                        $record,
+                        $get('variant_id'),
+                    )['editable']),
+                Placeholder::make('offer_gross_preview')
+                    ->label('З ПДВ')
+                    ->content(function (Get $get): string {
+                        $sell = $get('sell_net');
+                        $compareAt = $get('compare_at_net');
+                        $vat = $get('effective_vat_rate');
+
+                        if (! is_numeric($sell) || ! is_numeric($vat)) {
+                            return '—';
+                        }
+
+                        $sellGross = round((float) $sell * (1 + (float) $vat / 100), 2);
+                        $label = number_format($sellGross, 2, '.', ' ');
+
+                        if (is_numeric($compareAt) && (float) $compareAt > (float) $sell) {
+                            $compareGross = round((float) $compareAt * (1 + (float) $vat / 100), 2);
+                            $label .= ' · до знижки '.number_format($compareGross, 2, '.', ' ');
+                        }
+
+                        return $label.' · ПДВ '.number_format((float) $vat, 2, '.', '').'%';
+                    }),
+            ])
+            ->action(function (array $data, ?Product $record): void {
+                if (! $record instanceof Product) {
+                    throw new Halt;
+                }
+
+                $actor = auth()->user();
+                abort_unless($actor instanceof User, 403);
+
+                $variantId = self::offerResolvedVariantId($record, $data['variant_id'] ?? null);
+                $variant = ProductVariant::withoutWorkspaceScope()
+                    ->where('workspace_id', $record->workspace_id)
+                    ->where('product_id', $record->id)
+                    ->where('is_active', true)
+                    ->whereKey($variantId)
+                    ->first();
+
+                if (! $variant instanceof ProductVariant) {
+                    Notification::make()
+                        ->danger()
+                        ->title('Варіант уже недоступний')
+                        ->body('Оновіть товар і повторіть дію.')
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                $offer = app(MasterOfferReadService::class)->state($variant);
+                if (! $offer['editable']) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Ціна лише для перегляду')
+                        ->body($offer['message'])
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                $workspace = Workspace::query()->findOrFail($record->workspace_id);
+
+                try {
+                    $item = app(MasterOfferMutationService::class)->setPrice(
+                        $actor,
+                        $workspace,
+                        $record,
+                        $variant,
+                        expectedItemId: $data['expected_item_id'] ?? null,
+                        expectedRegularNet: $data['expected_regular_net'] ?? null,
+                        expectedSaleNet: $data['expected_sale_net'] ?? null,
+                        sellNet: $data['sell_net'],
+                        compareAtNet: $data['compare_at_net'] ?? null,
+                    );
+                } catch (MasterOfferMutationException $exception) {
+                    Notification::make()
+                        ->warning()
+                        ->title('Ціну не змінено')
+                        ->body($exception->getMessage())
+                        ->send();
+
+                    throw new Halt;
+                }
+
+                $record->refresh();
+
+                $currentSell = $item->sale_price ?? $item->price;
+                Notification::make()
+                    ->success()
+                    ->title('Ціну оновлено')
+                    ->body('Поточна ціна: '.number_format((float) $currentSell, 2, '.', ' ').' '.$item->priceList?->currency)
+                    ->send();
+            });
+    }
+
+    private static function offerResolvedVariantId(Product $record, mixed $requestedVariantId): int
+    {
+        $options = self::offerVariantOptions($record);
+
+        if (count($options) === 1) {
+            return (int) array_key_first($options);
+        }
+
+        return is_numeric($requestedVariantId) ? (int) $requestedVariantId : 0;
+    }
+
+    /**
+     * @return array{
+     *   variant_id:?string,
+     *   expected_item_id:?string,
+     *   expected_regular_net:?string,
+     *   expected_sale_net:?string,
+     *   sell_net:?string,
+     *   compare_at_net:?string,
+     *   effective_vat_rate:?string
+     * }
+     */
+    private static function offerEditorFormState(?Product $record): array
+    {
+        $options = self::offerVariantOptions($record);
+        $variantId = array_key_first($options);
+        $offer = self::offerVariantState($record, $variantId);
+
+        return [
+            'variant_id' => $variantId !== null ? (string) $variantId : null,
+            'expected_item_id' => $offer['expected_item_id'],
+            'expected_regular_net' => $offer['expected_regular_net'],
+            'expected_sale_net' => $offer['expected_sale_net'],
+            'sell_net' => $offer['sell_net'],
+            'compare_at_net' => $offer['compare_at_net'],
+            'effective_vat_rate' => $offer['effective_vat_rate'],
+        ];
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private static function offerVariantOptions(?Product $record): array
+    {
+        if (! $record instanceof Product) {
+            return [];
+        }
+
+        $summary = app(ProductWorkspaceSummaryService::class)->variants($record);
+        $options = [];
+
+        foreach ($summary['rows'] as $index => $row) {
+            $parts = array_values(array_filter(
+                $row['options'],
+                static fn (string $value): bool => $value !== '' && $value !== '—',
+            ));
+            $label = $parts !== []
+                ? implode(' · ', $parts)
+                : ($summary['count'] > 1 ? 'Варіант '.($index + 1) : 'Товар');
+
+            if (filled($row['sku'])) {
+                $label .= ' · SKU '.$row['sku'];
+            }
+
+            $options[(string) $row['id']] = $label;
+        }
+
+        return $options;
+    }
+
+    /**
+     * @return array{
+     *   editable:bool,
+     *   state:string,
+     *   sell_net:?string,
+     *   compare_at_net:?string,
+     *   cost_net:?string,
+     *   sell_gross:?string,
+     *   compare_at_gross:?string,
+     *   currency:string,
+     *   effective_vat_rate:?string,
+     *   expected_item_id:?string,
+     *   expected_regular_net:?string,
+     *   expected_sale_net:?string,
+     *   expected_cost_net:?string,
+     *   message:string
+     * }
+     */
+    private static function offerVariantState(?Product $record, mixed $variantId): array
+    {
+        if (! $record instanceof Product || ! is_numeric($variantId)) {
+            return [
+                'editable' => false,
+                'state' => 'variant_required',
+                'sell_net' => null,
+                'compare_at_net' => null,
+                'cost_net' => null,
+                'sell_gross' => null,
+                'compare_at_gross' => null,
+                'currency' => 'UAH',
+                'effective_vat_rate' => null,
+                'expected_item_id' => null,
+                'expected_regular_net' => null,
+                'expected_sale_net' => null,
+                'expected_cost_net' => null,
+                'message' => 'Оберіть варіант.',
+            ];
+        }
+
+        $variant = ProductVariant::withoutWorkspaceScope()
+            ->where('workspace_id', $record->workspace_id)
+            ->where('product_id', $record->id)
+            ->where('is_active', true)
+            ->whereKey((int) $variantId)
+            ->first();
+
+        if (! $variant instanceof ProductVariant) {
+            return [
+                'editable' => false,
+                'state' => 'variant_unavailable',
+                'sell_net' => null,
+                'compare_at_net' => null,
+                'cost_net' => null,
+                'sell_gross' => null,
+                'compare_at_gross' => null,
+                'currency' => 'UAH',
+                'effective_vat_rate' => null,
+                'expected_item_id' => null,
+                'expected_regular_net' => null,
+                'expected_sale_net' => null,
+                'expected_cost_net' => null,
+                'message' => 'Варіант уже недоступний. Оновіть товар.',
+            ];
+        }
+
+        return app(MasterOfferReadService::class)->state($variant);
+    }
 
     private static function inventoryEditorAction(): Action
     {
