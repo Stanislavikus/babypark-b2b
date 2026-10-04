@@ -14,6 +14,10 @@ use App\Filament\Pages\Sync\ManageAdobeRemoteCatalog;
 use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\Pages\EditProduct;
 use App\Filament\Resources\ProductResource\Pages\ListProducts;
+use App\Models\AdobeProductAttributeSet;
+use App\Models\AdobeProductTypeAttributeSetDefault;
+use App\Models\Category;
+use App\Models\ConnectorCategoryMapping;
 use App\Models\ExternalRecordLink;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -21,6 +25,7 @@ use App\Models\SyncConfiguration;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceUser;
+use App\Services\Connectors\ConnectorDiscoverySourceResolver;
 use App\Services\Sync\ProductChannelSelectionService;
 use App\Services\Sync\SyncDataSetupLandingService;
 use App\Services\Sync\SyncProductSelectionService;
@@ -213,12 +218,86 @@ class ProductChannelWorkspaceUiTest extends TestCase
         Livewire::actingAs($this->actor)
             ->test(EditProduct::class, ['record' => $product->getRouteKey()])
             ->assertSee('Відкрити Magento V1')
+            ->assertSee('Потрібне налаштування')
+            ->assertSee('Не вибрано категорію Magento.')
+            ->assertSee('Не вибрано набір атрибутів Magento.')
+            ->assertSee('Для Magento тут показано лише стан класифікації.')
             ->assertActionVisible($action)
             ->assertActionHasUrl(
                 $action,
                 ManageAdobeProductsChannel::getUrl(['account' => $account->id]),
             )
             ->assertActionShouldOpenUrlInNewTab($action);
+    }
+
+    #[Test]
+    public function selected_magento_product_shows_ready_classification_without_claiming_publication_readiness(): void
+    {
+        $this->grantExactWorkspacePermissions($this->workspace, $this->actor, [
+            WorkspacePermissions::MANAGE_PRODUCTS,
+            WorkspacePermissions::VIEW_CONNECTOR_ACCOUNTS,
+            WorkspacePermissions::MANAGE_SYNC_CONFIGURATIONS,
+            WorkspacePermissions::RUN_SYNC_PREVIEW,
+        ]);
+
+        $account = $this->createConnectorAccount();
+        $configuration = $this->createProductsExportConfiguration($account->id);
+        $category = Category::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'name' => 'Ready category',
+        ]);
+        $product = $this->createProduct('MASTER-READY-CLASSIFICATION', [
+            'category_id' => $category->id,
+        ]);
+
+        ProductVariant::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'product_id' => $product->id,
+            'onec_guid' => null,
+            'sku' => 'MASTER-READY-CLASSIFICATION',
+            'attributes' => [],
+            'is_active' => true,
+        ]);
+
+        $source = app(ConnectorDiscoverySourceResolver::class)->resolve($account);
+        $attributeSet = AdobeProductAttributeSet::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'connector_schema_source_id' => $source->id,
+            'provider_attribute_set_id' => 4,
+            'name' => 'Default',
+            'first_seen_at' => now(),
+            'last_seen_at' => now(),
+            'missing_since' => null,
+        ]);
+
+        ConnectorCategoryMapping::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'category_id' => $category->id,
+            'external_category_id' => '12',
+        ]);
+
+        AdobeProductTypeAttributeSetDefault::withoutWorkspaceScope()->create([
+            'workspace_id' => $this->workspace->id,
+            'connector_account_id' => $account->id,
+            'product_type_id' => $product->product_type_id,
+            'adobe_product_attribute_set_id' => $attributeSet->id,
+        ]);
+
+        app(ProductChannelSelectionService::class)->add(
+            $this->actor,
+            $this->workspace,
+            $configuration->id,
+            [$product->id],
+        );
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->assertSee('Класифікація готова')
+            ->assertSee('Категорія та набір атрибутів Magento визначені.')
+            ->assertSee('Готовність до публікації перевіряється в каналі окремо.')
+            ->assertDontSee('Готовий до публікації');
     }
 
     #[Test]

@@ -30,6 +30,7 @@ use App\Services\Catalog\ProductWorkspaceSummaryService;
 use App\Services\Catalog\TagManager;
 use App\Services\Pricing\PricingSqlExpressions;
 use App\Services\Pricing\ProductPricingSummary;
+use App\Services\Sync\ProductChannelReadinessReadService;
 use App\Services\Sync\ProductChannelSelectionService;
 use App\Services\Workspace\WorkspaceAuthorization;
 use App\Support\AdminAvailabilityPresenter;
@@ -217,6 +218,7 @@ class ProductResource extends Resource
                         ->visible(fn (?Product $record): bool => $record !== null),
 
                     Section::make('Доставка та фізичні дані')
+                        ->description('Вага, габарити та упаковка. Варіантні правила доставки й backorder залишаються у Характеристиках.')
                         ->schema([
                             TextInput::make('net_weight')
                                 ->label('Вага нетто')
@@ -231,22 +233,58 @@ class ProductResource extends Resource
                             TextInput::make('width_mm')
                                 ->label('Ширина')
                                 ->numeric()
+                                ->integer()
+                                ->minValue(0)
                                 ->suffix('мм')
                                 ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
                             TextInput::make('height_mm')
                                 ->label('Висота')
                                 ->numeric()
+                                ->integer()
+                                ->minValue(0)
                                 ->suffix('мм')
                                 ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
                             TextInput::make('depth_mm')
                                 ->label('Глибина')
                                 ->numeric()
+                                ->integer()
+                                ->minValue(0)
                                 ->suffix('мм')
                                 ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
                             TextInput::make('volume_m3')
                                 ->label('Об’єм')
                                 ->numeric()
+                                ->minValue(0)
                                 ->suffix('м³')
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('package_quantity')
+                                ->label('Кількість в упаковці')
+                                ->numeric()
+                                ->integer()
+                                ->minValue(0)
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('package_type')
+                                ->label('Тип упаковки')
+                                ->maxLength(255)
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('units_per_box')
+                                ->label('Одиниць у коробці')
+                                ->numeric()
+                                ->integer()
+                                ->minValue(0)
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('boxes_per_pallet')
+                                ->label('Коробок на палеті')
+                                ->numeric()
+                                ->integer()
+                                ->minValue(0)
+                                ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
+                            TextInput::make('lead_time_days')
+                                ->label('Термін поставки')
+                                ->numeric()
+                                ->integer()
+                                ->minValue(0)
+                                ->suffix('днів')
                                 ->disabled(fn (?Product $record): bool => self::isSourceOwned($record)),
                         ])
                         ->columns(3)
@@ -346,12 +384,15 @@ class ProductResource extends Resource
                     Section::make('Статус')
                         ->schema([
                             Placeholder::make('workspace_lifecycle')
-                                ->label('Master')
+                                ->label('Стан у Master')
                                 ->content(fn (?Product $record): string => $record
-                                    ? ($record->is_active ? 'Активний' : 'Неактивний')
+                                    ? ($record->is_active ? 'Активний запис' : 'Неактивний запис')
                                     : 'Нова чернетка'),
+                            Placeholder::make('workspace_publication_boundary')
+                                ->label('Публікація')
+                                ->content('Окремо для кожного каналу'),
                             Placeholder::make('workspace_source')
-                                ->label('Джерело')
+                                ->label('Джерело даних')
                                 ->content(fn (?Product $record): string => self::isSourceOwned($record)
                                     ? '1С · авторитетне джерело'
                                     : 'Master Workspace'),
@@ -1607,7 +1648,7 @@ class ProductResource extends Resource
             '<div style="height:6px;border-radius:999px;background:#e5e7eb;margin-top:5px;overflow:hidden;">'.
                 '<div style="height:100%;width:'.$structure['percentage'].'%;background:currentColor;border-radius:999px;"></div>'.
             '</div>'.
-            '<div style="margin-top:8px;font-size:11px;color:#6b7280;">Інформаційно · не є готовністю конкретного каналу.</div>'
+            '<div style="margin-top:8px;font-size:11px;color:#6b7280;">Це повнота Master-даних, а не готовність конкретного каналу.</div>'
         );
     }
 
@@ -1617,24 +1658,45 @@ class ProductResource extends Resource
             return new HtmlString('—');
         }
 
-        $labels = app(ProductWorkspaceSummaryService::class)->channelLabels($record);
+        $channels = app(ProductChannelReadinessReadService::class)->rows($record);
 
-        if ($labels === []) {
+        if ($channels === []) {
             return new HtmlString(
                 '<div style="color:#6b7280;">Товар ще не додано до жодного каналу публікації.</div>'
             );
         }
 
-        $rows = collect($labels)
-            ->map(function (string $label): string {
-                return '<div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #f3f4f6;">'.
-                    '<span>'.e($label).'</span>'.
-                    '<span style="font-size:11px;color:#6b7280;white-space:nowrap;">Додано</span>'.
+        $hasMagento = false;
+        $rows = collect($channels)
+            ->map(function (array $channel) use (&$hasMagento): string {
+                $isMagento = $channel['platform'] === 'adobe_commerce';
+                $hasMagento = $hasMagento || $isMagento;
+
+                $statusColor = match ($channel['status_label']) {
+                    'Класифікація готова' => '#166534',
+                    'Потрібне налаштування', 'Потрібна перевірка' => '#92400e',
+                    default => '#6b7280',
+                };
+
+                $details = collect($channel['details'])
+                    ->map(fn (string $detail): string => '<div style="margin-top:3px;font-size:11px;color:#6b7280;">'.e($detail).'</div>')
+                    ->implode('');
+
+                return '<div style="padding:8px 0;border-bottom:1px solid #f3f4f6;">'.
+                    '<div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;">'.
+                        '<span>'.e($channel['label']).'</span>'.
+                        '<span style="font-size:11px;color:'.$statusColor.';white-space:nowrap;">'.e($channel['status_label']).'</span>'.
+                    '</div>'.
+                    $details.
                 '</div>';
             })
             ->implode('');
 
-        return new HtmlString($rows);
+        $footer = $hasMagento
+            ? '<div style="margin-top:7px;font-size:11px;color:#9ca3af;">Для Magento тут показано лише стан класифікації. Готовність до публікації перевіряється в каналі окремо.</div>'
+            : '';
+
+        return new HtmlString($rows.$footer);
     }
 
     private static function buildAttentionHtml(?Product $record): HtmlString
@@ -1666,7 +1728,7 @@ class ProductResource extends Resource
         return new HtmlString(
             '<div style="margin-bottom:6px;color:#92400e;">Потрібна увага до Master-даних</div>'.
             '<ul style="margin:0;padding-left:18px;color:#6b7280;">'.$items.$structureItem.'</ul>'.
-            '<div style="margin-top:6px;font-size:11px;color:#9ca3af;">Канальні помилки та readiness відображаються окремо.</div>'
+            '<div style="margin-top:6px;font-size:11px;color:#9ca3af;">Помилки та готовність каналів перевіряються окремо.</div>'
         );
     }
 

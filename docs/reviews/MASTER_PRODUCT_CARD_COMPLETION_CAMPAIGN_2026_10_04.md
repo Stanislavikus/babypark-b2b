@@ -301,3 +301,36 @@ Current runtime cannot be mapped to the approved distinct `SELL / COMPARE_AT / C
 - `base_price_cache` is resolver fallback;
 - `cost_price` is Variant internal cost.
 No newer [Resolved] mapping was found. Price code remains untouched until the requested Sonnet 5 semantic review returns.
+
+
+## Checkpoint — Slice 3 Physical / Shipping + right rail
+
+Completed:
+- Expanded the existing collapsed Physical/Shipping section with canonical Product-owned package/logistics facts already present in the domain:
+  - net/gross weight, width/height/depth, volume;
+  - package quantity/type, units per box, boxes per pallet, lead time.
+- Kept Variant-owned `shipping_required` and `backorder_policy` in governed Characteristics; no second shipping-policy owner was created.
+- Manual/source-neutral Product can edit these facts; source-owned/1C Product remains read-only under the existing Master authority boundary.
+- Clarified the Status rail so `products.is_active` is presented as **Master record state**, not publication lifecycle.
+- Added explicit merchant-visible boundary: publication is separate per channel.
+- Reworded data-quality/attention copy to remove technical `readiness` jargon and distinguish Master completeness from channel readiness.
+- Added read-only `ProductChannelReadinessReadService` over existing channel selection + `AdobeProductClassificationReadService`.
+- Magento channel row now exposes only **per-product classification** status:
+  - `Класифікація готова`;
+  - `Потрібне налаштування`;
+  - `Потрібна перевірка`.
+- Stable Magento classification blockers are translated into merchant-facing Ukrainian copy.
+- The card explicitly states that Magento classification status is **not** publication readiness; full publication checks remain in the Magento channel/Workbench.
+
+Evidence:
+- Physical/shipping + Master shell: 10 tests / 115 assertions PASS.
+- Channel readiness + Physical/shipping + Master shell final gate: 24 tests / 225 assertions PASS.
+- The first combined run found one stale shell assertion for the old text `Інформаційно · не є готовністю конкретного каналу.`; runtime behavior was correct. The test was updated to the approved SAVE/PUBLISH wording and the same gate passed.
+- Magento UI tests prove both unresolved classification (missing Magento category + attribute set) and ready classification, and prove the UI does not claim `Готовий до публікації`.
+- Pint changed files PASS.
+- `git diff --check` PASS.
+
+Next exact work:
+- inspect Characteristics / Variants / Product Media / Variant Media composition for duplicate or misleading pending states; reuse existing writers/actions only;
+- continue whole-card composition while PRICE AMBIGUITY HALT awaits Sonnet 5 response;
+- after Price is resolved, finish Offer editor, remove the final false pending state, then run simple/configurable whole-card browser flows and visual correction.

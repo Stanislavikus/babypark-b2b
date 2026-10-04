@@ -118,7 +118,9 @@ class MasterProductWorkspaceShellTest extends TestCase
             ->assertSee('Master Product · 1С · SKU WORKSPACE-001')
             ->assertSee('Простий товар')
             ->assertSee('2 медіа · поточний Master-набір')
-            ->assertSee('Інформаційно · не є готовністю конкретного каналу.');
+            ->assertSee('Стан у Master')
+            ->assertSee('Окремо для кожного каналу')
+            ->assertSee('Це повнота Master-даних, а не готовність конкретного каналу.');
     }
 
     #[Test]
