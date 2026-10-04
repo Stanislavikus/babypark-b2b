@@ -21,6 +21,11 @@ final class InventoryMutationException extends RuntimeException
         return new self('Залишок уже змінився. Оновіть товар і повторіть дію.');
     }
 
+    public static function sourceOwnedReadOnly(): self
+    {
+        return new self('Для товару або варіанта з джерелом 1С залишок у Master доступний лише для перегляду.');
+    }
+
     public static function reconciliationRequired(): self
     {
         return new self('Залишок потребує звірки перед редагуванням.');

@@ -20,20 +20,10 @@ return new class extends Migration
 
     public function down(): void
     {
-        $permissionIds = DB::table('workspace_permissions')
-            ->where('code', self::CODE)
-            ->pluck('id');
-
-        if ($permissionIds->isEmpty()) {
-            return;
-        }
-
-        DB::table('workspace_role_permissions')
-            ->whereIn('workspace_permission_id', $permissionIds)
-            ->delete();
-
-        DB::table('workspace_permissions')
-            ->whereIn('id', $permissionIds)
-            ->delete();
+        // Intentionally additive. The canonical permission may have been
+        // materialized before this migration by a seeder or deployment step,
+        // and merchant role assignments may have been added afterwards.
+        // Older application code fails closed because the code is absent from
+        // WorkspacePermissions::catalogue(), so preserving the row is safer.
     }
 };

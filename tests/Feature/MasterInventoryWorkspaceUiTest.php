@@ -95,6 +95,26 @@ final class MasterInventoryWorkspaceUiTest extends TestCase
     }
 
     #[Test]
+    public function source_owned_variant_inventory_field_is_read_only_even_on_manual_product(): void
+    {
+        [$product, $variant] = $this->productWithVariants([
+            ['sku' => 'VARIANT-SOURCE-OWNED-STOCK', 'cache' => 3],
+        ]);
+        $variant->update(['onec_guid' => '66666666-6666-4666-8666-666666666666']);
+
+        $action = TestAction::make('edit_inventory')
+            ->schemaComponent('inventory_actions');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->assertActionVisible($action)
+            ->mountAction($action)
+            ->assertActionMounted($action)
+            ->assertFormFieldHidden('variant_id')
+            ->assertFormFieldDisabled('new_quantity');
+    }
+
+    #[Test]
     public function configurable_product_inventory_action_updates_only_selected_variant(): void
     {
         [$product, $first, $second] = $this->productWithVariants([

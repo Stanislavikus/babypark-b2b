@@ -298,6 +298,30 @@ final class MasterOfferWorkspaceUiTest extends TestCase
             ->assertActionDisabled($action);
     }
 
+    #[Test]
+    public function source_owned_variant_offer_fields_are_read_only_even_on_manual_product(): void
+    {
+        [$product, $variant] = $this->productWithVariants([
+            ['sku' => 'VARIANT-SOURCE-OWNED-OFFER'],
+        ]);
+        $variant->update(['onec_guid' => '55555555-5555-4555-8555-555555555555']);
+        $this->priceItem($variant, '120.00', '90.00');
+        $this->grantCostPermission();
+
+        $action = TestAction::make('edit_offer')
+            ->schemaComponent('offer_actions');
+
+        Livewire::actingAs($this->actor)
+            ->test(EditProduct::class, ['record' => $product->getRouteKey()])
+            ->assertActionVisible($action)
+            ->mountAction($action)
+            ->assertActionMounted($action)
+            ->assertFormFieldHidden('variant_id')
+            ->assertFormFieldDisabled('sell_net')
+            ->assertFormFieldDisabled('compare_at_net')
+            ->assertFormFieldDisabled('cost_net');
+    }
+
     /**
      * @param  list<array{sku:?string}>  $variants
      * @return array<int, Product|ProductVariant>

@@ -14,6 +14,7 @@ use App\Models\Stock;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Availability\MasterInventoryMutationService;
+use App\Services\Availability\MasterInventoryReadService;
 use App\Support\Workspace\WorkspacePermissions;
 use Database\Seeders\WorkspaceRbacPermissionSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -202,6 +203,64 @@ final class MasterInventoryMutationServiceTest extends TestCase
             expectedQuantity: 0,
             newQuantity: 3,
         );
+    }
+
+    #[Test]
+    public function source_owned_product_is_fail_closed_for_inventory_writer(): void
+    {
+        [$product, $variant] = $this->manualProductWithVariant(0);
+        $product->update(['onec_guid' => '33333333-3333-4333-8333-333333333333']);
+
+        $this->expectException(InventoryMutationException::class);
+        $this->expectExceptionMessage('1С');
+
+        try {
+            app(MasterInventoryMutationService::class)->setQuantity(
+                $this->actor,
+                $this->workspace,
+                $product->fresh(),
+                $variant,
+                expectedQuantity: 0,
+                newQuantity: 4,
+            );
+        } finally {
+            $this->assertSame(0, InventoryLocation::withoutWorkspaceScope()->count());
+            $this->assertSame(0, Stock::withoutWorkspaceScope()->count());
+            $this->assertSame(0, InventoryRecord::withoutWorkspaceScope()->count());
+        }
+    }
+
+    #[Test]
+    public function source_owned_variant_is_read_only_and_fail_closed_for_inventory_writer(): void
+    {
+        [$product, $variant] = $this->manualProductWithVariant(3);
+        $variant->update(['onec_guid' => '44444444-4444-4444-8444-444444444444']);
+        $stock = $this->stock($variant, 3);
+
+        $state = app(MasterInventoryReadService::class)
+            ->state($variant->fresh());
+
+        $this->assertFalse($state['editable']);
+        $this->assertSame('source_owned_read_only', $state['state']);
+        $this->assertSame(3, $state['current_quantity']);
+
+        $this->expectException(InventoryMutationException::class);
+        $this->expectExceptionMessage('1С');
+
+        try {
+            app(MasterInventoryMutationService::class)->setQuantity(
+                $this->actor,
+                $this->workspace,
+                $product,
+                $variant->fresh(),
+                expectedQuantity: 3,
+                newQuantity: 5,
+            );
+        } finally {
+            $this->assertSame(3, $stock->fresh()->quantity);
+            $this->assertSame(3, $variant->fresh()->available_quantity_cache);
+            $this->assertSame(0, InventoryRecord::withoutWorkspaceScope()->count());
+        }
     }
 
     #[Test]

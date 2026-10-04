@@ -533,3 +533,127 @@ Visual-evidence boundary:
 - the current connected Remote Desktop/repository tool stack exposes no browser/screenshot runner;
 - `composer.json` contains no Dusk/Playwright browser suite;
 - therefore final deployed visual/design acceptance remains a separate Product Owner gate and is not inferred from Livewire rendering tests.
+
+
+## Candidate adversarial Lead review — ORANGE seams
+
+### Finding A — destructive COST permission rollback
+
+Classification: **BLOCKER — fixed in branch**.
+
+Counterexample / trace:
+
+1. `manage_product_cost` is a canonical permission that may already exist because the RBAC catalogue seeder ran before this migration.
+2. A merchant may then assign that permission to one or more Workspace roles.
+3. The original migration `down()` deleted all role-permission assignments for the code and then deleted the permission row.
+4. Therefore rolling back application code could destroy merchant RBAC configuration that the migration did not necessarily create.
+
+Violated invariant:
+
+- **RBAC rollback must not delete pre-existing canonical authority or merchant role assignments when provenance is unknowable.**
+
+Minimal fix:
+
+- make the COST permission migration additive on rollback, matching the later Product permission materialization migration;
+- preserve the canonical row and role assignments;
+- rely on older application code's fail-closed catalogue check when the permission code is no longer recognized.
+
+Regression:
+
+- migration still materializes `manage_product_cost` with no automatic role grant;
+- explicit rollback test creates a role assignment, runs `down()`, and proves both permission and assignment remain.
+
+### Finding B — source-owned Offer / Inventory writer bypass
+
+Classification: **BLOCKER — fixed in branch**.
+
+Counterexample / trace:
+
+1. Existing Product Structure authority already treats either `Product.onec_guid` or a Variant `onec_guid` as source ownership for manual shape mutation.
+2. Master Offer originally checked only Product `onec_guid`.
+3. Master Inventory relied on a Product-level disabled UI action and had no source-ownership check inside the writer service.
+4. Therefore a direct service call could mutate Inventory for a 1C-owned Product, and a manual Product containing a source-owned target Variant could receive manual Offer/Inventory writes for that Variant.
+
+Violated invariant:
+
+- **Source-owned Product/target Variant mutations fail closed until an explicit authority/writeback contract exists. UI disablement is not writer authorization.**
+
+Minimal fix:
+
+- after deterministic Product/Variant locks, both Offer and Inventory writers reject when either the locked Product or target Variant has a source reference;
+- Offer/Inventory read state marks a source-owned target Variant read-only while preserving current values for display;
+- COST input follows the same Offer `editable` state and is visually disabled;
+- a source-owned sibling does not automatically block a different manual target Variant; Offer/Inventory authority is evaluated on the concrete target while Product Structure retains its stricter whole-shape rule.
+
+Regression:
+
+- direct source-owned Product Inventory write fails before location/Stock/ledger creation;
+- direct source-owned Variant Inventory write leaves Stock/cache/ledger unchanged;
+- source-owned Variant Offer retains existing SELL/COMPARE_AT for display and rejects mutation without changing the PriceListItem;
+- UI tests prove SELL / COMPARE_AT / COST and quantity fields become read-only for a source-owned target Variant.
+
+Focused authority/RBAC evidence after correction:
+
+- COST migration + Offer domain/UI + Inventory domain/UI:
+  **38 tests / 281 assertions PASS**.
+
+### Finding C — money value beyond physical DECIMAL(15,2) storage
+
+Classification: **SHOULD FIX — fixed in branch**.
+
+Counterexample / trace:
+
+- numeric input such as `1e20` passes PHP numeric validation and was normalized before MySQL rejected it as outside the existing `DECIMAL(15,2)` storage range.
+
+Violated quality boundary:
+
+- **Master Offer writer rejects invalid merchant input as a domain error before persistence rather than surfacing a storage-layer failure.**
+
+Minimal fix:
+
+- enforce the existing physical maximum `9999999999999.99` for SELL, COMPARE_AT and COST in the common money normalizer;
+- do not alter schema, currency semantics or PriceResolver behavior.
+
+Regression:
+
+- oversized SELL, COMPARE_AT and COST are rejected before any PriceListItem/COST mutation;
+- normal pricing regression remains green.
+
+### Reservation / concurrency challenge
+
+Classification: **NON-BLOCKING — architecture retained**.
+
+Trace reviewed:
+
+- Creator: Variant -> pending Reservations;
+- Confirmer: Variant -> ordered Stock rows -> target Reservation -> ledger;
+- Releaser: target Reservation only, with no reverse wait on Variant;
+- confirmer re-checks target Variant identity, status and expiry after acquiring the Reservation lock;
+- insufficient cache balance rejects rather than truncates;
+- when one Stock row matches cache, Stock and cache decrement together;
+- legacy Stock/cache mismatch stays on the compatibility path instead of being silently reconciled;
+- pending reservation quantity is removed from the pending set when cache is decremented, so availability is not subtracted twice.
+
+Focused Availability regression:
+- Reservation/availability service suite green after review; no new lock-order or double-subtraction counterexample found.
+
+No architecture change or external-model escalation was required because all findings resolved directly against frozen authority/RBAC/storage contracts.
+
+
+### Candidate local gate after adversarial fixes
+
+Current branch regression after Findings A–C:
+
+- expanded Master Product + RBAC + Availability + Pricing + order regression:
+  **198 tests / 1,573 assertions PASS**;
+- focused Offer + Reservation/Availability suite:
+  **29 tests / 115 assertions PASS**;
+- fresh disposable MySQL 8 concurrency proof on the current working tree:
+  **1 test / 18 assertions PASS**;
+  - simultaneous manual inventory edits from expected 0 still produce exactly one success and one stale result;
+  - one Stock row, one ledger movement and one deterministic internal default location remain;
+  - simultaneous confirmation of two qty=6 reservations against balance 10 still produces exactly one confirmed and one insufficient result;
+  - final Stock/cache remains 4 with no oversell;
+- disposable MySQL database was removed after the proof.
+
+The earlier GitHub MySQL run on `0d6f818` is now stale by definition because this review produced additional fixes. Final CI evidence must be taken only from the workflow started for the next pushed exact HEAD.

@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\DB;
 
 final class MasterOfferMutationService
 {
+    private const MAX_MONEY = '9999999999999.99';
+
     public function __construct(
         private readonly WorkspaceAuthorization $authorization,
     ) {}
@@ -87,10 +89,6 @@ final class MasterOfferMutationService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (filled($lockedProduct->onec_guid)) {
-                throw MasterOfferMutationException::sourceOwnedReadOnly();
-            }
-
             $lockedVariant = ProductVariant::withoutWorkspaceScope()
                 ->where('workspace_id', $lockedWorkspace->id)
                 ->where('product_id', $lockedProduct->id)
@@ -100,6 +98,10 @@ final class MasterOfferMutationService
 
             if (! $lockedVariant instanceof ProductVariant) {
                 throw MasterOfferMutationException::variantUnavailable();
+            }
+
+            if (filled($lockedProduct->onec_guid) || filled($lockedVariant->onec_guid)) {
+                throw MasterOfferMutationException::sourceOwnedReadOnly();
             }
 
             if ($writeCost && ! $this->sameMoney($lockedVariant->cost_price, $expectedCostNet)) {
@@ -227,7 +229,7 @@ final class MasterOfferMutationService
             throw MasterOfferMutationException::invalidSellPrice();
         }
 
-        return number_format((float) $value, 2, '.', '');
+        return $this->normalizeStorageMoney($value);
     }
 
     private function normalizeNullableMoney(string|float|int|null $value): ?string
@@ -240,7 +242,7 @@ final class MasterOfferMutationService
             throw MasterOfferMutationException::invalidCompareAtPrice();
         }
 
-        return number_format((float) $value, 2, '.', '');
+        return $this->normalizeStorageMoney($value);
     }
 
     private function normalizeNullableCost(string|float|int|null $value): ?string
@@ -253,6 +255,23 @@ final class MasterOfferMutationService
             throw MasterOfferMutationException::invalidCostPrice();
         }
 
-        return number_format((float) $value, 2, '.', '');
+        return $this->normalizeStorageMoney($value);
+    }
+
+    private function normalizeStorageMoney(string|float|int $value): string
+    {
+        $numeric = (float) $value;
+
+        if (! is_finite($numeric)) {
+            throw MasterOfferMutationException::amountOutOfRange();
+        }
+
+        $normalized = number_format($numeric, 2, '.', '');
+
+        if (bccomp($normalized, self::MAX_MONEY, 2) > 0) {
+            throw MasterOfferMutationException::amountOutOfRange();
+        }
+
+        return $normalized;
     }
 }

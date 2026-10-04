@@ -197,6 +197,50 @@ final class MasterOfferMutationServiceTest extends TestCase
     }
 
     #[Test]
+    public function amounts_outside_decimal_storage_range_are_rejected_before_write(): void
+    {
+        [$product, $variant] = $this->manualProductWithVariant();
+        $this->grantCostPermission();
+
+        $attempts = [
+            ['1e20', null, false, null],
+            ['100.00', '1e20', false, null],
+            ['100.00', null, true, '1e20'],
+        ];
+
+        foreach ($attempts as [$sell, $compareAt, $writeCost, $cost]) {
+            try {
+                app(MasterOfferMutationService::class)->setPrice(
+                    $this->actor,
+                    $this->workspace,
+                    $product,
+                    $variant->fresh(),
+                    expectedItemId: null,
+                    expectedRegularNet: null,
+                    expectedSaleNet: null,
+                    sellNet: $sell,
+                    compareAtNet: $compareAt,
+                    writeCost: $writeCost,
+                    expectedCostNet: null,
+                    costNet: $cost,
+                );
+
+                $this->fail('Expected out-of-range money amount to be rejected.');
+            } catch (MasterOfferMutationException $exception) {
+                $this->assertStringContainsString('завелика', $exception->getMessage());
+            }
+
+            $this->assertSame(
+                0,
+                PriceListItem::withoutWorkspaceScope()
+                    ->where('product_variant_id', $variant->id)
+                    ->count(),
+            );
+            $this->assertSame('40.00', (string) $variant->fresh()->cost_price);
+        }
+    }
+
+    #[Test]
     public function stale_reviewed_offer_is_rejected_atomically(): void
     {
         [$product, $variant] = $this->manualProductWithVariant();
@@ -443,6 +487,41 @@ final class MasterOfferMutationServiceTest extends TestCase
             sellNet: '100.00',
             compareAtNet: null,
         );
+    }
+
+    #[Test]
+    public function source_owned_variant_is_read_only_and_rejects_master_price_write(): void
+    {
+        [$product, $variant] = $this->manualProductWithVariant();
+        $variant->update(['onec_guid' => '22222222-2222-4222-8222-222222222222']);
+        $item = $this->priceItem($variant, '120.00', '90.00');
+
+        $state = app(MasterOfferReadService::class)->state($variant->fresh());
+
+        $this->assertFalse($state['editable']);
+        $this->assertSame('source_owned_read_only', $state['state']);
+        $this->assertSame('90.00', $state['sell_net']);
+        $this->assertSame('120.00', $state['compare_at_net']);
+
+        $this->expectException(MasterOfferMutationException::class);
+        $this->expectExceptionMessage('1С');
+
+        try {
+            app(MasterOfferMutationService::class)->setPrice(
+                $this->actor,
+                $this->workspace,
+                $product,
+                $variant->fresh(),
+                expectedItemId: $item->id,
+                expectedRegularNet: '120.00',
+                expectedSaleNet: '90.00',
+                sellNet: '95.00',
+                compareAtNet: '125.00',
+            );
+        } finally {
+            $this->assertSame('120.00', (string) $item->fresh()->price);
+            $this->assertSame('90.00', (string) $item->fresh()->sale_price);
+        }
     }
 
     #[Test]

@@ -1190,7 +1190,11 @@ class ProductResource extends Resource
                         $get('variant_id'),
                     )['currency'])
                     ->helperText('Внутрішня собівартість без ПДВ. Доступна лише ролям з окремим дозволом.')
-                    ->visible(fn (?Product $record): bool => self::canManageProductCost($record)),
+                    ->visible(fn (?Product $record): bool => self::canManageProductCost($record))
+                    ->disabled(fn (Get $get, ?Product $record): bool => ! self::offerVariantState(
+                        $record,
+                        $get('variant_id'),
+                    )['editable']),
                 Placeholder::make('offer_gross_preview')
                     ->label('З ПДВ')
                     ->content(function (Get $get): string {

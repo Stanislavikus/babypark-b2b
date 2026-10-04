@@ -39,6 +39,8 @@ final class MasterOfferReadService
     public function state(ProductVariant $variant): array
     {
         $workspace = Workspace::query()->findOrFail($variant->workspace_id);
+        $sourceOwned = filled($variant->onec_guid);
+
         $lists = PriceList::withoutWorkspaceScope()
             ->where('workspace_id', $variant->workspace_id)
             ->where('is_default', true)
@@ -97,13 +99,15 @@ final class MasterOfferReadService
             }
 
             return $this->result(
-                editable: true,
-                state: 'editable',
+                editable: ! $sourceOwned,
+                state: $sourceOwned ? 'source_owned_read_only' : 'editable',
                 variant: $variant,
                 currency: $priceList->currency,
                 item: $item,
                 workspace: $workspace,
-                message: 'Ціну можна редагувати.',
+                message: $sourceOwned
+                    ? 'Для варіанта з джерелом 1С ціна в Master доступна лише для перегляду.'
+                    : 'Ціну можна редагувати.',
             );
         }
 
@@ -121,8 +125,8 @@ final class MasterOfferReadService
         }
 
         return [
-            'editable' => true,
-            'state' => 'ready_to_materialize',
+            'editable' => ! $sourceOwned,
+            'state' => $sourceOwned ? 'source_owned_read_only' : 'ready_to_materialize',
             'sell_net' => $sell,
             'compare_at_net' => null,
             'cost_net' => $variant->cost_price !== null ? $this->money($variant->cost_price) : null,
@@ -134,7 +138,9 @@ final class MasterOfferReadService
             'expected_regular_net' => null,
             'expected_sale_net' => null,
             'expected_cost_net' => $variant->cost_price !== null ? $this->money($variant->cost_price) : null,
-            'message' => 'Після збереження буде створено базову ціну в основному прайсі компанії.',
+            'message' => $sourceOwned
+                ? 'Для варіанта з джерелом 1С ціна в Master доступна лише для перегляду.'
+                : 'Після збереження буде створено базову ціну в основному прайсі компанії.',
         ];
     }
 

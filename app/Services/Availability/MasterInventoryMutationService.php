@@ -75,6 +75,10 @@ final class MasterInventoryMutationService
                 throw InventoryMutationException::variantUnavailable();
             }
 
+            if (filled($lockedProduct->onec_guid) || filled($lockedVariant->onec_guid)) {
+                throw InventoryMutationException::sourceOwnedReadOnly();
+            }
+
             $stocks = $this->lockedStocks($lockedVariant);
 
             if ($stocks->count() > 1) {

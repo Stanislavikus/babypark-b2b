@@ -27,6 +27,18 @@ final class MasterInventoryReadService
         $cache = (int) $variant->available_quantity_cache;
         $pending = $this->availabilityResolver->activePendingReservationsSum($variant);
         $net = max(0, $cache - $pending);
+
+        if (filled($variant->onec_guid)) {
+            return $this->result(
+                editable: false,
+                state: 'source_owned_read_only',
+                currentQuantity: $cache,
+                netAvailable: $net,
+                pendingQuantity: $pending,
+                message: 'Для варіанта з джерелом 1С залишок у Master доступний лише для перегляду.',
+            );
+        }
+
         $stocks = $variant->stocks->values();
 
         if ($stocks->isEmpty()) {

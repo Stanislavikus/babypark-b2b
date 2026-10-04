@@ -21,6 +21,11 @@ final class MasterOfferMutationException extends RuntimeException
         return new self('Собівартість не може бути від’ємною.');
     }
 
+    public static function amountOutOfRange(): self
+    {
+        return new self('Сума завелика для збереження.');
+    }
+
     public static function defaultPriceListUnavailable(): self
     {
         return new self('Основний прайс компанії недоступний або налаштований неоднозначно.');
@@ -33,7 +38,7 @@ final class MasterOfferMutationException extends RuntimeException
 
     public static function sourceOwnedReadOnly(): self
     {
-        return new self('Для товару з джерелом 1С ціна в Master поки доступна лише для перегляду.');
+        return new self('Для товару або варіанта з джерелом 1С ціна в Master доступна лише для перегляду.');
     }
 
     public static function advancedPriceListState(): self
